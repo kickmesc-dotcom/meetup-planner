@@ -1,0 +1,127 @@
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class AutoPickRequest(BaseModel):
+    """Request body for /api/meetings/auto-pick."""
+
+    window_start: datetime
+    window_end: datetime
+    duration_minutes: int = Field(120, ge=30, le=24 * 60)
+    step_minutes: int = Field(60, ge=15, le=24 * 60)
+    top_n: int = Field(5, ge=1, le=20)
+
+
+class AutoPickSlotOut(BaseModel):
+    starts_at: datetime
+    ends_at: datetime
+    score: float
+    available_user_ids: list[int]
+    maybe_user_ids: list[int]
+
+
+class AutoPickResponse(BaseModel):
+    slots: list[AutoPickSlotOut]
+
+
+class MeetingCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    starts_at: datetime
+    ends_at: datetime
+    location: str | None = None
+    auto_picked: bool = False
+    score: float | None = None
+
+
+class MeetingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    created_by: int
+    title: str
+    starts_at: datetime
+    ends_at: datetime
+    location: str | None = None
+    status: str
+    auto_picked: bool
+    score: float | None = None
+
+
+class RsvpRequest(BaseModel):
+    rsvp: int = Field(..., ge=0, le=3)  # 0=не ответил, 1=да, 2=может, 3=нет
+
+
+class MeetingAttendeeOut(BaseModel):
+    user_id: int
+    rsvp: int
+
+
+class MeetingDetail(MeetingOut):
+    attendees: list[MeetingAttendeeOut]
+    my_rsvp: int = 0
+
+
+class LoserRollOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    rolled_at: datetime
+    rolled_by: int
+    loser_user_id: int
+    reason_text: str | None = None
+
+
+class LoserStatsOut(BaseModel):
+    counts: dict[int, int]
+    last: LoserRollOut | None
+    cooldown_remaining_seconds: int
+
+
+class LoserRollResponse(BaseModel):
+    roll: LoserRollOut
+    sent_to_chat: bool
+
+
+class PollCreateRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=255)
+    options: list[datetime] = Field(..., min_length=2, max_length=5)
+    closes_in_hours: int | None = Field(None, ge=1, le=72)
+    chat_id: int | None = None
+
+
+class PollAutoPickRequest(BaseModel):
+    """Авто-публикация TG-опроса по найденным top-N слотам."""
+
+    window_start: datetime
+    window_end: datetime
+    duration_minutes: int = Field(120, ge=30, le=24 * 60)
+    step_minutes: int = Field(60, ge=15, le=24 * 60)
+    top_n: int = Field(3, ge=2, le=5)
+    question: str = Field("Когда соберёмся?", min_length=1, max_length=255)
+    closes_in_hours: int | None = Field(24, ge=1, le=72)
+    chat_id: int | None = None
+
+
+class PollOptionOut(BaseModel):
+    id: int
+    starts_at: datetime
+    label: str | None = None
+    voter_user_ids: list[int] = []
+
+
+class PollOut(BaseModel):
+    id: int
+    question: str
+    closes_at: datetime | None
+    options: list[PollOptionOut]
+    my_vote_option_id: int | None = None
+
+
+def fmt_remaining(td: timedelta) -> str:
+    total = int(td.total_seconds())
+    h, rem = divmod(total, 3600)
+    m, _ = divmod(rem, 60)
+    return f"{h}ч {m}мин" if h else f"{m}мин"

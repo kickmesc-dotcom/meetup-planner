@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  overscroll-behavior-x: contain;
+}
+
+/* Контейнер календаря: отключаем горизонтальный rubber-band, чтобы за
+   пределами окна не светились пустые полоски. Жесты вешаются через JS. */
+.calendar-pan-container {
+  touch-action: pan-y;
+  overscroll-behavior-x: contain;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Фикс видимости текста в полях ввода */
+input, textarea, select {
+  @apply text-black bg-white border-gray-300; /* Используем Tailwind классы через @apply */
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+/* Для мобильных устройств убираем внутренние тени iOS */
+input {
+  -webkit-appearance: none;
+  border-radius: 8px;
+}
+
+/* Позволяем имени занимать больше места и не превращаться в три точки слишком рано */
+header .text-base.font-medium {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
