@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchAutoLoser, updateAutoLoser, type AutoLoserSettings } from "@/api/admin";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Toggle } from "@/components/Checkbox";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -16,12 +19,23 @@ export default function AutoLoserScreen({ onBack }: Props) {
 
   const save = useMutation({
     mutationFn: updateAutoLoser,
+    // U3: оптимистический update — сразу пишем в кэш, на error откатываем.
+    onMutate: async (next) => {
+      await qc.cancelQueries({ queryKey: ["admin", "autoloser"] });
+      const prev = qc.getQueryData<AutoLoserSettings>(["admin", "autoloser"]);
+      qc.setQueryData<AutoLoserSettings>(["admin", "autoloser"], next);
+      return { prev };
+    },
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "autoloser"] });
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
     },
-    onError: () => haptic("error"),
+    onError: (e, _vars, ctx) => {
+      haptic("error");
+      if (ctx?.prev) qc.setQueryData(["admin", "autoloser"], ctx.prev);
+      void showAlert(humanizeApiError(e));
+    },
   });
 
   return (
@@ -91,24 +105,11 @@ function AutoLoserForm({
   return (
     <>
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
-        <label
-          className={`flex items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors ${
-            enabled ? "bg-status-free/10" : "bg-tg-bg/40"
-          }`}
-        >
-          <span className="text-sm font-medium text-tg-text">
-            {enabled ? "🤖 Автолох включён" : "💤 Автолох выключен"}
-          </span>
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => {
-              haptic("selection");
-              setEnabled(e.target.checked);
-            }}
-            className="h-6 w-6 accent-status-free"
-          />
-        </label>
+        <Toggle
+          checked={enabled}
+          onChange={setEnabled}
+          label={enabled ? "🤖 Автолох включён" : "💤 Автолох выключен"}
+        />
 
         <div>
           <div className="text-base font-semibold mb-1">🕐 Окно времени</div>
@@ -139,8 +140,9 @@ function AutoLoserForm({
         type="button"
         disabled={!dirty || isPending}
         onClick={() => onSave(body)}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
+        {isPending && <Spinner />}
         {isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
       </button>
     </>

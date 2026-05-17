@@ -18,6 +18,7 @@ dependencies = [
     "aiosqlite==0.20.0",
     "apscheduler==3.10.4",
     "tzdata==2024.2",
+    "aiohttp-socks==0.10.1",
 ]
 
 [project.optional-dependencies]

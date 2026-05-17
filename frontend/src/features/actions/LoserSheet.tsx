@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { fetchLoserStats, rollLoser } from "@/api/meetings";
 import { fetchUsers } from "@/api/availability";
 import { useUI } from "@/store/ui";
-import { haptic } from "@/tg/webapp";
-import { ApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
+import { ApiError, humanizeApiError } from "@/api/client";
 import BottomSheet from "./BottomSheet";
 
 function fmtRemaining(seconds: number): string {
@@ -71,19 +71,25 @@ export default function LoserSheet() {
     },
     onSuccess: () => {
       stopSpin();
-      haptic("heavy");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["loser-stats"] });
       qc.invalidateQueries({ queryKey: ["loser", "stats"] });
       setError(null);
     },
     onError: (e) => {
       stopSpin();
+      haptic("error");
+      // Cooldown — мягкая inline-плашка, без модалки.
       if (e instanceof ApiError && e.detail.startsWith("cooldown:")) {
         const sec = Number(e.detail.split(":")[1] ?? 0);
         setError(`Подожди ещё ${fmtRemaining(sec)}.`);
-      } else {
-        setError(e instanceof Error ? e.message : "Ошибка");
+        return;
       }
+      const human = humanizeApiError(e);
+      setError(human);
+      // Реальные ошибки сети/TG — показываем нативный алерт, иначе юзер
+      // думает что «бот молчит» и не понимает что сделать.
+      void showAlert(human);
     },
   });
 

@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
     routes_admin,
     routes_availability,
+    routes_birthdays,
     routes_meetings,
     routes_polls,
     routes_users,
@@ -135,6 +136,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     sm = get_sessionmaker()
     async with sm() as session:
         await seed_users(session)
+        # P2: bootstrap proxy pool из env (PROXIES_BOOTSTRAP_JSON), если задан.
+        try:
+            from app.services.proxies import bootstrap_from_env
+            await bootstrap_from_env(session)
+        except Exception as exc:  # noqa: BLE001
+            structlog.get_logger().warning("proxy.bootstrap_failed", error=str(exc))
         
         # РЕЗЕРВНЫЙ ШАГ: Синхронизация аватарок отключена для ускорения запуска
         # try:
@@ -180,6 +187,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_availability.router, prefix="/api")
     app.include_router(routes_meetings.router, prefix="/api")
     app.include_router(routes_polls.router, prefix="/api")
+    app.include_router(routes_birthdays.router, prefix="/api")
     app.include_router(routes_admin.router, prefix="/api")
 
     @app.get("/healthz")

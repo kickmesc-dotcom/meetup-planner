@@ -44,4 +44,23 @@ export function haptic(kind: HapticKind = "light"): void {
   }
 }
 
+/**
+ * Показать нативный Telegram-алерт. Возвращает Promise, который резолвится
+ * после нажатия OK. Вне Telegram — fallback на window.alert.
+ */
+export function showAlert(message: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      WebApp.showAlert(message, () => resolve());
+    } catch {
+      try {
+        window.alert(message);
+      } catch {
+        // no-op
+      }
+      resolve();
+    }
+  });
+}
+
 export { WebApp };

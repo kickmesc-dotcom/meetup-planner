@@ -10,6 +10,8 @@ import RandomPhrasesGeneratorScreen from "./RandomPhrasesGeneratorScreen";
 import AutoLoserScreen from "./AutoLoserScreen";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
+import PollPresetsScreen from "./PollPresetsScreen";
+import ProxyScreen from "./ProxyScreen";
 
 type Section =
   | "root"
@@ -19,7 +21,9 @@ type Section =
   | "rp-generator"
   | "autoloser"
   | "history"
-  | "birthdays";
+  | "birthdays"
+  | "poll-presets"
+  | "proxy";
 
 interface Props {
   users: User[];
@@ -51,6 +55,8 @@ export default function AdminScreen({ users }: Props) {
   if (section === "autoloser") return <AutoLoserScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
+  if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
+  if (section === "proxy") return <ProxyScreen onBack={back} />;
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-3">
@@ -175,6 +181,24 @@ export default function AdminScreen({ users }: Props) {
         onClick={() => {
           haptic("selection");
           setSection("birthdays");
+        }}
+      />
+      <Card
+        icon="🕒"
+        title="Пресеты времени"
+        subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
+        onClick={() => {
+          haptic("selection");
+          setSection("poll-presets");
+        }}
+      />
+      <Card
+        icon="🌐"
+        title="Прокси"
+        subtitle="Пул прокси для отправки сообщений (fallback при сетевых сбоях)"
+        onClick={() => {
+          haptic("selection");
+          setSection("proxy");
         }}
       />
       <Card

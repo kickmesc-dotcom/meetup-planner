@@ -7,18 +7,24 @@ import {
   type AutoPickSlot,
 } from "@/api/meetings";
 import { fetchUsers } from "@/api/availability";
+import { fetchPollPresetsPublic } from "@/api/admin";
 import { useUI } from "@/store/ui";
-import { haptic } from "@/tg/webapp";
+import { haptic, showAlert } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
 import BottomSheet from "./BottomSheet";
 
 export default function AutoPickSheet() {
   const close = () => useUI.getState().setShowAutoPickSheet(false);
-  const [duration, setDuration] = useState(120);
   const [windowDays, setWindowDays] = useState(14);
   const [slots, setSlots] = useState<AutoPickSlot[] | null>(null);
 
   const usersQ = useQuery({ queryKey: ["users"], queryFn: fetchUsers, staleTime: 60_000 });
   const usersById = new Map((usersQ.data ?? []).map((u) => [u.id, u]));
+  const presetsQ = useQuery({
+    queryKey: ["poll-presets"],
+    queryFn: fetchPollPresetsPublic,
+    staleTime: 60_000,
+  });
   const qc = useQueryClient();
   const [pollMsg, setPollMsg] = useState<string | null>(null);
 
@@ -28,16 +34,21 @@ export default function AutoPickSheet() {
       return autoPick({
         window_start: start.toISOString(),
         window_end: addDays(start, windowDays).toISOString(),
-        duration_minutes: duration,
+        // Длительность/шаг игнорируются бэком (use_presets=true по умолчанию),
+        // но в схеме обязательные поля → передаём заглушку.
+        duration_minutes: 120,
         step_minutes: 60,
         top_n: 5,
       });
     },
     onSuccess: (resp) => {
-      haptic("medium");
+      haptic("success");
       setSlots(resp.slots);
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
 
   const pollMut = useMutation({
@@ -46,7 +57,7 @@ export default function AutoPickSheet() {
       return createAutoPickPoll({
         window_start: start.toISOString(),
         window_end: addDays(start, windowDays).toISOString(),
-        duration_minutes: duration,
+        duration_minutes: 120,
         step_minutes: 60,
         top_n: 3,
         question: "Когда соберёмся?",
@@ -54,7 +65,7 @@ export default function AutoPickSheet() {
       });
     },
     onSuccess: () => {
-      haptic("heavy");
+      haptic("success");
       setPollMsg("📊 Опрос опубликован в чате — голосуйте.");
       qc.invalidateQueries({ queryKey: ["polls"] });
     },
@@ -64,28 +75,14 @@ export default function AutoPickSheet() {
       if (msg.includes("not_enough_slots")) {
         setPollMsg("Слотов меньше двух — расширь окно или подними пилюли.");
       } else {
-        setPollMsg(`Ошибка: ${msg}`);
+        setPollMsg(`Ошибка: ${humanizeApiError(e)}`);
       }
     },
   });
 
   return (
     <BottomSheet title="Авто-подбор времени" onClose={close}>
-      <div className="grid grid-cols-2 gap-2">
-        <label className="text-sm">
-          <div className="mb-1 text-xs text-tg-hint">Длительность</div>
-          <select
-            value={duration}
-            onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full rounded-lg bg-tg-secondary-bg px-2 py-2"
-          >
-            <option value={60}>1 час</option>
-            <option value={120}>2 часа</option>
-            <option value={180}>3 часа</option>
-            <option value={240}>4 часа</option>
-            <option value={360}>6 часов</option>
-          </select>
-        </label>
+      <div className="grid grid-cols-1 gap-2">
         <label className="text-sm">
           <div className="mb-1 text-xs text-tg-hint">Окно</div>
           <select
@@ -98,6 +95,17 @@ export default function AutoPickSheet() {
             <option value={30}>Месяц</option>
           </select>
         </label>
+        {presetsQ.data && presetsQ.data.length > 0 && (
+          <div className="rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-xs text-tg-hint">
+            🕒 Слоты времени:{" "}
+            <span className="text-tg-text">
+              {presetsQ.data.map((p) => `${p.start}–${p.end}`).join(", ")}
+            </span>
+            <div className="mt-0.5 text-[10px]">
+              Меняются в админке → «🕒 Пресеты времени».
+            </div>
+          </div>
+        )}
       </div>
 
       <button

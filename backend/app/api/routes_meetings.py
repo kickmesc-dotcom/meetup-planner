@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import datetime, timedelta
 
 import structlog
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+)
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,6 +172,9 @@ async def auto_pick(
 ) -> AutoPickResponse:
     if body.window_end <= body.window_start:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_window")
+    from app.services.admin_config import get_poll_time_presets
+
+    presets = await get_poll_time_presets(session) if body.use_presets else None
     slots = await find_best_slots(
         session,
         window_start=body.window_start,
@@ -171,6 +182,7 @@ async def auto_pick(
         duration=timedelta(minutes=body.duration_minutes),
         step=timedelta(minutes=body.step_minutes),
         top_n=body.top_n,
+        presets=presets,
     )
     return AutoPickResponse(
         slots=[
@@ -233,6 +245,9 @@ async def ical_feed(
     )
 
 
+_LOSER_SEND_TIMEOUT = 15.0  # wall-clock budget for Telegram send (sec)
+
+
 @router.post("/loser/roll", response_model=LoserRollResponse)
 async def loser_roll_endpoint(
     session: SessionDep,
@@ -241,6 +256,8 @@ async def loser_roll_endpoint(
     settings = get_settings()
     target_chat = settings.group_chat_id
     sent_flag = {"ok": False}
+    timings: dict[str, float] = {}
+    t0 = time.monotonic()
 
     async def _announce(row: LoserRoll, loser: User) -> None:
         if not target_chat:
@@ -256,7 +273,12 @@ async def loser_roll_endpoint(
             f"Уже {cnt}-й раз становится лохом.\n"
             f"<i>Покрутил рулетку: {user.display_name}</i>"
         )
-        await get_bot().send_message(chat_id=target_chat, text=text)
+        send_started = time.monotonic()
+        await asyncio.wait_for(
+            get_bot().send_message(chat_id=target_chat, text=text),
+            timeout=_LOSER_SEND_TIMEOUT,
+        )
+        timings["send_ms"] = round((time.monotonic() - send_started) * 1000, 1)
         sent_flag["ok"] = True
 
     try:
@@ -266,12 +288,49 @@ async def loser_roll_endpoint(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"cooldown:{int(exc.remaining.total_seconds())}",
         ) from exc
-    except Exception as exc:  # send_message failed → row was rolled back
-        log.warning("loser.atomic_send_failed", error=str(exc))
+    except TelegramRetryAfter as exc:
+        log.warning("loser.tg_retry_after", retry=exc.retry_after, **timings)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"telegram_retry_after:{exc.retry_after}",
+        ) from exc
+    except TelegramForbiddenError as exc:
+        log.error("loser.tg_forbidden", error=str(exc), **timings)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail="telegram_forbidden",
+        ) from exc
+    except (TelegramNetworkError, asyncio.TimeoutError) as exc:
+        log.warning(
+            "loser.tg_network_failed",
+            error=str(exc),
+            total_ms=round((time.monotonic() - t0) * 1000, 1),
+            **timings,
+        )
+        raise HTTPException(
+            status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="telegram_network_timeout",
+        ) from exc
+    except TelegramAPIError as exc:
+        log.warning("loser.tg_api_error", error=str(exc), **timings)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail=f"telegram_api_error:{exc.__class__.__name__}",
+        ) from exc
+    except Exception as exc:  # truly unexpected — row was rolled back
+        log.exception("loser.atomic_send_failed", error=str(exc), **timings)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
             detail="telegram_send_failed",
         ) from exc
+
+    log.info(
+        "loser.rolled_ok",
+        loser_id=row.loser_user_id,
+        rolled_by=user.id,
+        total_ms=round((time.monotonic() - t0) * 1000, 1),
+        **timings,
+    )
 
     return LoserRollResponse(
         roll=LoserRollOut.model_validate(row),

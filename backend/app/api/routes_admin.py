@@ -15,6 +15,7 @@ from app.services.admin_config import (
     get_autoloser_settings,
     get_chukhan_weights,
     get_loser_reasons,
+    get_poll_time_presets,
     get_random_phrases_collective_chance,
     get_random_phrases_count,
     get_random_phrases_count_range,
@@ -27,6 +28,7 @@ from app.services.admin_config import (
     set_autoloser_settings,
     set_chukhan_weight,
     set_loser_reasons,
+    set_poll_time_presets,
     set_random_phrases_collective_chance,
     set_random_phrases_count,
     set_random_phrases_count_range,
@@ -735,3 +737,162 @@ async def update_birthdays(
     await session.commit()
     log.info("admin.birthdays_updated", count=len(body.items), by=user.id)
     return await list_birthdays(session, user)
+
+# --- GHG5 POLL-HOURS1: Time presets for polls/auto-pick ---
+
+class PollPresetItem(BaseModel):
+    start: str  # HH:MM
+    end: str    # HH:MM
+    label: str | None = None
+
+
+class PollPresetsOut(BaseModel):
+    presets: list[PollPresetItem]
+
+
+class PollPresetsUpdate(BaseModel):
+    presets: list[PollPresetItem]
+
+
+@router.get("/admin/poll-presets", response_model=PollPresetsOut)
+async def admin_get_poll_presets(session: SessionDep, user: CurrentUser) -> PollPresetsOut:
+    _ensure_admin(user)
+    raw = await get_poll_time_presets(session)
+    return PollPresetsOut(presets=[PollPresetItem(**p) for p in raw])
+
+
+@router.put("/admin/poll-presets", response_model=PollPresetsOut)
+async def admin_update_poll_presets(
+    body: PollPresetsUpdate, session: SessionDep, user: CurrentUser
+) -> PollPresetsOut:
+    _ensure_admin(user)
+    await set_poll_time_presets(session, [p.model_dump() for p in body.presets])
+    saved = await get_poll_time_presets(session)
+    log.info("admin.poll_presets_updated", count=len(saved), by=user.id)
+    return PollPresetsOut(presets=[PollPresetItem(**p) for p in saved])
+
+
+# --- GHG5 P2: Smart Proxy management ---
+
+from app.services.proxies import (
+    ProxyMode,
+    delete_proxy as _delete_proxy,
+    get_proxy_mode,
+    list_proxies,
+    set_proxy_mode,
+    update_proxy as _update_proxy,
+    upsert_proxy,
+)
+
+
+class ProxyOut(BaseModel):
+    id: int
+    server: str
+    port: int
+    type: str
+    secret: str | None
+    enabled: bool
+    fail_count: int
+    last_ok_at: datetime | None
+    last_fail_at: datetime | None
+    dead_until: datetime | None
+
+
+class ProxyCreateIn(BaseModel):
+    server: str = Field(..., min_length=1, max_length=255)
+    port: int = Field(..., ge=1, le=65535)
+    type: str = Field("mtproto", pattern="^(mtproto|socks5|http)$")
+    secret: str | None = Field(None, max_length=255)
+    enabled: bool = True
+
+
+class ProxyUpdateIn(BaseModel):
+    enabled: bool
+
+
+class ProxyModeOut(BaseModel):
+    mode: str
+
+
+class ProxyModeIn(BaseModel):
+    mode: str = Field(..., pattern="^(always_on|always_off|auto_fallback)$")
+
+
+def _proxy_to_out(p) -> ProxyOut:
+    return ProxyOut(
+        id=p.id,
+        server=p.server,
+        port=p.port,
+        type=p.type,
+        secret=p.secret,
+        enabled=p.enabled,
+        fail_count=p.fail_count,
+        last_ok_at=p.last_ok_at,
+        last_fail_at=p.last_fail_at,
+        dead_until=p.dead_until,
+    )
+
+
+@router.get("/admin/proxy/mode", response_model=ProxyModeOut)
+async def admin_get_proxy_mode(session: SessionDep, user: CurrentUser) -> ProxyModeOut:
+    _ensure_admin(user)
+    mode = await get_proxy_mode(session)
+    return ProxyModeOut(mode=mode.value)
+
+
+@router.put("/admin/proxy/mode", response_model=ProxyModeOut)
+async def admin_set_proxy_mode(
+    body: ProxyModeIn, session: SessionDep, user: CurrentUser
+) -> ProxyModeOut:
+    _ensure_admin(user)
+    await set_proxy_mode(session, ProxyMode(body.mode))
+    log.info("admin.proxy_mode_set", mode=body.mode, by=user.id)
+    return ProxyModeOut(mode=body.mode)
+
+
+@router.get("/admin/proxy", response_model=list[ProxyOut])
+async def admin_list_proxies(session: SessionDep, user: CurrentUser) -> list[ProxyOut]:
+    _ensure_admin(user)
+    rows = await list_proxies(session)
+    return [_proxy_to_out(r) for r in rows]
+
+
+@router.post("/admin/proxy", response_model=ProxyOut)
+async def admin_create_proxy(
+    body: ProxyCreateIn, session: SessionDep, user: CurrentUser
+) -> ProxyOut:
+    _ensure_admin(user)
+    row = await upsert_proxy(
+        session,
+        server=body.server,
+        port=body.port,
+        type_=body.type,
+        secret=body.secret,
+        enabled=body.enabled,
+    )
+    log.info("admin.proxy_upserted", server=body.server, port=body.port, by=user.id)
+    return _proxy_to_out(row)
+
+
+@router.put("/admin/proxy/{proxy_id}", response_model=ProxyOut)
+async def admin_update_proxy_endpoint(
+    proxy_id: int, body: ProxyUpdateIn, session: SessionDep, user: CurrentUser
+) -> ProxyOut:
+    _ensure_admin(user)
+    row = await _update_proxy(session, proxy_id, enabled=body.enabled)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "proxy_not_found")
+    log.info("admin.proxy_updated", id=proxy_id, enabled=body.enabled, by=user.id)
+    return _proxy_to_out(row)
+
+
+@router.delete("/admin/proxy/{proxy_id}")
+async def admin_delete_proxy_endpoint(
+    proxy_id: int, session: SessionDep, user: CurrentUser
+) -> dict:
+    _ensure_admin(user)
+    ok = await _delete_proxy(session, proxy_id)
+    if not ok:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "proxy_not_found")
+    log.info("admin.proxy_deleted", id=proxy_id, by=user.id)
+    return {"deleted": True}

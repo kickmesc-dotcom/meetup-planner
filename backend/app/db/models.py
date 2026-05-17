@@ -268,6 +268,33 @@ class BirthdayNotification(Base):
     )
 
 
+class ProxyEntry(Base):
+    """Пул прокси для аутgoing-трафика бота (P2 Smart Proxy).
+
+    Используется AiohttpSession-фолбэком: при ошибке direct connect к
+    api.telegram.org session пробует следующий enabled+живой прокси.
+    """
+    __tablename__ = "proxy_entries"
+    __table_args__ = (
+        UniqueConstraint("server", "port", name="uq_proxy_server_port"),
+        Index("ix_proxy_enabled_dead", "enabled", "dead_until"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    server: Mapped[str] = mapped_column(Text, nullable=False)
+    port: Mapped[int] = mapped_column(nullable=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False, default="mtproto")
+    secret: Mapped[str | None] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    fail_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_fail_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    dead_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class EventLog(Base):
     __tablename__ = "event_log"
 

@@ -9,8 +9,10 @@ import {
   updateWeight,
 } from "@/api/admin";
 import type { User } from "@/types";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -27,32 +29,47 @@ export default function ChukhanLoserScreen({ users, onBack }: Props) {
   const setW = useMutation({
     mutationFn: ({ tg, w }: { tg: number; w: number }) => updateWeight(tg, w),
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "weights"] });
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
   const resetW = useMutation({
     mutationFn: (tg: number) => resetWeight(tg),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "weights"] }),
-    onError: () => haptic("error"),
+    onSuccess: () => {
+      haptic("success");
+      qc.invalidateQueries({ queryKey: ["admin", "weights"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
   const reroll = useMutation({
     mutationFn: forceReroll,
     onSuccess: () => {
-      haptic("medium");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "history"] });
       qc.invalidateQueries({ queryKey: ["chukhan", "leaderboard"] });
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
   const saveReasons = useMutation({
     mutationFn: updateLoserReasons,
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "loser-reasons"] });
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
 
   const userByTg = Object.fromEntries(users.map((u) => [u.telegram_id, u] as const));
@@ -99,8 +116,9 @@ export default function ChukhanLoserScreen({ users, onBack }: Props) {
             haptic("medium");
             if (confirm("Перевыбрать чухана недели?")) reroll.mutate();
           }}
-          className="w-full rounded-lg bg-tg-button py-2.5 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
+          className="w-full rounded-lg bg-tg-button py-2.5 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
+          {reroll.isPending && <Spinner />}
           {reroll.isPending ? "Катаем…" : "Перевыбрать чухана"}
         </button>
         {reroll.isError && (
@@ -222,9 +240,13 @@ function LoserReasonsEditor({
         <button
           type="button"
           disabled={!dirty || isPending}
-          onClick={() => onSave(list)}
-          className="flex-1 min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+          onClick={() => {
+            haptic("medium");
+            onSave(list);
+          }}
+          className="flex-1 min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
+          {isPending && <Spinner />}
           {isPending ? "Сохраняем…" : dirty ? `💾 Сохранить (${list.length})` : `✓ Сохранено (${list.length})`}
         </button>
         {dirty && (

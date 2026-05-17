@@ -13,6 +13,9 @@ class AutoPickRequest(BaseModel):
     duration_minutes: int = Field(120, ge=30, le=24 * 60)
     step_minutes: int = Field(60, ge=15, le=24 * 60)
     top_n: int = Field(5, ge=1, le=20)
+    # GHG5 POLL-HOURS1: использовать пресеты времени из admin_config вместо
+    # фиксированных duration/step. True по умолчанию — никаких больше 00-04.
+    use_presets: bool = True
 
 
 class AutoPickSlotOut(BaseModel):
@@ -103,6 +106,8 @@ class PollAutoPickRequest(BaseModel):
     question: str = Field("Когда соберёмся?", min_length=1, max_length=255)
     closes_in_hours: int | None = Field(24, ge=1, le=72)
     chat_id: int | None = None
+    # GHG5 POLL-HOURS1: использовать пресеты времени из admin_config.
+    use_presets: bool = True
 
 
 class PollOptionOut(BaseModel):

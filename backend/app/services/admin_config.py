@@ -284,6 +284,71 @@ async def set_random_phrases_user_chance(session: AsyncSession, chance: float) -
     )
 
 
+# --- GHG5 POLL-HOURS1: Human-friendly time presets for polls/auto-pick ---
+
+POLL_TIME_PRESETS_KEY = "poll.time_presets"
+
+DEFAULT_POLL_TIME_PRESETS: list[dict] = [
+    {"start": "12:00", "end": "15:00"},
+    {"start": "15:00", "end": "18:00"},
+    {"start": "18:00", "end": "20:00"},
+    {"start": "20:00", "end": "23:00"},
+]
+
+
+def _validate_preset_dict(p: object) -> dict | None:
+    if not isinstance(p, dict):
+        return None
+    s = p.get("start")
+    e = p.get("end")
+    if not isinstance(s, str) or not isinstance(e, str):
+        return None
+    try:
+        sh, sm = (int(x) for x in s.split(":"))
+        eh, em = (int(x) for x in e.split(":"))
+    except (ValueError, AttributeError):
+        return None
+    if not (0 <= sh <= 23 and 0 <= sm <= 59 and 0 <= eh <= 23 and 0 <= em <= 59):
+        return None
+    if (sh, sm) >= (eh, em):
+        return None
+    label = p.get("label")
+    out = {"start": f"{sh:02d}:{sm:02d}", "end": f"{eh:02d}:{em:02d}"}
+    if isinstance(label, str) and label.strip():
+        out["label"] = label.strip()[:32]
+    return out
+
+
+async def get_poll_time_presets(session: AsyncSession) -> list[dict]:
+    raw = await _get_value(session, POLL_TIME_PRESETS_KEY)
+    if raw is None:
+        return [dict(p) for p in DEFAULT_POLL_TIME_PRESETS]
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return [dict(p) for p in DEFAULT_POLL_TIME_PRESETS]
+    if not isinstance(data, list):
+        return [dict(p) for p in DEFAULT_POLL_TIME_PRESETS]
+    out: list[dict] = []
+    for item in data:
+        v = _validate_preset_dict(item)
+        if v is not None:
+            out.append(v)
+    return out or [dict(p) for p in DEFAULT_POLL_TIME_PRESETS]
+
+
+async def set_poll_time_presets(session: AsyncSession, presets: list[dict]) -> None:
+    cleaned: list[dict] = []
+    for p in presets:
+        v = _validate_preset_dict(p)
+        if v is not None:
+            cleaned.append(v)
+    if not cleaned:
+        # Не даём «обнулить в ноль» — слотов не будет совсем.
+        cleaned = [dict(p) for p in DEFAULT_POLL_TIME_PRESETS]
+    await _set_value(session, POLL_TIME_PRESETS_KEY, json.dumps(cleaned, ensure_ascii=False))
+
+
 # --- A6: Auto-loser ---
 
 async def get_autoloser_settings(session: AsyncSession) -> dict:

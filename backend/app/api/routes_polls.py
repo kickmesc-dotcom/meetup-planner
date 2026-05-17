@@ -91,6 +91,9 @@ async def create_auto_pick_poll(
     if body.window_end <= body.window_start:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_window")
 
+    from app.services.admin_config import get_poll_time_presets
+
+    presets = await get_poll_time_presets(session) if body.use_presets else None
     slots = await find_best_slots(
         session,
         window_start=body.window_start,
@@ -98,6 +101,7 @@ async def create_auto_pick_poll(
         duration=timedelta(minutes=body.duration_minutes),
         step=timedelta(minutes=body.step_minutes),
         top_n=body.top_n,
+        presets=presets,
     )
 
     if len(slots) < 2:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,20 +29,61 @@ def _status_weight(status: int, confidence: int) -> float:
     return 0.0  # busy
 
 
+def _parse_hhmm(s: str) -> time:
+    h, m = s.split(":")
+    return time(hour=int(h), minute=int(m))
+
+
+def _enumerate_preset_slots(
+    window_start: datetime,
+    window_end: datetime,
+    presets: list[dict],
+) -> list[tuple[datetime, datetime]]:
+    """Перебираем дни window_start..window_end и в каждом дне применяем
+    пресеты вида {"start":"HH:MM","end":"HH:MM"} в TZ window_start."""
+    tz = window_start.tzinfo
+    pres = [
+        (_parse_hhmm(p["start"]), _parse_hhmm(p["end"]))
+        for p in presets
+        if "start" in p and "end" in p
+    ]
+    if not pres:
+        return []
+    day = window_start.date()
+    end_day = window_end.date()
+    out: list[tuple[datetime, datetime]] = []
+    while day <= end_day:
+        for ts, te in pres:
+            slot_start = datetime.combine(day, ts, tzinfo=tz)
+            slot_end = datetime.combine(day, te, tzinfo=tz)
+            if slot_end <= window_start or slot_start >= window_end:
+                continue
+            out.append((slot_start, slot_end))
+        day = day + timedelta(days=1)
+    return out
+
+
 async def find_best_slots(
     session: AsyncSession,
     *,
     window_start: datetime,
     window_end: datetime,
-    duration: timedelta,
+    duration: timedelta | None = None,
     step: timedelta = timedelta(hours=1),
     top_n: int = 5,
+    presets: list[dict] | None = None,
 ) -> list[Slot]:
     """
-    Sliding-window scoring over `window_start..window_end` in `step` granularity.
-    For each candidate slot of length `duration`, score = sum over all users of
-    the maximum weight of their ranges that fully contain the slot.
-    Unmarked users contribute 0 (== "busy by default").
+    Кандидатные слоты строятся ОДНИМ ИЗ способов:
+
+    1. `presets` (рекомендуемое, GHG5 POLL-HOURS1): на каждый день окна
+       применяем массив `[{"start":"HH:MM","end":"HH:MM"}, ...]`. Слот = пара
+       (HH:MM_start, HH:MM_end) в этот день. `duration` игнорируется.
+    2. Если `presets` не задан — fallback на старое скользящее окно
+       `cursor += step` с фиксированной `duration`.
+
+    Score = сумма по пользователям best-fit weight'а их range'а, который
+    полностью покрывает слот. Unmarked = 0 («занят по умолчанию»).
     """
     users = list((await session.scalars(select(User))).all())
     ranges = list(
@@ -60,11 +101,22 @@ async def find_best_slots(
     for r in ranges:
         by_user.setdefault(r.user_id, []).append(r)
 
+    # Подготавливаем список кандидатных интервалов
+    if presets:
+        candidates: list[tuple[datetime, datetime]] = _enumerate_preset_slots(
+            window_start, window_end, presets
+        )
+    else:
+        if duration is None:
+            duration = timedelta(hours=2)
+        candidates = []
+        cursor = window_start
+        while cursor + duration <= window_end:
+            candidates.append((cursor, cursor + duration))
+            cursor += step
+
     slots: list[Slot] = []
-    cursor = window_start
-    while cursor + duration <= window_end:
-        slot_start = cursor
-        slot_end = cursor + duration
+    for slot_start, slot_end in candidates:
         score = 0.0
         avail: list[int] = []
         maybe: list[int] = []
@@ -92,7 +144,6 @@ async def find_best_slots(
                     maybe_user_ids=maybe,
                 )
             )
-        cursor += step
 
     slots.sort(key=lambda s: (-s.score, s.starts_at))
 

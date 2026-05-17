@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBirthdays, updateBirthdays, type BirthdayRow } from "@/api/admin";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Checkbox, Toggle as TgToggle } from "@/components/Checkbox";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -18,10 +21,15 @@ export default function BirthdaysScreen({ onBack }: Props) {
   const save = useMutation({
     mutationFn: updateBirthdays,
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "birthdays"] });
+      // BD-CAL1: подсветить 🎂 в календаре сразу после сохранения.
+      qc.invalidateQueries({ queryKey: ["birthdays"] });
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
 
   return (
@@ -114,42 +122,38 @@ function BirthdaysForm({
                   className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
                 />
               </label>
-              <label className="flex items-center gap-1.5 pb-2 text-[11px] text-tg-hint">
-                <input
-                  type="checkbox"
+              <div className="pb-2">
+                <Checkbox
+                  size="sm"
                   checked={d.year_known}
-                  onChange={(e) => {
-                    haptic("selection");
-                    patch(r.user_id, { year_known: e.target.checked });
-                  }}
-                  className="h-4 w-4 accent-tg-link"
+                  onChange={(v) => patch(r.user_id, { year_known: v })}
+                  label="год известен"
                 />
-                год известен
-              </label>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-1">
-              <Toggle
+              <TgToggle
                 label="📅 За месяц"
                 checked={d.remind_month}
                 onChange={(v) => patch(r.user_id, { remind_month: v })}
               />
-              <Toggle
+              <TgToggle
                 label="🗓️ За неделю"
                 checked={d.remind_week}
                 onChange={(v) => patch(r.user_id, { remind_week: v })}
               />
-              <Toggle
+              <TgToggle
                 label="📌 За день"
                 checked={d.remind_day}
                 onChange={(v) => patch(r.user_id, { remind_day: v })}
               />
-              <Toggle
+              <TgToggle
                 label="🎉 В сам день (поздравление)"
                 checked={d.remind_on_day}
                 onChange={(v) => patch(r.user_id, { remind_on_day: v })}
               />
-              <Toggle
+              <TgToggle
                 label="💡 За неделю — намёк задать встречу"
                 checked={d.remind_hint_week}
                 onChange={(v) => patch(r.user_id, { remind_hint_week: v })}
@@ -162,41 +166,16 @@ function BirthdaysForm({
       <button
         type="button"
         disabled={!dirty || isPending}
-        onClick={() => onSave(Array.from(draft.values()))}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+        onClick={() => {
+          haptic("medium");
+          onSave(Array.from(draft.values()));
+        }}
+        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
+        {isPending && <Spinner />}
         {isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
       </button>
     </>
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label
-      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 transition-colors ${
-        checked ? "bg-status-free/10" : "bg-tg-bg/30"
-      }`}
-    >
-      <span className="text-xs text-tg-text">{label}</span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => {
-          haptic("selection");
-          onChange(e.target.checked);
-        }}
-        className="h-5 w-5 accent-status-free"
-      />
-    </label>
   );
 }
 

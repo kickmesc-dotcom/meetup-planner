@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { addMonths, isSameMonth, isToday, startOfMonth } from "date-fns";
+import { addMonths, format, isSameMonth, isToday, startOfMonth } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
+import type { BirthdayCalendarEntry } from "@/api/birthdays";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import {
@@ -16,9 +17,10 @@ interface Props {
   anchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
+  birthdays?: BirthdayCalendarEntry[];
 }
 
-export default function MonthView({ months, anchor, ranges, users }: Props) {
+export default function MonthView({ months, anchor, ranges, users, birthdays = [] }: Props) {
   const setZoom = useUI((s) => s.setZoom);
   const setAnchor = useUI((s) => s.setAnchorDate);
 
@@ -36,6 +38,17 @@ export default function MonthView({ months, anchor, ranges, users }: Props) {
     setZoom("day");
   };
 
+  // Индекс ДР: ключ — YYYY-MM-DD, значение — массив имён
+  const bdayIndex = useMemo(() => {
+    const idx = new Map<string, string[]>();
+    for (const b of birthdays) {
+      const arr = idx.get(b.date) ?? [];
+      arr.push(b.display_name);
+      idx.set(b.date, arr);
+    }
+    return idx;
+  }, [birthdays]);
+
   return (
     <div className="flex-1 overflow-y-auto pb-4">
       {monthAnchors.map((m) => (
@@ -44,6 +57,7 @@ export default function MonthView({ months, anchor, ranges, users }: Props) {
           monthAnchor={m}
           ranges={ranges}
           users={users}
+          bdayIndex={bdayIndex}
           onDayTap={onDayTap}
         />
       ))}
@@ -55,11 +69,13 @@ function MonthBlock({
   monthAnchor,
   ranges,
   users,
+  bdayIndex,
   onDayTap,
 }: {
   monthAnchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
+  bdayIndex: Map<string, string[]>;
   onDayTap: (d: Date) => void;
 }) {
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
@@ -99,11 +115,14 @@ function MonthBlock({
                   : ratioBusy >= 0.66
                     ? "bg-status-busy/15"
                     : "bg-tg-secondary-bg/40";
+          const dayKey = format(d, "yyyy-MM-dd");
+          const bdayNames = bdayIndex.get(dayKey);
           return (
             <button
               key={d.toISOString()}
               type="button"
               onClick={() => onDayTap(d)}
+              title={bdayNames ? `🎂 ${bdayNames.join(", ")}` : undefined}
               className={[
                 "aspect-square rounded-lg flex flex-col items-center justify-start py-1 px-1 text-xs transition-transform active:scale-95 relative",
                 inMonth ? "text-tg-text" : "text-tg-hint/60",
@@ -112,6 +131,14 @@ function MonthBlock({
               ].join(" ")}
             >
               <span className={today ? "font-bold" : "font-medium"}>{d.getDate()}</span>
+              {bdayNames && (
+                <span
+                  aria-label="День рождения"
+                  className="absolute top-0.5 right-0.5 text-[10px] leading-none"
+                >
+                  🎂
+                </span>
+              )}
               <div className="flex gap-0.5 mt-auto pb-0.5">
                 {Array.from({ length: Math.min(sum.free, 3) }).map((_, i) => (
                   <span key={`f${i}`} className="w-1 h-1 rounded-full bg-status-free" />

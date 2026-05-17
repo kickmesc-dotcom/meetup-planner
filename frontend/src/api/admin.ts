@@ -224,3 +224,74 @@ export const updateBirthdays = (items: Omit<BirthdayRow, "display_name">[]) =>
     method: "PUT",
     body: JSON.stringify({ items }),
   });
+
+// --- GHG5 POLL-HOURS1: Time presets for polls ---
+
+export interface PollPreset {
+  start: string; // HH:MM
+  end: string;   // HH:MM
+  label?: string | null;
+}
+
+export const fetchPollPresetsAdmin = () =>
+  api<{ presets: PollPreset[] }>("/api/admin/poll-presets");
+
+export const updatePollPresets = (presets: PollPreset[]) =>
+  api<{ presets: PollPreset[] }>("/api/admin/poll-presets", {
+    method: "PUT",
+    body: JSON.stringify({ presets }),
+  });
+
+// Public — для AutoPickSheet / PollSheet
+export const fetchPollPresetsPublic = () =>
+  api<PollPreset[]>("/api/poll-presets");
+
+// --- GHG5 P2: Smart Proxy ---
+
+export type ProxyMode = "always_on" | "always_off" | "auto_fallback";
+export type ProxyType = "mtproto" | "socks5" | "http";
+
+export interface ProxyEntry {
+  id: number;
+  server: string;
+  port: number;
+  type: ProxyType;
+  secret: string | null;
+  enabled: boolean;
+  fail_count: number;
+  last_ok_at: string | null;
+  last_fail_at: string | null;
+  dead_until: string | null;
+}
+
+export const fetchProxyMode = () =>
+  api<{ mode: ProxyMode }>("/api/admin/proxy/mode");
+
+export const updateProxyMode = (mode: ProxyMode) =>
+  api<{ mode: ProxyMode }>("/api/admin/proxy/mode", {
+    method: "PUT",
+    body: JSON.stringify({ mode }),
+  });
+
+export const fetchProxies = () => api<ProxyEntry[]>("/api/admin/proxy");
+
+export const createProxy = (body: {
+  server: string;
+  port: number;
+  type: ProxyType;
+  secret?: string | null;
+  enabled?: boolean;
+}) =>
+  api<ProxyEntry>("/api/admin/proxy", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const updateProxyEnabled = (id: number, enabled: boolean) =>
+  api<ProxyEntry>(`/api/admin/proxy/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });
+
+export const deleteProxy = (id: number) =>
+  api<{ deleted: boolean }>(`/api/admin/proxy/${id}`, { method: "DELETE" });

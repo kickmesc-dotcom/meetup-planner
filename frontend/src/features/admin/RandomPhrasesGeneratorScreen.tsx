@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchRPGenerator, updateRPGenerator, type RPGenerator } from "@/api/admin";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -17,10 +19,13 @@ export default function RandomPhrasesGeneratorScreen({ onBack }: Props) {
   const setGen = useMutation({
     mutationFn: updateRPGenerator,
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "rp-generator"] });
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
 
   return (
@@ -149,9 +154,13 @@ function GeneratorForm({
       <button
         type="button"
         disabled={!dirty || isPending}
-        onClick={() => onSave(body)}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+        onClick={() => {
+          haptic("medium");
+          onSave(body);
+        }}
+        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
+        {isPending && <Spinner />}
         {isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
       </button>
     </>

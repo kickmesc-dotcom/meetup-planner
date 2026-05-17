@@ -10,9 +10,15 @@ import {
   fetchScheduledJobs,
   updateRemindersSettings,
 } from "@/api/admin";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
+
+const errAlert = (e: unknown) => {
+  haptic("error");
+  void showAlert(humanizeApiError(e));
+};
 
 const JOBS_IDLE_INTERVAL_MS = 10 * 60 * 1000;
 const JOBS_HOT_INTERVAL_MS = 5_000;
@@ -65,7 +71,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
       qc.invalidateQueries({ queryKey: ["admin", "reminders"] });
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
     },
-    onError: () => haptic("error"),
+    onError: errAlert,
   });
   const cancelJob = useMutation({
     mutationFn: (id: string) => cancelScheduledJob(id),
@@ -73,7 +79,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
       haptic("light");
       enterHotMode();
     },
-    onError: () => haptic("error"),
+    onError: errAlert,
   });
 
   const polls = useQuery({ queryKey: ["admin", "polls"], queryFn: fetchAdminPolls });
@@ -84,7 +90,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
       qc.invalidateQueries({ queryKey: ["admin", "polls"] });
       qc.invalidateQueries({ queryKey: ["polls"] });
     },
-    onError: () => haptic("error"),
+    onError: errAlert,
   });
   const removePoll = useMutation({
     mutationFn: (id: number) => deleteAdminPoll(id),
@@ -93,7 +99,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
       qc.invalidateQueries({ queryKey: ["admin", "polls"] });
       qc.invalidateQueries({ queryKey: ["polls"] });
     },
-    onError: () => haptic("error"),
+    onError: errAlert,
   });
 
   return (

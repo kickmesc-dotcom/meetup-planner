@@ -1,3 +1,70 @@
+# Инструкция по выкладке GHG5 (2026-05-17)
+
+## P0 — критичные баги
+
+### Backend (HF Space)
+- `app/api/routes_meetings.py` — `loser_roll_endpoint` обёрнут в `asyncio.wait_for(send_message, 15s)`, отдельные обработчики `TelegramRetryAfter/Forbidden/Network/TimeoutError/APIError` с человечными `detail`.
+- `app/api/routes_birthdays.py` (новый) — `GET /api/birthdays/calendar?from=&to=` для отрисовки 🎂 в календаре. Подключён в `main.py`.
+- `app/services/admin_config.py` — `POLL_TIME_PRESETS_KEY` + `get/set_poll_time_presets` + `DEFAULT_POLL_TIME_PRESETS = 12-15/15-18/18-20/20-23`.
+- `app/services/auto_pick.py::find_best_slots` принимает `presets`, строит candidates как `день × preset` вместо sliding window.
+- `app/schemas/meetings.py` — `use_presets: bool = True`.
+- `app/api/routes_admin.py` — `GET/PUT /api/admin/poll-presets` (admin) + `GET /api/poll-presets` (whitelist) в `routes_birthdays`.
+
+### Frontend
+- `api/client.ts::humanizeApiError` — переводит `detail` в русский текст.
+- `tg/webapp.ts::showAlert` — Promise-обёртка `WebApp.showAlert`.
+- `features/actions/LoserSheet.tsx` — `humanizeApiError + showAlert` на onError.
+- `features/calendar/ParticipantRow.tsx` — `overflow-hidden [contain:layout_paint]` + вертикальные клетки.
+- `features/calendar/views/MonthView.tsx`, `StripView.tsx` — рендер 🎂.
+- `features/admin/PollPresetsScreen.tsx` (новый) + chip-кнопки в `PollSheet`/`AutoPickSheet`.
+
+Миграций БД нет — пресеты живут в `admin_config`.
+
+## P1 — UI/UX (контраст + Optimistic UI + Haptic)
+
+### Frontend
+- `styles.css` — снят глобальный `input { color:#000 !important; bg:#fff !important }`. Заменён на `var(--tg-theme-*)`. Добавлены классы `.chk-tg`, `.tgl-tg` (общий стиль чекбокса и toggle-slider, контраст AA в обеих темах).
+- `components/Checkbox.tsx` (новый) — экспорты `<Checkbox>` и `<Toggle>`. Оба тригерят `haptic("selection")` внутри.
+- `components/Spinner.tsx` (новый) — pending-индикатор для action-кнопок.
+- Применено в `AutoLoserScreen`, `BirthdaysScreen`, `RandomPhrasesScheduleScreen`, `RandomPhrasesGeneratorScreen`, `PollPresetsScreen`, `ChukhanLoserScreen`, `ScheduledPublicationsScreen` — optimistic `onMutate/onError revert` где это давало эффект (single-toggle), `showAlert(humanizeApiError(e))` на onError всех мутаций, `haptic("success/error/selection/medium")` по семантике.
+
+Миграций нет.
+
+## P2 — Smart Proxy
+
+### Backend
+- **Миграция**: `alembic upgrade head` на Neon должен прокатать `0007_proxies`. Делает таблицу `proxy_entries` (server/port/type/secret/enabled/fail_count/last_*/dead_until + uq на server+port).
+- `app/services/proxies.py` (новый) — `ProxyMode` enum (default `AUTO_FALLBACK`), `_state` синглтон (TTL 30s), CRUD-функции `list_proxies/upsert_proxy/update_proxy/delete_proxy`, `bootstrap_from_env()` для `PROXIES_BOOTSTRAP_JSON`. Hot-reload через `invalidate()`.
+- `app/bot/dispatcher.py::_IPv4AiohttpSession` — переопределён `make_request`: 3 попытки, ≥5 с между переключениями, SOCKS5/HTTP через `aiohttp-socks`. На ошибке мёртвый прокси отдыхает `PROXY_DEAD_COOLDOWN_MIN` (10 мин).
+- `app/api/routes_admin.py` — `GET/PUT /api/admin/proxy/mode`, `GET/POST /api/admin/proxy`, `PUT/DELETE /api/admin/proxy/{id}`.
+- `app/main.py` — `bootstrap_from_env(session)` в lifespan.
+
+### Frontend
+- `api/admin.ts` — `fetchProxyMode/updateProxyMode/fetchProxies/createProxy/updateProxyEnabled/deleteProxy` + типы `ProxyMode/ProxyEntry/ProxyType`.
+- `features/admin/ProxyScreen.tsx` (новый) — селектор режима, форма «+ добавить», список с Toggle/Delete.
+- Карточка 🌐 «Прокси» в `AdminScreen.tsx`.
+
+### Новая зависимость
+`pyproject.toml` → `aiohttp-socks==0.10.1`. На HF Spaces после `git push` Docker сам пересоберёт образ с новой либой.
+
+### Опциональные env-переменные
+- `SMART_PROXY_ENABLED` (default `true`) — глобальный выключатель smart-proxy слоя.
+- `PROXIES_BOOTSTRAP_JSON` — JSON-массив `[{"server":"1.2.3.4","port":1080,"type":"socks5","secret":"pwd"}]`. Заливается в пул при старте (upsert по server+port).
+- `PROXY_DEAD_COOLDOWN_MIN` (default `10`) — сколько минут «отдыхает» помеченный мёртвым прокси.
+- `PROXY_MAX_ATTEMPTS` (default `3`).
+- `PROXY_MIN_SWITCH_INTERVAL_SEC` (default `5`).
+
+### Проверка после деплоя
+1. В админке появилась карточка «🌐 Прокси». Внутри — выбор режима, форма добавления, пустой список (если bootstrap не задан).
+2. В логах HF при старте: `proxy.pool_loaded mode=... count=...`.
+3. Тест AUTO_FALLBACK: отключил `BOT_FORCE_IPV4`, добавил мёртвый SOCKS5 → запрос идёт direct, при ошибке direct пробует прокси (в логах `proxy.request_failed`).
+4. MTProto-прокси добавляется через UI, но в `make_request` пропускается (только сохраняется в пуле).
+
+### Что НЕ сделано (P3, отложено)
+- Парсер @ProxyMTProto-каналов через user-API (Telethon/Pyrogram). MVP — ручное наполнение + env-bootstrap.
+
+---
+
 # Инструкция по выкладке P0+P1+P2 (2026-05-14)
 
 ## P2 — реорганизация админки (этот блок)

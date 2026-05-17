@@ -1,28 +1,52 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { addDays, addHours, format, startOfDay } from "date-fns";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { addDays, addHours, addMinutes, format, parseISO, startOfDay } from "date-fns";
 import { createPoll } from "@/api/meetings";
+import { fetchPollPresetsPublic, type PollPreset } from "@/api/admin";
 import type { User } from "@/types";
 import { useUI } from "@/store/ui";
-import { haptic } from "@/tg/webapp";
+import { haptic, showAlert } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
 import BottomSheet from "./BottomSheet";
 
 interface Props {
   users: User[];
 }
 
-function defaultOption(daysAhead: number): string {
+function defaultOption(daysAhead: number, preset?: PollPreset): string {
   const base = startOfDay(addDays(new Date(), daysAhead));
+  if (preset) {
+    const [h, m] = preset.start.split(":").map(Number);
+    return addMinutes(addHours(base, h), m).toISOString().slice(0, 16);
+  }
   return addHours(base, 19).toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm" for input
+}
+
+function applyPresetToOption(option: string, preset: PollPreset): string {
+  // Сохраняем дату из option, заменяем часы/минуты на preset.start.
+  try {
+    const d = option ? parseISO(option) : new Date();
+    const [h, m] = preset.start.split(":").map(Number);
+    const next = addMinutes(addHours(startOfDay(d), h), m);
+    return next.toISOString().slice(0, 16);
+  } catch {
+    return option;
+  }
 }
 
 export default function PollSheet(_props: Props) {
   const close = () => useUI.getState().setShowPollSheet(false);
   const [question, setQuestion] = useState("Когда собираемся?");
+  const presetsQ = useQuery({
+    queryKey: ["poll-presets"],
+    queryFn: fetchPollPresetsPublic,
+    staleTime: 60_000,
+  });
+  const firstPreset = presetsQ.data?.[0];
   const [options, setOptions] = useState<string[]>([
-    defaultOption(1),
-    defaultOption(2),
-    defaultOption(3),
+    defaultOption(1, firstPreset),
+    defaultOption(2, firstPreset),
+    defaultOption(3, firstPreset),
   ]);
   const [closesIn, setClosesIn] = useState(24);
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +61,14 @@ export default function PollSheet(_props: Props) {
         closes_in_hours: closesIn,
       }),
     onSuccess: () => {
-      haptic("medium");
+      haptic("success");
       close();
     },
     onError: (e) => {
       haptic("error");
-      setError(e instanceof Error ? e.message : "Ошибка");
+      const human = humanizeApiError(e);
+      setError(human);
+      void showAlert(human);
     },
   });
 
@@ -80,24 +106,43 @@ export default function PollSheet(_props: Props) {
       <div className="mt-3 space-y-2">
         <div className="text-xs text-tg-hint">Варианты дат (2–5)</div>
         {options.map((v, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input
-              type="datetime-local"
-              value={v}
-              onChange={(e) => setOption(i, e.target.value)}
-              className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
-            />
-            <span className="text-xs text-tg-hint">
-              {v ? format(new Date(v), "EEE") : ""}
-            </span>
-            {options.length > 2 && (
-              <button
-                type="button"
-                onClick={() => removeOption(i)}
-                className="rounded-lg bg-status-busy/15 px-2 py-2 text-xs text-status-busy"
-              >
-                ✕
-              </button>
+          <div key={i} className="space-y-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={v}
+                onChange={(e) => setOption(i, e.target.value)}
+                className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
+              />
+              <span className="text-xs text-tg-hint">
+                {v ? format(new Date(v), "EEE") : ""}
+              </span>
+              {options.length > 2 && (
+                <button
+                  type="button"
+                  onClick={() => removeOption(i)}
+                  className="rounded-lg bg-status-busy/15 px-2 py-2 text-xs text-status-busy"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {presetsQ.data && presetsQ.data.length > 0 && (
+              <div className="flex flex-wrap gap-1 pl-1">
+                {presetsQ.data.map((p, pi) => (
+                  <button
+                    key={pi}
+                    type="button"
+                    onClick={() => {
+                      haptic("selection");
+                      setOption(i, applyPresetToOption(v, p));
+                    }}
+                    className="rounded-md border border-tg-secondary-bg/80 bg-tg-bg/40 px-2 py-0.5 text-[11px] text-tg-text hover:bg-tg-link/15"
+                  >
+                    {p.start}–{p.end}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         ))}

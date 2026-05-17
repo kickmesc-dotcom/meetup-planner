@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDrag, usePinch } from "@use-gesture/react";
 import { fetchRanges } from "@/api/availability";
+import { fetchBirthdaysInWindow } from "@/api/birthdays";
 import type { User } from "@/types";
 import { useUI, isStripZoom, isMonthGridZoom } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
@@ -41,6 +42,14 @@ export default function CalendarView({ users, meId }: Props) {
     queryKey: ["ranges", win.start.toISOString(), win.end.toISOString()],
     queryFn: () => fetchRanges(win.start, win.end),
     staleTime: 15_000,
+  });
+
+  // BD-CAL1: ДР-шки в текущем окне. staleTime короткий, чтобы после ввода
+  // в админке («год известен — сохранил») значок 🎂 появился без перезагрузки.
+  const birthdays = useQuery({
+    queryKey: ["birthdays", win.start.toISOString(), win.end.toISOString()],
+    queryFn: () => fetchBirthdaysInWindow(win.start, win.end),
+    staleTime: 10_000,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +127,7 @@ export default function CalendarView({ users, meId }: Props) {
   }, [ranges]);
 
   const data = ranges.data ?? [];
+  const bdays = birthdays.data ?? [];
   const isPending = ranges.isPending;
 
   let body: React.ReactNode = null;
@@ -132,12 +142,13 @@ export default function CalendarView({ users, meId }: Props) {
         users={users}
         meId={meId}
         ranges={data}
+        birthdays={bdays}
         isPending={isPending}
       />
     );
   } else if (isMonthGridZoom(zoom)) {
     const months = zoom === "month" ? 1 : zoom === "threeMonths" ? 3 : 6;
-    body = <MonthView months={months} anchor={anchor} ranges={data} users={users} />;
+    body = <MonthView months={months} anchor={anchor} ranges={data} users={users} birthdays={bdays} />;
   } else if (zoom === "year") {
     body = <YearView anchor={anchor} ranges={data} users={users} />;
   } else if (zoom === "allYears") {

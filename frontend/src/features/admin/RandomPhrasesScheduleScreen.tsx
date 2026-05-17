@@ -7,8 +7,11 @@ import {
   updateRandomPhrases,
   type RPScheduleMode,
 } from "@/api/admin";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Toggle } from "@/components/Checkbox";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -31,19 +34,38 @@ export default function RandomPhrasesScheduleScreen({ onBack }: Props) {
   const setSchedule = useMutation({
     mutationFn: updateRPSchedule,
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "rp-schedule"] });
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
     },
-    onError: () => haptic("error"),
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
   const setEnabled = useMutation({
     mutationFn: updateRandomPhrases,
+    // U3: оптимистичный toggle — пишем в кэш сразу, на error откатываемся.
+    onMutate: async (next) => {
+      await qc.cancelQueries({ queryKey: ["admin", "phrases"] });
+      const prev = qc.getQueryData<{ enabled: boolean; count: number }>([
+        "admin",
+        "phrases",
+      ]);
+      if (prev) {
+        qc.setQueryData(["admin", "phrases"], { ...prev, enabled: next.enabled });
+      }
+      return { prev };
+    },
     onSuccess: () => {
-      haptic("light");
+      haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "phrases"] });
     },
-    onError: () => haptic("error"),
+    onError: (e, _vars, ctx) => {
+      haptic("error");
+      if (ctx?.prev) qc.setQueryData(["admin", "phrases"], ctx.prev);
+      void showAlert(humanizeApiError(e));
+    },
   });
 
   return (
@@ -56,24 +78,16 @@ export default function RandomPhrasesScheduleScreen({ onBack }: Props) {
         {enable.isPending || !enable.data ? (
           <ListSkeleton rows={1} />
         ) : (
-          <label
-            className={`flex items-center justify-between gap-2 rounded-lg px-2 py-2.5 transition-colors ${
-              enable.data.enabled ? "bg-status-free/10" : "bg-tg-bg/40"
-            }`}
-          >
-            <span className="text-sm font-medium text-tg-text">
-              {enable.data.enabled ? "🔔 Авто-постинг включён" : "🔕 Авто-постинг выключен"}
-            </span>
-            <input
-              type="checkbox"
-              disabled={setEnabled.isPending}
-              checked={enable.data.enabled}
-              onChange={(e) =>
-                setEnabled.mutate({ enabled: e.target.checked, count: enable.data!.count })
-              }
-              className="h-6 w-6 accent-status-free disabled:opacity-50"
-            />
-          </label>
+          <Toggle
+            checked={enable.data.enabled}
+            disabled={setEnabled.isPending}
+            label={
+              enable.data.enabled ? "🔔 Авто-постинг включён" : "🔕 Авто-постинг выключен"
+            }
+            onChange={(v) =>
+              setEnabled.mutate({ enabled: v, count: enable.data!.count })
+            }
+          />
         )}
       </section>
 
@@ -272,9 +286,13 @@ function ScheduleEditor({
       <button
         type="button"
         disabled={isPending || (mode === "fixed_times" && times.filter(isValidHHMM).length === 0)}
-        onClick={() => onSave(mode, buildParam())}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+        onClick={() => {
+          haptic("medium");
+          onSave(mode, buildParam());
+        }}
+        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
+        {isPending && <Spinner />}
         {isPending ? "Сохраняем…" : "💾 Сохранить расписание"}
       </button>
     </div>

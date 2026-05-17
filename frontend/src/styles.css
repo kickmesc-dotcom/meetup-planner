@@ -24,17 +24,108 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Фикс видимости текста в полях ввода */
+/* Поля ввода: наследуют тему TG (var из @twa-dev). Конкретный фон/цвет
+   задаём через Tailwind-классы bg-tg-secondary-bg / text-tg-text в каждом
+   компоненте — не оверрайдим глобально, чтобы не было «белое на белом». */
 input, textarea, select {
-  @apply text-black bg-white border-gray-300; /* Используем Tailwind классы через @apply */
-  color: #000000 !important;
-  background-color: #ffffff !important;
+  color: var(--tg-theme-text-color, #000000);
+  background-color: var(--tg-theme-secondary-bg-color, #ffffff);
+  caret-color: var(--tg-theme-link-color, #2481cc);
+}
+
+/* Плейсхолдеры: чтоб не сливались с фоном на тёмной теме */
+input::placeholder,
+textarea::placeholder {
+  color: var(--tg-theme-hint-color, #999999);
+  opacity: 0.7;
+}
+
+/* datetime-local / time на iOS — белый текст невидно на белом фоне native picker.
+   Принудительно делаем поле читаемым в теме. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: light dark;
 }
 
 /* Для мобильных устройств убираем внутренние тени iOS */
 input {
   -webkit-appearance: none;
   border-radius: 8px;
+}
+
+/* Унифицированный чекбокс — рамка контрастная в idle и заливается tg-link в checked.
+   Подключается классом .chk-tg к <input type="checkbox"> или к обёртке.        */
+.chk-tg {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid var(--tg-theme-hint-color, #999999);
+  background-color: var(--tg-theme-bg-color, #ffffff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.05s;
+  position: relative;
+}
+.chk-tg:checked {
+  background-color: var(--tg-theme-link-color, #2481cc);
+  border-color: var(--tg-theme-link-color, #2481cc);
+}
+.chk-tg:checked::after {
+  content: "";
+  width: 6px;
+  height: 10px;
+  border: solid var(--tg-theme-button-text-color, #ffffff);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.chk-tg:active {
+  transform: scale(0.92);
+}
+.chk-tg:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Унифицированный toggle (slider). Применяется к <input type="checkbox" class="tgl-tg">. */
+.tgl-tg {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background-color: var(--tg-theme-hint-color, #999999);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.18s;
+  flex-shrink: 0;
+}
+.tgl-tg::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  transition: transform 0.18s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.tgl-tg:checked {
+  background-color: var(--tg-theme-link-color, #2481cc);
+}
+.tgl-tg:checked::before {
+  transform: translateX(18px);
+}
+.tgl-tg:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Позволяем имени занимать больше места и не превращаться в три точки слишком рано */

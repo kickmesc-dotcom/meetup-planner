@@ -50,7 +50,7 @@ export default function ParticipantRow({
   };
 
   return (
-    <div className="relative flex items-center border-b border-tg-secondary-bg/50">
+    <div className="relative flex items-center border-b border-tg-secondary-bg/60">
       <div className="w-[60px] flex flex-col items-center py-1.5 shrink-0">
         <div
           className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
@@ -72,8 +72,11 @@ export default function ParticipantRow({
         </div>
       </div>
 
+      {/* CAL1: overflow-hidden + contain жёстко удерживают пилюли в пределах
+          разметки. Любая анимация framer-motion, выходящая за грань,
+          клиппится контейнером. */}
       <div
-        className="relative flex-1 grid h-14"
+        className="relative flex-1 grid h-14 overflow-hidden [contain:layout_paint]"
         style={{ gridTemplateColumns: `repeat(${windowSpan}, minmax(36px, 1fr))` }}
       >
         {Array.from({ length: windowSpan }).map((_, i) => {
@@ -85,6 +88,7 @@ export default function ParticipantRow({
             const e = new Date(r.ends_at).getTime();
             return s < dayEnd && e > dayStartMs;
           });
+          const isLast = i === windowSpan - 1;
           return (
             <button
               key={i}
@@ -92,7 +96,9 @@ export default function ParticipantRow({
               onClick={() => onCellTap(i)}
               disabled={!isMe || createMut.isPending}
               className={[
-                "h-full border-r border-tg-secondary-bg/30 relative",
+                "h-full relative",
+                // CAL1: явная вертикальная сетка между клетками. Последняя ячейка без правой границы — её даст контейнер.
+                isLast ? "" : "border-r border-tg-secondary-bg/70",
                 isMe ? "active:bg-tg-secondary-bg/50" : "",
                 !covered ? "bg-[repeating-linear-gradient(45deg,transparent_0_4px,rgba(239,68,68,0.08)_4px_8px)]" : "",
               ].join(" ")}
