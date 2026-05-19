@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import {
-  fetchLoserReasons,
+  fetchChukhanHistory,
+  fetchChukhanReasons,
   fetchWeights,
   forceReroll,
   resetWeight,
-  updateLoserReasons,
+  updateChukhanReasons,
   updateWeight,
 } from "@/api/admin";
 import type { User } from "@/types";
@@ -14,17 +16,19 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
+import ReasonsEditor from "./ReasonsEditor";
 
 interface Props {
   users: User[];
   onBack: () => void;
 }
 
-export default function ChukhanLoserScreen({ users, onBack }: Props) {
+export default function ChukhanScreen({ users, onBack }: Props) {
   const qc = useQueryClient();
 
   const weights = useQuery({ queryKey: ["admin", "weights"], queryFn: fetchWeights });
-  const reasons = useQuery({ queryKey: ["admin", "loser-reasons"], queryFn: fetchLoserReasons });
+  const reasons = useQuery({ queryKey: ["admin", "chukhan-reasons"], queryFn: fetchChukhanReasons });
+  const history = useQuery({ queryKey: ["admin", "history"], queryFn: fetchChukhanHistory });
 
   const setW = useMutation({
     mutationFn: ({ tg, w }: { tg: number; w: number }) => updateWeight(tg, w),
@@ -61,10 +65,10 @@ export default function ChukhanLoserScreen({ users, onBack }: Props) {
     },
   });
   const saveReasons = useMutation({
-    mutationFn: updateLoserReasons,
+    mutationFn: updateChukhanReasons,
     onSuccess: () => {
       haptic("success");
-      qc.invalidateQueries({ queryKey: ["admin", "loser-reasons"] });
+      qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons"] });
     },
     onError: (e) => {
       haptic("error");
@@ -73,15 +77,16 @@ export default function ChukhanLoserScreen({ users, onBack }: Props) {
   });
 
   const userByTg = Object.fromEntries(users.map((u) => [u.telegram_id, u] as const));
+  const userById = Object.fromEntries(users.map((u) => [u.id, u] as const));
 
   return (
     <SubScreen
-      title="💩 Чухан / 🤡 Лох"
-      subtitle="Веса, перевыбор, кастомные фразы"
+      title="💩 Чухан недели"
+      subtitle="Веса, ре-ролл, история, шаблоны фраз"
       onBack={onBack}
     >
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="text-base font-semibold mb-1">⚖️ Веса чухана</div>
+        <div className="text-base font-semibold mb-1">⚖️ Веса</div>
         <div className="text-xs text-tg-hint mb-2">
           Чем выше вес — тем чаще выпадает. База 1.0. Обнуляй, чтобы вернуть env.
         </div>
@@ -129,16 +134,52 @@ export default function ChukhanLoserScreen({ users, onBack }: Props) {
       </section>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="text-base font-semibold mb-1">🤡 Фразы лоха</div>
+        <div className="text-base font-semibold mb-1">📜 История чуханов</div>
+        <div className="text-xs text-tg-hint mb-2">Последние записи по неделям.</div>
+        {history.isPending ? (
+          <ListSkeleton rows={5} />
+        ) : (history.data ?? []).length === 0 ? (
+          <div className="text-xs text-tg-hint">Пока пусто.</div>
+        ) : (
+          <div className="divide-y divide-tg-bg/40">
+            {(history.data ?? []).map((h) => {
+              const u = userById[h.user_id];
+              const color = u?.color_hex ?? "#888";
+              return (
+                <div key={h.id} className="flex items-center gap-2 py-1.5">
+                  <div
+                    className="w-7 h-7 rounded-full inline-flex items-center justify-center text-white text-xs font-medium shrink-0"
+                    style={{ background: color }}
+                  >
+                    {(u?.display_name ?? "?")[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-tg-text truncate">
+                      {u?.display_name ?? `#${h.user_id}`}
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-tg-hint tabular-nums whitespace-nowrap">
+                    {format(new Date(h.week_start), "dd.MM.yyyy")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-base font-semibold mb-1">💩 Шаблоны фраз чухана</div>
         <div className="text-xs text-tg-hint mb-2">
-          Бот выбирает случайную фразу при roll'е лоха. Пустой список → дефолт из кода.
+          Используются при объявлении чухана недели. Пустой список → дефолт из кода.
         </div>
         {reasons.isPending || !reasons.data ? (
           <ListSkeleton rows={5} />
         ) : (
-          <LoserReasonsEditor
+          <ReasonsEditor
             initial={reasons.data.reasons}
             isPending={saveReasons.isPending}
+            placeholder="например: на этой неделе вообще пропал"
             onSave={(list) => saveReasons.mutate(list)}
           />
         )}
@@ -149,120 +190,6 @@ export default function ChukhanLoserScreen({ users, onBack }: Props) {
         )}
       </section>
     </SubScreen>
-  );
-}
-
-function LoserReasonsEditor({
-  initial,
-  isPending,
-  onSave,
-}: {
-  initial: string[];
-  isPending: boolean;
-  onSave: (list: string[]) => void;
-}) {
-  const [list, setList] = useState<string[]>(initial);
-  const [draft, setDraft] = useState("");
-
-  useEffect(() => {
-    setList(initial);
-  }, [initial]);
-
-  const dirty = JSON.stringify(list) !== JSON.stringify(initial);
-
-  const add = () => {
-    const v = draft.trim();
-    if (!v) return;
-    if (list.includes(v)) {
-      haptic("warning");
-      return;
-    }
-    setList([...list, v]);
-    setDraft("");
-    haptic("selection");
-  };
-
-  const remove = (i: number) => {
-    haptic("warning");
-    setList(list.filter((_, j) => j !== i));
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              add();
-            }
-          }}
-          placeholder="например: снова забыл выпить таблетки"
-          className="flex-1 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
-        />
-        <button
-          type="button"
-          onClick={add}
-          disabled={!draft.trim()}
-          className="min-h-11 min-w-11 rounded-md bg-tg-link/15 px-2 text-xs text-tg-link disabled:opacity-40"
-        >
-          + добавить
-        </button>
-      </div>
-
-      <div className="max-h-72 overflow-y-auto rounded-lg bg-tg-bg/40 divide-y divide-tg-secondary-bg/40">
-        {list.length === 0 ? (
-          <div className="px-2 py-3 text-xs text-tg-hint text-center">
-            Пусто — будет использован дефолт из кода.
-          </div>
-        ) : (
-          list.map((r, i) => (
-            <div key={`${i}:${r}`} className="flex items-center gap-2 px-2 py-1.5">
-              <div className="text-[10px] text-tg-hint w-6 tabular-nums">{i + 1}</div>
-              <div className="flex-1 text-sm text-tg-text truncate">{r}</div>
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="min-h-9 min-w-9 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
-                title="Удалить"
-              >
-                ✕
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={!dirty || isPending}
-          onClick={() => {
-            haptic("medium");
-            onSave(list);
-          }}
-          className="flex-1 min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
-        >
-          {isPending && <Spinner />}
-          {isPending ? "Сохраняем…" : dirty ? `💾 Сохранить (${list.length})` : `✓ Сохранено (${list.length})`}
-        </button>
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => {
-              haptic("warning");
-              setList(initial);
-            }}
-            className="min-h-11 min-w-11 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-hint"
-          >
-            ↺
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 

@@ -470,6 +470,169 @@ async def update_loser_reasons(
     return LoserReasonsOut(reasons=saved)
 
 
+# --- GHG6 AD6: chukhan reasons (по образцу loser_reasons) ---
+
+from app.services.admin_config import (
+    get_chukhan_reasons as _get_chukhan_reasons,
+    set_chukhan_reasons as _set_chukhan_reasons,
+    get_scheduled_settings as _get_sched,
+    set_scheduled_settings as _set_sched,
+)
+
+
+class ChukhanReasonsOut(BaseModel):
+    reasons: list[str]
+
+
+class ChukhanReasonsUpdate(BaseModel):
+    reasons: list[str] = Field(..., max_length=500)
+
+
+@router.get("/admin/chukhan-reasons", response_model=ChukhanReasonsOut)
+async def admin_get_chukhan_reasons(
+    session: SessionDep, user: CurrentUser
+) -> ChukhanReasonsOut:
+    _ensure_admin(user)
+    return ChukhanReasonsOut(reasons=await _get_chukhan_reasons(session))
+
+
+@router.put("/admin/chukhan-reasons", response_model=ChukhanReasonsOut)
+async def admin_update_chukhan_reasons(
+    body: ChukhanReasonsUpdate, session: SessionDep, user: CurrentUser
+) -> ChukhanReasonsOut:
+    _ensure_admin(user)
+    await _set_chukhan_reasons(session, body.reasons)
+    saved = await _get_chukhan_reasons(session)
+    log.info("admin.chukhan_reasons_updated", count=len(saved), by=user.id)
+    return ChukhanReasonsOut(reasons=saved)
+
+
+# --- GHG6 AD4/AD7/AD8: scheduled settings (агрегат master-toggles) ---
+
+
+class ScheduledRemindersIO(BaseModel):
+    enabled: bool
+    tick_minutes: int = Field(..., ge=1, le=120)
+
+
+class ScheduledLoserIO(BaseModel):
+    enabled: bool
+    per_day: int = Field(..., ge=1, le=12)
+    window_start_hour: int = Field(..., ge=0, le=23)
+    window_end_hour: int = Field(..., ge=0, le=23)
+    interval_hours: int = Field(..., ge=0, le=72)
+
+
+class ScheduledPhrasesIO(BaseModel):
+    enabled: bool
+    window_start: str
+    window_end: str
+
+
+class ScheduledAvatarsIO(BaseModel):
+    enabled: bool
+    per_day: float = Field(..., ge=0.14, le=24.0)
+
+
+class ScheduledBirthdaysIO(BaseModel):
+    alerts_enabled: bool
+
+
+class ScheduledChukhanIO(BaseModel):
+    weekday: int = Field(..., ge=0, le=6)
+    window_start: str
+    window_end: str
+
+
+class ScheduledSettingsIO(BaseModel):
+    reminders: ScheduledRemindersIO
+    loser: ScheduledLoserIO
+    phrases: ScheduledPhrasesIO
+    avatars: ScheduledAvatarsIO
+    birthdays: ScheduledBirthdaysIO
+    chukhan: ScheduledChukhanIO
+
+
+@router.get("/admin/scheduled", response_model=ScheduledSettingsIO)
+async def admin_get_scheduled(
+    session: SessionDep, user: CurrentUser
+) -> ScheduledSettingsIO:
+    _ensure_admin(user)
+    return ScheduledSettingsIO(**(await _get_sched(session)))
+
+
+@router.put("/admin/scheduled", response_model=ScheduledSettingsIO)
+async def admin_set_scheduled(
+    body: ScheduledSettingsIO, session: SessionDep, user: CurrentUser
+) -> ScheduledSettingsIO:
+    _ensure_admin(user)
+    await _set_sched(session, body.model_dump())
+    log.info("admin.scheduled_updated", by=user.id)
+    # После записи — пересоберём динамические job'ы.
+    from app.bot.dispatcher import get_bot
+
+    try:
+        await reload_dynamic_jobs(get_bot())
+    except Exception:  # noqa: BLE001
+        log.exception("admin.scheduled_reload_failed")
+    return ScheduledSettingsIO(**(await _get_sched(session)))
+
+
+# --- GHG6 AD5: quick action «крутануть лоха» через admin API ---
+
+
+class LoserRollNowOut(BaseModel):
+    ok: bool
+    loser_user_id: int | None = None
+    reason_text: str | None = None
+    error: str | None = None
+
+
+@router.post("/admin/loser/roll-now", response_model=LoserRollNowOut)
+async def admin_loser_roll_now(
+    session: SessionDep, user: CurrentUser
+) -> LoserRollNowOut:
+    """Прокручивает лоха немедленно (как quick-action в шапке AdminScreen).
+
+    Использует тот же `roll_loser`, что и обычный пользовательский флоу.
+    Анонс в групповой чат идёт через on_announce — best-effort, ошибки TG не
+    блокируют ответ API (детальная сетевая обработка — на стороне основного
+    LoserSheet).
+    """
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+    from app.config import get_settings as _gs
+    from app.services.loser import roll_loser
+
+    settings = _gs()
+    bot = get_bot()
+
+    async def _announce(roll, loser):
+        if not settings.group_chat_id:
+            return
+        try:
+            await bot.send_message(
+                chat_id=settings.group_chat_id,
+                text=(
+                    f"🤡 <b>Лох дня:</b> {loser.display_name}\n<i>{roll.reason_text}</i>"
+                ),
+                parse_mode="HTML",
+            )
+        except Exception:  # noqa: BLE001
+            log.warning("admin.loser_roll_announce_failed")
+
+    try:
+        roll = await roll_loser(session, rolled_by=user, on_announce=_announce)
+        return LoserRollNowOut(
+            ok=True,
+            loser_user_id=roll.loser_user_id,
+            reason_text=roll.reason_text,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("admin.loser_roll_failed", error=str(exc))
+        return LoserRollNowOut(ok=False, error=str(exc))
+
+
 # --- A2: Reminders tick ---
 
 class RemindersSettingsOut(BaseModel):
@@ -862,14 +1025,19 @@ async def admin_create_proxy(
     body: ProxyCreateIn, session: SessionDep, user: CurrentUser
 ) -> ProxyOut:
     _ensure_admin(user)
-    row = await upsert_proxy(
-        session,
-        server=body.server,
-        port=body.port,
-        type_=body.type,
-        secret=body.secret,
-        enabled=body.enabled,
-    )
+    try:
+        row = await upsert_proxy(
+            session,
+            server=body.server,
+            port=body.port,
+            type_=body.type,
+            secret=body.secret,
+            enabled=body.enabled,
+        )
+    except ValueError as exc:
+        if str(exc).startswith("proxy_pool_full"):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+        raise
     log.info("admin.proxy_upserted", server=body.server, port=body.port, by=user.id)
     return _proxy_to_out(row)
 
@@ -886,6 +1054,36 @@ async def admin_update_proxy_endpoint(
     return _proxy_to_out(row)
 
 
+class ProxyEditIn(BaseModel):
+    server: str | None = Field(None, min_length=1, max_length=255)
+    port: int | None = Field(None, ge=1, le=65535)
+    type: str | None = Field(None, pattern="^(mtproto|socks5|http)$")
+    secret: str | None = Field(None, max_length=255)
+    clear_secret: bool = False
+    enabled: bool | None = None
+
+
+@router.patch("/admin/proxy/{proxy_id}", response_model=ProxyOut)
+async def admin_edit_proxy_endpoint(
+    proxy_id: int, body: ProxyEditIn, session: SessionDep, user: CurrentUser
+) -> ProxyOut:
+    _ensure_admin(user)
+    row = await _update_proxy(
+        session,
+        proxy_id,
+        enabled=body.enabled,
+        server=body.server,
+        port=body.port,
+        type_=body.type,
+        secret=body.secret,
+        clear_secret=body.clear_secret,
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "proxy_not_found")
+    log.info("admin.proxy_edited", id=proxy_id, by=user.id)
+    return _proxy_to_out(row)
+
+
 @router.delete("/admin/proxy/{proxy_id}")
 async def admin_delete_proxy_endpoint(
     proxy_id: int, session: SessionDep, user: CurrentUser
@@ -896,3 +1094,209 @@ async def admin_delete_proxy_endpoint(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "proxy_not_found")
     log.info("admin.proxy_deleted", id=proxy_id, by=user.id)
     return {"deleted": True}
+
+
+# --- GHG6 P0: indicators / parser / ping / alerts ---
+
+from app.services.proxies import (
+    clear_last_error,
+    delete_dead as _delete_dead_proxies,
+    get_alerts_enabled,
+    get_last_alert_at,
+    get_last_error,
+    parse_mtproto_blob,
+    ping_all as _ping_all_proxies,
+    ping_proxy as _ping_proxy,
+    selftest_send as _selftest_send,
+    set_alerts_enabled,
+)
+
+
+class ProxySelftestOut(BaseModel):
+    ok: bool
+    mode_used: str
+    proxy_id: int | None
+    latency_ms: int | None
+    error: str | None
+    bot_active: bool
+
+
+class ProxyPingOut(BaseModel):
+    proxy_id: int
+    ok: bool
+    latency_ms: int | None
+    error: str | None
+
+
+class ProxyStatusOut(BaseModel):
+    bot_active: bool
+    mode: str
+    pool_size: int
+    alive_count: int
+    last_selftest: ProxySelftestOut | None
+    last_error: dict | None
+
+
+class ProxyParseIn(BaseModel):
+    text: str = Field(..., min_length=1, max_length=10000)
+
+
+class ProxyParseOut(BaseModel):
+    parsed: list[dict]
+
+
+class ProxyAlertsIn(BaseModel):
+    enabled: bool
+
+
+class ProxyAlertsOut(BaseModel):
+    enabled: bool
+    last_alert_at: datetime | None
+
+
+@router.post("/admin/proxy/selftest", response_model=ProxySelftestOut)
+async def admin_proxy_selftest(session: SessionDep, user: CurrentUser) -> ProxySelftestOut:
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+
+    bot = get_bot()
+    res = await _selftest_send(bot, session=session)
+    log.info(
+        "admin.proxy_selftest",
+        ok=res.ok,
+        latency_ms=res.latency_ms,
+        mode=res.mode_used,
+        by=user.id,
+    )
+    return ProxySelftestOut(**res.to_dict())
+
+
+@router.post("/admin/proxy/{proxy_id}/ping", response_model=ProxyPingOut)
+async def admin_proxy_ping_one(
+    proxy_id: int, session: SessionDep, user: CurrentUser
+) -> ProxyPingOut:
+    _ensure_admin(user)
+    res = await _ping_proxy(session, proxy_id)
+    return ProxyPingOut(**res.to_dict())
+
+
+@router.post("/admin/proxy/ping-all", response_model=list[ProxyPingOut])
+async def admin_proxy_ping_all(
+    session: SessionDep, user: CurrentUser
+) -> list[ProxyPingOut]:
+    _ensure_admin(user)
+    rows = await _ping_all_proxies(session)
+    return [ProxyPingOut(**r.to_dict()) for r in rows]
+
+
+@router.post("/admin/proxy/delete-dead")
+async def admin_proxy_delete_dead(
+    session: SessionDep, user: CurrentUser
+) -> dict:
+    _ensure_admin(user)
+    n = await _delete_dead_proxies(session)
+    log.info("admin.proxy_delete_dead", count=n, by=user.id)
+    return {"deleted": n}
+
+
+@router.post("/admin/proxy/parse", response_model=ProxyParseOut)
+async def admin_proxy_parse(
+    body: ProxyParseIn, user: CurrentUser
+) -> ProxyParseOut:
+    _ensure_admin(user)
+    drafts = parse_mtproto_blob(body.text)
+    return ProxyParseOut(parsed=[d.to_dict() for d in drafts])
+
+
+@router.get("/admin/proxy/status", response_model=ProxyStatusOut)
+async def admin_proxy_status(session: SessionDep, user: CurrentUser) -> ProxyStatusOut:
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+    from app.services.proxies import (
+        ensure_loaded as _ensure_loaded,
+        get_state_snapshot as _get_state_snapshot,
+    )
+
+    await _ensure_loaded(session)
+    snap = _get_state_snapshot()
+    # Лёгкий пинг через getMe (с тайм-аутом) — чтобы понять «бот вообще жив?».
+    bot = get_bot()
+    res = await _selftest_send(bot, session=session)
+    last_err = await get_last_error(session)
+    return ProxyStatusOut(
+        bot_active=res.bot_active,
+        mode=snap["mode"],
+        pool_size=snap["pool_size"],
+        alive_count=snap["alive"],
+        last_selftest=ProxySelftestOut(**res.to_dict()),
+        last_error=last_err,
+    )
+
+
+@router.delete("/admin/proxy/status/last-error")
+async def admin_proxy_clear_last_error(
+    session: SessionDep, user: CurrentUser
+) -> dict:
+    _ensure_admin(user)
+    await clear_last_error(session)
+    return {"cleared": True}
+
+
+@router.get("/admin/proxy/alerts", response_model=ProxyAlertsOut)
+async def admin_proxy_get_alerts(
+    session: SessionDep, user: CurrentUser
+) -> ProxyAlertsOut:
+    _ensure_admin(user)
+    return ProxyAlertsOut(
+        enabled=await get_alerts_enabled(session),
+        last_alert_at=await get_last_alert_at(session),
+    )
+
+
+@router.put("/admin/proxy/alerts", response_model=ProxyAlertsOut)
+async def admin_proxy_set_alerts(
+    body: ProxyAlertsIn, session: SessionDep, user: CurrentUser
+) -> ProxyAlertsOut:
+    _ensure_admin(user)
+    await set_alerts_enabled(session, body.enabled)
+    log.info("admin.proxy_alerts_set", enabled=body.enabled, by=user.id)
+    return ProxyAlertsOut(
+        enabled=body.enabled,
+        last_alert_at=await get_last_alert_at(session),
+    )
+
+
+# =============================================================================
+# GHG6 CL0: master-toggle нового таймлайн-вида календаря.
+# GET — whitelist-only (читает любой залогиненный, в т.ч. фронт-CalendarView).
+# PUT — admin-only.
+# =============================================================================
+
+
+class CalendarTimelineOut(BaseModel):
+    enabled: bool
+
+
+class CalendarTimelineIn(BaseModel):
+    enabled: bool
+
+
+@router.get("/admin/calendar/timeline", response_model=CalendarTimelineOut)
+async def admin_calendar_timeline_get(
+    session: SessionDep, _: CurrentUser
+) -> CalendarTimelineOut:
+    # Намеренно без _ensure_admin: флаг видит весь фронт, чтобы
+    # CalendarView выбрал legacy/new ветку рендера.
+    from app.services.admin_config import get_calendar_timeline_enabled
+    return CalendarTimelineOut(enabled=await get_calendar_timeline_enabled(session))
+
+
+@router.put("/admin/calendar/timeline", response_model=CalendarTimelineOut)
+async def admin_calendar_timeline_put(
+    body: CalendarTimelineIn, session: SessionDep, user: CurrentUser
+) -> CalendarTimelineOut:
+    _ensure_admin(user)
+    from app.services.admin_config import set_calendar_timeline_enabled
+    await set_calendar_timeline_enabled(session, body.enabled)
+    log.info("admin.calendar_timeline_set", enabled=body.enabled, by=user.id)
+    return CalendarTimelineOut(enabled=body.enabled)

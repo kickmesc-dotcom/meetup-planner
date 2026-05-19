@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDrag, usePinch } from "@use-gesture/react";
 import { fetchRanges } from "@/api/availability";
-import { fetchBirthdaysInWindow } from "@/api/birthdays";
+import { fetchBirthdaysInWindow, fetchCalendarMarks } from "@/api/birthdays";
+import { fetchCalendarTimelineFlag } from "@/api/admin";
 import type { User } from "@/types";
 import { useUI, isStripZoom, isMonthGridZoom } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
@@ -15,6 +16,7 @@ import AutoPickSheet from "../actions/AutoPickSheet";
 import LoserSheet from "../actions/LoserSheet";
 import PollSheet from "../actions/PollSheet";
 import StripView from "./views/StripView";
+import BirthdayPopover from "./BirthdayPopover";
 import HoursView from "./views/HoursView";
 import MonthView from "./views/MonthView";
 import YearView from "./views/YearView";
@@ -50,6 +52,25 @@ export default function CalendarView({ users, meId }: Props) {
     queryKey: ["birthdays", win.start.toISOString(), win.end.toISOString()],
     queryFn: () => fetchBirthdaysInWindow(win.start, win.end),
     staleTime: 10_000,
+  });
+
+  // GHG6 CL0: master-toggle нового таймлайн-вида. Пока TimelineView ещё не
+  // реализован (CL1+), оба значения флага рендерят legacy-вид. Запрос всё
+  // равно делаем — чтобы как только CL1 приземлится, ветвление включилось
+  // без дополнительной выкладки.
+  const timelineFlag = useQuery({
+    queryKey: ["admin", "calendar", "timeline"],
+    queryFn: fetchCalendarTimelineFlag,
+    staleTime: 60_000,
+  });
+  const timelineEnabled = timelineFlag.data?.enabled ?? true;
+  void timelineEnabled; // CL1: тут будет if (timelineEnabled) <TimelineView/> else legacy.
+
+  // GHG6 BD4: отметки лох/чухан в окне. Используются для 👑/💩 на прошедших днях.
+  const marks = useQuery({
+    queryKey: ["calendar-marks", win.start.toISOString(), win.end.toISOString()],
+    queryFn: () => fetchCalendarMarks(win.start, win.end),
+    staleTime: 30_000,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -128,13 +149,14 @@ export default function CalendarView({ users, meId }: Props) {
 
   const data = ranges.data ?? [];
   const bdays = birthdays.data ?? [];
+  const calMarks = marks.data ?? [];
   const isPending = ranges.isPending;
 
   let body: React.ReactNode = null;
   if (zoom === "hour") {
     body = <HoursView day={win.start} users={users} meId={meId} ranges={data} />;
   } else if (isStripZoom(zoom)) {
-    const span = zoom === "day" ? 1 : zoom === "week" ? 7 : 14;
+    const span = zoom === "day" ? 1 : 7;
     body = (
       <StripView
         windowStart={win.start}
@@ -143,6 +165,7 @@ export default function CalendarView({ users, meId }: Props) {
         meId={meId}
         ranges={data}
         birthdays={bdays}
+        marks={calMarks}
         isPending={isPending}
       />
     );
@@ -179,6 +202,9 @@ export default function CalendarView({ users, meId }: Props) {
       {showAutoPick && <AutoPickSheet />}
       {showLoser && <LoserSheet />}
       {showPoll && <PollSheet users={users} />}
+
+      {/* GHG6 BD2: глобальный поповер ДР; рендерится поверх всего календаря. */}
+      <BirthdayPopover />
     </div>
   );
 }

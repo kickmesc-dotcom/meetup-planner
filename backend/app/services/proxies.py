@@ -1,4 +1,4 @@
-"""Smart Proxy (P2/GHG5 Task 1).
+"""Smart Proxy (P2/GHG5 Task 1; расширено в GHG6 P0).
 
 Хранит пул прокси в таблице proxy_entries и режим работы в admin_config.
 ProxyManager — синглтон, кэширующий пул на короткое время (TTL) и
@@ -15,8 +15,15 @@ ProxyManager — синглтон, кэширующий пул на коротк
 - Hot-reload: `set_proxy_mode` инвалидирует синглтон, и следующий
   запрос подхватит новый режим/пул из БД.
 
-Прокси-парсер из каналов (P-4) отложен — добавляется ручное
-наполнение через admin API + env-bootstrap.
+GHG6 P0 добавляет:
+- `selftest_send` — скрытая проверка getMe (+опц. echo в SELFTEST_CHAT_ID)
+  с замером latency.
+- `ping_proxy` — TCP-коннект через aiohttp_socks с тайм-аутом.
+- `ping_all`, `delete_dead` — batch-операции на пулом.
+- `parse_mtproto_blob` — парсер простыни из @ProxyMTProto.
+- `notify_admins_about_proxy_down` — алёрт админам с rate-limit 1/час.
+- `record_last_error` / `get_last_error` — хвост последней ошибки
+  отправки (для UI).
 """
 from __future__ import annotations
 
@@ -24,11 +31,14 @@ import asyncio
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import TYPE_CHECKING
 
+import aiohttp
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,9 +46,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import ProxyEntry
 from app.services.admin_config import _get_value, _set_value
 
+if TYPE_CHECKING:
+    from aiogram import Bot
+
 log = logging.getLogger(__name__)
 
 PROXY_MODE_KEY = "proxy.mode"
+PROXY_LAST_ERROR_KEY = "proxy.last_error"               # JSON
+PROXY_LAST_ALERT_AT_KEY = "proxy.last_admin_alert_at"   # ISO datetime
+PROXY_ADMIN_ALERTS_ENABLED_KEY = "proxy.admin_alerts_enabled"  # bool
+
+# Лимит на размер пула (GHG6 PX10).
+PROXY_POOL_MAX = 50
+
+# Тайм-ауты для проверок и нотификаций.
+PING_TIMEOUT_SEC = 6.0
+SELFTEST_TIMEOUT_SEC = 15.0
+ADMIN_ALERT_COOLDOWN_SEC = 60 * 60  # 1 час
 
 
 class ProxyMode(str, Enum):
@@ -272,6 +296,19 @@ async def upsert_proxy(
     secret: str | None = None,
     enabled: bool = True,
 ) -> ProxyEntry:
+    # GHG6 PX10: enforce pool limit на add (не на upsert существующего).
+    existing = await session.scalar(
+        select(ProxyEntry).where(
+            ProxyEntry.server == server, ProxyEntry.port == port
+        )
+    )
+    if existing is None:
+        count = (await session.scalar(select(ProxyEntry.id).limit(PROXY_POOL_MAX + 1))) or 0
+        # Берём фактический count через func.count проще:
+        from sqlalchemy import func as _sqlfunc
+        total = await session.scalar(select(_sqlfunc.count()).select_from(ProxyEntry))
+        if (total or 0) >= PROXY_POOL_MAX:
+            raise ValueError(f"proxy_pool_full:{PROXY_POOL_MAX}")
     stmt = (
         pg_insert(ProxyEntry)
         .values(server=server, port=port, type=type_, secret=secret, enabled=enabled)
@@ -288,7 +325,15 @@ async def upsert_proxy(
 
 
 async def update_proxy(
-    session: AsyncSession, proxy_id: int, *, enabled: bool | None = None
+    session: AsyncSession,
+    proxy_id: int,
+    *,
+    enabled: bool | None = None,
+    server: str | None = None,
+    port: int | None = None,
+    type_: str | None = None,
+    secret: str | None = None,
+    clear_secret: bool = False,
 ) -> ProxyEntry | None:
     row = await session.get(ProxyEntry, proxy_id)
     if row is None:
@@ -297,6 +342,16 @@ async def update_proxy(
         row.enabled = enabled
         if not enabled:
             row.dead_until = None  # выключенные не «отдыхают»
+    if server is not None:
+        row.server = server
+    if port is not None:
+        row.port = port
+    if type_ is not None:
+        row.type = type_
+    if clear_secret:
+        row.secret = None
+    elif secret is not None:
+        row.secret = secret
     await session.commit()
     invalidate()
     return row
@@ -359,3 +414,479 @@ async def bootstrap_from_env(session: AsyncSession) -> int:
     if added:
         log.info("proxy.bootstrap_loaded", extra={"count": added})
     return added
+
+
+# =============================================================================
+# GHG6 P0: indicators, parser, ping/selftest, admin alerts
+# =============================================================================
+
+
+# --- PX5: парсер простыни из @ProxyMTProto ---
+
+_PARSE_KV_RE = re.compile(
+    r"^\s*(server|port|secret)\s*[:=]\s*(.+?)\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+@dataclass
+class ProxyDraft:
+    server: str
+    port: int
+    secret: str | None
+    type: str = "mtproto"
+
+    def to_dict(self) -> dict:
+        return {
+            "server": self.server,
+            "port": self.port,
+            "secret": self.secret,
+            "type": self.type,
+        }
+
+
+def parse_mtproto_blob(text: str) -> list[ProxyDraft]:
+    """Найти прокси в произвольной текстовой простыне.
+
+    Логика проста: пробегаем по строкам, собираем `Server:` / `Port:` /
+    `Secret:` (case-insensitive, разделитель `:` или `=`). Когда встретили
+    повторный `Server:` (или дошли до конца) — закрываем текущую группу.
+
+    Поддерживает форматы из инструкции:
+        Server: 178.105.137.152
+        Port: 443
+        Secret: eeabf...
+        @ProxyMTProto
+
+        PROXY MTProto
+        Server: mt.nowaboost.com
+        Port: 853
+        Secret: 4fd95a...
+        @ProxyMTProto
+
+    Возвращает список валидных черновиков (server+port обязательны).
+    """
+    if not text:
+        return []
+    current: dict[str, str] = {}
+    drafts: list[ProxyDraft] = []
+
+    def _flush() -> None:
+        s = current.get("server")
+        p_raw = current.get("port")
+        if not s or not p_raw:
+            current.clear()
+            return
+        try:
+            p = int(p_raw)
+        except ValueError:
+            current.clear()
+            return
+        if not (1 <= p <= 65535):
+            current.clear()
+            return
+        secret = current.get("secret") or None
+        drafts.append(ProxyDraft(server=s.strip(), port=p, secret=secret))
+        current.clear()
+
+    for m in _PARSE_KV_RE.finditer(text):
+        key = m.group(1).lower()
+        value = m.group(2).strip()
+        if key == "server" and current.get("server"):
+            _flush()
+        current[key] = value
+    _flush()
+    return drafts
+
+
+# --- PX2/PX3: ping ---
+
+
+@dataclass
+class PingResult:
+    proxy_id: int
+    ok: bool
+    latency_ms: int | None
+    error: str | None
+
+    def to_dict(self) -> dict:
+        return {
+            "proxy_id": self.proxy_id,
+            "ok": self.ok,
+            "latency_ms": self.latency_ms,
+            "error": self.error,
+        }
+
+
+def _proxy_connector_for_ping(rec: ProxyRecord) -> aiohttp.BaseConnector | None:
+    """SOCKS5/HTTP — через aiohttp_socks. MTProto не годится для HTTP-пробы."""
+    ptype = (rec.type or "").lower()
+    if ptype not in {"socks5", "http"}:
+        return None
+    try:
+        from aiohttp_socks import ProxyConnector, ProxyType as _PT
+    except ImportError:
+        log.warning("proxy.aiohttp_socks_missing_in_ping")
+        return None
+    pt = _PT.SOCKS5 if ptype == "socks5" else _PT.HTTP
+    return ProxyConnector(
+        proxy_type=pt,
+        host=rec.server,
+        port=rec.port,
+        password=rec.secret if ptype == "socks5" else None,
+        rdns=True,
+    )
+
+
+async def _http_probe(rec: ProxyRecord, *, timeout: float = PING_TIMEOUT_SEC) -> PingResult:
+    """Пингуем `https://api.telegram.org/` (без токена — отдаст 404, но
+    нам важен сам факт TCP-handshake'а через прокси)."""
+    connector = _proxy_connector_for_ping(rec)
+    if connector is None:
+        # MTProto или ImportError — не можем достоверно проверить через HTTP.
+        return PingResult(
+            proxy_id=rec.id,
+            ok=False,
+            latency_ms=None,
+            error="ping_not_supported_for_type:" + (rec.type or "?"),
+        )
+    started = time.monotonic()
+    try:
+        async with aiohttp.ClientSession(connector=connector, trust_env=False) as sess:
+            async with asyncio.timeout(timeout):
+                async with sess.get("https://api.telegram.org/") as resp:
+                    await resp.read()
+        latency_ms = int((time.monotonic() - started) * 1000)
+        return PingResult(proxy_id=rec.id, ok=True, latency_ms=latency_ms, error=None)
+    except asyncio.TimeoutError:
+        return PingResult(proxy_id=rec.id, ok=False, latency_ms=None, error="timeout")
+    except Exception as exc:  # noqa: BLE001
+        return PingResult(
+            proxy_id=rec.id,
+            ok=False,
+            latency_ms=None,
+            error=f"{exc.__class__.__name__}: {exc}"[:200],
+        )
+
+
+def _record_from_row(row: ProxyEntry) -> ProxyRecord:
+    return ProxyRecord(
+        id=row.id,
+        server=row.server,
+        port=row.port,
+        type=row.type,
+        secret=row.secret,
+        enabled=row.enabled,
+        fail_count=row.fail_count,
+        last_ok_at=row.last_ok_at,
+        last_fail_at=row.last_fail_at,
+        dead_until=row.dead_until,
+    )
+
+
+async def ping_proxy(session: AsyncSession, proxy_id: int) -> PingResult:
+    row = await session.get(ProxyEntry, proxy_id)
+    if row is None:
+        return PingResult(proxy_id=proxy_id, ok=False, latency_ms=None, error="not_found")
+    rec = _record_from_row(row)
+    result = await _http_probe(rec)
+    if result.ok:
+        await mark_proxy_ok(session, rec)
+    else:
+        # Не помечаем dead на «ping_not_supported» — это не сбой, а нечего пинговать.
+        if not (result.error or "").startswith("ping_not_supported"):
+            await mark_proxy_failed(session, rec)
+    return result
+
+
+async def ping_all(session: AsyncSession) -> list[PingResult]:
+    rows = await list_proxies(session)
+    if not rows:
+        return []
+    sem = asyncio.Semaphore(5)
+
+    async def _one(row: ProxyEntry) -> PingResult:
+        async with sem:
+            rec = _record_from_row(row)
+            return await _http_probe(rec)
+
+    results = await asyncio.gather(*[_one(r) for r in rows])
+    # Применяем mark_ok / mark_failed по результатам — последовательно, чтобы не
+    # ловить deadlock'и на одной сессии.
+    for row, res in zip(rows, results, strict=True):
+        rec = _record_from_row(row)
+        if res.ok:
+            await mark_proxy_ok(session, rec)
+        elif not (res.error or "").startswith("ping_not_supported"):
+            await mark_proxy_failed(session, rec)
+    return list(results)
+
+
+# --- PX4: cleanup ---
+
+
+async def delete_dead(session: AsyncSession) -> int:
+    """Удаляет прокси, которые были проверены и оказались мёртвыми.
+
+    Критерий: `fail_count > 0` И `last_ok_at IS NULL` — то есть прокси
+    ни разу не отвечал успехом, но как минимум один отказ был зафиксирован.
+    Не трогает «свежие» (никогда не пинговавшиеся) и периодически живые.
+    """
+    rows = (
+        await session.scalars(
+            select(ProxyEntry).where(
+                ProxyEntry.fail_count > 0, ProxyEntry.last_ok_at.is_(None)
+            )
+        )
+    ).all()
+    if not rows:
+        return 0
+    for r in rows:
+        await session.delete(r)
+    await session.commit()
+    invalidate()
+    log.info("proxy.delete_dead", extra={"count": len(rows)})
+    return len(rows)
+
+
+# --- PX1: selftest (скрытая отправка) ---
+
+
+@dataclass
+class SelftestResult:
+    ok: bool
+    mode_used: str
+    proxy_id: int | None
+    latency_ms: int | None
+    error: str | None
+    bot_active: bool  # True если бот вообще удалось дёрнуть (даже если send упал)
+
+    def to_dict(self) -> dict:
+        return {
+            "ok": self.ok,
+            "mode_used": self.mode_used,
+            "proxy_id": self.proxy_id,
+            "latency_ms": self.latency_ms,
+            "error": self.error,
+            "bot_active": self.bot_active,
+        }
+
+
+async def selftest_send(bot: "Bot", *, session: AsyncSession | None = None) -> SelftestResult:
+    """Замеряет latency на getMe через текущую сессию бота.
+
+    Дополнительно: если задан env `SELFTEST_CHAT_ID` — шлёт туда короткое
+    «ping» и сразу удаляет, чтобы реально проверить именно отправку.
+    Никаких сообщений в основные чаты — это «скрытая» проверка.
+    """
+    selftest_chat_raw = os.getenv("SELFTEST_CHAT_ID")
+    selftest_chat_id: int | None = None
+    if selftest_chat_raw:
+        try:
+            selftest_chat_id = int(selftest_chat_raw)
+        except ValueError:
+            selftest_chat_id = None
+
+    # Получаем текущий режим — для отображения в UI.
+    mode_str = "unknown"
+    if session is not None:
+        mode_str = (await get_proxy_mode(session)).value
+    else:
+        # fallback — берём из state
+        mode_str = _state.mode.value
+
+    started = time.monotonic()
+    proxy_id_after_call: int | None = None
+    try:
+        async with asyncio.timeout(SELFTEST_TIMEOUT_SEC):
+            await bot.get_me()
+            # Заберём id активного прокси из session, если он есть.
+            sess = getattr(bot, "session", None)
+            proxy_id_after_call = getattr(sess, "_active_proxy_id", None)
+
+            if selftest_chat_id is not None:
+                msg = await bot.send_message(chat_id=selftest_chat_id, text="🧪 ping")
+                try:
+                    await bot.delete_message(chat_id=selftest_chat_id, message_id=msg.message_id)
+                except Exception:  # noqa: BLE001
+                    pass
+        latency_ms = int((time.monotonic() - started) * 1000)
+        return SelftestResult(
+            ok=True,
+            mode_used=mode_str,
+            proxy_id=proxy_id_after_call,
+            latency_ms=latency_ms,
+            error=None,
+            bot_active=True,
+        )
+    except asyncio.TimeoutError:
+        return SelftestResult(
+            ok=False,
+            mode_used=mode_str,
+            proxy_id=proxy_id_after_call,
+            latency_ms=None,
+            error="timeout",
+            bot_active=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        err = f"{exc.__class__.__name__}: {exc}"[:300]
+        # Если ошибка пришла от Telegram (Unauthorized/BadRequest) — бот сам жив.
+        bot_active = exc.__class__.__name__ in {
+            "TelegramUnauthorizedError",
+            "TelegramBadRequest",
+            "TelegramForbiddenError",
+        }
+        return SelftestResult(
+            ok=False,
+            mode_used=mode_str,
+            proxy_id=proxy_id_after_call,
+            latency_ms=None,
+            error=err,
+            bot_active=bot_active,
+        )
+
+
+# --- PX9: last error tail (для UI) ---
+
+
+async def record_last_error(
+    session: AsyncSession,
+    *,
+    message: str,
+    mode_used: str,
+    proxy_id: int | None,
+) -> None:
+    payload = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "message": message[:500],
+        "mode_used": mode_used,
+        "proxy_id": proxy_id,
+    }
+    await _set_value(session, PROXY_LAST_ERROR_KEY, json.dumps(payload, ensure_ascii=False))
+
+
+async def get_last_error(session: AsyncSession) -> dict | None:
+    raw = await _get_value(session, PROXY_LAST_ERROR_KEY)
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else None
+    except (ValueError, TypeError):
+        return None
+
+
+async def clear_last_error(session: AsyncSession) -> None:
+    await _set_value(session, PROXY_LAST_ERROR_KEY, "")
+
+
+# --- PX7: admin alerts ---
+
+
+async def get_alerts_enabled(session: AsyncSession) -> bool:
+    raw = await _get_value(session, PROXY_ADMIN_ALERTS_ENABLED_KEY)
+    if raw is None:
+        return True
+    return raw.lower() in {"1", "true", "yes", "on"}
+
+
+async def set_alerts_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(
+        session, PROXY_ADMIN_ALERTS_ENABLED_KEY, "true" if enabled else "false"
+    )
+
+
+async def get_last_alert_at(session: AsyncSession) -> datetime | None:
+    raw = await _get_value(session, PROXY_LAST_ALERT_AT_KEY)
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+async def notify_admins_about_proxy_down(
+    bot: "Bot", session: AsyncSession, reason: str
+) -> bool:
+    """Шлёт в личку каждому ADMIN_TG_IDS, но не чаще ADMIN_ALERT_COOLDOWN_SEC.
+
+    Возвращает True, если хотя бы одно сообщение реально ушло.
+    """
+    if not await get_alerts_enabled(session):
+        return False
+    last_at = await get_last_alert_at(session)
+    now = datetime.now(timezone.utc)
+    if last_at is not None:
+        # last_at может быть naive — нормализуем в utc
+        if last_at.tzinfo is None:
+            last_at = last_at.replace(tzinfo=timezone.utc)
+        if (now - last_at).total_seconds() < ADMIN_ALERT_COOLDOWN_SEC:
+            log.info("proxy.alert_skipped_cooldown", extra={"reason": reason})
+            return False
+    from app.config import get_settings as _gs
+
+    admin_ids = list(_gs().admin_tg_id_set)
+    if not admin_ids:
+        return False
+    text = (
+        "⚠️ <b>Прокси-проблема</b>\n"
+        f"<i>{reason}</i>\n\n"
+        "Меньше — не чаще раза в час. Выключить нотификации можно в админке Mini App "
+        "(Прокси → 🔔 уведомления админу)."
+    )
+    sent_any = False
+    for admin_id in admin_ids:
+        try:
+            await bot.send_message(chat_id=admin_id, text=text, parse_mode="HTML")
+            sent_any = True
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "proxy.alert_send_failed",
+                extra={"admin_id": admin_id, "err": exc.__class__.__name__},
+            )
+    if sent_any:
+        await _set_value(session, PROXY_LAST_ALERT_AT_KEY, now.isoformat())
+    return sent_any
+
+
+# --- PX6: периодический самотест (вызывается из scheduler.py) ---
+
+
+async def proxy_health_tick(bot: "Bot") -> None:
+    """Раз в env.PROXY_HEALTH_INTERVAL_SEC: запускаем selftest_send. Если в режиме
+    ALWAYS_ON и все прокси умерли — алёртим админам."""
+    from app.db.base import get_sessionmaker
+
+    sm = get_sessionmaker()
+    async with sm() as db:
+        result = await selftest_send(bot, session=db)
+        if not result.ok:
+            mode = await get_proxy_mode(db)
+            if mode is ProxyMode.ALWAYS_ON:
+                await ensure_loaded(db)
+                now = datetime.now(timezone.utc)
+                alive = sum(1 for p in _state.pool if p.is_alive(now))
+                if alive == 0:
+                    await notify_admins_about_proxy_down(
+                        bot,
+                        db,
+                        reason=(
+                            f"Selftest упал ({result.error}), а в режиме ALWAYS_ON "
+                            "ни одного живого прокси."
+                        ),
+                    )
+            await record_last_error(
+                db,
+                message=result.error or "unknown",
+                mode_used=result.mode_used,
+                proxy_id=result.proxy_id,
+            )
+        log.info(
+            "proxy.health_tick",
+            extra={
+                "ok": result.ok,
+                "latency_ms": result.latency_ms,
+                "mode": result.mode_used,
+            },
+        )

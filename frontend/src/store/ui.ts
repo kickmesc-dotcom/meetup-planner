@@ -1,16 +1,19 @@
 import { create } from "zustand";
 
 /**
- * Девять уровней зума по аналогии с iOS Calendar: от часовой шкалы одного
+ * Восемь уровней зума по аналогии с iOS Calendar: от часовой шкалы одного
  * дня до общего обзора всех годов. Все уровни делятся на «полосовые»
- * (одна горизонтальная лента ячеек на участника — hour/day/week/twoWeeks)
- * и «сеточные» (классическая календарная сетка — month/threeMonths/sixMonths/year/allYears).
+ * (одна горизонтальная лента ячеек на участника — hour/day/week) и
+ * «сеточные» (классическая календарная сетка — month/threeMonths/sixMonths/year/allYears).
+ *
+ * GHG6 CL0: уровень `twoWeeks` удалён в рамках подготовки к новому
+ * TimelineView. Дефолт — `week`. Если позже захочется «произвольный
+ * диапазон», добавим его отдельным presetom внутри TimelineView (CL12).
  */
 export type ZoomLevel =
   | "hour"
   | "day"
   | "week"
-  | "twoWeeks"
   | "month"
   | "threeMonths"
   | "sixMonths"
@@ -23,7 +26,6 @@ export const ZOOM_ORDER: ZoomLevel[] = [
   "sixMonths",
   "threeMonths",
   "month",
-  "twoWeeks",
   "week",
   "day",
   "hour",
@@ -33,7 +35,6 @@ export const ZOOM_LABELS: Record<ZoomLevel, string> = {
   hour: "Часы",
   day: "День",
   week: "Неделя",
-  twoWeeks: "2 нед",
   month: "Месяц",
   threeMonths: "3 мес",
   sixMonths: "Полгода",
@@ -42,7 +43,7 @@ export const ZOOM_LABELS: Record<ZoomLevel, string> = {
 };
 
 export function isStripZoom(z: ZoomLevel): boolean {
-  return z === "day" || z === "week" || z === "twoWeeks";
+  return z === "day" || z === "week";
 }
 
 export function isMonthGridZoom(z: ZoomLevel): boolean {
@@ -79,6 +80,20 @@ interface UIState {
 
   showPollSheet: boolean;
   setShowPollSheet: (v: boolean) => void;
+
+  /**
+   * GHG6 BD2: поповер «🎂 поздравить / назначить встречу». Хранит, чьё ДР
+   * и на какую дату открыто. Закрывается через setBirthdayPopover(null).
+   */
+  birthdayPopover: { userId: number; date: string; displayName: string } | null;
+  setBirthdayPopover: (v: { userId: number; date: string; displayName: string } | null) => void;
+
+  /**
+   * GHG6 BD2: дата, с которой надо открыть PollSheet при «Назначить встречу»
+   * из поповера. PollSheet читает её при монтаже и кладёт в первый вариант.
+   */
+  pollSheetPresetDate: string | null;
+  setPollSheetPresetDate: (date: string | null) => void;
 }
 
 function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
@@ -90,9 +105,6 @@ function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
       break;
     case "week":
       x.setDate(x.getDate() + dir * 7);
-      break;
-    case "twoWeeks":
-      x.setDate(x.getDate() + dir * 14);
       break;
     case "month":
       x.setMonth(x.getMonth() + dir);
@@ -117,7 +129,7 @@ export const useUI = create<UIState>((set, get) => ({
   tab: "calendar",
   setTab: (tab) => set({ tab }),
 
-  zoom: "twoWeeks",
+  zoom: "week",
   setZoom: (zoom) => set({ zoom }),
   zoomIn: () => {
     const cur = get().zoom;
@@ -147,4 +159,10 @@ export const useUI = create<UIState>((set, get) => ({
 
   showPollSheet: false,
   setShowPollSheet: (v) => set({ showPollSheet: v }),
+
+  birthdayPopover: null,
+  setBirthdayPopover: (birthdayPopover) => set({ birthdayPopover }),
+
+  pollSheetPresetDate: null,
+  setPollSheetPresetDate: (pollSheetPresetDate) => set({ pollSheetPresetDate }),
 }));

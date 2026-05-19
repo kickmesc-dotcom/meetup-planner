@@ -1,53 +1,107 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { addDays, addHours, addMinutes, format, parseISO, startOfDay } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
 import { createPoll } from "@/api/meetings";
-import { fetchPollPresetsPublic, type PollPreset } from "@/api/admin";
+import { fetchPollPresetsPublic } from "@/api/admin";
 import type { User } from "@/types";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
+import { Checkbox } from "@/components/Checkbox";
+import { Spinner } from "@/components/Spinner";
 import BottomSheet from "./BottomSheet";
 
 interface Props {
   users: User[];
 }
 
-function defaultOption(daysAhead: number, preset?: PollPreset): string {
-  const base = startOfDay(addDays(new Date(), daysAhead));
-  if (preset) {
-    const [h, m] = preset.start.split(":").map(Number);
-    return addMinutes(addHours(base, h), m).toISOString().slice(0, 16);
-  }
-  return addHours(base, 19).toISOString().slice(0, 16); // "YYYY-MM-DDTHH:mm" for input
+interface OptionDraft {
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM, актуально только если includeTime=true */
+  time: string;
 }
 
-function applyPresetToOption(option: string, preset: PollPreset): string {
-  // Сохраняем дату из option, заменяем часы/минуты на preset.start.
+const DOW_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] as const;
+
+/**
+ * GHG6 PL1: дефолтные 3 варианта — пятница/суббота/воскресенье текущей недели.
+ * Если сегодня уже после среды и пт/сб/вс прошли — берём следующую неделю.
+ */
+function defaultWeekendOptions(today: Date = new Date()): string[] {
+  const t = startOfDay(today);
+  // День недели: 0=Вс,1=Пн,...,5=Пт,6=Сб
+  const dow = t.getDay();
+  // Считаем, сколько дней прибавить до ближайшей пятницы.
+  // Если сегодня <= среда — берём ближайшую пт текущей недели.
+  // Если сегодня четверг и позже — берём пт следующей недели.
+  let daysToFri: number;
+  if (dow <= 4) {
+    // 0..4 → 5 - dow (включая, если уже пт)
+    daysToFri = 5 - dow;
+  } else {
+    // пт уже сегодня (5) или прошла (6) — следующая пт
+    daysToFri = 5 - dow + 7;
+  }
+  // На самом деле инструкция: "пт/сб/вс текущей недели, если сегодня уже после
+  // среды и они прошли — следующей". То есть пятница включительно — текущая.
+  if (dow === 5) daysToFri = 0;
+  const fri = addDays(t, daysToFri);
+  const sat = addDays(fri, 1);
+  const sun = addDays(fri, 2);
+  return [fri, sat, sun].map((d) => format(d, "yyyy-MM-dd"));
+}
+
+function fmtDateRu(d: string): string {
+  if (!d) return "";
   try {
-    const d = option ? parseISO(option) : new Date();
-    const [h, m] = preset.start.split(":").map(Number);
-    const next = addMinutes(addHours(startOfDay(d), h), m);
-    return next.toISOString().slice(0, 16);
+    const dt = new Date(d + "T00:00:00");
+    const dow = DOW_RU[dt.getDay()];
+    const dm = format(dt, "dd.MM");
+    return `${dow} · ${dm}`;
   } catch {
-    return option;
+    return d;
   }
 }
 
 export default function PollSheet(_props: Props) {
-  const close = () => useUI.getState().setShowPollSheet(false);
+  const close = () => {
+    useUI.getState().setShowPollSheet(false);
+    // Очищаем пресетную дату после закрытия, чтобы следующий ручной вызов
+    // PollSheet начинался с обычных дефолтов.
+    useUI.getState().setPollSheetPresetDate(null);
+  };
   const [question, setQuestion] = useState("Когда собираемся?");
+
+  // Public presets подтягиваем — нужен дефолт-час, если включат «Указать время».
   const presetsQ = useQuery({
     queryKey: ["poll-presets"],
     queryFn: fetchPollPresetsPublic,
     staleTime: 60_000,
   });
-  const firstPreset = presetsQ.data?.[0];
-  const [options, setOptions] = useState<string[]>([
-    defaultOption(1, firstPreset),
-    defaultOption(2, firstPreset),
-    defaultOption(3, firstPreset),
-  ]);
+  const defaultTime = useMemo(() => {
+    const first = presetsQ.data?.[0]?.start;
+    return first || "20:00";
+  }, [presetsQ.data]);
+
+  // GHG6 BD2: если поповер ДР открыл нас с пресетной датой — она становится
+  // первым вариантом, следующие два — это +1 и +2 дня. Иначе обычные пт/сб/вс.
+  const presetDate = useUI((s) => s.pollSheetPresetDate);
+  const [options, setOptions] = useState<OptionDraft[]>(() => {
+    if (presetDate) {
+      try {
+        const base = new Date(`${presetDate}T00:00:00`);
+        return [base, addDays(base, 1), addDays(base, 2)].map((d) => ({
+          date: format(d, "yyyy-MM-dd"),
+          time: "20:00",
+        }));
+      } catch {
+        // fallthrough → defaults
+      }
+    }
+    return defaultWeekendOptions().map((d) => ({ date: d, time: "20:00" }));
+  });
+  const [includeTime, setIncludeTime] = useState(false);
   const [closesIn, setClosesIn] = useState(24);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,9 +109,14 @@ export default function PollSheet(_props: Props) {
     mutationFn: () =>
       createPoll({
         question: question.trim(),
+        // Если время не указано — шлём YYYY-MM-DD; иначе ISO datetime в локальной зоне.
         options: options
-          .filter(Boolean)
-          .map((v) => new Date(v).toISOString()),
+          .filter((o) => !!o.date)
+          .map((o) => {
+            if (!includeTime) return o.date;
+            const iso = new Date(`${o.date}T${o.time || defaultTime}:00`).toISOString();
+            return iso;
+          }),
         closes_in_hours: closesIn,
       }),
     onSuccess: () => {
@@ -72,13 +131,21 @@ export default function PollSheet(_props: Props) {
     },
   });
 
-  const setOption = (i: number, v: string) => {
-    setOptions((o) => o.map((x, idx) => (idx === i ? v : x)));
+  const setOption = (i: number, patch: Partial<OptionDraft>) => {
+    setOptions((o) => o.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   };
 
   const addOption = () => {
-    if (options.length >= 5) return;
-    setOptions((o) => [...o, defaultOption(o.length + 1)]);
+    if (options.length >= 6) return;
+    // Новый вариант — следующий день после последнего, время дефолтное.
+    const last = options[options.length - 1]?.date;
+    let next: string;
+    try {
+      next = format(addDays(new Date(`${last}T00:00:00`), 1), "yyyy-MM-dd");
+    } catch {
+      next = format(new Date(), "yyyy-MM-dd");
+    }
+    setOptions((o) => [...o, { date: next, time: defaultTime }]);
   };
 
   const removeOption = (i: number) => {
@@ -89,7 +156,8 @@ export default function PollSheet(_props: Props) {
   const valid =
     question.trim().length > 0 &&
     options.length >= 2 &&
-    options.every((v) => !!v && !Number.isNaN(new Date(v).getTime()));
+    options.every((o) => !!o.date) &&
+    (!includeTime || options.every((o) => /^\d{2}:\d{2}$/.test(o.time)));
 
   return (
     <BottomSheet title="📊 Опрос в чат" onClose={close}>
@@ -103,50 +171,61 @@ export default function PollSheet(_props: Props) {
         />
       </label>
 
+      <div className="mt-3">
+        <Checkbox
+          checked={includeTime}
+          onChange={setIncludeTime}
+          label="Указать время"
+          size="md"
+        />
+        {!includeTime && (
+          <div className="mt-1 pl-1 text-[11px] text-tg-hint">
+            Без времени — в опросе будет только день недели и число.
+          </div>
+        )}
+      </div>
+
       <div className="mt-3 space-y-2">
-        <div className="text-xs text-tg-hint">Варианты дат (2–5)</div>
-        {options.map((v, i) => (
-          <div key={i} className="space-y-1">
+        <div className="text-xs text-tg-hint">
+          Варианты дат (2–6) · по умолчанию пт/сб/вс текущей недели
+        </div>
+        {options.map((o, i) => (
+          <div
+            key={i}
+            className="rounded-lg bg-tg-secondary-bg/40 p-2 space-y-1.5"
+          >
             <div className="flex items-center gap-2">
               <input
-                type="datetime-local"
-                value={v}
-                onChange={(e) => setOption(i, e.target.value)}
-                className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
+                type="date"
+                value={o.date}
+                onChange={(e) => setOption(i, { date: e.target.value })}
+                className="flex-1 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
               />
-              <span className="text-xs text-tg-hint">
-                {v ? format(new Date(v), "EEE") : ""}
+              <span className="min-w-[78px] text-right text-xs text-tg-hint tabular-nums">
+                {fmtDateRu(o.date)}
               </span>
               {options.length > 2 && (
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
-                  className="rounded-lg bg-status-busy/15 px-2 py-2 text-xs text-status-busy"
+                  className="min-h-9 min-w-9 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
+                  title="Убрать"
                 >
                   ✕
                 </button>
               )}
             </div>
-            {presetsQ.data && presetsQ.data.length > 0 && (
-              <div className="flex flex-wrap gap-1 pl-1">
-                {presetsQ.data.map((p, pi) => (
-                  <button
-                    key={pi}
-                    type="button"
-                    onClick={() => {
-                      haptic("selection");
-                      setOption(i, applyPresetToOption(v, p));
-                    }}
-                    className="rounded-md border border-tg-secondary-bg/80 bg-tg-bg/40 px-2 py-0.5 text-[11px] text-tg-text hover:bg-tg-link/15"
-                  >
-                    {p.start}–{p.end}
-                  </button>
-                ))}
-              </div>
+            {includeTime && (
+              <input
+                type="time"
+                value={o.time || defaultTime}
+                onChange={(e) => setOption(i, { time: e.target.value })}
+                className="w-[120px] rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text tabular-nums outline-none border border-transparent focus:border-tg-link"
+              />
             )}
           </div>
         ))}
-        {options.length < 5 && (
+        {options.length < 6 && (
           <button
             type="button"
             onClick={addOption}
@@ -185,8 +264,9 @@ export default function PollSheet(_props: Props) {
           mut.mutate();
         }}
         disabled={!valid || mut.isPending}
-        className="mt-4 w-full rounded-xl bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-4 w-full rounded-xl bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
       >
+        {mut.isPending && <Spinner />}
         {mut.isPending ? "Отправляем…" : "Отправить в чат"}
       </button>
 
@@ -197,6 +277,9 @@ export default function PollSheet(_props: Props) {
       >
         Отмена
       </button>
+
+      {/* Chip-presets времени убраны — они теперь применяются только когда
+          включён чекбокс «Указать время» через default. */}
     </BottomSheet>
   );
 }

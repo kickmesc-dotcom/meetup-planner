@@ -11,6 +11,10 @@ import {
   summarizeDay,
 } from "../dateUtils";
 
+// GHG6 BD1: в MonthView нет «строк по участникам», но иконка 🎂 должна
+// открывать поповер, а не только проваливать тап на день. Это ближайшая
+// аппроксимация спецификации в рамках сетки.
+
 interface Props {
   /** Сколько подряд месяцев показать. month=1, threeMonths=3, sixMonths=6. */
   months: number;
@@ -38,12 +42,13 @@ export default function MonthView({ months, anchor, ranges, users, birthdays = [
     setZoom("day");
   };
 
-  // Индекс ДР: ключ — YYYY-MM-DD, значение — массив имён
+  // Индекс ДР: ключ — YYYY-MM-DD, значение — список именинников (id+имя).
+  // Берём первого для дефолтного клика — поповер открывается на нём.
   const bdayIndex = useMemo(() => {
-    const idx = new Map<string, string[]>();
+    const idx = new Map<string, BirthdayCalendarEntry[]>();
     for (const b of birthdays) {
       const arr = idx.get(b.date) ?? [];
-      arr.push(b.display_name);
+      arr.push(b);
       idx.set(b.date, arr);
     }
     return idx;
@@ -75,9 +80,10 @@ function MonthBlock({
   monthAnchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
-  bdayIndex: Map<string, string[]>;
+  bdayIndex: Map<string, BirthdayCalendarEntry[]>;
   onDayTap: (d: Date) => void;
 }) {
+  const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
   const totalUsers = users.length || 6;
 
@@ -116,13 +122,17 @@ function MonthBlock({
                     ? "bg-status-busy/15"
                     : "bg-tg-secondary-bg/40";
           const dayKey = format(d, "yyyy-MM-dd");
-          const bdayNames = bdayIndex.get(dayKey);
+          const bdayList = bdayIndex.get(dayKey);
           return (
             <button
               key={d.toISOString()}
               type="button"
               onClick={() => onDayTap(d)}
-              title={bdayNames ? `🎂 ${bdayNames.join(", ")}` : undefined}
+              title={
+                bdayList
+                  ? `🎂 ${bdayList.map((b) => b.display_name).join(", ")}`
+                  : undefined
+              }
               className={[
                 "aspect-square rounded-lg flex flex-col items-center justify-start py-1 px-1 text-xs transition-transform active:scale-95 relative",
                 inMonth ? "text-tg-text" : "text-tg-hint/60",
@@ -131,12 +141,26 @@ function MonthBlock({
               ].join(" ")}
             >
               <span className={today ? "font-bold" : "font-medium"}>{d.getDate()}</span>
-              {bdayNames && (
+              {bdayList && bdayList.length > 0 && (
                 <span
-                  aria-label="День рождения"
-                  className="absolute top-0.5 right-0.5 text-[10px] leading-none"
+                  role="button"
+                  aria-label={`День рождения ${bdayList.map((b) => b.display_name).join(", ")}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    haptic("selection");
+                    const first = bdayList[0];
+                    setBirthdayPopover({
+                      userId: first.user_id,
+                      date: first.date,
+                      displayName: first.display_name,
+                    });
+                  }}
+                  className="absolute top-0.5 right-0.5 text-[10px] leading-none cursor-pointer"
                 >
                   🎂
+                  {bdayList.length > 1 && (
+                    <span className="ml-0.5 text-[8px]">×{bdayList.length}</span>
+                  )}
                 </span>
               )}
               <div className="flex gap-0.5 mt-auto pb-0.5">

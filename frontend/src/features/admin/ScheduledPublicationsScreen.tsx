@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -6,13 +6,15 @@ import {
   closeAdminPoll,
   deleteAdminPoll,
   fetchAdminPolls,
-  fetchRemindersSettings,
   fetchScheduledJobs,
-  updateRemindersSettings,
+  fetchScheduledSettings,
+  updateScheduledSettings,
+  type ScheduledSettingsIO,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 const errAlert = (e: unknown) => {
@@ -23,6 +25,8 @@ const errAlert = (e: unknown) => {
 const JOBS_IDLE_INTERVAL_MS = 10 * 60 * 1000;
 const JOBS_HOT_INTERVAL_MS = 5_000;
 const JOBS_HOT_DURATION_MS = 3 * 60 * 1000;
+
+const WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 
 interface Props {
   onBack: () => void;
@@ -60,19 +64,32 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
     queryFn: fetchScheduledJobs,
     refetchInterval: jobsInterval,
   });
-  const tick = useQuery({
-    queryKey: ["admin", "reminders"],
-    queryFn: fetchRemindersSettings,
+
+  const sched = useQuery({
+    queryKey: ["admin", "scheduled"],
+    queryFn: fetchScheduledSettings,
   });
-  const setTick = useMutation({
-    mutationFn: updateRemindersSettings,
-    onSuccess: () => {
-      haptic("light");
-      qc.invalidateQueries({ queryKey: ["admin", "reminders"] });
+
+  const [draft, setDraft] = useState<ScheduledSettingsIO | null>(null);
+  useEffect(() => {
+    if (sched.data) setDraft(structuredClone(sched.data));
+  }, [sched.data]);
+
+  const dirty = useMemo(
+    () => !!draft && !!sched.data && JSON.stringify(draft) !== JSON.stringify(sched.data),
+    [draft, sched.data],
+  );
+
+  const save = useMutation({
+    mutationFn: updateScheduledSettings,
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "scheduled"], data);
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
     },
     onError: errAlert,
   });
+
   const cancelJob = useMutation({
     mutationFn: (id: string) => cancelScheduledJob(id),
     onSuccess: () => {
@@ -102,32 +119,227 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
     onError: errAlert,
   });
 
+  const patch = useCallback(
+    (updater: (d: ScheduledSettingsIO) => ScheduledSettingsIO) => {
+      setDraft((cur) => (cur ? updater(structuredClone(cur)) : cur));
+    },
+    [],
+  );
+
   return (
     <SubScreen
       title="⏱️ Запланированные публикации"
-      subtitle="Тик напоминаний, очередь job'ов, опросы"
+      subtitle="Master-toggles, очередь задач, опросы в чате"
       onBack={onBack}
     >
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="text-base font-semibold mb-1">⏰ Тик напоминаний</div>
-        <div className="text-xs text-tg-hint mb-2">
-          Раз в N минут бот проверяет очередь напоминаний к встречам. Дефолт — 10 минут.
-        </div>
-        {tick.isPending || !tick.data ? (
-          <ListSkeleton rows={1} />
-        ) : (
-          <TickEditor
-            initial={tick.data.tick_minutes}
-            isPending={setTick.isPending}
-            onSave={(v) => setTick.mutate(v)}
+      {sched.isPending || !draft ? (
+        <ListSkeleton rows={6} />
+      ) : (
+        <>
+          <ToggleBlock
+            icon="⏰"
+            title="Тик напоминаний"
+            hint="Раз в N минут бот проверяет очередь напоминаний к встречам."
+            enabled={draft.reminders.enabled}
+            onToggle={(v) =>
+              patch((d) => {
+                d.reminders.enabled = v;
+                return d;
+              })
+            }
+          >
+            <Field label="Интервал, мин (1–120)">
+              <NumberInput
+                value={draft.reminders.tick_minutes}
+                min={1}
+                max={120}
+                onChange={(v) =>
+                  patch((d) => {
+                    d.reminders.tick_minutes = v;
+                    return d;
+                  })
+                }
+              />
+            </Field>
+          </ToggleBlock>
+
+          <ToggleBlock
+            icon="🤡"
+            title="Автолох"
+            hint="Бот сам выбирает лоха в течение рабочего окна."
+            enabled={draft.loser.enabled}
+            onToggle={(v) =>
+              patch((d) => {
+                d.loser.enabled = v;
+                return d;
+              })
+            }
+          >
+            <Field label="Раз в сутки (1–12)">
+              <NumberInput
+                value={draft.loser.per_day}
+                min={1}
+                max={12}
+                onChange={(v) =>
+                  patch((d) => {
+                    d.loser.per_day = v;
+                    return d;
+                  })
+                }
+              />
+            </Field>
+            <Field label="Окно активности">
+              <HourRange
+                start={draft.loser.window_start_hour}
+                end={draft.loser.window_end_hour}
+                onChange={(s, e) =>
+                  patch((d) => {
+                    d.loser.window_start_hour = s;
+                    d.loser.window_end_hour = e;
+                    return d;
+                  })
+                }
+              />
+            </Field>
+          </ToggleBlock>
+
+          <ToggleBlock
+            icon="💬"
+            title="Рандомная фраза"
+            hint="Автопостинг рандомных фраз. Окно — когда бот может постить."
+            enabled={draft.phrases.enabled}
+            onToggle={(v) =>
+              patch((d) => {
+                d.phrases.enabled = v;
+                return d;
+              })
+            }
+          >
+            <Field label="Окно активности">
+              <HhmmRange
+                start={draft.phrases.window_start}
+                end={draft.phrases.window_end}
+                onChange={(s, e) =>
+                  patch((d) => {
+                    d.phrases.window_start = s;
+                    d.phrases.window_end = e;
+                    return d;
+                  })
+                }
+              />
+            </Field>
+          </ToggleBlock>
+
+          <ToggleBlock
+            icon="🖼️"
+            title="Синхронизация аватарок"
+            hint="Бот скачивает свежие аватарки участников из Telegram."
+            enabled={draft.avatars.enabled}
+            onToggle={(v) =>
+              patch((d) => {
+                d.avatars.enabled = v;
+                return d;
+              })
+            }
+          >
+            <Field label="Раз в сутки (мин 0.14 ≈ раз в неделю)">
+              <NumberInput
+                value={draft.avatars.per_day}
+                min={0.14}
+                max={24}
+                step={0.1}
+                onChange={(v) =>
+                  patch((d) => {
+                    d.avatars.per_day = v;
+                    return d;
+                  })
+                }
+              />
+            </Field>
+          </ToggleBlock>
+
+          <ToggleBlock
+            icon="🎂"
+            title="Дни рождения"
+            hint="Все напоминания о ДР (диапазон-перед-днём — в экране ДР)."
+            enabled={draft.birthdays.alerts_enabled}
+            onToggle={(v) =>
+              patch((d) => {
+                d.birthdays.alerts_enabled = v;
+                return d;
+              })
+            }
           />
-        )}
-        {setTick.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
-            ⚠ {String((setTick.error as Error)?.message ?? setTick.error)}
+
+          <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base">💩</span>
+              <span className="text-base font-semibold">Чухан недели</span>
+            </div>
+            <div className="text-xs text-tg-hint mb-2">
+              День недели и окно, в котором бот публикует чухана.
+            </div>
+            <Field label="День недели">
+              <div className="flex flex-wrap gap-1">
+                {WEEKDAYS_RU.map((label, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      haptic("selection");
+                      patch((d) => {
+                        d.chukhan.weekday = idx;
+                        return d;
+                      });
+                    }}
+                    className={[
+                      "min-h-9 min-w-9 rounded-md px-2 text-xs",
+                      draft.chukhan.weekday === idx
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-bg/70 text-tg-text",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Окно активности">
+              <HhmmRange
+                start={draft.chukhan.window_start}
+                end={draft.chukhan.window_end}
+                onChange={(s, e) =>
+                  patch((d) => {
+                    d.chukhan.window_start = s;
+                    d.chukhan.window_end = e;
+                    return d;
+                  })
+                }
+              />
+            </Field>
+          </section>
+
+          <div className="sticky bottom-0 -mx-3 px-3 pb-3 pt-2 bg-tg-bg/95 backdrop-blur">
+            <button
+              type="button"
+              disabled={!dirty || save.isPending}
+              onClick={() => {
+                if (!draft) return;
+                haptic("medium");
+                save.mutate(draft);
+              }}
+              className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+            >
+              {save.isPending && <Spinner />}
+              {save.isPending
+                ? "Сохраняем…"
+                : dirty
+                ? "💾 Сохранить настройки"
+                : "✓ Сохранено"}
+            </button>
           </div>
-        )}
-      </section>
+        </>
+      )}
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <div className="flex items-start justify-between gap-2 mb-1">
@@ -271,41 +483,171 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
   );
 }
 
-function TickEditor({
-  initial,
-  isPending,
-  onSave,
+function ToggleBlock({
+  icon,
+  title,
+  hint,
+  enabled,
+  onToggle,
+  children,
 }: {
-  initial: number;
-  isPending: boolean;
-  onSave: (v: number) => void;
+  icon: string;
+  title: string;
+  hint: string;
+  enabled: boolean;
+  onToggle: (v: boolean) => void;
+  children?: ReactNode;
 }) {
-  const [val, setVal] = useState(initial.toString());
-  useEffect(() => {
-    setVal(initial.toString());
-  }, [initial]);
-  const parsed = parseInt(val, 10);
-  const valid = !Number.isNaN(parsed) && parsed >= 1 && parsed <= 120;
-  const dirty = valid && parsed !== initial;
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base">{icon}</span>
+          <div className="min-w-0">
+            <div className="text-base font-semibold text-tg-text">{title}</div>
+            <div className="text-[11px] text-tg-hint">{hint}</div>
+          </div>
+        </div>
+        <Switch
+          checked={enabled}
+          onChange={(v) => {
+            haptic("selection");
+            onToggle(v);
+          }}
+        />
+      </div>
+      {enabled && children && <div className="mt-2 space-y-2">{children}</div>}
+    </section>
+  );
+}
 
+function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={[
+        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors",
+        checked ? "bg-tg-button" : "bg-tg-hint/30",
+      ].join(" ")}
+      role="switch"
+      aria-checked={checked}
+    >
+      <span
+        className={[
+          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+          checked ? "translate-x-5" : "translate-x-0.5",
+        ].join(" ")}
+      />
+    </button>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="text-[11px] text-tg-hint mb-1">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function NumberInput({
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+  const isInt = step >= 1 && Number.isInteger(step);
+  return (
+    <input
+      type="text"
+      inputMode={isInt ? "numeric" : "decimal"}
+      value={draft}
+      onChange={(e) => {
+        const cleaned = e.target.value.replace(isInt ? /[^0-9]/g : /[^0-9.]/g, "");
+        setDraft(cleaned);
+      }}
+      onBlur={() => {
+        const n = parseFloat(draft);
+        if (Number.isNaN(n)) {
+          setDraft(String(value));
+          return;
+        }
+        const clamped = Math.max(min, Math.min(max, n));
+        const rounded = isInt ? Math.round(clamped) : Math.round(clamped * 100) / 100;
+        setDraft(String(rounded));
+        if (rounded !== value) onChange(rounded);
+      }}
+      className="w-24 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
+    />
+  );
+}
+
+function HourRange({
+  start,
+  end,
+  onChange,
+}: {
+  start: number;
+  end: number;
+  onChange: (s: number, e: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <NumberInput
+        value={start}
+        min={0}
+        max={23}
+        onChange={(v) => onChange(v, end)}
+      />
+      <span className="text-tg-hint text-xs">…</span>
+      <NumberInput
+        value={end}
+        min={0}
+        max={23}
+        onChange={(v) => onChange(start, v)}
+      />
+      <span className="text-tg-hint text-xs">ч</span>
+    </div>
+  );
+}
+
+function HhmmRange({
+  start,
+  end,
+  onChange,
+}: {
+  start: string;
+  end: string;
+  onChange: (s: string, e: string) => void;
+}) {
   return (
     <div className="flex items-center gap-2">
       <input
-        type="text"
-        inputMode="numeric"
-        value={val}
-        onChange={(e) => setVal(e.target.value.replace(/[^0-9]/g, ""))}
-        className="w-20 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
+        type="time"
+        value={start}
+        onChange={(e) => onChange(e.target.value, end)}
+        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
       />
-      <div className="text-xs text-tg-hint">мин (1..120)</div>
-      <button
-        type="button"
-        disabled={!dirty || isPending}
-        onClick={() => onSave(parsed)}
-        className="ml-auto min-h-11 rounded-md bg-tg-link/15 px-3 text-xs text-tg-link disabled:opacity-40"
-      >
-        {isPending ? "..." : "Сохранить"}
-      </button>
+      <span className="text-tg-hint text-xs">…</span>
+      <input
+        type="time"
+        value={end}
+        onChange={(e) => onChange(start, e.target.value)}
+        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+      />
     </div>
   );
 }

@@ -1,7 +1,8 @@
-import { addDays, startOfDay } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup } from "framer-motion";
 import type { AvailabilityRange, User } from "@/types";
+import type { BirthdayCalendarEntry, CalendarMark } from "@/api/birthdays";
 import { rangeToPillRect } from "./dateUtils";
 import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
@@ -14,6 +15,10 @@ interface Props {
   ranges: AvailabilityRange[];
   windowStart: Date;
   windowSpan: number;
+  /** ДР этого участника в окне (после фильтра по user_id в StripView). */
+  birthdays?: BirthdayCalendarEntry[];
+  /** Отметки лох/чухан этого участника в окне. */
+  marks?: CalendarMark[];
 }
 
 export default function ParticipantRow({
@@ -22,8 +27,11 @@ export default function ParticipantRow({
   ranges,
   windowStart,
   windowSpan,
+  birthdays = [],
+  marks = [],
 }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
+  const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
   const qc = useQueryClient();
 
   const createMut = useMutation({
@@ -48,6 +56,16 @@ export default function ParticipantRow({
       confidence: 3,
     });
   };
+
+  // GHG6 BD1/BD5: индексы по YYYY-MM-DD, чтобы не сканить массивы в каждой ячейке.
+  const bdayByDate = new Map(birthdays.map((b) => [b.date, b]));
+  const marksByDate = new Map<string, Set<CalendarMark["type"]>>();
+  for (const m of marks) {
+    const set = marksByDate.get(m.date) ?? new Set();
+    set.add(m.type);
+    marksByDate.set(m.date, set);
+  }
+  const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
 
   return (
     <div className="relative flex items-center border-b border-tg-secondary-bg/60">
@@ -81,6 +99,7 @@ export default function ParticipantRow({
       >
         {Array.from({ length: windowSpan }).map((_, i) => {
           const dayStart = startOfDay(addDays(windowStart, i));
+          const dayKey = format(dayStart, "yyyy-MM-dd");
           const dayEnd = addDays(dayStart, 1).getTime();
           const dayStartMs = dayStart.getTime();
           const covered = ranges.some((r) => {
@@ -89,22 +108,67 @@ export default function ParticipantRow({
             return s < dayEnd && e > dayStartMs;
           });
           const isLast = i === windowSpan - 1;
+          const bday = bdayByDate.get(dayKey);
+          const dayMarks = marksByDate.get(dayKey);
+          // BD5: бейджи лох/чухан показываем только на прошедших днях, чтобы
+          // в будущем не светить будущие записи (их там и не должно быть, но
+          // на всякий случай защищаемся от часовых поясов и подмены даты).
+          const isPast = dayKey < todayKey;
+          const showLoser = isPast && dayMarks?.has("loser");
+          const showChukhan = isPast && dayMarks?.has("chukhan");
           return (
-            <button
+            <div
               key={i}
-              type="button"
-              onClick={() => onCellTap(i)}
-              disabled={!isMe || createMut.isPending}
               className={[
                 "h-full relative",
-                // CAL1: явная вертикальная сетка между клетками. Последняя ячейка без правой границы — её даст контейнер.
                 isLast ? "" : "border-r border-tg-secondary-bg/70",
-                isMe ? "active:bg-tg-secondary-bg/50" : "",
-                !covered ? "bg-[repeating-linear-gradient(45deg,transparent_0_4px,rgba(239,68,68,0.08)_4px_8px)]" : "",
               ].join(" ")}
-              aria-label={`day ${i}`}
-              title={!covered ? "Не отмечено — считается занятым" : undefined}
-            />
+            >
+              <button
+                type="button"
+                onClick={() => onCellTap(i)}
+                disabled={!isMe || createMut.isPending}
+                className={[
+                  "absolute inset-0",
+                  isMe ? "active:bg-tg-secondary-bg/50" : "",
+                  !covered
+                    ? "bg-[repeating-linear-gradient(45deg,transparent_0_4px,rgba(239,68,68,0.08)_4px_8px)]"
+                    : "",
+                ].join(" ")}
+                aria-label={`day ${i}`}
+                title={!covered ? "Не отмечено — считается занятым" : undefined}
+              />
+              {/* GHG6 BD5: «прошедшие» бейджи лох/чухан в углу ячейки.
+                  pointer-events-none — клик уходит на основную кнопку. */}
+              {(showLoser || showChukhan) && (
+                <div className="pointer-events-none absolute bottom-0.5 left-0.5 flex gap-0.5 text-[10px] leading-none">
+                  {showLoser && <span aria-label="Был лохом">👑</span>}
+                  {showChukhan && <span aria-label="Был чуханом">💩</span>}
+                </div>
+              )}
+              {/* GHG6 BD1+BD3: 🎂 живёт в ячейке участника-именинника. Иконка —
+                  отдельная кнопка с pointer-events:auto и stopPropagation,
+                  чтобы тап по ячейке вне иконки работал как обычно. */}
+              {bday && (
+                <button
+                  type="button"
+                  aria-label={`День рождения ${user.display_name}`}
+                  title={`🎂 ${user.display_name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    haptic("selection");
+                    setBirthdayPopover({
+                      userId: user.id,
+                      date: bday.date,
+                      displayName: user.display_name,
+                    });
+                  }}
+                  className="absolute top-0.5 right-0.5 z-10 text-[12px] leading-none rounded-sm bg-tg-bg/70 px-0.5 active:scale-95"
+                >
+                  🎂
+                </button>
+              )}
+            </div>
           );
         })}
 

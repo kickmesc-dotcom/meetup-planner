@@ -379,3 +379,283 @@ async def set_autoloser_settings(
     await _set_value(
         session, AUTOLOSER_INTERVAL_HOURS_KEY, str(max(0, min(72, interval_hours)))
     )
+
+
+# =============================================================================
+# GHG6 P2: chukhan-фразы + master-toggles периодических процессов
+# =============================================================================
+
+
+# --- AD6: chukhan_reasons (по образцу loser_reasons) ---
+
+CHUKHAN_REASONS_KEY = "chukhan_reasons.list"
+
+_DEFAULT_CHUKHAN_REASONS: list[str] = [
+    "за немытую кружку на столе",
+    "за опоздание больше чем на 15 минут",
+    "за рассказ про крипту в нерабочее время",
+    "за чужие наушники без спроса",
+    "за «потом доделаю» на ретроспективе",
+    "за пропуск встречи без отмены",
+]
+
+
+# --- CL0: новый таймлайн-вид календаря (master-toggle) ---
+
+CALENDAR_TIMELINE_ENABLED_KEY = "calendar.timeline_enabled"
+
+
+async def get_calendar_timeline_enabled(session: AsyncSession) -> bool:
+    """GHG6 CL0: глобальный switch «новый таймлайн или legacy-вид».
+
+    Default = True (новый вид по умолчанию для тестового прогона). Когда у
+    пользователя на фронте обнаружится регрессия — админ переключает на
+    false, и фронт возвращается на legacy StripView/MonthView.
+    """
+    return await _get_bool(session, CALENDAR_TIMELINE_ENABLED_KEY, True)
+
+
+async def set_calendar_timeline_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(
+        session, CALENDAR_TIMELINE_ENABLED_KEY, "true" if enabled else "false"
+    )
+
+
+# --- BD2: Birthdays greeting templates ---
+
+BIRTHDAYS_GREETING_TEMPLATES_KEY = "birthdays.greeting_templates"
+
+_DEFAULT_BIRTHDAY_GREETINGS: list[str] = [
+    "С днём рождения, {name}! 🎉 Пусть {age_or_year} принесёт побольше движа и поменьше дедлайнов.",
+    "{name}, расти большим! 🎂 {age_phrase} — самое время устроить движ всей шестёркой.",
+    "С др, {name}! Здоровья, бабла и нормальных собутыльников. {age_phrase} 🥂",
+    "Сегодня {name} стал на год старше и на пиво ближе к мудрости. {age_phrase} 🍻",
+    "{name}, шестёрка тебя поздравляет! 🎊 {age_phrase} Пусть тосты будут громче, а похмелье — мягче.",
+    "С праздником, {name}! 🎁 Желаем меньше «под вопросом» в календаре. {age_phrase}",
+]
+
+
+async def get_birthdays_greeting_templates(session: AsyncSession) -> list[str]:
+    """Список шаблонов поздравлений с плейсхолдерами {name}/{age}/{age_phrase}/{age_or_year}.
+
+    Шаблон БЕЗ кастомного списка → дефолтный набор из кода. После того как
+    админ сохранит свой набор, дефолт перестаёт «протекать».
+    """
+    raw = await _get_value(session, BIRTHDAYS_GREETING_TEMPLATES_KEY)
+    if raw is None:
+        return list(_DEFAULT_BIRTHDAY_GREETINGS)
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list) and all(isinstance(x, str) for x in data):
+            return data or list(_DEFAULT_BIRTHDAY_GREETINGS)
+    except (ValueError, TypeError):
+        pass
+    return list(_DEFAULT_BIRTHDAY_GREETINGS)
+
+
+async def set_birthdays_greeting_templates(
+    session: AsyncSession, templates: list[str]
+) -> None:
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for t in templates:
+        t = t.strip()
+        if not t or t in seen:
+            continue
+        seen.add(t)
+        cleaned.append(t)
+    await _set_value(
+        session,
+        BIRTHDAYS_GREETING_TEMPLATES_KEY,
+        json.dumps(cleaned, ensure_ascii=False),
+    )
+
+
+async def get_chukhan_reasons(session: AsyncSession) -> list[str]:
+    raw = await _get_value(session, CHUKHAN_REASONS_KEY)
+    if raw is None:
+        return list(_DEFAULT_CHUKHAN_REASONS)
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list) and all(isinstance(x, str) for x in data):
+            return data
+    except (ValueError, TypeError):
+        pass
+    return list(_DEFAULT_CHUKHAN_REASONS)
+
+
+async def set_chukhan_reasons(session: AsyncSession, reasons: list[str]) -> None:
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for r in reasons:
+        r = r.strip()
+        if not r or r in seen:
+            continue
+        seen.add(r)
+        cleaned.append(r)
+    await _set_value(
+        session, CHUKHAN_REASONS_KEY, json.dumps(cleaned, ensure_ascii=False)
+    )
+
+
+# --- AD6: master-toggles для запланированных процессов ---
+
+# reminders уже есть (REMINDERS_TICK_MINUTES_KEY). Добавляем enabled:
+REMINDERS_ENABLED_KEY = "reminders.enabled"
+
+# loser auto: уже есть AUTOLOSER_*_KEY. Добавим per_day (для совместимости с UI).
+LOSER_AUTO_PER_DAY_KEY = "loser.auto.per_day"
+
+# phrases auto: уже есть RANDOM_PHRASES_ENABLED_KEY. Добавим окно активности и
+# per_day для согласованности с UI (фактически это переключатель на daily_n).
+PHRASES_WINDOW_START_KEY = "random_phrases.window_start"  # "HH:MM"
+PHRASES_WINDOW_END_KEY = "random_phrases.window_end"      # "HH:MM"
+
+# avatars sync
+AVATARS_SYNC_ENABLED_KEY = "avatars.sync_enabled"
+AVATARS_SYNC_PER_DAY_KEY = "avatars.sync_per_day"  # float, >=0.14 (раз в неделю)
+
+# birthdays — глобальный switch
+BIRTHDAYS_ALERTS_ENABLED_KEY = "birthdays.alerts_enabled"
+
+# chukhan weekly publish window
+CHUKHAN_WEEKDAY_KEY = "chukhan.weekday"            # int 0..6 (0=пн)
+CHUKHAN_WINDOW_START_KEY = "chukhan.window_start"  # "HH:MM"
+CHUKHAN_WINDOW_END_KEY = "chukhan.window_end"      # "HH:MM"
+
+
+def _validate_hhmm(s: str | None, default: str) -> str:
+    if not isinstance(s, str):
+        return default
+    try:
+        h, m = (int(x) for x in s.strip().split(":"))
+        if 0 <= h <= 23 and 0 <= m <= 59:
+            return f"{h:02d}:{m:02d}"
+    except (ValueError, AttributeError):
+        pass
+    return default
+
+
+async def _get_hhmm(session: AsyncSession, key: str, default: str) -> str:
+    raw = await _get_value(session, key)
+    return _validate_hhmm(raw, default)
+
+
+async def get_scheduled_settings(session: AsyncSession) -> dict:
+    """Агрегат настроек запланированных публикаций — для UI и для scheduler."""
+    auto = await get_autoloser_settings(session)
+    return {
+        "reminders": {
+            "enabled": await _get_bool(session, REMINDERS_ENABLED_KEY, True),
+            "tick_minutes": await get_reminders_tick_minutes(session),
+        },
+        "loser": {
+            "enabled": auto["enabled"],
+            "per_day": max(1, min(12, await _get_int(session, LOSER_AUTO_PER_DAY_KEY, 1))),
+            "window_start_hour": auto["window_start_hour"],
+            "window_end_hour": auto["window_end_hour"],
+            "interval_hours": auto["interval_hours"],
+        },
+        "phrases": {
+            "enabled": await get_random_phrases_enabled(session),
+            "window_start": await _get_hhmm(session, PHRASES_WINDOW_START_KEY, "07:30"),
+            "window_end": await _get_hhmm(session, PHRASES_WINDOW_END_KEY, "22:00"),
+        },
+        "avatars": {
+            "enabled": await _get_bool(session, AVATARS_SYNC_ENABLED_KEY, True),
+            "per_day": max(
+                0.14, min(24.0, await _get_float(session, AVATARS_SYNC_PER_DAY_KEY, 1.0))
+            ),
+        },
+        "birthdays": {
+            "alerts_enabled": await _get_bool(session, BIRTHDAYS_ALERTS_ENABLED_KEY, True),
+        },
+        "chukhan": {
+            "weekday": max(0, min(6, await _get_int(session, CHUKHAN_WEEKDAY_KEY, 0))),
+            "window_start": await _get_hhmm(session, CHUKHAN_WINDOW_START_KEY, "07:30"),
+            "window_end": await _get_hhmm(session, CHUKHAN_WINDOW_END_KEY, "12:00"),
+        },
+    }
+
+
+async def set_scheduled_settings(session: AsyncSession, body: dict) -> None:
+    """Принимает структуру get_scheduled_settings и сохраняет все ключи.
+
+    Идемпотентно. После записи вызывающий должен дёрнуть
+    `scheduler.reload_dynamic_jobs(bot)` чтобы новые значения подхватились.
+    """
+    rem = body.get("reminders") or {}
+    if "enabled" in rem:
+        await _set_value(
+            session, REMINDERS_ENABLED_KEY, "true" if rem["enabled"] else "false"
+        )
+    if "tick_minutes" in rem:
+        await set_reminders_tick_minutes(session, int(rem["tick_minutes"]))
+
+    loser = body.get("loser") or {}
+    if loser:
+        # Конвертируем per_day → interval_hours, если оба заданы:
+        # per_day=1 → interval=0 (random); per_day≥2 → interval = 24 / per_day.
+        per_day = int(loser.get("per_day", 1))
+        interval = 0 if per_day <= 1 else max(1, 24 // per_day)
+        await set_autoloser_settings(
+            session,
+            enabled=bool(loser.get("enabled", False)),
+            window_start_hour=int(loser.get("window_start_hour", 7)),
+            window_end_hour=int(loser.get("window_end_hour", 22)),
+            interval_hours=int(loser.get("interval_hours", interval)),
+        )
+        await _set_value(session, LOSER_AUTO_PER_DAY_KEY, str(max(1, min(12, per_day))))
+
+    phrases = body.get("phrases") or {}
+    if "enabled" in phrases:
+        await set_random_phrases_enabled(session, bool(phrases["enabled"]))
+    if "window_start" in phrases:
+        await _set_value(
+            session,
+            PHRASES_WINDOW_START_KEY,
+            _validate_hhmm(phrases["window_start"], "07:30"),
+        )
+    if "window_end" in phrases:
+        await _set_value(
+            session, PHRASES_WINDOW_END_KEY, _validate_hhmm(phrases["window_end"], "22:00")
+        )
+
+    avatars = body.get("avatars") or {}
+    if "enabled" in avatars:
+        await _set_value(
+            session,
+            AVATARS_SYNC_ENABLED_KEY,
+            "true" if avatars["enabled"] else "false",
+        )
+    if "per_day" in avatars:
+        per = max(0.14, min(24.0, float(avatars["per_day"])))
+        await _set_value(session, AVATARS_SYNC_PER_DAY_KEY, str(per))
+
+    birthdays = body.get("birthdays") or {}
+    if "alerts_enabled" in birthdays:
+        await _set_value(
+            session,
+            BIRTHDAYS_ALERTS_ENABLED_KEY,
+            "true" if birthdays["alerts_enabled"] else "false",
+        )
+
+    chukhan = body.get("chukhan") or {}
+    if "weekday" in chukhan:
+        await _set_value(
+            session,
+            CHUKHAN_WEEKDAY_KEY,
+            str(max(0, min(6, int(chukhan["weekday"])))),
+        )
+    if "window_start" in chukhan:
+        await _set_value(
+            session,
+            CHUKHAN_WINDOW_START_KEY,
+            _validate_hhmm(chukhan["window_start"], "07:30"),
+        )
+    if "window_end" in chukhan:
+        await _set_value(
+            session,
+            CHUKHAN_WINDOW_END_KEY,
+            _validate_hhmm(chukhan["window_end"], "12:00"),
+        )

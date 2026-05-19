@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import date, datetime, time, timedelta, timezone
 
 import structlog
 from aiogram import Bot
@@ -11,10 +12,36 @@ from app.db.models import Poll, PollOption, PollVote, User
 
 log = structlog.get_logger()
 
+_DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
-def _fmt_option(dt: datetime) -> str:
+
+def _parse_option(raw: str | datetime | date) -> tuple[datetime, bool]:
+    """Принимает ISO datetime, YYYY-MM-DD или объект date/datetime.
+
+    Возвращает (datetime, has_time). `has_time=False` означает, что пользователь
+    не указывал время (date-only вариант) — label будет без часа, ends_at = +24ч.
+    """
+    if isinstance(raw, datetime):
+        return raw, True
+    if isinstance(raw, date):
+        return datetime.combine(raw, time(0, 0)), False
+    if not isinstance(raw, str):
+        raise ValueError(f"bad_option_type: {type(raw).__name__}")
+    s = raw.strip()
+    if _DATE_ONLY_RE.match(s):
+        d = date.fromisoformat(s)
+        return datetime.combine(d, time(0, 0)), False
+    # Полный datetime ISO. Поддерживаем `Z` суффикс.
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s), True
+
+
+def _fmt_option(dt: datetime, *, has_time: bool) -> str:
     days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-    return f"{days[dt.weekday()]} {dt.strftime('%d.%m %H:%M')}"
+    if has_time:
+        return f"{days[dt.weekday()]} {dt.strftime('%d.%m %H:%M')}"
+    return f"{days[dt.weekday()]} {dt.strftime('%d.%m')}"
 
 
 async def create_poll_in_chat(
@@ -24,7 +51,7 @@ async def create_poll_in_chat(
     created_by: User,
     chat_id: int,
     question: str,
-    options: list[datetime],
+    options: list[str | datetime | date],
     closes_in_hours: int | None,
 ) -> Poll:
     closes_at = (
@@ -32,7 +59,9 @@ async def create_poll_in_chat(
         if closes_in_hours
         else None
     )
-    labels = [_fmt_option(o) for o in options]
+
+    parsed: list[tuple[datetime, bool]] = [_parse_option(o) for o in options]
+    labels = [_fmt_option(dt, has_time=ht) for dt, ht in parsed]
 
     msg = await bot.send_poll(
         chat_id=chat_id,
@@ -53,12 +82,13 @@ async def create_poll_in_chat(
     session.add(poll)
     await session.flush()
 
-    for dt, label in zip(options, labels, strict=True):
+    for (dt, has_time), label in zip(parsed, labels, strict=True):
+        ends = dt + (timedelta(hours=2) if has_time else timedelta(hours=24))
         session.add(
             PollOption(
                 poll_id=poll.id,
                 starts_at=dt,
-                ends_at=dt + timedelta(hours=2),
+                ends_at=ends,
                 label=label,
             )
         )

@@ -1,9 +1,14 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchRandomPhrasesPool, triggerRandomPhrases } from "@/api/admin";
+import {
+  adminLoserRollNow,
+  fetchRandomPhrasesPool,
+  triggerRandomPhrases,
+} from "@/api/admin";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
-import ChukhanLoserScreen from "./ChukhanLoserScreen";
+import ChukhanScreen from "./ChukhanScreen";
+import LoserScreen from "./loser/LoserScreen";
 import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
 import RandomPhrasesScheduleScreen from "./RandomPhrasesScheduleScreen";
 import RandomPhrasesGeneratorScreen from "./RandomPhrasesGeneratorScreen";
@@ -15,7 +20,8 @@ import ProxyScreen from "./ProxyScreen";
 
 type Section =
   | "root"
-  | "chukhan-loser"
+  | "chukhan"
+  | "loser"
   | "scheduled-pubs"
   | "rp-schedule"
   | "rp-generator"
@@ -39,6 +45,12 @@ export default function AdminScreen({ users }: Props) {
     onError: () => haptic("error"),
   });
 
+  const rollLoser = useMutation({
+    mutationFn: adminLoserRollNow,
+    onSuccess: (res) => haptic(res.ok ? "success" : "warning"),
+    onError: () => haptic("error"),
+  });
+
   const pool = useQuery({
     queryKey: ["admin", "rp-pool"],
     queryFn: fetchRandomPhrasesPool,
@@ -48,7 +60,8 @@ export default function AdminScreen({ users }: Props) {
 
   const back = () => setSection("root");
 
-  if (section === "chukhan-loser") return <ChukhanLoserScreen users={users} onBack={back} />;
+  if (section === "chukhan") return <ChukhanScreen users={users} onBack={back} />;
+  if (section === "loser") return <LoserScreen users={users} onBack={back} />;
   if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
   if (section === "rp-schedule") return <RandomPhrasesScheduleScreen onBack={back} />;
   if (section === "rp-generator") return <RandomPhrasesGeneratorScreen onBack={back} />;
@@ -58,10 +71,41 @@ export default function AdminScreen({ users }: Props) {
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
   if (section === "proxy") return <ProxyScreen onBack={back} />;
 
+  const select = (s: Section) => {
+    haptic("selection");
+    setSection(s);
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto p-3 space-y-3">
+    <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      {/* ⚡ Quick actions */}
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="text-base font-semibold mb-2">⚡ Быстрые действия</div>
+        <SectionHeader icon="⚡" title="Быстрые действия" />
+
+        <button
+          type="button"
+          disabled={rollLoser.isPending}
+          onClick={() => {
+            haptic("medium");
+            rollLoser.mutate();
+          }}
+          className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
+        >
+          {rollLoser.isPending ? "⏳ Крутим…" : "🎲 Крутануть лоха"}
+        </button>
+        {rollLoser.isError && (
+          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            ⚠ {String((rollLoser.error as Error)?.message ?? rollLoser.error)}
+          </div>
+        )}
+        {rollLoser.isSuccess && !rollLoser.isPending && (
+          <div className="mt-2 rounded-md bg-status-free/10 p-2 text-xs text-status-free">
+            {rollLoser.data.ok
+              ? `✓ Крутанули — лох уже в чате.`
+              : `⚠ ${rollLoser.data.error ?? "Не удалось крутануть"}`}
+          </div>
+        )}
+
         <button
           type="button"
           disabled={runPhrases.isPending}
@@ -69,7 +113,7 @@ export default function AdminScreen({ users }: Props) {
             haptic("medium");
             runPhrases.mutate();
           }}
-          className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
+          className="mt-2 w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
         >
           {runPhrases.isPending ? "⏳ Постим…" : "🚀 Прогнать рандомную фразу сейчас"}
         </button>
@@ -129,88 +173,115 @@ export default function AdminScreen({ users }: Props) {
         )}
       </section>
 
-      <Card
-        icon="💩"
-        title="Чухан / Лох"
-        subtitle="Веса, ре-ролл, кастомные фразы"
-        onClick={() => {
-          haptic("selection");
-          setSection("chukhan-loser");
-        }}
-      />
-      <Card
-        icon="⏱️"
-        title="Запланированные публикации"
-        subtitle="Тик напоминаний, очередь job'ов, опросы"
-        onClick={() => {
-          haptic("selection");
-          setSection("scheduled-pubs");
-        }}
-      />
-      <Card
-        icon="💬"
-        title="Автопост рандомных фраз"
-        subtitle="Расписание (N раз/день, фикс-времена, рандом-интервал)"
-        onClick={() => {
-          haptic("selection");
-          setSection("rp-schedule");
-        }}
-      />
-      <Card
-        icon="🧪"
-        title="Генератор рандомных фраз"
-        subtitle="Длина цитаты, глубина истории, шансы"
-        onClick={() => {
-          haptic("selection");
-          setSection("rp-generator");
-        }}
-      />
-      <Card
-        icon="🤡"
-        title="Автолох"
-        subtitle="Бот сам выбирает лоха в окне дня"
-        onClick={() => {
-          haptic("selection");
-          setSection("autoloser");
-        }}
-      />
-      <Card
-        icon="🎂"
-        title="Дни рождения"
-        subtitle="Дата + что напоминать по каждому"
-        onClick={() => {
-          haptic("selection");
-          setSection("birthdays");
-        }}
-      />
-      <Card
-        icon="🕒"
-        title="Пресеты времени"
-        subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
-        onClick={() => {
-          haptic("selection");
-          setSection("poll-presets");
-        }}
-      />
-      <Card
-        icon="🌐"
-        title="Прокси"
-        subtitle="Пул прокси для отправки сообщений (fallback при сетевых сбоях)"
-        onClick={() => {
-          haptic("selection");
-          setSection("proxy");
-        }}
-      />
-      <Card
-        icon="📜"
-        title="История"
-        subtitle="Чуханы недели + лохи дня"
-        onClick={() => {
-          haptic("selection");
-          setSection("history");
-        }}
-      />
+      <SectionGroup icon="📅" title="Календарь">
+        <Card
+          icon="🎂"
+          title="Дни рождения"
+          subtitle="Дата + что напоминать по каждому"
+          onClick={() => select("birthdays")}
+        />
+        <Card
+          icon="🕒"
+          title="Пресеты времени"
+          subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
+          onClick={() => select("poll-presets")}
+        />
+      </SectionGroup>
+
+      <SectionGroup icon="⏰" title="Запланированные публикации">
+        <Card
+          icon="⏱️"
+          title="Расписание задач"
+          subtitle="Тик напоминаний, очередь job'ов, опросы"
+          onClick={() => select("scheduled-pubs")}
+        />
+        <Card
+          icon="💬"
+          title="Автопост рандомных фраз"
+          subtitle="Расписание (N раз/день, фикс-времена, рандом-интервал)"
+          onClick={() => select("rp-schedule")}
+        />
+        <Card
+          icon="🧪"
+          title="Генератор рандомных фраз"
+          subtitle="Длина цитаты, глубина истории, шансы"
+          onClick={() => select("rp-generator")}
+        />
+        <Card
+          icon="🤡"
+          title="Автолох"
+          subtitle="Бот сам выбирает лоха в окне дня"
+          onClick={() => select("autoloser")}
+        />
+      </SectionGroup>
+
+      <SectionGroup icon="🤡" title="Лох">
+        <Card
+          icon="🎲"
+          title="Лох дня"
+          subtitle="Force-reroll, история, шаблоны фраз"
+          onClick={() => select("loser")}
+        />
+      </SectionGroup>
+
+      <SectionGroup icon="💩" title="Чухан">
+        <Card
+          icon="⚖️"
+          title="Чухан недели"
+          subtitle="Веса, ре-ролл, история, шаблоны фраз"
+          onClick={() => select("chukhan")}
+        />
+      </SectionGroup>
+
+      <SectionGroup icon="📜" title="История">
+        <Card
+          icon="📜"
+          title="Сводная история"
+          subtitle="Чуханы недели + лохи дня в одном списке"
+          onClick={() => select("history")}
+        />
+      </SectionGroup>
+
+      <SectionGroup icon="🔧" title="Инфраструктура">
+        <Card
+          icon="🌐"
+          title="Прокси"
+          subtitle="Пул прокси для отправки сообщений (fallback при сетевых сбоях)"
+          onClick={() => select("proxy")}
+        />
+      </SectionGroup>
     </div>
+  );
+}
+
+function SectionHeader({ icon, title }: { icon: string; title: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <span className="text-base">{icon}</span>
+      <span className="text-base font-semibold text-tg-text">{title}</span>
+    </div>
+  );
+}
+
+function SectionGroup({
+  icon,
+  title,
+  children,
+}: {
+  icon: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-tg-hint/15 pt-3">
+      <div className="flex items-center gap-2 mb-2 px-1">
+        <span className="text-base">{icon}</span>
+        <span className="text-xs font-semibold uppercase tracking-wide text-tg-hint">
+          {title}
+        </span>
+      </div>
+      <div className="space-y-2">{children}</div>
+    </section>
   );
 }
 

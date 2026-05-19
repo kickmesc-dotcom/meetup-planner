@@ -89,8 +89,16 @@ class LoserRollResponse(BaseModel):
 
 
 class PollCreateRequest(BaseModel):
+    """GHG6 PL5: вариант может быть либо `datetime` ISO, либо строка-дата `YYYY-MM-DD`.
+
+    Date-only означает, что время не задано (опросник без чекбокса «указать время»):
+    backend хранит `starts_at = date 00:00 локали`, `ends_at = 23:59`, label
+    «вс 17.05» — без часа.
+    """
+
     question: str = Field(..., min_length=1, max_length=255)
-    options: list[datetime] = Field(..., min_length=2, max_length=5)
+    # Принимаем строки (ISO datetime или YYYY-MM-DD). Парсинг — в services/polls.py.
+    options: list[str] = Field(..., min_length=2, max_length=6)
     closes_in_hours: int | None = Field(None, ge=1, le=72)
     chat_id: int | None = None
 

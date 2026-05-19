@@ -21,8 +21,8 @@ from app.services.admin_config import (
     get_autoloser_settings,
     get_random_phrases_schedule,
     get_reminders_tick_minutes,
+    get_scheduled_settings,
 )
-from app.services.avatars import sync_all_avatars
 from app.services.birthdays import run_birthdays_job
 from app.services.chukhan import run_chukhan_job
 from app.services.random_phrases import run_random_phrases_job
@@ -66,6 +66,24 @@ def get_scheduler() -> AsyncIOScheduler:
 JOB_REMINDERS_TICK = "meeting_reminders_tick"
 JOB_RANDOM_PHRASES = "random_phrases"
 JOB_AUTOLOSER = "autoloser"
+JOB_PROXY_HEALTH = "proxy_health"
+JOB_CHUKHAN_WEEKLY = "chukhan_weekly"
+JOB_AVATAR_SYNC = "avatar_sync_daily"
+JOB_BIRTHDAYS = "birthdays_daily"
+
+
+def _env_int(name: str, default: int) -> int:
+    import os
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+PROXY_HEALTH_INTERVAL_SEC = _env_int("PROXY_HEALTH_INTERVAL_SEC", 600)  # GHG6 PX6
 
 
 async def _autoloser_job(bot: Bot) -> None:
@@ -197,59 +215,77 @@ def _build_autoloser_trigger(cfg: dict, tz: str):
 
 
 async def reload_dynamic_jobs(bot: Bot) -> None:
-    """Пересобрать reminders/random_phrases/autoloser-job'ы под новые
-    admin-настройки. Идемпотентно: вызывается из start_scheduler и из API при
-    смене конфига."""
+    """Пересобрать все управляемые админкой job'ы под текущие admin-настройки.
+
+    Идемпотентно: вызывается из start_scheduler и из API при смене конфига
+    (`/admin/scheduled` PUT). Респектит master-toggle'ы GHG6 AD6: если
+    `enabled=false` — соответствующий job удаляется, не пере-создаётся.
+    """
     settings = get_settings()
     sched = get_scheduler()
     sm = get_sessionmaker()
     async with sm() as session:
-        tick_minutes = await get_reminders_tick_minutes(session)
+        sched_cfg = await get_scheduled_settings(session)
+        tick_minutes = sched_cfg["reminders"]["tick_minutes"]
         rp_mode, rp_param = await get_random_phrases_schedule(session)
-        autoloser_cfg = await get_autoloser_settings(session)
 
-    sched.add_job(
-        _logged_job(JOB_REMINDERS_TICK, run_due_reminders),
-        IntervalTrigger(minutes=tick_minutes),
-        kwargs={"bot": bot},
-        id=JOB_REMINDERS_TICK,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    log.info("scheduler.reminders_tick_reloaded", minutes=tick_minutes)
+    # --- Reminders ---
+    if sched_cfg["reminders"]["enabled"]:
+        sched.add_job(
+            _logged_job(JOB_REMINDERS_TICK, run_due_reminders),
+            IntervalTrigger(minutes=tick_minutes),
+            kwargs={"bot": bot},
+            id=JOB_REMINDERS_TICK,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        log.info("scheduler.reminders_tick_reloaded", minutes=tick_minutes)
+    else:
+        _remove_job_if_exists(sched, JOB_REMINDERS_TICK)
+        log.info("scheduler.reminders_disabled")
 
-    # Random phrases: один основной job; для fixed_times с несколькими временами
-    # добавляем дополнительные job'ы с суффиксом.
-    rp_trigger = _build_random_phrases_trigger(rp_mode, rp_param, settings.scheduler_tz)
-    sched.add_job(
-        _logged_job(JOB_RANDOM_PHRASES, run_random_phrases_job),
-        rp_trigger,
-        kwargs={"bot": bot},
-        id=JOB_RANDOM_PHRASES,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-    )
-    # Лишние fixed_times — отдельные job'ы. Чистим прошлые «extra», добавляем заново.
+    # --- Random phrases ---
+    # Лишние fixed_times — отдельные job'ы. Чистим прошлые «extra» в любом случае.
     for j in list(sched.get_jobs()):
         if j.id.startswith(f"{JOB_RANDOM_PHRASES}:extra:"):
             sched.remove_job(j.id)
-    if rp_mode == "fixed_times":
-        times = rp_param.get("times") or []
-        for i, t in enumerate(times[1:], start=1):
-            hh, mm = _parse_hhmm(t)
-            sched.add_job(
-                _logged_job(f"{JOB_RANDOM_PHRASES}:extra:{i}", run_random_phrases_job),
-                CronTrigger(hour=hh, minute=mm, timezone=settings.scheduler_tz),
-                kwargs={"bot": bot},
-                id=f"{JOB_RANDOM_PHRASES}:extra:{i}",
-                replace_existing=True,
-                max_instances=1,
-                coalesce=True,
-            )
-    log.info("scheduler.random_phrases_reloaded", mode=rp_mode, param=rp_param)
+    if sched_cfg["phrases"]["enabled"]:
+        rp_trigger = _build_random_phrases_trigger(rp_mode, rp_param, settings.scheduler_tz)
+        sched.add_job(
+            _logged_job(JOB_RANDOM_PHRASES, run_random_phrases_job),
+            rp_trigger,
+            kwargs={"bot": bot},
+            id=JOB_RANDOM_PHRASES,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        if rp_mode == "fixed_times":
+            times = rp_param.get("times") or []
+            for i, t in enumerate(times[1:], start=1):
+                hh, mm = _parse_hhmm(t)
+                sched.add_job(
+                    _logged_job(f"{JOB_RANDOM_PHRASES}:extra:{i}", run_random_phrases_job),
+                    CronTrigger(hour=hh, minute=mm, timezone=settings.scheduler_tz),
+                    kwargs={"bot": bot},
+                    id=f"{JOB_RANDOM_PHRASES}:extra:{i}",
+                    replace_existing=True,
+                    max_instances=1,
+                    coalesce=True,
+                )
+        log.info("scheduler.random_phrases_reloaded", mode=rp_mode, param=rp_param)
+    else:
+        _remove_job_if_exists(sched, JOB_RANDOM_PHRASES)
+        log.info("scheduler.random_phrases_disabled")
 
+    # --- Autoloser ---
+    autoloser_cfg = {
+        "enabled": sched_cfg["loser"]["enabled"],
+        "window_start_hour": sched_cfg["loser"]["window_start_hour"],
+        "window_end_hour": sched_cfg["loser"]["window_end_hour"],
+        "interval_hours": sched_cfg["loser"]["interval_hours"],
+    }
     if autoloser_cfg["enabled"]:
         sched.add_job(
             _logged_job(JOB_AUTOLOSER, _autoloser_job),
@@ -262,9 +298,85 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
         )
         log.info("scheduler.autoloser_enabled", cfg=autoloser_cfg)
     else:
-        if sched.get_job(JOB_AUTOLOSER) is not None:
-            sched.remove_job(JOB_AUTOLOSER)
+        _remove_job_if_exists(sched, JOB_AUTOLOSER)
         log.info("scheduler.autoloser_disabled")
+
+    # --- Avatars sync (GHG6 AD6) ---
+    if sched_cfg["avatars"]["enabled"]:
+        per_day = sched_cfg["avatars"]["per_day"]
+        # per_day → interval_hours: 1.0 → 24ч, 2.0 → 12ч, 0.5 → 48ч.
+        interval_hours = max(1, int(round(24.0 / max(0.14, per_day))))
+        async def _sync_avatars_job() -> None:
+            sm2 = get_sessionmaker()
+            async with sm2() as session:
+                from app.services.avatars import sync_all_avatars
+                await sync_all_avatars(session, bot)
+        sched.add_job(
+            _logged_job(JOB_AVATAR_SYNC, _sync_avatars_job),
+            IntervalTrigger(hours=interval_hours, jitter=300),
+            id=JOB_AVATAR_SYNC,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        log.info("scheduler.avatars_reloaded", per_day=per_day, interval_hours=interval_hours)
+    else:
+        _remove_job_if_exists(sched, JOB_AVATAR_SYNC)
+        log.info("scheduler.avatars_disabled")
+
+    # --- Chukhan weekly (GHG6 AD6) — день недели + рандомная минута в окне ---
+    chukhan_cfg = sched_cfg["chukhan"]
+    ws_h, ws_m = _parse_hhmm(chukhan_cfg["window_start"])
+    we_h, we_m = _parse_hhmm(chukhan_cfg["window_end"])
+    # Случайный час в окне (включая ws_h, исключая we_h), затем минута в окне для крайних случаев.
+    if we_h <= ws_h:
+        we_h = (ws_h + 1) % 24
+    import random as _rnd
+    chukhan_hour = _rnd.randint(ws_h, max(ws_h, we_h - 1))
+    chukhan_min = _rnd.randint(0, 59)
+    chukhan_dow = chukhan_cfg["weekday"]  # 0=Mon в нашей UI ↔ APScheduler dow=0=Mon
+    sched.add_job(
+        _logged_job(JOB_CHUKHAN_WEEKLY, run_chukhan_job),
+        CronTrigger(
+            day_of_week=str(chukhan_dow),
+            hour=chukhan_hour,
+            minute=chukhan_min,
+            timezone=settings.scheduler_tz,
+        ),
+        kwargs={"bot": bot},
+        id=JOB_CHUKHAN_WEEKLY,
+        replace_existing=True,
+        misfire_grace_time=3600,
+        coalesce=True,
+    )
+    log.info(
+        "scheduler.chukhan_reloaded",
+        dow=chukhan_dow,
+        hour=chukhan_hour,
+        minute=chukhan_min,
+    )
+
+    # --- Birthdays — глобальный switch (точное время — внутри run_birthdays_job) ---
+    if sched_cfg["birthdays"]["alerts_enabled"]:
+        sched.add_job(
+            _logged_job(JOB_BIRTHDAYS, run_birthdays_job),
+            CronTrigger(hour=9, minute=7, timezone=settings.scheduler_tz),
+            kwargs={"bot": bot},
+            id=JOB_BIRTHDAYS,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        log.info("scheduler.birthdays_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_BIRTHDAYS)
+        log.info("scheduler.birthdays_disabled")
+
+
+def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:
+    if sched.get_job(job_id) is not None:
+        sched.remove_job(job_id)
 
 
 def start_scheduler(bot: Bot) -> AsyncIOScheduler:
@@ -273,39 +385,19 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     if sched.running:
         return sched
 
+    # GHG6 AD6: chukhan/avatars/birthdays теперь регистрирует
+    # `reload_dynamic_jobs` — респектят master-toggles из admin_config.
+    # Прокси-health-tick — независимая инфра, регистрируем здесь.
+    from app.services.proxies import proxy_health_tick
+
     sched.add_job(
-        _logged_job("chukhan_weekly", run_chukhan_job),
-        CronTrigger.from_crontab(settings.chukhan_cron, timezone=settings.scheduler_tz),
+        _logged_job(JOB_PROXY_HEALTH, proxy_health_tick),
+        IntervalTrigger(seconds=PROXY_HEALTH_INTERVAL_SEC, jitter=30),
         kwargs={"bot": bot},
-        id="chukhan_weekly",
-        replace_existing=True,
-        misfire_grace_time=3600,
-        coalesce=True,
-    )
-
-    async def _sync_avatars_job() -> None:
-        sm = get_sessionmaker()
-        async with sm() as session:
-            await sync_all_avatars(session, bot)
-
-    sched.add_job(
-        _logged_job("avatar_sync_daily", _sync_avatars_job),
-        CronTrigger.from_crontab("17 4 * * *", timezone=settings.scheduler_tz),
-        id="avatar_sync_daily",
+        id=JOB_PROXY_HEALTH,
         replace_existing=True,
         max_instances=1,
         coalesce=True,
-    )
-
-    sched.add_job(
-        _logged_job("birthdays_daily", run_birthdays_job),
-        CronTrigger(hour=9, minute=7, timezone=settings.scheduler_tz),
-        kwargs={"bot": bot},
-        id="birthdays_daily",
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=3600,
     )
 
     sched.start()

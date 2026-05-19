@@ -119,6 +119,83 @@ export const updateLoserReasons = (reasons: string[]) =>
     body: JSON.stringify({ reasons }),
   });
 
+// --- GHG6 AD6: Chukhan reasons CRUD (отдельные шаблоны фраз чухана) ---
+
+export const fetchChukhanReasons = () =>
+  api<LoserReasons>("/api/admin/chukhan-reasons");
+
+export const updateChukhanReasons = (reasons: string[]) =>
+  api<LoserReasons>("/api/admin/chukhan-reasons", {
+    method: "PUT",
+    body: JSON.stringify({ reasons }),
+  });
+
+// --- GHG6 AD5: Quick action — крутануть лоха из админки ---
+
+export interface LoserRollNow {
+  ok: boolean;
+  loser_user_id: number | null;
+  reason_text: string | null;
+  error: string | null;
+}
+
+export const adminLoserRollNow = () =>
+  api<LoserRollNow>("/api/admin/loser/roll-now", { method: "POST" });
+
+// --- GHG6 AD4/AD8: Scheduled publications master-toggles ---
+
+export interface ScheduledRemindersIO {
+  enabled: boolean;
+  tick_minutes: number;
+}
+
+export interface ScheduledLoserIO {
+  enabled: boolean;
+  per_day: number;
+  window_start_hour: number;
+  window_end_hour: number;
+  interval_hours: number;
+}
+
+export interface ScheduledPhrasesIO {
+  enabled: boolean;
+  window_start: string;
+  window_end: string;
+}
+
+export interface ScheduledAvatarsIO {
+  enabled: boolean;
+  per_day: number;
+}
+
+export interface ScheduledBirthdaysIO {
+  alerts_enabled: boolean;
+}
+
+export interface ScheduledChukhanIO {
+  weekday: number; // 0=Mon
+  window_start: string;
+  window_end: string;
+}
+
+export interface ScheduledSettingsIO {
+  reminders: ScheduledRemindersIO;
+  loser: ScheduledLoserIO;
+  phrases: ScheduledPhrasesIO;
+  avatars: ScheduledAvatarsIO;
+  birthdays: ScheduledBirthdaysIO;
+  chukhan: ScheduledChukhanIO;
+}
+
+export const fetchScheduledSettings = () =>
+  api<ScheduledSettingsIO>("/api/admin/scheduled");
+
+export const updateScheduledSettings = (body: ScheduledSettingsIO) =>
+  api<ScheduledSettingsIO>("/api/admin/scheduled", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
 // --- A2: Reminders tick ---
 
 export interface RemindersSettings {
@@ -295,3 +372,114 @@ export const updateProxyEnabled = (id: number, enabled: boolean) =>
 
 export const deleteProxy = (id: number) =>
   api<{ deleted: boolean }>(`/api/admin/proxy/${id}`, { method: "DELETE" });
+
+// --- GHG6 P0: indicators, parser, ping, alerts ---
+
+export interface ProxyEditPatch {
+  server?: string;
+  port?: number;
+  type?: ProxyType;
+  secret?: string;
+  clear_secret?: boolean;
+  enabled?: boolean;
+}
+
+export const patchProxy = (id: number, patch: ProxyEditPatch) =>
+  api<ProxyEntry>(`/api/admin/proxy/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+
+export interface ProxySelftest {
+  ok: boolean;
+  mode_used: string;
+  proxy_id: number | null;
+  latency_ms: number | null;
+  error: string | null;
+  bot_active: boolean;
+}
+
+export interface ProxyPing {
+  proxy_id: number;
+  ok: boolean;
+  latency_ms: number | null;
+  error: string | null;
+}
+
+export interface ProxyStatus {
+  bot_active: boolean;
+  mode: ProxyMode;
+  pool_size: number;
+  alive_count: number;
+  last_selftest: ProxySelftest | null;
+  last_error: {
+    at: string;
+    message: string;
+    mode_used: string;
+    proxy_id: number | null;
+  } | null;
+}
+
+export const proxySelftest = () =>
+  api<ProxySelftest>("/api/admin/proxy/selftest", { method: "POST" });
+
+export const proxyPing = (id: number) =>
+  api<ProxyPing>(`/api/admin/proxy/${id}/ping`, { method: "POST" });
+
+export const proxyPingAll = () =>
+  api<ProxyPing[]>("/api/admin/proxy/ping-all", { method: "POST" });
+
+export const proxyDeleteDead = () =>
+  api<{ deleted: number }>("/api/admin/proxy/delete-dead", { method: "POST" });
+
+export interface ProxyDraft {
+  server: string;
+  port: number;
+  secret: string | null;
+  type: ProxyType;
+}
+
+export const proxyParse = (text: string) =>
+  api<{ parsed: ProxyDraft[] }>("/api/admin/proxy/parse", {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+
+export const proxyStatus = () =>
+  api<ProxyStatus>("/api/admin/proxy/status");
+
+export const proxyClearLastError = () =>
+  api<{ cleared: boolean }>("/api/admin/proxy/status/last-error", {
+    method: "DELETE",
+  });
+
+export interface ProxyAlerts {
+  enabled: boolean;
+  last_alert_at: string | null;
+}
+
+export const proxyAlertsGet = () =>
+  api<ProxyAlerts>("/api/admin/proxy/alerts");
+
+export const proxyAlertsSet = (enabled: boolean) =>
+  api<ProxyAlerts>("/api/admin/proxy/alerts", {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });
+
+
+// GHG6 CL0: master-toggle нового таймлайн-вида календаря.
+// GET читает любой залогиненный — это нужно CalendarView, чтобы выбрать legacy/new ветку.
+// PUT — только админ.
+export interface CalendarTimelineFlag {
+  enabled: boolean;
+}
+
+export const fetchCalendarTimelineFlag = () =>
+  api<CalendarTimelineFlag>("/api/admin/calendar/timeline");
+
+export const setCalendarTimelineFlag = (enabled: boolean) =>
+  api<CalendarTimelineFlag>("/api/admin/calendar/timeline", {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });

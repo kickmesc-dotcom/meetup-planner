@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.models import User, WeeklyChukhan
-from app.services.admin_config import get_chukhan_weights
+from app.services.admin_config import get_chukhan_reasons, get_chukhan_weights
 from app.services.avatars import sync_user_avatar
 
 log = structlog.get_logger()
@@ -101,10 +101,13 @@ CHUKHAN_TAGLINES = [
 ]
 
 
-def _format_announcement(user: User) -> str:
+def _format_announcement(user: User, *, reason: str | None = None) -> str:
     name = user.display_name
     handle = f"@{user.username}" if user.username else name
-    tagline = random.choice(CHUKHAN_TAGLINES)
+    # GHG6 AD6: если админ настроил chukhan_reasons — берём из них; иначе
+    # старые CHUKHAN_TAGLINES. Аргумент `reason` пробрасывается извне (см.
+    # announce_chukhan), чтобы тест/UI могли проверить, какая фраза выбрана.
+    tagline = reason or random.choice(CHUKHAN_TAGLINES)
     return (
         "💩💩💩 <b>ЧУХАН НЕДЕЛИ</b> 💩💩💩\n"
         "🤮🤢🤮🤢🤮🤢🤮🤢🤮\n\n"
@@ -155,7 +158,13 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
     except Exception:  # noqa: BLE001
         log.warning("chukhan.avatar_sync_failed", user_id=user.id)
 
-    text = _format_announcement(user)
+    # GHG6 AD6: подтянем кастомные фразы чухана из admin_config (если заданы).
+    try:
+        custom_reasons = await get_chukhan_reasons(session)
+    except Exception:  # noqa: BLE001
+        custom_reasons = []
+    reason = random.choice(custom_reasons) if custom_reasons else None
+    text = _format_announcement(user, reason=reason)
     # «Барабанная дробь» — best-effort, не блокирует основной пост.
     try:
         await _drumroll(bot, settings.group_chat_id, user.display_name)

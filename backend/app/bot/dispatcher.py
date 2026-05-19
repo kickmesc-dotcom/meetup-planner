@@ -212,6 +212,22 @@ class _IPv4AiohttpSession(AiohttpSession):
                     mark_switch()
                     await self._swap_session(next_rec)
         assert last_exc is not None
+        # GHG6 PX9: пишем хвост последней ошибки — чтобы UI его показал.
+        try:
+            from app.db.base import get_sessionmaker as _gsm2
+            from app.services.proxies import record_last_error as _rec_err
+
+            sm2 = _gsm2()
+            async with sm2() as _db:
+                await _rec_err(
+                    _db,
+                    message=f"{last_exc.__class__.__name__}: {last_exc}",
+                    mode_used=mode.value,
+                    proxy_id=self._active_proxy_id,
+                )
+        except Exception:  # noqa: BLE001
+            # Не глушим оригинальную ошибку из-за проблемы записи диагностики.
+            log.exception("proxy.record_last_error_failed")
         raise last_exc
 
 

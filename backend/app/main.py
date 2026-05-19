@@ -21,6 +21,7 @@ from app.api import (
     routes_admin,
     routes_availability,
     routes_birthdays,
+    routes_calendar,
     routes_meetings,
     routes_polls,
     routes_users,
@@ -188,6 +189,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_meetings.router, prefix="/api")
     app.include_router(routes_polls.router, prefix="/api")
     app.include_router(routes_birthdays.router, prefix="/api")
+    app.include_router(routes_calendar.router, prefix="/api")
     app.include_router(routes_admin.router, prefix="/api")
 
     @app.get("/healthz")

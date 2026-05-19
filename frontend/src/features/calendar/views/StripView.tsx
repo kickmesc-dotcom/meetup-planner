@@ -1,7 +1,6 @@
-import { useMemo } from "react";
 import { format, isToday, isWeekend, startOfDay } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
-import type { BirthdayCalendarEntry } from "@/api/birthdays";
+import type { BirthdayCalendarEntry, CalendarMark } from "@/api/birthdays";
 import { buildDaysWindow, ruWeekdayShort } from "../dateUtils";
 import ParticipantRow from "../ParticipantRow";
 
@@ -12,6 +11,7 @@ interface Props {
   meId: number;
   ranges: AvailabilityRange[];
   birthdays?: BirthdayCalendarEntry[];
+  marks?: CalendarMark[];
   isPending: boolean;
 }
 
@@ -22,18 +22,10 @@ export default function StripView({
   meId,
   ranges,
   birthdays = [],
+  marks = [],
   isPending,
 }: Props) {
   const days = buildDaysWindow(startOfDay(windowStart), span);
-  const bdayIndex = useMemo(() => {
-    const idx = new Map<string, string[]>();
-    for (const b of birthdays) {
-      const arr = idx.get(b.date) ?? [];
-      arr.push(b.display_name);
-      idx.set(b.date, arr);
-    }
-    return idx;
-  }, [birthdays]);
 
   return (
     <>
@@ -45,13 +37,12 @@ export default function StripView({
           const today = isToday(d);
           const we = isWeekend(d);
           const showMonth = d.getDate() === 1 || d.getTime() === days[0].getTime();
-          const dayKey = format(d, "yyyy-MM-dd");
-          const bdayNames = bdayIndex.get(dayKey);
           const isLast = idx === days.length - 1;
+          // GHG6 BD1: 🎂 в шапке дня больше не рисуем — теперь иконка живёт
+          // в ячейке участника-именинника. Так понятно, чей именно ДР.
           return (
             <div
               key={d.toISOString()}
-              title={bdayNames ? `🎂 ${bdayNames.join(", ")}` : undefined}
               className={[
                 "py-1.5 text-center select-none relative",
                 isLast ? "" : "border-r border-tg-secondary-bg/70",
@@ -68,14 +59,6 @@ export default function StripView({
               <div className="text-sm leading-none">
                 {showMonth ? format(d, "d.MM") : d.getDate()}
               </div>
-              {bdayNames && (
-                <span
-                  aria-label="День рождения"
-                  className="absolute top-0 right-0 text-[10px] leading-none"
-                >
-                  🎂
-                </span>
-              )}
               {today && (
                 <div className="absolute left-1/2 -translate-x-1/2 -bottom-px h-0.5 w-6 rounded-full bg-tg-link" />
               )}
@@ -92,6 +75,8 @@ export default function StripView({
             ranges={ranges.filter((r) => r.user_id === u.id)}
             windowStart={windowStart}
             windowSpan={span}
+            birthdays={birthdays.filter((b) => b.user_id === u.id)}
+            marks={marks.filter((m) => m.user_id === u.id)}
           />
         ))}
         {isPending && (

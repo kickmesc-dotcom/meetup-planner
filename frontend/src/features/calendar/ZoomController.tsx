@@ -5,7 +5,6 @@ const COMPACT_ORDER: ZoomLevel[] = [
   "hour",
   "day",
   "week",
-  "twoWeeks",
   "month",
   "threeMonths",
   "sixMonths",

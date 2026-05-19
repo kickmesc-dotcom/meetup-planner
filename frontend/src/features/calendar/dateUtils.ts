@@ -52,10 +52,6 @@ export function windowForZoom(zoom: ZoomLevel, anchor: Date): { start: Date; end
       const start = startOfWeek(a, WEEK_OPTS);
       return { start, end: addDays(start, 7) };
     }
-    case "twoWeeks": {
-      const start = startOfWeek(a, WEEK_OPTS);
-      return { start, end: addDays(start, 14) };
-    }
     case "month": {
       const start = startOfMonth(a);
       return { start, end: addDays(endOfMonth(start), 1) };
@@ -224,8 +220,7 @@ export function zoomTitle(zoom: ZoomLevel, anchor: Date): string {
       const dow = ruWeekdayShort(a.getDay());
       return `${a.getDate()} ${ruMonthShort(a.getMonth())} ${a.getFullYear()} · ${dow}`;
     }
-    case "week":
-    case "twoWeeks": {
+    case "week": {
       const ws = startOfWeek(a, WEEK_OPTS);
       const we = endOfWeek(a, WEEK_OPTS);
       const sameMonth = ws.getMonth() === we.getMonth();
