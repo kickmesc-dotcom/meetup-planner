@@ -110,37 +110,155 @@ Frontend синхронизирует пользователь сам в `kickme
 
 ## P3 — Календарь: горизонтальный таймлайн (большой блок)
 
-Это переработка `CalendarView` и связанных компонентов. Поэтому P3 — последний.
-Подзадачи разбить ещё внутри, ниже — крупными мазками. Как будто на будущее было бы неплохо еще добавить возможность в админке принудительно переключить бота на рудиментарный вид календаря (исключение - убрать режим отображения 2 недели и сделать по умолчанию "неделя"). После внедрения нового вида, для тестовых прогонов пока оставляем его стандартным - этот пункт добавить к чеклисту, ДО внедрения новго режима отображения. Подружить оба варианта отображения между собой, чтобы ничего не конфликтовало и не падало на уже релизнутых билдах.
+Переработка `CalendarView` и связанных компонентов — последний крупный блок GHG6.
+**CL0 уже сделан и приземлён** (admin master-toggle `calendar.timeline_enabled`,
+default true, эндпоинты `GET/PUT /admin/calendar/timeline`). `CalendarView.tsx`
+уже читает флаг и готов ветвиться на новый таймлайн / legacy.
 
-### Архитектура
-- [ ] **CL1.** Новый компонент `TimelineView.tsx`:
-  - Слева — `ParticipantColumn` (фиксированная, нескрываемая, 6 строк в порядке из `WHITELIST_NAMES`).
-  - Справа — горизонтально-скроллируемая зона. Каждая строка = `ParticipantTimelineRow` (`overflow: hidden`, ширина = `days × cellWidth`).
-  - Header сверху над таймлайн-зоной (синхронно скроллится по X).
-- [ ] **CL2.** Виртуализация (опционально для MVP): рендерить ±N дней от текущего, при скролле подгружать.
-- [ ] **CL3.** Жесты: `pointermove` с инерцией (request-animation-frame-based), магнит к ближайшему дню после `pointerup`. У краёв (15% ширины с каждой стороны) — автоскролл (`requestAnimationFrame` loop, скорость = функция расстояния пальца от края).
-- [ ] **CL4.** Motion blur во время быстрой прокрутки: CSS-фильтр `filter: blur(...)` пропорционально |velocity|, снимать при остановке.
-- [ ] **CL5.** Слайдер зума (диапазон cellWidth 24px…120px), плавная анимация изменения через `framer-motion`. Привязать «дни/неделя/месяц/год/все года» к пресетам слайдера.
-- [ ] **CL6.** Дефолтное состояние: cellWidth ≈ `containerWidth / 7.4` (неделя + хвосты). Кнопка «📍 К сегодня» — анимация `scroll-to` с центрированием.
+**Снято с чеклиста (2026-05-20):**
+- **CL10.** Миграция `confidence`/`time_from`/`time_to` не нужна — `AvailabilityRange`
+  уже содержит `confidence: SmallInteger 1..5` (default 3, check constraint) и
+  `starts_at`/`ends_at`/`all_day`. Бэк-схема готова, миграция отменена.
+- **CL11.** `PUT /api/availability/{date}` с одним статусом на день — отказ.
+  За день у участника может быть несколько диапазонов (несколько окон, разные
+  уровни уверенности) — переходить на «один статус на день» это регресс модели.
+  Фронт адаптируется под существующий `/api/availability/range`.
 
-### Ячейка
-- [ ] **CL7.** Заливка ячейки по `confidence` (5 уровней) — пропорция высоты ячейки + цвет (точно нет = красный сплошной, скорее нет = красный 60%, неизвестно = серый, скорее да = зелёный 60%, точно да = зелёный сплошной).
-- [ ] **CL8.** Bottom-sheet (`RangeEditorSheet.tsx` — переделать): радио занят/свободен/под вопросом, слайдер уверенности (5 stops), чекбокс «Конкретное время» → time-from/time-to (на pickerах часов/минут). Дефолт уверенности зависит от выбранного статуса (свободен → точно да, занят → точно нет, под вопросом → неизвестно).
-- [ ] **CL9.** Если задан временной диапазон, ячейка рисует частичную заливку (горизонтальная полоса по доле дня) + иконка 🕓.
-- [ ] **CL10.** Сохранение на бэк: расширить модель `Availability` полем `confidence` (int 1..5, default 3) и опциональными `time_from`/`time_to`. Миграция alembic `0008_availability_confidence_time.py`.
-- [ ] **CL11.** API: `routes_availability.py::PUT /api/availability/{date}` принимает `{status, confidence, time_from?, time_to?}`.
+### Этап 1 — Скелет TimelineView (CL1)
 
-### Режимы
-- [ ] **CL12.** Удалить режим «2 недели» (или переименовать в «Произвольный диапазон» с пользовательским пресетом). По умолчанию — «Неделя».
-- [ ] **CL13.** Стрелки `←` / `→`, селектор режима (день/неделя/месяц/год/все года), слайдер зума, «📍 К сегодня» — собрать в нижнюю/верхнюю плашку.
+- [ ] **CL1.** `frontend/src/features/calendar/views/TimelineView.tsx`:
+  - `ParticipantColumn` (sticky-left, 6 строк по `WHITELIST_NAMES`, аватар+имя).
+  - `TimelineGrid` (`overflow-x-auto`, `overflow-y-hidden`, 6 строк
+    `ParticipantTimelineRow`, ширина = `days × cellWidth`).
+  - `TimelineHeader` (sticky-top, синхрон по X через общий `scrollLeft` ref).
+  - Этап 1 — жёсткий `cellWidth=56px`, окно ±21 день от `anchor`, без жестов,
+    без зума, без confidence-заливки (`bg-tg-secondary-bg` пустой ячейки).
+- [ ] **CL1.2.** Ветвление в `CalendarView.tsx`: `if (timelineEnabled) <TimelineView/>`,
+  иначе текущий switch по zoom. NavBar/ZoomController гасятся для нового вида —
+  у TimelineView собственная нижняя плашка (этап 2).
 
-### Sync
-- [ ] **D-P3.** Копия backend (миграция!). Этапная — сделать после CL1–CL11.
+### Этап 2 — Скролл, зум, режимы (CL2, CL3, CL5, CL6, CL12, CL13)
+
+- [ ] **CL6.a.** Дефолт `cellWidth = containerWidth / 7.4` (ResizeObserver).
+- [ ] **CL5.** Слайдер зума `cellWidth ∈ [24, 120]px`, 5 пресетов
+  (День / Неделя / Месяц / Год / Все года), framer-motion на изменение.
+  На «Год» и «Все года» — переиспользуем существующие `YearView`/`AllYearsView`
+  (не выкидываем — они уже работают).
+- [ ] **CL3.** Жесты в `TimelineGrid`:
+  - `pointermove` + RAF inertia (decay velocity).
+  - `pointerup` → магнит к ближайшему дню (`round(scrollLeft / cellWidth)`,
+    `scrollTo({behavior:'smooth'})`).
+  - Авто-скролл у краёв (15% ширины, RAF-loop, скорость = f(distance from edge)).
+- [ ] **CL2.** Виртуализация: рендерим только видимые дни ± overscan 14. Невидимые
+  ячейки — `<div style={{width:cellWidth}}/>` без контента. Без сторонних
+  библиотек — у нас всего 6 строк, простая ручная реализация.
+- [ ] **CL6.b.** Кнопка «📍 К сегодня» — `scrollTo({left: todayOffset - W/2})` с
+  анимацией.
+- [ ] **CL13.** Нижняя плашка: стрелки `←`/`→` (двигают на `7×cellWidth`),
+  селектор режима, слайдер зума, «📍 К сегодня». Sticky.
+- [ ] **CL12.** Дефолт TimelineView — «Неделя». Режим «twoWeeks» в legacy не
+  трогаем (за ним стоит чекбокс админа). В TimelineView переименовать
+  «2 недели» → «Произвольный диапазон» (если нужно).
+
+### Этап 3 — Motion blur + ячейка под confidence (CL4, CL7)
+
+- [ ] **CL4.** Motion blur: `filter: blur(${clamp(|v|/200, 0, 4)}px)` на
+  `TimelineGrid` во время инерции, снимать через 80ms после `pointerup`.
+  **Выключаем при `@media (prefers-reduced-motion: reduce)`** — a11y + защита
+  слабых устройств. Кружок пользователей — 6 человек, у части не флагман.
+- [ ] **CL7.** `TimelineCell` рендерит confidence-заливку. Без range на день →
+  серый `bg-tg-secondary-bg`. С range — по worst-status и по confidence:
+  - `status=1` (свободен): conf 5 → green-500 solid · 4 → green-400/60 ·
+    3 → gray-300 · 2 → red-400/60 · 1 → red-500 solid.
+  - `status=2` (занят): инверсия.
+  - `status=3` (под вопросом) → желтый средней насыщенности.
+  - Если на день несколько range — берём worst-status (приоритет: 2 > 3 > 1).
+
+### Этап 4 — Bottom-sheet редактор и timeline-метки (CL8, CL9)
+
+- [ ] **CL8.** Доработать `RangeEditorSheet`:
+  - Радио status (1/2/3) — есть в схеме.
+  - Слайдер confidence 1..5 — есть в схеме.
+  - Чекбокс «Конкретное время» → два time-picker (часы/минуты). On: `all_day=false`,
+    `starts_at`/`ends_at` = `selectedDate + time_from/time_to`. Off: `all_day=true`,
+    окно 00:00..23:59:59 (как сейчас).
+  - Дефолт confidence по status: свободен→5, занят→1, под вопросом→3.
+- [ ] **CL9.** `TimelineCell` при `all_day=false` рисует частичную горизонтальную
+  заливку (доля дня от 0:00 до 24:00) + иконка 🕓 в углу.
+
+### Этап 5 — Sync и пост-релиз (D-P3, D-FINAL, D-MEM)
+
+- [ ] **D-P3.** Sync `backend/` → `meetup-planner-backend/`. По плану в бэке менять
+  нечего (миграция CL10 отменена). Если по ходу появится хелпер
+  `services/availability.py::worst_status_for_day` — попадёт сюда.
+- [ ] **D-FINAL.** `DEPLOY_NOTES.md` — раздел «GHG6 (2026-05-XX)»: env-переменные
+  не менялись, флаг `admin_config.calendar.timeline_enabled` теперь default-true,
+  ссылка на откат через `PUT /admin/calendar/timeline {enabled:false}`.
+- [ ] **D-MEM.** Память `project_meetup_planner_deployed.md` — упоминание
+  `meetup-planner-frontend` уже удалено, проставить `[x]` после P3.
 
 ---
 
-## D — пост-релиз
+## D — багфиксы и UX-правки по результатам теста
 
-- [ ] **D-FINAL.** Обновить `DEPLOY_NOTES.md` — раздел «GHG6 (дата)»: какие env-переменные новые (`PROXY_HEALTH_INTERVAL_SEC`, `SELFTEST_CHAT_ID?`), миграции (`0008_availability_confidence_time`), новые admin_config ключи (список из AD6).
-- [ ] **D-MEM.** Обновить память `project_meetup_planner_deployed.md`: топология теперь без `meetup-planner-frontend`.
+Сырой репорт пользователя (оригинал):
+> «У меня так и не удалось добавить новые прокси. Я закинул порядка 13 новых, через
+> авто-парсинг и вручную, протыкав разные боксы (mtproto, http, socks5). Единственный
+> до сих пор рабочий прокси — `tg1.tgproxy1.fun` с прошлых билдов.
+> Парсер хочется максимально дружелюбный (хочу не из чата по полям копировать).
+> Порт почти всегда 443 — пусть будет предзаполнен.
+> На iPhone 13 Pro экран отпрыгивает вверх при появлении клавиатуры, поле уходит из видимости.
+> На главной (календарь) логично добавить «прогон фразы» в quick actions.
+> Из быстрых действий админки убрать «реролл лоха» (он игнорит кулдаун и не показывает recent).
+> Порядок секций админки: Быстрые действия → Прокси → Запл. публикации → Календарь → Лох → Чухан → История.»
+
+Приоритет P0 (блокирует базовый сценарий — добавление прокси), остальное P1.
+
+### Backend (`meetup-planner-main/backend`)
+- [x] **D1.** (2026-05-20) Фикс `routes_admin.py::admin_create_proxy` — `upsert_proxy`
+  возвращает `(row, created)` кортеж, старый код передавал кортеж в `_proxy_to_out`
+  → ошибка сериализации, все ручные/парсерные добавления падали. Распаковка
+  `row, _created = await upsert_proxy(...)`. Это и есть корень «13 прокси не добавились».
+- [x] **D1b.** (2026-05-20) `services/proxies.py::parse_mtproto_blob` расширен:
+  поддержка ссылочного формата `tg://proxy?...` и `https://t.me/proxy|socks?...`
+  (типичный формат forward'a из @ProxyMTProto), нормализация key-aliases
+  (`host/ip/address` → server, `password/pass` → secret, `protocol` → type),
+  определение типа по hint-маркеру в заголовке блока (`SOCKS5 proxy ... Server: ...`),
+  дедуп по `(server, port)`. Старые тесты сохранены, добавлены 6 новых
+  (tg://, https://t.me/, SOCKS-url, KV-hint, дубли, mix URL+KV) — все 13 проходят.
+
+### Frontend (`meetup-planner-main/frontend`)
+- [x] **D2.** (2026-05-20) `ProxyScreen.tsx::AddProxyForm` — port default = "443",
+  ресет после submit тоже на "443" (а не пустой).
+- [x] **D3.** (2026-05-20) `tg/webapp.ts::installFocusScrollFix` — глобальный
+  фикс iOS keyboard jump. На `focusin` для `<input>`/`<textarea>`/`contenteditable`
+  делается `el.scrollIntoView({block:'center', behavior:'smooth'})` сразу и
+  повторно через 300мс (после полного выезда клавиатуры). Плюс подписка на
+  `WebApp.onEvent('viewportChanged')` — догоняем, когда WebApp пересчитывает
+  размеры. `date/time/datetime-local` пропускаются (открывают пикер, а не
+  клавиатуру). Срабатывает по всему приложению — не только в прокси-форме.
+- [x] **D4.** (2026-05-20) `AdminScreen.tsx`:
+  - Quick actions: убрана кнопка «🎲 Крутануть лоха» (force-reroll живёт в
+    подразделе «🤡 Лох», там есть подтверждение и история). Осталась
+    «🚀 Прогнать рандомную фразу» + спойлер пула фраз.
+  - Новый порядок секций: Quick actions → **🌐 Прокси** (в топе после quick) →
+    ⏰ Запл. публикации → 📅 Календарь → 🤡 Лох → 💩 Чухан → 📜 История.
+  - Секция «🔧 Инфраструктура» упразднена (внутри был только прокси, который
+    переехал наверх).
+- [x] **D5.** (2026-05-20) `features/actions/ActionBar.tsx` (нижняя плашка на
+  календаре): добавлена кнопка «🗯 Прогон фразы» — видна только админам
+  (эндпоинт `/admin/random-phrases/run-now` admin-only). Grid авто-перестраивается:
+  3 кнопки для не-админов, 4 для админов. Спиннер на pending, haptic+showAlert.
+- [x] **D6.** (2026-05-20) Раздел D в этом чеклисте переписан в структурированный
+  формат (P0/P1, чекбоксы, отдельные backend/frontend пункты).
+
+### Sync
+- [x] **D-D.** (2026-05-20) Sync `meetup-planner-main/backend/*` →
+  `meetup-planner-backend/*` сделан для `app/api/routes_admin.py`,
+  `app/services/proxies.py`, `tests/test_proxy_parse.py`. Diff: 158+/20-,
+  3 файла. Frontend синхронизируется пользователем сам в
+  `kickmesc-dotcom/meetup-planner`. Push в HF / Pages — за пользователем.
+
+---
+
+D-FINAL и D-MEM перенесены в раздел P3 этап 5 — закрываются вместе с P3.

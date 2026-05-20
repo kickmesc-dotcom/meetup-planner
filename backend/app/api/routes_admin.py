@@ -1026,7 +1026,7 @@ async def admin_create_proxy(
 ) -> ProxyOut:
     _ensure_admin(user)
     try:
-        row = await upsert_proxy(
+        row, _created = await upsert_proxy(
             session,
             server=body.server,
             port=body.port,

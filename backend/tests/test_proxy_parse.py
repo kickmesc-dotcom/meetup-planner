@@ -72,3 +72,63 @@ def test_parse_no_secret_ok():
     drafts = parse_mtproto_blob(text)
     assert len(drafts) == 1
     assert drafts[0].secret is None
+
+
+def test_parse_tg_proxy_url():
+    text = "Подключайся: tg://proxy?server=1.2.3.4&port=443&secret=deadbeef"
+    drafts = parse_mtproto_blob(text)
+    assert len(drafts) == 1
+    assert drafts[0].server == "1.2.3.4"
+    assert drafts[0].port == 443
+    assert drafts[0].secret == "deadbeef"
+    assert drafts[0].type == "mtproto"
+
+
+def test_parse_t_me_proxy_url():
+    text = "https://t.me/proxy?server=mt.host.com&port=443&secret=ee00ff"
+    drafts = parse_mtproto_blob(text)
+    assert len(drafts) == 1
+    assert drafts[0].type == "mtproto"
+    assert drafts[0].server == "mt.host.com"
+
+
+def test_parse_socks_url_marks_type():
+    text = "tg://socks?server=1.2.3.4&port=1080&user=u&pass=p"
+    drafts = parse_mtproto_blob(text)
+    assert len(drafts) == 1
+    assert drafts[0].type == "socks5"
+
+
+def test_parse_kv_type_hint_in_header():
+    text = """SOCKS5 proxy
+    Server: 9.9.9.9
+    Port: 1080
+    """
+    drafts = parse_mtproto_blob(text)
+    assert len(drafts) == 1
+    assert drafts[0].type == "socks5"
+
+
+def test_parse_dedupes_same_server_port():
+    text = """tg://proxy?server=1.2.3.4&port=443&secret=aa
+    Server: 1.2.3.4
+    Port: 443
+    Secret: bb
+    """
+    drafts = parse_mtproto_blob(text)
+    assert len(drafts) == 1  # дубликат отброшен — оба раза (1.2.3.4, 443)
+
+
+def test_parse_url_and_kv_block_mixed():
+    text = """Forward by @ProxyMTProto
+    tg://proxy?server=1.1.1.1&port=443&secret=aaaa
+
+    Server: 2.2.2.2
+    Port: 443
+    Secret: bbbb
+    @ProxyMTProto
+    """
+    drafts = parse_mtproto_blob(text)
+    assert len(drafts) == 2
+    servers = sorted(d.server for d in drafts)
+    assert servers == ["1.1.1.1", "2.2.2.2"]

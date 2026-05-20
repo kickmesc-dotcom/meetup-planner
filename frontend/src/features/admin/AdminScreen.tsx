@@ -1,7 +1,6 @@
 import { ReactNode, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  adminLoserRollNow,
   fetchRandomPhrasesPool,
   triggerRandomPhrases,
 } from "@/api/admin";
@@ -45,12 +44,6 @@ export default function AdminScreen({ users }: Props) {
     onError: () => haptic("error"),
   });
 
-  const rollLoser = useMutation({
-    mutationFn: adminLoserRollNow,
-    onSuccess: (res) => haptic(res.ok ? "success" : "warning"),
-    onError: () => haptic("error"),
-  });
-
   const pool = useQuery({
     queryKey: ["admin", "rp-pool"],
     queryFn: fetchRandomPhrasesPool,
@@ -78,33 +71,12 @@ export default function AdminScreen({ users }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      {/* ⚡ Quick actions */}
+      {/* ⚡ Quick actions
+          GHG6 D4: убрали «Крутануть лоха» — он игнорил cooldown и не показывал recent;
+          force-reroll переехал в подраздел «Лох». «Прогон фразы» доступен и тут,
+          и из главной (ActionBar внизу календаря). */}
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <SectionHeader icon="⚡" title="Быстрые действия" />
-
-        <button
-          type="button"
-          disabled={rollLoser.isPending}
-          onClick={() => {
-            haptic("medium");
-            rollLoser.mutate();
-          }}
-          className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
-        >
-          {rollLoser.isPending ? "⏳ Крутим…" : "🎲 Крутануть лоха"}
-        </button>
-        {rollLoser.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
-            ⚠ {String((rollLoser.error as Error)?.message ?? rollLoser.error)}
-          </div>
-        )}
-        {rollLoser.isSuccess && !rollLoser.isPending && (
-          <div className="mt-2 rounded-md bg-status-free/10 p-2 text-xs text-status-free">
-            {rollLoser.data.ok
-              ? `✓ Крутанули — лох уже в чате.`
-              : `⚠ ${rollLoser.data.error ?? "Не удалось крутануть"}`}
-          </div>
-        )}
 
         <button
           type="button"
@@ -113,7 +85,7 @@ export default function AdminScreen({ users }: Props) {
             haptic("medium");
             runPhrases.mutate();
           }}
-          className="mt-2 w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
+          className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
         >
           {runPhrases.isPending ? "⏳ Постим…" : "🚀 Прогнать рандомную фразу сейчас"}
         </button>
@@ -173,18 +145,14 @@ export default function AdminScreen({ users }: Props) {
         )}
       </section>
 
-      <SectionGroup icon="📅" title="Календарь">
+      {/* GHG6 D4: новый порядок — прокси сразу после quick actions (самое важное),
+          потом запланированные публикации, потом календарь, лох, чухан, история. */}
+      <SectionGroup icon="🌐" title="Прокси">
         <Card
-          icon="🎂"
-          title="Дни рождения"
-          subtitle="Дата + что напоминать по каждому"
-          onClick={() => select("birthdays")}
-        />
-        <Card
-          icon="🕒"
-          title="Пресеты времени"
-          subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
-          onClick={() => select("poll-presets")}
+          icon="🌐"
+          title="Прокси"
+          subtitle="Пул прокси, индикаторы, парсер, авто-фолбэк"
+          onClick={() => select("proxy")}
         />
       </SectionGroup>
 
@@ -215,6 +183,21 @@ export default function AdminScreen({ users }: Props) {
         />
       </SectionGroup>
 
+      <SectionGroup icon="📅" title="Календарь">
+        <Card
+          icon="🎂"
+          title="Дни рождения"
+          subtitle="Дата + что напоминать по каждому"
+          onClick={() => select("birthdays")}
+        />
+        <Card
+          icon="🕒"
+          title="Пресеты времени"
+          subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
+          onClick={() => select("poll-presets")}
+        />
+      </SectionGroup>
+
       <SectionGroup icon="🤡" title="Лох">
         <Card
           icon="🎲"
@@ -239,15 +222,6 @@ export default function AdminScreen({ users }: Props) {
           title="Сводная история"
           subtitle="Чуханы недели + лохи дня в одном списке"
           onClick={() => select("history")}
-        />
-      </SectionGroup>
-
-      <SectionGroup icon="🔧" title="Инфраструктура">
-        <Card
-          icon="🌐"
-          title="Прокси"
-          subtitle="Пул прокси для отправки сообщений (fallback при сетевых сбоях)"
-          onClick={() => select("proxy")}
         />
       </SectionGroup>
     </div>

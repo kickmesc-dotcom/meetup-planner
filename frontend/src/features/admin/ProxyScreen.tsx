@@ -898,7 +898,7 @@ function AddProxyForm({
   }) => void;
 }) {
   const [server, setServer] = useState("");
-  const [port, setPort] = useState("");
+  const [port, setPort] = useState("443");
   const [type, setType] = useState<ProxyType>("mtproto");
   const [secret, setSecret] = useState("");
 
@@ -954,7 +954,7 @@ function AddProxyForm({
             secret: secret.trim() || null,
           });
           setServer("");
-          setPort("");
+          setPort("443");
           setSecret("");
         }}
         className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"

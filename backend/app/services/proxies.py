@@ -295,7 +295,12 @@ async def upsert_proxy(
     type_: str = "mtproto",
     secret: str | None = None,
     enabled: bool = True,
-) -> ProxyEntry:
+) -> tuple[ProxyEntry, bool]:
+    """Создать или обновить прокси по (server, port).
+
+    Возвращает ``(row, created)`` — ``created=True`` если запись была добавлена,
+    ``False`` если по (server, port) уже существовала и просто обновилась.
+    """
     # GHG6 PX10: enforce pool limit на add (не на upsert существующего).
     existing = await session.scalar(
         select(ProxyEntry).where(
@@ -303,8 +308,6 @@ async def upsert_proxy(
         )
     )
     if existing is None:
-        count = (await session.scalar(select(ProxyEntry.id).limit(PROXY_POOL_MAX + 1))) or 0
-        # Берём фактический count через func.count проще:
         from sqlalchemy import func as _sqlfunc
         total = await session.scalar(select(_sqlfunc.count()).select_from(ProxyEntry))
         if (total or 0) >= PROXY_POOL_MAX:
@@ -321,7 +324,7 @@ async def upsert_proxy(
     res = await session.execute(stmt)
     await session.commit()
     invalidate()
-    return res.scalar_one()
+    return res.scalar_one(), existing is None
 
 
 async def update_proxy(
@@ -424,9 +427,31 @@ async def bootstrap_from_env(session: AsyncSession) -> int:
 # --- PX5: парсер простыни из @ProxyMTProto ---
 
 _PARSE_KV_RE = re.compile(
-    r"^\s*(server|port|secret)\s*[:=]\s*(.+?)\s*$",
+    r"^\s*(server|host|ip|address|port|secret|password|pass|type|protocol)\s*[:=]\s*(.+?)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
+# Маркеры типа в свободном тексте (заголовки блоков): "PROXY MTProto", "SOCKS5 proxy", "HTTP proxy".
+_TYPE_HINT_RE = re.compile(r"\b(mtproto|socks5|socks|https?)\b", re.IGNORECASE)
+# Ссылочный формат telegram-прокси: tg://proxy?server=X&port=Y&secret=Z (или ?user=&pass= для socks)
+# а также https://t.me/proxy?... и https://t.me/socks?... Учитываем оба варианта.
+_PROXY_URL_RE = re.compile(
+    r"(?:tg://|https?://t\.me/)(proxy|socks)\?([^\s)<>\"']+)",
+    re.IGNORECASE,
+)
+
+
+def _normalize_type_hint(s: str | None) -> str:
+    """Приводит произвольную метку типа к одному из {mtproto, socks5, http}."""
+    if not s:
+        return "mtproto"
+    v = s.strip().lower()
+    if "mtproto" in v or v == "mt":
+        return "mtproto"
+    if "socks" in v:
+        return "socks5"
+    if "http" in v:
+        return "http"
+    return "mtproto"
 
 
 @dataclass
@@ -468,34 +493,87 @@ def parse_mtproto_blob(text: str) -> list[ProxyDraft]:
     """
     if not text:
         return []
-    current: dict[str, str] = {}
     drafts: list[ProxyDraft] = []
+    seen: set[tuple[str, int]] = set()
 
-    def _flush() -> None:
+    def _add(server: str, port_raw: str | int, secret: str | None, type_: str) -> None:
+        s = (server or "").strip()
+        if not s:
+            return
+        try:
+            p = int(port_raw)
+        except (ValueError, TypeError):
+            return
+        if not (1 <= p <= 65535):
+            return
+        key = (s, p)
+        if key in seen:
+            return
+        seen.add(key)
+        drafts.append(
+            ProxyDraft(server=s, port=p, secret=(secret or None), type=type_)
+        )
+
+    # 1) Ссылочный формат tg://proxy / https://t.me/proxy|socks?... — самый частый
+    # вариант пересылки прокси в телеге, его обязательно поддерживаем.
+    from urllib.parse import parse_qs
+
+    for m in _PROXY_URL_RE.finditer(text):
+        kind = m.group(1).lower()  # "proxy" → mtproto, "socks" → socks5
+        qs = parse_qs(m.group(2), keep_blank_values=False)
+        server = (qs.get("server") or [""])[0]
+        port = (qs.get("port") or [""])[0]
+        secret = (qs.get("secret") or [None])[0]
+        type_ = "socks5" if kind == "socks" else "mtproto"
+        _add(server, port, secret, type_)
+
+    # 2) KV-блоки вида "Server: X / Port: Y / Secret: Z".
+    # Тип определяем по подсказке в ближайшей строке выше группы.
+    lines = text.splitlines()
+    current: dict[str, str] = {}
+    current_type: str = "mtproto"
+    last_hint_line = -1
+
+    def _flush_kv() -> None:
         s = current.get("server")
         p_raw = current.get("port")
         if not s or not p_raw:
             current.clear()
             return
-        try:
-            p = int(p_raw)
-        except ValueError:
-            current.clear()
-            return
-        if not (1 <= p <= 65535):
-            current.clear()
-            return
-        secret = current.get("secret") or None
-        drafts.append(ProxyDraft(server=s.strip(), port=p, secret=secret))
+        type_ = _normalize_type_hint(current.get("type") or current.get("protocol")) \
+            if (current.get("type") or current.get("protocol")) else current_type
+        secret = current.get("secret") or current.get("password") or current.get("pass")
+        _add(s, p_raw, secret, type_)
         current.clear()
 
-    for m in _PARSE_KV_RE.finditer(text):
+    for idx, raw_line in enumerate(lines):
+        line = raw_line.strip()
+        # Подсказка типа: ищем в строках без `:` или с ключевыми словами (заголовки блоков).
+        if line and not _PARSE_KV_RE.match(raw_line):
+            hint = _TYPE_HINT_RE.search(line)
+            if hint:
+                current_type = _normalize_type_hint(hint.group(1))
+                last_hint_line = idx
+        m = _PARSE_KV_RE.match(raw_line)
+        if not m:
+            continue
         key = m.group(1).lower()
         value = m.group(2).strip()
         if key == "server" and current.get("server"):
-            _flush()
+            _flush_kv()
+            # Сбрасываем тип к последней подсказке выше — иначе при двух
+            # подряд блоках MTProto/SOCKS5 второй унаследует тип первого.
+            if last_hint_line < idx - 6:
+                current_type = "mtproto"
+        # Нормализуем ключевые алиасы.
+        if key in {"host", "ip", "address"}:
+            key = "server"
+        if key in {"password", "pass"}:
+            key = "secret"
+        if key == "protocol":
+            key = "type"
         current[key] = value
-    _flush()
+    _flush_kv()
     return drafts
 
 
