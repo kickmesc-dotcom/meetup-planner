@@ -14,12 +14,14 @@ from aiogram.enums import ParseMode
 
 from app.bot.handlers import (
     admin_chukhan,
+    bot_reactions,
     chat_capture,
     chat_commands,
     next_meeting,
     poll_answer,
     start,
     whoami,
+    zaebal,
 )
 from app.config import get_settings
 
@@ -281,5 +283,14 @@ def get_dispatcher() -> Dispatcher:
         _dispatcher.include_router(admin_chukhan.router)
         _dispatcher.include_router(next_meeting.router)
         _dispatcher.include_router(chat_commands.router)
+        # GHG6 E11: zaebal-команды — до catch-all chat_capture, иначе их «съест»
+        # сохранение текста (Command-фильтры всё равно сработают первыми, но
+        # для читаемости держим порядок).
+        _dispatcher.include_router(zaebal.router)
+        # GHG6 E9: реакции бота — ДО chat_capture, чтобы успеть на mention/reply
+        # раньше, чем сообщение запишется в ChatMessage (порядок aiogram-роутеров
+        # на срабатывание не влияет, но семантически правильнее иметь mention-
+        # обработчик перед catch-all сохранением).
+        _dispatcher.include_router(bot_reactions.router)
         _dispatcher.include_router(chat_capture.router)
     return _dispatcher

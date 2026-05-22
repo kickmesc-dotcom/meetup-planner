@@ -30,7 +30,12 @@ async def sync_user_avatar(session: AsyncSession, bot: Bot, user: User) -> None:
         log.warning("avatar.sync_failed", telegram_id=user.telegram_id, error=str(exc))
 
 
-async def sync_all_avatars(session: AsyncSession, bot: Bot) -> None:
+async def sync_all_avatars(session: AsyncSession, bot: Bot) -> int:
+    """Возвращает количество пользователей, для которых выполнен запрос
+    (не только тех, у кого аватар реально поменялся). Удобно для UI: показать
+    «затронуто N пользователей». Ошибки на отдельных пользователях не прерывают
+    остальных и логируются в `sync_user_avatar`."""
     users = list((await session.scalars(select(User))).all())
     for u in users:
         await sync_user_avatar(session, bot, u)
+    return len(users)

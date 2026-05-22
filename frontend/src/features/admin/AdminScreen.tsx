@@ -16,6 +16,7 @@ import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
+import GamesScreen from "./GamesScreen";
 
 type Section =
   | "root"
@@ -28,7 +29,8 @@ type Section =
   | "history"
   | "birthdays"
   | "poll-presets"
-  | "proxy";
+  | "proxy"
+  | "games";
 
 interface Props {
   users: User[];
@@ -63,6 +65,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
   if (section === "proxy") return <ProxyScreen onBack={back} />;
+  if (section === "games") return <GamesScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -195,6 +198,17 @@ export default function AdminScreen({ users }: Props) {
           title="Пресеты времени"
           subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
           onClick={() => select("poll-presets")}
+        />
+      </SectionGroup>
+
+      {/* GHG6 E6: номинации игр + голосование «Во что сыграем». Отдельный раздел,
+          чтобы не путать с обычными meetup-полами. */}
+      <SectionGroup icon="🎮" title="Игры">
+        <Card
+          icon="🗳"
+          title="Номинации и голосование"
+          subtitle="Добавить игру, запустить «Во что сыграем», follow-up «Когда»"
+          onClick={() => select("games")}
         />
       </SectionGroup>
 

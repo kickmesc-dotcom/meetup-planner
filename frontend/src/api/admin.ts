@@ -130,6 +130,31 @@ export const updateChukhanReasons = (reasons: string[]) =>
     body: JSON.stringify({ reasons }),
   });
 
+// --- GHG6 E5: use-counts фраз (вес = 1/(1+use_count)) ---
+
+export interface ReasonUseCountsOut {
+  counts: Record<string, number>;
+}
+export interface ReasonUseCountsCleared {
+  cleared: number;
+}
+
+export const fetchLoserReasonUseCounts = () =>
+  api<ReasonUseCountsOut>("/api/admin/loser-reasons/use-counts");
+
+export const clearLoserReasonUseCounts = () =>
+  api<ReasonUseCountsCleared>("/api/admin/loser-reasons/use-counts", {
+    method: "DELETE",
+  });
+
+export const fetchChukhanReasonUseCounts = () =>
+  api<ReasonUseCountsOut>("/api/admin/chukhan-reasons/use-counts");
+
+export const clearChukhanReasonUseCounts = () =>
+  api<ReasonUseCountsCleared>("/api/admin/chukhan-reasons/use-counts", {
+    method: "DELETE",
+  });
+
 // --- GHG6 AD5: Quick action — крутануть лоха из админки ---
 
 export interface LoserRollNow {
@@ -352,6 +377,16 @@ export const updateProxyMode = (mode: ProxyMode) =>
 
 export const fetchProxies = () => api<ProxyEntry[]>("/api/admin/proxy");
 
+// GHG6 E1.2: POST /admin/proxy теперь возвращает {proxy, created, ping_result}.
+// ping_result=null означает «не пинговали» (например, проксь создан как enabled=false).
+// При type=mtproto ping_result.error = "ping_not_supported_for_type:mtproto" — UI должен
+// показывать это отдельно от «мёртв».
+export interface ProxyAddResult {
+  proxy: ProxyEntry;
+  created: boolean;
+  ping_result: ProxyPing | null;
+}
+
 export const createProxy = (body: {
   server: string;
   port: number;
@@ -359,7 +394,7 @@ export const createProxy = (body: {
   secret?: string | null;
   enabled?: boolean;
 }) =>
-  api<ProxyEntry>("/api/admin/proxy", {
+  api<ProxyAddResult>("/api/admin/proxy", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -467,6 +502,38 @@ export const proxyAlertsSet = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
+// GHG6 E1.1: ring-buffer ошибок добавления прокси.
+export interface ProxyAddErrorItem {
+  at: string;
+  reason: string;  // proxy_pool_full | db_error | validation_error
+  detail: string;
+  draft: Record<string, unknown>;
+}
+
+export const proxyGetAddErrors = () =>
+  api<{ errors: ProxyAddErrorItem[] }>("/api/admin/proxy/add-errors");
+
+export const proxyClearAddErrors = () =>
+  api<{ cleared: boolean }>("/api/admin/proxy/add-errors", { method: "DELETE" });
+
+// GHG6 E1.4: bootstrap-fetch публичного списка прокси.
+export interface ProxyBootstrapResult {
+  source_url: string;
+  fetched: number;
+  pinged_alive: number;
+  added: number;
+  skipped_duplicate: number;
+  skipped_dead: number;
+  skipped_pool_full: number;
+  errors: string[];
+}
+
+export const proxyBootstrapFetch = (urlOverride?: string) =>
+  api<ProxyBootstrapResult>("/api/admin/proxy/bootstrap-fetch", {
+    method: "POST",
+    body: JSON.stringify(urlOverride ? { url_override: urlOverride } : {}),
+  });
+
 
 // GHG6 CL0: master-toggle нового таймлайн-вида календаря.
 // GET читает любой залогиненный — это нужно CalendarView, чтобы выбрать legacy/new ветку.
@@ -482,4 +549,132 @@ export const setCalendarTimelineFlag = (enabled: boolean) =>
   api<CalendarTimelineFlag>("/api/admin/calendar/timeline", {
     method: "PUT",
     body: JSON.stringify({ enabled }),
+  });
+
+// --- GHG6 E11: bot pause + zaebal settings ---
+
+export interface BotPauseState {
+  active: boolean;
+  id: number | null;
+  started_at: string | null;
+  ends_at: string | null;
+  reason: string | null;
+}
+
+export interface ZaebalSettings {
+  threshold: number;
+  duration_days: number;
+  poll_hours: number;
+  vote_duration_days: number;
+  auto_enabled: boolean;
+  auto_max_per_month: number;
+}
+
+export const fetchBotPauseCurrent = () =>
+  api<BotPauseState>("/api/admin/bot-pause/current");
+
+export const startBotPause = (durationDays: number | null) =>
+  api<BotPauseState>("/api/admin/bot-pause/start", {
+    method: "POST",
+    body: JSON.stringify({ duration_days: durationDays }),
+  });
+
+export const stopBotPause = () =>
+  api<BotPauseState>("/api/admin/bot-pause/stop", { method: "POST" });
+
+export const fetchZaebalSettings = () =>
+  api<ZaebalSettings>("/api/admin/zaebal-settings");
+
+export const updateZaebalSettings = (s: ZaebalSettings) =>
+  api<ZaebalSettings>("/api/admin/zaebal-settings", {
+    method: "PUT",
+    body: JSON.stringify(s),
+  });
+
+// --- GHG6 E9: реакции бота на @-mention и reply ---
+
+export interface BotReactionsSettings {
+  mention_enabled: boolean;
+  reply_all_enabled: boolean;
+  reply_except_phrases_enabled: boolean;
+}
+
+export const fetchBotReactions = () =>
+  api<BotReactionsSettings>("/api/admin/bot-reactions");
+
+export const updateBotReactions = (s: BotReactionsSettings) =>
+  api<BotReactionsSettings>("/api/admin/bot-reactions", {
+    method: "PUT",
+    body: JSON.stringify(s),
+  });
+
+// --- GHG6 E10: avatars — разовый sync + одноразовое расписание ---
+
+export interface AvatarsSyncNowResult {
+  synced: number;
+}
+export interface AvatarsScheduleOnce {
+  scheduled: boolean;
+  run_at: string | null;
+}
+
+export const avatarsSyncNow = () =>
+  api<AvatarsSyncNowResult>("/api/admin/avatars/sync-now", { method: "POST" });
+
+export const avatarsScheduleOnceGet = () =>
+  api<AvatarsScheduleOnce>("/api/admin/avatars/schedule-once");
+
+export const avatarsScheduleOncePost = (runAtIso: string) =>
+  api<AvatarsScheduleOnce>("/api/admin/avatars/schedule-once", {
+    method: "POST",
+    body: JSON.stringify({ run_at: runAtIso }),
+  });
+
+export const avatarsScheduleOnceDelete = () =>
+  api<AvatarsScheduleOnce>("/api/admin/avatars/schedule-once", {
+    method: "DELETE",
+  });
+
+// --- GHG6 E6: номинированные игры + голосование ---
+
+export interface GameNomination {
+  id: number;
+  name: string;
+  added_by_tg_id: number;
+  added_at: string;
+}
+
+export interface GameNominationsList {
+  items: GameNomination[];
+  max_active: number;
+}
+
+export interface GamesPollCreateResult {
+  poll_id: number;
+  tg_message_id: number | null;
+  options_count: number;
+  closes_at: string | null;
+  follow_up_when: boolean;
+}
+
+export const fetchGameNominations = () =>
+  api<GameNominationsList>("/api/admin/games");
+
+export const addGameNomination = (name: string) =>
+  api<GameNomination>("/api/admin/games", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+
+export const removeGameNomination = (id: number) =>
+  api<void>(`/api/admin/games/${id}`, { method: "DELETE" });
+
+export const createGamesPoll = (input: {
+  timeout_hours: number;
+  nomination_ids?: number[];
+  follow_up_when: boolean;
+}) =>
+  api<GamesPollCreateResult>("/api/admin/games/poll-create", {
+    method: "POST",
+    body: JSON.stringify(input),
   });

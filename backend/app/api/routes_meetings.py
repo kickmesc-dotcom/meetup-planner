@@ -37,6 +37,7 @@ from app.services.ical import make_token, render_calendar, verify_token
 from app.services.loser import (
     CooldownError,
     delete_last_loser,
+    compose_loser_message,
     last_loser,
     loser_stats,
     roll_loser,
@@ -245,7 +246,14 @@ async def ical_feed(
     )
 
 
-_LOSER_SEND_TIMEOUT = 15.0  # wall-clock budget for Telegram send (sec)
+# GHG6 E3 (2026-05-21): унификация с админским force-reroll.
+# Раньше публичный /loser/roll делал atomic send+commit с таймаутом 15с — при
+# сбоях прокси аиограм висел и пользователь получал 504/502 «telegram_error»,
+# а ролл откатывался. Админский /admin/loser/roll-now всегда срабатывал, потому
+# что _announce там глотает ошибки и roll_loser коммитит. Приводим к тому же
+# поведению: запись сохраняется всегда, send в чат — best-effort. На фронте
+# UX-крутилка живёт независимо (LoserSheet.tsx — локальный setInterval).
+_LOSER_SEND_TIMEOUT = 8.0  # короче 15с — фронт всё равно крутит ≥1.1с, а 15с никто не ждёт.
 
 
 @router.post("/loser/roll", response_model=LoserRollResponse)
@@ -259,27 +267,53 @@ async def loser_roll_endpoint(
     timings: dict[str, float] = {}
     t0 = time.monotonic()
 
-    async def _announce(row: LoserRoll, loser: User) -> None:
+    async def _announce(row: LoserRoll, loser: User, extras=None) -> None:
+        """Best-effort публикация в группу. Любое исключение глотается —
+        запись ролла всё равно коммитится. Принцип: «лучше зафиксированный
+        ролл без объявления, чем зависший HTTP-запрос с 504»."""
         if not target_chat:
             return  # No chat configured — silent success, row still saved.
         from app.bot.dispatcher import get_bot
 
-        # Count BEFORE commit: existing rolls only. +1 for this one.
-        counts = await loser_stats(session)
-        cnt = counts.get(row.loser_user_id, 0) + 1
-        text = (
-            f"🎲 <b>Лох дня</b> — {loser.display_name}!\n"
-            f"Причина: {row.reason_text}\n"
-            f"Уже {cnt}-й раз становится лохом.\n"
-            f"<i>Покрутил рулетку: {user.display_name}</i>"
-        )
-        send_started = time.monotonic()
-        await asyncio.wait_for(
-            get_bot().send_message(chat_id=target_chat, text=text),
-            timeout=_LOSER_SEND_TIMEOUT,
-        )
-        timings["send_ms"] = round((time.monotonic() - send_started) * 1000, 1)
-        sent_flag["ok"] = True
+        try:
+            # Count BEFORE commit: existing rolls only. +1 for this one.
+            counts = await loser_stats(session)
+            cnt = counts.get(row.loser_user_id, 0) + 1
+            text = compose_loser_message(
+                roller_name=user.display_name,
+                loser_name=loser.display_name,
+                reason_text=row.reason_text or "",
+                loser_count=cnt,
+                extras=extras,
+                header_emoji="🎲",
+                header_label="Лох дня",
+            )
+            send_started = time.monotonic()
+            await asyncio.wait_for(
+                get_bot().send_message(
+                    chat_id=target_chat,
+                    text=text,
+                    parse_mode="HTML",
+                ),
+                timeout=_LOSER_SEND_TIMEOUT,
+            )
+            timings["send_ms"] = round((time.monotonic() - send_started) * 1000, 1)
+            sent_flag["ok"] = True
+        except TelegramRetryAfter as exc:
+            log.warning("loser.tg_retry_after", retry=exc.retry_after, **timings)
+        except TelegramForbiddenError as exc:
+            log.warning("loser.tg_forbidden", error=str(exc), **timings)
+        except (TelegramNetworkError, asyncio.TimeoutError) as exc:
+            log.warning(
+                "loser.tg_network_failed",
+                error=str(exc),
+                total_ms=round((time.monotonic() - t0) * 1000, 1),
+                **timings,
+            )
+        except TelegramAPIError as exc:
+            log.warning("loser.tg_api_error", error=str(exc), **timings)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("loser.announce_unexpected", error=str(exc), **timings)
 
     try:
         row = await roll_loser(session, rolled_by=user, on_announce=_announce)
@@ -288,46 +322,18 @@ async def loser_roll_endpoint(
             status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"cooldown:{int(exc.remaining.total_seconds())}",
         ) from exc
-    except TelegramRetryAfter as exc:
-        log.warning("loser.tg_retry_after", retry=exc.retry_after, **timings)
+    except Exception as exc:  # noqa: BLE001 — row уже откачен внутри roll_loser, нам сюда дойти не должно (announce не raise'ит). Если дошло — это уже не TG, а БД.
+        log.exception("loser.roll_failed", error=str(exc), **timings)
         raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"telegram_retry_after:{exc.retry_after}",
-        ) from exc
-    except TelegramForbiddenError as exc:
-        log.error("loser.tg_forbidden", error=str(exc), **timings)
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail="telegram_forbidden",
-        ) from exc
-    except (TelegramNetworkError, asyncio.TimeoutError) as exc:
-        log.warning(
-            "loser.tg_network_failed",
-            error=str(exc),
-            total_ms=round((time.monotonic() - t0) * 1000, 1),
-            **timings,
-        )
-        raise HTTPException(
-            status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="telegram_network_timeout",
-        ) from exc
-    except TelegramAPIError as exc:
-        log.warning("loser.tg_api_error", error=str(exc), **timings)
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail=f"telegram_api_error:{exc.__class__.__name__}",
-        ) from exc
-    except Exception as exc:  # truly unexpected — row was rolled back
-        log.exception("loser.atomic_send_failed", error=str(exc), **timings)
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail="telegram_send_failed",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="loser_roll_failed",
         ) from exc
 
     log.info(
         "loser.rolled_ok",
         loser_id=row.loser_user_id,
         rolled_by=user.id,
+        sent_to_chat=sent_flag["ok"],
         total_ms=round((time.monotonic() - t0) * 1000, 1),
         **timings,
     )

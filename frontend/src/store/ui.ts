@@ -94,6 +94,15 @@ interface UIState {
    */
   pollSheetPresetDate: string | null;
   setPollSheetPresetDate: (date: string | null) => void;
+
+  /**
+   * GHG6 P3 CL5: пользовательский cellWidth для TimelineView. null = «авто»
+   * (TimelineView сам считает по ResizeObserver — CL6.a). Когда пользователь
+   * двинул слайдер зума или нажал пресет «День»/«Неделя»/«Месяц», сюда
+   * кладётся фиксированное значение в px и TimelineView читает его.
+   */
+  timelineCellWidth: number | null;
+  setTimelineCellWidth: (w: number | null) => void;
 }
 
 function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
@@ -165,4 +174,7 @@ export const useUI = create<UIState>((set, get) => ({
 
   pollSheetPresetDate: null,
   setPollSheetPresetDate: (pollSheetPresetDate) => set({ pollSheetPresetDate }),
+
+  timelineCellWidth: null,
+  setTimelineCellWidth: (timelineCellWidth) => set({ timelineCellWidth }),
 }));

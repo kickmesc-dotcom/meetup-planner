@@ -507,6 +507,91 @@ async def admin_update_chukhan_reasons(
     return ChukhanReasonsOut(reasons=saved)
 
 
+# --- GHG6 E5.3: счётчики использований фраз (для подписи `(use:N)` в UI) ---
+# Хранятся в admin_config как `{phrase_hash: count}` — формат, удобный для
+# weighted_choice (вес = 1/(1+count)). Фронту удобнее {phrase: count}, поэтому
+# мерджим прямо здесь. Лишних счётчиков «осиротевших» хешей в ответе нет —
+# UI рисует подпись только напротив актуальных фраз.
+
+from app.services.phrase_weights import (
+    CHUKHAN_USE_COUNTS_KEY,
+    LOSER_USE_COUNTS_KEY,
+    clear_use_counts,
+    get_use_counts,
+    phrase_hash,
+)
+
+
+class ReasonUseCountsOut(BaseModel):
+    """Словарь `{phrase: count}` для всех актуальных фраз. Фразы без записи
+    в счётчиках попадают со значением 0 — фронту не надо угадывать.
+    """
+    counts: dict[str, int]
+
+
+class ReasonUseCountsCleared(BaseModel):
+    cleared: int
+
+
+async def _merge_counts_by_phrase(
+    reasons: list[str], counts_by_hash: dict[str, int]
+) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for p in reasons:
+        out[p] = int(counts_by_hash.get(phrase_hash(p), 0))
+    return out
+
+
+@router.get(
+    "/admin/loser-reasons/use-counts", response_model=ReasonUseCountsOut
+)
+async def admin_get_loser_reason_use_counts(
+    session: SessionDep, user: CurrentUser
+) -> ReasonUseCountsOut:
+    _ensure_admin(user)
+    reasons = await get_loser_reasons(session)
+    counts = await get_use_counts(session, LOSER_USE_COUNTS_KEY)
+    return ReasonUseCountsOut(counts=await _merge_counts_by_phrase(reasons, counts))
+
+
+@router.delete(
+    "/admin/loser-reasons/use-counts", response_model=ReasonUseCountsCleared
+)
+async def admin_clear_loser_reason_use_counts(
+    session: SessionDep, user: CurrentUser
+) -> ReasonUseCountsCleared:
+    _ensure_admin(user)
+    n = await clear_use_counts(session, LOSER_USE_COUNTS_KEY)
+    await session.commit()
+    log.info("admin.loser_reason_use_counts_cleared", removed=n, by=user.id)
+    return ReasonUseCountsCleared(cleared=n)
+
+
+@router.get(
+    "/admin/chukhan-reasons/use-counts", response_model=ReasonUseCountsOut
+)
+async def admin_get_chukhan_reason_use_counts(
+    session: SessionDep, user: CurrentUser
+) -> ReasonUseCountsOut:
+    _ensure_admin(user)
+    reasons = await _get_chukhan_reasons(session)
+    counts = await get_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
+    return ReasonUseCountsOut(counts=await _merge_counts_by_phrase(reasons, counts))
+
+
+@router.delete(
+    "/admin/chukhan-reasons/use-counts", response_model=ReasonUseCountsCleared
+)
+async def admin_clear_chukhan_reason_use_counts(
+    session: SessionDep, user: CurrentUser
+) -> ReasonUseCountsCleared:
+    _ensure_admin(user)
+    n = await clear_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
+    await session.commit()
+    log.info("admin.chukhan_reason_use_counts_cleared", removed=n, by=user.id)
+    return ReasonUseCountsCleared(cleared=n)
+
+
 # --- GHG6 AD4/AD7/AD8: scheduled settings (агрегат master-toggles) ---
 
 
@@ -602,19 +687,24 @@ async def admin_loser_roll_now(
     _ensure_admin(user)
     from app.bot.dispatcher import get_bot
     from app.config import get_settings as _gs
-    from app.services.loser import roll_loser
+    from app.services.loser import compose_loser_message, roll_loser
 
     settings = _gs()
     bot = get_bot()
 
-    async def _announce(roll, loser):
+    async def _announce(roll, loser, extras=None):
         if not settings.group_chat_id:
             return
         try:
             await bot.send_message(
                 chat_id=settings.group_chat_id,
-                text=(
-                    f"🤡 <b>Лох дня:</b> {loser.display_name}\n<i>{roll.reason_text}</i>"
+                text=compose_loser_message(
+                    loser_name=loser.display_name,
+                    reason_text=roll.reason_text or "",
+                    roller_name=user.display_name,
+                    extras=extras,
+                    header_emoji="🤡",
+                    header_label="Лох дня",
                 ),
                 parse_mode="HTML",
             )
@@ -772,6 +862,53 @@ async def update_autoloser(
     await reload_dynamic_jobs(get_bot())
     log.info("admin.autoloser_updated", body=body.model_dump(), by=user.id)
     return body
+
+
+# --- E8: «Червь-пидор» ---
+
+
+class WormSettingsOut(BaseModel):
+    enabled: bool
+    chance: float  # 0..1
+
+
+class WormSettingsUpdate(BaseModel):
+    enabled: bool | None = None
+    chance: float | None = None
+
+
+@router.get("/admin/worm", response_model=WormSettingsOut)
+async def get_worm(session: SessionDep, user: CurrentUser) -> WormSettingsOut:
+    _ensure_admin(user)
+    from app.services.admin_config import get_worm_chance, is_worm_enabled
+
+    return WormSettingsOut(
+        enabled=await is_worm_enabled(session),
+        chance=await get_worm_chance(session),
+    )
+
+
+@router.put("/admin/worm", response_model=WormSettingsOut)
+async def update_worm(
+    body: WormSettingsUpdate, session: SessionDep, user: CurrentUser
+) -> WormSettingsOut:
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        get_worm_chance,
+        is_worm_enabled,
+        set_worm_chance,
+        set_worm_enabled,
+    )
+
+    if body.enabled is not None:
+        await set_worm_enabled(session, body.enabled)
+    if body.chance is not None:
+        await set_worm_chance(session, body.chance)
+    log.info("admin.worm_updated", body=body.model_dump(exclude_unset=True), by=user.id)
+    return WormSettingsOut(
+        enabled=await is_worm_enabled(session),
+        chance=await get_worm_chance(session),
+    )
 
 
 # --- A7: Loser history ---
@@ -939,12 +1076,15 @@ async def admin_update_poll_presets(
 
 from app.services.proxies import (
     ProxyMode,
+    bootstrap_fetch as _bootstrap_fetch,
+    clear_add_errors as _clear_add_errors,
     delete_proxy as _delete_proxy,
+    get_add_errors as _get_add_errors,
     get_proxy_mode,
     list_proxies,
     set_proxy_mode,
     update_proxy as _update_proxy,
-    upsert_proxy,
+    upsert_proxy_with_ping,
 )
 
 
@@ -1020,13 +1160,27 @@ async def admin_list_proxies(session: SessionDep, user: CurrentUser) -> list[Pro
     return [_proxy_to_out(r) for r in rows]
 
 
-@router.post("/admin/proxy", response_model=ProxyOut)
+class ProxyAddOut(BaseModel):
+    """Ответ на POST /admin/proxy (GHG6 E1.2).
+
+    `ping_result=None` означает «не пинговали» (например, прокси создан как
+    `enabled=false`). При `type=mtproto` ping_result будет с
+    `error="ping_not_supported_for_type:mtproto"` — фронт показывает это
+    отдельным состоянием (не «мёртв», а «нельзя проверить по HTTP»).
+    """
+
+    proxy: ProxyOut
+    created: bool
+    ping_result: "ProxyPingOut | None"
+
+
+@router.post("/admin/proxy", response_model=ProxyAddOut)
 async def admin_create_proxy(
     body: ProxyCreateIn, session: SessionDep, user: CurrentUser
-) -> ProxyOut:
+) -> ProxyAddOut:
     _ensure_admin(user)
     try:
-        row, _created = await upsert_proxy(
+        row, created, ping = await upsert_proxy_with_ping(
             session,
             server=body.server,
             port=body.port,
@@ -1035,11 +1189,35 @@ async def admin_create_proxy(
             enabled=body.enabled,
         )
     except ValueError as exc:
-        if str(exc).startswith("proxy_pool_full"):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
-        raise
-    log.info("admin.proxy_upserted", server=body.server, port=body.port, by=user.id)
-    return _proxy_to_out(row)
+        # ring-buffer для proxy_pool_full и db_error пишется в upsert_proxy.
+        # Любую другую ValueError (валидация на бизнес-уровне) тоже фиксируем.
+        msg = str(exc)
+        if not msg.startswith("proxy_pool_full"):
+            from app.services.proxies import record_add_error as _record_add_error
+            await _record_add_error(
+                session,
+                reason="validation_error",
+                detail=msg[:300],
+                draft={"server": body.server, "port": body.port, "type": body.type},
+            )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, msg)
+    log.info(
+        "admin.proxy_upserted",
+        server=body.server,
+        port=body.port,
+        created=created,
+        ping_ok=ping.ok if ping else None,
+        by=user.id,
+    )
+    ping_out = None
+    if ping is not None:
+        ping_out = ProxyPingOut(
+            proxy_id=ping.proxy_id,
+            ok=ping.ok,
+            latency_ms=ping.latency_ms,
+            error=ping.error,
+        )
+    return ProxyAddOut(proxy=_proxy_to_out(row), created=created, ping_result=ping_out)
 
 
 @router.put("/admin/proxy/{proxy_id}", response_model=ProxyOut)
@@ -1208,6 +1386,94 @@ async def admin_proxy_parse(
     return ProxyParseOut(parsed=[d.to_dict() for d in drafts])
 
 
+# --- GHG6 E1.1: ring-buffer ошибок добавления прокси ---
+
+class ProxyAddErrorItem(BaseModel):
+    at: str
+    reason: str
+    detail: str
+    draft: dict
+
+
+class ProxyAddErrorsOut(BaseModel):
+    errors: list[ProxyAddErrorItem]
+
+
+@router.get("/admin/proxy/add-errors", response_model=ProxyAddErrorsOut)
+async def admin_proxy_get_add_errors(
+    session: SessionDep, user: CurrentUser
+) -> ProxyAddErrorsOut:
+    _ensure_admin(user)
+    raw = await _get_add_errors(session)
+    items: list[ProxyAddErrorItem] = []
+    for r in raw:
+        try:
+            items.append(
+                ProxyAddErrorItem(
+                    at=str(r.get("at", "")),
+                    reason=str(r.get("reason", "")),
+                    detail=str(r.get("detail", "")),
+                    draft=r.get("draft") if isinstance(r.get("draft"), dict) else {},
+                )
+            )
+        except Exception:  # noqa: BLE001 — диагностический эндпоинт, не падаем на корявой записи.
+            continue
+    return ProxyAddErrorsOut(errors=items)
+
+
+@router.delete("/admin/proxy/add-errors")
+async def admin_proxy_clear_add_errors(
+    session: SessionDep, user: CurrentUser
+) -> dict:
+    _ensure_admin(user)
+    await _clear_add_errors(session)
+    log.info("admin.proxy_add_errors_cleared", by=user.id)
+    return {"cleared": True}
+
+
+# --- GHG6 E1.4: bootstrap-fetch публичного списка прокси ---
+
+class ProxyBootstrapIn(BaseModel):
+    # Опциональный override: если задан, env PROXY_BOOTSTRAP_URL игнорируется.
+    url_override: str | None = Field(None, min_length=1, max_length=2048)
+
+
+class ProxyBootstrapOut(BaseModel):
+    source_url: str
+    fetched: int
+    pinged_alive: int
+    added: int
+    skipped_duplicate: int
+    skipped_dead: int
+    skipped_pool_full: int
+    errors: list[str]
+
+
+@router.post("/admin/proxy/bootstrap-fetch", response_model=ProxyBootstrapOut)
+async def admin_proxy_bootstrap_fetch(
+    body: ProxyBootstrapIn | None,
+    session: SessionDep,
+    user: CurrentUser,
+) -> ProxyBootstrapOut:
+    """Скачать публичный список прокси, проверить живые, добавить до 10 в пул.
+
+    503 `bootstrap_not_configured` — если ни `url_override`, ни env
+    `PROXY_BOOTSTRAP_URL`, ни встроенный список `BUNDLED_BOOTSTRAP_URLS` не дают
+    рабочих URL. По умолчанию BUNDLED — пуст (см. proxies.py:510 TODO), так что
+    без явного override/env эндпоинт сразу отвечает 503.
+    """
+    _ensure_admin(user)
+    override = body.url_override if body is not None else None
+    res = await _bootstrap_fetch(session, url_override=override)
+    if "bootstrap_not_configured" in res.errors:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="bootstrap_not_configured",
+        )
+    log.info("admin.proxy_bootstrap_fetch", by=user.id, **res.to_dict())
+    return ProxyBootstrapOut(**res.to_dict())
+
+
 @router.get("/admin/proxy/status", response_model=ProxyStatusOut)
 async def admin_proxy_status(session: SessionDep, user: CurrentUser) -> ProxyStatusOut:
     _ensure_admin(user)
@@ -1300,3 +1566,391 @@ async def admin_calendar_timeline_put(
     await set_calendar_timeline_enabled(session, body.enabled)
     log.info("admin.calendar_timeline_set", enabled=body.enabled, by=user.id)
     return CalendarTimelineOut(enabled=body.enabled)
+
+
+# --- GHG6 E11: bot pause + zaebal settings ---
+
+
+class BotPauseStartIn(BaseModel):
+    duration_days: int | None = None
+    reason: str | None = None
+
+
+class BotPauseOut(BaseModel):
+    active: bool
+    id: int | None = None
+    started_at: datetime | None = None
+    ends_at: datetime | None = None
+    reason: str | None = None
+
+
+class ZaebalSettingsIO(BaseModel):
+    threshold: int = Field(..., ge=1, le=10)
+    duration_days: int = Field(..., ge=1, le=30)
+    poll_hours: int = Field(..., ge=1, le=72)
+    vote_duration_days: int = Field(..., ge=1, le=30)
+    auto_enabled: bool
+    auto_max_per_month: int = Field(..., ge=0, le=10)
+
+
+def _pause_to_out(p) -> BotPauseOut:
+    if p is None:
+        return BotPauseOut(active=False)
+    return BotPauseOut(
+        active=p.ended_at is None,
+        id=p.id,
+        started_at=p.started_at,
+        ends_at=p.ends_at,
+        reason=p.reason,
+    )
+
+
+@router.get("/admin/bot-pause/current", response_model=BotPauseOut)
+async def admin_pause_current(
+    session: SessionDep, user: CurrentUser
+) -> BotPauseOut:
+    _ensure_admin(user)
+    from app.services.bot_pause import get_active_pause
+
+    return _pause_to_out(await get_active_pause(session))
+
+
+@router.post("/admin/bot-pause/start", response_model=BotPauseOut)
+async def admin_pause_start(
+    body: BotPauseStartIn, session: SessionDep, user: CurrentUser
+) -> BotPauseOut:
+    _ensure_admin(user)
+    from app.services.bot_pause import start_pause
+
+    reason = body.reason or "manual_admin"
+    try:
+        pause = await start_pause(
+            session,
+            duration_days=body.duration_days,
+            reason=reason,
+            started_by_tg_id=user.telegram_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    return _pause_to_out(pause)
+
+
+@router.post("/admin/bot-pause/stop", response_model=BotPauseOut)
+async def admin_pause_stop(
+    session: SessionDep, user: CurrentUser
+) -> BotPauseOut:
+    _ensure_admin(user)
+    from app.services.bot_pause import stop_pause
+
+    pause = await stop_pause(session)
+    return _pause_to_out(pause)
+
+
+@router.get("/admin/zaebal-settings", response_model=ZaebalSettingsIO)
+async def admin_zaebal_get(
+    session: SessionDep, user: CurrentUser
+) -> ZaebalSettingsIO:
+    _ensure_admin(user)
+    from app.services.bot_pause import get_zaebal_settings
+
+    return ZaebalSettingsIO(**(await get_zaebal_settings(session)))
+
+
+@router.put("/admin/zaebal-settings", response_model=ZaebalSettingsIO)
+async def admin_zaebal_put(
+    body: ZaebalSettingsIO, session: SessionDep, user: CurrentUser
+) -> ZaebalSettingsIO:
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+    from app.services.bot_pause import set_zaebal_settings
+
+    await set_zaebal_settings(session, body.model_dump())
+    await reload_dynamic_jobs(get_bot())
+    log.info("admin.zaebal_settings_updated", by=user.id)
+    return body
+
+
+# --- GHG6 E9: реакции бота на @-mention и reply ---
+
+
+class BotReactionsIO(BaseModel):
+    mention_enabled: bool
+    reply_all_enabled: bool
+    reply_except_phrases_enabled: bool
+
+
+@router.get("/admin/bot-reactions", response_model=BotReactionsIO)
+async def admin_get_bot_reactions(
+    session: SessionDep, user: CurrentUser
+) -> BotReactionsIO:
+    _ensure_admin(user)
+    from app.services.admin_config import get_bot_reactions_settings
+
+    cfg = await get_bot_reactions_settings(session)
+    return BotReactionsIO(**cfg)
+
+
+@router.put("/admin/bot-reactions", response_model=BotReactionsIO)
+async def admin_put_bot_reactions(
+    body: BotReactionsIO, session: SessionDep, user: CurrentUser
+) -> BotReactionsIO:
+    _ensure_admin(user)
+    from app.services.admin_config import set_bot_reactions_settings
+
+    await set_bot_reactions_settings(
+        session,
+        mention_enabled=body.mention_enabled,
+        reply_all_enabled=body.reply_all_enabled,
+        reply_except_phrases_enabled=body.reply_except_phrases_enabled,
+    )
+    log.info("admin.bot_reactions_updated", by=user.id, **body.model_dump())
+    return body
+
+
+# --- GHG6 E10: avatars — разовый sync + одноразовое расписание ---
+# Рекуррентный JOB_AVATAR_SYNC упразднён (default avatars.sync_enabled=false).
+# Вместо него — две ручные операции: запустить прямо сейчас или запланировать
+# на конкретное datetime один раз.
+
+JOB_AVATAR_SYNC_ONE_SHOT = "avatar_sync_one_shot"
+
+
+class AvatarsSyncNowOut(BaseModel):
+    synced: int  # количество пользователей, чьи аватары были запрошены
+
+
+class AvatarsScheduleOnceIn(BaseModel):
+    # ISO 8601 datetime. Принимаем как str, чтобы не зависеть от tz pydantic-парсера —
+    # парсим вручную и проверяем «в будущем».
+    run_at: str
+
+
+class AvatarsScheduleOnceOut(BaseModel):
+    scheduled: bool
+    run_at: datetime | None = None
+
+
+@router.post("/admin/avatars/sync-now", response_model=AvatarsSyncNowOut)
+async def admin_avatars_sync_now(
+    session: SessionDep, user: CurrentUser
+) -> AvatarsSyncNowOut:
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+    from app.services.avatars import sync_all_avatars
+
+    count = await sync_all_avatars(session, get_bot())
+    log.info("admin.avatars_sync_now", count=count, by=user.id)
+    return AvatarsSyncNowOut(synced=count)
+
+
+def _parse_iso_future(run_at: str) -> datetime:
+    try:
+        dt = datetime.fromisoformat(run_at.replace("Z", "+00:00"))
+    except ValueError as e:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"invalid_datetime: {e}")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    if dt <= datetime.now(timezone.utc):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "run_at_must_be_future")
+    return dt
+
+
+@router.get("/admin/avatars/schedule-once", response_model=AvatarsScheduleOnceOut)
+async def admin_avatars_schedule_once_get(
+    user: CurrentUser,
+) -> AvatarsScheduleOnceOut:
+    _ensure_admin(user)
+    sched = get_scheduler()
+    job = sched.get_job(JOB_AVATAR_SYNC_ONE_SHOT)
+    if job is None or job.next_run_time is None:
+        return AvatarsScheduleOnceOut(scheduled=False)
+    return AvatarsScheduleOnceOut(scheduled=True, run_at=job.next_run_time)
+
+
+@router.post("/admin/avatars/schedule-once", response_model=AvatarsScheduleOnceOut)
+async def admin_avatars_schedule_once_post(
+    body: AvatarsScheduleOnceIn, user: CurrentUser
+) -> AvatarsScheduleOnceOut:
+    _ensure_admin(user)
+    from apscheduler.triggers.date import DateTrigger
+    from app.bot.dispatcher import get_bot
+    from app.db.base import get_sessionmaker
+    from app.services.avatars import sync_all_avatars
+
+    run_dt = _parse_iso_future(body.run_at)
+
+    async def _one_shot() -> None:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            try:
+                await sync_all_avatars(session, get_bot())
+            except Exception as exc:  # noqa: BLE001
+                log.warning("avatars.one_shot_failed", error=str(exc))
+
+    sched = get_scheduler()
+    sched.add_job(
+        _one_shot,
+        DateTrigger(run_date=run_dt),
+        id=JOB_AVATAR_SYNC_ONE_SHOT,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    log.info("admin.avatars_schedule_once", run_at=run_dt.isoformat(), by=user.id)
+    return AvatarsScheduleOnceOut(scheduled=True, run_at=run_dt)
+
+
+@router.delete("/admin/avatars/schedule-once", response_model=AvatarsScheduleOnceOut)
+async def admin_avatars_schedule_once_delete(
+    user: CurrentUser,
+) -> AvatarsScheduleOnceOut:
+    _ensure_admin(user)
+    sched = get_scheduler()
+    job = sched.get_job(JOB_AVATAR_SYNC_ONE_SHOT)
+    if job is not None:
+        sched.remove_job(JOB_AVATAR_SYNC_ONE_SHOT)
+        log.info("admin.avatars_schedule_once_cancelled", by=user.id)
+    return AvatarsScheduleOnceOut(scheduled=False)
+
+
+# --- GHG6 E6: номинированные игры + голосование ---
+
+class GameNominationOut(BaseModel):
+    id: int
+    name: str
+    added_by_tg_id: int
+    added_at: datetime
+
+
+class GameNominationIn(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+
+
+class GameNominationsListOut(BaseModel):
+    items: list[GameNominationOut]
+    max_active: int
+
+
+@router.get("/admin/games", response_model=GameNominationsListOut)
+async def admin_games_list(
+    session: SessionDep, user: CurrentUser
+) -> GameNominationsListOut:
+    _ensure_admin(user)
+    from app.services.games import (
+        MAX_ACTIVE_NOMINATIONS,
+        list_active_nominations,
+    )
+
+    rows = await list_active_nominations(session)
+    return GameNominationsListOut(
+        items=[
+            GameNominationOut(
+                id=r.id,
+                name=r.name,
+                added_by_tg_id=r.added_by_tg_id,
+                added_at=r.added_at,
+            )
+            for r in rows
+        ],
+        max_active=MAX_ACTIVE_NOMINATIONS,
+    )
+
+
+@router.post(
+    "/admin/games", response_model=GameNominationOut, status_code=status.HTTP_201_CREATED
+)
+async def admin_games_create(
+    body: GameNominationIn, session: SessionDep, user: CurrentUser
+) -> GameNominationOut:
+    _ensure_admin(user)
+    from app.services.games import (
+        NominationEmpty,
+        NominationLimitExceeded,
+        add_nomination,
+    )
+
+    try:
+        row = await add_nomination(
+            session, name=body.name, added_by_tg_id=user.telegram_id
+        )
+    except NominationEmpty as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+    except NominationLimitExceeded as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+
+    return GameNominationOut(
+        id=row.id,
+        name=row.name,
+        added_by_tg_id=row.added_by_tg_id,
+        added_at=row.added_at,
+    )
+
+
+@router.delete("/admin/games/{nomination_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def admin_games_remove(
+    nomination_id: int, session: SessionDep, user: CurrentUser
+) -> Response:
+    _ensure_admin(user)
+    from app.services.games import remove_nomination
+
+    removed = await remove_nomination(session, nomination_id=nomination_id)
+    if not removed:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "nomination_not_found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class GamesPollCreateIn(BaseModel):
+    """Запуск голосования «Во что сыграем».
+
+    `timeout_hours` — open_period в часах (12..24 по спеке E6.3).
+    `nomination_ids` — если пусто, берём все активные номинации.
+    `follow_up_when` — если true, после закрытия `game_choice` создаём
+    follow-up `game_when` с datetime-вариантами.
+    """
+
+    timeout_hours: int = Field(default=24, ge=1, le=72)
+    nomination_ids: list[int] | None = None
+    follow_up_when: bool = False
+
+
+class GamesPollCreateOut(BaseModel):
+    poll_id: int
+    tg_message_id: int | None
+    options_count: int
+    closes_at: datetime | None
+    follow_up_when: bool
+
+
+@router.post("/admin/games/poll-create", response_model=GamesPollCreateOut)
+async def admin_games_poll_create(
+    body: GamesPollCreateIn, session: SessionDep, user: CurrentUser
+) -> GamesPollCreateOut:
+    _ensure_admin(user)
+    settings = get_settings()
+    if not settings.group_chat_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "group_chat_id_not_configured"
+        )
+    from app.bot.dispatcher import get_bot
+    from app.services.games_poll import create_game_choice_poll
+
+    try:
+        poll = await create_game_choice_poll(
+            session,
+            get_bot(),
+            chat_id=settings.group_chat_id,
+            created_by=user,
+            timeout_hours=body.timeout_hours,
+            nomination_ids=body.nomination_ids,
+            follow_up_when=body.follow_up_when,
+        )
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+
+    return GamesPollCreateOut(
+        poll_id=poll.id,
+        tg_message_id=poll.tg_message_id,
+        options_count=len(body.nomination_ids or []),
+        closes_at=poll.closes_at,
+        follow_up_when=body.follow_up_when,
+    )

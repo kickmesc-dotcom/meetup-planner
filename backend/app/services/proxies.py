@@ -55,9 +55,12 @@ PROXY_MODE_KEY = "proxy.mode"
 PROXY_LAST_ERROR_KEY = "proxy.last_error"               # JSON
 PROXY_LAST_ALERT_AT_KEY = "proxy.last_admin_alert_at"   # ISO datetime
 PROXY_ADMIN_ALERTS_ENABLED_KEY = "proxy.admin_alerts_enabled"  # bool
+PROXY_ADD_ERRORS_KEY = "proxy.add_errors"               # JSON list (ring-buffer)
 
 # Лимит на размер пула (GHG6 PX10).
 PROXY_POOL_MAX = 50
+# Сколько последних add-ошибок храним (GHG6 E1.1).
+ADD_ERRORS_BUFFER_SIZE = 20
 
 # Тайм-ауты для проверок и нотификаций.
 PING_TIMEOUT_SEC = 6.0
@@ -300,6 +303,10 @@ async def upsert_proxy(
 
     Возвращает ``(row, created)`` — ``created=True`` если запись была добавлена,
     ``False`` если по (server, port) уже существовала и просто обновилась.
+
+    При отклонении (переполнение пула / ошибка БД / валидация) пишет причину
+    в ring-buffer `admin_config["proxy.add_errors"]` (см. `record_add_error`)
+    и пробрасывает исключение наружу — REST конвертирует его в HTTP-ошибку.
     """
     # GHG6 PX10: enforce pool limit на add (не на upsert существующего).
     existing = await session.scalar(
@@ -311,20 +318,140 @@ async def upsert_proxy(
         from sqlalchemy import func as _sqlfunc
         total = await session.scalar(select(_sqlfunc.count()).select_from(ProxyEntry))
         if (total or 0) >= PROXY_POOL_MAX:
+            await record_add_error(
+                session,
+                reason="proxy_pool_full",
+                detail=f"pool size {total}/{PROXY_POOL_MAX}",
+                draft={"server": server, "port": port, "type": type_},
+            )
             raise ValueError(f"proxy_pool_full:{PROXY_POOL_MAX}")
-    stmt = (
-        pg_insert(ProxyEntry)
-        .values(server=server, port=port, type=type_, secret=secret, enabled=enabled)
-        .on_conflict_do_update(
-            constraint="uq_proxy_server_port",
-            set_={"type": type_, "secret": secret, "enabled": enabled},
+    try:
+        stmt = (
+            pg_insert(ProxyEntry)
+            .values(server=server, port=port, type=type_, secret=secret, enabled=enabled)
+            .on_conflict_do_update(
+                constraint="uq_proxy_server_port",
+                set_={"type": type_, "secret": secret, "enabled": enabled},
+            )
+            .returning(ProxyEntry)
         )
-        .returning(ProxyEntry)
-    )
-    res = await session.execute(stmt)
-    await session.commit()
+        res = await session.execute(stmt)
+        await session.commit()
+    except Exception as exc:  # noqa: BLE001 — БД-ошибки бывают разные, важно их зафиксировать.
+        # Откат частичного состояния (на случай asyncpg-ошибки в середине транзакции).
+        try:
+            await session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        await record_add_error(
+            session,
+            reason="db_error",
+            detail=f"{exc.__class__.__name__}: {exc}"[:300],
+            draft={"server": server, "port": port, "type": type_},
+        )
+        raise
     invalidate()
     return res.scalar_one(), existing is None
+
+
+# --- E1.1: ring-buffer ошибок добавления прокси ---
+
+async def record_add_error(
+    session: AsyncSession,
+    *,
+    reason: str,
+    detail: str,
+    draft: dict | None = None,
+) -> None:
+    """Запихать запись в ring-buffer `admin_config["proxy.add_errors"]`.
+
+    Не падает на ошибках сериализации/БД — это диагностический слой, он не
+    должен ронять основной сценарий. Размер буфера — `ADD_ERRORS_BUFFER_SIZE`.
+    """
+    entry = {
+        "at": datetime.now(timezone.utc).isoformat(),
+        "reason": reason,
+        "detail": (detail or "")[:500],
+        "draft": draft or {},
+    }
+    try:
+        existing_raw = await _get_value(session, PROXY_ADD_ERRORS_KEY)
+        items: list[dict] = []
+        if existing_raw:
+            try:
+                parsed = json.loads(existing_raw)
+                if isinstance(parsed, list):
+                    items = [x for x in parsed if isinstance(x, dict)]
+            except (ValueError, TypeError):
+                items = []
+        items.append(entry)
+        # Усечь до последних N (новые в конце).
+        if len(items) > ADD_ERRORS_BUFFER_SIZE:
+            items = items[-ADD_ERRORS_BUFFER_SIZE:]
+        await _set_value(session, PROXY_ADD_ERRORS_KEY, json.dumps(items, ensure_ascii=False))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("proxy.record_add_error_failed", extra={"err": exc.__class__.__name__})
+
+
+async def get_add_errors(session: AsyncSession) -> list[dict]:
+    raw = await _get_value(session, PROXY_ADD_ERRORS_KEY)
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [x for x in data if isinstance(x, dict)]
+    except (ValueError, TypeError):
+        return []
+    return []
+
+
+async def clear_add_errors(session: AsyncSession) -> None:
+    await _set_value(session, PROXY_ADD_ERRORS_KEY, "")
+
+
+async def upsert_proxy_with_ping(
+    session: AsyncSession,
+    *,
+    server: str,
+    port: int,
+    type_: str = "mtproto",
+    secret: str | None = None,
+    enabled: bool = True,
+) -> tuple[ProxyEntry, bool, PingResult | None]:
+    """`upsert_proxy` + сразу `ping_proxy` для свежей записи.
+
+    Для MTProto-прокси HTTP-проба не подходит (см. `_http_probe`), поэтому
+    `ping_result` будет с `error="ping_not_supported_for_type:mtproto"` —
+    UI должен это понимать и показывать иначе, чем «мёртв». Если ping упал
+    из-за DNS/таймаута/коннекта — запись всё равно создаётся (пользователь
+    сам решит, оставить ли её), а PingResult показывает причину.
+    """
+    row, created = await upsert_proxy(
+        session,
+        server=server,
+        port=port,
+        type_=type_,
+        secret=secret,
+        enabled=enabled,
+    )
+    # Пингуем только если прокси enabled — выключенные не дёргаем.
+    if not enabled:
+        return row, created, None
+    try:
+        ping_result = await ping_proxy(session, row.id)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "proxy.post_add_ping_failed",
+            extra={"proxy_id": row.id, "err": exc.__class__.__name__},
+        )
+        ping_result = PingResult(
+            proxy_id=row.id,
+            ok=False,
+            latency_ms=None,
+            error=f"ping_exception:{exc.__class__.__name__}",
+        )
+    return row, created, ping_result
 
 
 async def update_proxy(
@@ -371,6 +498,187 @@ async def delete_proxy(session: AsyncSession, proxy_id: int) -> bool:
 
 
 # --- env-bootstrap ---
+
+
+# --- E1.4: загрузка пула из внешнего источника ---
+
+# Жёстко вшитые публичные источники списков прокси. Если оба недоступны/
+# не настроены — эндпоинт ответит 503. Пользователь может переопределить
+# через env `PROXY_BOOTSTRAP_URL` (один URL). Список заведомо короткий —
+# чтобы не превратиться в рассыпуху мёртвых URL: лучше явный 503, чем
+# таймауты по 10 секунд на ходу.
+BUNDLED_BOOTSTRAP_URLS: list[str] = [
+    # TODO(GHG6 E1.4): по факту работающие RSS/JSON-источники нужно проверить
+    # и вписать сюда. Пока пусто — эндпоинт даст 503 `bootstrap_not_configured`
+    # пока пользователь не задаст PROXY_BOOTSTRAP_URL.
+]
+
+# Сколько живых прокси максимум добавляем за один bootstrap (защита от
+# мгновенного забивания пула 50/50 при первом же вызове).
+BOOTSTRAP_MAX_ADD_PER_RUN = 10
+BOOTSTRAP_FETCH_TIMEOUT_SEC = 15.0
+
+
+@dataclass
+class BootstrapResult:
+    """Сводка одного запуска `bootstrap_fetch`."""
+
+    source_url: str
+    fetched: int           # сколько прокси нашёл парсер
+    pinged_alive: int      # сколько ответили на ping (для socks/http)
+    added: int             # сколько реально добавлено в БД
+    skipped_duplicate: int  # сколько было уже в пуле
+    skipped_dead: int      # сколько отбраковали ping'ом
+    skipped_pool_full: int  # сколько отбросили из-за PROXY_POOL_MAX
+    errors: list[str]
+
+    def to_dict(self) -> dict:
+        return {
+            "source_url": self.source_url,
+            "fetched": self.fetched,
+            "pinged_alive": self.pinged_alive,
+            "added": self.added,
+            "skipped_duplicate": self.skipped_duplicate,
+            "skipped_dead": self.skipped_dead,
+            "skipped_pool_full": self.skipped_pool_full,
+            "errors": self.errors[:10],
+        }
+
+
+def _resolve_bootstrap_urls(override: str | None = None) -> list[str]:
+    """Приоритет: явный override (из body REST) → env → встроенный список.
+
+    Возвращает список *уникальных* URL'ов. Если пусто — эндпоинт даст 503.
+    """
+    if override:
+        return [override.strip()]
+    env_url = (os.getenv("PROXY_BOOTSTRAP_URL") or "").strip()
+    if env_url:
+        return [env_url]
+    return [u for u in BUNDLED_BOOTSTRAP_URLS if u]
+
+
+async def bootstrap_fetch(
+    session: AsyncSession, *, url_override: str | None = None
+) -> BootstrapResult:
+    """Скачать публичный список прокси и подсыпать в пул живые экземпляры.
+
+    Последовательность:
+        1. Получить URL (`url_override` → env → встроенный список).
+        2. Скачать (HTTP GET, тайм-аут 15с, без прокси — bootstrap по
+           определению идёт с direct-коннекта).
+        3. Прогнать через `parse_mtproto_blob` (он же используется для
+           ручного парсера — поддерживает tg://, https://t.me/, KV-блоки).
+        4. Для каждого черновика: создать ProxyRecord-протоединение, дёрнуть
+           `_http_probe` (для socks5/http) или принять «как есть» (для mtproto:
+           HTTP-проба не работает).
+        5. Живых — до `BOOTSTRAP_MAX_ADD_PER_RUN` — добавить через `upsert_proxy`.
+    """
+    urls = _resolve_bootstrap_urls(url_override)
+    if not urls:
+        return BootstrapResult(
+            source_url="",
+            fetched=0,
+            pinged_alive=0,
+            added=0,
+            skipped_duplicate=0,
+            skipped_dead=0,
+            skipped_pool_full=0,
+            errors=["bootstrap_not_configured"],
+        )
+    source = urls[0]
+    res = BootstrapResult(
+        source_url=source,
+        fetched=0,
+        pinged_alive=0,
+        added=0,
+        skipped_duplicate=0,
+        skipped_dead=0,
+        skipped_pool_full=0,
+        errors=[],
+    )
+
+    # 1+2: скачивание.
+    try:
+        async with aiohttp.ClientSession(trust_env=False) as http:
+            async with asyncio.timeout(BOOTSTRAP_FETCH_TIMEOUT_SEC):
+                async with http.get(source) as resp:
+                    if resp.status >= 400:
+                        res.errors.append(f"http_{resp.status}")
+                        return res
+                    text = await resp.text(errors="replace")
+    except asyncio.TimeoutError:
+        res.errors.append("fetch_timeout")
+        return res
+    except Exception as exc:  # noqa: BLE001
+        res.errors.append(f"fetch_error:{exc.__class__.__name__}")
+        return res
+
+    # 3: парсинг.
+    drafts = parse_mtproto_blob(text)
+    res.fetched = len(drafts)
+    if not drafts:
+        return res
+
+    # 4: пинг + дедуп + добавление.
+    # Существующие записи — одним SELECT'ом, дальше дедупим в памяти.
+    rows = (await session.execute(select(ProxyEntry.server, ProxyEntry.port))).all()
+    existing_keys = {(r.server, r.port) for r in rows}
+
+    from sqlalchemy import func as _sqlfunc
+    pool_size = await session.scalar(select(_sqlfunc.count()).select_from(ProxyEntry)) or 0
+    pool_remaining = max(0, PROXY_POOL_MAX - pool_size)
+
+    for draft in drafts:
+        if res.added >= BOOTSTRAP_MAX_ADD_PER_RUN:
+            break
+        if (draft.server, draft.port) in existing_keys:
+            res.skipped_duplicate += 1
+            continue
+        if pool_remaining <= 0:
+            res.skipped_pool_full += 1
+            continue
+
+        # Имитируем ProxyRecord на лету, чтоб переиспользовать _http_probe.
+        rec = ProxyRecord(
+            id=-1,
+            server=draft.server,
+            port=draft.port,
+            type=draft.type,
+            secret=draft.secret,
+            enabled=True,
+            fail_count=0,
+            last_ok_at=None,
+            last_fail_at=None,
+            dead_until=None,
+        )
+        ping = await _http_probe(rec)
+        # MTProto — пинговать не умеем, добавляем без проверки.
+        is_mtproto = draft.type.lower() == "mtproto"
+        if ping.ok or is_mtproto:
+            if ping.ok:
+                res.pinged_alive += 1
+            try:
+                await upsert_proxy(
+                    session,
+                    server=draft.server,
+                    port=draft.port,
+                    type_=draft.type,
+                    secret=draft.secret,
+                )
+                res.added += 1
+                pool_remaining -= 1
+                existing_keys.add((draft.server, draft.port))
+            except ValueError as exc:
+                if str(exc).startswith("proxy_pool_full"):
+                    res.skipped_pool_full += 1
+                else:
+                    res.errors.append(f"upsert:{exc}")
+        else:
+            res.skipped_dead += 1
+
+    log.info("proxy.bootstrap_fetch", extra=res.to_dict())
+    return res
 
 
 async def bootstrap_from_env(session: AsyncSession) -> int:

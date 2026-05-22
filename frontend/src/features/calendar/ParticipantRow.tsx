@@ -19,6 +19,15 @@ interface Props {
   birthdays?: BirthdayCalendarEntry[];
   /** Отметки лох/чухан этого участника в окне. */
   marks?: CalendarMark[];
+  /** GHG6 E8.4: этот участник — активный «червь-пидор». Рисуем 🪱 у аватара. */
+  isWorm?: boolean;
+  /**
+   * GHG6 CL1: фикс-ширина одной ячейки в пикселях. Если задано — строка не
+   * растягивается на flex-1, а имеет ширину windowSpan × cellWidth. Используется
+   * TimelineView для синхронизации сетки строк с горизонтальным скроллом и шапкой.
+   * Если не задано — legacy-режим: 1fr (растягивается на доступную ширину).
+   */
+  cellWidth?: number;
 }
 
 export default function ParticipantRow({
@@ -29,6 +38,8 @@ export default function ParticipantRow({
   windowSpan,
   birthdays = [],
   marks = [],
+  isWorm = false,
+  cellWidth,
 }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
@@ -69,20 +80,35 @@ export default function ParticipantRow({
 
   return (
     <div className="relative flex items-center border-b border-tg-secondary-bg/60">
-      <div className="w-[60px] flex flex-col items-center py-1.5 shrink-0">
-        <div
-          className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
-          style={{ background: user.color_hex }}
-          title={user.display_name}
-        >
-          {user.avatar_url ? (
-            <img
-              src={user.avatar_url}
-              alt={user.display_name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            initials(user.display_name)
+      {/* GHG6 CL1: sticky-left делает колонку аватара "вмороженной" при
+          горизонтальном скролле TimelineView. В StripView (легаси) родитель
+          горизонтально не скроллится, поэтому sticky здесь — no-op. */}
+      <div className="w-[60px] flex flex-col items-center py-1.5 shrink-0 sticky left-0 z-10 bg-tg-bg">
+        <div className="relative">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
+            style={{ background: user.color_hex }}
+            title={isWorm ? `🪱 ${user.display_name} — червь-пидор` : user.display_name}
+          >
+            {user.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt={user.display_name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              initials(user.display_name)
+            )}
+          </div>
+          {/* GHG6 E8.4: переходящее звание «червь-пидор». Бейдж висит у аватара
+              того, кто сейчас активный носитель. */}
+          {isWorm && (
+            <span
+              aria-label="Червь-пидор"
+              className="absolute -bottom-1 -right-1 text-[14px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
+            >
+              🪱
+            </span>
           )}
         </div>
         <div className="text-[10px] text-tg-hint truncate max-w-[60px] mt-0.5">
@@ -92,10 +118,20 @@ export default function ParticipantRow({
 
       {/* CAL1: overflow-hidden + contain жёстко удерживают пилюли в пределах
           разметки. Любая анимация framer-motion, выходящая за грань,
-          клиппится контейнером. */}
+          клиппится контейнером.
+          CL1: при заданном cellWidth — фикс-ширина (TimelineView), иначе
+          1fr (legacy StripView). */}
       <div
-        className="relative flex-1 grid h-14 overflow-hidden [contain:layout_paint]"
-        style={{ gridTemplateColumns: `repeat(${windowSpan}, minmax(36px, 1fr))` }}
+        className={[
+          "relative grid h-14 overflow-hidden [contain:layout_paint]",
+          cellWidth ? "" : "flex-1",
+        ].join(" ")}
+        style={{
+          gridTemplateColumns: cellWidth
+            ? `repeat(${windowSpan}, ${cellWidth}px)`
+            : `repeat(${windowSpan}, minmax(36px, 1fr))`,
+          width: cellWidth ? windowSpan * cellWidth : undefined,
+        }}
       >
         {Array.from({ length: windowSpan }).map((_, i) => {
           const dayStart = startOfDay(addDays(windowStart, i));

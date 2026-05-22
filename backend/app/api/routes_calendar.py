@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
-from app.db.models import LoserRoll, WeeklyChukhan
+from app.db.models import LoserRoll, Meeting, User, WeeklyChukhan
 
 router = APIRouter(tags=["calendar"])
 
@@ -120,3 +120,74 @@ async def calendar_marks(
         loser_rolls=loser_pairs,
         chukhan_weeks=chukhan_pairs,
     )
+
+
+# --- E8: активный «червь-пидор» ---
+
+class WormCurrentOut(BaseModel):
+    """Активный червь-пидор (или поля=None, если никого не назначено).
+    Доступно всем участникам (не только админу) — иконка 🪱 нужна в
+    `ParticipantRow` у всех клиентов."""
+    user_id: int | None = None
+    display_name: str | None = None
+    started_at: datetime | None = None
+
+
+@router.get("/worm/current", response_model=WormCurrentOut)
+async def get_worm_current(session: SessionDep, _user: CurrentUser) -> WormCurrentOut:
+    from app.services.loser import get_current_worm
+
+    row = await get_current_worm(session)
+    if row is None:
+        return WormCurrentOut()
+    target = await session.get(User, row.user_id)
+    return WormCurrentOut(
+        user_id=row.user_id,
+        display_name=target.display_name if target else None,
+        started_at=row.started_at,
+    )
+
+
+# --- E6: запланированные игры на календаре ---
+
+class GameSessionOut(BaseModel):
+    """Запланированная игра — meeting с tag='game'.
+
+    Фронт рисует иконку 🎮 в углу дня (без привязки к участнику —
+    это коллективное событие, не индивидуальная отметка)."""
+    meeting_id: int
+    title: str
+    date: date
+    starts_at: datetime
+
+
+@router.get("/games/scheduled", response_model=list[GameSessionOut])
+async def get_scheduled_games(
+    session: SessionDep,
+    _user: CurrentUser,
+    from_: datetime = Query(..., alias="from"),
+    to: datetime = Query(...),
+) -> list[GameSessionOut]:
+    if to <= from_:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "to must be after from")
+    rows = list(
+        (
+            await session.scalars(
+                select(Meeting)
+                .where(Meeting.tag == "game")
+                .where(Meeting.starts_at >= from_)
+                .where(Meeting.starts_at < to)
+                .where(Meeting.status != "cancelled")
+                .order_by(Meeting.starts_at)
+            )
+        ).all()
+    )
+    return [
+        GameSessionOut(
+            meeting_id=m.id,
+            title=m.title,
+            date=m.starts_at.date(),
+            starts_at=m.starts_at,
+        )
+        for m in rows
+    ]

@@ -13,6 +13,9 @@ export interface ReasonsEditorProps {
   placeholder?: string;
   emptyHint?: string;
   onSave: (list: string[]) => void;
+  useCounts?: Record<string, number>;
+  onResetCounts?: () => void;
+  resetCountsPending?: boolean;
 }
 
 export default function ReasonsEditor({
@@ -21,6 +24,9 @@ export default function ReasonsEditor({
   placeholder = "новая фраза…",
   emptyHint = "Пусто — будет использован дефолт из кода.",
   onSave,
+  useCounts,
+  onResetCounts,
+  resetCountsPending = false,
 }: ReasonsEditorProps) {
   const [list, setList] = useState<string[]>(initial);
   const [draft, setDraft] = useState("");
@@ -78,20 +84,31 @@ export default function ReasonsEditor({
         {list.length === 0 ? (
           <div className="px-2 py-3 text-xs text-tg-hint text-center">{emptyHint}</div>
         ) : (
-          list.map((r, i) => (
-            <div key={`${i}:${r}`} className="flex items-center gap-2 px-2 py-1.5">
-              <div className="text-[10px] text-tg-hint w-6 tabular-nums">{i + 1}</div>
-              <div className="flex-1 text-sm text-tg-text truncate">{r}</div>
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="min-h-9 min-w-9 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
-                title="Удалить"
-              >
-                ✕
-              </button>
-            </div>
-          ))
+          list.map((r, i) => {
+            const count = useCounts?.[r] ?? 0;
+            return (
+              <div key={`${i}:${r}`} className="flex items-center gap-2 px-2 py-1.5">
+                <div className="text-[10px] text-tg-hint w-6 tabular-nums">{i + 1}</div>
+                <div className="flex-1 text-sm text-tg-text truncate">{r}</div>
+                {useCounts !== undefined && (
+                  <div
+                    className="text-[10px] text-tg-hint tabular-nums shrink-0"
+                    title={`Использовано ${count} раз${count === 1 ? "" : "а"}`}
+                  >
+                    use:{count}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => remove(i)}
+                  className="min-h-9 min-w-9 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
+                  title="Удалить"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })
         )}
       </div>
 
@@ -125,6 +142,23 @@ export default function ReasonsEditor({
           </button>
         )}
       </div>
+
+      {onResetCounts && (
+        <button
+          type="button"
+          disabled={resetCountsPending}
+          onClick={() => {
+            haptic("warning");
+            if (confirm("Сбросить счётчики использования всех фраз?")) {
+              onResetCounts();
+            }
+          }}
+          className="w-full min-h-9 rounded-md bg-tg-bg/70 px-2 text-[11px] text-tg-hint disabled:opacity-50 inline-flex items-center justify-center gap-2"
+        >
+          {resetCountsPending && <Spinner />}
+          🔄 Сбросить счётчики использования
+        </button>
+      )}
     </div>
   );
 }

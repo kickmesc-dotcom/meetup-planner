@@ -21,6 +21,12 @@ from app.db.base import get_sessionmaker
 from app.db.models import User, WeeklyChukhan
 from app.services.admin_config import get_chukhan_reasons, get_chukhan_weights
 from app.services.avatars import sync_user_avatar
+from app.services.phrase_weights import (
+    CHUKHAN_USE_COUNTS_KEY,
+    get_use_counts,
+    increment_use_count,
+    weighted_choice,
+)
 
 log = structlog.get_logger()
 
@@ -163,7 +169,13 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
         custom_reasons = await get_chukhan_reasons(session)
     except Exception:  # noqa: BLE001
         custom_reasons = []
-    reason = random.choice(custom_reasons) if custom_reasons else None
+    # GHG6 E5: взвешенный выбор по use_count для кастомных фраз. Для дефолтных
+    # CHUKHAN_TAGLINES счётчики не ведём — фолбэк остаётся равномерным.
+    reason = None
+    if custom_reasons:
+        use_counts = await get_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
+        reason = weighted_choice(custom_reasons, use_counts) or random.choice(custom_reasons)
+        await increment_use_count(session, CHUKHAN_USE_COUNTS_KEY, reason)
     text = _format_announcement(user, reason=reason)
     # «Барабанная дробь» — best-effort, не блокирует основной пост.
     try:

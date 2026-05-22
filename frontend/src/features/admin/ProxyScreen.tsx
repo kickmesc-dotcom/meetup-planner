@@ -8,8 +8,11 @@ import {
   patchProxy,
   proxyAlertsGet,
   proxyAlertsSet,
+  proxyBootstrapFetch,
+  proxyClearAddErrors,
   proxyClearLastError,
   proxyDeleteDead,
+  proxyGetAddErrors,
   proxyParse,
   proxyPing,
   proxyPingAll,
@@ -17,6 +20,8 @@ import {
   proxyStatus,
   updateProxyEnabled,
   updateProxyMode,
+  type ProxyAddErrorItem,
+  type ProxyAddResult,
   type ProxyDraft,
   type ProxyEntry,
   type ProxyMode,
@@ -110,11 +115,60 @@ export default function ProxyScreen({ onBack }: Props) {
     },
   });
 
+  // GHG6 E1.2/E1.3: после добавления показываем результат ping'а одним баннером
+  // прямо в этом экране (а не отдельным alert'ом), и инвалидируем ring-buffer
+  // ошибок — там может прибавиться запись, если упало.
+  const [lastAdd, setLastAdd] = useState<ProxyAddResult | null>(null);
+
   const add = useMutation({
     mutationFn: createProxy,
+    onSuccess: (data) => {
+      haptic(data.ping_result?.ok === false ? "warning" : "success");
+      setLastAdd(data);
+      qc.invalidateQueries({ queryKey: ["admin", "proxies"] });
+      qc.invalidateQueries({ queryKey: ["admin", "proxy-add-errors"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      setLastAdd(null);
+      qc.invalidateQueries({ queryKey: ["admin", "proxy-add-errors"] });
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  // GHG6 E1.1: лента ошибок добавления (ring-buffer 20). Раздел рендерится
+  // только если буфер не пуст.
+  const addErrorsQ = useQuery({
+    queryKey: ["admin", "proxy-add-errors"],
+    queryFn: proxyGetAddErrors,
+    staleTime: 30 * 1000,
+  });
+
+  const clearAddErrors = useMutation({
+    mutationFn: proxyClearAddErrors,
     onSuccess: () => {
       haptic("success");
+      qc.invalidateQueries({ queryKey: ["admin", "proxy-add-errors"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  // GHG6 E1.4: bootstrap-fetch публичного списка прокси.
+  const bootstrap = useMutation({
+    mutationFn: () => proxyBootstrapFetch(),
+    onSuccess: (data) => {
+      haptic(data.added > 0 ? "success" : "warning");
       qc.invalidateQueries({ queryKey: ["admin", "proxies"] });
+      qc.invalidateQueries({ queryKey: ["admin", "proxy-add-errors"] });
+      void showAlert(
+        `Источник: ${data.source_url || "—"}\n` +
+          `Найдено: ${data.fetched}, живых: ${data.pinged_alive}, добавлено: ${data.added}.\n` +
+          `Пропущено: дубли ${data.skipped_duplicate}, мёртвые ${data.skipped_dead}, пул полон ${data.skipped_pool_full}.` +
+          (data.errors.length ? `\nОшибки: ${data.errors.join(", ")}` : ""),
+      );
     },
     onError: (e) => {
       haptic("error");
@@ -334,7 +388,37 @@ export default function ProxyScreen({ onBack }: Props) {
             />
           </div>
         </details>
+
+        {/* GHG6 E1.2/E1.3: баннер с результатом последнего add (ping_result). */}
+        {lastAdd && (
+          <AddResultBanner result={lastAdd} onDismiss={() => setLastAdd(null)} />
+        )}
+
+        {/* GHG6 E1.4: bootstrap-fetch публичного списка прокси. */}
+        <button
+          type="button"
+          disabled={bootstrap.isPending}
+          onClick={() => {
+            haptic("medium");
+            bootstrap.mutate();
+          }}
+          className="w-full min-h-10 rounded-md bg-tg-button/80 px-3 py-2 text-sm text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
+          title="Скачать публичный список прокси, пингануть и добавить живые"
+        >
+          {bootstrap.isPending && <Spinner />}
+          🌐 Найти живые прокси
+        </button>
       </section>
+
+      {/* GHG6 E1.1: collapsible раздел «Ошибки добавления». Рендерится только
+          если ring-buffer непустой. */}
+      {(addErrorsQ.data?.errors.length ?? 0) > 0 && (
+        <AddErrorsSection
+          errors={addErrorsQ.data!.errors}
+          onClear={() => clearAddErrors.mutate()}
+          isClearing={clearAddErrors.isPending}
+        />
+      )}
 
       {/* === Пул === */}
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
@@ -963,5 +1047,130 @@ function AddProxyForm({
         {isPending ? "Добавляем…" : "➕ Добавить"}
       </button>
     </div>
+  );
+}
+
+// --- GHG6 E1.2/E1.3: баннер последнего добавления с ping-результатом ---
+
+function AddResultBanner({
+  result,
+  onDismiss,
+}: {
+  result: ProxyAddResult;
+  onDismiss: () => void;
+}) {
+  const { proxy, created, ping_result } = result;
+  // MTProto не пингуется по HTTP — это «нельзя проверить», не «мёртв».
+  const isMtprotoNotChecked =
+    ping_result?.error === "ping_not_supported_for_type:mtproto";
+  const ok = ping_result?.ok === true;
+  const dead = ping_result && ping_result.ok === false && !isMtprotoNotChecked;
+  const cls = ok
+    ? "bg-status-free/15 text-status-free border-status-free/40"
+    : dead
+      ? "bg-status-busy/15 text-status-busy border-status-busy/40"
+      : "bg-tg-link/15 text-tg-link border-tg-link/40";
+  const icon = ok ? "✅" : dead ? "⚠️" : "ℹ️";
+  let msg: string;
+  if (!ping_result) {
+    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"} (не пинговали — enabled=false)`;
+  } else if (ok) {
+    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"}, ping ${ping_result.latency_ms}мс`;
+  } else if (isMtprotoNotChecked) {
+    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"}. MTProto не проверяется по HTTP — оценишь по селфтесту/использованию.`;
+  } else {
+    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"}, но не отвечает: ${ping_result.error ?? "unknown"}`;
+  }
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-lg border ${cls} px-3 py-2 text-sm`}
+    >
+      <span className="mt-0.5">{icon}</span>
+      <span className="flex-1 min-w-0 break-words">{msg}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="text-current opacity-70 hover:opacity-100"
+        title="Скрыть"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+// --- GHG6 E1.1: ring-buffer ошибок добавления (collapsible) ---
+
+const REASON_LABEL: Record<string, string> = {
+  proxy_pool_full: "Пул переполнен",
+  db_error: "Ошибка БД",
+  validation_error: "Не прошёл валидацию",
+};
+
+function AddErrorsSection({
+  errors,
+  onClear,
+  isClearing,
+}: {
+  errors: ProxyAddErrorItem[];
+  onClear: () => void;
+  isClearing: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  // Показываем самые свежие сверху.
+  const reversed = [...errors].reverse();
+  return (
+    <section className="rounded-xl bg-status-busy/10 border border-status-busy/30 p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex-1 text-left text-base font-semibold flex items-center gap-2 text-status-busy"
+        >
+          <span>{open ? "▼" : "▶"}</span>
+          <span>🚨 Ошибки добавления ({errors.length})</span>
+        </button>
+        <button
+          type="button"
+          disabled={isClearing}
+          onClick={() => {
+            if (confirm("Очистить ленту ошибок добавления?")) onClear();
+          }}
+          className="min-h-9 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
+        >
+          {isClearing && <Spinner />}✕ Очистить
+        </button>
+      </div>
+      {open && (
+        <ul className="space-y-1 text-xs">
+          {reversed.map((e, i) => {
+            const d = e.draft || {};
+            const where =
+              typeof d.server === "string" && typeof d.port === "number"
+                ? `${d.server}:${d.port}${typeof d.type === "string" ? ` (${d.type})` : ""}`
+                : "—";
+            return (
+              <li
+                key={`${e.at}-${i}`}
+                className="rounded-md bg-tg-bg/60 px-2 py-1.5 text-tg-text"
+              >
+                <div className="flex items-center justify-between gap-2 tabular-nums">
+                  <span className="font-semibold text-status-busy">
+                    {REASON_LABEL[e.reason] ?? e.reason}
+                  </span>
+                  <span className="text-tg-hint">
+                    {new Date(e.at).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-tg-hint break-all">{where}</div>
+                {e.detail && (
+                  <div className="text-tg-hint italic break-all">{e.detail}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

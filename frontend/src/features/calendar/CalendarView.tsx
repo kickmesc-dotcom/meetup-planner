@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDrag, usePinch } from "@use-gesture/react";
 import { fetchRanges } from "@/api/availability";
-import { fetchBirthdaysInWindow, fetchCalendarMarks } from "@/api/birthdays";
+import {
+  fetchBirthdaysInWindow,
+  fetchCalendarMarks,
+  fetchCurrentWorm,
+  fetchScheduledGames,
+} from "@/api/birthdays";
 import { fetchCalendarTimelineFlag } from "@/api/admin";
 import type { User } from "@/types";
 import { useUI, isStripZoom, isMonthGridZoom } from "@/store/ui";
@@ -16,6 +21,8 @@ import AutoPickSheet from "../actions/AutoPickSheet";
 import LoserSheet from "../actions/LoserSheet";
 import PollSheet from "../actions/PollSheet";
 import StripView from "./views/StripView";
+import TimelineView from "./views/TimelineView";
+import TimelineNavBar from "./views/TimelineNavBar";
 import BirthdayPopover from "./BirthdayPopover";
 import HoursView from "./views/HoursView";
 import MonthView from "./views/MonthView";
@@ -38,7 +45,34 @@ export default function CalendarView({ users, meId }: Props) {
   const zoomOut = useUI((s) => s.zoomOut);
   const shift = useUI((s) => s.shiftAnchor);
 
-  const win = useMemo(() => windowForZoom(zoom, anchor), [zoom, anchor]);
+  // GHG6 CL0: master-toggle нового таймлайн-вида. Пока TimelineView ещё не
+  // реализован (CL1+), оба значения флага рендерят legacy-вид. Запрос всё
+  // равно делаем — чтобы как только CL1 приземлится, ветвление включилось
+  // без дополнительной выкладки.
+  const timelineFlag = useQuery({
+    queryKey: ["admin", "calendar", "timeline"],
+    queryFn: fetchCalendarTimelineFlag,
+    staleTime: 60_000,
+  });
+  // GHG6 P3 CL1: пока новый таймлайн в стадии каркаса (нет жестов, зума,
+  // боттом-плашки), дефолт = false. Включается админкой через
+  // PUT /admin/calendar/timeline {enabled:true} — для ручного теста.
+  const timelineEnabled = timelineFlag.data?.enabled ?? false;
+
+  // CL1: при включённом timeline окно фиксируется в ±21 день от anchor (43 дня).
+  // Это позволяет существующим useQuery подтянуть нужный диапазон одним
+  // запросом — TimelineView сам отсюда читает windowStart/span.
+  const win = useMemo(() => {
+    if (timelineEnabled) {
+      const start = new Date(anchor);
+      start.setDate(start.getDate() - 21);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 43);
+      return { start, end };
+    }
+    return windowForZoom(zoom, anchor);
+  }, [timelineEnabled, zoom, anchor]);
 
   const ranges = useQuery({
     queryKey: ["ranges", win.start.toISOString(), win.end.toISOString()],
@@ -54,22 +88,27 @@ export default function CalendarView({ users, meId }: Props) {
     staleTime: 10_000,
   });
 
-  // GHG6 CL0: master-toggle нового таймлайн-вида. Пока TimelineView ещё не
-  // реализован (CL1+), оба значения флага рендерят legacy-вид. Запрос всё
-  // равно делаем — чтобы как только CL1 приземлится, ветвление включилось
-  // без дополнительной выкладки.
-  const timelineFlag = useQuery({
-    queryKey: ["admin", "calendar", "timeline"],
-    queryFn: fetchCalendarTimelineFlag,
-    staleTime: 60_000,
-  });
-  const timelineEnabled = timelineFlag.data?.enabled ?? true;
-  void timelineEnabled; // CL1: тут будет if (timelineEnabled) <TimelineView/> else legacy.
-
   // GHG6 BD4: отметки лох/чухан в окне. Используются для 👑/💩 на прошедших днях.
   const marks = useQuery({
     queryKey: ["calendar-marks", win.start.toISOString(), win.end.toISOString()],
     queryFn: () => fetchCalendarMarks(win.start, win.end),
+    staleTime: 30_000,
+  });
+
+  // GHG6 E8.4: текущий «червь-пидор» (≤1 одновременно). Перешедшее звание —
+  // ребёр-роллится при следующем worm-триггере в roll_loser. Не от окна,
+  // запрос «глобальный». 30s staleTime достаточно: ролл — событие редкое.
+  const worm = useQuery({
+    queryKey: ["worm-current"],
+    queryFn: fetchCurrentWorm,
+    staleTime: 30_000,
+  });
+
+  // GHG6 E6: запланированные игры в окне — рисуем иконку 🎮 в углу дня.
+  // Окно совпадает с окном ranges, чтобы один и тот же refresh охватывал всё.
+  const games = useQuery({
+    queryKey: ["games-scheduled", win.start.toISOString(), win.end.toISOString()],
+    queryFn: () => fetchScheduledGames(win.start, win.end),
     staleTime: 30_000,
   });
 
@@ -150,10 +189,33 @@ export default function CalendarView({ users, meId }: Props) {
   const data = ranges.data ?? [];
   const bdays = birthdays.data ?? [];
   const calMarks = marks.data ?? [];
+  const wormUserId = worm.data?.user_id ?? null;
+  const gameDates = new Set((games.data ?? []).map((g) => g.date));
   const isPending = ranges.isPending;
 
+  // GHG6 P3 CL13: при включённом timeline мы переиспользуем legacy YearView /
+  // AllYearsView для крупных zoom-уровней — TimelineView имеет смысл только
+  // в диапазоне day/week/month. Так же кейс zoom='hour' остаётся на HoursView
+  // (одна суточная шкала), а 'threeMonths/sixMonths' — на MonthView (сетка).
+  const useTimelineForCurrentZoom =
+    timelineEnabled && (zoom === "day" || zoom === "week" || zoom === "month");
+
   let body: React.ReactNode = null;
-  if (zoom === "hour") {
+  if (useTimelineForCurrentZoom) {
+    body = (
+      <TimelineView
+        users={users}
+        meId={meId}
+        anchor={anchor}
+        ranges={data}
+        birthdays={bdays}
+        marks={calMarks}
+        wormUserId={wormUserId}
+        gameDates={gameDates}
+        isPending={isPending}
+      />
+    );
+  } else if (zoom === "hour") {
     body = <HoursView day={win.start} users={users} meId={meId} ranges={data} />;
   } else if (isStripZoom(zoom)) {
     const span = zoom === "day" ? 1 : 7;
@@ -166,12 +228,23 @@ export default function CalendarView({ users, meId }: Props) {
         ranges={data}
         birthdays={bdays}
         marks={calMarks}
+        wormUserId={wormUserId}
+        gameDates={gameDates}
         isPending={isPending}
       />
     );
   } else if (isMonthGridZoom(zoom)) {
     const months = zoom === "month" ? 1 : zoom === "threeMonths" ? 3 : 6;
-    body = <MonthView months={months} anchor={anchor} ranges={data} users={users} birthdays={bdays} />;
+    body = (
+      <MonthView
+        months={months}
+        anchor={anchor}
+        ranges={data}
+        users={users}
+        birthdays={bdays}
+        gameDates={gameDates}
+      />
+    );
   } else if (zoom === "year") {
     body = <YearView anchor={anchor} ranges={data} users={users} />;
   } else if (zoom === "allYears") {
@@ -183,9 +256,18 @@ export default function CalendarView({ users, meId }: Props) {
       ref={containerRef}
       className="relative flex h-full flex-col calendar-pan-container"
     >
-      <NavBar />
-      <ZoomController />
+      {/* CL1: NavBar/ZoomController нужны только legacy-веткам.
+          У TimelineView (CL13) собственная нижняя плашка TimelineNavBar. */}
+      {!useTimelineForCurrentZoom && <NavBar />}
+      {!useTimelineForCurrentZoom && <ZoomController />}
       {body}
+      {timelineEnabled && (
+        <TimelineNavBar
+          isOnToday={
+            anchor.toDateString() === new Date().toDateString()
+          }
+        />
+      )}
       <ActionBar />
 
       {/* F6: edge hints. Стрелки/иконки появляются при жесте, гасятся через 450ms. */}

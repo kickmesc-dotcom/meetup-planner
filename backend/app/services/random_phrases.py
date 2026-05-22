@@ -6,6 +6,7 @@ from __future__ import annotations
 import random
 import re
 from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
 import structlog
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
@@ -94,6 +95,75 @@ def _glue_chunks(chunks: list[str]) -> str:
         out += "..."
     return out
 
+# --- GHG6 E4: дедуп цитат внутри одного сообщения ---
+
+_NORMALIZE_WS_RE = re.compile(r"\s+")
+
+
+def _normalize_chunk(s: str) -> str:
+    """Нормализация для сравнения «похожести»: lower + схлопывание пробелов.
+
+    Знаки препинания оставляем — SequenceMatcher всё равно даст высокий ratio
+    для «привет, как дела» vs «Привет как дела!», а для коротких фраз сильное
+    отличие в пунктуации обычно сигнализирует о разных мыслях.
+    """
+    return _NORMALIZE_WS_RE.sub(" ", s.strip().lower())
+
+
+def dedup_chunks(
+    picked: list[str],
+    *,
+    all_pool: list[str],
+    target_n: int,
+    similarity_threshold: float = 0.85,
+) -> list[str]:
+    """Удалить почти-дубли из `picked`, добрать недостающее из `all_pool`.
+
+    Алгоритм:
+      1. Идём по picked в исходном порядке. Каждый кандидат сравниваем со
+         всеми уже отобранными через `SequenceMatcher.ratio()` на
+         нормализованных строках. Если max ratio > `similarity_threshold` —
+         кандидата отбрасываем.
+      2. Если уникальных < target_n — пробуем добрать из `all_pool` (опять же
+         избегая похожих). Перемешиваем pool перед добором, чтобы выбор был
+         стохастичным.
+      3. Если и так не хватает — возвращаем что есть (вызывающий код может
+         склеить меньше n кусочков, это не ошибка).
+    """
+    if target_n <= 0 or not picked:
+        return []
+
+    seen_norms: list[str] = []
+    unique: list[str] = []
+
+    def _is_dup(candidate: str) -> bool:
+        cn = _normalize_chunk(candidate)
+        if not cn:
+            return True  # пустые строки/whitespace-only считаем дублями
+        for prev in seen_norms:
+            if SequenceMatcher(None, cn, prev).ratio() > similarity_threshold:
+                return True
+        seen_norms.append(cn)
+        return False
+
+    for c in picked:
+        if not _is_dup(c):
+            unique.append(c)
+        if len(unique) >= target_n:
+            return unique
+
+    # Добор: проходим по перемешанному пулу, пропускаем уже взятые и похожие.
+    leftovers = [c for c in all_pool if c not in unique]
+    random.shuffle(leftovers)
+    for c in leftovers:
+        if len(unique) >= target_n:
+            break
+        if not _is_dup(c):
+            unique.append(c)
+
+    return unique
+
+
 async def compose_random_phrase(
     session: AsyncSession,
     n: int,
@@ -148,6 +218,9 @@ async def compose_random_phrase(
         
     if is_collective:
         picked = random.sample(all_chunks, min(len(all_chunks), n))
+        # GHG6 E4: даже sample (без повторов экземпляров) даёт почти-дубли —
+        # одно и то же сообщение могло быть нарезано в почти одинаковые куски.
+        picked = dedup_chunks(picked, all_pool=all_chunks, target_n=n)
         glued = _glue_chunks(picked)
         return f"🗣 <b>Сводный хор Шестёрки:</b>\n\n«<i>{glued}</i>»"
 
@@ -155,7 +228,12 @@ async def compose_random_phrase(
     target_uid = random.choice(list(by_user.keys()))
     user_pool = by_user[target_uid]
 
-    picked = [random.choice(user_pool) for _ in range(n)]
+    # GHG6 E4: было `[random.choice(user_pool) for _ in range(n)]` — выбор с
+    # возвратом, повторы случались закономерно (особенно у юзеров с маленьким
+    # пулом — типичный кейс Русланище). Теперь берём с запасом и фильтруем
+    # через dedup_chunks.
+    picked_raw = [random.choice(user_pool) for _ in range(n * 2)]
+    picked = dedup_chunks(picked_raw, all_pool=user_pool, target_n=n)
     glued = _glue_chunks(picked)
 
     user = await session.get(User, target_uid)

@@ -8,6 +8,17 @@ import type {
 export const fetchMe = () => api<User>("/api/me");
 export const fetchUsers = () => api<User[]>("/api/users");
 
+// E7: per-user UI prefs (hide_greeting на главной)
+export interface UiPrefs {
+  hide_greeting: boolean;
+}
+export const fetchUiPrefs = () => api<UiPrefs>("/api/me/ui-prefs");
+export const updateUiPrefs = (prefs: UiPrefs) =>
+  api<UiPrefs>("/api/me/ui-prefs", {
+    method: "PUT",
+    body: JSON.stringify(prefs),
+  });
+
 export const fetchRanges = (from: Date, to: Date) =>
   api<AvailabilityRange[]>(
     `/api/availability?from=${from.toISOString()}&to=${to.toISOString()}`,

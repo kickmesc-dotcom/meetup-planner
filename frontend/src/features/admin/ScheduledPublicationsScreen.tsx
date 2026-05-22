@@ -2,13 +2,20 @@ import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
+  avatarsScheduleOnceDelete,
+  avatarsScheduleOnceGet,
+  avatarsScheduleOncePost,
+  avatarsSyncNow,
   cancelScheduledJob,
   closeAdminPoll,
   deleteAdminPoll,
   fetchAdminPolls,
+  fetchBotReactions,
   fetchScheduledJobs,
   fetchScheduledSettings,
+  updateBotReactions,
   updateScheduledSettings,
+  type BotReactionsSettings,
   type ScheduledSettingsIO,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
@@ -233,7 +240,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
           <ToggleBlock
             icon="🖼️"
             title="Синхронизация аватарок"
-            hint="Бот скачивает свежие аватарки участников из Telegram."
+            hint="Регулярного авто-синхрона больше нет. Запускай вручную или планируй на конкретное время."
             enabled={draft.avatars.enabled}
             onToggle={(v) =>
               patch((d) => {
@@ -242,20 +249,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
               })
             }
           >
-            <Field label="Раз в сутки (мин 0.14 ≈ раз в неделю)">
-              <NumberInput
-                value={draft.avatars.per_day}
-                min={0.14}
-                max={24}
-                step={0.1}
-                onChange={(v) =>
-                  patch((d) => {
-                    d.avatars.per_day = v;
-                    return d;
-                  })
-                }
-              />
-            </Field>
+            <AvatarsActions onJobsChanged={enterHotMode} />
           </ToggleBlock>
 
           <ToggleBlock
@@ -270,6 +264,8 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
               })
             }
           />
+
+          <BotReactionsSection />
 
           <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
             <div className="flex items-center gap-2 mb-1">
@@ -648,6 +644,231 @@ function HhmmRange({
         onChange={(e) => onChange(start, e.target.value)}
         className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
       />
+    </div>
+  );
+}
+
+/**
+ * GHG6 E9: три master-toggle реакций бота. Отдельная секция со своим
+ * локальным state и save-mutation (не делит draft с ScheduledSettingsIO,
+ * чтобы не плодить лишние поля в общей форме).
+ */
+function BotReactionsSection() {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["admin", "bot-reactions"],
+    queryFn: fetchBotReactions,
+  });
+  const [draft, setDraft] = useState<BotReactionsSettings | null>(null);
+  useEffect(() => {
+    if (q.data) setDraft({ ...q.data });
+  }, [q.data]);
+
+  const save = useMutation({
+    mutationFn: updateBotReactions,
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "bot-reactions"], data);
+    },
+    onError: errAlert,
+  });
+
+  if (q.isPending || !draft) {
+    return (
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <ListSkeleton rows={3} />
+      </section>
+    );
+  }
+
+  const setField = (key: keyof BotReactionsSettings, v: boolean) => {
+    const next = { ...draft, [key]: v };
+    setDraft(next);
+    save.mutate(next);
+  };
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-base">🤖</span>
+        <span className="text-base font-semibold">Реакции бота</span>
+      </div>
+      <div className="text-xs text-tg-hint mb-2">
+        Бот отвечает рандомной шизо-цитатой на упоминание и/или reply.
+      </div>
+
+      <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
+        <div className="min-w-0">
+          <div className="text-sm text-tg-text">@-упоминание</div>
+          <div className="text-[11px] text-tg-hint">
+            На тег <code>@бот</code> бот отвечает фразой.
+          </div>
+        </div>
+        <Switch
+          checked={draft.mention_enabled}
+          onChange={(v) => {
+            haptic("selection");
+            setField("mention_enabled", v);
+          }}
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
+        <div className="min-w-0">
+          <div className="text-sm text-tg-text">Reply на любое сообщение бота</div>
+          <div className="text-[11px] text-tg-hint">
+            На любой ответ-реплай на сообщение бота — бот отвечает фразой
+            (включая reply к собственным цитатам).
+          </div>
+        </div>
+        <Switch
+          checked={draft.reply_all_enabled}
+          onChange={(v) => {
+            haptic("selection");
+            setField("reply_all_enabled", v);
+          }}
+        />
+      </div>
+
+      <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
+        <div className="min-w-0">
+          <div className="text-sm text-tg-text">Reply, кроме рандом-цитат</div>
+          <div className="text-[11px] text-tg-hint">
+            Бот отвечает на reply к своим сообщениям, кроме случаев, когда
+            оригинал — рандом-цитата. Работает независимо от верхнего тогла.
+          </div>
+        </div>
+        <Switch
+          checked={draft.reply_except_phrases_enabled}
+          onChange={(v) => {
+            haptic("selection");
+            setField("reply_except_phrases_enabled", v);
+          }}
+        />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * GHG6 E10: ручные операции с синхронизацией аватарок.
+ * Рекуррентного расписания больше нет — только разовая кнопка и опц.
+ * однократный запуск на конкретное datetime.
+ */
+function AvatarsActions({ onJobsChanged }: { onJobsChanged: () => void }) {
+  const qc = useQueryClient();
+  const sched = useQuery({
+    queryKey: ["admin", "avatars-schedule-once"],
+    queryFn: avatarsScheduleOnceGet,
+    staleTime: 10_000,
+  });
+
+  // Дефолт: завтра 10:00 локально. Формат для <input type="datetime-local">.
+  const [whenLocal, setWhenLocal] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(10, 0, 0, 0);
+    // datetime-local требует YYYY-MM-DDTHH:mm
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  });
+
+  const syncNow = useMutation({
+    mutationFn: avatarsSyncNow,
+    onSuccess: (res) => {
+      haptic("success");
+      void showAlert(`Готово. Запрошены аватарки ${res.synced} пользователей.`);
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: errAlert,
+  });
+
+  const schedule = useMutation({
+    mutationFn: (iso: string) => avatarsScheduleOncePost(iso),
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "avatars-schedule-once"], data);
+      onJobsChanged();
+    },
+    onError: errAlert,
+  });
+
+  const cancel = useMutation({
+    mutationFn: avatarsScheduleOnceDelete,
+    onSuccess: (data) => {
+      haptic("warning");
+      qc.setQueryData(["admin", "avatars-schedule-once"], data);
+      onJobsChanged();
+    },
+    onError: errAlert,
+  });
+
+  const scheduledRunAt = sched.data?.scheduled ? sched.data.run_at : null;
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        disabled={syncNow.isPending}
+        onClick={() => {
+          haptic("medium");
+          syncNow.mutate();
+        }}
+        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+      >
+        {syncNow.isPending && <Spinner />}
+        🔄 Синхронизировать сейчас
+      </button>
+
+      <div className="rounded-lg bg-tg-bg/40 p-2 space-y-2">
+        <div className="text-[11px] text-tg-hint">
+          📅 Запланировать однократно
+        </div>
+        <input
+          type="datetime-local"
+          value={whenLocal}
+          onChange={(e) => setWhenLocal(e.target.value)}
+          className="w-full rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+        />
+        <button
+          type="button"
+          disabled={schedule.isPending || !whenLocal}
+          onClick={() => {
+            // datetime-local — без таймзоны; интерпретируем как локальное время
+            // и шлём как ISO. Backend парсит и считает naive→UTC (см. _parse_iso_future).
+            const local = new Date(whenLocal);
+            if (Number.isNaN(local.getTime())) {
+              errAlert(new Error("invalid_datetime"));
+              return;
+            }
+            haptic("medium");
+            schedule.mutate(local.toISOString());
+          }}
+          className="w-full min-h-11 rounded-lg bg-tg-link/15 py-2 text-sm font-medium text-tg-link disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+        >
+          {schedule.isPending && <Spinner />}
+          📅 Запланировать
+        </button>
+        {scheduledRunAt && (
+          <div className="flex items-center gap-2 rounded-md bg-tg-bg/60 px-2 py-1.5 text-[11px]">
+            <div className="flex-1 text-tg-text">
+              Запланировано: {format(new Date(scheduledRunAt), "dd.MM.yyyy HH:mm")}
+            </div>
+            <button
+              type="button"
+              disabled={cancel.isPending}
+              onClick={() => {
+                if (confirm("Отменить запланированную синхронизацию?")) {
+                  cancel.mutate();
+                }
+              }}
+              className="min-h-9 rounded-md bg-status-busy/15 px-2 text-status-busy disabled:opacity-50"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

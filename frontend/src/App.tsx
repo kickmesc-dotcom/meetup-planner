@@ -1,5 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchMe, fetchUsers } from "./api/availability";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchMe,
+  fetchUiPrefs,
+  fetchUsers,
+  updateUiPrefs,
+  type UiPrefs,
+} from "./api/availability";
 import CalendarView from "./features/calendar/CalendarView";
 import MeetingsScreen from "./features/meetings/MeetingsScreen";
 import PollsScreen from "./features/polls/PollsScreen";
@@ -7,10 +13,27 @@ import LeaderboardScreen from "./features/leaderboard/LeaderboardScreen";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import { useUI } from "./store/ui";
+import { haptic } from "./tg/webapp";
 
 export default function App() {
+  const qc = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: fetchMe });
   const users = useQuery({ queryKey: ["users"], queryFn: fetchUsers });
+  const uiPrefs = useQuery({ queryKey: ["ui-prefs"], queryFn: fetchUiPrefs });
+  const hideGreeting = useMutation({
+    mutationFn: () => updateUiPrefs({ hide_greeting: true }),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["ui-prefs"] });
+      const prev = qc.getQueryData<UiPrefs>(["ui-prefs"]);
+      qc.setQueryData<UiPrefs>(["ui-prefs"], { hide_greeting: true });
+      return { prev };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["ui-prefs"], ctx.prev);
+      haptic("error");
+    },
+    onSuccess: () => haptic("selection"),
+  });
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
 
@@ -59,18 +82,35 @@ export default function App() {
     setTab("calendar");
   }
 
+  const greetingHidden = uiPrefs.data?.hide_greeting === true;
+
   let content: React.ReactNode = null;
   if (tab === "calendar") {
     content = (
       <>
-        <header className="px-4 py-3 border-b border-tg-secondary-bg">
-          <div className="text-base font-medium">Привет, {meData.display_name} 👋</div>
-          <div className="text-xs text-tg-hint">
-            Не размечен день = считается{" "}
-            <span className="text-status-busy">занятым</span>. Тапай по дате,
-            чтобы открыть редактор.
-          </div>
-        </header>
+        {!greetingHidden && (
+          <header className="relative px-4 py-3 border-b border-tg-secondary-bg pr-10">
+            <div className="text-base font-medium">Привет, {meData.display_name} 👋</div>
+            <div className="text-xs text-tg-hint">
+              Не размечен день = считается{" "}
+              <span className="text-status-busy">занятым</span>. Тапай по дате,
+              чтобы открыть редактор.
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                haptic("warning");
+                hideGreeting.mutate();
+              }}
+              disabled={hideGreeting.isPending}
+              aria-label="Скрыть приветствие"
+              title="Не показывать в следующий раз"
+              className="absolute top-2 right-2 min-h-8 min-w-8 rounded-md text-tg-hint hover:text-tg-text active:scale-95 transition-transform disabled:opacity-50"
+            >
+              ✕
+            </button>
+          </header>
+        )}
         <main className="flex-1 overflow-hidden">
           <CalendarView users={users.data} meId={meData.id} />
         </main>

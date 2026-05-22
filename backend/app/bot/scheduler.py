@@ -70,6 +70,8 @@ JOB_PROXY_HEALTH = "proxy_health"
 JOB_CHUKHAN_WEEKLY = "chukhan_weekly"
 JOB_AVATAR_SYNC = "avatar_sync_daily"
 JOB_BIRTHDAYS = "birthdays_daily"
+JOB_BOT_PAUSE_AUTO_RESTORE = "bot_pause_auto_restore"  # GHG6 E11
+JOB_AUTO_ZAEBAL = "auto_zaebal"  # GHG6 E11.3
 
 
 def _env_int(name: str, default: int) -> int:
@@ -97,7 +99,7 @@ async def _autoloser_job(bot: Bot) -> None:
     from app.bot.dispatcher import get_bot  # noqa: F401  — keep cycle-safe pattern
     from app.config import get_settings as _gs
     from app.db.base import get_sessionmaker as _gsm
-    from app.services.loser import roll_loser
+    from app.services.loser import compose_loser_message, roll_loser
 
     settings = _gs()
     if not settings.group_chat_id:
@@ -132,8 +134,14 @@ async def _autoloser_job(bot: Bot) -> None:
             log.warning("autoloser.no_users")
             return
 
-        async def _announce(roll, loser):
-            text = f"🤡 <b>Автолох сегодня:</b> {loser.display_name}\n<i>{roll.reason_text}</i>"
+        async def _announce(roll, loser, extras=None):
+            text = compose_loser_message(
+                loser_name=loser.display_name,
+                reason_text=roll.reason_text or "",
+                extras=extras,
+                header_emoji="🤡",
+                header_label="Автолох сегодня",
+            )
             await bot.send_message(
                 chat_id=settings.group_chat_id,
                 text=text,
@@ -356,6 +364,36 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
         minute=chukhan_min,
     )
 
+    # --- E11.3: авто-zaebal раз в месяц (15-18 числа, default-off) ---
+    async with sm() as session:
+        from app.services.bot_pause import get_zaebal_settings
+        zaebal_cfg = await get_zaebal_settings(session)
+    if zaebal_cfg["auto_enabled"]:
+        async def _auto_zaebal() -> None:
+            from app.services.zaebal import run_auto_zaebal
+
+            sm2 = get_sessionmaker()
+            async with sm2() as session:
+                await run_auto_zaebal(session, bot)
+
+        sched.add_job(
+            _logged_job(JOB_AUTO_ZAEBAL, _auto_zaebal),
+            CronTrigger(
+                day="15-18",
+                hour=18,
+                minute=37,
+                timezone=settings.scheduler_tz,
+            ),
+            id=JOB_AUTO_ZAEBAL,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        log.info("scheduler.auto_zaebal_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_AUTO_ZAEBAL)
+        log.info("scheduler.auto_zaebal_disabled")
+
     # --- Birthdays — глобальный switch (точное время — внутри run_birthdays_job) ---
     if sched_cfg["birthdays"]["alerts_enabled"]:
         sched.add_job(
@@ -395,6 +433,25 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         IntervalTrigger(seconds=PROXY_HEALTH_INTERVAL_SEC, jitter=30),
         kwargs={"bot": bot},
         id=JOB_PROXY_HEALTH,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # GHG6 E11: фоновая проверка истечения паузы. Раз в 5 минут — пауза
+    # не требует точности до секунды. Этот job не отключается reload_dynamic_jobs
+    # и всегда крутится: иначе из автопаузы не выйти.
+    async def _auto_restore_tick() -> None:
+        from app.services.bot_pause import maybe_auto_restore
+
+        sm2 = get_sessionmaker()
+        async with sm2() as session:
+            await maybe_auto_restore(session)
+
+    sched.add_job(
+        _logged_job(JOB_BOT_PAUSE_AUTO_RESTORE, _auto_restore_tick),
+        IntervalTrigger(minutes=5, jitter=30),
+        id=JOB_BOT_PAUSE_AUTO_RESTORE,
         replace_existing=True,
         max_instances=1,
         coalesce=True,

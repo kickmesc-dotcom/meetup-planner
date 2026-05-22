@@ -40,6 +40,14 @@ AUTOLOSER_WINDOW_START_HOUR_KEY = "autoloser.window_start_hour"  # default 7
 AUTOLOSER_WINDOW_END_HOUR_KEY = "autoloser.window_end_hour"      # default 22
 AUTOLOSER_INTERVAL_HOURS_KEY = "autoloser.interval_hours"        # 0 = random раз в сутки
 
+# --- E8: «Червь-пидор» (особая номинация при ролле лоха) ---
+WORM_ENABLED_KEY = "worm.enabled"          # default true (механика работает)
+WORM_CHANCE_KEY = "worm.chance"            # default 0.01 (1/100)
+
+# Хардкод-дефолты — чтобы можно было выкатить фичу без миграции конфига.
+_WORM_ENABLED_DEFAULT = True
+_WORM_CHANCE_DEFAULT = 0.01
+
 
 async def _get_value(session: AsyncSession, key: str) -> str | None:
     row = await session.get(AdminConfig, key)
@@ -182,6 +190,10 @@ async def set_loser_reasons(session: AsyncSession, reasons: list[str]) -> None:
         seen.add(r)
         cleaned.append(r)
     await _set_value(session, LOSER_REASONS_KEY, json.dumps(cleaned, ensure_ascii=False))
+    # GHG6 E5: дроп счётчиков для фраз, которых больше нет в активном списке.
+    # Lazy-импорт во избежание цикла admin_config ↔ phrase_weights.
+    from app.services.phrase_weights import LOSER_USE_COUNTS_KEY, cleanup_use_counts
+    await cleanup_use_counts(session, LOSER_USE_COUNTS_KEY, cleaned)
 
 
 # --- A2: Reminders tick ---
@@ -408,11 +420,12 @@ CALENDAR_TIMELINE_ENABLED_KEY = "calendar.timeline_enabled"
 async def get_calendar_timeline_enabled(session: AsyncSession) -> bool:
     """GHG6 CL0: глобальный switch «новый таймлайн или legacy-вид».
 
-    Default = True (новый вид по умолчанию для тестового прогона). Когда у
-    пользователя на фронте обнаружится регрессия — админ переключает на
-    false, и фронт возвращается на legacy StripView/MonthView.
+    Default = False (пока этапы 2-4 не доделаны — нет жестов, зума, нижней
+    плашки). Включается админкой через
+    `PUT /admin/calendar/timeline {enabled:true}` для ручного теста.
+    Когда CL2/CL3/CL5/CL13 приземлятся, дефолт станет True.
     """
-    return await _get_bool(session, CALENDAR_TIMELINE_ENABLED_KEY, True)
+    return await _get_bool(session, CALENDAR_TIMELINE_ENABLED_KEY, False)
 
 
 async def set_calendar_timeline_enabled(session: AsyncSession, enabled: bool) -> None:
@@ -496,6 +509,9 @@ async def set_chukhan_reasons(session: AsyncSession, reasons: list[str]) -> None
     await _set_value(
         session, CHUKHAN_REASONS_KEY, json.dumps(cleaned, ensure_ascii=False)
     )
+    # GHG6 E5: дроп счётчиков для фраз, которых больше нет в активном списке.
+    from app.services.phrase_weights import CHUKHAN_USE_COUNTS_KEY, cleanup_use_counts
+    await cleanup_use_counts(session, CHUKHAN_USE_COUNTS_KEY, cleaned)
 
 
 # --- AD6: master-toggles для запланированных процессов ---
@@ -562,7 +578,11 @@ async def get_scheduled_settings(session: AsyncSession) -> dict:
             "window_end": await _get_hhmm(session, PHRASES_WINDOW_END_KEY, "22:00"),
         },
         "avatars": {
-            "enabled": await _get_bool(session, AVATARS_SYNC_ENABLED_KEY, True),
+            # E10 (GHG6, 2026-05-22): default → false. Рекуррентный авто-синхрон
+            # упразднён, в UI остались только разовая кнопка и одноразовое расписание.
+            # `per_day` оставлен в схеме для обратной совместимости со старой записью
+            # в admin_config, но UI его больше не показывает и не редактирует.
+            "enabled": await _get_bool(session, AVATARS_SYNC_ENABLED_KEY, False),
             "per_day": max(
                 0.14, min(24.0, await _get_float(session, AVATARS_SYNC_PER_DAY_KEY, 1.0))
             ),
@@ -659,3 +679,106 @@ async def set_scheduled_settings(session: AsyncSession, body: dict) -> None:
             CHUKHAN_WINDOW_END_KEY,
             _validate_hhmm(chukhan["window_end"], "12:00"),
         )
+
+
+# --- E8: «Червь-пидор» ---
+
+async def is_worm_enabled(session: AsyncSession) -> bool:
+    raw = await _get_value(session, WORM_ENABLED_KEY)
+    if raw is None:
+        return _WORM_ENABLED_DEFAULT
+    return raw.lower() in ("1", "true", "yes", "on")
+
+
+async def set_worm_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(session, WORM_ENABLED_KEY, "true" if enabled else "false")
+
+
+async def get_worm_chance(session: AsyncSession) -> float:
+    """Шанс выпадения червя при ролле лоха. Clamp [0..1]."""
+    raw = await _get_value(session, WORM_CHANCE_KEY)
+    if raw is None:
+        return _WORM_CHANCE_DEFAULT
+    try:
+        v = float(raw)
+    except (ValueError, TypeError):
+        return _WORM_CHANCE_DEFAULT
+    return max(0.0, min(1.0, v))
+
+
+async def set_worm_chance(session: AsyncSession, chance: float) -> None:
+    v = max(0.0, min(1.0, float(chance)))
+    await _set_value(session, WORM_CHANCE_KEY, f"{v:.6f}")
+
+
+# --- E9: реакции бота на @-mention и reply ---
+# Три независимых master-toggle (см. GHG6.txt п.9):
+#  - mention_enabled         — @bot в чате → ответ. Default ON.
+#  - reply_all_enabled       — reply на ЛЮБОЕ сообщение бота → ответ. Default OFF.
+#  - reply_except_phrases_enabled — reply на сообщение бота, КРОМЕ рандом-цитат
+#    → ответ. Default ON.
+# Логика срабатывания (в bot_reactions handler): сначала проверяем
+# reply_all_enabled (отвечает на всё подряд), затем reply_except_phrases_enabled
+# (отвечает только если оригинал НЕ цитата). Это две отдельные ветки, чтобы
+# можно было гонять «отвечать на всё» и «отвечать на не-цитаты» независимо.
+BOT_REACT_MENTION_KEY = "bot_reactions.mention_enabled"                  # default true
+BOT_REACT_REPLY_ALL_KEY = "bot_reactions.reply_all_enabled"              # default false
+BOT_REACT_REPLY_EXCEPT_PHRASES_KEY = "bot_reactions.reply_except_phrases_enabled"  # default true
+
+
+async def get_bot_reactions_settings(session: AsyncSession) -> dict:
+    """Агрегат для UI: одна запись API на все три флага."""
+    return {
+        "mention_enabled": await _get_bool(session, BOT_REACT_MENTION_KEY, True),
+        "reply_all_enabled": await _get_bool(
+            session, BOT_REACT_REPLY_ALL_KEY, False
+        ),
+        "reply_except_phrases_enabled": await _get_bool(
+            session, BOT_REACT_REPLY_EXCEPT_PHRASES_KEY, True
+        ),
+    }
+
+
+async def set_bot_reactions_settings(
+    session: AsyncSession,
+    *,
+    mention_enabled: bool | None = None,
+    reply_all_enabled: bool | None = None,
+    reply_except_phrases_enabled: bool | None = None,
+) -> None:
+    if mention_enabled is not None:
+        await _set_value(
+            session, BOT_REACT_MENTION_KEY, "true" if mention_enabled else "false"
+        )
+    if reply_all_enabled is not None:
+        await _set_value(
+            session,
+            BOT_REACT_REPLY_ALL_KEY,
+            "true" if reply_all_enabled else "false",
+        )
+    if reply_except_phrases_enabled is not None:
+        await _set_value(
+            session,
+            BOT_REACT_REPLY_EXCEPT_PHRASES_KEY,
+            "true" if reply_except_phrases_enabled else "false",
+        )
+
+
+# --- E7: per-user UI prefs (закрываемое приветствие) ---
+# Хранятся как `ui.hide_greeting:{tg_id}` -> "true"/"false". Per-user, потому что
+# баннер приветствия каждый прячет себе сам. tg_id (а не user.id) — стабильный
+# идентификатор от Telegram, ему доверяем больше, чем нашему автоинкременту.
+UI_HIDE_GREETING_PREFIX = "ui.hide_greeting:"
+
+
+async def get_ui_hide_greeting(session: AsyncSession, tg_id: int) -> bool:
+    raw = await _get_value(session, f"{UI_HIDE_GREETING_PREFIX}{tg_id}")
+    return raw == "true"
+
+
+async def set_ui_hide_greeting(
+    session: AsyncSession, tg_id: int, hide: bool
+) -> None:
+    await _set_value(
+        session, f"{UI_HIDE_GREETING_PREFIX}{tg_id}", "true" if hide else "false"
+    )

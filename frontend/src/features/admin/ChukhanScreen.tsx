@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
+  clearChukhanReasonUseCounts,
   fetchChukhanHistory,
   fetchChukhanReasons,
+  fetchChukhanReasonUseCounts,
   fetchWeights,
   forceReroll,
   resetWeight,
@@ -28,6 +30,10 @@ export default function ChukhanScreen({ users, onBack }: Props) {
 
   const weights = useQuery({ queryKey: ["admin", "weights"], queryFn: fetchWeights });
   const reasons = useQuery({ queryKey: ["admin", "chukhan-reasons"], queryFn: fetchChukhanReasons });
+  const useCounts = useQuery({
+    queryKey: ["admin", "chukhan-reasons-use-counts"],
+    queryFn: fetchChukhanReasonUseCounts,
+  });
   const history = useQuery({ queryKey: ["admin", "history"], queryFn: fetchChukhanHistory });
 
   const setW = useMutation({
@@ -69,6 +75,18 @@ export default function ChukhanScreen({ users, onBack }: Props) {
     onSuccess: () => {
       haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons"] });
+      qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons-use-counts"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+  const resetCounts = useMutation({
+    mutationFn: clearChukhanReasonUseCounts,
+    onSuccess: () => {
+      haptic("success");
+      qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons-use-counts"] });
     },
     onError: (e) => {
       haptic("error");
@@ -181,6 +199,9 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             isPending={saveReasons.isPending}
             placeholder="например: на этой неделе вообще пропал"
             onSave={(list) => saveReasons.mutate(list)}
+            useCounts={useCounts.data?.counts}
+            onResetCounts={() => resetCounts.mutate()}
+            resetCountsPending={resetCounts.isPending}
           />
         )}
         {saveReasons.isError && (

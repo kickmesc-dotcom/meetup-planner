@@ -61,7 +61,7 @@ async def on_loser(message: Message) -> None:
         return
 
     from app.bot.dispatcher import get_bot
-    from app.services.loser import CooldownError, roll_loser
+    from app.services.loser import CooldownError, compose_loser_message, roll_loser
 
     settings = get_settings()
     chat_id = settings.group_chat_id
@@ -76,8 +76,15 @@ async def on_loser(message: Message) -> None:
             log.warning("chat.loser_caller_not_in_db", tg_id=message.from_user.id)
             return
 
-        async def _announce(roll, loser):
-            text = f"🤡 <b>Лох дня:</b> {loser.display_name}\n<i>{roll.reason_text}</i>"
+        async def _announce(roll, loser, extras=None):
+            text = compose_loser_message(
+                loser_name=loser.display_name,
+                reason_text=roll.reason_text or "",
+                roller_name=caller.display_name,
+                extras=extras,
+                header_emoji="🤡",
+                header_label="Лох дня",
+            )
             target = chat_id if chat_id else message.chat.id
             await bot.send_message(chat_id=target, text=text, parse_mode="HTML")
 
@@ -202,6 +209,76 @@ async def on_tasks(message: Message) -> None:
         lines.append(f"• {label} — {local} <i>({eta})</i>")
 
     await message.answer("\n".join(lines))
+
+
+# ---------------------- E6: /nominate_game и /remove_nominated_game ----------------------
+
+@router.message(Command("nominate_game"))
+async def on_nominate_game(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    if not message.text:
+        return
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer(
+            "🎮 Использование: <code>/nominate_game Название игры</code>",
+            parse_mode="HTML",
+        )
+        return
+    name = parts[1].strip()
+
+    from app.services.games import (
+        MAX_ACTIVE_NOMINATIONS,
+        NominationEmpty,
+        NominationLimitExceeded,
+        add_nomination,
+    )
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        try:
+            row = await add_nomination(
+                session, name=name, added_by_tg_id=message.from_user.id
+            )
+        except NominationEmpty:
+            await message.answer("⚠️ Имя не может быть пустым.")
+            return
+        except NominationLimitExceeded:
+            await message.answer(
+                f"⚠️ Уже {MAX_ACTIVE_NOMINATIONS} активных номинаций — "
+                f"сначала удали лишние через <code>/remove_nominated_game</code>.",
+                parse_mode="HTML",
+            )
+            return
+
+    await message.answer(f"🎮 Добавлено: <b>{row.name}</b>", parse_mode="HTML")
+
+
+@router.message(Command("remove_nominated_game"))
+async def on_remove_nominated_game(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    if not message.text:
+        return
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer(
+            "🗑 Использование: <code>/remove_nominated_game Название игры</code>",
+            parse_mode="HTML",
+        )
+        return
+    name = parts[1].strip()
+
+    from app.services.games import remove_nomination_by_name
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        row = await remove_nomination_by_name(session, name=name)
+    if row is None:
+        await message.answer("⚠️ Не нашёл такую игру в активных номинациях.")
+        return
+    await message.answer(f"🗑 Удалено: <b>{row.name}</b>", parse_mode="HTML")
 
 
 def _humanize_delta(delta: timedelta) -> str:

@@ -36,3 +36,28 @@ export const fetchCalendarMarks = (from: Date, to: Date) =>
   api<CalendarMark[]>(
     `/api/calendar/marks?from=${from.toISOString()}&to=${to.toISOString()}`,
   );
+
+// GHG6 E8.4: активный «червь-пидор». Звание переходящее, одновременно ≤1.
+// Все поля = null, если никого не назначено.
+export interface WormCurrent {
+  user_id: number | null;
+  display_name: string | null;
+  started_at: string | null;
+}
+
+export const fetchCurrentWorm = () =>
+  api<WormCurrent>("/api/worm/current");
+
+// GHG6 E6: запланированные игры (meeting.tag='game') в окне.
+// Используется для иконки 🎮 в углу дня в CalendarView.
+export interface GameSession {
+  meeting_id: number;
+  title: string;
+  date: string; // YYYY-MM-DD
+  starts_at: string; // ISO
+}
+
+export const fetchScheduledGames = (from: Date, to: Date) =>
+  api<GameSession[]>(
+    `/api/games/scheduled?from=${from.toISOString()}&to=${to.toISOString()}`,
+  );

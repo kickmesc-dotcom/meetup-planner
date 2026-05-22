@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   adminLoserRollNow,
+  clearLoserReasonUseCounts,
   fetchLoserHistory,
   fetchLoserReasons,
+  fetchLoserReasonUseCounts,
   updateLoserReasons,
 } from "@/api/admin";
 import type { User } from "@/types";
@@ -25,6 +27,10 @@ export default function LoserScreen({ users, onBack }: Props) {
   const reasons = useQuery({
     queryKey: ["admin", "loser-reasons"],
     queryFn: fetchLoserReasons,
+  });
+  const useCounts = useQuery({
+    queryKey: ["admin", "loser-reasons-use-counts"],
+    queryFn: fetchLoserReasonUseCounts,
   });
   const history = useQuery({
     queryKey: ["admin", "loser-history"],
@@ -48,6 +54,18 @@ export default function LoserScreen({ users, onBack }: Props) {
     onSuccess: () => {
       haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "loser-reasons"] });
+      qc.invalidateQueries({ queryKey: ["admin", "loser-reasons-use-counts"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+  const resetCounts = useMutation({
+    mutationFn: clearLoserReasonUseCounts,
+    onSuccess: () => {
+      haptic("success");
+      qc.invalidateQueries({ queryKey: ["admin", "loser-reasons-use-counts"] });
     },
     onError: (e) => {
       haptic("error");
@@ -145,6 +163,9 @@ export default function LoserScreen({ users, onBack }: Props) {
             isPending={saveReasons.isPending}
             placeholder="например: снова забыл выпить таблетки"
             onSave={(list) => saveReasons.mutate(list)}
+            useCounts={useCounts.data?.counts}
+            onResetCounts={() => resetCounts.mutate()}
+            resetCountsPending={resetCounts.isPending}
           />
         )}
         {saveReasons.isError && (

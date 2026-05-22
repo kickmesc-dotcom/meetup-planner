@@ -108,6 +108,8 @@ Frontend синхронизирует пользователь сам в `kickme
 
 ---
 
+
+
 ## P3 — Календарь: горизонтальный таймлайн (большой блок)
 
 Переработка `CalendarView` и связанных компонентов — последний крупный блок GHG6.
@@ -126,16 +128,20 @@ default true, эндпоинты `GET/PUT /admin/calendar/timeline`). `CalendarV
 
 ### Этап 1 — Скелет TimelineView (CL1)
 
-- [ ] **CL1.** `frontend/src/features/calendar/views/TimelineView.tsx`:
-  - `ParticipantColumn` (sticky-left, 6 строк по `WHITELIST_NAMES`, аватар+имя).
-  - `TimelineGrid` (`overflow-x-auto`, `overflow-y-hidden`, 6 строк
-    `ParticipantTimelineRow`, ширина = `days × cellWidth`).
-  - `TimelineHeader` (sticky-top, синхрон по X через общий `scrollLeft` ref).
-  - Этап 1 — жёсткий `cellWidth=56px`, окно ±21 день от `anchor`, без жестов,
-    без зума, без confidence-заливки (`bg-tg-secondary-bg` пустой ячейки).
-- [ ] **CL1.2.** Ветвление в `CalendarView.tsx`: `if (timelineEnabled) <TimelineView/>`,
-  иначе текущий switch по zoom. NavBar/ZoomController гасятся для нового вида —
-  у TimelineView собственная нижняя плашка (этап 2).
+- [x] **CL1.** (2026-05-21, аудит) `TimelineView.tsx` создан:
+  - Sticky-left колонка аватара (60px) живёт внутри `ParticipantRow` (не отдельный
+    компонент, но структура верна).
+  - `TimelineGrid` — `overflow-x-auto`, общий горизонтальный скролл шапки и строк через
+    единый контейнер (синхронизация автоматическая).
+  - `TimelineHeader` — `sticky top-0 z-20`, grid `repeat(${days.length}, ${cellWidth}px)`,
+    подсветка сегодня, ruWeekdayShort.
+  - cellWidth default 56px, окно ±21 (`WINDOW_HALF=21`, span=43).
+  - Без жестов, без confidence-заливки. Зум-слайдер уже зашит в `TimelineNavBar`, но это
+    задел под CL5 (на CL1 неактивен).
+- [x] **CL1.2.** (2026-05-21, аудит) `CalendarView.tsx:176-191` — ветвление
+  `useTimelineForCurrentZoom = timelineEnabled && (zoom in day/week/month)`, при true
+  отдаётся `<TimelineView/>` и гасятся `NavBar`/`ZoomController`. `TimelineNavBar` живёт
+  отдельно. Legacy-views (Hours/Strip/Month/Year/AllYears) остаются под `timelineEnabled=false`.
 
 ### Этап 2 — Скролл, зум, режимы (CL2, CL3, CL5, CL6, CL12, CL13)
 
@@ -261,4 +267,441 @@ default true, эндпоинты `GET/PUT /admin/calendar/timeline`). `CalendarV
 
 ---
 
+
 D-FINAL и D-MEM перенесены в раздел P3 этап 5 — закрываются вместе с P3.
+
+---
+
+## E — правки от пользователя (2026-05-21), вносим ДО P3
+
+Источник — раздел «Добавлено пользователем» (см. ниже, оставлен как первоисточник).
+Раскладка в чекбоксы и приоритизация. Идём по приоритетам сверху вниз.
+
+### E-P0 — блокеры базовых сценариев
+
+#### E1. Прокси: план Б, диагностика «почему не добавляются» (источник: п.1)
+- [x] **E1.1.** (2026-05-21) Backend `services/proxies.py::upsert_proxy` — `record_add_error`/`get_add_errors`/`clear_add_errors`
+  (ring-buffer 20 в `admin_config["proxy.add_errors"]`, ключ `PROXY_ADD_ERRORS_KEY`). Причины: `proxy_pool_full` и
+  `db_error` пишутся в `upsert_proxy`, `validation_error` — в роуте `admin_create_proxy` для любой не-pool `ValueError`
+  (теперь все ValueError возвращают HTTP 400, а не 500). `duplicate` сознательно не записывается — upsert по
+  `(server, port)` это нормальное обновление, фронт получает `created=False` в `ProxyAddOut`. Новые REST:
+  `GET /admin/proxy/add-errors` (`ProxyAddErrorsOut{errors:[ProxyAddErrorItem]}`) + `DELETE /admin/proxy/add-errors`.
+- [x] **E1.2.** (2026-05-21, аудит) Уже сделан в предыдущей сессии: `proxies.py::upsert_proxy_with_ping` (вызывает
+  `ping_proxy` сразу после upsert для свежей записи), `routes_admin.py::ProxyAddOut{proxy, created, ping_result}`,
+  POST `/admin/proxy` возвращает ping_result в ответе. MTProto отдаёт
+  `error="ping_not_supported_for_type:mtproto"` — UI должен это отличать от «мёртв».
+- [x] **E1.3.** (2026-05-21) `frontend/src/api/admin.ts`: `createProxy` теперь возвращает
+  `ProxyAddResult{proxy, created, ping_result}`; добавлены типы `ProxyAddErrorItem`,
+  `ProxyBootstrapResult` и функции `proxyGetAddErrors`/`proxyClearAddErrors`/`proxyBootstrapFetch`.
+  `ProxyScreen.tsx`: компонент `AddResultBanner` (рендерится после `add.mutateAsync` —
+  ✅/⚠️/ℹ️ по `ping_result.ok`, отдельный случай для `ping_not_supported_for_type:mtproto`).
+  Раздел `🚨 Ошибки добавления (N)` — collapsible, рендерится только если буфер не пуст,
+  кнопка `✕ Очистить` с confirm. Локализованные подписи `proxy_pool_full`/`db_error`/
+  `validation_error`. Add-mutation после success/error инвалидирует
+  `["admin","proxy-add-errors"]`. TS-проверка чистая. Кроме E1.3 — заодно влита кнопка
+  `🌐 Найти живые прокси` (см. E1.4 frontend).
+- [x] **E1.4 (backend).** (2026-05-21) REST `POST /admin/proxy/bootstrap-fetch`:
+  тело `ProxyBootstrapIn{url_override?: str}`, ответ `ProxyBootstrapOut` со всеми полями
+  `BootstrapResult` (source_url, fetched, pinged_alive, added, skipped_*, errors). Если в
+  результирующих ошибках есть `bootstrap_not_configured` (override пуст + env пуст +
+  BUNDLED_BOOTSTRAP_URLS пуст) — HTTP 503 `bootstrap_not_configured`. Иначе 200 со сводкой.
+  Сервисная `bootstrap_fetch` (proxies.py:561) уже была.
+- [x] **E1.4 (frontend).** (2026-05-21) `proxyBootstrapFetch` в `api/admin.ts`, кнопка
+  `🌐 Найти живые прокси` под парсером, по success — alert со сводкой (источник,
+  fetched/alive/added/skipped/errors). По 503 — `humanizeApiError` показывает `bootstrap_not_configured`.
+
+#### E2. iOS keyboard jump в форме прокси (источник: п.2)
+- [x] **E2.1.** (2026-05-21) Корень — `SubScreen.tsx:33` оборачивает контент в собственный
+  `overflow-y-auto`-контейнер. На iOS-WKWebView внутри Telegram дефолтный
+  `el.scrollIntoView({block:'center'})` иногда не проникает во вложенный прокрутный
+  родитель (особенно когда Telegram сам двигает viewport под клавиатуру в тот же кадр).
+  `tg/webapp.ts::installFocusScrollFix` теперь: 1) идёт по предкам, ищет ближайший
+  `overflow-y: auto/scroll`-родитель с реальным `scrollHeight > clientHeight`;
+  2) считает `targetTop = offsetWithinParent - parent.clientHeight/2 + elRect.height/2`;
+  3) явно `parent.scrollTo({top, behavior:'smooth'})`; 4) параллельно дёргает старый
+  `scrollIntoView` для случаев без вложенного родителя. Без меток `data-scroll-root` —
+  фикс автоматически распространяется на все экраны через `SubScreen`.
+- [x] **E2.2.** (2026-05-21) В `focusin`-обработчике: если `WebApp.viewportStableHeight < 500px` —
+  зовём `WebApp.expand()`. Уже-expanded — no-op. Никаких per-form data-атрибутов не нужно,
+  фикс глобальный.
+
+#### E3. Loser-spin: зависание рулетки → telegram error (источник: п.3)
+
+⚠️ **(2026-05-21, аудит) Диагноз исходных пунктов был неверным.** Анимация рулетки живёт
+на фронте (`LoserSheet.tsx::mut.mutationFn` — локальный `setInterval` имён каждые 90мс,
+ожидание ≥1.1с), на бэке никакой анимации `edit_message_text` нет (`loser.py::roll_loser` —
+обычный одношаговый SELECT/INSERT + commit). «Зависание» = HTTP-запрос `POST /meetings/loser/roll-now`
+не отвечает вовремя, потому что бэк после ролла блокируется на `bot.send_message(group_chat_id, …)`
+через прокси (в `routes_admin.py::admin_loser_roll_now._announce` и/или в публичном loser-route).
+Корректный фикс — не блокировать ответ HTTP-вызова отправкой в Telegram.
+
+**Решение (по уточнению пользователя 2026-05-21):** унифицировать публичный и админский
+методы на рабочий — админская версия глотает TG-ошибки в `_announce`, поэтому `roll_loser`
+коммитит запись и возвращает успех. UI-крутилка живёт чисто на фронте (LoserSheet —
+локальный setInterval + ожидание ≥1.1с) и не влияет на метод отправки.
+
+- [x] **E3.1.** (2026-05-21) `routes_meetings.py::loser_roll_endpoint._announce`: все TG-ошибки
+  (`TelegramRetryAfter`/`TelegramForbiddenError`/`TelegramNetworkError`/`TelegramAPIError`/
+  `asyncio.TimeoutError`/прочие) теперь ловятся внутри `_announce` и не пробрасываются —
+  лог-warning, `sent_flag["ok"]=False`. `roll_loser` получает «успешный» announce → коммитит
+  запись. HTTP-ответ всегда 200 (только cooldown остался 429). Таймаут на send сокращён с
+  15с до 8с — UX-крутилка на фронте крутится ≥1.1с, дольше 8с никто не ждёт.
+- [x] **E3.2.** (2026-05-21) Отдельный ring-buffer `loser.publish_errors` не нужен — sent_to_chat
+  в ответе фронту и log.warning достаточно для диагностики. Если сообщений в чате нет, а ролл
+  в истории есть — пользователь сам поймёт, что прокси умер, по селфтесту в админке.
+- [x] **E3.3.** (2026-05-21) `chukhan.py:136 edit_message_text` — это не анимация рулетки, это
+  редактирование «🥁 Чухан недели» сообщения при обнаружении дубликата (есть `try/except`
+  с лог-warning). Админская `/admin/chukhan/reroll` уже использует тот же безопасный путь.
+  Расхождения с loser-флоу нет.
+
+### E-P1 — UX-баги и мелкие новые фичи
+
+#### E4. Цитатник: дедуп фраз внутри одного сообщения (источник: п.4)
+- [x] **E4.1.** (2026-05-21) `services/random_phrases.py::dedup_chunks(picked, all_pool, target_n,
+  similarity_threshold=0.85)` — чистая функция: нормализация (`_normalize_chunk`: lower + collapse
+  whitespace), сравнение через `difflib.SequenceMatcher.ratio()` со всеми уже отобранными,
+  отбрасывание кандидата если max ratio > 0.85. При нехватке после фильтра — добор из
+  `all_pool` (shuffle, тот же фильтр). Применена в обеих ветках `compose_random_phrase`:
+  collective-ветке (после `random.sample`) и user-ветке (раньше был `[random.choice(pool) for _]`
+  с возвратом — теперь берём с запасом `n*2` и фильтруем). Кейс «Русланище» (короткий пул +
+  выбор с возвратом → повторы) починен: даже если функция вернёт меньше n — `_glue_chunks`
+  это переживёт, повторы исключены.
+- [x] **E4.2.** (2026-05-21) `tests/test_random_phrases_dedup.py` — 9 кейсов: нормализация,
+  точные дубли, почти-дубли (~0.95/0.90 ratio), добор из пула при дублях в picked, граничный
+  случай «пул совпадает с picked», порог 0.85 (различные ~80% — не дубли), пустые/whitespace,
+  target_n=0, пустой picked. Все 61 тест проекта проходят.
+
+#### E5. Фразы лох/чухан: приоритет свежим (источник: п.5)
+- [x] **E5.1.** (2026-05-22, аудит) `services/phrase_weights.py` уже содержит `weighted_choice`
+  (вес = `1 / (1 + use_count)`) на основе `phrase_hash` (SHA1 hex, 16 символов). Использовано
+  в `services/loser.py:155` (LOSER_USE_COUNTS_KEY) и `services/chukhan.py:176` (CHUKHAN_USE_COUNTS_KEY).
+  Fallback на `random.choice` если по какой-то причине вернётся `None`.
+- [x] **E5.2.** (2026-05-22, аудит) `increment_use_count` зовётся сразу после выбора в обеих ветках.
+  `cleanup_use_counts(active_phrases)` дёргается из `admin_config.set_loser_reasons:195` и
+  `set_chukhan_reasons:513` — счётчики фраз, исчезнувших из списка, дропаются автоматически.
+- [x] **E5.3.** (2026-05-22) REST переименованы в единый стиль: `GET/DELETE /admin/loser-reasons/use-counts`
+  и `/admin/chukhan-reasons/use-counts` (раньше были `/admin/loser/reasons/...` — рассинхрон с
+  `/admin/loser-reasons`). `api/admin.ts`: типы `ReasonUseCountsOut`/`ReasonUseCountsCleared` +
+  функции `fetchLoserReasonUseCounts`/`clearLoserReasonUseCounts`/`fetchChukhanReasonUseCounts`/
+  `clearChukhanReasonUseCounts`. `ReasonsEditor.tsx` — новые пропы `useCounts?: Record<string,number>`,
+  `onResetCounts?: () => void`, `resetCountsPending`. При наличии `useCounts` рядом с каждой фразой
+  серая подпись `use:N` (tabular-nums). При наличии `onResetCounts` под кнопкой «Сохранить» — отдельная
+  кнопка «🔄 Сбросить счётчики использования» с confirm-диалогом и haptic warning. `LoserScreen.tsx`
+  и `ChukhanScreen.tsx` подключают новые query/mutation и инвалидируют `["admin","*-reasons-use-counts"]`
+  после save/reset. TS чистый, 61 backend-тест зелёный.
+
+#### E7. Закрываемое приветствие (источник: п.7)
+- [x] **E7.1.** (2026-05-22) `admin_config.py` — `UI_HIDE_GREETING_PREFIX = "ui.hide_greeting:"`,
+  хелперы `get_ui_hide_greeting(session, tg_id) -> bool` / `set_ui_hide_greeting(session, tg_id, hide)`.
+  Per-user, ключ привязан к `telegram_id` (стабильнее автоинкремента user.id). `routes_users.py`:
+  `GET/PUT /api/me/ui-prefs` со схемой `UiPrefsIO{hide_greeting: bool}`. PUT возвращает
+  актуальное состояние. Backend-тесты 61/61 ✅.
+- [x] **E7.2.** (2026-05-22) `api/availability.ts` — типы `UiPrefs`, функции `fetchUiPrefs` /
+  `updateUiPrefs`. `App.tsx` — query `["ui-prefs"]` + mutation с optimistic update (cancel/snapshot/
+  rollback). В календарном табе `<header>` рендерится только если `!hide_greeting`. Внутри —
+  абсолютная кнопка `✕` (top-right, min-h/w 8, haptic warning + selection on success,
+  disabled на pending). Никаких упоминаний геймификации в UI/коде нет — это решение отложено
+  до реальной имплементации, чтобы не плодить мёртвые рубильники. TS чистый.
+- ⊘ **E7.3.** Снято с GHG6 по решению пользователя 2026-05-22: рубильник геймификации
+  бессмыслен пока нечего гейтить (профиль/уровни не написаны). Вернёмся к этому, когда
+  начнём имплементировать сами уровни/ранги — заодно тогда заведём флаг.
+
+#### E10. Авто-синхрон аватарок → разовая кнопка + одноразовое расписание (источник: п.10)
+- [x] **E10.1.** (2026-05-22) `admin_config.py::get_scheduled_settings` — default
+  `avatars.sync_enabled` теперь `False` (было `True`). Существующие установки бота, где
+  значение уже хранится в БД как `true`, продолжат работать как прежде — флип влияет
+  только на свежие записи и пользователей, у кого ключ ещё не выставлен.
+  `scheduler.py::reload_dynamic_jobs` уже корректно удаляет `JOB_AVATAR_SYNC` при
+  `enabled=false` — рекуррент-job больше не регистрируется по дефолту.
+- [x] **E10.2.** (2026-05-22) `POST /admin/avatars/sync-now` — синхронно зовёт
+  `sync_all_avatars(session, bot)`, возвращает `{synced: N}`. `services/avatars.py::sync_all_avatars`
+  доработан: теперь возвращает количество затронутых пользователей (`int`), а не `None` —
+  UI показывает в alert «Запрошены аватарки N пользователей».
+- [x] **E10.3.** (2026-05-22) `POST/GET/DELETE /admin/avatars/schedule-once`:
+  - POST `{run_at: ISO datetime}` — валидирует «в будущем» (raise 400 иначе),
+    кладёт `DateTrigger` one-shot job с фиксированным id `JOB_AVATAR_SYNC_ONE_SHOT`,
+    `replace_existing=True` (старый одноразовый перезаписывается).
+  - GET — отдаёт `{scheduled: bool, run_at}` (по `sched.get_job(id).next_run_time`).
+  - DELETE — `sched.remove_job(id)` (если есть). Возвращает `scheduled=false`.
+  Парсер `_parse_iso_future` — `datetime.fromisoformat` с подменой `Z` → `+00:00`,
+  naive datetime трактуем как UTC (UI шлёт `local.toISOString()`).
+- [x] **E10.4.** (2026-05-22) Frontend: `api/admin.ts` — типы `AvatarsSyncNowResult`,
+  `AvatarsScheduleOnce` + 4 функции (`avatarsSyncNow`, `avatarsScheduleOnceGet/Post/Delete`).
+  `ScheduledPublicationsScreen.tsx` — удалён `NumberInput` для `per_day` в AvatarsBlock,
+  hint обновлён на «Регулярного авто-синхрона больше нет. Запускай вручную или планируй...»,
+  вместо контента — компонент `AvatarsActions`. В нём: query `["admin","avatars-schedule-once"]`
+  (staleTime 10s), кнопка «🔄 Синхронизировать сейчас» (mutation, на success — invalidate
+  `["users"]` чтобы фронт подхватил новые аватарки), блок «📅 Запланировать однократно» с
+  `<input type="datetime-local">` (default = завтра 10:00 локально), кнопка «📅 Запланировать»
+  (mutation шлёт `local.toISOString()`), и пилюля «Запланировано: dd.MM.yyyy HH:mm» с
+  крестиком отмены — рендерится только если `scheduled=true`. После плана/отмены — вызов
+  `onJobsChanged()` (enterHotMode) чтобы общая очередь задач обновилась. Master-toggle
+  «Синхронизация аватарок» оставлен — он отвечает только за рекуррент-job в scheduler,
+  поля для него убраны.
+  TS чистый, backend 61/61 ✅.
+
+### E-P2 — новые крупные механики
+
+#### E6. Номинации игр + голосование (источник: п.6)
+- [x] **E6.1.** (2026-05-22) Backend: модель `GameNomination` (`game_nominations`: id, name, added_by_tg_id,
+  added_at, removed_at). Миграция `alembic/versions/0010_games_nominations.py` добавляет таблицу +
+  `polls.kind` (String 32 nullable: `'game_choice'`/`'game_when'`, NULL для legacy meetup-полов),
+  `polls.game_nomination_id` (BigInteger nullable, для game_when — id игры-победителя), `meetings.tag`
+  (String 16 nullable, `'game'` для встреч-игр). Лимит 10 активных (`MAX_ACTIVE_NOMINATIONS`)
+  проверяется в `services/games.py`, не БД-констрейнтом — soft-deleted строки реанимируются при
+  повторном добавлении имени, а не дублируются.
+- [x] **E6.2.** (2026-05-22) `services/games.py`: `list_active_nominations`, `count_active_nominations`,
+  `add_nomination` (lower-case dedup, restore из soft-delete, raise `NominationLimitExceeded`/
+  `NominationEmpty`), `remove_nomination(id)`, `remove_nomination_by_name(name)`. REST:
+  `GET /admin/games` → `{items, max_active}`, `POST /admin/games` (создание), `DELETE /admin/games/{id}`
+  (soft-delete). Bot-команды (`chat_commands.py`): `/nominate_game <name>`, `/remove_nominated_game
+  <name>` — whitelist-only, информативные ответы при ошибках. Лимит 10 и пустое имя обрабатываются
+  отдельными ветками.
+- [x] **E6.3.** (2026-05-22) `services/games_poll.py::create_game_choice_poll` — `bot.send_poll(
+  is_anonymous=False, allows_multiple_answers=False, open_period=timeout_hours*3600)` в
+  `settings.group_chat_id`. Сохраняет `Poll(kind='game_choice', tg_poll_id, tg_message_id, closes_at)` +
+  `PollOption(label=nomination.name, starts_at=ends_at=now())` (starts_at/ends_at — заглушки,
+  семантически про meetup-time-варианты, для игр не используются). Префикс `[+when]` в
+  `Poll.question` хранит follow-up-флаг без расширения схемы. REST: `POST /admin/games/poll-create`
+  `{timeout_hours: 1..72, nomination_ids?, follow_up_when}` → `GamesPollCreateOut`. Валидация
+  ≥2 опций / ≤10 (telegram limit) в сервисе. Закрытие — `bot/handlers/poll_answer.py::on_poll_update`
+  диспетчирует по `Poll.kind` (`game_choice`/`game_when` → `handle_game_*_closed`, иначе zaebal).
+  Победитель выбирается по `PollVote`-counts с tie-break по id ASC.
+- [x] **E6.4.** (2026-05-22) `handle_game_choice_closed` — объявляет победителя реплаем на исходный
+  полл, и если был `[+when]`-префикс, дёргает `create_game_when_poll`: 3 ближайшие даты от today,
+  single answer, `PollOption.starts_at` = `date 00:00 UTC` (это «слот» встречи). `Poll(kind='game_when',
+  game_nomination_id)` помнит, какую игру привязать. `handle_game_when_closed` — победившая дата →
+  `Meeting(title="{game.name} 🎮", starts_at, ends_at, tag='game', status='confirmed')` + объявление
+  в чат. Если 0 голосов — короткое сообщение в чат, ничего не пишем.
+- [x] **E6.5.** (2026-05-22) Frontend: `api/admin.ts` — типы `GameNomination`,
+  `GameNominationsList`, `GamesPollCreateResult` + функции `fetchGameNominations`,
+  `addGameNomination`, `removeGameNomination`, `createGamesPoll`. `tg/webapp.ts` дополнен
+  `showConfirm(message)` (WebApp.showConfirm с fallback на `window.confirm`).
+  `features/admin/GamesScreen.tsx` — секция «Номинации» со списком, формой «➕ Добавить» (лимит 10,
+  disabled при достижении), кнопкой «🗑» с confirm; секция «Запустить голосование» с range-слайдером
+  12–24ч, чекбоксом «follow-up Когда играем» (default ON), `🗳 Запустить голосование` (disabled при
+  <2 номинаций, confirm + alert со сводкой). `AdminScreen.tsx` — новый `SectionGroup "🎮 Игры"`
+  с карточкой, ведущей в GamesScreen.
+- [x] **E6.6.** (2026-05-22) Backend: `routes_calendar.py` — новый `GET /api/games/scheduled?from&to`
+  отдаёт `[GameSessionOut{meeting_id, title, date, starts_at}]` для `Meeting.tag='game'` в окне.
+  Frontend: `api/birthdays.ts` — `GameSession` тип и `fetchScheduledGames`. `CalendarView.tsx` —
+  новый `useQuery(["games-scheduled", win])` со staleTime 30c, прокидывает `Set<YYYY-MM-DD>`
+  как `gameDates` в `StripView` / `TimelineView` / `MonthView`. В Strip/Timeline иконка 🎮 в
+  правом-верхнем углу шапки дня; в MonthView — в левом-нижнем углу ячейки (right-top занят 🎂).
+  Без привязки к участнику — игра коллективна.
+
+### Sync E6
+- [x] **D-E6.** (2026-05-22) Синхронизировано в `meetup-planner-backend/`:
+  `app/db/models.py`, `alembic/versions/0010_games_nominations.py`, `app/services/games.py`,
+  `app/services/games_poll.py`, `app/api/routes_admin.py`, `app/api/routes_calendar.py`,
+  `app/bot/handlers/chat_commands.py`, `app/bot/handlers/poll_answer.py`. Frontend
+  (`src/api/admin.ts`, `src/api/birthdays.ts`, `src/tg/webapp.ts`, `src/features/admin/GamesScreen.tsx`,
+  `src/features/admin/AdminScreen.tsx`, `src/features/calendar/CalendarView.tsx`,
+  `src/features/calendar/views/StripView.tsx`, `MonthView.tsx`, `TimelineView.tsx`) —
+  через `kickmesc-dotcom/meetup-planner` пользователем. Backend-тесты 71/71 ✅, `tsc --noEmit` ✅.
+  Push в HF / Pages — за пользователем. **Важно:** на HF Space перед первым стартом нужна миграция
+  `alembic upgrade head` (новая 0010).
+
+#### E8. Червь-пидор: редкая особая номинация при ролле лоха (источник: п.8)
+- [x] **E8.1.** (2026-05-21, аудит) `loser.py:216 decide_worm` (чистая функция),
+  `roll_loser` использует его + читает `is_worm_enabled`/`get_worm_chance` из admin_config (default 0.01).
+  Лох-счётчик +1 пишется в любом случае (E8.1.5: червь — это «надстройка» над лохом, не замена).
+- [x] **E8.2.** (2026-05-21, аудит) `db/models.py:160 WormAssignment` (worm_assignments table) +
+  миграция `alembic/versions/0008_worm_assignments.py`. При новом назначении предыдущий
+  `WormAssignment` закрывается (`ended_at = now`), partial unique index гарантирует не более одного
+  активного носителя. admin_config helpers: `is_worm_enabled/set_worm_enabled/get_worm_chance/set_worm_chance`.
+  Yellow-event в group chat — встроен в `compose_loser_message` с особой шапкой 🪱 (см. test_worm.py).
+- [~] **E8.3.** (2026-05-21, аудит) Запись факта сделана через `WormAssignment` (это и есть «achievement»
+  по факту). Таблицы `user_achievements` нет — но и нет UI ачивок, который её бы потреблял.
+  Гейт `gamification.enabled` (E7.3) тоже не нужен пока — нечего гейтить. Считаем закрытым в рамках MVP.
+- [x] **E8.4.** (2026-05-22) Backend: исправлен баг с двойным префиксом —
+  `routes_calendar.py:136` маршрут был `/api/worm/current`, но роутер монтируется с
+  `prefix="/api"` (см. `app/main.py:192`), реальный URL получался `/api/api/worm/current`
+  → фронт никогда бы не достучался. Исправлено на `/worm/current` (итоговый URL
+  `/api/worm/current`). Frontend: `api/birthdays.ts` — `WormCurrent` тип и
+  `fetchCurrentWorm()`. `CalendarView.tsx` — query `["worm-current"]` со staleTime 30c
+  (ролл — событие редкое, чаще опрашивать смысла нет), прокидывает `wormUserId` в
+  `StripView`/`TimelineView`. Оба view — новый проп пробрасывают в `ParticipantRow`
+  через `isWorm={wormUserId === u.id}`. `ParticipantRow.tsx` — в sticky-left колонке
+  аватара добавлен абсолютный бейдж 🪱 (bottom-right аватара, на `bg-tg-bg` rounded-full
+  с тенью, чтобы не сливался с цветным аватаром). Title аватара тоже меняется на
+  «🪱 X — червь-пидор», если активен. Иконку показываем в **колонке участника**,
+  а не в каждой ячейке: звание переходящее и непрерывное, дублировать по 43 ячейкам
+  излишне и шумно. TS чистый, 61/61 backend-тест зелёный.
+- [x] **E8.5.** (2026-05-21) Тест `tests/test_worm.py` (10 кейсов): `decide_worm` (5 — disabled, zero chance, граница <chance, ==chance не триггерит, chance=1) + `compose_loser_message` (5 — без extras, worm-layout, с prev holder, без prev, повтор same user без self-transfer). Интеграция с БД (создание/закрытие `WormAssignment`, partial unique index) проверяется вручную при первом ролле — отдельный sqlite-стенд в проект не тащим (его нет ни у одного другого сервиса). Все 52 теста проекта проходят на свежем `.venv` (Python 3.12, `pip install -e ".[dev]"`).
+
+#### E9. Бот реагирует на @-mention и reply (источник: п.9)
+- [x] **E9.1.** (2026-05-22, аудит) `bot/handlers/bot_reactions.py::on_message` — фильтр `F.text` +
+  `_mentions_bot()` (entity `mention` через `@bot_username` lowercase или `text_mention` через
+  `entity.user.id == bot_id`). Бот identity кешируется в модуле (`_BOT_IDENTITY`) одним
+  `bot.me()`-вызовом. Реагируем только в `settings.group_chat_id` и только на whitelist'е.
+  Master-toggle `bot_reactions.mention_enabled` (default true). Роутер подключён в
+  `dispatcher.py` до `chat_capture`.
+- [x] **E9.2.** (2026-05-22) Backend: два независимых тогла для reply, по спеке GHG6.txt п.9:
+  `bot_reactions.reply_all_enabled` (default false) — отвечать на ЛЮБОЙ reply на сообщение
+  бота, включая reply к рандом-цитатам; `bot_reactions.reply_except_phrases_enabled`
+  (default true) — отвечать на reply, КРОМЕ случаев, когда оригинал — рандом-цитата.
+  Логика в `on_message`: если `reply_all_enabled` → отвечаем; иначе если
+  `reply_except_phrases_enabled and not is_phrase` → отвечаем. Цитаты опознаются по
+  префиксам `🗣 ` / `👤 ` (см. `compose_random_phrase`). `_react()` шлёт `compose_random_phrase(session, n=1)`
+  как reply на исходное сообщение, ошибки send'а ловятся (`log.warning`).
+  **Раньше** ключи назывались `reply_enabled` / `reply_except_phrases` и работали как
+  `reply_all_enabled` + «исключение», но это не совпадало со спекой (третий тогл вообще не работал
+  при выключенном `reply_enabled`). Имена и логика приведены к спеке.
+- ⊘ **E9.3.** Снято с GHG6 по принципу [[no-premature-gamification]]: счётчик ачивки «Укротитель
+  паст» бессмысленно делать пока нет UI ачивок/уровней. Вернёмся вместе с самой геймификацией —
+  тогда же добавим запись инкремента в `bot_reactions.on_message`.
+- [x] **E9.4.** (2026-05-22) Frontend: `api/admin.ts::BotReactionsSettings` —
+  `{mention_enabled, reply_all_enabled, reply_except_phrases_enabled}`. `ScheduledPublicationsScreen.tsx`
+  → секция `BotReactionsSection` с тремя `Switch`-тоглами и подсказками. Auto-save на каждое
+  изменение (debounce не нужен — три булева флага, не количественные поля). Backend
+  `routes_admin.py` — `BotReactionsIO` обновлён под новые ключи.
+- **Bot pause sync.** `services/bot_pause.py::apply_pause_overrides` теперь выключает оба
+  reply-тогла (`reply_all_enabled=false`, `reply_except_phrases_enabled=false`), при restore из
+  snapshot пользовательские значения возвращаются. `test_bot_pause.py` обновлён.
+
+#### E11. /zaebal, /zaebal-vote, авто-zaebal, snapshot/restore (источник: п.11)
+- [ ] **E11.1.** Backend: новая таблица `bot_pause` (id, started_at, ends_at NULL, started_by_tg_id,
+  reason ENUM('manual_admin','zaebal_threshold','zaebal_vote','auto_monthly'), settings_snapshot JSONB).
+  Миграция.
+- [ ] **E11.2.** Backend `bot/handlers/zaebal.py`:
+  - `/zaebal` — фиксирует голос юзера (буфер на 1 час, ring-buffer в admin_config или таблица
+    `zaebal_votes`). Когда набирается `>= zaebal.threshold` (default 2 из 5) — стартует пауза на
+    `zaebal.duration_days` (default 3). В чат — сообщение с прощальной фразой (random из массива).
+  - `/zaebal-vote` — создаёт Telegram-полл «GHG Bot - zaebal?», `open_period = zaebal.poll_hours * 3600`.
+    После закрытия — если большинство «за», пауза на `zaebal.vote_duration_days` (default 7).
+- [ ] **E11.3.** Backend `scheduler.py`: job `JOB_AUTO_ZAEBAL` — между 15-18 числами раз в месяц
+  (cron-like), default-on. При срабатывании — публикует «дружеский» зэбал-вот от лица бота.
+  Master-toggle `zaebal.auto_enabled`, поле `zaebal.auto_max_per_month` (default 1), интервал — env.
+- [ ] **E11.4.** Backend: при старте паузы — снэпшот всех master-toggles (reminders/loser/phrases/avatars/
+  birthdays/chukhan/bot_reactions/zaebal.auto) и интервалов в `bot_pause.settings_snapshot`. Все ключи
+  выставляются в false. По истечении (или ручному снятию) — restore из snapshot.
+- [ ] **E11.5.** Backend: личка старшему админу (Серж-Neo, ADMIN_TG_IDS[0]) — `bot.send_message`
+  с уведомлением о начале паузы. Лог + повторная попытка через 60с при FloodWait.
+- [ ] **E11.6.** Backend: реверс — `POST /admin/bot-pause/start` (`{duration_days?, reason?}`), `POST
+  /admin/bot-pause/stop`. Те же snapshot/restore, что и в E11.4.
+- [ ] **E11.7.** Frontend `AdminScreen`: при активной паузе — sticky-плашка наверху раздела с
+  «Бот на паузе. Возобновится через Xд Yч» (живой таймер на `setInterval(1000)`) + кнопка
+  `▶️ Снять паузу`. Все master-toggle ниже — disabled (`opacity-50`, `pointer-events-none`).
+- [ ] **E11.8.** Frontend: рядом с плашкой паузы — кнопка `⏸ Поставить бота на паузу` (когда паузы
+  нет) с модалкой «Длительность: [N дней / Бессрочно]» + причина (опц.).
+- [ ] **E11.9.** Тест: `tests/test_bot_pause.py` (5 кейсов: старт, snapshot, истечение → restore,
+  ручное снятие → restore, повторный старт пока активна — отказ).
+
+### Sync
+- [~] **D-E.** После закрытия каждой подгруппы E-P0/E-P1/E-P2 — `cp meetup-planner-main/backend/* →
+  meetup-planner-backend/`, отдельные коммиты «GHG6 E-P0: …», «GHG6 E-P1: …», «GHG6 E-P2: …».
+  Frontend синхронизируется пользователем сам.
+  - (2026-05-22, частично) Для E5 синхронизировано в `meetup-planner-backend/`:
+    `app/api/routes_admin.py`, `app/services/phrase_weights.py`, `app/services/admin_config.py`,
+    `app/services/loser.py`, `app/services/chukhan.py`. Заодно дотащены `app/api/routes_calendar.py`
+    (BD4) и `app/bot/handlers/chat_commands.py`, которые отставали от main. Backend-тесты 61/61 ✅.
+    Остаются недосинкнутые в HF-клоне `app/bot/scheduler.py` (compose_loser_message), `app/db/models.py`
+    (WormAssignment) и миграция `alembic/versions/0008_worm_assignments.py` — это хвосты E8/AD,
+    их пользователь подтянет следующим коммитом. Push в HF / Pages — за пользователем.
+  - (2026-05-22, частично) Для E7 синхронизировано: `app/api/routes_users.py`,
+    `app/services/admin_config.py` (уже выше). Frontend: `src/api/availability.ts`, `src/App.tsx` —
+    через `kickmesc-dotcom/meetup-planner` пользователем.
+  - (2026-05-22, частично) Для E8.4 синхронизировано: `app/api/routes_calendar.py` (фикс
+    префикса `/worm/current`). Frontend: `src/api/birthdays.ts`, `src/features/calendar/CalendarView.tsx`,
+    `src/features/calendar/ParticipantRow.tsx`, `src/features/calendar/views/StripView.tsx`,
+    `src/features/calendar/views/TimelineView.tsx`.
+  - (2026-05-22, частично) Для E10 синхронизировано: `app/api/routes_admin.py`,
+    `app/services/admin_config.py`, `app/services/avatars.py`. Frontend: `src/api/admin.ts`,
+    `src/features/admin/ScheduledPublicationsScreen.tsx`. Остатки E-P1/P2 (E9, E11, E6).
+  - (2026-05-22) Для E9 синхронизировано в `meetup-planner-backend/`:
+    `app/bot/handlers/bot_reactions.py`, `app/services/admin_config.py`,
+    `app/api/routes_admin.py`, `app/services/bot_pause.py`, `tests/test_bot_pause.py`.
+    71/71 backend-тест зелёный. Frontend (`src/api/admin.ts`,
+    `src/features/admin/ScheduledPublicationsScreen.tsx`) — через `kickmesc-dotcom/meetup-planner`
+    пользователем. Push в HF / Pages — за пользователем.
+
+---
+
+
+## ДОбавлено пользователем (приоритетные правки внести до начала работы с P3)
+1. Попробовал подобавлять еще прокси, ни один из них не закинулся. Закралось подозрение что может быть у них там какая-то защита появилась чтобы могли только живые люди подрубаться. Пока еще работает всего один (самый первый добавленный в раннем билде), но это как-то ненадежно, ибо нет даже плана б (на случай если текущий отвалится)
+2. Проблема прыгающего экрана пофиксилась во всех полях ввода, однако именно при добавлении прокси - сохранилась.
+3. После добавления функционла прокси мы больше не сталкивались с проблемой тайм-аута телеги, НО. Если делать ролл лоха по кнопке (где крутится рулетка) - там чаще (возможно всегда) рулетка крутится слишком долго, как будто зависая и потом выдает telegram error. Это даже не связано с кулдауном, я выжидал легитимные 12 часов. А вот там где принудительный реролл чухана, игнорирующий кулдаун через админка-лох, он выбирается исправно и ни разу не завис.
+4. Шизо-цитатник работает весьма криво, в 70% случаев (например цитаты пользователя Русланище) он дважды или трижды повторяет одну и ту же сказанную фразу в одном сообщении с незначительным изменением формулировки. Нужно вшить какой-то протекшен, чтобы одна фраза бралась только один раз.
+5. В целом я надобавлял такой огромный пул кастомных фраз на лоха недели и чухана, но уже который раз подряд в сообщении выпадает повторка. Здесь бы тоже было неплохо внедрить систему, по которой уже использованная фраза будет иметь приоритет ниже (но не нулевой) чем свеженькие и использованные меньшее кол-во раз.
+6. У нас на днях возникло предложение собраться вместе и поиграть в игру, у всех разные варианты. Хочу добавить команду \nominate_game и \remove_nominated_game где командой или в админке можно добавить кастомное кол-во игр в предложку (пусть будет до 10 шт на начальном этапе), потом отдельной кнопкой запустить голсование типа "Во что сыграем" с опциональной возможностью докинуть последующий воут "Когда играем". В админке можно смотреть\редактировать лист номинированных игр. Для голосований по играм можно посмотреть количество голосов и кто за что проголосовал (вроде как стоковый телеграм и так позволяет это видеть), только таймаут опроса должен быть по дефолту не час, а хотя бы часов 12-24. Сами намеченные игры тоже можно добавлять на календарик, раз уж имеется такой функционал.
+7. По умолчанию при входе в приложение у нас открывается вид календаря, он честно говоря и так уже чутка перегружен, из-за количества кнопок быстрых действий. А вверху висит приветствие "Привет, Серж-Neo", которое не несет особой смысловой нагрузки, но съедает лишнее место на экране. Хочу чтобы оно было закрываемым, в формате "не показывать в следующий раз" и эту настроечку сохраняем персонально для каждого пользователя. Совсем удалять блок приветствия не хочу, поскольку сюда мы будем добавлять фичи редактирования профиля в будущем.
+Система будет в будущем расти и перенастраиваться, но пока такой вектор наметим. Весь функционал по прокачке\левелам\рангам можно приостановить одним рубильником в админке.
+8. Особая номинация (червь-пидор) - при прокрутке лоха есть редкий шанс (1 к 100) что вместо лоха участник будет назначен червем-пидором, об этом нужно яркое оповещение в чат и супер ачивка в профиль (в счетчик лохов добавляется просто как +1 лох). В календаре пользователь отмечен особой иконкой у всех. Червь-пидор это переходящее звание и при выборе нового червя, у старого забирают звание, возвращая то которое полагается из расчета его текущего левела\экспы.
+9. Еще фишки:
+Если тегнуть бота в сообщении через @ - отвечает рандом фразой. (отключаемо в админке, по умолчанию вкл)
+Если ответить на любое сообщение бота реплаем - отвечает рандом фразой. (отключаемо в админке, по умолчанию выкл)
+Если ответить на любое сообщение бота реплаем, кроме рандом цитаты - отвечает еще одной рандом фразой. (отключаемо в админке, по умолчанию вкл)
+10. такую фишку как авто-синхрон аватарок по расписанию упраздняем, теперь это можно сделать принудительно по нажатию кнопки или запланировать на определенную дату\время (но делать это регулярно и на ежедневной\еженедельной основе точно нет нужды пока)
+11. чат команда /zaebal - бот с сожалением сообщает в чат что скорее всего его активность поднадоела участнику %username% но честно уведомляет что если кто-то еще напишет команду и наберется x голосов (по умолчанию 2 из 5 живых участников), то вся чат-активность (автопост цитат, реакции, автолох, чухан) бота будет приостановлена на z дней (по умолчанию 3). Еще есть /zaebal-vote - которая сразу создает опрос "GHG Bot - zaebal?" и если большинство проголосовало за, то активность бота выключается уже на Y дней (по умолчанию 7). Где-то к середине месяца, между 15-18 числами, бот может сам инициировать от себя /zaebal-vote (с чуть другим оформлением, как от своего лица в духе "Друзьяшечки братушечки, отвечаем только честно - заебал?"). Автозаеб - отключаемая в настройках функция, количество раз в месяц можно задать, интервал для забного периода - можно задать. Если по итогам голосования бот был отключен, то он откидывает в общий чат прощальное сообщение в духе "I'll be back" "Я вернусь, сучки" "И ты, брут" и метку что активность возобновится через x дней y часов. Параллельно он должен отписаться в личку старшему админу (Серж-Neo) что была инициирована приостановка. Да, перед началом приостановки нужно сделать как бы снэпшот того какие галочки были включены, а какие выключены, где стояли какие интервалы и значения - чтобы автоматически все вернуть по истечению таймера паузы, или ручном снятии паузы. На период действия приостановки, все ручные "включатели" фишек автопостинга в админке - помечены серым и неинтерактивны. В самом верху раздела настроек - плашка о том что сейчас действует приостановка и там же бежит живой таймер показыающий через сколько она закончится. Прямо под ней - глобальный тумблерок, который позволит снять паузу вручную. Раз уж такое дело, давай сделаем и реверс фичу, чтобы можно было прямо с этой же кнопки в админке инициировать глобальную приостановку всех функций отправки сообщений от бота в общий чат. Можно так же задать таймер, через сколько блок снимется автоматом. Если таймер не задан, то блокировка бессрочная, до тех пор, пока не будет снята вручную админом или участником имеющим доступ в админку (по умолчанию все могут).
+
+Обрыв сессии, я скопировал последнее содержимое окна claude:
+  Теперь — тест E8.5. Создаю tests/test_worm_assignment.py.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+● Чистый юнит-тест по чистым функциям — тест с сессией DB их паттерн не использует. Для roll_loser нужен async-тест с
+  sqlite/in-memory. Глянем, есть ли conftest:
+
+  Listed 1 directory (ctrl+o to expand)
+
+● (Игнорирую.) Нет conftest, async-тестов с sqlite нет — паттерн проекта чисто юнит на чистых функциях. Не буду тащить
+  sqlite-инфраструктуру ради одного теста — это инвазивно. Вместо этого вынесу решение «червь» в чистую функцию
+  decide_worm(now_random, enabled, chance) (тестабельная), а интеграцию с БД не тестирую отдельно (но руками проверится
+  при первом ролле — это не критичная часть, она простая).
+
+● Update(meetup-planner-main\backend\app\services\loser.py)
+  ⎿  Added 12 lines
+      211      )
+      212
+      213
+      214 +def decide_worm(*, enabled: bool, chance: float, rng_value: float) -> bool:
+      215 +    """Чистая функция: выпадает ли «червь-пидор»?
+      216 +
+      217 +    `rng_value` — число из `random.random()` (0 ≤ v < 1). Триггер: enabled AND
+      218 +    chance > 0 AND rng_value < chance. Шанс ≤0 — никогда; ≥1 — всегда (clamp
+      219 +    хранится при записи, здесь только сравнение). Возвращает bool.
+      220 +    """
+      221 +    if not enabled or chance <= 0.0:
+      222 +        return False
+      223 +    return rng_value < chance
+      224 +
+      225 +
+      226  def compose_loser_message(
+      227      *,
+      228      loser_name: str,
+
+● И использую decide_worm в roll_loser:
+
+● Update(meetup-planner-main\backend\app\services\loser.py)
+  ⎿  Added 3 lines, removed 1 line
+      133      # E8: бросаем «червь-пидор»
+      134      worm_enabled = await is_worm_enabled(session)
+      135      worm_chance = await get_worm_chance(session) if worm_enabled else 0.0
+      136 -    is_worm = worm_enabled and worm_chance > 0.0 and random.random() < worm_chance
+      136 +    is_worm = decide_worm(
+      137 +        enabled=worm_enabled, chance=worm_chance, rng_value=random.random()
+      138 +    )
+      139
+      140      if is_worm:
+      141          reason = WORM_REASON_TEXT
+
+● И аналогично для compose_loser_message — пишу тесты обоих:
+
+● Write(meetup-planner-main\backend\tests\test_worm.py)
+  ⎿  Wrote 104 lines to meetup-planner-main\backend\tests\test_worm.py
+       1 """GHG6 E8 — «Червь-пидор»: чистая логика broska/композиции сообщения.
+       2
+       3 Интеграция с БД (создание `WormAssignment`, закрытие предыдущего, partial
+       4 unique index) проверяется руками при первом ролле — отдельный sqlite-стенд
+       5 в проект не тащим (его нет для других сервисов). Здесь — только декомпозируемая
+       6 часть: `decide_worm` и `compose_loser_message`.
+       7 """
+       8 from __future__ import annotations
+       9
+      10 from app.services.loser import (
+     … +94 lines (ctrl+o to expand)
+  ⎿  API Error: 400 You have exceeded your daily token limit. You can resume at 2026-05-22 00:00 UTC.
+
+✻ Cogitated for 30m 47s

@@ -83,6 +83,8 @@ class Meeting(Base):
     status: Mapped[str] = mapped_column(Text, default="proposed", nullable=False)
     auto_picked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    # E6: 'game' для встреч-игр; NULL для обычных встреч.
+    tag: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -110,6 +112,12 @@ class Poll(Base):
     closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
     tg_poll_id: Mapped[str | None] = mapped_column(String(64), unique=True, index=True)
+    # E6: 'game_choice' (Во что сыграем) / 'game_when' (Когда играем). NULL для
+    # старых meetup-полов с datetime-опциями.
+    kind: Mapped[str | None] = mapped_column(String(32))
+    # E6: для game_when — id игры-победителя, чтобы знать, какую игру кладём
+    # в Meeting после выбора даты.
+    game_nomination_id: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -155,6 +163,60 @@ class LoserRoll(Base):
     rolled_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     loser_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     reason_text: Mapped[str | None] = mapped_column(Text)
+
+
+class WormAssignment(Base):
+    """Особая номинация «Червь-пидор» (E8, GHG6).
+
+    Звание переходящее: в любой момент существует ≤1 активной строки
+    (`ended_at IS NULL`) — обеспечено partial unique index на (1) в миграции
+    0008. При новом назначении старая активная строка получает
+    `ended_at=now()` и затем создаётся новая (внутри одной транзакции).
+    """
+    __tablename__ = "worm_assignments"
+    __table_args__ = (
+        Index("ix_worm_user_started", "user_id", "started_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_loser_roll_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("loser_rolls.id", ondelete="SET NULL")
+    )
+
+
+class BotPause(Base):
+    """GHG6 E11 — глобальная пауза публикаций бота.
+
+    Активная запись — `ended_at IS NULL`. В любой момент существует
+    не более одной активной строки (партиальный unique index на (1) WHERE
+    ended_at IS NULL — как в worm_assignments).
+
+    `settings_snapshot` — JSONB-копия master-toggles и интервалов на момент
+    старта паузы. При снятии паузы (по времени или вручную) — состояние
+    восстанавливается из snapshot.
+    """
+
+    __tablename__ = "bot_pause"
+    __table_args__ = (
+        Index("ix_bot_pause_started", "started_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    started_by_tg_id: Mapped[int | None] = mapped_column(BigInteger)
+    reason: Mapped[str] = mapped_column(String(32), nullable=False, default="manual_admin")
+    settings_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
 
 class WeeklyChukhan(Base):
@@ -305,6 +367,28 @@ class EventLog(Base):
     actor_user_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("users.id"))
     kind: Mapped[str] = mapped_column(Text, nullable=False)
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
+
+
+class GameNomination(Base):
+    """GHG6 E6 — номинированные игры для голосования «Во что сыграем».
+
+    Лимит активных (10) и проверка на дубль по `name` (case-insensitive)
+    обеспечиваются на уровне сервиса (`services/games.py`), не БД — чтобы
+    при ре-добавлении удалённой игры можно было «вернуть» строку из soft-delete.
+    """
+
+    __tablename__ = "game_nominations"
+    __table_args__ = (
+        Index("ix_game_nomination_active", "removed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    added_by_tg_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
