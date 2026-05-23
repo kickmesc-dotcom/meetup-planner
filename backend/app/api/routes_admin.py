@@ -1160,6 +1160,13 @@ async def admin_list_proxies(session: SessionDep, user: CurrentUser) -> list[Pro
     return [_proxy_to_out(r) for r in rows]
 
 
+class ProxyPingOut(BaseModel):
+    proxy_id: int
+    ok: bool
+    latency_ms: int | None
+    error: str | None
+
+
 class ProxyAddOut(BaseModel):
     """Ответ на POST /admin/proxy (GHG6 E1.2).
 
@@ -1171,7 +1178,7 @@ class ProxyAddOut(BaseModel):
 
     proxy: ProxyOut
     created: bool
-    ping_result: "ProxyPingOut | None"
+    ping_result: ProxyPingOut | None
 
 
 @router.post("/admin/proxy", response_model=ProxyAddOut)
@@ -1297,13 +1304,6 @@ class ProxySelftestOut(BaseModel):
     latency_ms: int | None
     error: str | None
     bot_active: bool
-
-
-class ProxyPingOut(BaseModel):
-    proxy_id: int
-    ok: bool
-    latency_ms: int | None
-    error: str | None
 
 
 class ProxyStatusOut(BaseModel):
