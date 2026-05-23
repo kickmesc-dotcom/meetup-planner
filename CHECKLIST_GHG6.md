@@ -272,6 +272,68 @@ D-FINAL и D-MEM перенесены в раздел P3 этап 5 — закр
 
 ---
 
+## F — багфиксы после E6 (2026-05-23, из `error.txt`)
+
+Источник — `C:\Users\fa1nt\error.txt`: после пуша E6 (game nominations) билд упал на
+`NameError: name 'ProxyPingOut' is not defined`. Пользователь зафиксил роут вручную
+по совету Gemini, билд встал — но обнаружились ещё проблемы. Все P0 (блокеры).
+
+### Backend
+- [x] **F1.** (2026-05-23) `routes_admin.py` — `class ProxyPingOut` перенесён выше
+  его использования в `ProxyAddOut` (Pydantic не разрешал forward-ref в кавычках на
+  module-level scope). Снят forward-ref `"ProxyPingOut | None"` → прямой
+  `ProxyPingOut | None`. Это первый из двух коммитов.
+- [x] **F2.** (2026-05-23) Send-isolation для `/admin/games/poll-create`:
+  `services/games_poll.py::create_game_choice_poll` и `create_game_when_poll`
+  оборачивают `bot.send_poll` в `asyncio.wait_for(timeout=8)`, ловят
+  `TelegramRetryAfter/Forbidden/Network/APIError + asyncio.TimeoutError` →
+  бросают `GamesPollSendFailed(reason=type_name)`. `session.add(poll)` и
+  `commit` делаются ТОЛЬКО после успешного send — никаких висячих записей
+  в БД без TG-сообщения. `routes_admin.py::admin_games_poll_create` ловит
+  `GamesPollSendFailed` → 503 `telegram_send_failed:<reason>`.
+  `handle_game_choice_closed` (зовётся из bot-handler, не HTTP) глотает
+  `GamesPollSendFailed` warning-логом, follow-up `game_when` не создаётся.
+- [x] **F3.** (2026-05-23) То же лечение для обычных meetup-полов:
+  `services/polls.py::create_poll_in_chat` + `PollSendFailed`. Роуты в
+  `routes_polls.py` (`/polls` и `/polls/auto-pick`) теперь ловят
+  `PollSendFailed` отдельной веткой и возвращают 503 — раньше всё падало
+  через generic `except Exception` в 502 (что плохо отличало badparse-ошибки
+  от network).
+- [x] **F4.** (2026-05-23) Reply-bug E9: `compose_random_phrase` зашивает
+  префикс 🗣 «Сводный хор» / 👤 «Имя вещает» — в reply бота это выглядело
+  как цитата от другого участника. Добавлена чистая функция
+  `format_bot_reply(chunks, n)` + async-обёртка `compose_bot_reply_phrase`
+  (без шапки, только `<i>склейка</i>`). `bot_reactions._react` переведён
+  на новую функцию. Старая `compose_random_phrase` (для автопоста) не
+  тронута — там префиксы корректны.
+- [x] **F5.** (2026-05-23) `main.py::_register_bot_metadata` — `/nominate_game`
+  и `/remove_nominated_game` добавлены в обоих списках `private_cmds` и
+  `group_cmds`. Пользователь не находил их в меню `/` бота.
+- [x] **F6.** (2026-05-23) `tests/test_bot_reply.py` — 5 кейсов на
+  `format_bot_reply`: нет префиксов 🗣/👤, пустой пул → fallback, обёртка
+  `<i>…</i>`, маленький пул не падает, дедуп работает. 76/76 pytest зелёный.
+
+### Sync
+- [x] **D-F.** (2026-05-23) Sync `meetup-planner-main/backend/*` →
+  `meetup-planner-backend/*`: `app/api/routes_admin.py`, `app/api/routes_polls.py`,
+  `app/services/games_poll.py`, `app/services/polls.py`,
+  `app/services/random_phrases.py`, `app/bot/handlers/bot_reactions.py`,
+  `app/main.py`, `tests/test_bot_reply.py`. Два коммита в каждом репо
+  («ProxyPingOut» + «hotfix F»). Push в HF/Pages — за пользователем.
+
+### Что НЕ закрыто
+
+- **/zaebal (E11)** — пользователь в error.txt спрашивал про неё. Раздел E11
+  в чеклисте всё ещё `[ ]` (миграция bot_pause, handler `/zaebal`+`/zaebal-vote`,
+  auto-zaebal job, snapshot/restore, UI-плашка). Файл `app/bot/handlers/zaebal.py`
+  на 199 строк уже существует — но интеграция (миграция, регистрация роутера,
+  scheduler-job, UI) не завершена. Отложено по решению пользователя в этой
+  сессии — займёмся в следующую итерацию.
+- **Реакции на мем/подборку мемов** — фича не реализована, в админке нет
+  настроек. Не оценена в GHG6 (не было в исходной спеке), ждёт постановки.
+
+---
+
 ## E — правки от пользователя (2026-05-21), вносим ДО P3
 
 Источник — раздел «Добавлено пользователем» (см. ниже, оставлен как первоисточник).
