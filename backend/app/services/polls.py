@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import date, datetime, time, timedelta, timezone
 
 import structlog
 from aiogram import Bot
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +20,21 @@ from app.db.models import Poll, PollOption, PollVote, User
 log = structlog.get_logger()
 
 _DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# GHG6 hotfix: send-isolation для meetup-полла (см. games_poll._POLL_SEND_TIMEOUT).
+_POLL_SEND_TIMEOUT = 8.0
+
+
+class PollSendFailed(Exception):
+    """`bot.send_poll` упал по таймауту/network — Poll в БД НЕ создан.
+
+    HTTP-роут ловит и возвращает 503 — фронт показывает понятную ошибку,
+    висячих записей в БД без TG-сообщения не остаётся.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 def _parse_option(raw: str | datetime | date) -> tuple[datetime, bool]:
@@ -63,14 +85,31 @@ async def create_poll_in_chat(
     parsed: list[tuple[datetime, bool]] = [_parse_option(o) for o in options]
     labels = [_fmt_option(dt, has_time=ht) for dt, ht in parsed]
 
-    msg = await bot.send_poll(
-        chat_id=chat_id,
-        question=question,
-        options=labels,
-        is_anonymous=False,
-        allows_multiple_answers=True,
-        open_period=closes_in_hours * 3600 if closes_in_hours else None,
-    )
+    try:
+        msg = await asyncio.wait_for(
+            bot.send_poll(
+                chat_id=chat_id,
+                question=question,
+                options=labels,
+                is_anonymous=False,
+                allows_multiple_answers=True,
+                open_period=closes_in_hours * 3600 if closes_in_hours else None,
+            ),
+            timeout=_POLL_SEND_TIMEOUT,
+        )
+    except (
+        TelegramRetryAfter,
+        TelegramForbiddenError,
+        TelegramNetworkError,
+        TelegramAPIError,
+        asyncio.TimeoutError,
+    ) as exc:
+        log.warning(
+            "polls.send_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise PollSendFailed(type(exc).__name__) from exc
 
     poll = Poll(
         created_by=created_by.id,

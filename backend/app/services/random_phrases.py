@@ -240,6 +240,60 @@ async def compose_random_phrase(
     author_name = user.display_name if user else "Кто-то из наших"
     return f"👤 <b>{author_name} вещает:</b>\n\n«<i>{glued}</i>»"
 
+def format_bot_reply(chunks: list[str], *, n: int = 2) -> str:
+    """GHG6 hotfix: чистая функция форматирования reply-фразы бота.
+
+    Без префиксов 🗣/👤 — это голос самого бота, не цитата участника.
+    На вход — пул чанков (любого размера, в т.ч. пустой). Берёт случайные
+    `n*2`, фильтрует через `dedup_chunks` до `n`, склеивает.
+    """
+    if not chunks:
+        return "<i>(нет слов...)</i>"
+    n = max(1, n)
+    picked_raw = random.sample(chunks, min(len(chunks), n * 2))
+    picked = dedup_chunks(picked_raw, all_pool=chunks, target_n=n)
+    glued = _glue_chunks(picked)
+    return f"<i>{glued}</i>"
+
+
+async def compose_bot_reply_phrase(
+    session: AsyncSession,
+    *,
+    n: int = 2,
+    lookback_days: int = 7,
+) -> str | None:
+    """GHG6 hotfix: короткая «шизо-цитата» от лица БОТА, без шапки автора.
+
+    Используется в `bot_reactions._react` для ответа на @mention / reply.
+    Семантика отличается от `compose_random_phrase`:
+    - НЕТ префиксов 🗣 «Сводный хор» / 👤 «Имя вещает» — иначе reply бота
+      выглядит как цитата от другого участника (что вводило в заблуждение).
+    - Берём чанки из общего пула (всех whitelist-юзеров) — это «голос
+      бота», не пересказ конкретного участника.
+    - По умолчанию короче автопоста (n=2), чтобы reply не растекался.
+
+    Возвращает HTML-готовый текст (`<i>…</i>`) или короткий fallback при
+    пустом пуле.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    stmt = select(ChatMessage.text).where(ChatMessage.sent_at >= cutoff)
+    texts = list((await session.scalars(stmt)).all())
+
+    if not texts:
+        stmt = (
+            select(ChatMessage.text)
+            .order_by(ChatMessage.sent_at.desc())
+            .limit(100)
+        )
+        texts = list((await session.scalars(stmt)).all())
+
+    all_chunks: list[str] = []
+    for text in texts:
+        all_chunks.extend(_split_into_chunks(text or ""))
+
+    return format_bot_reply(all_chunks, n=n)
+
+
 async def run_random_phrases_job(bot: Bot) -> None:
     settings = get_settings()
     if not settings.group_chat_id:

@@ -87,12 +87,17 @@ def _whitelist_set() -> set[int]:
 
 async def _react(message: Message) -> None:
     """Сгенерировать и отправить ответ. Reply на исходное сообщение —
-    чтобы в групповом чате было понятно, на что бот реагирует."""
-    from app.services.random_phrases import compose_random_phrase
+    чтобы в групповом чате было понятно, на что бот реагирует.
+
+    GHG6 hotfix: используем `compose_bot_reply_phrase` (без шапки автора)
+    вместо `compose_random_phrase` (с 🗣/👤). Reply бота — это голос самого
+    бота, а не цитата от другого участника.
+    """
+    from app.services.random_phrases import compose_bot_reply_phrase
 
     sm = get_sessionmaker()
     async with sm() as session:
-        text = await compose_random_phrase(session, n=1)
+        text = await compose_bot_reply_phrase(session)
     if not text:
         return
     try:

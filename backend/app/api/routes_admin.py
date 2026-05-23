@@ -1932,7 +1932,7 @@ async def admin_games_poll_create(
             status.HTTP_400_BAD_REQUEST, "group_chat_id_not_configured"
         )
     from app.bot.dispatcher import get_bot
-    from app.services.games_poll import create_game_choice_poll
+    from app.services.games_poll import GamesPollSendFailed, create_game_choice_poll
 
     try:
         poll = await create_game_choice_poll(
@@ -1946,6 +1946,14 @@ async def admin_games_poll_create(
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+    except GamesPollSendFailed as exc:
+        # GHG6 hotfix: прокси/network failed на send_poll — не валим ASGI,
+        # отвечаем понятным 503. Фронт показывает alert, пользователь идёт
+        # чинить прокси в админке.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            f"telegram_send_failed:{exc.reason}",
+        ) from None
 
     return GamesPollCreateOut(
         poll_id=poll.id,

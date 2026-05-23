@@ -55,6 +55,8 @@ async def _register_bot_metadata() -> None:
         BotCommand(command="chukhan", description="Чухан недели"),
         BotCommand(command="loser", description="Назначить лоха дня"),
         BotCommand(command="phrase", description="Прогнать рандомную фразу"),
+        BotCommand(command="nominate_game", description="🎮 Добавить игру в номинации"),
+        BotCommand(command="remove_nominated_game", description="🗑 Удалить игру из номинаций"),
         BotCommand(command="tasks", description="Запланированные задачи бота"),
         BotCommand(command="whoami", description="Мой Telegram ID"),
     ]
@@ -64,6 +66,8 @@ async def _register_bot_metadata() -> None:
         BotCommand(command="chukhan", description="Чухан недели"),
         BotCommand(command="loser", description="Назначить лоха дня"),
         BotCommand(command="phrase", description="Прогнать рандомную фразу"),
+        BotCommand(command="nominate_game", description="🎮 Добавить игру в номинации"),
+        BotCommand(command="remove_nominated_game", description="🗑 Удалить игру из номинаций"),
         BotCommand(command="tasks", description="Запланированные задачи бота"),
     ]
     try:

@@ -15,10 +15,17 @@
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, time, timedelta, timezone
 
 import structlog
 from aiogram import Bot
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+)
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,6 +43,25 @@ log = structlog.get_logger()
 POLL_KIND_GAME_CHOICE = "game_choice"
 POLL_KIND_GAME_WHEN = "game_when"
 MEETING_TAG_GAME = "game"
+
+# GHG6 hotfix: при «полумёртвом» прокси `bot.send_poll` зависает до сетевого
+# таймаута aiohttp (~30с) и валит весь ASGI-запрос с asyncio.CancelledError.
+# Ограничиваем 8с — UX-обратка фронта (alert после ответа) дольше не ждёт.
+_POLL_SEND_TIMEOUT = 8.0
+
+
+class GamesPollSendFailed(Exception):
+    """Не удалось отправить TG-полл — Poll в БД НЕ создан.
+
+    Бросается из `create_game_choice_poll`/`create_game_when_poll`, когда
+    `bot.send_poll` падает по таймауту/network/api-error. HTTP-роут ловит и
+    возвращает 503 — фронт показывает понятную ошибку, висячих записей в БД
+    не остаётся.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 _RU_DAYS = ("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
 
@@ -85,14 +111,33 @@ async def create_game_choice_poll(
     # Префикс для опознания follow_up в handler закрытия — без расширения схемы.
     stored_question = ("[+when] " + question) if follow_up_when else question
 
-    msg = await bot.send_poll(
-        chat_id=chat_id,
-        question=question,
-        options=labels,
-        is_anonymous=False,
-        allows_multiple_answers=False,
-        open_period=timeout_hours * 3600,
-    )
+    # GHG6 hotfix: send_poll ДО session.add — если упадёт по таймауту прокси,
+    # в БД не должно остаться «висячей» Poll-записи без TG-сообщения.
+    try:
+        msg = await asyncio.wait_for(
+            bot.send_poll(
+                chat_id=chat_id,
+                question=question,
+                options=labels,
+                is_anonymous=False,
+                allows_multiple_answers=False,
+                open_period=timeout_hours * 3600,
+            ),
+            timeout=_POLL_SEND_TIMEOUT,
+        )
+    except (
+        TelegramRetryAfter,
+        TelegramForbiddenError,
+        TelegramNetworkError,
+        TelegramAPIError,
+        asyncio.TimeoutError,
+    ) as exc:
+        log.warning(
+            "games_poll.choice_send_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+        )
+        raise GamesPollSendFailed(type(exc).__name__) from exc
 
     closes_at = datetime.now(timezone.utc) + timedelta(hours=timeout_hours)
     poll = Poll(
@@ -161,14 +206,32 @@ async def create_game_when_poll(
 
     labels = [_fmt_date_label(d) for d in dates]
     question = f"📅 Когда играем в «{nomination.name}»?"
-    msg = await bot.send_poll(
-        chat_id=chat_id,
-        question=question,
-        options=labels,
-        is_anonymous=False,
-        allows_multiple_answers=False,
-        open_period=timeout_hours * 3600,
-    )
+    try:
+        msg = await asyncio.wait_for(
+            bot.send_poll(
+                chat_id=chat_id,
+                question=question,
+                options=labels,
+                is_anonymous=False,
+                allows_multiple_answers=False,
+                open_period=timeout_hours * 3600,
+            ),
+            timeout=_POLL_SEND_TIMEOUT,
+        )
+    except (
+        TelegramRetryAfter,
+        TelegramForbiddenError,
+        TelegramNetworkError,
+        TelegramAPIError,
+        asyncio.TimeoutError,
+    ) as exc:
+        log.warning(
+            "games_poll.when_send_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            nomination_id=nomination.id,
+        )
+        raise GamesPollSendFailed(type(exc).__name__) from exc
 
     closes_at = datetime.now(timezone.utc) + timedelta(hours=timeout_hours)
     poll = Poll(
@@ -289,14 +352,20 @@ async def handle_game_choice_closed(
     if poll.closes_at and poll.created_at:
         delta = poll.closes_at - poll.created_at
         timeout_hours = max(1, min(72, int(delta.total_seconds() // 3600)))
-    when_poll = await create_game_when_poll(
-        session,
-        bot,
-        chat_id=chat_id,
-        created_by_user_id=poll.created_by,
-        nomination=nomination,
-        timeout_hours=timeout_hours,
-    )
+    try:
+        when_poll = await create_game_when_poll(
+            session,
+            bot,
+            chat_id=chat_id,
+            created_by_user_id=poll.created_by,
+            nomination=nomination,
+            timeout_hours=timeout_hours,
+        )
+    except GamesPollSendFailed as exc:
+        # Зовётся из bot-handler `poll_answer.py` (не HTTP) — глотаем,
+        # follow-up не создаётся, choice-победитель уже объявлен в чат.
+        log.warning("games_poll.followup_send_failed", reason=exc.reason)
+        return None
     return when_poll
 
 

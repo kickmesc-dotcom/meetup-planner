@@ -18,7 +18,7 @@ from app.schemas.meetings import (
     PollOut,
 )
 from app.services.auto_pick import find_best_slots
-from app.services.polls import create_poll_in_chat
+from app.services.polls import PollSendFailed, create_poll_in_chat
 
 log = structlog.get_logger()
 router = APIRouter(tags=["polls"])
@@ -52,6 +52,13 @@ async def create_poll(
             options=body.options,
             closes_in_hours=body.closes_in_hours,
         )
+    except PollSendFailed as exc:
+        # GHG6 hotfix: send_poll упал по таймауту/network — отдаём 503,
+        # не вешаем ASGI.
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            f"telegram_send_failed:{exc.reason}",
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         log.warning("poll.create_failed", error=str(exc))
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"telegram_error:{exc}") from exc
@@ -126,6 +133,11 @@ async def create_auto_pick_poll(
             options=options,
             closes_in_hours=body.closes_in_hours,
         )
+    except PollSendFailed as exc:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            f"telegram_send_failed:{exc.reason}",
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         log.warning("poll.auto_pick_failed", error=str(exc))
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"telegram_error:{exc}") from exc
