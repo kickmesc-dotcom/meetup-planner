@@ -17,6 +17,8 @@ import BirthdaysScreen from "./BirthdaysScreen";
 import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
 import GamesScreen from "./GamesScreen";
+import ZaebalSettingsScreen from "./ZaebalSettingsScreen";
+import BotPauseBar from "./BotPauseBar";
 
 type Section =
   | "root"
@@ -30,7 +32,8 @@ type Section =
   | "birthdays"
   | "poll-presets"
   | "proxy"
-  | "games";
+  | "games"
+  | "zaebal";
 
 interface Props {
   users: User[];
@@ -66,6 +69,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
   if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "games") return <GamesScreen onBack={back} />;
+  if (section === "zaebal") return <ZaebalSettingsScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -74,6 +78,10 @@ export default function AdminScreen({ users }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      {/* GHG6 E11: статус глобальной паузы — sticky-плашка при active, иначе
+          компактная полоска «в эфире» с кнопкой инициации паузы. */}
+      <BotPauseBar />
+
       {/* ⚡ Quick actions
           GHG6 D4: убрали «Крутануть лоха» — он игнорил cooldown и не показывал recent;
           force-reroll переехал в подраздел «Лох». «Прогон фразы» доступен и тут,
@@ -183,6 +191,12 @@ export default function AdminScreen({ users }: Props) {
           title="Автолох"
           subtitle="Бот сам выбирает лоха в окне дня"
           onClick={() => select("autoloser")}
+        />
+        <Card
+          icon="⏸"
+          title="Пауза и /zaebal"
+          subtitle="Порог голосов, длительности, авто-зэбал"
+          onClick={() => select("zaebal")}
         />
       </SectionGroup>
 
