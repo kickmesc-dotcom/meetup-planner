@@ -90,9 +90,11 @@ async def on_poll_update(poll: Poll) -> None:
 
                 settings = get_settings()
                 if settings.group_chat_id:
+                    bot = None
+                    sent_announce = None
                     try:
                         bot = get_bot()
-                        await bot.send_message(
+                        sent_announce = await bot.send_message(
                             settings.group_chat_id,
                             f"<i>{_farewell_phrase()}</i>\n\n"
                             f"⏸ Большинство против — бот уходит на паузу.",
@@ -100,5 +102,17 @@ async def on_poll_update(poll: Poll) -> None:
                         )
                     except Exception as exc:  # noqa: BLE001
                         log.warning("zaebal.farewell_send_failed", error=str(exc))
+                    # G3.4: пин announce, если admin_config.polls.pin_result=true.
+                    if bot is not None and sent_announce is not None:
+                        from app.services.admin_config import get_polls_pin_result
+
+                        if await get_polls_pin_result(session):
+                            from app.bot.utils.pinning import pin_message_safely
+
+                            await pin_message_safely(
+                                bot,
+                                chat_id=settings.group_chat_id,
+                                message_id=sent_announce.message_id,
+                            )
     except Exception as exc:  # noqa: BLE001
         log.warning("poll_update.failed", error=str(exc))

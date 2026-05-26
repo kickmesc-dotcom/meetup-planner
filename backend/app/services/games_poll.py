@@ -355,8 +355,13 @@ async def handle_game_choice_closed(
         )
     )
 
+    # G3.4: announce победителя + опц. пин этого сообщения, если включён
+    # admin_config.polls.pin_result. Сам announce посылаем reply-ом на полл —
+    # `sent.message_id` нужен для pin_message_safely. Глотаем send-ошибки
+    # (объявление важно, пин — опционально).
+    sent_announce = None
     try:
-        await bot.send_message(
+        sent_announce = await bot.send_message(
             chat_id,
             f"🎮 Победила <b>{winner_opt.label}</b>!",
             parse_mode="HTML",
@@ -364,6 +369,16 @@ async def handle_game_choice_closed(
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("games_poll.announce_winner_failed", error=str(exc))
+
+    if sent_announce is not None:
+        from app.services.admin_config import get_polls_pin_result
+
+        if await get_polls_pin_result(session):
+            from app.bot.utils.pinning import pin_message_safely
+
+            await pin_message_safely(
+                bot, chat_id=chat_id, message_id=sent_announce.message_id
+            )
 
     # GHG6 G2: префиксы [+pin] и [+when] в question — флаги choice-полла.
     # Порядок: [+pin] идёт перед [+when], если оба есть.
@@ -435,8 +450,10 @@ async def handle_game_when_closed(
         starts_at=winner_opt.starts_at.isoformat(),
     )
 
+    # G3.4: announce + опц. пин (см. handle_game_choice_closed).
+    sent_announce = None
     try:
-        await bot.send_message(
+        sent_announce = await bot.send_message(
             chat_id,
             f"📅 Играем <b>{winner_opt.label}</b> — добавил в календарь.",
             parse_mode="HTML",
@@ -444,5 +461,15 @@ async def handle_game_when_closed(
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("games_poll.when_announce_failed", error=str(exc))
+
+    if sent_announce is not None:
+        from app.services.admin_config import get_polls_pin_result
+
+        if await get_polls_pin_result(session):
+            from app.bot.utils.pinning import pin_message_safely
+
+            await pin_message_safely(
+                bot, chat_id=chat_id, message_id=sent_announce.message_id
+            )
 
     return meeting

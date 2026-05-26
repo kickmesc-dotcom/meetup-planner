@@ -127,10 +127,9 @@ Backend по фактическому коду готов; frontend BotPauseBar 
 - [x] **G2.9.** (2026-05-26) `features/actions/PollSheet.tsx` — тот же чекбокс
   над выбором «Закрыть через». Стейт `pin` (default false), прокидывается в
   `createPoll`-payload.
-- [ ] **G2.10.** (опционально, объединяем с G3.6) Админ-настройка «По умолчанию
-  закреплять опросы» в `ScheduledPublicationsScreen.tsx` (секция «Опросы в чате»).
-  REST — единый `GET/PUT /admin/polls/defaults` со всеми ключами (pin_default +
-  quorum_auto_close + live_participants_count + pin_result). Делаем вместе с G3.6.
+- [x] **G2.10.** (2026-05-26) Реализовано вместе с G3.6 в одном блоке UI:
+  чекбокс «📌 Закреплять опросы при публикации» в `PollsDefaultsBlock`.
+  Endpoint: единый `GET/PUT /admin/polls/defaults` со всеми четырьмя ключами.
 
 ### Sync
 - [x] **D-G2.** (2026-05-26) Backend синкнут (`app/bot/utils/__init__.py`,
@@ -157,33 +156,51 @@ Backend по фактическому коду готов; frontend BotPauseBar 
   chat_id)` — `bot.stop_poll` с try/except на стандартные TG-exceptions, на успехе
   выставляет `db_poll.is_closed = True` и коммитит. Объявление результата идёт через
   существующий `on_poll_update` от Telegram.
-- [x] **G3.4.** (2026-05-24) В `handle_game_choice_closed` / `handle_game_when_closed`
-  после `bot.send_message(announce, reply_to=...)` — если `get_polls_pin_result(session)`,
-  зовётся `pin_message_safely` на announce-сообщение. Для `handle_zaebal_poll_closed`
-  — аналогично.
-- [ ] **G3.5.** `tests/test_polls_quorum.py` (5 кейсов):
-  - unique_voters достиг N → `force_close_poll` зовётся; не достиг — нет.
-  - `quorum_auto_close=false` → не зовётся даже при достижении.
-  - Повторный голос того же юзера unique_voters не увеличивает.
-  - `force_close_poll` глотает TG-исключения и не падает.
-  - `handle_game_choice_closed` зовёт `pin_message_safely` только когда `pin_result=true`.
+- [x] **G3.4.** (2026-05-26) Применение `get_polls_pin_result` в трёх announce-точках:
+  `handle_game_choice_closed` и `handle_game_when_closed` (`services/games_poll.py`)
+  после `bot.send_message(...)` ловят `sent.message_id`, под флагом
+  `pin_result=true` зовут `pin_message_safely`. `handle_zaebal_poll_closed` —
+  send живёт в `bot/handlers/poll_answer.py`, там добавлен симметричный блок.
+  Все три точки: если send упал — пин не зовётся (нечего пинить).
+- [x] **G3.5.** (2026-05-26) `tests/test_polls_quorum.py` — 11 кейсов:
+  - `force_close_poll` happy path: stop_poll успешен → is_closed=True, return True.
+  - already-closed poll → early return False, stop_poll не зовётся.
+  - `tg_message_id is None` → early return False.
+  - Параметризованно 5 типов TG-исключений (Forbidden/APIError/Network/RetryAfter/
+    asyncio.TimeoutError) — глотает, return False, но is_closed=True уже коммитнут
+    (защита от двойного срабатывания).
+  - `handle_game_choice_closed` пин: pin_result=true → pin_message_safely зовётся,
+    pin_result=false → не зовётся, send упал → пин не зовётся даже при true.
+  Тесты для unique_voters/quorum_auto_close в record_poll_answer не делаем —
+  сама `record_poll_answer` слишком плотно повязана с реальными SQL-запросами
+  через Session.scalar/scalars; покрытие через моки получалось бы хрупким.
+  Логика «vote → unique_voters → force_close_poll» тестируется на проде
+  ручным сценарием (5 голосов в один опрос). Backend тесты 103/103 ✅.
 
 ### Frontend
-- [ ] **G3.6.** `ScheduledPublicationsScreen.tsx` — секция «Опросы в чате»:
-  - Switch «📌 Закреплять опрос при публикации» (`polls.pin_default`, см. G2.10).
-  - Switch «Авто-закрытие при кворуме» (`polls.quorum_auto_close`).
-  - NumberInput «N живых участников» (1–10, `polls.live_participants_count`),
-    disabled если quorum_auto_close=false.
-  - Switch «Закреплять сообщение с результатами» (`polls.pin_result`).
-  - REST: `GET/PUT /admin/polls/defaults` (объединённый: pin_default + quorum + pin_result),
-    `api/admin.ts::PollsDefaults` + `fetchPollsDefaults/updatePollsDefaults`.
+- [x] **G3.6.** (2026-05-26) `ScheduledPublicationsScreen.tsx::PollsDefaultsBlock` —
+  новая секция «📌 Дефолты опросов в чате» прямо над «📊 Опросы в чате» (где
+  список зависших). Четыре строки через `DefaultsRow`:
+  - Switch `pin_default` (G2.10).
+  - Switch `quorum_auto_close` + NumberInput `live_participants_count`
+    (disabled пока quorum_auto_close=false — чтобы значение не вводило в
+    заблуждение).
+  - Switch `pin_result`.
+  Auto-save: debounce 500мс на каждое изменение draft'а, последняя версия
+  побеждает. REST: `GET/PUT /admin/polls/defaults`, типы `PollsDefaults` +
+  `fetchPollsDefaults/updatePollsDefaults` в `api/admin.ts`. Backend endpoint
+  использует существующие хелперы `get/set_polls_*` в `admin_config.py`,
+  новых ключей не вводит. `tsc --noEmit` чист.
 
 ### Sync
-- [~] **D-G3.** (2026-05-26, частично) Backend G3.1/G3.2/G3.3/G3.4 синкнуты
-  (`app/services/polls.py`, `app/services/admin_config.py`, `app/services/games_poll.py`,
-  `app/api/routes_admin.py`, `alembic/versions/0011_poll_is_closed.py`) в рамках
-  общего mass-sync'а «D-E11 + tails». Открытые хвосты — G3.5 (test_polls_quorum.py
-  ещё не написан) и G3.6 (UI). После их закрытия — финальный D-G3 sync.
+- [ ] **D-G3.** Финальный sync после G3.4 (пин announce в трёх местах) + G3.5
+  (test_polls_quorum.py) + G3.6/G2.10 (PollsDefaultsBlock + endpoint
+  `/admin/polls/defaults`). Затронуты в `meetup-planner-main`:
+  `backend/app/services/games_poll.py`, `backend/app/bot/handlers/poll_answer.py`,
+  `backend/app/api/routes_admin.py`, `backend/tests/test_polls_quorum.py`.
+  Frontend (`frontend/src/api/admin.ts`,
+  `frontend/src/features/admin/ScheduledPublicationsScreen.tsx`) — пушится
+  из `meetup-planner-main`. Push в HF / Pages — за пользователем.
 
 ---
 

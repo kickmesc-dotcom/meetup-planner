@@ -426,6 +426,69 @@ async def delete_admin_poll(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# --- G2.10 + G3.6: единый endpoint настроек опросов в чате ---
+
+class PollsDefaultsIO(BaseModel):
+    """Дефолты опросов в чате — единый блок для UI «Опросы в чате».
+
+    `pin_default` (G2): пинить ли создаваемые опросы. PUT-запросы создания
+    опроса с `pin=null` берут это значение как дефолт.
+    `quorum_auto_close` (G3): закрывать ли опрос досрочно при достижении
+    кворума уникальных голосовавших.
+    `live_participants_count` (G3): сколько уникальных голосов = «все живые».
+    Default 5 (шестёрка минус автор/админ обычно).
+    `pin_result` (G3): пинить ли announce-сообщение с результатами после
+    закрытия опроса (game_choice/game_when/zaebal).
+    """
+
+    pin_default: bool
+    quorum_auto_close: bool
+    live_participants_count: int = Field(..., ge=1, le=10)
+    pin_result: bool
+
+
+@router.get("/admin/polls/defaults", response_model=PollsDefaultsIO)
+async def get_polls_defaults(
+    session: SessionDep,
+    user: CurrentUser,
+) -> PollsDefaultsIO:
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        get_polls_live_participants,
+        get_polls_pin_default,
+        get_polls_pin_result,
+        get_polls_quorum_auto_close,
+    )
+
+    return PollsDefaultsIO(
+        pin_default=await get_polls_pin_default(session),
+        quorum_auto_close=await get_polls_quorum_auto_close(session),
+        live_participants_count=await get_polls_live_participants(session),
+        pin_result=await get_polls_pin_result(session),
+    )
+
+
+@router.put("/admin/polls/defaults", response_model=PollsDefaultsIO)
+async def put_polls_defaults(
+    body: PollsDefaultsIO,
+    session: SessionDep,
+    user: CurrentUser,
+) -> PollsDefaultsIO:
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        set_polls_live_participants,
+        set_polls_pin_default,
+        set_polls_pin_result,
+        set_polls_quorum_auto_close,
+    )
+
+    await set_polls_pin_default(session, body.pin_default)
+    await set_polls_quorum_auto_close(session, body.quorum_auto_close)
+    await set_polls_live_participants(session, body.live_participants_count)
+    await set_polls_pin_result(session, body.pin_result)
+    return body
+
+
 @router.get("/chukhan/leaderboard", response_model=list[ChukhanLeaderRow])
 async def chukhan_leaderboard(
     session: SessionDep,

@@ -11,11 +11,14 @@ import {
   deleteAdminPoll,
   fetchAdminPolls,
   fetchBotReactions,
+  fetchPollsDefaults,
   fetchScheduledJobs,
   fetchScheduledSettings,
   updateBotReactions,
+  updatePollsDefaults,
   updateScheduledSettings,
   type BotReactionsSettings,
+  type PollsDefaults,
   type ScheduledSettingsIO,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
@@ -304,6 +307,10 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
         )}
       </section>
 
+      {/* G2.10 + G3.6: единый блок настроек опросов в чате — pin_default,
+          quorum_auto_close + live_participants_count, pin_result. */}
+      <PollsDefaultsBlock />
+
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">📊 Опросы в чате</div>
         <div className="text-xs text-tg-hint mb-2">
@@ -437,6 +444,169 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         ].join(" ")}
       />
     </button>
+  );
+}
+
+/**
+ * GHG6 G2.10 + G3.6: дефолты опросов в чате.
+ *
+ * Один блок, четыре поля, авто-save на debounce 500ms по `dirty`. Отдельный
+ * REST endpoint (`/admin/polls/defaults`), независимый от ScheduledSettings —
+ * это не «расписание», а персистентные настройки поведения при
+ * создании/закрытии опросов.
+ *
+ * Поля:
+ * - `pin_default` (Switch) — пинить ли при публикации (G2). Чекбокс в
+ *   `GamesScreen/PollSheet` тоже отправляет своё значение, но если в payload
+ *   `pin=null` — сервер берёт этот дефолт.
+ * - `quorum_auto_close` (Switch) — стопать ли опрос при N уникальных голосах.
+ * - `live_participants_count` (NumberInput) — N для предыдущего. Disabled,
+ *   когда quorum_auto_close=false, чтобы значение не вводило в заблуждение.
+ * - `pin_result` (Switch) — пинить ли announce-сообщение с результатами.
+ */
+function PollsDefaultsBlock() {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ["admin", "polls-defaults"],
+    queryFn: fetchPollsDefaults,
+    staleTime: 60_000,
+  });
+
+  const [draft, setDraft] = useState<PollsDefaults | null>(null);
+  useEffect(() => {
+    if (q.data) setDraft({ ...q.data });
+  }, [q.data]);
+
+  const save = useMutation({
+    mutationFn: updatePollsDefaults,
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "polls-defaults"], data);
+    },
+    onError: errAlert,
+  });
+
+  // Auto-save: каждое изменение draft'а (после задержки 500мс) уходит на бэк.
+  // Меньше кнопок «Сохранить» — UI становится плотнее. Если save в полёте,
+  // следующий schedule перетрёт текущий timeout — последняя версия победит.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  useEffect(() => {
+    if (!draft || !q.data) return;
+    const same =
+      draft.pin_default === q.data.pin_default &&
+      draft.quorum_auto_close === q.data.quorum_auto_close &&
+      draft.live_participants_count === q.data.live_participants_count &&
+      draft.pin_result === q.data.pin_result;
+    if (same) return;
+    const t = setTimeout(() => {
+      const cur = draftRef.current;
+      if (cur) save.mutate(cur);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [draft, q.data, save]);
+
+  if (q.isPending || !draft) {
+    return (
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-base font-semibold mb-1">📌 Дефолты опросов в чате</div>
+        <ListSkeleton rows={3} />
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-base font-semibold">📌 Дефолты опросов в чате</div>
+        {save.isPending && <Spinner />}
+      </div>
+      <div className="text-[11px] text-tg-hint">
+        Пин и автозакрытие применяются к опросам из приложения (Games + PollSheet)
+        и zaebal-voting. Если в форме создания опроса оставить чекбокс «закрепить»
+        пустым — берётся значение отсюда.
+      </div>
+
+      {/* G2.10 — Пин при публикации */}
+      <DefaultsRow
+        label="📌 Закреплять опросы при публикации"
+        hint="Bot.pin_chat_message с disable_notification=true сразу после публикации."
+      >
+        <Switch
+          checked={draft.pin_default}
+          onChange={(v) => {
+            haptic("selection");
+            setDraft({ ...draft, pin_default: v });
+          }}
+        />
+      </DefaultsRow>
+
+      {/* G3.6 — Авто-закрытие по кворуму */}
+      <DefaultsRow
+        label="⏱ Авто-закрытие по кворуму"
+        hint="Бот зовёт stop_poll, когда N уникальных голосов набрано."
+      >
+        <Switch
+          checked={draft.quorum_auto_close}
+          onChange={(v) => {
+            haptic("selection");
+            setDraft({ ...draft, quorum_auto_close: v });
+          }}
+        />
+      </DefaultsRow>
+
+      <DefaultsRow
+        label="N живых участников"
+        hint="Сколько уникальных голосов = «все живые». 1–10."
+      >
+        <input
+          type="number"
+          min={1}
+          max={10}
+          value={draft.live_participants_count}
+          disabled={!draft.quorum_auto_close}
+          onChange={(e) => {
+            const n = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1));
+            setDraft({ ...draft, live_participants_count: n });
+          }}
+          className="w-16 rounded-md bg-tg-bg/70 px-2 py-1 text-sm text-tg-text disabled:opacity-40"
+        />
+      </DefaultsRow>
+
+      {/* G3.6 — Пин announce-сообщения */}
+      <DefaultsRow
+        label="📍 Закреплять сообщение с результатами"
+        hint="После закрытия опроса announce-сообщение с победителем уходит в закреп."
+      >
+        <Switch
+          checked={draft.pin_result}
+          onChange={(v) => {
+            haptic("selection");
+            setDraft({ ...draft, pin_result: v });
+          }}
+        />
+      </DefaultsRow>
+    </section>
+  );
+}
+
+function DefaultsRow({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-sm text-tg-text">{label}</div>
+        <div className="text-[11px] text-tg-hint">{hint}</div>
+      </div>
+      {children}
+    </div>
   );
 }
 

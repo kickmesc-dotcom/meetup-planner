@@ -680,3 +680,25 @@ export const createGamesPoll = (input: {
     method: "POST",
     body: JSON.stringify(input),
   });
+
+// --- G2.10 + G3.6: единый блок дефолтов опросов в чате ---
+
+export interface PollsDefaults {
+  /** G2: при создании опроса с pin=null — берётся это значение. */
+  pin_default: boolean;
+  /** G3: авто-закрытие опроса при достижении кворума уникальных голосов. */
+  quorum_auto_close: boolean;
+  /** G3: сколько уникальных голосов = «все живые». Default 5. */
+  live_participants_count: number;
+  /** G3: пинить ли announce-сообщение с результатами. */
+  pin_result: boolean;
+}
+
+export const fetchPollsDefaults = () =>
+  api<PollsDefaults>("/api/admin/polls/defaults");
+
+export const updatePollsDefaults = (body: PollsDefaults) =>
+  api<PollsDefaults>("/api/admin/polls/defaults", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
