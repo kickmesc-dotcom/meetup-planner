@@ -211,9 +211,13 @@ async def on_tasks(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
-# ---------------------- E6: /nominate_game и /remove_nominated_game ----------------------
+# ---------------------- E6: /nominate (+legacy /nominate_game) и /remove_nominated_game ----------------------
 
-@router.message(Command("nominate_game"))
+# G1: команда переименована /nominate_game → /nominate; старая остаётся alias'ом
+# через `commands=[...]`, чтобы привычные вызовы не ломались. Ack-сообщение
+# теперь содержит текущий список (см. ниже).
+
+@router.message(Command(commands=["nominate", "nominate_game"]))
 async def on_nominate_game(message: Message) -> None:
     if not message.from_user or not _is_member(message.from_user.id):
         return
@@ -222,7 +226,7 @@ async def on_nominate_game(message: Message) -> None:
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2 or not parts[1].strip():
         await message.answer(
-            "🎮 Использование: <code>/nominate_game Название игры</code>",
+            "🎮 Использование: <code>/nominate Название игры</code>",
             parse_mode="HTML",
         )
         return
@@ -233,10 +237,19 @@ async def on_nominate_game(message: Message) -> None:
         NominationEmpty,
         NominationLimitExceeded,
         add_nomination,
+        list_active_nominations,
     )
 
     sm = get_sessionmaker()
     async with sm() as session:
+        # Pre-snapshot чтобы понять статус (created / restored / already)
+        # без инвазивных правок сервиса. id-set'ы пересечём — три состояния
+        # покрываются однозначно.
+        before = await list_active_nominations(session)
+        before_ids = {r.id for r in before}
+        norm_target = name.strip().lower()
+        already_active = any(r.name.strip().lower() == norm_target for r in before)
+
         try:
             row = await add_nomination(
                 session, name=name, added_by_tg_id=message.from_user.id
@@ -252,10 +265,35 @@ async def on_nominate_game(message: Message) -> None:
             )
             return
 
-    await message.answer(f"🎮 Добавлено: <b>{row.name}</b>", parse_mode="HTML")
+        after = await list_active_nominations(session)
+
+    if already_active:
+        status_line = f"ℹ️ <b>{row.name}</b> уже в списке номинаций"
+    elif row.id in before_ids:
+        # маловероятно (active=False но id остался) — на всякий случай
+        status_line = f"🎮 <b>{row.name}</b> уже в списке номинаций"
+    else:
+        # Свежая или восстановлена из soft-delete — в обоих случаях для
+        # пользователя это «появилась в активных».
+        # Различаем по before_ids: если id новый — created/restored.
+        restored = any(r.id == row.id for r in before) is False and len(after) <= len(before) + 1
+        # Простое сообщение: «добавлена». «Возвращена» — только если была удалена
+        # ранее (id присутствовал в БД до вызова — определить дёшево не можем без
+        # отдельного запроса, опускаем тонкость).
+        _ = restored
+        status_line = f"🎮 <b>{row.name}</b> добавлена в номинации"
+
+    total = len(after)
+    header = f"{status_line} ({total}/{MAX_ACTIVE_NOMINATIONS})"
+    if after:
+        names = ", ".join(f"<b>{r.name}</b>" for r in after)
+        body = f"\nТекущий список: {names}"
+    else:
+        body = ""
+    await message.answer(header + body, parse_mode="HTML")
 
 
-@router.message(Command("remove_nominated_game"))
+@router.message(Command(commands=["remove_nominated_game", "remove_nominated"]))
 async def on_remove_nominated_game(message: Message) -> None:
     if not message.from_user or not _is_member(message.from_user.id):
         return

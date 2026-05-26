@@ -712,7 +712,16 @@ async def admin_loser_roll_now(
             log.warning("admin.loser_roll_announce_failed")
 
     try:
-        roll = await roll_loser(session, rolled_by=user, on_announce=_announce)
+        # GHG6 H1: admin force-reroll — source='manual' (он же — ручная
+        # рулетка, просто игнорирующая cooldown), bypass_cooldown=True
+        # сохраняет старое поведение «крутить, когда захочется».
+        roll = await roll_loser(
+            session,
+            rolled_by=user,
+            on_announce=_announce,
+            source="manual",
+            bypass_cooldown=True,
+        )
         return LoserRollNowOut(
             ok=True,
             loser_user_id=roll.loser_user_id,
@@ -1911,6 +1920,8 @@ class GamesPollCreateIn(BaseModel):
     timeout_hours: int = Field(default=24, ge=1, le=72)
     nomination_ids: list[int] | None = None
     follow_up_when: bool = False
+    # G2: None → берём дефолт из admin_config (polls.pin_default).
+    pin: bool | None = None
 
 
 class GamesPollCreateOut(BaseModel):
@@ -1934,6 +1945,13 @@ async def admin_games_poll_create(
     from app.bot.dispatcher import get_bot
     from app.services.games_poll import GamesPollSendFailed, create_game_choice_poll
 
+    # G2: дефолт pin берём из admin_config, если в теле не указали.
+    if body.pin is None:
+        from app.services.admin_config import get_polls_pin_default
+        pin = await get_polls_pin_default(session)
+    else:
+        pin = body.pin
+
     try:
         poll = await create_game_choice_poll(
             session,
@@ -1943,6 +1961,7 @@ async def admin_games_poll_create(
             timeout_hours=body.timeout_hours,
             nomination_ids=body.nomination_ids,
             follow_up_when=body.follow_up_when,
+            pin=pin,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None

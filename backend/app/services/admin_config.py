@@ -48,6 +48,19 @@ WORM_CHANCE_KEY = "worm.chance"            # default 0.01 (1/100)
 _WORM_ENABLED_DEFAULT = True
 _WORM_CHANCE_DEFAULT = 0.01
 
+# --- G2/G3: настройки опросов в чате ---
+# G2: закрепление сообщения с опросом после публикации
+POLLS_PIN_DEFAULT_KEY = "polls.pin_default"              # default False
+# G3: авто-закрытие при достижении кворума
+POLLS_QUORUM_AUTO_CLOSE_KEY = "polls.quorum_auto_close"  # default True
+POLLS_LIVE_PARTICIPANTS_KEY = "polls.live_participants_count"  # default 5
+POLLS_PIN_RESULT_KEY = "polls.pin_result"                # default False (пин announce-сообщения)
+
+_POLLS_PIN_DEFAULT_DEFAULT = False
+_POLLS_QUORUM_AUTO_CLOSE_DEFAULT = True
+_POLLS_LIVE_PARTICIPANTS_DEFAULT = 5
+_POLLS_PIN_RESULT_DEFAULT = False
+
 
 async def _get_value(session: AsyncSession, key: str) -> str | None:
     row = await session.get(AdminConfig, key)
@@ -782,3 +795,65 @@ async def set_ui_hide_greeting(
     await _set_value(
         session, f"{UI_HIDE_GREETING_PREFIX}{tg_id}", "true" if hide else "false"
     )
+
+
+# --- G2/G3: настройки опросов в чате ---
+
+def _parse_bool(raw: str | None, default: bool) -> bool:
+    if raw is None:
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
+async def get_polls_pin_default(session: AsyncSession) -> bool:
+    """G2: дефолт чекбокса «закрепить опрос» при создании из UI."""
+    return _parse_bool(
+        await _get_value(session, POLLS_PIN_DEFAULT_KEY),
+        _POLLS_PIN_DEFAULT_DEFAULT,
+    )
+
+
+async def set_polls_pin_default(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, POLLS_PIN_DEFAULT_KEY, "true" if value else "false")
+
+
+async def get_polls_quorum_auto_close(session: AsyncSession) -> bool:
+    """G3: закрывать ли опрос автоматически при достижении N голосов."""
+    return _parse_bool(
+        await _get_value(session, POLLS_QUORUM_AUTO_CLOSE_KEY),
+        _POLLS_QUORUM_AUTO_CLOSE_DEFAULT,
+    )
+
+
+async def set_polls_quorum_auto_close(session: AsyncSession, value: bool) -> None:
+    await _set_value(
+        session, POLLS_QUORUM_AUTO_CLOSE_KEY, "true" if value else "false"
+    )
+
+
+async def get_polls_live_participants(session: AsyncSession) -> int:
+    """G3: сколько живых участников считаем кворумом. Дефолт 5 (шестёрка минус
+    автор, который обычно не голосует). Настраивается админом."""
+    raw = await _get_value(session, POLLS_LIVE_PARTICIPANTS_KEY)
+    try:
+        n = int(raw) if raw is not None else _POLLS_LIVE_PARTICIPANTS_DEFAULT
+    except ValueError:
+        n = _POLLS_LIVE_PARTICIPANTS_DEFAULT
+    return max(1, min(20, n))
+
+
+async def set_polls_live_participants(session: AsyncSession, value: int) -> None:
+    v = max(1, min(20, int(value)))
+    await _set_value(session, POLLS_LIVE_PARTICIPANTS_KEY, str(v))
+
+
+async def get_polls_pin_result(session: AsyncSession) -> bool:
+    """G3: пинить ли сообщение с оглашением результата (отдельно от пина опроса)."""
+    return _parse_bool(
+        await _get_value(session, POLLS_PIN_RESULT_KEY),
+        _POLLS_PIN_RESULT_DEFAULT,
+    )
+
+
+async def set_polls_pin_result(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, POLLS_PIN_RESULT_KEY, "true" if value else "false")

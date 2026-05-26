@@ -33,8 +33,6 @@ const JOBS_IDLE_INTERVAL_MS = 10 * 60 * 1000;
 const JOBS_HOT_INTERVAL_MS = 5_000;
 const JOBS_HOT_DURATION_MS = 3 * 60 * 1000;
 
-const WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
-
 interface Props {
   onBack: () => void;
 }
@@ -143,10 +141,12 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
         <ListSkeleton rows={6} />
       ) : (
         <>
+          {/* GHG6 H3 (п.16): числовые/временные поля переехали в отдельный
+              экран «🎛 Интервалы и окна». Здесь — только master-toggles. */}
           <ToggleBlock
             icon="⏰"
             title="Тик напоминаний"
-            hint="Раз в N минут бот проверяет очередь напоминаний к встречам."
+            hint="Раз в N минут бот проверяет очередь. Интервал — в «Интервалы и окна»."
             enabled={draft.reminders.enabled}
             onToggle={(v) =>
               patch((d) => {
@@ -154,26 +154,12 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
                 return d;
               })
             }
-          >
-            <Field label="Интервал, мин (1–120)">
-              <NumberInput
-                value={draft.reminders.tick_minutes}
-                min={1}
-                max={120}
-                onChange={(v) =>
-                  patch((d) => {
-                    d.reminders.tick_minutes = v;
-                    return d;
-                  })
-                }
-              />
-            </Field>
-          </ToggleBlock>
+          />
 
           <ToggleBlock
             icon="🤡"
             title="Автолох"
-            hint="Бот сам выбирает лоха в течение рабочего окна."
+            hint="Бот сам выбирает лоха. Частота и окно — в «Интервалы и окна»."
             enabled={draft.loser.enabled}
             onToggle={(v) =>
               patch((d) => {
@@ -181,39 +167,12 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
                 return d;
               })
             }
-          >
-            <Field label="Раз в сутки (1–12)">
-              <NumberInput
-                value={draft.loser.per_day}
-                min={1}
-                max={12}
-                onChange={(v) =>
-                  patch((d) => {
-                    d.loser.per_day = v;
-                    return d;
-                  })
-                }
-              />
-            </Field>
-            <Field label="Окно активности">
-              <HourRange
-                start={draft.loser.window_start_hour}
-                end={draft.loser.window_end_hour}
-                onChange={(s, e) =>
-                  patch((d) => {
-                    d.loser.window_start_hour = s;
-                    d.loser.window_end_hour = e;
-                    return d;
-                  })
-                }
-              />
-            </Field>
-          </ToggleBlock>
+          />
 
           <ToggleBlock
             icon="💬"
             title="Рандомная фраза"
-            hint="Автопостинг рандомных фраз. Окно — когда бот может постить."
+            hint="Автопостинг рандомных фраз. Окно — в «Интервалы и окна»."
             enabled={draft.phrases.enabled}
             onToggle={(v) =>
               patch((d) => {
@@ -221,21 +180,7 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
                 return d;
               })
             }
-          >
-            <Field label="Окно активности">
-              <HhmmRange
-                start={draft.phrases.window_start}
-                end={draft.phrases.window_end}
-                onChange={(s, e) =>
-                  patch((d) => {
-                    d.phrases.window_start = s;
-                    d.phrases.window_end = e;
-                    return d;
-                  })
-                }
-              />
-            </Field>
-          </ToggleBlock>
+          />
 
           <ToggleBlock
             icon="🖼️"
@@ -267,53 +212,9 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
 
           <BotReactionsSection />
 
-          <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-base">💩</span>
-              <span className="text-base font-semibold">Чухан недели</span>
-            </div>
-            <div className="text-xs text-tg-hint mb-2">
-              День недели и окно, в котором бот публикует чухана.
-            </div>
-            <Field label="День недели">
-              <div className="flex flex-wrap gap-1">
-                {WEEKDAYS_RU.map((label, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      haptic("selection");
-                      patch((d) => {
-                        d.chukhan.weekday = idx;
-                        return d;
-                      });
-                    }}
-                    className={[
-                      "min-h-9 min-w-9 rounded-md px-2 text-xs",
-                      draft.chukhan.weekday === idx
-                        ? "bg-tg-button text-tg-button-text"
-                        : "bg-tg-bg/70 text-tg-text",
-                    ].join(" ")}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-            <Field label="Окно активности">
-              <HhmmRange
-                start={draft.chukhan.window_start}
-                end={draft.chukhan.window_end}
-                onChange={(s, e) =>
-                  patch((d) => {
-                    d.chukhan.window_start = s;
-                    d.chukhan.window_end = e;
-                    return d;
-                  })
-                }
-              />
-            </Field>
-          </section>
+          {/* GHG6 H3 (п.16): расписание чухана (day + window) переехало в
+              «🎛 Интервалы и окна». Master-toggle'a у чухана нет — он публикуется
+              всегда, когда наступает окно. */}
 
           <div className="sticky bottom-0 -mx-3 px-3 pb-3 pt-2 bg-tg-bg/95 backdrop-blur">
             <button
@@ -536,115 +437,6 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
         ].join(" ")}
       />
     </button>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <div className="text-[11px] text-tg-hint mb-1">{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function NumberInput({
-  value,
-  min,
-  max,
-  step = 1,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (v: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
-  const isInt = step >= 1 && Number.isInteger(step);
-  return (
-    <input
-      type="text"
-      inputMode={isInt ? "numeric" : "decimal"}
-      value={draft}
-      onChange={(e) => {
-        const cleaned = e.target.value.replace(isInt ? /[^0-9]/g : /[^0-9.]/g, "");
-        setDraft(cleaned);
-      }}
-      onBlur={() => {
-        const n = parseFloat(draft);
-        if (Number.isNaN(n)) {
-          setDraft(String(value));
-          return;
-        }
-        const clamped = Math.max(min, Math.min(max, n));
-        const rounded = isInt ? Math.round(clamped) : Math.round(clamped * 100) / 100;
-        setDraft(String(rounded));
-        if (rounded !== value) onChange(rounded);
-      }}
-      className="w-24 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
-    />
-  );
-}
-
-function HourRange({
-  start,
-  end,
-  onChange,
-}: {
-  start: number;
-  end: number;
-  onChange: (s: number, e: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <NumberInput
-        value={start}
-        min={0}
-        max={23}
-        onChange={(v) => onChange(v, end)}
-      />
-      <span className="text-tg-hint text-xs">…</span>
-      <NumberInput
-        value={end}
-        min={0}
-        max={23}
-        onChange={(v) => onChange(start, v)}
-      />
-      <span className="text-tg-hint text-xs">ч</span>
-    </div>
-  );
-}
-
-function HhmmRange({
-  start,
-  end,
-  onChange,
-}: {
-  start: string;
-  end: string;
-  onChange: (s: string, e: string) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="time"
-        value={start}
-        onChange={(e) => onChange(e.target.value, end)}
-        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
-      />
-      <span className="text-tg-hint text-xs">…</span>
-      <input
-        type="time"
-        value={end}
-        onChange={(e) => onChange(start, e.target.value)}
-        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
-      />
-    </div>
   );
 }
 

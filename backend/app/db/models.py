@@ -118,6 +118,11 @@ class Poll(Base):
     # E6: для game_when — id игры-победителя, чтобы знать, какую игру кладём
     # в Meeting после выбора даты.
     game_nomination_id: Mapped[int | None] = mapped_column(BigInteger)
+    # G3: true после bot.stop_poll или TG-уведомления о закрытии. Защита от
+    # повторного auto-close при следующем poll_answer.
+    is_closed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false", default=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -154,7 +159,10 @@ class PollVote(Base):
 
 class LoserRoll(Base):
     __tablename__ = "loser_rolls"
-    __table_args__ = (Index("ix_loser_rolled_at", "rolled_at"),)
+    __table_args__ = (
+        Index("ix_loser_rolled_at", "rolled_at"),
+        Index("ix_loser_source_rolled_at", "source", "rolled_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     rolled_at: Mapped[datetime] = mapped_column(
@@ -163,6 +171,10 @@ class LoserRoll(Base):
     rolled_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     loser_user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     reason_text: Mapped[str | None] = mapped_column(Text)
+    # GHG6 H1: 'auto' — scheduler-job (автолох), 'manual' — ручная крутилка и
+    # admin force-reroll. Cooldown считается раздельно по семейству источников;
+    # «лох дня» в календаре — только source='auto'.
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
 
 
 class WormAssignment(Base):

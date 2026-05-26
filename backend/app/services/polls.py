@@ -12,9 +12,10 @@ from aiogram.exceptions import (
     TelegramNetworkError,
     TelegramRetryAfter,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.models import Poll, PollOption, PollVote, User
 
 log = structlog.get_logger()
@@ -75,6 +76,7 @@ async def create_poll_in_chat(
     question: str,
     options: list[str | datetime | date],
     closes_in_hours: int | None,
+    pin: bool = False,
 ) -> Poll:
     closes_at = (
         datetime.now(timezone.utc) + timedelta(hours=closes_in_hours)
@@ -133,6 +135,12 @@ async def create_poll_in_chat(
         )
     await session.commit()
     await session.refresh(poll)
+
+    # GHG6 G2: пин опционально, ошибки глотает помощник — опрос важнее закрепа.
+    if pin:
+        from app.bot.utils.pinning import pin_message_safely
+        await pin_message_safely(bot, chat_id=chat_id, message_id=msg.message_id)
+
     return poll
 
 
@@ -188,3 +196,83 @@ async def record_poll_answer(
             session.add(PollVote(poll_option_id=options[idx].id, user_id=user.id))
 
     await session.commit()
+
+    # G3: авто-закрытие при кворуме. Считаем уникальных голосовавших по этому
+    # опросу. Если ≥ live_participants_count и фича включена — зовём
+    # force_close_poll. Защита от двойного срабатывания — `poll.is_closed`.
+    if poll.is_closed:
+        return
+    from app.services.admin_config import (
+        get_polls_live_participants,
+        get_polls_quorum_auto_close,
+    )
+
+    if not await get_polls_quorum_auto_close(session):
+        return
+    threshold = await get_polls_live_participants(session)
+    unique_voters: int = (
+        await session.scalar(
+            select(func.count(func.distinct(PollVote.user_id)))
+            .join(PollOption, PollOption.id == PollVote.poll_option_id)
+            .where(PollOption.poll_id == poll.id)
+        )
+    ) or 0
+    if unique_voters < threshold:
+        return
+
+    from app.bot.dispatcher import get_bot
+
+    settings = get_settings()
+    if not settings.group_chat_id:
+        return
+    try:
+        bot = get_bot()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("polls.quorum_no_bot", error=str(exc))
+        return
+    await force_close_poll(session, bot, poll, chat_id=settings.group_chat_id)
+
+
+async def force_close_poll(
+    session: AsyncSession,
+    bot: Bot,
+    poll: Poll,
+    *,
+    chat_id: int,
+) -> bool:
+    """G3: закрыть полл досрочно (кворум достигнут).
+
+    Зовёт `bot.stop_poll` — TG пришлёт `poll_update` с `is_closed=True`, который
+    дальше уйдёт через существующий `on_poll_update` handler и объявит результат.
+    Здесь же помечаем `poll.is_closed=True`, чтобы повторный `record_poll_answer`
+    не пытался закрывать ещё раз.
+
+    Возвращает True, если stop_poll прошёл успешно.
+    """
+    if poll.is_closed:
+        return False
+    if poll.tg_message_id is None:
+        return False
+    poll.is_closed = True
+    await session.commit()
+    try:
+        await asyncio.wait_for(
+            bot.stop_poll(chat_id=chat_id, message_id=poll.tg_message_id),
+            timeout=_POLL_SEND_TIMEOUT,
+        )
+        log.info("polls.force_closed", poll_id=poll.id, tg_poll_id=poll.tg_poll_id)
+        return True
+    except (
+        TelegramRetryAfter,
+        TelegramForbiddenError,
+        TelegramNetworkError,
+        TelegramAPIError,
+        asyncio.TimeoutError,
+    ) as exc:
+        log.warning(
+            "polls.stop_poll_failed",
+            error=str(exc),
+            error_type=type(exc).__name__,
+            poll_id=poll.id,
+        )
+        return False

@@ -673,6 +673,8 @@ export const createGamesPoll = (input: {
   timeout_hours: number;
   nomination_ids?: number[];
   follow_up_when: boolean;
+  /** GHG6 G2: закрепить опрос. null → дефолт из admin_config. */
+  pin?: boolean | null;
 }) =>
   api<GamesPollCreateResult>("/api/admin/games/poll-create", {
     method: "POST",

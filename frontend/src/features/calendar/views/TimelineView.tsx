@@ -13,9 +13,14 @@ import { useUI } from "@/store/ui";
  * горизонтальный скролл для шапки и строк (один overflow-x-auto контейнер).
  * Этап 2: CL6.a — динамический cellWidth по ширине контейнера (default
  * ≈containerW/7.4, неделя помещается). CL12 — дефолт «Неделя».
- * Этап 3+ добавит CL3 (жесты), CL5 (слайдер зума), CL2 (виртуализация),
- * CL4 (motion blur), CL7 (confidence-заливка), CL13 (нижняя плашка),
- * CL6.b («К сегодня»).
+ * CL3 — нативный horizontal scroll + scroll-snap proximity на ячейках шапки
+ * (см. .calendar-timeline-scroll в styles.css). Магнит к ближайшему дню
+ * получается бесплатно от браузера, нативный momentum-scroll на iOS/Android
+ * сохранён (без JS pointermove-перехватов). goToday() и shiftAnchor через
+ * scrollTo({behavior:'smooth'}); первый mount — instant, чтобы не было
+ * «вылета» из позиции 0.
+ * Этап 3+ добавит CL2 (виртуализация), CL4 (motion blur), CL7 (confidence-
+ * заливка), CL8/CL9 (RangeEditor + partial fill).
  */
 
 const WINDOW_HALF = 21;
@@ -26,6 +31,11 @@ const CELL_WIDTH_MAX = 120;
 // 7.4 даёт небольшой "хвост" следующего дня, чтобы пользователь видел, что
 // справа есть продолжение (хороший аффорданс).
 const CELLS_PER_VIEWPORT_DEFAULT = 7.4;
+// CL2: overscan — сколько дней по краям видимого окна рендерим «впрок», чтобы
+// при быстром скролле пользователь не видел дырки от ещё-не-смонтированных
+// ячеек. 14 — компромисс: при cellWidth=24 (минимум) это 336px по краям,
+// что больше типичного flick-расстояния.
+const OVERSCAN_DAYS = 14;
 
 interface Props {
   users: User[];
@@ -88,15 +98,60 @@ export default function TimelineView({
   const totalWidth = span * cellWidth;
   const days = Array.from({ length: span }, (_, i) => addDays(windowStart, i));
 
-  // CL6.b (частично): при изменении anchor — скроллим к anchor так, чтобы он
-  // оказался по центру viewport. Полноценная кнопка «📍 К сегодня»
-  // и smooth-scroll придут в CL13.
+  // CL2: виртуализация. Считаем индексы видимых дней по scrollLeft +
+  // clientWidth, расширяем на OVERSCAN_DAYS в обе стороны и передаём в
+  // ParticipantRow/TimelineHeader. Невидимые ячейки рендерятся как пустые
+  // div'ы, что экономит на covered-проверке + confidenceFillForDay (heaviest
+  // part) + bday/marks lookup в каждой ячейке. При 6 строках это 6 × 43 = 258
+  // ячеек; с виртуализацией остаётся ~6 × (7 + 28) ≈ 210 → экономия скромная
+  // на десктопе, но заметная на старых iPhone, особенно при scroll-анимации
+  // и движении слайдера зума (re-render всей сетки каждый кадр).
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [clientWidth, setClientWidth] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => setScrollLeft(el.scrollLeft);
+    const onResize = () => setClientWidth(el.clientWidth);
+    onResize();
+    onScroll();
+    el.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(onResize);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      ro.disconnect();
+    };
+  }, []);
+
+  // Видимая область внутри days-сетки (исключая sticky-аватар-колонку).
+  const viewLeft = Math.max(0, scrollLeft - AVATAR_COL_WIDTH);
+  const viewRight = scrollLeft + clientWidth - AVATAR_COL_WIDTH;
+  const rawFirstVisible = Math.floor(viewLeft / Math.max(1, cellWidth));
+  const rawLastVisible = Math.ceil(viewRight / Math.max(1, cellWidth));
+  const visibleStart = Math.max(0, rawFirstVisible - OVERSCAN_DAYS);
+  const visibleEnd = Math.min(span - 1, rawLastVisible + OVERSCAN_DAYS);
+
+  // CL6.b + CL3: при изменении anchor (вкл. goToday / shiftAnchor) скроллим
+  // к anchor так, чтобы он оказался по центру viewport. Smooth-scroll везде,
+  // кроме первого mount — иначе пользователь видит «вылет» ленты из позиции 0.
+  // Изменение cellWidth (зум) — тоже smooth: визуально лучше, чем мгновенный
+  // прыжок при движении слайдера.
+  const didInitialScrollRef = useRef(false);
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const anchorIndex = WINDOW_HALF; // anchor по построению в центре окна
     const target = AVATAR_COL_WIDTH + anchorIndex * cellWidth - el.clientWidth / 2 + cellWidth / 2;
-    el.scrollLeft = Math.max(0, target);
+    const left = Math.max(0, target);
+    if (!didInitialScrollRef.current) {
+      // На первом рендере scrollTo с behavior:'smooth' игнорируется, если
+      // элемент только что появился; используем явный instant.
+      el.scrollLeft = left;
+      didInitialScrollRef.current = true;
+    } else {
+      el.scrollTo({ left, behavior: "smooth" });
+    }
   }, [anchor, cellWidth]);
 
   void meId;
@@ -110,7 +165,13 @@ export default function TimelineView({
           Шапка и строки делят этот слой и один и тот же горизонтальный скролл —
           синхронизация бесплатно. */}
       <div style={{ width: totalWidth + AVATAR_COL_WIDTH, minWidth: "100%" }}>
-        <TimelineHeader days={days} cellWidth={cellWidth} gameDates={gameDates} />
+        <TimelineHeader
+          days={days}
+          cellWidth={cellWidth}
+          gameDates={gameDates}
+          visibleStart={visibleStart}
+          visibleEnd={visibleEnd}
+        />
         {users.map((u) => (
           <ParticipantRow
             key={u.id}
@@ -123,6 +184,8 @@ export default function TimelineView({
             marks={marks.filter((m) => m.user_id === u.id)}
             isWorm={wormUserId === u.id}
             cellWidth={cellWidth}
+            visibleStart={visibleStart}
+            visibleEnd={visibleEnd}
           />
         ))}
         {isPending && (
@@ -137,11 +200,26 @@ function TimelineHeader({
   days,
   cellWidth,
   gameDates,
+  visibleStart,
+  visibleEnd,
 }: {
   days: Date[];
   cellWidth: number;
   gameDates?: Set<string>;
+  /**
+   * GHG6 CL2: индексы видимого диапазона дней (включительно, с учётом
+   * OVERSCAN). Дни за пределами схлопываются в два grid-спейсера —
+   * `grid-column: span N` — чтобы не плодить DOM-узлы и не считать
+   * для них isToday/isWeekend/gameDates lookup на каждом ре-рендере.
+   * Если границы не заданы — рендерим всё, как раньше.
+   */
+  visibleStart?: number;
+  visibleEnd?: number;
 }) {
+  const start = visibleStart ?? 0;
+  const end = visibleEnd ?? days.length - 1;
+  const leftSpan = Math.max(0, start);
+  const rightSpan = Math.max(0, days.length - 1 - end);
   return (
     <div
       className="grid sticky top-0 z-20 bg-tg-bg border-b border-tg-secondary-bg/80"
@@ -151,7 +229,11 @@ function TimelineHeader({
         width: AVATAR_COL_WIDTH + days.length * cellWidth,
       }}
     >
-      {days.map((d, idx) => {
+      {leftSpan > 0 && (
+        <div aria-hidden style={{ gridColumn: `span ${leftSpan}` }} />
+      )}
+      {days.slice(start, end + 1).map((d, sliceIdx) => {
+        const idx = start + sliceIdx;
         const today = isToday(d);
         const we = isWeekend(d);
         const showMonth = d.getDate() === 1 || idx === 0;
@@ -160,7 +242,7 @@ function TimelineHeader({
           <div
             key={d.toISOString()}
             className={[
-              "py-1.5 text-center select-none relative",
+              "timeline-day py-1.5 text-center select-none relative",
               isLast ? "" : "border-r border-tg-secondary-bg/70",
               today
                 ? "text-tg-link font-semibold"
@@ -189,6 +271,9 @@ function TimelineHeader({
           </div>
         );
       })}
+      {rightSpan > 0 && (
+        <div aria-hidden style={{ gridColumn: `span ${rightSpan}` }} />
+      )}
     </div>
   );
 }

@@ -106,6 +106,8 @@ export interface PollCreateRequest {
   options: string[]; // ISO datetimes
   closes_in_hours?: number | null;
   chat_id?: number | null;
+  /** GHG6 G2: закрепить опрос в чате после публикации. None → дефолт из admin_config. */
+  pin?: boolean | null;
 }
 
 export const createPoll = (body: PollCreateRequest) =>

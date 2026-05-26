@@ -1,4 +1,9 @@
-"""Тесты для GHG6 BD4: чистая логика build_marks."""
+"""Тесты для GHG6 BD4 + H2: чистая логика build_marks.
+
+GHG6 H2: loser-метки теперь несут `source` ('auto' | 'manual'). Дедуп
+по `(date, user_id, source)` — за один день у одного юзера может быть
+до двух корон (auto + manual). chukhan-метки source не имеют.
+"""
 from __future__ import annotations
 
 from datetime import date
@@ -10,11 +15,11 @@ def test_loser_inside_window():
     out = build_marks(
         start_date=date(2026, 5, 1),
         end_date=date(2026, 5, 31),
-        loser_rolls=[(date(2026, 5, 10), 7)],
+        loser_rolls=[(date(2026, 5, 10), 7, "auto")],
         chukhan_weeks=[],
     )
-    assert [(m.date, m.user_id, m.type) for m in out] == [
-        (date(2026, 5, 10), 7, "loser"),
+    assert [(m.date, m.user_id, m.type, m.source) for m in out] == [
+        (date(2026, 5, 10), 7, "loser", "auto"),
     ]
 
 
@@ -22,20 +27,43 @@ def test_loser_outside_window_dropped():
     out = build_marks(
         start_date=date(2026, 5, 1),
         end_date=date(2026, 5, 31),
-        loser_rolls=[(date(2026, 4, 30), 7), (date(2026, 5, 31), 7)],
+        loser_rolls=[
+            (date(2026, 4, 30), 7, "auto"),
+            (date(2026, 5, 31), 7, "manual"),
+        ],
         chukhan_weeks=[],
     )
     assert out == []  # граница end_date — exclusive, start_date — inclusive
 
 
-def test_loser_dedup_same_day_same_user():
+def test_loser_dedup_same_day_same_user_same_source():
     out = build_marks(
         start_date=date(2026, 5, 1),
         end_date=date(2026, 5, 31),
-        loser_rolls=[(date(2026, 5, 10), 7), (date(2026, 5, 10), 7)],
+        loser_rolls=[
+            (date(2026, 5, 10), 7, "auto"),
+            (date(2026, 5, 10), 7, "auto"),
+        ],
         chukhan_weeks=[],
     )
     assert len(out) == 1
+
+
+def test_loser_auto_and_manual_same_day_both_kept():
+    """GHG6 H2: автолох + ручная крутилка попали в один день — две короны."""
+    out = build_marks(
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 5, 31),
+        loser_rolls=[
+            (date(2026, 5, 10), 7, "auto"),
+            (date(2026, 5, 10), 7, "manual"),
+        ],
+        chukhan_weeks=[],
+    )
+    assert len(out) == 2
+    sources = {m.source for m in out}
+    assert sources == {"auto", "manual"}
+    assert all(m.date == date(2026, 5, 10) and m.user_id == 7 for m in out)
 
 
 def test_chukhan_expands_to_7_days():
@@ -47,7 +75,7 @@ def test_chukhan_expands_to_7_days():
         chukhan_weeks=[(date(2026, 5, 11), 3)],
     )
     assert [m.date for m in out] == [date(2026, 5, 11 + i) for i in range(7)]
-    assert all(m.user_id == 3 and m.type == "chukhan" for m in out)
+    assert all(m.user_id == 3 and m.type == "chukhan" and m.source is None for m in out)
 
 
 def test_chukhan_week_partially_outside_window():
@@ -84,7 +112,7 @@ def test_loser_and_chukhan_both_kept_on_same_day():
     out = build_marks(
         start_date=date(2026, 5, 1),
         end_date=date(2026, 5, 31),
-        loser_rolls=[(date(2026, 5, 11), 3)],
+        loser_rolls=[(date(2026, 5, 11), 3, "auto")],
         chukhan_weeks=[(date(2026, 5, 11), 3)],
     )
     assert len(out) >= 2
@@ -97,7 +125,10 @@ def test_output_sorted_by_date_user_type():
     out = build_marks(
         start_date=date(2026, 5, 1),
         end_date=date(2026, 5, 31),
-        loser_rolls=[(date(2026, 5, 20), 2), (date(2026, 5, 10), 5)],
+        loser_rolls=[
+            (date(2026, 5, 20), 2, "auto"),
+            (date(2026, 5, 10), 5, "manual"),
+        ],
         chukhan_weeks=[],
     )
     dates = [m.date for m in out]

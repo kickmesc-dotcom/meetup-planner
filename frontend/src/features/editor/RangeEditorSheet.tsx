@@ -5,7 +5,7 @@ import type { AvailabilityRange, Status } from "@/types";
 import { deleteRange, fetchRanges, patchRange } from "@/api/availability";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
-import { format } from "date-fns";
+import { addDays, format, startOfDay } from "date-fns";
 
 interface Props {
   rangeId: number | "new";
@@ -14,6 +14,20 @@ interface Props {
   meId: number;
 }
 
+/**
+ * GHG6 CL8: bottom-sheet редактор range.
+ *
+ * Изменения относительно CL7:
+ * - Чекбокс «🕓 Конкретное время» — управляет `all_day`. Off (по умолчанию) →
+ *   `all_day=true`, окно сутки 00:00..23:59:59. On → `all_day=false` +
+ *   два `<input type="time">` (старт/конец) на той же дате, что и `starts_at`.
+ * - Дефолт confidence при смене статуса (см. handler смены status):
+ *   свободен→5, занят→5, может→3 (см. ответ пользователя 2026-05-25).
+ *   Шкала confidence: 5 = высокая уверенность, 1 = низкая
+ *   (см. `dateUtils::pickConfidenceColor`).
+ * - Подписи `CONFIDENCE_LABELS` приведены к шкале: 1=«Точно нет», 5=«Точно да».
+ *   Раньше были инверсные, что вводило в заблуждение (баг наследия).
+ */
 export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
   const qc = useQueryClient();
@@ -31,8 +45,8 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
     mutationFn: (body: Partial<AvailabilityRange>) =>
       patchRange(rangeId as number, body as never),
     onMutate: async (body) => {
-      // Оптимистично подменяем поля в кэше ranges, чтобы пилюля перекрашивалась
-      // сразу. На ошибке откатываем — пилюля вернётся в старое состояние.
+      // Оптимистично подменяем поля в кэше ranges, чтобы пилюля/заливка
+      // перекрашивались сразу. На ошибке откатываем.
       await qc.cancelQueries({ queryKey: ["ranges"] });
       const snapshot = qc.getQueriesData<AvailabilityRange[]>({ queryKey: ["ranges"] });
       qc.setQueriesData<AvailabilityRange[] | undefined>({ queryKey: ["ranges"] }, (old) => {
@@ -79,6 +93,96 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
 
   const isOwn = range?.user_id === meId;
 
+  // CL8: дефолт confidence по новому статусу. При смене status «свободен» или
+  // «занят» — выставляем максимум (5), «может» — середину (3).
+  const defaultConfidenceForStatus = (s: Status): number => (s === 2 ? 3 : 5);
+
+  const onStatusChange = (s: Status) => {
+    if (!range) return;
+    haptic("selection");
+    const conf = defaultConfidenceForStatus(s);
+    setRange({ ...range, status: s, confidence: conf });
+    patchMut.mutate({ status: s, confidence: conf });
+  };
+
+  const onConfidenceChange = (c: number) => {
+    if (!range) return;
+    haptic("selection");
+    setRange({ ...range, confidence: c });
+    patchMut.mutate({ confidence: c });
+  };
+
+  // CL8: переключение all_day. Off → весь день (00:00..23:59:59 локального tz
+  // того дня, в котором сейчас starts_at). On → берём текущее time-окно или
+  // дефолт 09:00..18:00 на этой же дате.
+  const onAllDayToggle = (allDay: boolean) => {
+    if (!range) return;
+    haptic("selection");
+    const startDate = new Date(range.starts_at);
+    const dayBase = startOfDay(startDate);
+    let nextStarts: Date;
+    let nextEnds: Date;
+    if (allDay) {
+      // Off → all_day. Окно — сутки. ends берём как 23:59:59.999 чтобы не пересечь
+      // следующий день (бэк валидирует ends > starts строгим неравенством).
+      nextStarts = dayBase;
+      nextEnds = new Date(dayBase.getTime() + 24 * 60 * 60 * 1000 - 1);
+    } else {
+      // On → конкретное время. Если range уже не all_day, берём текущие
+      // часы:минуты; иначе дефолт 09:00..18:00.
+      if (!range.all_day) {
+        nextStarts = startDate;
+        nextEnds = new Date(range.ends_at);
+      } else {
+        nextStarts = new Date(dayBase.getTime() + 9 * 60 * 60 * 1000);
+        nextEnds = new Date(dayBase.getTime() + 18 * 60 * 60 * 1000);
+      }
+    }
+    setRange({
+      ...range,
+      all_day: allDay,
+      starts_at: nextStarts.toISOString(),
+      ends_at: nextEnds.toISOString(),
+    });
+    patchMut.mutate({
+      all_day: allDay,
+      starts_at: nextStarts.toISOString(),
+      ends_at: nextEnds.toISOString(),
+    });
+  };
+
+  // CL8: смена времени в pickers. timeKind = 'start' | 'end'. value — "HH:MM".
+  // Сохраняем дату текущего starts_at, меняем только часы/минуты выбранного
+  // конца. Бэк требует ends > starts; при нарушении (старт >= конец) патчим
+  // вторую границу +30мин, чтобы не падать на валидаторе.
+  const onTimeChange = (kind: "start" | "end", value: string) => {
+    if (!range) return;
+    const [hh, mm] = value.split(":").map((x) => Number.parseInt(x, 10));
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return;
+    const base = startOfDay(new Date(range.starts_at));
+    const baseMs = base.getTime();
+    const startMs = new Date(range.starts_at).getTime();
+    const endMs = new Date(range.ends_at).getTime();
+    const newPointMs = baseMs + hh * 60 * 60 * 1000 + mm * 60 * 1000;
+    let nextStartsMs = startMs;
+    let nextEndsMs = endMs;
+    if (kind === "start") {
+      nextStartsMs = newPointMs;
+      if (nextEndsMs <= nextStartsMs) {
+        nextEndsMs = Math.min(addDays(base, 1).getTime() - 1, nextStartsMs + 30 * 60 * 1000);
+      }
+    } else {
+      nextEndsMs = newPointMs;
+      if (nextEndsMs <= nextStartsMs) {
+        nextStartsMs = Math.max(baseMs, nextEndsMs - 30 * 60 * 1000);
+      }
+    }
+    const nextStarts = new Date(nextStartsMs).toISOString();
+    const nextEnds = new Date(nextEndsMs).toISOString();
+    setRange({ ...range, starts_at: nextStarts, ends_at: nextEnds });
+    patchMut.mutate({ starts_at: nextStarts, ends_at: nextEnds });
+  };
+
   return (
     <AnimatePresence>
       <motion.div
@@ -104,28 +208,34 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
         {range && (
           <>
             <div className="text-sm text-tg-hint mb-1">
-              {format(new Date(range.starts_at), "d MMM HH:mm")} →{" "}
-              {format(new Date(range.ends_at), "d MMM HH:mm")}
+              {range.all_day
+                ? format(new Date(range.starts_at), "d MMM")
+                : `${format(new Date(range.starts_at), "d MMM HH:mm")} → ${format(
+                    new Date(range.ends_at),
+                    "HH:mm",
+                  )}`}
             </div>
 
             <StatusPicker
-              value={range.status}
+              value={range.status as Status}
               disabled={!isOwn}
-              onChange={(s) => {
-                haptic("selection");
-                setRange({ ...range, status: s });
-                patchMut.mutate({ status: s });
-              }}
+              onChange={onStatusChange}
             />
 
             <ConfidencePicker
               value={range.confidence}
+              status={range.status as Status}
               disabled={!isOwn}
-              onChange={(c) => {
-                haptic("selection");
-                setRange({ ...range, confidence: c });
-                patchMut.mutate({ confidence: c });
-              }}
+              onChange={onConfidenceChange}
+            />
+
+            <TimePicker
+              allDay={range.all_day}
+              startsAt={range.starts_at}
+              endsAt={range.ends_at}
+              disabled={!isOwn}
+              onAllDayToggle={onAllDayToggle}
+              onTimeChange={onTimeChange}
             />
 
             {isOwn && (
@@ -192,23 +302,38 @@ function StatusPicker({
   );
 }
 
-const CONFIDENCE_LABELS: Record<number, string> = {
-  1: "Точно да",
-  2: "Скорее да",
+// CL8: подписи confidence по реальной шкале (5 = высокая уверенность,
+// 1 = низкая). Для status=2 («может») — нейтральные «Не уверен / 50/50 /
+// Уверенно», т.к. «точно нет/точно да» в контексте «может» бессмысленны
+// (статус и так промежуточный).
+const CONFIDENCE_LABELS_DEFAULT: Record<number, string> = {
+  1: "Точно нет",
+  2: "Скорее нет",
   3: "Под вопросом",
-  4: "Скорее нет",
-  5: "Точно нет",
+  4: "Скорее да",
+  5: "Точно да",
+};
+
+const CONFIDENCE_LABELS_MAYBE: Record<number, string> = {
+  1: "Едва ли",
+  2: "Слабо",
+  3: "50/50",
+  4: "Склоняюсь",
+  5: "Почти точно",
 };
 
 function ConfidencePicker({
   value,
+  status,
   onChange,
   disabled,
 }: {
   value: number;
+  status: Status;
   onChange: (c: number) => void;
   disabled?: boolean;
 }) {
+  const labels = status === 2 ? CONFIDENCE_LABELS_MAYBE : CONFIDENCE_LABELS_DEFAULT;
   return (
     <div className="my-3">
       <div className="text-xs text-tg-hint mb-1">Уверенность</div>
@@ -220,14 +345,69 @@ function ConfidencePicker({
             disabled={disabled}
             onClick={() => onChange(c)}
             className={[
-              "flex-1 py-2 rounded-lg text-xs",
+              "flex-1 py-2 rounded-lg text-[11px] leading-tight",
               value === c ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg",
             ].join(" ")}
           >
-            {CONFIDENCE_LABELS[c]}
+            {labels[c]}
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+// CL8: time-picker для конкретного времени range'а. Чекбокс над — «🕓
+// Конкретное время». В off-режиме скрыты сами поля времени; в on — два
+// `<input type="time">` (часы:минуты, native picker на iOS/Android).
+function TimePicker({
+  allDay,
+  startsAt,
+  endsAt,
+  disabled,
+  onAllDayToggle,
+  onTimeChange,
+}: {
+  allDay: boolean;
+  startsAt: string;
+  endsAt: string;
+  disabled?: boolean;
+  onAllDayToggle: (v: boolean) => void;
+  onTimeChange: (kind: "start" | "end", value: string) => void;
+}) {
+  const startHm = format(new Date(startsAt), "HH:mm");
+  const endHm = format(new Date(endsAt), "HH:mm");
+  return (
+    <div className="my-3">
+      <label className="flex items-center gap-2 select-none cursor-pointer">
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-tg-link"
+          checked={!allDay}
+          disabled={disabled}
+          onChange={(e) => onAllDayToggle(!e.currentTarget.checked)}
+        />
+        <span className="text-sm">🕓 Конкретное время</span>
+      </label>
+      {!allDay && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="time"
+            className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
+            value={startHm}
+            disabled={disabled}
+            onChange={(e) => onTimeChange("start", e.currentTarget.value)}
+          />
+          <span className="text-tg-hint text-sm">→</span>
+          <input
+            type="time"
+            className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
+            value={endHm}
+            disabled={disabled}
+            onChange={(e) => onTimeChange("end", e.currentTarget.value)}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -35,44 +35,53 @@ class CalendarMark(BaseModel):
     date: date
     user_id: int
     type: str  # "loser" | "chukhan"
+    # GHG6 H2: source='auto' | 'manual' для loser-марок. Фронт рисует две
+    # короны рядом, если за день есть оба источника у одного юзера; для
+    # 'chukhan' поле всегда None.
+    source: str | None = None
 
 
 def build_marks(
     *,
     start_date: date,
     end_date: date,
-    loser_rolls: list[tuple[date, int]],
+    loser_rolls: list[tuple[date, int, str]],
     chukhan_weeks: list[tuple[date, int]],
 ) -> list[CalendarMark]:
     """Чистая логика для теста: на входе уже распакованные строки
-    (`loser_rolls`: [(rolled_at::date, loser_user_id), ...],
+    (`loser_rolls`: [(rolled_at::date, loser_user_id, source), ...],
      `chukhan_weeks`: [(week_start::date, user_id), ...]), на выходе —
     отсортированный дедуплицированный список marks для окна [start, end).
+
+    GHG6 H2: дедуп loser-меток по `(date, user_id, source)` — за один день
+    у одного юзера может быть две короны (auto и manual), и обе попадают
+    в выдачу. Старый дедуп по `(date, user_id, type)` не различал источники.
     """
     out: list[CalendarMark] = []
-    seen: set[tuple[date, int, str]] = set()
+    seen_loser: set[tuple[date, int, str]] = set()
+    seen_chukhan: set[tuple[date, int]] = set()
 
-    for d, uid in loser_rolls:
+    for d, uid, src in loser_rolls:
         if not (start_date <= d < end_date):
             continue
-        key = (d, uid, "loser")
-        if key in seen:
+        key = (d, uid, src)
+        if key in seen_loser:
             continue
-        seen.add(key)
-        out.append(CalendarMark(date=d, user_id=uid, type="loser"))
+        seen_loser.add(key)
+        out.append(CalendarMark(date=d, user_id=uid, type="loser", source=src))
 
     for ws, uid in chukhan_weeks:
         for offset in range(7):
             d = ws + timedelta(days=offset)
             if not (start_date <= d < end_date):
                 continue
-            key = (d, uid, "chukhan")
-            if key in seen:
+            key = (d, uid)
+            if key in seen_chukhan:
                 continue
-            seen.add(key)
+            seen_chukhan.add(key)
             out.append(CalendarMark(date=d, user_id=uid, type="chukhan"))
 
-    out.sort(key=lambda m: (m.date, m.user_id, m.type))
+    out.sort(key=lambda m: (m.date, m.user_id, m.type, m.source or ""))
     return out
 
 
@@ -99,7 +108,9 @@ async def calendar_marks(
             )
         ).all()
     )
-    loser_pairs = [(r.rolled_at.date(), r.loser_user_id) for r in loser_rows]
+    loser_pairs = [
+        (r.rolled_at.date(), r.loser_user_id, r.source or "manual") for r in loser_rows
+    ]
 
     # WeeklyChukhan: с запасом ±7 дней (неделя может «зацепиться» одним концом).
     chukhan_rows = list(

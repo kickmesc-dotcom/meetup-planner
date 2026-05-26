@@ -20,6 +20,28 @@ body,
   overflow-x: hidden;
 }
 
+/* GHG6 P3 CL3: TimelineView — нативный горизонтальный скролл с
+   magnet-to-day через scroll-snap. proximity (а не mandatory) даёт быстрым
+   свайпам пролетать через много дней без рывков и одновременно «дотягивает»
+   медленный скролл до ближайшего дня. scroll-padding-left компенсирует
+   sticky-аватар-колонку (60px), чтобы snap указывал на левую границу дня,
+   а не «вглубь» под аватара. scroll-behavior: smooth — для goToday() и
+   программных scrollTo. prefers-reduced-motion отключает анимацию скролла,
+   но не отключает snap (snap — функциональность, не декорация). */
+.calendar-timeline-scroll {
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 60px;
+  scroll-behavior: smooth;
+}
+.calendar-timeline-scroll .timeline-day {
+  scroll-snap-align: start;
+}
+@media (prefers-reduced-motion: reduce) {
+  .calendar-timeline-scroll {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }

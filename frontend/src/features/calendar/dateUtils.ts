@@ -182,6 +182,100 @@ export function statusLabel(s: 1 | 2 | 3): string {
   return s === 1 ? "свободен" : s === 2 ? "может" : "занят";
 }
 
+/**
+ * GHG6 CL7: цвет заливки TimelineCell по status × confidence.
+ *
+ * Семантика статусов (как в `summarizeDay`/`statusLabel`): 1=свободен, 2=может,
+ * 3=занят. Worst-status на день: 3 > 2 > 1 (занят бьёт всё — это худший исход
+ * для координации встречи; «может» хуже «свободен», но лучше «занят»).
+ *
+ * Шкала confidence (1..5) модулирует, насколько мы доверяем заявленному статусу:
+ * - status=1 (свободен): conf 5 → насыщенный зелёный («точно свободен»),
+ *   conf 1 → красный («заявил свободен, но уверенность нулевая → по факту занят»).
+ * - status=3 (занят, инверсия): conf 5 → насыщенный красный, conf 1 → зелёный.
+ * - status=2 (может): жёлтый с opacity по confidence (3 → средний, 5 → плотный,
+ *   1 → бледный).
+ *
+ * Возвращает CSS `background` строку (Tailwind-цвета как hex/rgba — Tailwind
+ * arbitrary-value классы в runtime'е не работают, нужен inline style).
+ *
+ * Если на день нет range — возвращает null (caller рисует серый «не отмечено»
+ * паттерн, как было до CL7).
+ */
+export function confidenceFillForDay(
+  day: Date,
+  ranges: { starts_at: string; ends_at: string; status: 1 | 2 | 3; confidence: number }[],
+): { background: string; status: 1 | 2 | 3; confidence: number } | null {
+  const dayStart = startOfDay(day).getTime();
+  const dayEnd = dayStart + DAY_MS;
+
+  // Worst-status агрегация: 3 > 2 > 1. Для итогового цвета берём максимальную
+  // confidence среди range'ей с worst-status — чем увереннее «худший» голос,
+  // тем темнее цвет.
+  let worst: 0 | 1 | 2 | 3 = 0;
+  let worstConf = 0;
+  for (const r of ranges) {
+    const s = new Date(r.starts_at).getTime();
+    const e = new Date(r.ends_at).getTime();
+    if (e <= dayStart || s >= dayEnd) continue;
+    if (r.status > worst) {
+      worst = r.status;
+      worstConf = r.confidence;
+    } else if (r.status === worst && r.confidence > worstConf) {
+      worstConf = r.confidence;
+    }
+  }
+  if (worst === 0) return null;
+
+  const conf = clamp(worstConf, 1, 5);
+  return {
+    background: pickConfidenceColor(worst, conf),
+    status: worst,
+    confidence: conf,
+  };
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.min(hi, Math.max(lo, v));
+}
+
+/**
+ * Цветовая шкала status × confidence. Источник палитры — Tailwind 500/400/300:
+ * green-500 = #22c55e, green-400 = #4ade80, gray-300 = #d1d5db,
+ * red-400 = #f87171, red-500 = #ef4444, amber-400 = #fbbf24.
+ *
+ * Промежуточные ступени (conf 4 и conf 2) для status 1/3 берут «противоположный»
+ * 400-й оттенок с opacity 0.6 — это создаёт ощущение «склоняется в сторону X, но
+ * не уверенно». Для status=2 (может) — амбер с opacity по confidence.
+ */
+function pickConfidenceColor(status: 1 | 2 | 3, confidence: number): string {
+  if (status === 1) {
+    // свободен → зелёные тона при высокой уверенности, красные при низкой.
+    switch (confidence) {
+      case 5: return "#22c55e";                  // green-500 solid
+      case 4: return "rgba(74,222,128,0.6)";     // green-400/60
+      case 3: return "#d1d5db";                  // gray-300 — баланс
+      case 2: return "rgba(248,113,113,0.6)";    // red-400/60
+      case 1: return "#ef4444";                  // red-500 solid
+    }
+  }
+  if (status === 3) {
+    // занят → инверсия: высокая уверенность = насыщенный красный.
+    switch (confidence) {
+      case 5: return "#ef4444";
+      case 4: return "rgba(248,113,113,0.6)";
+      case 3: return "#d1d5db";
+      case 2: return "rgba(74,222,128,0.6)";
+      case 1: return "#22c55e";
+    }
+  }
+  // status === 2 (может) — жёлтая шкала с opacity по confidence.
+  // conf 5 → плотный, conf 1 → почти прозрачный (но не пустой, иначе ячейка
+  // визуально слипнется с «не отмечено»).
+  const opacity = 0.25 + ((confidence - 1) / 4) * 0.65; // 0.25..0.9
+  return `rgba(251,191,36,${opacity.toFixed(2)})`;       // amber-400
+}
+
 /** Короткое читаемое сокращение для пилюли/ячейки.
  * Никаких «сво…» и «з…» — слово целиком либо нормальное сокращение. */
 export function statusLabelShort(s: 1 | 2 | 3): string {

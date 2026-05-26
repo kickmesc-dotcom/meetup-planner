@@ -86,6 +86,7 @@ async def create_game_choice_poll(
     timeout_hours: int,
     nomination_ids: list[int] | None,
     follow_up_when: bool,
+    pin: bool = False,
 ) -> Poll:
     """Запустить TG-полл «Во что сыграем» и сохранить запись Poll(kind='game_choice').
 
@@ -169,6 +170,20 @@ async def create_game_choice_poll(
         options=len(nominations),
         follow_up=follow_up_when,
     )
+
+    # GHG6 G2: пин опционально, ошибки глотает помощник.
+    # `follow_up_when` префикс уже в question — флаг pin кодируем там же,
+    # чтобы handle_game_choice_closed знал, нужно ли пинить follow-up-полл.
+    if pin:
+        from app.bot.utils.pinning import pin_message_safely
+        await pin_message_safely(bot, chat_id=chat_id, message_id=msg.message_id)
+        # Помечаем choice-полл, чтобы при auto-создании when-полла унаследовать pin.
+        # Префикс [+pin] идёт ПЕРЕД [+when], если оба есть.
+        new_question = "[+pin] " + poll.question
+        poll.question = new_question
+        await session.commit()
+        await session.refresh(poll)
+
     return poll
 
 
@@ -190,6 +205,7 @@ async def create_game_when_poll(
     nomination: GameNomination,
     timeout_hours: int,
     dates: list[date] | None = None,
+    pin: bool = False,
 ) -> Poll:
     """Follow-up «Когда играем» — короткий полл на 3 даты по умолчанию.
 
@@ -264,6 +280,12 @@ async def create_game_when_poll(
         nomination_id=nomination.id,
         dates=[d.isoformat() for d in dates],
     )
+
+    # GHG6 G2: пин опционально.
+    if pin:
+        from app.bot.utils.pinning import pin_message_safely
+        await pin_message_safely(bot, chat_id=chat_id, message_id=msg.message_id)
+
     return poll
 
 
@@ -343,7 +365,11 @@ async def handle_game_choice_closed(
     except Exception as exc:  # noqa: BLE001
         log.warning("games_poll.announce_winner_failed", error=str(exc))
 
-    follow_up = poll.question.startswith("[+when]")
+    # GHG6 G2: префиксы [+pin] и [+when] в question — флаги choice-полла.
+    # Порядок: [+pin] идёт перед [+when], если оба есть.
+    q = poll.question
+    pinned = "[+pin]" in q
+    follow_up = "[+when]" in q
     if not follow_up or nomination is None:
         return None
 
@@ -360,6 +386,7 @@ async def handle_game_choice_closed(
             created_by_user_id=poll.created_by,
             nomination=nomination,
             timeout_hours=timeout_hours,
+            pin=pinned,
         )
     except GamesPollSendFailed as exc:
         # Зовётся из bot-handler `poll_answer.py` (не HTTP) — глотаем,

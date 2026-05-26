@@ -42,6 +42,13 @@ async def create_poll(
     from app.bot.dispatcher import get_bot
     bot = get_bot()
 
+    # G2: pin берём из тела, либо из admin_config (если None).
+    if body.pin is None:
+        from app.services.admin_config import get_polls_pin_default
+        pin = await get_polls_pin_default(session)
+    else:
+        pin = body.pin
+
     try:
         poll = await create_poll_in_chat(
             session,
@@ -51,6 +58,7 @@ async def create_poll(
             question=body.question,
             options=body.options,
             closes_in_hours=body.closes_in_hours,
+            pin=pin,
         )
     except PollSendFailed as exc:
         # GHG6 hotfix: send_poll упал по таймауту/network — отдаём 503,
@@ -123,6 +131,13 @@ async def create_auto_pick_poll(
     from app.bot.dispatcher import get_bot
     bot = get_bot()
 
+    # G2: pin берём из тела, либо из admin_config.
+    if body.pin is None:
+        from app.services.admin_config import get_polls_pin_default
+        pin = await get_polls_pin_default(session)
+    else:
+        pin = body.pin
+
     try:
         poll = await create_poll_in_chat(
             session,
@@ -132,6 +147,7 @@ async def create_auto_pick_poll(
             question=body.question,
             options=options,
             closes_in_hours=body.closes_in_hours,
+            pin=pin,
         )
     except PollSendFailed as exc:
         raise HTTPException(

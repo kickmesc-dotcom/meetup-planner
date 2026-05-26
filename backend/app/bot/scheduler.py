@@ -35,20 +35,27 @@ def _logged_job(
     job_id: str,
     func: Callable[..., Awaitable[Any]],
 ) -> Callable[..., Awaitable[None]]:
-    """Wrap an async job so any exception is logged with traceback.
+    """Wrap an async job so any exception is logged with traceback, и пишет
+    `job_fired`/`job_done` для трассировки реальных запусков.
 
-    Without this, APScheduler's executor swallows the exception, logs a bare
-    'Executed successfully' / 'Job raised an exception' line without context,
-    and the actual reason (network, DB, TG API) never reaches stdout.
+    Без exception-обёртки APScheduler-executor молча проглатывает traceback и
+    в логе остаётся `Job raised an exception` без причины (сеть/БД/TG API).
+    Без `job_fired`/`job_done` невозможно отличить «job не сработал» от
+    «сработал и упал» — пользователь GHG6 п.16 как раз жаловался, что бот
+    «забивает на job в назначенное время». Логи дают возможность увидеть,
+    был ли вообще вход в функцию.
     """
 
     @functools.wraps(func)
     async def _wrapped(*args: Any, **kwargs: Any) -> None:
+        log.info("scheduler.job_fired", job_id=job_id)
         try:
             await func(*args, **kwargs)
         except Exception:
             log.exception("scheduler.job_failed", job_id=job_id)
             raise
+        else:
+            log.info("scheduler.job_done", job_id=job_id)
 
     return _wrapped
 
@@ -149,7 +156,15 @@ async def _autoloser_job(bot: Bot) -> None:
             )
 
         try:
-            await roll_loser(session, rolled_by=rolled_by, on_announce=_announce)
+            # GHG6 H1: source='auto' и bypass_cooldown=True — авто-лох не
+            # делит кулдаун с ручной рулеткой, и сам не блокируется им.
+            await roll_loser(
+                session,
+                rolled_by=rolled_by,
+                on_announce=_announce,
+                source="auto",
+                bypass_cooldown=True,
+            )
             log.info("autoloser.posted")
         except Exception:
             log.exception("autoloser.failed")
@@ -247,6 +262,10 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
             replace_existing=True,
             max_instances=1,
             coalesce=True,
+            # GHG6 H4: дефолтный misfire_grace_time=1с молча роняет
+            # запуск если воркер был занят. Час grace покрывает любой
+            # реалистичный лаг (повисший прокси/сеть/GC).
+            misfire_grace_time=3600,
         )
         log.info("scheduler.reminders_tick_reloaded", minutes=tick_minutes)
     else:
@@ -268,6 +287,7 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
             replace_existing=True,
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=3600,  # GHG6 H4
         )
         if rp_mode == "fixed_times":
             times = rp_param.get("times") or []
@@ -281,6 +301,7 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
                     replace_existing=True,
                     max_instances=1,
                     coalesce=True,
+                    misfire_grace_time=3600,  # GHG6 H4
                 )
         log.info("scheduler.random_phrases_reloaded", mode=rp_mode, param=rp_param)
     else:
@@ -303,6 +324,7 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
             replace_existing=True,
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=3600,  # GHG6 H4
         )
         log.info("scheduler.autoloser_enabled", cfg=autoloser_cfg)
     else:
@@ -326,6 +348,7 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
             replace_existing=True,
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=3600,  # GHG6 H4
         )
         log.info("scheduler.avatars_reloaded", per_day=per_day, interval_hours=interval_hours)
     else:
@@ -388,6 +411,7 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
             replace_existing=True,
             max_instances=1,
             coalesce=True,
+            misfire_grace_time=3600,  # GHG6 H4
         )
         log.info("scheduler.auto_zaebal_enabled")
     else:
@@ -436,6 +460,7 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         replace_existing=True,
         max_instances=1,
         coalesce=True,
+        misfire_grace_time=PROXY_HEALTH_INTERVAL_SEC,  # GHG6 H4
     )
 
     # GHG6 E11: фоновая проверка истечения паузы. Раз в 5 минут — пауза
@@ -455,6 +480,7 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         replace_existing=True,
         max_instances=1,
         coalesce=True,
+        misfire_grace_time=600,  # GHG6 H4: 10мин — пауза не требует секундной точности
     )
 
     sched.start()

@@ -101,6 +101,8 @@ class PollCreateRequest(BaseModel):
     options: list[str] = Field(..., min_length=2, max_length=6)
     closes_in_hours: int | None = Field(None, ge=1, le=72)
     chat_id: int | None = None
+    # G2: закрепить сообщение с опросом. None → дефолт из admin_config.
+    pin: bool | None = None
 
 
 class PollAutoPickRequest(BaseModel):
@@ -116,6 +118,8 @@ class PollAutoPickRequest(BaseModel):
     chat_id: int | None = None
     # GHG5 POLL-HOURS1: использовать пресеты времени из admin_config.
     use_presets: bool = True
+    # G2: закрепить сообщение. None → дефолт из admin_config.
+    pin: bool | None = None
 
 
 class PollOptionOut(BaseModel):

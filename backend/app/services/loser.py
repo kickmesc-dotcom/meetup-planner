@@ -94,8 +94,23 @@ LOSER_REASONS = [
 ]
 
 
-async def time_until_next_roll(session: AsyncSession) -> timedelta:
-    last = await session.scalar(select(func.max(LoserRoll.rolled_at)))
+async def time_until_next_roll(
+    session: AsyncSession, *, source: str = "manual"
+) -> timedelta:
+    """GHG6 H1: cooldown считается раздельно по семейству источников.
+
+    Раньше функция смотрела МАКС rolled_at по всей таблице — авто-лох,
+    срабатывая каждый день, блокировал ручную рулетку. Теперь callers
+    передают `source` (обычно 'manual' для UI-кнопок), и в окне cooldown'а
+    учитываются только строки этого же семейства.
+
+    `source='auto'` для полноты симметрии (если когда-нибудь авто-задаче
+    понадобится «не дёргать дважды подряд за час»), но scheduler-job сейчас
+    передаёт `bypass_cooldown=True` в `roll_loser` и эту функцию не зовёт.
+    """
+    last = await session.scalar(
+        select(func.max(LoserRoll.rolled_at)).where(LoserRoll.source == source)
+    )
     if last is None:
         return timedelta(0)
     elapsed = datetime.now(timezone.utc) - last
@@ -111,6 +126,8 @@ async def roll_loser(
     *,
     rolled_by: User,
     on_announce: AnnounceFn | None = None,
+    source: str = "manual",
+    bypass_cooldown: bool = False,
 ) -> LoserRoll:
     """Roll a loser atomically with the chat announcement.
 
@@ -125,10 +142,17 @@ async def roll_loser(
     создаётся новая для выбранного юзера. Сигнатура `on_announce` расширена:
     третий аргумент — `RollExtras` с `worm: WormEvent`. Callers, которые
     игнорируют третий аргумент, должны принять `*_` — иначе TypeError на raise.
+
+    GHG6 H1: `source` пишется в `LoserRoll.source` ('auto' для autoloser-job,
+    'manual' для UI/chat-команды/admin force-reroll). `bypass_cooldown=True`
+    скипает проверку — для admin force-reroll и для autoloser-job, которые
+    не должны блокировать друг друга. Cooldown между двумя ручными рулетками
+    подряд остаётся в силе.
     """
-    remaining = await time_until_next_roll(session)
-    if remaining > timedelta(0):
-        raise CooldownError(remaining)
+    if not bypass_cooldown:
+        remaining = await time_until_next_roll(session, source=source)
+        if remaining > timedelta(0):
+            raise CooldownError(remaining)
 
     users = list((await session.scalars(select(User))).all())
     if not users:
@@ -164,6 +188,7 @@ async def roll_loser(
         rolled_by=rolled_by.id,
         loser_user_id=loser.id,
         reason_text=reason,
+        source=source,
     )
     session.add(row)
     await session.flush()  # populate row.id without committing
