@@ -278,23 +278,31 @@ Backend по фактическому коду готов; frontend BotPauseBar 
 Текущий `routes_calendar.py::build_marks` отдаёт по одной записи на дату.
 
 ### Backend
-- [ ] **J1.** `app/api/routes_calendar.py::build_marks` (или новая helper-функция):
-  для каждой даты `LoserRoll` отдавать отдельную метку на каждый `source` (вместо
-  дедупа). Тип ответа расширить: `{date, user_id, type:"loser", source:"auto"|"manual"}`.
-- [ ] **J2.** `tests/test_calendar_marks.py` — обновить под новый формат, добавить
-  кейс «один день, два источника → две метки».
+- [x] **J1.** (по факту 2026-05-25, в рамках H2 mass-sync'а) `routes_calendar.py`
+  уже отдаёт `CalendarMark.source: str | None`, `build_marks` дедупает по
+  `(date, user_id, source)` — за один день у одного юзера выживают и `auto`,
+  и `manual`. Endpoint считывает `r.source or "manual"` из `LoserRoll`.
+- [x] **J2.** (по факту 2026-05-25) `tests/test_calendar_marks.py` — 9 кейсов,
+  включая `test_loser_auto_and_manual_same_day_both_kept` и
+  `test_loser_dedup_same_day_same_user_same_source`. Прогон 9/9 ✅ (2026-05-26).
 
 ### Frontend
-- [ ] **J3.** `api/birthdays.ts::CalendarMark` — добавить `source?: string`.
-  `CalendarView.tsx` собирает `marksByDate: Map<dayKey, Set<{type, source?}>>`
-  (вместо `Set<string>`).
-- [ ] **J4.** `ParticipantRow.tsx` — в углу прошедшего дня рисуем 👑 за каждый
-  `loser`-mark (если две — 👑👑, при этом не выпадаем за пределы ячейки на узких
-  ширинах: при `cellWidth < 40` показываем `👑×2`).
+- [x] **J3.** (2026-05-26) `api/birthdays.ts::CalendarMark` — добавлено поле
+  `source?: "auto" | "manual" | null`. Комментарий поясняет, что для
+  `type='loser'` приходит источник, для `chukhan` всегда null.
+- [x] **J4.** (2026-05-26) `ParticipantRow.tsx` — `marksByDate` заменён на
+  `chukhanByDate: Set<string>` + `loserSourcesByDate: Map<dayKey, Set<source>>`.
+  В углу дня рисуем 👑 за каждый уникальный источник (1→👑, 2→👑👑). При
+  `cellWidth < 40` сжимаем в 👑×N (legacy StripView без cellWidth всегда
+  рисует подряд — там ячейка растягивается на 1fr и места достаточно).
+  aria-label «Был лохом N раза» для compact-варианта. tsc --noEmit чист.
 
 ### Sync
-- [ ] **D-J.** `cp backend/app/api/routes_calendar.py backend/tests/test_calendar_marks.py
-  → meetup-planner-backend/`. Frontend — пользователь сам.
+- [x] **D-J.** (2026-05-26) Backend (`routes_calendar.py`,
+  `test_calendar_marks.py`) уже идентичен в `meetup-planner-backend/` — синкнут
+  в рамках H1/H2 mass-sync'а 2026-05-25. `diff` пуст. Frontend
+  (`api/birthdays.ts`, `features/calendar/ParticipantRow.tsx`) — push из
+  `meetup-planner-main` в `kickmesc-dotcom/meetup-planner` за пользователем.
 
 ---
 
@@ -304,23 +312,34 @@ Backend по фактическому коду готов; frontend BotPauseBar 
 описанием принципа действия каждой команды.»
 
 ### Backend
-- [ ] **K1.** `app/bot/handlers/help.py` — handler `/help` (и alias `/commands`),
-  работает в личке и в группе для участников whitelist'а.
-- [ ] **K2.** Источник списка — единый dict-каталог в `app/bot/commands_catalog.py`
-  (новый файл). Каждый элемент: `{cmd, desc_ru, scope: "private"|"group"|"both",
-  admin_only: bool, hidden: bool}`. `main.py::_register_bot_metadata` берёт оттуда же
-  (`BotCommand`) — никакого дублирования.
-- [ ] **K3.** `/help` рендерит грид `<b>/cmd</b> — описание` через `\n`, в группе
-  скрывает admin-only. Один пробел между блоками. В личке у админа — отдельный
-  блок «🔧 Админ». Reply на исходное сообщение, parse_mode HTML.
-- [ ] **K4.** `dispatcher.py::_setup_dispatcher` — `router.include_router(help.router)`.
-- [ ] **K5.** `tests/test_help_commands.py` — кейсы: catalog непуст, /help group
-  скрывает admin_only, /help private содержит «🔧 Админ» только если запрашивает
-  админ, hidden не показывается ни там, ни там.
+- [x] **K1.** (2026-05-26) `app/bot/handlers/help.py` — handler `/help`
+  (+ alias `/commands`). В группе отвечает только участникам whitelist; в
+  личке — кому угодно (это публичный список команд, скрывать бесполезно).
+  Reply на исходное, parse_mode HTML, disable_web_page_preview.
+- [x] **K2.** (2026-05-26) `app/bot/commands_catalog.py` — единый каталог
+  `CommandSpec(cmd, desc_ru, scope: 'private'|'group'|'both', admin_only,
+  hidden)`. Хелперы: `visible_for(scope, is_admin)` для /help и
+  `bot_commands_for_scope(scope)` для set_my_commands (admin_only исключены,
+  т.к. Telegram BotCommandScope не различает админов).
+- [x] **K3.** (2026-05-26) `render_help(scope, is_admin)` — чистая функция:
+  `📖 <b>Доступные команды</b>` + список `<b>/cmd</b> — desc`. У админа в
+  личке добавляется блок `🔧 <b>Админ</b>` с admin_only-командами. В группе
+  admin_only-команды скрыты всегда.
+- [x] **K4.** (2026-05-26) `dispatcher.py` — `include_router(help_handler.router)`
+  добавлен до `chat_capture.router`.
+- [x] **K5.** (2026-05-26) `tests/test_help_commands.py` — 8 кейсов:
+  catalog непуст / well-formed, group hides admin_only, private admin sees
+  «🔧 Админ», hidden никогда не показывается, bot_commands_for_scope не
+  светит admin_only, private user-help содержит ожидаемые команды.
+  Все 8 ✅, полный сьют 111/111 ✅.
 
 ### Sync
-- [ ] **D-K.** `cp backend/app/bot/{handlers/help.py,commands_catalog.py,dispatcher.py}
-  backend/app/main.py backend/tests/test_help_commands.py → meetup-planner-backend/`.
+- [x] **D-K.** (2026-05-26) Скопированы в `meetup-planner-backend/`:
+  `app/bot/commands_catalog.py`, `app/bot/handlers/help.py`,
+  `app/bot/dispatcher.py`, `app/main.py` (переключение
+  `_register_bot_metadata` на каталог — К2-bis),
+  `tests/test_help_commands.py`. `diff -r` чист, `git status` в HF-клоне
+  показывает ровно эти 5 файлов. Push в HF — за пользователем.
 
 ---
 

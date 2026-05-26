@@ -48,27 +48,17 @@ def _configure_logging(level: str) -> None:
 async def _register_bot_metadata() -> None:
     settings = get_settings()
     bot = get_bot()
+    # GHG6 K2-bis: список команд берём из единого каталога commands_catalog.py.
+    # Описания в Telegram-menu и в /help теперь не расходятся.
+    from app.bot.commands_catalog import bot_commands_for_scope
+
     private_cmds = [
-        BotCommand(command="start", description="Открыть планер встреч"),
-        BotCommand(command="next", description="Ближайшая встреча"),
-        BotCommand(command="meetings", description="5 ближайших встреч + RSVP"),
-        BotCommand(command="chukhan", description="Чухан недели"),
-        BotCommand(command="loser", description="Назначить лоха дня"),
-        BotCommand(command="phrase", description="Прогнать рандомную фразу"),
-        BotCommand(command="nominate", description="🎮 Добавить игру в номинации"),
-        BotCommand(command="remove_nominated_game", description="🗑 Удалить игру из номинаций"),
-        BotCommand(command="tasks", description="Запланированные задачи бота"),
-        BotCommand(command="whoami", description="Мой Telegram ID"),
+        BotCommand(command=c.cmd, description=c.desc_ru)
+        for c in bot_commands_for_scope("private")
     ]
     group_cmds = [
-        BotCommand(command="next", description="Ближайшая встреча с RSVP"),
-        BotCommand(command="meetings", description="5 ближайших встреч + RSVP"),
-        BotCommand(command="chukhan", description="Чухан недели"),
-        BotCommand(command="loser", description="Назначить лоха дня"),
-        BotCommand(command="phrase", description="Прогнать рандомную фразу"),
-        BotCommand(command="nominate", description="🎮 Добавить игру в номинации"),
-        BotCommand(command="remove_nominated_game", description="🗑 Удалить игру из номинаций"),
-        BotCommand(command="tasks", description="Запланированные задачи бота"),
+        BotCommand(command=c.cmd, description=c.desc_ru)
+        for c in bot_commands_for_scope("group")
     ]
     try:
         # Устанавливаем команды с коротким таймаутом

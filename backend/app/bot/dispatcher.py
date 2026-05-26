@@ -17,6 +17,7 @@ from app.bot.handlers import (
     bot_reactions,
     chat_capture,
     chat_commands,
+    help as help_handler,
     next_meeting,
     poll_answer,
     start,
@@ -282,6 +283,9 @@ def get_dispatcher() -> Dispatcher:
         _dispatcher.include_router(poll_answer.router)
         _dispatcher.include_router(admin_chukhan.router)
         _dispatcher.include_router(next_meeting.router)
+        # GHG6 K: /help до chat_capture catch-all — Command-фильтр всё равно
+        # сработает первым, но порядок read-friendly.
+        _dispatcher.include_router(help_handler.router)
         _dispatcher.include_router(chat_commands.router)
         # GHG6 E11: zaebal-команды — до catch-all chat_capture, иначе их «съест»
         # сохранение текста (Command-фильтры всё равно сработают первыми, но
