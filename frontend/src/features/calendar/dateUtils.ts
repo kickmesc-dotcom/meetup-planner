@@ -201,19 +201,43 @@ export function statusLabel(s: 1 | 2 | 3): string {
  *
  * Если на день нет range — возвращает null (caller рисует серый «не отмечено»
  * паттерн, как было до CL7).
+ *
+ * GHG6 CL9: для worst-range при `all_day=false` возвращает дополнительно
+ * `partial`: top/height в долях [0..1] относительно ячейки (top=0 — верх ячейки
+ * = 0:00 локальных суток, height=1 — на весь день). Caller рисует частичную
+ * полосу заливки вместо полной. Если worst-range `all_day=true` (либо поле
+ * отсутствует — для обратной совместимости считаем полным днём), `partial=null`.
  */
+export interface DayFill {
+  background: string;
+  status: 1 | 2 | 3;
+  confidence: number;
+  /** null = полная заливка ячейки (all_day=true). Иначе — позиционная полоса
+   * по доле дня worst-range'а. */
+  partial: { top: number; height: number } | null;
+}
+
 export function confidenceFillForDay(
   day: Date,
-  ranges: { starts_at: string; ends_at: string; status: 1 | 2 | 3; confidence: number }[],
-): { background: string; status: 1 | 2 | 3; confidence: number } | null {
+  ranges: {
+    starts_at: string;
+    ends_at: string;
+    status: 1 | 2 | 3;
+    confidence: number;
+    all_day?: boolean;
+  }[],
+): DayFill | null {
   const dayStart = startOfDay(day).getTime();
   const dayEnd = dayStart + DAY_MS;
 
   // Worst-status агрегация: 3 > 2 > 1. Для итогового цвета берём максимальную
   // confidence среди range'ей с worst-status — чем увереннее «худший» голос,
   // тем темнее цвет.
+  // GHG6 CL9: одновременно с цветом отслеживаем сам range, выигравший
+  // worst-status (нужны его `starts_at`/`ends_at`/`all_day` для partial-fraction).
   let worst: 0 | 1 | 2 | 3 = 0;
   let worstConf = 0;
+  let worstRange: (typeof ranges)[number] | null = null;
   for (const r of ranges) {
     const s = new Date(r.starts_at).getTime();
     const e = new Date(r.ends_at).getTime();
@@ -221,17 +245,44 @@ export function confidenceFillForDay(
     if (r.status > worst) {
       worst = r.status;
       worstConf = r.confidence;
-    } else if (r.status === worst && r.confidence > worstConf) {
-      worstConf = r.confidence;
+      worstRange = r;
+    } else if (r.status === worst) {
+      if (r.confidence > worstConf) {
+        worstConf = r.confidence;
+        worstRange = r;
+      } else if (r.confidence === worstConf) {
+        // GHG6 CL9: при равных status и confidence предпочитаем all_day=true —
+        // полная заливка точнее отражает реальное покрытие дня.
+        if (r.all_day === true && worstRange && worstRange.all_day !== true) {
+          worstRange = r;
+        }
+      }
     }
   }
-  if (worst === 0) return null;
+  if (worst === 0 || worstRange === null) return null;
 
   const conf = clamp(worstConf, 1, 5);
+  // GHG6 CL9: partial — только если worst-range явно НЕ all_day. Старые
+  // записи без поля считаем полным днём (обратная совместимость).
+  let partial: { top: number; height: number } | null = null;
+  if (worstRange.all_day === false) {
+    const s = new Date(worstRange.starts_at).getTime();
+    const e = new Date(worstRange.ends_at).getTime();
+    const visStart = Math.max(s, dayStart);
+    const visEnd = Math.min(e, dayEnd);
+    const top = clamp((visStart - dayStart) / DAY_MS, 0, 1);
+    const height = clamp((visEnd - visStart) / DAY_MS, 0, 1);
+    // Защита от нулевой полосы — лучше показать full-fill, чем «пустой» day.
+    if (height > 0) {
+      partial = { top, height };
+    }
+  }
+
   return {
     background: pickConfidenceColor(worst, conf),
     status: worst,
     confidence: conf,
+    partial,
   };
 }
 

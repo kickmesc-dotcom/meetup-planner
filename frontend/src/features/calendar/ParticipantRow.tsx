@@ -106,12 +106,20 @@ export default function ParticipantRow({
   };
 
   // GHG6 BD1/BD5: индексы по YYYY-MM-DD, чтобы не сканить массивы в каждой ячейке.
+  // GHG6 J: для loser-меток храним множество источников ('auto'|'manual') —
+  // в одном дне может быть и автолох, и ручной ролл, тогда рисуем 👑×2.
   const bdayByDate = new Map(birthdays.map((b) => [b.date, b]));
-  const marksByDate = new Map<string, Set<CalendarMark["type"]>>();
+  const chukhanByDate = new Set<string>();
+  const loserSourcesByDate = new Map<string, Set<string>>();
   for (const m of marks) {
-    const set = marksByDate.get(m.date) ?? new Set();
-    set.add(m.type);
-    marksByDate.set(m.date, set);
+    if (m.type === "chukhan") {
+      chukhanByDate.add(m.date);
+    } else if (m.type === "loser") {
+      const src = m.source ?? "manual";
+      const set = loserSourcesByDate.get(m.date) ?? new Set<string>();
+      set.add(src);
+      loserSourcesByDate.set(m.date, set);
+    }
   }
   const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
 
@@ -211,13 +219,28 @@ export default function ParticipantRow({
             const fill = cellWidth ? confidenceFillForDay(dayStart, ranges) : null;
             const isLast = i === windowSpan - 1;
             const bday = bdayByDate.get(dayKey);
-            const dayMarks = marksByDate.get(dayKey);
             // BD5: бейджи лох/чухан показываем только на прошедших днях, чтобы
             // в будущем не светить будущие записи (их там и не должно быть, но
             // на всякий случай защищаемся от часовых поясов и подмены даты).
             const isPast = dayKey < todayKey;
-            const showLoser = isPast && dayMarks?.has("loser");
-            const showChukhan = isPast && dayMarks?.has("chukhan");
+            const loserSources = isPast ? loserSourcesByDate.get(dayKey) : undefined;
+            const loserCount = loserSources?.size ?? 0;
+            const showChukhan = isPast && chukhanByDate.has(dayKey);
+            // GHG6 J4: при узких ячейках (cellWidth<40) две короны рядом
+            // не помещаются — складываем в 👑×2. В legacy StripView без cellWidth
+            // — всегда рисуем подряд (там ширина ячейки растягивается на 1fr).
+            const compactLoser = loserCount > 1 && cellWidth !== undefined && cellWidth < 40;
+            // GHG6 CL9: при partial=null (или fill отсутствует) фон рисуем
+            // на самой кнопке (как было). При partial — кнопка прозрачная, а
+            // фон уходит в отдельный pointer-events-none div поверх (под
+            // бейджами 👑/💩/🎂), занимающий только долю дня по top/height.
+            const hasPartial = fill?.partial != null;
+            const partialPct = fill?.partial
+              ? {
+                  top: `${(fill.partial.top * 100).toFixed(2)}%`,
+                  height: `${(fill.partial.height * 100).toFixed(2)}%`,
+                }
+              : null;
             cells.push(
               <div
                 key={i}
@@ -239,25 +262,65 @@ export default function ParticipantRow({
                       ? "bg-[repeating-linear-gradient(45deg,transparent_0_4px,rgba(239,68,68,0.08)_4px_8px)]"
                       : "",
                   ].join(" ")}
-                  style={fill ? { background: fill.background } : undefined}
+                  style={
+                    fill && !hasPartial
+                      ? { background: fill.background }
+                      : undefined
+                  }
                   aria-label={
                     fill
-                      ? `${statusLabel(fill.status)}, уверенность ${fill.confidence}/5`
+                      ? `${statusLabel(fill.status)}, уверенность ${fill.confidence}/5${hasPartial ? " (часть дня)" : ""}`
                       : `day ${i}`
                   }
                   title={
                     fill
-                      ? `${statusLabel(fill.status)} · уверенность ${fill.confidence}/5`
+                      ? `${statusLabel(fill.status)} · уверенность ${fill.confidence}/5${hasPartial ? " · часть дня" : ""}`
                       : !covered
                         ? "Не отмечено — считается занятым"
                         : undefined
                   }
                 />
-                {/* GHG6 BD5: «прошедшие» бейджи лох/чухан в углу ячейки.
+                {/* GHG6 CL9: частичная заливка по высоте worst-range при all_day=false.
+                    Позиционируем top/height в процентах от ячейки (24h scale).
                     pointer-events-none — клик уходит на основную кнопку. */}
-                {(showLoser || showChukhan) && (
+                {fill && partialPct && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute left-0 right-0"
+                    style={{
+                      top: partialPct.top,
+                      height: partialPct.height,
+                      background: fill.background,
+                    }}
+                  />
+                )}
+                {/* GHG6 CL9: индикатор «не на весь день» — 🕓 в левом-верхнем
+                    углу ячейки. Только при partial-заливке. */}
+                {hasPartial && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute top-0.5 left-0.5 text-[10px] leading-none opacity-70"
+                  >
+                    🕓
+                  </span>
+                )}
+                {/* GHG6 BD5/J4: «прошедшие» бейджи лох/чухан в углу ячейки.
+                    pointer-events-none — клик уходит на основную кнопку.
+                    GHG6 J: автолох + ручной ролл в один день — две короны
+                    подряд (👑👑), либо 👑×2 в узких ячейках. */}
+                {(loserCount > 0 || showChukhan) && (
                   <div className="pointer-events-none absolute bottom-0.5 left-0.5 flex gap-0.5 text-[10px] leading-none">
-                    {showLoser && <span aria-label="Был лохом">👑</span>}
+                    {loserCount > 0 && (
+                      compactLoser ? (
+                        <span aria-label={`Был лохом ${loserCount} раза`}>
+                          👑×{loserCount}
+                        </span>
+                      ) : (
+                        Array.from({ length: loserCount }).map((_, k) => (
+                          <span key={`crown-${k}`} aria-label="Был лохом">👑</span>
+                        ))
+                      )
+                    )}
                     {showChukhan && <span aria-label="Был чуханом">💩</span>}
                   </div>
                 )}
