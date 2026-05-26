@@ -193,14 +193,15 @@ Backend по фактическому коду готов; frontend BotPauseBar 
   новых ключей не вводит. `tsc --noEmit` чист.
 
 ### Sync
-- [ ] **D-G3.** Финальный sync после G3.4 (пин announce в трёх местах) + G3.5
-  (test_polls_quorum.py) + G3.6/G2.10 (PollsDefaultsBlock + endpoint
-  `/admin/polls/defaults`). Затронуты в `meetup-planner-main`:
-  `backend/app/services/games_poll.py`, `backend/app/bot/handlers/poll_answer.py`,
-  `backend/app/api/routes_admin.py`, `backend/tests/test_polls_quorum.py`.
+- [x] **D-G3.** (2026-05-26) Скопированы `backend/app/services/games_poll.py`,
+  `backend/app/bot/handlers/poll_answer.py`, `backend/app/api/routes_admin.py`,
+  `backend/tests/test_polls_quorum.py` из `meetup-planner-main/backend/` в
+  `meetup-planner-backend/`. `diff -r` чист (кроме `.venv`/`.gitignore`),
+  `git status` в HF-клоне показывает ровно эти 4 файла как готовые к коммиту.
   Frontend (`frontend/src/api/admin.ts`,
   `frontend/src/features/admin/ScheduledPublicationsScreen.tsx`) — пушится
-  из `meetup-planner-main`. Push в HF / Pages — за пользователем.
+  пользователем из `meetup-planner-main` в `kickmesc-dotcom/meetup-planner`.
+  Push в HF / Pages — за пользователем.
 
 ---
 
