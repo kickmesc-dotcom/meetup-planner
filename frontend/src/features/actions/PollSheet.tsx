@@ -103,6 +103,10 @@ export default function PollSheet(_props: Props) {
   });
   const [includeTime, setIncludeTime] = useState(false);
   const [closesIn, setClosesIn] = useState(24);
+  // G2.9: чекбокс пина опроса в чате. См. комментарий в GamesScreen.tsx
+  // — серверный дефолт (admin_config.polls.pin_default) применяется только
+  // при `pin=null`. Здесь стейт — boolean (явное намерение пользователя).
+  const [pin, setPin] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mut = useMutation({
@@ -118,6 +122,7 @@ export default function PollSheet(_props: Props) {
             return iso;
           }),
         closes_in_hours: closesIn,
+        pin,
       }),
     onSuccess: () => {
       haptic("success");
@@ -235,6 +240,24 @@ export default function PollSheet(_props: Props) {
           </button>
         )}
       </div>
+
+      {/* G2.9: чекбокс «Закрепить» — над выбором длительности, чтобы он не
+          терялся между вариантами и кнопкой отправки. */}
+      <label className="mt-3 flex items-start gap-2 cursor-pointer text-sm">
+        <input
+          type="checkbox"
+          checked={pin}
+          onChange={(e) => setPin(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          📌 Закрепить опрос в чате
+          <div className="text-[11px] text-tg-hint">
+            Сразу после публикации бот пин-нёт сообщение (без шумного
+            уведомления).
+          </div>
+        </span>
+      </label>
 
       <label className="mt-3 block text-sm">
         <div className="mb-1 text-xs text-tg-hint">Закрыть через</div>

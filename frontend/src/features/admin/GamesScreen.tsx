@@ -31,6 +31,15 @@ export default function GamesScreen({ onBack }: Props) {
   const [name, setName] = useState("");
   const [timeoutHours, setTimeoutHours] = useState(24);
   const [followUp, setFollowUp] = useState(true);
+  // G2.8: чекбокс «📌 Закрепить опрос». Дефолт — false; серверный дефолт из
+  // admin_config.polls.pin_default подмешивается ТОЛЬКО когда поле опущено
+  // (null). Если пользователь явно тыкнул чекбокс — отправляем булево; иначе
+  // null → бэк подставит свой дефолт. Чтобы реализовать «нетронутое»
+  // состояние с минимумом UI-сложности, держим стейт как boolean (default
+  // false) и шлём false без особой магии: сервер хранит false как
+  // «явно не пиним», тоже валидно. Когда сделаем G2.10/G3.6, добавим
+  // подгрузку дефолта и установку начального значения чекбокса оттуда.
+  const [pinPoll, setPinPoll] = useState(false);
 
   const add = useMutation({
     mutationFn: addGameNomination,
@@ -102,7 +111,11 @@ export default function GamesScreen({ onBack }: Props) {
     const ok = await showConfirm(msg);
     if (!ok) return;
     haptic("medium");
-    startPoll.mutate({ timeout_hours: timeoutHours, follow_up_when: followUp });
+    startPoll.mutate({
+      timeout_hours: timeoutHours,
+      follow_up_when: followUp,
+      pin: pinPoll,
+    });
   };
 
   return (
@@ -215,6 +228,25 @@ export default function GamesScreen({ onBack }: Props) {
             <div className="text-[11px] text-tg-hint">
               Второй опрос на 3 ближайших даты, победившая дата → запись в
               календарь с тегом «🎮».
+            </div>
+          </span>
+        </label>
+
+        {/* G2.8: чекбокс пина. Для follow-up «Когда играем» бэк наследует
+            это же значение (см. services/games_poll.py: pinned проброс). */}
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={pinPoll}
+            onChange={(e) => setPinPoll(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span className="text-sm text-tg-text">
+            📌 Закрепить опрос в чате
+            <div className="text-[11px] text-tg-hint">
+              Сразу после публикации бот пин-нёт сообщение с опросом
+              (disable_notification=true). Follow-up «Когда играем» получит ту
+              же опцию.
             </div>
           </span>
         </label>

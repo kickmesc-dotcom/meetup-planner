@@ -18,6 +18,7 @@ import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
 import GamesScreen from "./GamesScreen";
 import ZaebalSettingsScreen from "./ZaebalSettingsScreen";
+import IntervalsScreen from "./IntervalsScreen";
 import BotPauseBar from "./BotPauseBar";
 
 type Section =
@@ -33,7 +34,8 @@ type Section =
   | "poll-presets"
   | "proxy"
   | "games"
-  | "zaebal";
+  | "zaebal"
+  | "intervals";
 
 interface Props {
   users: User[];
@@ -70,6 +72,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "games") return <GamesScreen onBack={back} />;
   if (section === "zaebal") return <ZaebalSettingsScreen onBack={back} />;
+  if (section === "intervals") return <IntervalsScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -250,6 +253,18 @@ export default function AdminScreen({ users }: Props) {
           title="Сводная история"
           subtitle="Чуханы недели + лохи дня в одном списке"
           onClick={() => select("history")}
+        />
+      </SectionGroup>
+
+      {/* GHG6 I (п.16): единый линейный экран всех числовых/временных параметров
+          расписания. Стоит самым нижним — «выставил и забыл», рубильники живут
+          в «Запланированных публикациях». */}
+      <SectionGroup icon="⏱" title="Интервалы">
+        <Card
+          icon="🎛"
+          title="Интервалы и окна"
+          subtitle="Тик напоминаний, частота автолоха, окна фраз и чухана"
+          onClick={() => select("intervals")}
         />
       </SectionGroup>
     </div>
