@@ -661,6 +661,169 @@ async def put_polls_defaults(
     return body
 
 
+# --- N1: история опросов / игр (исходник п.18) ---
+#
+# Чисто чтение. Возвращаем последние N опросов с раскрытыми опциями и голосами.
+# Без новых таблиц — данные из polls / poll_options / poll_votes.
+
+
+class PollHistoryVote(BaseModel):
+    user_id: int
+    display_name: str | None = None
+    voted_at: datetime
+
+
+class PollHistoryOption(BaseModel):
+    id: int
+    label: str | None
+    starts_at: datetime | None
+    ends_at: datetime | None
+    votes: list[PollHistoryVote]
+
+
+class PollHistoryRow(BaseModel):
+    poll_id: int
+    kind: str | None
+    question: str
+    created_by: int
+    created_at: datetime
+    closes_at: datetime | None
+    closed: bool
+    tg_message_id: int | None
+    # Для game_when poll — id связанной номинации (чтобы фронт мог показать
+    # «Какая игра была»). Для остальных типов — None.
+    game_nomination_id: int | None = None
+    options: list[PollHistoryOption]
+
+
+async def _build_poll_history(
+    session, *, kinds: list[str] | None = None, limit: int = 30
+) -> list[PollHistoryRow]:
+    """Чистая функция: достать последние N опросов с join'ами по опциям и голосам.
+
+    Не делаем отдельных подзапросов на каждый poll — один SELECT для опций
+    и один для голосов, потом группируем в Python. Это держит endpoint
+    дёшевым даже на большой истории.
+    """
+    poll_stmt = select(Poll).order_by(desc(Poll.created_at)).limit(limit)
+    if kinds:
+        poll_stmt = poll_stmt.where(Poll.kind.in_(kinds))
+    polls: list[Poll] = list((await session.scalars(poll_stmt)).all())
+    if not polls:
+        return []
+    poll_ids = [p.id for p in polls]
+
+    from app.db.models import PollOption, PollVote
+
+    option_rows: list[PollOption] = list(
+        (
+            await session.scalars(
+                select(PollOption).where(PollOption.poll_id.in_(poll_ids))
+            )
+        ).all()
+    )
+    by_poll: dict[int, list[PollOption]] = {}
+    for opt in option_rows:
+        by_poll.setdefault(opt.poll_id, []).append(opt)
+
+    option_ids = [opt.id for opt in option_rows]
+    votes_by_opt: dict[int, list[tuple[int, datetime]]] = {}
+    voter_ids: set[int] = set()
+    if option_ids:
+        vote_rows = list(
+            (
+                await session.execute(
+                    select(PollVote.poll_option_id, PollVote.user_id, PollVote.voted_at).where(
+                        PollVote.poll_option_id.in_(option_ids)
+                    )
+                )
+            ).all()
+        )
+        for opt_id, uid, voted_at in vote_rows:
+            votes_by_opt.setdefault(opt_id, []).append((uid, voted_at))
+            voter_ids.add(uid)
+
+    name_by_uid: dict[int, str] = {}
+    if voter_ids:
+        user_rows = list(
+            (
+                await session.execute(
+                    select(User.id, User.display_name).where(User.id.in_(voter_ids))
+                )
+            ).all()
+        )
+        name_by_uid = {uid: name for uid, name in user_rows}
+
+    out: list[PollHistoryRow] = []
+    for p in polls:
+        options_out: list[PollHistoryOption] = []
+        for opt in by_poll.get(p.id, []):
+            options_out.append(
+                PollHistoryOption(
+                    id=opt.id,
+                    label=opt.label,
+                    starts_at=opt.starts_at,
+                    ends_at=opt.ends_at,
+                    votes=[
+                        PollHistoryVote(
+                            user_id=uid,
+                            display_name=name_by_uid.get(uid),
+                            voted_at=voted_at,
+                        )
+                        for uid, voted_at in votes_by_opt.get(opt.id, [])
+                    ],
+                )
+            )
+        out.append(
+            PollHistoryRow(
+                poll_id=p.id,
+                kind=p.kind,
+                question=p.question,
+                created_by=p.created_by,
+                created_at=p.created_at,
+                closes_at=p.closes_at,
+                closed=bool(p.is_closed),
+                tg_message_id=p.tg_message_id,
+                game_nomination_id=p.game_nomination_id,
+                options=options_out,
+            )
+        )
+    return out
+
+
+@router.get("/admin/polls/history", response_model=list[PollHistoryRow])
+async def admin_polls_history(
+    session: SessionDep,
+    user: CurrentUser,
+    limit: int = 30,
+) -> list[PollHistoryRow]:
+    """N1.1: последние N опросов любого типа с раскрытыми опциями/голосами.
+
+    Не фильтруем по kind — это полная история. Лимит ограничен сверху 200,
+    чтобы не отдавать всю таблицу.
+    """
+    _ensure_admin(user)
+    return await _build_poll_history(session, limit=max(1, min(limit, 200)))
+
+
+@router.get("/admin/games/history", response_model=list[PollHistoryRow])
+async def admin_games_history(
+    session: SessionDep,
+    user: CurrentUser,
+    limit: int = 30,
+) -> list[PollHistoryRow]:
+    """N1.2: история игровых опросов (`kind in ('game_choice','game_when')`).
+
+    Возвращает тот же `PollHistoryRow`, что и /admin/polls/history. Поле
+    `game_nomination_id` имеет смысл только для `game_when` — фронт по нему
+    может подтянуть имя игры через /admin/games (если номинация ещё жива).
+    """
+    _ensure_admin(user)
+    return await _build_poll_history(
+        session, kinds=["game_choice", "game_when"], limit=max(1, min(limit, 200))
+    )
+
+
 @router.get("/chukhan/leaderboard", response_model=list[ChukhanLeaderRow])
 async def chukhan_leaderboard(
     session: SessionDep,

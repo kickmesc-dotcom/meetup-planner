@@ -526,16 +526,37 @@ Backend по фактическому коду готов; frontend BotPauseBar 
 голосование с побочными эффектами на вес чухана).
 
 ### N1 — История опросов
-- [ ] **N1.1.** Backend `routes_admin.py::GET /admin/polls/history` — `[{poll_id,
-  kind, question, created_at, closed_at, options:[{label, votes:[user_id]}]}]`.
-  Источник: существующие таблицы `polls`, `poll_options`, `poll_votes`.
-- [ ] **N1.2.** Backend `routes_admin.py::GET /admin/games/history` — фильтр
-  `polls.kind in ('game_choice','game_when')`, обогащение `meetings.tag='game'`-
-  записями (если был follow-up `game_when` → `Meeting.starts_at` → реально ли
-  «сыграно» = `now() > Meeting.starts_at`).
-- [ ] **N1.3.** Frontend `features/admin/PollHistoryScreen.tsx` — список опросов
-  с раскрытием опции/голосов. Подключить как ссылку из `AdminScreen` «📜 История»
-  (рядом с уже существующей историей лохов/чуханов).
+- [x] **N1.1.** (2026-05-27) Backend `routes_admin.py::GET /admin/polls/history`
+  (limit≤200, default 30). Возвращает `PollHistoryRow[]` — `poll_id, kind,
+  question, created_by, created_at, closes_at, closed, tg_message_id,
+  game_nomination_id, options[]`. Каждый `options[i]` — `id, label, starts_at,
+  ends_at, votes:[{user_id, display_name, voted_at}]`. Реализация через
+  `_build_poll_history` (один SELECT polls, один SELECT poll_options, один
+  SELECT poll_votes + N имён через select(User.id, display_name) — без N+1).
+- [x] **N1.2.** (2026-05-27) Backend `routes_admin.py::GET /admin/games/history`
+  (limit≤200, default 30) — то же, но с фильтром `Poll.kind in
+  ('game_choice','game_when')`. Чтобы не делать N+1 на номинации, поле
+  `game_nomination_id` уже есть в `Poll` — фронт может подтянуть имя из
+  `/admin/games` (если номинация ещё в active-списке).
+  ⚠️ Обогащение `Meeting` («реально сыграно» = `now > Meeting.starts_at`) из
+  исходного описания опущено: это семантика «исторический факт», а не «опрос».
+  Для будущего N2 (post-meeting feedback) — там и будет жить.
+- [x] **N1.3.** (2026-05-27) Frontend `features/admin/HistoryScreen.tsx`
+  расширен:
+  - `Tab` union → 'chukhan'|'loser'|'polls'|'games' (overflow-x-auto для tab-bar).
+  - `fetchPollsHistory/fetchGamesHistory` (limit=30) подключены через
+    useQuery + `enabled: tab === 'polls' / 'games'`.
+  - Новый компонент `PollsHistoryList` + `PollHistoryItem`: каждая строка —
+    клик-раскрытие, в раскрытии опции с chip'ами голосовавших, у пустых опций
+    — отдельный empty-state. Цветной chip kind (🎮 во что / 🕒 когда / ⏸ zaebal
+    / meetup). Без отдельного PollHistoryScreen — это естественная пятая/
+    шестая вкладка уже существующей «📜 История». tsc --noEmit чист.
+
+### Sync (N1)
+- [x] **D-N1.** (2026-05-27) `meetup-planner-backend/app/api/routes_admin.py`
+  синкнут (`_build_poll_history` + GET /admin/polls/history + GET
+  /admin/games/history). `diff -rq` чист. Frontend (`api/admin.ts` +
+  `features/admin/HistoryScreen.tsx`) — пользователь пушит сам.
 
 ### N2 — Пост-фактум голосование по встрече (5★)
 - [ ] **N2.1.** Backend: миграция `0013_meeting_feedback.py` — таблица

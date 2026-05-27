@@ -59,6 +59,40 @@ export interface ScheduledJob {
 export const fetchScheduledJobs = () =>
   api<ScheduledJob[]>("/api/admin/jobs");
 
+// GHG6 N1: история опросов и игр.
+export interface PollHistoryVote {
+  user_id: number;
+  display_name: string | null;
+  voted_at: string;
+}
+
+export interface PollHistoryOption {
+  id: number;
+  label: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  votes: PollHistoryVote[];
+}
+
+export interface PollHistoryRow {
+  poll_id: number;
+  kind: string | null;
+  question: string;
+  created_by: number;
+  created_at: string;
+  closes_at: string | null;
+  closed: boolean;
+  tg_message_id: number | null;
+  game_nomination_id: number | null;
+  options: PollHistoryOption[];
+}
+
+export const fetchPollsHistory = (limit = 30) =>
+  api<PollHistoryRow[]>(`/api/admin/polls/history?limit=${limit}`);
+
+export const fetchGamesHistory = (limit = 30) =>
+  api<PollHistoryRow[]>(`/api/admin/games/history?limit=${limit}`);
+
 // GHG6 M3: cancel = пропустить ближайший запуск (для recurring) / удалить (one-shot).
 export const cancelScheduledJob = (jobId: string) =>
   api<void>(`/api/admin/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" });
