@@ -1,3 +1,145 @@
+# Инструкция по выкладке GHG6 (2026-05-27)
+
+Итерация GHG6 (старт 2026-05-18, закрытие основной массы — 2026-05-26..27).
+Закрыты разделы: P0, P1, P2, P2.5, P3 CL1–CL9/CL12/CL13/CL8 (включая частичную
+заливку таймлайн-ячейки), D, E1–E11, F, G1, G2, G3, H, I, J, K. Открытые на
+момент релиза: L (режимы сбора фраз), M (очередь задач: ручное управление),
+N (история опросов и встреч + 5★ feedback) — см. `CHECKLIST_GHG6.md`.
+
+## Миграции БД (Alembic) — 0008 → 0012
+
+После пуша backend в HF Space контейнер сам делает `alembic upgrade head` при
+старте. Все пять миграций безопасны (только `op.create_table` / `op.add_column`
+без backfill, который мог бы блокировать таблицы). Порядок:
+
+- **0008_worm_assignments** (E8) — таблица `worm_assignments` для номинации
+  «Червь-пидор». Partial unique index `WHERE ended_at IS NULL` гарантирует ≤1
+  активного червя.
+- **0009_bot_pause** (E11) — таблица `bot_pause` (snapshot всех master-toggles
+  в JSONB + auto-restore по `ends_at`). Partial unique index на одну активную
+  строку.
+- **0010_games_nominations** (E6) — `game_nominations` (10 активных, soft-delete
+  через `removed_at`) + `polls.kind` + `polls.game_nomination_id` + `meetings.tag`.
+- **0011_poll_is_closed** (G3) — `polls.is_closed BOOLEAN NOT NULL DEFAULT false`.
+  Защита от двойного `bot.stop_poll` при auto-close по кворуму.
+- **0012_loser_source** (H1) — `loser_rolls.source VARCHAR(8) NOT NULL DEFAULT
+  'manual'` + индекс `ix_loser_source_rolled_at(source, rolled_at)`. Старые
+  строки помечаются как `'manual'` (для текущего cooldown'а нерелевантно — он
+  считается от ПОСЛЕДНЕЙ строки соответствующего источника).
+
+Откат: `alembic downgrade -1` по каждой миграции в обратном порядке. Все имеют
+рабочие `downgrade()` (drop_table / drop_column).
+
+## Новые admin-ручки (REST)
+
+Все требуют admin-tg-id из `ADMIN_TG_IDS`. Источник — `app/api/routes_admin.py`.
+
+- **Календарь (CL0):** `GET/PUT /admin/calendar/timeline {enabled: bool}`. ⚠️
+  **Default = `false`** (см. ниже про откат и `admin_config.py:450-461`).
+- **Пауза бота (E11):** `GET /admin/bot-pause/current`,
+  `POST /admin/bot-pause/start {duration_days?: int, reason?: str}`,
+  `POST /admin/bot-pause/stop`. snapshot/restore master-toggles делается
+  внутри сервиса.
+- **/zaebal настройки (E11):** `GET/PUT /admin/zaebal-settings` —
+  `threshold`, `duration_days`, `poll_hours`, `auto_enabled`, `auto_max_per_month`.
+- **Дефолты опросов (G2/G3):** `GET/PUT /admin/polls/defaults` — четыре ключа в
+  одном эндпойнте: `pin_default`, `quorum_auto_close`, `live_participants_count`,
+  `pin_result`.
+- **Игровые номинации (E6):** `GET /admin/games`, `DELETE /admin/games/{id}`,
+  `POST /admin/games/poll-create {kind, pin?, ...}`.
+- **Червь-пидор (E8):** `GET/PUT /admin/worm` — `worm.chance` (default 0.01).
+- **Реакции бота (F):** `GET/PUT /admin/bot-reactions`.
+- **Аватары (D):** `POST /admin/avatars/sync-now`,
+  `GET/POST/DELETE /admin/avatars/schedule-once`.
+- **Прокси (расширено над GHG5 P2):** селф-тест и пинги — `POST /admin/proxy/selftest`,
+  `POST /admin/proxy/{id}/ping`, `POST /admin/proxy/ping-all`,
+  `POST /admin/proxy/delete-dead`, `POST /admin/proxy/parse`,
+  `GET/DELETE /admin/proxy/add-errors`, `POST /admin/proxy/bootstrap-fetch`,
+  `GET /admin/proxy/status`, `DELETE /admin/proxy/status/last-error`,
+  `GET/PUT /admin/proxy/alerts`.
+
+## Флаг `calendar.timeline_enabled` — как откатить на legacy-вид
+
+Новый таймлайн-вид календаря (CL1–CL9) сидит за master-toggle
+`admin_config["calendar.timeline_enabled"]`. **Default = `false`** (так
+было заложено на старте CL0; код в `app/services/admin_config.py:450-461`
+оставляет дефолт `false` до тех пор, пока не появится явное желание раздать
+новый вид всем — см. docstring там же).
+
+- **Включить новый вид руками** (для проверки на проде после пуша):
+  `PUT /admin/calendar/timeline {"enabled": true}`. Применяется без перезапуска
+  — frontend читает значение при следующем рендере календаря.
+- **Откат на legacy:** `PUT /admin/calendar/timeline {"enabled": false}`.
+  Никакие миграции не откатываются, состояние календаря не теряется.
+
+Frontend сам выбирает между `TimelineView` и `StripView`/`MonthView` по этому
+флагу. Если хочется поднять дефолт до `true` — поправить третий аргумент
+`_get_bool(...)` в `get_calendar_timeline_enabled` на `True` и пересобрать
+backend (миграции не требуются).
+
+## Новые env-секреты HF Space
+
+В разделе **Settings → Variables and secrets** HF Space
+`fryesw/meetup-planner-backend` должны существовать (имена сохранены из
+`project_meetup_planner_deployed.md`):
+
+- `ADMIN_TG_IDS` — список tg-id админов через запятую (личка для уведомлений о
+  паузе/zaebal/snapshot).
+- `GROUP_CHAT_ID` — chat_id основной группы (нужен publishers/announce-точкам).
+
+Если этих переменных ещё нет — добавить **до** пуша GHG6, иначе `/zaebal`,
+auto-zaebal и announce-точки опросов будут логировать warning «no admin/group
+chat configured» и тихо пропускать действия.
+
+## Шаги пуша GHG6
+
+Backend синхронизирован: `meetup-planner-main/backend/` →
+`meetup-planner-backend/` (последний mass-sync — 2026-05-26, см. логи
+D-E11 / D-G2 / D-G3 / D-H1 / D-K в `CHECKLIST_GHG6.md`).
+
+```
+cd C:\Users\fa1nt\meetup-planner-backend
+git status                # должны быть только файлы из mass-sync'а GHG6
+git add app/ alembic/ tests/
+git commit -m "feat(GHG6): worm, bot_pause, games_nominations, polls auto-close/pin, loser source, /help, timeline calendar"
+git push                  # HF Space сам пересоберёт Docker
+```
+
+Frontend — отдельным коммитом из `meetup-planner-main/frontend/` в
+`kickmesc-dotcom/meetup-planner` (GitHub Pages соберёт).
+
+## Проверка после деплоя
+
+1. HF логи на старте: `alembic upgrade head` доезжает до `0012_loser_source`
+   без ошибок. `scheduler.started`, потом `webhook.set url=...`.
+2. В админке появились новые экраны: `🎮 Игры`, `⏸ Пауза бота` (через
+   `BotPauseBar` сверху AdminScreen), `📌 Дефолты опросов`, `⏱ Интервалы`,
+   `🐛 Червь-пидор`.
+3. `/help` в группе отвечает списком команд без admin-only; в личке у админа —
+   с блоком «🔧 Админ».
+4. Ручная рулетка лоха работает даже если автолох сегодня уже крутился —
+   cooldown manual независим от auto (H1).
+5. Новый календарь: включить `PUT /admin/calendar/timeline {"enabled":true}`,
+   обновить Mini App → видны рендер таймлайн-ячеек, частичная заливка по часам
+   (CL9), 👑×N короны в один день (J).
+6. Auto-close опроса по кворуму: 5 голосов в один опрос → poll закрывается,
+   `polls.is_closed=true` (G3).
+
+## Откат всей итерации
+
+Если что-то взорвётся фатально:
+
+1. `git revert <commit-range> && git push` в `meetup-planner-backend` — HF
+   откатит образ. Миграции 0008–0012 НЕ снимаются автоматически: новые таблицы
+   останутся пустыми и не помешают legacy-коду (он их не читает).
+2. Если нужно жёстко откатить и схему — на Neon вручную:
+   `alembic downgrade 0007_proxies` (требует подключения с
+   `DATABASE_URL` локально, HF Space сам downgrade не делает).
+3. `PUT /admin/calendar/timeline {"enabled":false}` — на случай, если новый
+   таймлайн надо погасить без отката backend'а.
+
+---
+
 # Инструкция по выкладке GHG5 (2026-05-17)
 
 ## P0 — критичные баги

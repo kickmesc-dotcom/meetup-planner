@@ -26,10 +26,14 @@ export const fetchBirthdayGreeting = (userId: number, date: string) =>
   );
 
 // GHG6 BD4: отметки лох/чухан в окне (для рисования 👑/💩 в ячейках).
+// GHG6 J: для type='loser' приходит source ('auto' | 'manual'). Один и тот же
+// день у одного юзера может содержать обе метки — фронт рисует 👑×2.
+// Для type='chukhan' source всегда null.
 export interface CalendarMark {
   date: string; // YYYY-MM-DD
   user_id: number;
   type: "loser" | "chukhan";
+  source?: "auto" | "manual" | null;
 }
 
 export const fetchCalendarMarks = (from: Date, to: Date) =>

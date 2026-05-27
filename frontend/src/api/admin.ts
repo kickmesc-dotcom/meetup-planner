@@ -256,12 +256,18 @@ export const updateRPSchedule = (body: RPSchedule) =>
 
 // --- A4: Generator settings ---
 
+// GHG6 L: режим сбора фраз. 'words' — отдельные слова, 'phrases' — целые фразы
+// из истории, 'mix' (default) — оба пула вместе. Серверный default — 'mix'
+// для обратной совместимости со старыми клиентами.
+export type RandomPhrasesMode = "words" | "phrases" | "mix";
+
 export interface RPGenerator {
   count_min: number;
   count_max: number;
   lookback_days: number;
   collective_chance: number;
   user_chance: number;
+  mode: RandomPhrasesMode;
 }
 
 export const fetchRPGenerator = () =>

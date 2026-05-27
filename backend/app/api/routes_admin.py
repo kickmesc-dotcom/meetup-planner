@@ -21,6 +21,7 @@ from app.services.admin_config import (
     get_random_phrases_count_range,
     get_random_phrases_enabled,
     get_random_phrases_lookback_days,
+    get_random_phrases_mode,
     get_random_phrases_schedule,
     get_random_phrases_user_chance,
     get_reminders_tick_minutes,
@@ -34,6 +35,7 @@ from app.services.admin_config import (
     set_random_phrases_count_range,
     set_random_phrases_enabled,
     set_random_phrases_lookback_days,
+    set_random_phrases_mode,
     set_random_phrases_schedule,
     set_random_phrases_user_chance,
     set_reminders_tick_minutes,
@@ -860,6 +862,8 @@ class GeneratorSettingsOut(BaseModel):
     lookback_days: int
     collective_chance: float
     user_chance: float
+    # GHG6 L: режим сбора фраз — отдельные слова / целые фразы / смесь.
+    mode: str = Field("mix", pattern="^(words|phrases|mix)$")
 
 
 class GeneratorSettingsUpdate(BaseModel):
@@ -868,6 +872,8 @@ class GeneratorSettingsUpdate(BaseModel):
     lookback_days: int = Field(..., ge=1, le=365)
     collective_chance: float = Field(..., ge=0.0, le=1.0)
     user_chance: float = Field(..., ge=0.0, le=1.0)
+    # GHG6 L: дефолт 'mix' — старые клиенты не присылают mode.
+    mode: str = Field("mix", pattern="^(words|phrases|mix)$")
 
 
 @router.get("/admin/random-phrases/generator", response_model=GeneratorSettingsOut)
@@ -880,6 +886,7 @@ async def get_rp_generator(session: SessionDep, user: CurrentUser) -> GeneratorS
         lookback_days=await get_random_phrases_lookback_days(session),
         collective_chance=await get_random_phrases_collective_chance(session),
         user_chance=await get_random_phrases_user_chance(session),
+        mode=await get_random_phrases_mode(session),
     )
 
 
@@ -892,6 +899,7 @@ async def update_rp_generator(
     await set_random_phrases_lookback_days(session, body.lookback_days)
     await set_random_phrases_collective_chance(session, body.collective_chance)
     await set_random_phrases_user_chance(session, body.user_chance)
+    await set_random_phrases_mode(session, body.mode)
     log.info("admin.rp_generator_updated", body=body.model_dump(), by=user.id)
     return body
 

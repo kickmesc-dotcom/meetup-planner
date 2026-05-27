@@ -27,6 +27,14 @@ RANDOM_PHRASES_USER_CHANCE_KEY = "random_phrases.user_chance"
 # A3: расписание автопостинга
 RANDOM_PHRASES_SCHEDULE_MODE_KEY = "random_phrases.schedule_mode"   # daily_n|weekly_n|fixed_times|random_interval
 RANDOM_PHRASES_SCHEDULE_PARAM_KEY = "random_phrases.schedule_param"  # JSON: {"n":3} | {"times":["12:00","18:00"]} | {"min_minutes":120}
+# GHG6 L: режим сбора фраз. 'words' — N случайных слов; 'phrases' — N целых
+# фраз-чанков (по пунктуации); 'mix' — оба пула вместе. До L count_min/count_max
+# применялись только к чанкам, поэтому N=2..2 по факту могло выдавать сообщение
+# любой длины — баг п.20. Теперь min/max строго ограничивают итоговое
+# количество единиц выбранного типа.
+RANDOM_PHRASES_MODE_KEY = "random_phrases.mode"
+_RANDOM_PHRASES_MODES = ("words", "phrases", "mix")
+_RANDOM_PHRASES_MODE_DEFAULT = "mix"
 
 # --- Reminders tick (A2) ---
 REMINDERS_TICK_MINUTES_KEY = "reminders.tick_minutes"
@@ -307,6 +315,18 @@ async def set_random_phrases_user_chance(session: AsyncSession, chance: float) -
     await _set_value(
         session, RANDOM_PHRASES_USER_CHANCE_KEY, str(max(0.0, min(1.0, chance)))
     )
+
+
+async def get_random_phrases_mode(session: AsyncSession) -> str:
+    """GHG6 L: режим сбора. Невалидное значение → default 'mix'."""
+    raw = (await _get_value(session, RANDOM_PHRASES_MODE_KEY)) or _RANDOM_PHRASES_MODE_DEFAULT
+    return raw if raw in _RANDOM_PHRASES_MODES else _RANDOM_PHRASES_MODE_DEFAULT
+
+
+async def set_random_phrases_mode(session: AsyncSession, mode: str) -> None:
+    if mode not in _RANDOM_PHRASES_MODES:
+        raise ValueError(f"random_phrases.mode must be one of {_RANDOM_PHRASES_MODES}, got {mode!r}")
+    await _set_value(session, RANDOM_PHRASES_MODE_KEY, mode)
 
 
 # --- GHG5 POLL-HOURS1: Human-friendly time presets for polls/auto-pick ---

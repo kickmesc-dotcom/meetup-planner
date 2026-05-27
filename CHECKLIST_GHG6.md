@@ -208,24 +208,40 @@ Backend по фактическому коду готов; frontend BotPauseBar 
 ## P3 этап 4–5 — Календарь: остаток TimelineView (CL9, D-P3, D-FINAL, D-MEM)
 
 ### CL9 — частичная заливка таймлайн-ячейки при `all_day=false`
-- [ ] **CL9.1.** `ParticipantRow.tsx` — расчёт `partialFraction = (ends_at -
-  starts_at) / 24h` для дня, у которого worst-status имеет `all_day=false`.
-  Рисуем `<div>` с `position:absolute; left:0; height: partialFraction*100%; …`
-  с тем же `fill.background`, что и full-fill. Полная заливка остаётся для
-  `all_day=true`.
-- [ ] **CL9.2.** Иконка 🕓 в правом-верхнем углу таймлайн-ячейки при `all_day=false`
-  (через `pointer-events:none`, `text-[10px] opacity-70`).
-- [ ] **CL9.3.** `confidenceFillForDay` или новый helper `worstRangeForDay` должен
-  возвращать не только `{status, confidence}`, но и `{all_day, starts_at, ends_at}`,
-  чтобы рендер мог посчитать долю. Аккуратно с агрегацией: если worst-range имеет
-  `all_day=true`, доля = 100%.
+- [x] **CL9.3.** (2026-05-26) `dateUtils.ts::confidenceFillForDay` расширен:
+  принимает опциональное `all_day?: boolean` в range'ах, отслеживает «выигравший»
+  worst-range (не только status/confidence). Возвращаемый тип теперь
+  `DayFill = { background, status, confidence, partial: {top, height} | null }`.
+  При worst.all_day=false считает `top = (visStart - dayStart)/24h`,
+  `height = (visEnd - visStart)/24h`, защищён clamp [0,1] и проверкой height>0.
+  Tie-break при равных status+confidence: предпочитаем all_day=true (точнее
+  отражает покрытие дня). Старые callers без поля `all_day` остаются на полной
+  заливке (обратная совместимость).
+- [x] **CL9.1.** (2026-05-26) `ParticipantRow.tsx` — при `fill.partial != null`
+  background уходит с самой button (она становится прозрачной), а отдельный
+  `pointer-events-none div` с `top/height` в процентах и `fill.background`
+  рисует полосу строго по времени worst-range'а (0:00 = top ячейки, 24:00 = низ).
+  Полная заливка остаётся для all_day=true / range, покрывающего ≥24ч.
+- [x] **CL9.2.** (2026-05-26) Иконка 🕓 в **левом-верхнем** углу ячейки при
+  `hasPartial` (top-0.5 left-0.5). Право-верх занят бейджем 🎂 — поэтому
+  левый угол выбран как «свободное место». pointer-events-none, text-[10px],
+  opacity-70 как было в спеке.
+  aria-label и title таймлайн-кнопки обогащены суффиксом «(часть дня) / · часть дня».
+  `tsc --noEmit` чист.
 
 ### Финал GHG6
-- [ ] **D-P3.** Sync backend после CL9 (там вряд ли будут изменения, но если появится
-  `services/availability.py::worst_range_for_day` — попадёт сюда).
-- [ ] **D-FINAL.** `DEPLOY_NOTES.md` — раздел «GHG6 (2026-05-XX)»: миграции 0008–0012,
-  ссылки на админские ручки управления, флаг `admin_config.calendar.timeline_enabled`
-  (default true), как откатить на legacy через `PUT /admin/calendar/timeline {enabled:false}`.
+- [x] **D-P3.** (2026-05-26) CL9 чисто фронт — backend-каталог не менялся
+  (`diff -r meetup-planner-main/backend meetup-planner-backend` пуст). No-op.
+- [x] **D-FINAL.** (2026-05-27) `DEPLOY_NOTES.md` — раздел «GHG6 (2026-05-27)»
+  дописан наверху файла: миграции 0008–0012 с откатами, новые `/admin/*`-ручки
+  (calendar/timeline, bot-pause, zaebal-settings, polls/defaults, games, worm,
+  bot-reactions, avatars, proxy/{selftest,ping,...}), флаг
+  `admin_config.calendar.timeline_enabled` (фактический default = **false**,
+  не true как было в исходной формулировке чеклиста — поправлено по коду
+  `admin_config.py:461`), включение/откат через
+  `PUT /admin/calendar/timeline`, шаги пуша backend в HF, проверка после
+  деплоя, инструкция отката (git revert HF + `alembic downgrade 0007_proxies`
+  на Neon).
 - [ ] **D-MEM.** Память `project_meetup_planner_deployed.md` — упоминание `meetup-planner-frontend`
   уже удалено, проставить `[x]` после релиза GHG6.
 
@@ -352,44 +368,63 @@ Backend по фактическому коду готов; frontend BotPauseBar 
  в) смесь из фраз и сообщений: от x до y фраз\сообщений (выбран по умолчанию)»
 
 ### Backend
-- [ ] **L1.** `admin_config.py`:
-  - `RANDOM_PHRASES_MODE_KEY = "random_phrases.mode"` ∈ {'words','phrases','mix'},
-    default 'mix'.
-  - Существующие `random_phrases.count_min/count_max` остаются как min/max единиц
-    (слов в режиме words, фраз в режиме phrases, любого в mix).
-  - `get/set_random_phrases_mode`.
-- [ ] **L2.** `services/random_phrases.py::compose_random_phrase` — разветвить
-  по mode:
-  - `words`: брать только сообщения (entity 'message'/без entity), резать на
-    отдельные слова (split по пробелу + пунктуации), собирать `N ∈ [min..max]`
-    случайных слов. Если пул < min — снизить целевое N до размера пула.
-  - `phrases`: брать только цельные «фразы» (из истории — `Phrase` или PollVote-
-    или Quote-источника; уточнить, где у нас хранится «фраза» как единица).
-    Собирать `N ∈ [min..max]` целых фраз через сепаратор.
-  - `mix`: текущее поведение (склейка слов и фраз), но **строго** соблюдая [min..max]
-    итоговых единиц — сейчас это нарушается (баг 2→2 → 8).
-- [ ] **L3.** Тщательно проверить, где сейчас формируется итог: `_glue_chunks`,
-  `dedup_chunks`. После dedup может остаться меньше min — в таком случае добор
-  из исходного пула (как для dedup) до min, без дублей. Если пул кончился —
-  отдать сколько есть (лог-warning).
-- [ ] **L4.** `routes_admin.py` — `RandomPhrasesSettings` обогатить полем
-  `mode: str`. GET/PUT обрабатывают новое поле.
-- [ ] **L5.** `tests/test_random_phrases_mode.py`:
-  - words mode: min=2, max=2 → ровно 2 слова в выводе на 50 прогонах.
-  - phrases mode: min=1, max=3 → каждый прогон сегментно собран из 1..3 фраз.
-  - mix mode: дефолт + строгое соблюдение [min..max] на 50 прогонах.
-  - Пул < min: возвращает «сколько есть», лог-warning.
+- [x] **L1.** (2026-05-27) `admin_config.py`:
+  `RANDOM_PHRASES_MODE_KEY = "random_phrases.mode"`, валидируется через
+  `_RANDOM_PHRASES_MODES = ("words","phrases","mix")`, default `'mix'`.
+  Хелперы `get/set_random_phrases_mode`. Невалидное значение в БД → silent
+  fallback на `'mix'` в getter'е.
+- [x] **L2.** (2026-05-27) `services/random_phrases.py::compose_random_phrase`
+  разветвлён по mode:
+  - `words`: `_split_into_words` (regex `[^\W_]{3,}`) даёт отдельные слова ≥3
+    символа. Склейка через `_glue_words` (пробел + капитализация + терминатор).
+  - `phrases`: `_split_into_chunks` (по пунктуации, MIN_CHUNK_LEN=6). Склейка
+    через `_glue_chunks` со связками.
+  - `mix`: оба пула объединены в единый список единиц, склейка через `_glue_chunks`.
+  Невалидный mode → log-warning + fallback на `mix`.
+- [x] **L3.** (2026-05-27) Строгое соблюдение [min..max] делается через
+  существующий `dedup_chunks(picked_raw, all_pool=..., target_n=n)`: на входе
+  `n*2` кандидатов с возвратом, на выходе ≤ n уникальных (≤ — потому что пул
+  может быть скудным). При `len(picked) < n` пишется `random_phrases.pool_undersized`
+  с pool/requested — это не ошибка.
+- [x] **L4.** (2026-05-27) `routes_admin.py` — `mode` ушёл из
+  `RandomPhrasesSettings` (этот endpoint используется только для enable+count) в
+  `GeneratorSettingsOut/Update` (`/admin/random-phrases/generator`), потому что
+  именно там живут `count_min/count_max` — единицы которые `mode` определяет.
+  GET читает через `get_random_phrases_mode`, PUT пишет через `set_random_phrases_mode`.
+  Старые клиенты без поля `mode` → Pydantic подставит default `'mix'`,
+  совместимость не страдает.
+- [x] **L5.** (2026-05-27) `tests/test_random_phrases_mode.py` — 12 кейсов:
+  - чистые юниты `_split_into_words` / `_glue_words` (фильтр коротких,
+    капитализация, терминатор, пустой ввод).
+  - `compose_random_phrase` через fake-async-session (паттерн `test_loser_cooldown_split`):
+    words 50 прогонов с min=max=2 → строго 2 слова в выводе;
+    phrases 50 прогонов с n=1..3 → непустой вывод;
+    mix 50 прогонов с n=2..5;
+    invalid mode → fallback на mix;
+    пустой пул → fallback-строка;
+    пул < n → отдаём что есть (≤ size of pool), без падения.
+  - бекап-тест `_split_into_chunks` (MIN_CHUNK_LEN=6).
+  Полный сьют 123/123 ✅ (было 111 — +12 за L).
 
 ### Frontend
-- [ ] **L6.** `features/admin/RandomPhrasesScreen.tsx` (или эквивалентный экран
-  настроек фраз) — chip-выбор режима (words / phrases / mix) + подсказка под
-  выбранным. Лейблы поля count_min/count_max меняются: «слов», «фраз», «фраз/
-  сообщений» в зависимости от mode.
+- [x] **L6.** (2026-05-27) `api/admin.ts::RPGenerator` обогащён полем
+  `mode: RandomPhrasesMode` (+ экспорт type). `features/admin/RandomPhrasesGeneratorScreen.tsx`:
+  - Секция «🧩 Режим сбора» сверху над «📏 Длина цитаты». 3 chip'а
+    (🔤 Слова / 💬 Фразы / 🌀 Смесь) на `ModeChip`-компоненте, haptic('selection')
+    при тапе.
+  - Лейблы count_min/count_max динамические: `min слов (2..6)` /
+    `min фраз (2..6)` / `min фраз/сообщений (2..6)` по выбранному mode.
+  - Хинт под chip'ами объясняет семантику текущего режима.
+  - `mode` участвует в `dirty`-проверке и в `body`-payload. Старые серверы без
+    поля `mode` в ответе → `initial.mode ?? "mix"`. tsc --noEmit чист.
 
 ### Sync
-- [ ] **D-L.** `cp backend/app/services/random_phrases.py backend/app/services/admin_config.py
-  backend/app/api/routes_admin.py backend/tests/test_random_phrases_mode.py
-  → meetup-planner-backend/`. Frontend — пользователь сам.
+- [x] **D-L.** (2026-05-27) Скопированы в `meetup-planner-backend/`:
+  `app/services/admin_config.py`, `app/services/random_phrases.py`,
+  `app/api/routes_admin.py`, `tests/test_random_phrases_mode.py`.
+  `diff -rq` чист (только `.venv/.git/__pycache__/.pytest_cache/.env/.gitignore`
+  исключены). Frontend (`api/admin.ts`, `RandomPhrasesGeneratorScreen.tsx`) —
+  пушится пользователем сам в `kickmesc-dotcom/meetup-planner`.
 
 ---
 
@@ -471,10 +506,10 @@ Backend по фактическому коду готов; frontend BotPauseBar 
     `services/chukhan.py::add_weight` или новый helper), запись в общий feed.
 - [ ] **N2.3.** Backend `bot/handlers/meeting_feedback.py` — на следующий день
   после `Meeting.starts_at` (scheduler-job `JOB_MEETING_FEEDBACK`, daily 12:00)
-  публикует в чат «Как собрались?» Telegram-poll 5★ + «меня не было». При
+  публикует в чат «Как собрались?» Telegram-poll 5★ + «пропустил». При
   голосе — `submit_feedback` через `on_poll_update` (расширить диспетчер kind).
 - [ ] **N2.4.** Backend: тост в чат при `was_absent=True` («@user пропустил
-  встречу — +0.5 к весу чухана»).
+  встречу — +0.5 к весу чухана» - добавим возможность отключить это уведомление в настройках встреч).
 - [ ] **N2.5.** Frontend `PollHistoryScreen.tsx` — секция «🍻 История встреч» —
   список Meeting-записей с агрегированной средней оценкой и количеством отсутствий.
 - [ ] **N2.6.** Тесты `tests/test_meeting_feedback.py` — submit / increment /

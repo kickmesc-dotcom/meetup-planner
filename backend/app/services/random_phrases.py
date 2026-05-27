@@ -20,6 +20,7 @@ from app.services.admin_config import (
     get_random_phrases_count_range,
     get_random_phrases_enabled,
     get_random_phrases_lookback_days,
+    get_random_phrases_mode,
     get_random_phrases_user_chance,
 )
 
@@ -54,6 +55,37 @@ def _split_into_chunks(text: str) -> list[str]:
     """Делим сообщение на фрагменты."""
     parts = re.split(r"(?<=[.!?…])\s+|[,;\n]+", text)
     return [p.strip() for p in parts if len(p.strip()) >= MIN_CHUNK_LEN]
+
+
+# GHG6 L: режим 'words' — отдельные слова длиной ≥ 3 (буквы/цифры в любых
+# алфавитах). Цифры тоже считаем словами (`2024` — это слово). Эмодзи и одиночные
+# символы пунктуации не считаем словом.
+_WORD_RE = re.compile(r"[^\W_]{3,}", re.UNICODE)
+MIN_WORD_LEN = 3
+
+
+def _split_into_words(text: str) -> list[str]:
+    """GHG6 L: режим 'words'. Возвращает отдельные слова длиной ≥3.
+
+    Без нормализации регистра — `_glue_words`/`dedup_chunks` сами нормализуют.
+    """
+    if not text:
+        return []
+    return [m.group(0) for m in _WORD_RE.finditer(text)]
+
+
+def _glue_words(words: list[str]) -> str:
+    """GHG6 L: склейка слов через пробел. Без connector'ов / запятых, чтобы
+    не «надувать» N: пользователь просил 2 слова — должен увидеть 2 слова,
+    а не «два слова, и связка». Капитализируем первое, точку в конце ставим
+    только если её ещё нет."""
+    if not words:
+        return "..."
+    head = words[0][0].upper() + words[0][1:]
+    out = " ".join([head, *words[1:]])
+    if not out.endswith((".", "!", "?", "…")):
+        out += "..."
+    return out
 
 
 _DUP_WORD_RE = re.compile(r"\b(\w+)(\s+\1\b)+", re.IGNORECASE)
@@ -170,15 +202,29 @@ async def compose_random_phrase(
     *,
     lookback_days: int = 7,
     collective_chance: float = 0.1,
+    mode: str = "mix",
 ) -> str | None:
+    """Собрать случайную «шизо-цитату» по N единиц выбранного `mode`.
+
+    `mode` ∈ {'words','phrases','mix'} — единица сборки:
+      - words: отдельные слова длиной ≥3 (см. _split_into_words). Склейка пробелом.
+      - phrases: чанки по пунктуации (см. _split_into_chunks). Склейка через связки.
+      - mix: оба пула объединены, склейка через связки.
+
+    Возвращает HTML-готовый текст или None/fallback при пустых данных.
+    Если пул < n — отдаёт «сколько есть» с log-warning (это не ошибка).
+    """
     # Защита от некорректного n
     n = max(1, n or 3)
+    if mode not in ("words", "phrases", "mix"):
+        log.warning("random_phrases.bad_mode_fallback_mix", got=mode)
+        mode = "mix"
 
     # 1. Сначала пробуем за последние lookback_days дней
     cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
     stmt = select(ChatMessage.user_id, ChatMessage.text).where(ChatMessage.sent_at >= cutoff)
     rows = list((await session.execute(stmt)).all())
-        
+
     # 2. Если за неделю пусто — откатываемся к последним 100 сообщениям вообще
     if not rows:
         log.info("random_phrases.weekly_empty_falling_back")
@@ -192,49 +238,66 @@ async def compose_random_phrase(
     if not rows:
         return "<i>(В чате подозрительно тихо... Мне нечего цитировать)</i>"
 
-    # 3. Группируем чанки
+    # 3. Группируем единицы по mode. Для mix держим оба пула отдельно, чтобы
+    # потом смешать в едином списке.
     by_user: dict[int, list[str]] = {}
-    all_chunks: list[str] = []
+    all_units: list[str] = []
     for uid, text in rows:
-        chunks = _split_into_chunks(text or "")
-        if chunks:
-            by_user.setdefault(int(uid), []).extend(chunks)
-            all_chunks.extend(chunks)
+        if mode == "words":
+            units = _split_into_words(text or "")
+        elif mode == "phrases":
+            units = _split_into_chunks(text or "")
+        else:  # mix
+            units = _split_into_chunks(text or "") + _split_into_words(text or "")
+        if units:
+            by_user.setdefault(int(uid), []).extend(units)
+            all_units.extend(units)
 
-    # Видимость пула: сколько фраз есть на каждого участника.
-    pool_sizes = {uid: len(chunks) for uid, chunks in by_user.items()}
+    pool_sizes = {uid: len(units) for uid, units in by_user.items()}
     log.info(
         "random_phrases.pool_ready",
-        total_chunks=len(all_chunks),
-        users_with_chunks=len(by_user),
+        mode=mode,
+        total_units=len(all_units),
+        users_with_units=len(by_user),
         pool_sizes=pool_sizes,
     )
 
-    if not all_chunks:
+    if not all_units:
         return "<i>(Сообщения есть, но они слишком короткие для цитат)</i>"
 
     # 4. Решаем: Шизо-цитата юзера (1 - collective_chance) или Голос Шестерки.
     is_collective = (random.random() < collective_chance) or (len(by_user) < 2)
-        
+
     if is_collective:
-        picked = random.sample(all_chunks, min(len(all_chunks), n))
-        # GHG6 E4: даже sample (без повторов экземпляров) даёт почти-дубли —
-        # одно и то же сообщение могло быть нарезано в почти одинаковые куски.
-        picked = dedup_chunks(picked, all_pool=all_chunks, target_n=n)
-        glued = _glue_chunks(picked)
+        picked_raw = [random.choice(all_units) for _ in range(n * 2)]
+        picked = dedup_chunks(picked_raw, all_pool=all_units, target_n=n)
+        if len(picked) < n:
+            log.warning(
+                "random_phrases.pool_undersized",
+                mode=mode,
+                requested=n,
+                got=len(picked),
+                pool=len(all_units),
+            )
+        glued = _glue_words(picked) if mode == "words" else _glue_chunks(picked)
         return f"🗣 <b>Сводный хор Шестёрки:</b>\n\n«<i>{glued}</i>»"
 
     # 5. Шизо-цитата конкретного автора
     target_uid = random.choice(list(by_user.keys()))
     user_pool = by_user[target_uid]
 
-    # GHG6 E4: было `[random.choice(user_pool) for _ in range(n)]` — выбор с
-    # возвратом, повторы случались закономерно (особенно у юзеров с маленьким
-    # пулом — типичный кейс Русланище). Теперь берём с запасом и фильтруем
-    # через dedup_chunks.
     picked_raw = [random.choice(user_pool) for _ in range(n * 2)]
     picked = dedup_chunks(picked_raw, all_pool=user_pool, target_n=n)
-    glued = _glue_chunks(picked)
+    if len(picked) < n:
+        log.warning(
+            "random_phrases.pool_undersized",
+            mode=mode,
+            requested=n,
+            got=len(picked),
+            pool=len(user_pool),
+            user_id=target_uid,
+        )
+    glued = _glue_words(picked) if mode == "words" else _glue_chunks(picked)
 
     user = await session.get(User, target_uid)
     author_name = user.display_name if user else "Кто-то из наших"
@@ -314,12 +377,14 @@ async def run_random_phrases_job(bot: Bot) -> None:
         cmin, cmax = await get_random_phrases_count_range(session)
         lookback_days = await get_random_phrases_lookback_days(session)
         collective_chance = await get_random_phrases_collective_chance(session)
+        mode = await get_random_phrases_mode(session)
         n = random.randint(cmin, cmax)
         log.info(
             "random_phrases.starting",
             n=n,
             cmin=cmin,
             cmax=cmax,
+            mode=mode,
             lookback_days=lookback_days,
             collective_chance=collective_chance,
             chat_id=settings.group_chat_id,
@@ -331,6 +396,7 @@ async def run_random_phrases_job(bot: Bot) -> None:
                 n,
                 lookback_days=lookback_days,
                 collective_chance=collective_chance,
+                mode=mode,
             )
         except Exception:
             log.exception("random_phrases.compose_failed")
