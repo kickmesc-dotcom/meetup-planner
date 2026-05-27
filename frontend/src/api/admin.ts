@@ -43,17 +43,32 @@ export const fetchChukhanLeaderboard = () =>
 
 export interface ScheduledJob {
   id: string;
-  kind: "cron" | "interval" | "reminder";
+  // GHG6 M: backend стал возвращать также "date" и "unknown" для системных,
+  // плюс "reminder" для DB-напоминаний.
+  kind: "cron" | "interval" | "date" | "reminder" | "unknown";
   label: string;
   next_run_at: string | null;
   detail: string | null;
+  // GHG6 M: тот же что kind, но не «соврёт» если бэкенд не отдаёт (default).
+  trigger_kind?: "cron" | "interval" | "date" | "reminder" | "unknown";
+  // GHG6 M: системные job'ы (proxy_health) приходят с editable=false —
+  // фронт скрывает у них кнопки «Изменить» / «Отменить».
+  editable?: boolean;
 }
 
 export const fetchScheduledJobs = () =>
   api<ScheduledJob[]>("/api/admin/jobs");
 
+// GHG6 M3: cancel = пропустить ближайший запуск (для recurring) / удалить (one-shot).
 export const cancelScheduledJob = (jobId: string) =>
   api<void>(`/api/admin/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" });
+
+// GHG6 M2: подвинуть next_run_time job'а на указанный момент (UTC ISO).
+export const rescheduleScheduledJob = (jobId: string, runAtIso: string) =>
+  api<ScheduledJob>(`/api/admin/jobs/${encodeURIComponent(jobId)}/reschedule`, {
+    method: "POST",
+    body: JSON.stringify({ run_at: runAtIso }),
+  });
 
 export interface RandomPhrasesSettings {
   enabled: boolean;

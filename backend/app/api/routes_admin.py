@@ -78,6 +78,31 @@ class ScheduledJobOut(BaseModel):
     label: str
     next_run_at: datetime | None
     detail: str | None = None
+    # GHG6 M: тип триггера (для фронта — определять, что писать в reschedule)
+    # и редактируемость. Системные job'ы вроде proxy_health не редактируются.
+    trigger_kind: str = "interval"  # interval | cron | date | reminder
+    editable: bool = True
+
+
+# GHG6 M: пропускаемые scheduler-job-id (нельзя двигать/отменять руками).
+# Это инфраструктурный health-check — он должен идти строго по таймеру.
+_NON_EDITABLE_JOB_IDS: frozenset[str] = frozenset({"proxy_health"})
+
+
+def _classify_trigger(trigger: object) -> str:
+    """GHG6 M: текстовое имя для типа APScheduler-триггера.
+
+    Не используем `isinstance` напрямую, чтобы не тащить лишних импортов
+    в этот файл — анализируем имя класса.
+    """
+    name = type(trigger).__name__.lower()
+    if "cron" in name:
+        return "cron"
+    if "interval" in name:
+        return "interval"
+    if "date" in name:
+        return "date"
+    return "unknown"
 
 class RandomPhrasesSettings(BaseModel):
     enabled: bool
@@ -184,13 +209,16 @@ async def list_scheduled_jobs(
             label = f"💬 Автопост фраз (доп. {job.id.rsplit(':', 1)[-1]})"
         else:
             label = _JOB_LABELS.get(job.id, job.id)
+        tkind = _classify_trigger(job.trigger)
         out.append(
             ScheduledJobOut(
                 id=job.id,
-                kind="cron" if "cron" in str(type(job.trigger)).lower() else "interval",
+                kind=tkind,
                 label=label,
                 next_run_at=job.next_run_time,
                 detail=str(job.trigger),
+                trigger_kind=tkind,
+                editable=job.id not in _NON_EDITABLE_JOB_IDS,
             )
         )
     reminder_rows = list(
@@ -213,27 +241,131 @@ async def list_scheduled_jobs(
                 label=f"📅 «{meeting.title}» (-{rem.offset_minutes} мин)",
                 next_run_at=rem.due_at,
                 detail=f"meeting_id={meeting.id}",
+                trigger_kind="reminder",
+                editable=True,
             )
         )
     return out
 
-# Исправленный Cancel Job
+# GHG6 M: ручное управление scheduler-jobs (reschedule + skip-next).
+#
+# Решения по семантике (по п.17):
+# - reschedule на конкретное время — только для editable APScheduler-jobs
+#   и reminder:<id>. Системные job'ы из _NON_EDITABLE_JOB_IDS отказывают 400.
+# - cancel = «пропустить ближайший запуск», НЕ удаление job'а:
+#   * Для recurring (interval/cron) → next_run_time = trigger.get_next_fire_time
+#     после now + epsilon (1 сек), что даёт следующий цикл и пропускает текущий.
+#   * Для one-shot (date) → действительно удаляем job из планировщика.
+#   * Для reminder → выставляем sent_at=now (старая семантика).
+# - reload_dynamic_jobs НЕ зовём — это сбросило бы все ручные правки и
+#   собрало бы расписание заново.
+
+
+class JobRescheduleIn(BaseModel):
+    """GHG6 M: тело для POST /admin/jobs/{id}/reschedule.
+
+    `run_at` всегда в UTC ISO; фронт переводит из локального времени.
+    """
+
+    run_at: datetime
+
+
+@router.post("/admin/jobs/{job_id:path}/reschedule", response_model=ScheduledJobOut)
+async def reschedule_job(
+    job_id: str,
+    body: JobRescheduleIn,
+    session: SessionDep,
+    user: CurrentUser,
+) -> ScheduledJobOut:
+    """GHG6 M2: подвинуть `next_run_time` job'а на указанный момент."""
+    _ensure_admin(user)
+    run_at = body.run_at
+    if run_at.tzinfo is None:
+        run_at = run_at.replace(tzinfo=timezone.utc)
+
+    if job_id.startswith("reminder:"):
+        try:
+            rem_id = int(job_id.split(":", 1)[1])
+        except (ValueError, IndexError) as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_job_id") from e
+        rem = await session.get(MeetingReminder, rem_id)
+        if rem is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "reminder_not_found")
+        if rem.sent_at is not None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "reminder_already_sent")
+        rem.due_at = run_at
+        await session.commit()
+        meeting = await session.get(Meeting, rem.meeting_id)
+        meeting_title = meeting.title if meeting else "?"
+        log.info(
+            "admin.reminder_rescheduled",
+            reminder_id=rem_id,
+            run_at=run_at.isoformat(),
+            by=user.id,
+        )
+        return ScheduledJobOut(
+            id=job_id,
+            kind="reminder",
+            label=f"📅 «{meeting_title}» (-{rem.offset_minutes} мин)",
+            next_run_at=rem.due_at,
+            detail=f"meeting_id={rem.meeting_id}",
+            trigger_kind="reminder",
+            editable=True,
+        )
+
+    if job_id in _NON_EDITABLE_JOB_IDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "system_job_not_editable")
+
+    sched = get_scheduler()
+    job = sched.get_job(job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "job_not_found")
+    try:
+        sched.modify_job(job_id, next_run_time=run_at)
+    except Exception as e:  # noqa: BLE001 — APScheduler не специфичен
+        log.warning("admin.job_reschedule_failed", job_id=job_id, error=str(e))
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "modify_failed") from e
+    log.info("admin.job_rescheduled", job_id=job_id, run_at=run_at.isoformat(), by=user.id)
+    job = sched.get_job(job_id)
+    tkind = _classify_trigger(job.trigger) if job else "unknown"
+    label = (
+        f"💬 Автопост фраз (доп. {job_id.rsplit(':', 1)[-1]})"
+        if job_id.startswith("random_phrases:extra:")
+        else _JOB_LABELS.get(job_id, job_id)
+    )
+    return ScheduledJobOut(
+        id=job_id,
+        kind=tkind,
+        label=label,
+        next_run_at=job.next_run_time if job else None,
+        detail=str(job.trigger) if job else None,
+        trigger_kind=tkind,
+        editable=True,
+    )
+
+
 @router.delete(
-    "/admin/jobs/{job_id:path}", 
+    "/admin/jobs/{job_id:path}",
     status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response # Явно указываем класс ответа
+    response_class=Response,
 )
 async def cancel_job(
     job_id: str,
     session: SessionDep,
     user: CurrentUser,
 ):
+    """GHG6 M3: пропустить ближайший запуск (для recurring) / удалить (one-shot).
+
+    Семантика см. шапку секции — НЕ совпадает с «delete job» в классическом
+    APScheduler, потому что recurring-job нам нужно сохранить (он автоматически
+    пересоберётся через reload_dynamic_jobs при следующей правке настроек).
+    """
     _ensure_admin(user)
     if job_id.startswith("reminder:"):
         try:
             rem_id = int(job_id.split(":", 1)[1])
-        except (ValueError, IndexError):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_job_id")
+        except (ValueError, IndexError) as e:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_job_id") from e
         rem = await session.get(MeetingReminder, rem_id)
         if rem is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "reminder_not_found")
@@ -243,7 +375,45 @@ async def cancel_job(
         await session.commit()
         log.info("admin.reminder_cancelled", reminder_id=rem_id, by=user.id)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    raise HTTPException(status.HTTP_400_BAD_REQUEST, "system_job_not_cancellable")
+
+    if job_id in _NON_EDITABLE_JOB_IDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "system_job_not_cancellable")
+
+    sched = get_scheduler()
+    job = sched.get_job(job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "job_not_found")
+    tkind = _classify_trigger(job.trigger)
+    if tkind == "date":
+        # One-shot — действительно удаляем (DateTrigger всё равно выстрелит один раз).
+        sched.remove_job(job_id)
+        log.info("admin.job_removed_oneshot", job_id=job_id, by=user.id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # Recurring (cron/interval) — пропускаем ближайший запуск.
+    # `get_next_fire_time(prev, now)` у APScheduler-триггеров возвращает
+    # следующее время после `now`. Берём now+1сек, чтобы текущий запуск
+    # (если он на now) был пропущен.
+    from datetime import timedelta as _td
+    now = datetime.now(timezone.utc)
+    try:
+        next_fire = job.trigger.get_next_fire_time(None, now + _td(seconds=1))
+    except Exception as e:  # noqa: BLE001
+        log.warning("admin.job_skip_next_failed", job_id=job_id, error=str(e))
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "skip_next_failed") from e
+    if next_fire is None:
+        # Триггер исчерпан — просто удалим job.
+        sched.remove_job(job_id)
+        log.info("admin.job_removed_exhausted", job_id=job_id, by=user.id)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    sched.modify_job(job_id, next_run_time=next_fire)
+    log.info(
+        "admin.job_next_skipped",
+        job_id=job_id,
+        new_next_run_at=next_fire.isoformat(),
+        by=user.id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @router.get("/admin/random-phrases", response_model=RandomPhrasesSettings)
 async def get_random_phrases(

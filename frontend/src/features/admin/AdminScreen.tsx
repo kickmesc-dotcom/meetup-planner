@@ -20,6 +20,7 @@ import GamesScreen from "./GamesScreen";
 import ZaebalSettingsScreen from "./ZaebalSettingsScreen";
 import IntervalsScreen from "./IntervalsScreen";
 import BotPauseBar from "./BotPauseBar";
+import JobsQueueScreen from "./JobsQueueScreen";
 
 type Section =
   | "root"
@@ -35,7 +36,8 @@ type Section =
   | "proxy"
   | "games"
   | "zaebal"
-  | "intervals";
+  | "intervals"
+  | "jobs";
 
 interface Props {
   users: User[];
@@ -73,6 +75,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "games") return <GamesScreen onBack={back} />;
   if (section === "zaebal") return <ZaebalSettingsScreen onBack={back} />;
   if (section === "intervals") return <IntervalsScreen onBack={back} />;
+  if (section === "jobs") return <JobsQueueScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -170,11 +173,24 @@ export default function AdminScreen({ users }: Props) {
         />
       </SectionGroup>
 
+      {/* GHG6 M6 (п.17): «Очередь задач» поднята СРАЗУ под Прокси — пользователь
+          просил видеть её ближе к топу. Раньше та же таблица жила внутри
+          ScheduledPublicationsScreen, теперь это отдельный экран с reschedule
+          и skip-next кнопками. */}
+      <SectionGroup icon="📋" title="Очередь задач">
+        <Card
+          icon="📋"
+          title="Запланированные задачи"
+          subtitle="APScheduler-job'ы + напоминания. ✎ изменить, ⏭ пропустить"
+          onClick={() => select("jobs")}
+        />
+      </SectionGroup>
+
       <SectionGroup icon="⏰" title="Запланированные публикации">
         <Card
           icon="⏱️"
           title="Расписание задач"
-          subtitle="Тик напоминаний, очередь job'ов, опросы"
+          subtitle="Master-toggles, дефолты опросов, опросы в чате"
           onClick={() => select("scheduled-pubs")}
         />
         <Card

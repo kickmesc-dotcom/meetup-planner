@@ -6,13 +6,11 @@ import {
   avatarsScheduleOnceGet,
   avatarsScheduleOncePost,
   avatarsSyncNow,
-  cancelScheduledJob,
   closeAdminPoll,
   deleteAdminPoll,
   fetchAdminPolls,
   fetchBotReactions,
   fetchPollsDefaults,
-  fetchScheduledJobs,
   fetchScheduledSettings,
   updateBotReactions,
   updatePollsDefaults,
@@ -32,10 +30,6 @@ const errAlert = (e: unknown) => {
   void showAlert(humanizeApiError(e));
 };
 
-const JOBS_IDLE_INTERVAL_MS = 10 * 60 * 1000;
-const JOBS_HOT_INTERVAL_MS = 5_000;
-const JOBS_HOT_DURATION_MS = 3 * 60 * 1000;
-
 interface Props {
   onBack: () => void;
 }
@@ -43,35 +37,9 @@ interface Props {
 export default function ScheduledPublicationsScreen({ onBack }: Props) {
   const qc = useQueryClient();
 
-  const [jobsHotUntil, setJobsHotUntil] = useState(0);
-  const [, forceTick] = useState(0);
-  const hotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const enterHotMode = useCallback(() => {
-    const until = Date.now() + JOBS_HOT_DURATION_MS;
-    setJobsHotUntil(until);
-    if (hotTimerRef.current) clearTimeout(hotTimerRef.current);
-    hotTimerRef.current = setTimeout(() => {
-      forceTick((n) => n + 1);
-      hotTimerRef.current = null;
-    }, JOBS_HOT_DURATION_MS + 100);
-    qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
-  }, [qc]);
-
-  useEffect(() => {
-    return () => {
-      if (hotTimerRef.current) clearTimeout(hotTimerRef.current);
-    };
-  }, []);
-
-  const isHot = Date.now() < jobsHotUntil;
-  const jobsInterval = isHot ? JOBS_HOT_INTERVAL_MS : JOBS_IDLE_INTERVAL_MS;
-
-  const jobs = useQuery({
-    queryKey: ["admin", "jobs"],
-    queryFn: fetchScheduledJobs,
-    refetchInterval: jobsInterval,
-  });
+  // GHG6 M6: блок очереди задач вынесен в отдельный экран JobsQueueScreen
+  // (доступен из AdminScreen → «📋 Очередь задач»). Здесь больше нет hot-mode
+  // и polling'а /admin/jobs.
 
   const sched = useQuery({
     queryKey: ["admin", "scheduled"],
@@ -93,16 +61,8 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
     onSuccess: (data) => {
       haptic("success");
       qc.setQueryData(["admin", "scheduled"], data);
+      // Invalidate jobs cache на случай, если из JobsQueueScreen он уже подгружен.
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
-    },
-    onError: errAlert,
-  });
-
-  const cancelJob = useMutation({
-    mutationFn: (id: string) => cancelScheduledJob(id),
-    onSuccess: () => {
-      haptic("light");
-      enterHotMode();
     },
     onError: errAlert,
   });
@@ -197,7 +157,11 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
               })
             }
           >
-            <AvatarsActions onJobsChanged={enterHotMode} />
+            <AvatarsActions
+              onJobsChanged={() =>
+                qc.invalidateQueries({ queryKey: ["admin", "jobs"] })
+              }
+            />
           </ToggleBlock>
 
           <ToggleBlock
@@ -241,71 +205,9 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
         </>
       )}
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="text-base font-semibold">📋 Очередь задач</div>
-          <button
-            type="button"
-            onClick={() => {
-              haptic("light");
-              enterHotMode();
-              jobs.refetch();
-            }}
-            className="shrink-0 rounded-md bg-tg-bg/70 px-2 py-1 text-[10px] text-tg-hint active:scale-95 transition-transform"
-            title="Обновить очередь и опрашивать чаще 3 минуты"
-          >
-            ↻ {isHot ? "тик 5с" : "тик 10м"}
-          </button>
-        </div>
-        <div className="text-xs text-tg-hint mb-2">
-          APScheduler-задачи + ближайшие напоминания.
-        </div>
-        {jobs.isPending ? (
-          <ListSkeleton rows={3} />
-        ) : (jobs.data ?? []).length === 0 ? (
-          <div className="text-xs text-tg-hint">Очередь пуста.</div>
-        ) : (
-          <div className="space-y-1.5">
-            {(jobs.data ?? []).map((j) => (
-              <div
-                key={j.id}
-                className="flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm truncate text-tg-text">{j.label}</div>
-                  <div className="text-[10px] text-tg-hint truncate">
-                    {j.next_run_at
-                      ? format(new Date(j.next_run_at), "dd.MM HH:mm")
-                      : "—"}
-                  </div>
-                </div>
-                <div
-                  className={[
-                    "text-[10px] rounded-full px-1.5 py-0.5 shrink-0",
-                    j.kind === "reminder"
-                      ? "bg-status-maybe/15 text-status-maybe"
-                      : "bg-tg-link/15 text-tg-link",
-                  ].join(" ")}
-                >
-                  {j.kind}
-                </div>
-                {j.kind === "reminder" && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm(`Отменить «${j.label}»?`)) cancelJob.mutate(j.id);
-                    }}
-                    disabled={cancelJob.isPending}
-                    className="min-h-11 min-w-11 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-40"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* GHG6 M6 (п.17): «Очередь задач» вынесена в отдельный экран
+          `JobsQueueScreen`, доступный из AdminScreen сразу под «🌐 Прокси»
+          с возможностью reschedule/skip-next. Здесь её больше нет. */}
 
       {/* G2.10 + G3.6: единый блок настроек опросов в чате — pin_default,
           quorum_auto_close + live_participants_count, pin_result. */}

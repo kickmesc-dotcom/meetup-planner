@@ -441,32 +441,74 @@ Backend по фактическому коду готов; frontend BotPauseBar 
   на следующие сутки/неделю.
 
 ### Backend
-- [ ] **M1.** `app/api/routes_admin.py::admin_jobs_list` (есть? проверить —
-  если нет, добавить `GET /admin/jobs`) возвращает `[{id, name, next_run_time,
-  trigger_kind: 'interval'|'date'|'cron', editable: bool}]`.
-- [ ] **M2.** `POST /admin/jobs/{id}/reschedule` `{run_at: ISO}` — для editable-задач
-  пересоздаёт триггер с `next_run_time` = `run_at`. Использует существующие
-  `DateTrigger` или `IntervalTrigger.modify`. Для `cron` — отдельный кейс
-  (cron не двигается одной точкой; альтернатива — задать `next_run_time` через
-  `sched.modify_job`).
-- [ ] **M3.** `POST /admin/jobs/{id}/cancel` — для one-shot (DateTrigger) удаляет
-  job; для periodic (Interval/Cron) — выставляет `paused=True` до следующего
-  цикла (или `pause_for_one_run`-механика).
-- [ ] **M4.** Тесты `tests/test_admin_jobs.py` (mock APScheduler) — list / reschedule /
-  cancel one-shot / cancel recurring.
+- [x] **M1.** (2026-05-27) `ScheduledJobOut` обогащён полями `trigger_kind:
+  str` ('interval'|'cron'|'date'|'reminder'|'unknown') и `editable: bool`.
+  Системные job'ы определяются через `_NON_EDITABLE_JOB_IDS = {"proxy_health"}`
+  — они приходят с `editable=false` и фронт не рендерит у них кнопки управления.
+  `_classify_trigger(trigger)` — чистая функция по имени класса.
+- [x] **M2.** (2026-05-27) `POST /admin/jobs/{job_id:path}/reschedule
+  {run_at: datetime}` — для editable APScheduler-jobs зовёт
+  `sched.modify_job(job_id, next_run_time=run_at)`. Для `reminder:<id>` —
+  обновляет `MeetingReminder.due_at`. Naive datetime трактуется как UTC.
+  Возвращает обновлённый `ScheduledJobOut`. Для `proxy_health` — 400
+  `system_job_not_editable`; для несуществующего job'а — 404.
+- [x] **M3.** (2026-05-27) `DELETE /admin/jobs/{job_id:path}` — переработан
+  под семантику «пропустить ближайший запуск», НЕ полное удаление:
+  - one-shot `DateTrigger` → `sched.remove_job` (он одноразовый — корректно).
+  - recurring `IntervalTrigger`/`CronTrigger` → `modify_job(next_run_time=
+    trigger.get_next_fire_time(None, now + 1s))` — текущий пропускается,
+    следующий по расписанию остаётся.
+  - триггер исчерпан (`get_next_fire_time` вернул None) → `remove_job`.
+  - `reminder:<id>` — `sent_at=now` (старая семантика GHG5).
+  - `proxy_health` → 400 `system_job_not_cancellable`.
+- [x] **M4.** (2026-05-27) `tests/test_admin_jobs.py` — 13 кейсов через
+  `_FakeScheduler` (mock APScheduler без живой БД, по паттерну
+  test_loser_cooldown_split):
+  - `_classify_trigger`: Interval/Cron/Date/Unknown.
+  - `reschedule`: interval job → modify_job; unknown → 404; non-editable → 400
+    (без вызова modify); naive datetime → автоматически UTC.
+  - `cancel`: one-shot date → remove_job; recurring interval → modify_job
+    (next в будущем, не remove); recurring cron → то же; non-editable → 400;
+    unknown → 404.
+  Reminder-кейсы тестируются вручную на проде (требуют живой БД и MeetingReminder
+  с FK на Meeting). Полный сьют 136/136 ✅ (было 123 — +13 за M4).
 
 ### Frontend
-- [ ] **M5.** `features/admin/JobsQueueScreen.tsx` — таблица задач, под каждой:
-  - `next_run_time` форматированный (локальное время),
-  - кнопка «✎ Изменить» → inline `<input type="datetime-local">` + «💾 Сохранить»,
-  - кнопка «🚫 Отменить» (one-shot) / «⏭ Пропустить ближайший запуск» (recurring).
-- [ ] **M6.** `AdminScreen.tsx` — секция «📋 Очередь задач» поднята **сразу
-  под «🌐 Прокси»** (новый порядок после п.16: Quick → Прокси → Очередь задач →
-  Запл. публикации → Календарь → Лох → Чухан → История → ⏱ Интервалы).
+- [x] **M5.** (2026-05-27) `features/admin/JobsQueueScreen.tsx` — новый экран
+  «📋 Очередь задач»:
+  - Список `ScheduledJob`-строк с label / next_run_at (форматирование
+    `dd.MM HH:mm` через date-fns) / chip с trigger_kind.
+  - Hot-mode polling (5с после действия, 10 мин idle) — как было в
+    ScheduledPublicationsScreen, теперь тут.
+  - Inline-редактор: кнопка «✎» раскрывает `<input type="datetime-local">`
+    + кнопка «💾» (haptic medium) — `rescheduleScheduledJob(id, utcIso)`.
+  - Кнопка «🚫» / «⏭» (динамическая иконка по `trigger_kind`):
+    date/reminder → «удалить», recurring → «пропустить ближайший запуск».
+    `confirm()` перед действием.
+  - Для `editable=false` (proxy_health) кнопки скрыты — отображается только
+    label и next_run_at (нагляднее, чем дизейблить — пользователь не путается).
+  - `api/admin.ts::ScheduledJob` обогащён `trigger_kind?`, `editable?`.
+  - `rescheduleScheduledJob(id, runAtIso)` — новая мутация
+    (`POST /admin/jobs/{id}/reschedule`). tsc --noEmit чист.
+- [x] **M6.** (2026-05-27) `AdminScreen.tsx`:
+  - `Section` тип расширен `"jobs"`.
+  - Импорт `JobsQueueScreen` + ветка рендера.
+  - **Новая секция «📋 Очередь задач»** прямо под «🌐 Прокси», ВЫШЕ
+    «⏰ Запланированные публикации» — по тексту п.17 («сразу под прокси»).
+  - Subtitle карточки `scheduled-pubs` поправлен: «Master-toggles, дефолты
+    опросов, опросы в чате» — без упоминания «очередь job'ов».
+  - Дубликат блока «📋 Очередь задач» удалён из `ScheduledPublicationsScreen`
+    (вместе с импортами `fetchScheduledJobs/cancelScheduledJob`, hot-mode
+    `useState/useRef`, константами `JOBS_*_INTERVAL_MS` — всё больше не нужно).
+    `AvatarsActions.onJobsChanged` теперь зовёт `qc.invalidateQueries`
+    напрямую.
 
 ### Sync
-- [ ] **D-M.** `cp backend/app/api/routes_admin.py backend/tests/test_admin_jobs.py
-  → meetup-planner-backend/`. Frontend — пользователь сам.
+- [x] **D-M.** (2026-05-27) Скопированы в `meetup-planner-backend/`:
+  `app/api/routes_admin.py`, `tests/test_admin_jobs.py`. `diff -rq` чист.
+  Frontend (`api/admin.ts`, `features/admin/JobsQueueScreen.tsx` (новый),
+  `features/admin/AdminScreen.tsx`, `features/admin/ScheduledPublicationsScreen.tsx`)
+  — пушится пользователем сам.
 
 ---
 
