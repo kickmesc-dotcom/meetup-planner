@@ -82,6 +82,7 @@ JOB_BIRTHDAYS = "birthdays_daily"
 JOB_BOT_PAUSE_AUTO_RESTORE = "bot_pause_auto_restore"  # GHG6 E11
 JOB_AUTO_ZAEBAL = "auto_zaebal"  # GHG6 E11.3
 JOB_MEETING_FEEDBACK = "meeting_feedback_daily"  # GHG6 N2.3
+JOB_LOSER_OUTBOX_RETRY = "loser_outbox_retry"  # GHG7 P0.2.b.4
 
 
 def _env_int(name: str, default: int) -> int:
@@ -239,6 +240,134 @@ async def _autoloser_job(bot: Bot) -> None:
             log.info("autoloser.posted")
         except Exception:
             log.exception("autoloser.failed")
+
+
+async def _loser_outbox_retry_job(bot: Bot) -> None:
+    """GHG7 P0.2.b.4: ретраит pending-записи `loser_outbox`.
+
+    Каждую минуту берёт до 10 записей `status='pending' AND attempts<MAX AND
+    next_retry_at<=now()` под `FOR UPDATE SKIP LOCKED` — две машины (или job
+    и админский «принудительный ретрай», если когда-нибудь появится) не
+    подерутся за одну строку. Для каждой пересобираем текст из
+    `LoserRoll+User` (без worm-блока — если корона уже передавалась в БД
+    при первом roll, текст «передача звания» уже бессмыслен через час).
+
+    Лимиты: 12 попыток × 5 мин = ~1 час суммарного окна доставки. После —
+    `status='expired'`. Корона на календаре до `status='sent'` не показана
+    (фильтр в `routes_calendar.py`, см. b.5), поэтому expired-роллы
+    тихо остаются в БД для аналитики, без визуального шума.
+    """
+    from sqlalchemy import select as _select
+
+    from app.config import get_settings as _gs
+    from app.db.base import get_sessionmaker as _gsm
+    from app.db.models import LoserOutbox, LoserRoll, User
+    from app.services.loser import compose_loser_message
+
+    settings = _gs()
+    if not settings.group_chat_id:
+        return  # без чата ретраить некуда — outbox останется pending
+
+    sm = _gsm()
+    async with sm() as session:
+        # FOR UPDATE SKIP LOCKED — postgres-only, в SQLite-тестах sa упадёт.
+        # Тесты на retry-job будут использовать postgres-fixture либо моковать
+        # эту функцию целиком. LIMIT 10 защищает от «бури» если пул-доставщик
+        # вдруг встал на час и накопил тысячу записей.
+        stmt = (
+            _select(LoserOutbox)
+            .where(
+                LoserOutbox.status == "pending",
+                LoserOutbox.attempts < _AUTOLOSER_MAX_ATTEMPTS,
+                LoserOutbox.next_retry_at <= datetime.now(timezone.utc),
+            )
+            .order_by(LoserOutbox.next_retry_at.asc())
+            .limit(10)
+            .with_for_update(skip_locked=True)
+        )
+        rows = list((await session.scalars(stmt)).all())
+        if not rows:
+            return
+
+        for outbox in rows:
+            roll = await session.get(LoserRoll, outbox.loser_roll_id)
+            if roll is None:
+                # Roll удалён вручную (например `delete_last_loser`) — outbox
+                # обессмыслен. Помечаем expired, чтобы не крутить впустую.
+                outbox.status = "expired"
+                outbox.last_error = "loser_roll missing"
+                continue
+
+            loser_user = await session.get(User, roll.loser_user_id)
+            loser_name = (
+                loser_user.display_name if loser_user is not None else "?"
+            )
+            text = compose_loser_message(
+                loser_name=loser_name,
+                reason_text=roll.reason_text or "",
+                extras=None,  # worm-стилизация при ретрае не повторяется
+                header_emoji="🤡",
+                header_label="Автолох сегодня",
+            )
+
+            transport = (
+                "proxy"
+                if getattr(bot.session, "_active_proxy_id", None) is not None
+                else "direct"
+            )
+            proxy_id = getattr(bot.session, "_active_proxy_id", None)
+            send_started = time.monotonic()
+            try:
+                msg = await asyncio.wait_for(
+                    bot.send_message(
+                        chat_id=settings.group_chat_id,
+                        text=text,
+                        parse_mode="HTML",
+                    ),
+                    timeout=_AUTOLOSER_SEND_TIMEOUT,
+                )
+                elapsed_ms = round((time.monotonic() - send_started) * 1000, 1)
+                outbox.status = "sent"
+                outbox.attempts = outbox.attempts + 1
+                outbox.sent_at = datetime.now(timezone.utc)
+                outbox.tg_message_id = getattr(msg, "message_id", None)
+                outbox.last_error = None
+                log.info(
+                    "loser_outbox_retry.sent",
+                    outbox_id=outbox.id,
+                    attempts=outbox.attempts,
+                    transport=transport,
+                    proxy_id=proxy_id,
+                    elapsed_ms=elapsed_ms,
+                    tg_message_id=outbox.tg_message_id,
+                )
+            except Exception as exc:  # noqa: BLE001 — лимит/ретрай решается ниже
+                elapsed_ms = round((time.monotonic() - send_started) * 1000, 1)
+                outbox.attempts = outbox.attempts + 1
+                outbox.last_error = f"{type(exc).__name__}: {exc}"[:500]
+                if outbox.attempts >= _AUTOLOSER_MAX_ATTEMPTS:
+                    outbox.status = "expired"
+                    log.warning(
+                        "loser_outbox_retry.expired",
+                        outbox_id=outbox.id,
+                        attempts=outbox.attempts,
+                        last_error=outbox.last_error,
+                    )
+                else:
+                    outbox.next_retry_at = (
+                        datetime.now(timezone.utc) + _AUTOLOSER_RETRY_DELAY
+                    )
+                    log.warning(
+                        "loser_outbox_retry.pending",
+                        outbox_id=outbox.id,
+                        attempts=outbox.attempts,
+                        transport=transport,
+                        proxy_id=proxy_id,
+                        elapsed_ms=elapsed_ms,
+                        error=outbox.last_error,
+                    )
+
+        await session.commit()
 
 
 def _build_random_phrases_trigger(mode: str, param: dict, tz: str):
@@ -576,6 +705,20 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=600,  # GHG6 H4: 10мин — пауза не требует секундной точности
+    )
+
+    # GHG7 P0.2.b.4: ретрай недоставленных автолох-постов. Раз в минуту тянем
+    # pending-записи из loser_outbox и пробуем отправить заново. Не зависит
+    # от admin-config — это infra-job, как proxy_health.
+    sched.add_job(
+        _logged_job(JOB_LOSER_OUTBOX_RETRY, _loser_outbox_retry_job),
+        IntervalTrigger(minutes=1, jitter=10),
+        kwargs={"bot": bot},
+        id=JOB_LOSER_OUTBOX_RETRY,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=300,  # GHG6 H4: 5 мин — таков же шаг ретрая
     )
 
     sched.start()

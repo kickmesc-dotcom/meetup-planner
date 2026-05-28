@@ -99,6 +99,12 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   (`fryesw/meetup-planner-backend@f20a08f`). DDL применится при старте
   Space, фактическое поведение остаётся прежним (outbox не используется
   никем до b.3).
+- [x] **P0.2.b.3 sync** (2026-05-28) main `@47453a0` + HF `@194ae78`.
+  Теперь автолох ПИШЕТ в outbox при каждом срабатывании, но без retry-job
+  (b.4) `pending`-записи никогда не догоняются. Без фильтра в календаре
+  (b.5) корона показывается и для pending-роллов — то есть проявления
+  бага P0.2 пока не полностью устранены; критически важно поскорее
+  закрыть b.4 и b.5.
 - [x] **P0.2.b.3.** (2026-05-28) `_announce` в `app/bot/scheduler.py`
   переписан под outbox-паттерн: создаёт `LoserOutbox(status='pending')`
   в одной транзакции с roll, пробует `send_message` с timeout=8s, при
@@ -109,11 +115,14 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   `transport=direct|proxy`, `proxy_id`, `elapsed_ms`. Константы:
   `_AUTOLOSER_SEND_TIMEOUT=8.0`, `_AUTOLOSER_RETRY_DELAY=5min`,
   `_AUTOLOSER_MAX_ATTEMPTS=12`.
-- [ ] **P0.2.b.4.** Новый scheduler-job `loser_outbox_retry` (id =
-  `JOB_LOSER_OUTBOX_RETRY`, каждую минуту): SELECT outbox WHERE
-  status='pending' AND attempts<12 AND next_retry_at<=now() FOR UPDATE
-  SKIP LOCKED. Для каждой записи — попытка send. attempts<12 → next_retry
-  = now+5m; attempts>=12 → status='expired'.
+- [x] **P0.2.b.4.** (2026-05-28) `_loser_outbox_retry_job` в
+  `scheduler.py`: SELECT pending FOR UPDATE SKIP LOCKED LIMIT 10,
+  пересборка текста из `LoserRoll+User` (без worm-стилизации в ретрае),
+  send_message с timeout=8s, при успехе → sent+message_id, при фейле
+  → attempts+=1, expired при достижении MAX. Зарегистрирован в
+  `start_scheduler` как infra-job (IntervalTrigger 1 min, jitter 10s,
+  misfire_grace=5min). Удалённые roll'ы (None при `session.get`) сразу
+  помечаются expired с last_error='loser_roll missing'.
 - [ ] **P0.2.b.5.** Фильтр в `routes_calendar.py` calendar-marks:
   для type='loser' source='auto' включать только если в outbox
   `status='sent'` ИЛИ outbox-записи нет (legacy до миграции). Ручные
