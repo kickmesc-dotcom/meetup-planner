@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import structlog
 # Добавлен импорт Response
 from fastapi import APIRouter, HTTPException, status, Response
@@ -497,6 +497,107 @@ async def get_rp_pool(session: SessionDep, user: CurrentUser) -> RandomPhrasesPo
     return RandomPhrasesPoolOut(
         lookback_days=lookback_days, total_chunks=total, rows=out_rows
     )
+
+
+# --- GHG7 P0.3: debug-снимок копилки (ВСЕ записи, без cutoff) ---
+#
+# Жалоба GHG7 стр.4: счётчики фраз в админ-UI обнулились/упали (140+ → 63),
+# у активного юзера висит 0. Эндпоинт ниже отдаёт сырьё для разбора:
+# total_messages по юзеру без cutoff (т.е. что физически лежит в БД),
+# last_sent_at (старая запись = чистка отъела), messages_within_lookback
+# (то, что попадает в /pool). Расхождение total vs within_lookback
+# показывает, режет ли TTL-чистка слишком много; large total + 0 в
+# within_lookback при «вчера активный» = баг TZ/cutoff; малый total
+# при «много писал» = не записывается на входе (whitelist/тип сообщения).
+#
+# Безопасный read-only эндпоинт под админ-токеном.
+
+
+class RandomPhrasesPoolRawRow(BaseModel):
+    user_id: int
+    telegram_id: int
+    display_name: str
+    total_messages: int
+    last_sent_at: datetime | None
+    messages_within_lookback: int
+
+
+class RandomPhrasesPoolRawOut(BaseModel):
+    server_now_utc: datetime
+    lookback_days: int
+    cutoff_used_utc: datetime
+    total_messages_in_db: int
+    total_within_lookback: int
+    rows: list[RandomPhrasesPoolRawRow]
+
+
+@router.get(
+    "/admin/random-phrases/pool/raw",
+    response_model=RandomPhrasesPoolRawOut,
+)
+async def get_rp_pool_raw(
+    session: SessionDep, user: CurrentUser
+) -> RandomPhrasesPoolRawOut:
+    _ensure_admin(user)
+    from app.db.models import ChatMessage as _CM
+
+    lookback_days = await get_random_phrases_lookback_days(session)
+    now_utc = datetime.now(timezone.utc)
+    cutoff = now_utc - timedelta(days=lookback_days)
+
+    # Агрегаты по юзеру без cutoff'a — что физически лежит в БД.
+    total_rows = list((await session.execute(
+        select(
+            _CM.user_id,
+            func.count().label("total"),
+            func.max(_CM.sent_at).label("last_sent_at"),
+        ).group_by(_CM.user_id)
+    )).all())
+    totals_by_uid: dict[int, tuple[int, datetime | None]] = {}
+    grand_total = 0
+    for uid, cnt, last in total_rows:
+        if uid is None:
+            continue
+        totals_by_uid[int(uid)] = (int(cnt), last)
+        grand_total += int(cnt)
+
+    # Агрегаты внутри окна.
+    win_rows = list((await session.execute(
+        select(_CM.user_id, func.count())
+        .where(_CM.sent_at >= cutoff)
+        .group_by(_CM.user_id)
+    )).all())
+    win_by_uid: dict[int, int] = {
+        int(uid): int(cnt) for uid, cnt in win_rows if uid is not None
+    }
+    win_total = sum(win_by_uid.values())
+
+    users = (await session.scalars(select(User).order_by(User.id))).all()
+    out_rows = []
+    for u in users:
+        total_cnt, last_at = totals_by_uid.get(u.id, (0, None))
+        out_rows.append(
+            RandomPhrasesPoolRawRow(
+                user_id=u.id,
+                telegram_id=u.telegram_id,
+                display_name=u.display_name,
+                total_messages=total_cnt,
+                last_sent_at=last_at,
+                messages_within_lookback=win_by_uid.get(u.id, 0),
+            )
+        )
+    # Сортировка по «вкладу в БД» убывая, потом по имени.
+    out_rows.sort(key=lambda r: (-r.total_messages, r.display_name))
+
+    return RandomPhrasesPoolRawOut(
+        server_now_utc=now_utc,
+        lookback_days=lookback_days,
+        cutoff_used_utc=cutoff,
+        total_messages_in_db=grand_total,
+        total_within_lookback=win_total,
+        rows=out_rows,
+    )
+
 
 class AdminPollOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

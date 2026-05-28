@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from aiogram import F, Router
@@ -24,8 +24,16 @@ RETENTION_DAYS = 7
 
 
 async def cleanup_old_messages(session) -> None:
-    """Удаляет сообщения старше RETENTION_DAYS из всей таблицы."""
-    cutoff_date = datetime.utcnow() - timedelta(days=RETENTION_DAYS)
+    """Удаляет сообщения старше RETENTION_DAYS из всей таблицы.
+
+    GHG7 P0.3: используем aware UTC (`datetime.now(timezone.utc)`), а не
+    naive `utcnow()`. `ChatMessage.sent_at` — `TIMESTAMP WITH TIME ZONE`,
+    и сравнение naive vs timestamptz Postgres интерпретирует как локальное
+    время сервера. На HF Space TZ обычно UTC и баг не проявлялся, но
+    рассинхрон с reader'ами (`random_phrases.py`, `routes_admin.get_rp_pool`),
+    которые уже используют aware UTC, делал чистку латентно-хрупкой.
+    """
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
     try:
         await session.execute(
             delete(ChatMessage).where(ChatMessage.sent_at < cutoff_date)

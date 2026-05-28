@@ -58,14 +58,19 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
 
 ### P0.1. `loser_rolls.source` перепутан manual ↔ auto
 Источник: GHG7.txt стр. 1.
-- [ ] **P0.1.a.** Найти место записи в `loser_rolls.source` — `auto` ставится
-  при ручной прокрутке, `manual` — при auto-job планировщика.
-- [ ] **P0.1.b.** Фикс кода: правильное значение per code-path
-  (scheduler-job → `auto`, chat-команда/админ-эндпоинт → `manual`/`admin`).
-- [ ] **P0.1.c.** Бэкап и нормализация существующих записей в проде
-  (data-migration или одноразовый SQL-скрипт — решить по итогам P0.1.a).
-- [ ] **P0.1.d.** Unit-тест на каждое из трёх возможных значений `source`.
-- [ ] **P0.1.e.** Sync `main/backend` → `meetup-planner-backend`.
+- [x] **P0.1.** (2026-05-28) **WONT-FIX.** Проверка кода 2026-05-28:
+  все четыре пути записи в `loser_rolls` передают корректный `source`:
+  - `app/bot/scheduler.py:237` (autoloser-job) → `"auto"` ✓
+  - `app/api/routes_admin.py:1240` (admin force-reroll) → `"manual"` ✓
+  - `app/bot/handlers/chat_commands.py:92` (`/loser`) → default `"manual"` ✓
+  - `app/api/routes_meetings.py:319` (UI Mini App) → default `"manual"` ✓
+  Прямых `LoserRoll(...)` мимо `roll_loser` в проде-коде нет
+  (`tests/test_loser_outbox.py:80` — только тест-фикстура).
+  HF-копия `meetup-planner-backend` идентична main по этим файлам
+  (`diff -q` пуст). Жалоба GHG7 стр.1 описывает старые данные в Neon,
+  оставшиеся от пред-GHG6-H1 кодовой базы и/или server_default='manual'
+  миграции 0012. Пользователь подтвердил 2026-05-28: «это не баг и
+  ни на что не влияет кроме эстетики в базе». Data-migration НЕ пишем.
 
 ### P0.2. Автолох не доставляется в чат, но появляется в БД
 Источник: GHG7.txt стр. 2, 192–198.
@@ -99,10 +104,11 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   (`fryesw/meetup-planner-backend@f20a08f`). DDL применится при старте
   Space, фактическое поведение остаётся прежним (outbox не используется
   никем до b.3).
-- [x] **P0.2.b.4 sync** (2026-05-28) main `@c414706` + HF `@7e488f5`.
-  Теперь pending-роллы догоняются retry-job'ом. Осталось закрыть b.5
-  (фильтр короны в календаре) — без него корона видна сразу при создании
-  роллa, ещё до успешного поста.
+- [x] **P0.2.b.5+f sync** (2026-05-28) main `@40de092` + HF `@bc45f2c`.
+  **P0.2 закрыт по основному фронту:** autoloser теперь пишет в outbox,
+  retry-job каждую минуту догоняет недоставленные, корона на календаре
+  появляется только после фактического поста в чат. P0.2.b.4 sync
+  (`@c414706`/`@7e488f5`) — теперь pending-роллы догоняются retry-job'ом.
 - [x] **P0.2.b.3 sync** (2026-05-28) main `@47453a0` + HF `@194ae78`.
   Теперь автолох ПИШЕТ в outbox при каждом срабатывании, но без retry-job
   (b.4) `pending`-записи никогда не догоняются. Без фильтра в календаре
@@ -160,13 +166,39 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
 
 ### P0.3. Копилка фраз — резкое падение и обнуление по участникам
 Источник: GHG7.txt стр. 4.
-- [ ] **P0.3.a.** Поднять снапшот таблицы счётчиков фраз за дни до/после
-  скачка (140+ → 63). Определить — это удаление, переинициализация или
-  фильтрация по `is_active`/`is_deleted`.
-- [ ] **P0.3.b.** Если регрессия в коде накопителя — фикс и тест.
-- [ ] **P0.3.c.** Восстановление пропавших фраз (если можно) или
-  фиксирование «начнём заново с этой даты».
-- [ ] **P0.3.d.** Sync.
+
+«Копилка» — `chat_messages` table (`app/bot/handlers/chat_capture.py`).
+Сохраняются текстовые сообщения известных юзеров из `group_chat_id`,
+non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
+`GET /admin/random-phrases/pool` (`routes_admin.py:464`).
+
+- [x] **P0.3.a.** (2026-05-28) Разбор кода. Найден TZ-несоответствие
+  writer/reader: `chat_capture.cleanup_old_messages` использовал
+  naive `datetime.utcnow()`, а reader'ы (`random_phrases.compose_*`,
+  `routes_admin.get_rp_pool`) — aware `datetime.now(timezone.utc)`.
+  `ChatMessage.sent_at` — `TIMESTAMP WITH TIME ZONE`. Если TZ HF Space
+  не UTC — naive интерпретируется как локальное время и cutoff
+  сдвигается. На HF обычно UTC, но рассинхрон латентно-хрупкий.
+  Других подозрительных мест записи/удаления `ChatMessage` не найдено.
+- [x] **P0.3.b.** (2026-05-28) Два фикса в `meetup-planner-main`:
+  - `app/bot/handlers/chat_capture.py:28-39` —
+    `utcnow()` → `now(timezone.utc)`. Cleanup теперь aware UTC.
+  - `app/api/routes_admin.py` — добавлен debug-эндпоинт
+    `GET /admin/random-phrases/pool/raw`: возвращает по каждому юзеру
+    `total_messages` (без cutoff), `last_sent_at`,
+    `messages_within_lookback`, плюс meta `server_now_utc`,
+    `cutoff_used_utc`, `total_messages_in_db`. Расхождение
+    total↔within_lookback покажет, режет ли TTL слишком много;
+    малый `total` при «активный юзер» = не записывается на входе.
+  Тесты: 155/155 зелёные (`pytest tests/`).
+- [ ] **P0.3.c.** Восстановление пропавших фраз. Ждёт прод-данных
+  через `/admin/random-phrases/pool/raw`. Если total в БД мал —
+  ничего восстановить нельзя (фиксируем «с этой даты заново»).
+  Если total нормальный, но within_lookback мал — был артефакт
+  TZ/cutoff, и сейчас фикс уже сработает с новых сообщений.
+- [x] **P0.3.d sync** (2026-05-28) `meetup-planner-main/backend/` →
+  `meetup-planner-backend/`: `chat_capture.py`, `routes_admin.py`.
+  Push в HF/GitHub отдельным шагом.
 
 ### P0.4. Healthcheck бота даёт false-negative ~80%
 Источник: GHG7.txt стр. 8.
