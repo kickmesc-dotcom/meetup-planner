@@ -93,6 +93,37 @@ export const fetchPollsHistory = (limit = 30) =>
 export const fetchGamesHistory = (limit = 30) =>
   api<PollHistoryRow[]>(`/api/admin/games/history?limit=${limit}`);
 
+// GHG6 N2: master-toggle и история 5★ feedback-опросов по встречам.
+export interface MeetingFeedbackSettings {
+  enabled: boolean;
+  notify_absence: boolean;
+  absence_weight_delta: number;
+}
+
+export const fetchMeetingFeedbackSettings = () =>
+  api<MeetingFeedbackSettings>("/api/admin/meeting-feedback");
+
+export const updateMeetingFeedbackSettings = (body: MeetingFeedbackSettings) =>
+  api<MeetingFeedbackSettings>("/api/admin/meeting-feedback", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+export interface MeetingFeedbackRow {
+  meeting_id: number;
+  meeting_title: string;
+  meeting_starts_at: string;
+  user_id: number;
+  display_name: string | null;
+  rating: number | null;
+  was_absent: boolean;
+  reason_text: string | null;
+  created_at: string;
+}
+
+export const fetchMeetingFeedbackHistory = (limit = 50) =>
+  api<MeetingFeedbackRow[]>(`/api/admin/meeting-feedback/history?limit=${limit}`);
+
 // GHG6 M3: cancel = пропустить ближайший запуск (для recurring) / удалить (one-shot).
 export const cancelScheduledJob = (jobId: string) =>
   api<void>(`/api/admin/jobs/${encodeURIComponent(jobId)}`, { method: "DELETE" });

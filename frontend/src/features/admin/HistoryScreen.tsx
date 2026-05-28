@@ -5,7 +5,9 @@ import {
   fetchChukhanHistory,
   fetchGamesHistory,
   fetchLoserHistory,
+  fetchMeetingFeedbackHistory,
   fetchPollsHistory,
+  type MeetingFeedbackRow,
   type PollHistoryRow,
 } from "@/api/admin";
 import type { User } from "@/types";
@@ -18,8 +20,8 @@ interface Props {
   onBack: () => void;
 }
 
-// GHG6 N1.3: добавлены вкладки «Опросы» и «Игры» — история опросов из БД.
-type Tab = "chukhan" | "loser" | "polls" | "games";
+// GHG6 N1.3 + N2.5: добавлены «Опросы», «Игры», «🍻 Встречи» (5★-фидбек).
+type Tab = "chukhan" | "loser" | "polls" | "games" | "meetings";
 
 export default function HistoryScreen({ users, onBack }: Props) {
   const [tab, setTab] = useState<Tab>("chukhan");
@@ -43,6 +45,11 @@ export default function HistoryScreen({ users, onBack }: Props) {
     queryKey: ["admin", "games-history"],
     queryFn: () => fetchGamesHistory(30),
     enabled: tab === "games",
+  });
+  const meetingsHistory = useQuery({
+    queryKey: ["admin", "meetings-feedback-history"],
+    queryFn: () => fetchMeetingFeedbackHistory(50),
+    enabled: tab === "meetings",
   });
 
   const userById = Object.fromEntries(users.map((u) => [u.id, u] as const));
