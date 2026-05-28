@@ -94,14 +94,21 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   `app/db/models.py` сразу после `LoserRoll`. Relationship `loser_roll`,
   CheckConstraint по статусу повторяет DDL миграции, импорт `Integer`
   добавлен.
-- [ ] **P0.2.b.3.** В `_autoloser_job` (`scheduler.py`): передавать в
-  `roll_loser` новый `on_announce`, который a) создаёт `LoserOutbox` со
-  `status='pending', attempts=0, next_retry_at=now()` внутри той же
-  транзакции; b) пробует send_message с тайм-аутом 8с; c) при успехе
-  обновляет outbox `status='sent', sent_at=now(), tg_message_id=...`;
-  d) при ошибке — `attempts=1, last_error=..., next_retry_at=now()+5m`.
-  Любой результат → roll_loser коммитит (исключения внутри _announce
-  глотать, чтобы не было rollback).
+- [x] **P0.2.b.0 sync** (2026-05-28) main → GitHub
+  (`kickmesc-dotcom/meetup-planner@858c295`) + backend → HF Space
+  (`fryesw/meetup-planner-backend@f20a08f`). DDL применится при старте
+  Space, фактическое поведение остаётся прежним (outbox не используется
+  никем до b.3).
+- [x] **P0.2.b.3.** (2026-05-28) `_announce` в `app/bot/scheduler.py`
+  переписан под outbox-паттерн: создаёт `LoserOutbox(status='pending')`
+  в одной транзакции с roll, пробует `send_message` с timeout=8s, при
+  успехе → `status='sent'`+tg_message_id, при ошибке → `attempts=1,
+  last_error, next_retry_at=now+5m`. Исключение НЕ rerais'ится (иначе
+  roll_loser откатит и потеряется ретрай-материал). Закрыто заодно
+  P0.2.d — логи `autoloser.outbox_sent`/`outbox_pending` с полями
+  `transport=direct|proxy`, `proxy_id`, `elapsed_ms`. Константы:
+  `_AUTOLOSER_SEND_TIMEOUT=8.0`, `_AUTOLOSER_RETRY_DELAY=5min`,
+  `_AUTOLOSER_MAX_ATTEMPTS=12`.
 - [ ] **P0.2.b.4.** Новый scheduler-job `loser_outbox_retry` (id =
   `JOB_LOSER_OUTBOX_RETRY`, каждую минуту): SELECT outbox WHERE
   status='pending' AND attempts<12 AND next_retry_at<=now() FOR UPDATE
@@ -114,10 +121,11 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   раньше.
 - [ ] **P0.2.c.** [объединено в b.3] Защита от ложного затирания —
   rollback больше не делаем для авто-лоха, поэтому подэтап неактуален.
-- [ ] **P0.2.d.** Логирование таймаута сессии Telegram (директ vs прокси) для
-  диагностики «долго тупит, потом просыпается». Реализация: в
-  `_announce` логировать `transport=direct|proxy`, `elapsed_ms`,
-  `proxy_url` (если применимо), `attempts`.
+- [x] **P0.2.d.** (2026-05-28) Закрыто в составе b.3. Логи
+  `autoloser.outbox_sent` (успех) и `autoloser.outbox_pending` (фейл)
+  содержат `transport=direct|proxy`, `proxy_id`, `elapsed_ms`,
+  `error/tg_message_id`. Для retry-job (b.4) аналогичные логи будут с
+  префиксом `loser_outbox_retry.*`.
 - [ ] **P0.2.e.** Попап «причина ролла» по клику на корону в календаре:
   попап с текстом анонса (или JSON-снэпшотом ставок), который уже есть в
   БД. Это часть GHG7 стр. 2 хвост — формально UX, но тематически здесь.

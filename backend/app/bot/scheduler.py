@@ -2,10 +2,12 @@
 шарит event loop с aiogram."""
 from __future__ import annotations
 
+import asyncio
 import functools
 import random
+import time
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
@@ -95,6 +97,14 @@ def _env_int(name: str, default: int) -> int:
 
 PROXY_HEALTH_INTERVAL_SEC = _env_int("PROXY_HEALTH_INTERVAL_SEC", 600)  # GHG6 PX6
 
+# GHG7 P0.2.b: 8 секунд достаточно — прокси с медленнее реальной доставкой
+# всё равно «не успеет» в чат к юзеру; ретрай-job переотправит через 5 мин.
+_AUTOLOSER_SEND_TIMEOUT = 8.0
+# Шаг между попытками retry — ровно 5 минут (12 попыток × 5 мин = ~1ч лимит).
+_AUTOLOSER_RETRY_DELAY = timedelta(minutes=5)
+# Сколько раз пытаемся вообще (включая первую попытку). После — status='expired'.
+_AUTOLOSER_MAX_ATTEMPTS = 12
+
 
 async def _autoloser_job(bot: Bot) -> None:
     """A6: автоматический roll лоха через services.loser.
@@ -107,6 +117,7 @@ async def _autoloser_job(bot: Bot) -> None:
     from app.bot.dispatcher import get_bot  # noqa: F401  — keep cycle-safe pattern
     from app.config import get_settings as _gs
     from app.db.base import get_sessionmaker as _gsm
+    from app.db.models import LoserOutbox
     from app.services.loser import compose_loser_message, roll_loser
 
     settings = _gs()
@@ -143,6 +154,17 @@ async def _autoloser_job(bot: Bot) -> None:
             return
 
         async def _announce(roll, loser, extras=None):
+            """GHG7 P0.2.b.3: outbox-паттерн вместо raise-on-fail.
+
+            Создаём `LoserOutbox` сразу в той же транзакции что и `roll`, после
+            чего пробуем send_message. Любой результат — ОБНОВЛЯЕМ outbox и
+            НЕ raise: иначе `roll_loser` откатит транзакцию и мы потеряем как
+            roll, так и outbox-запись, что лишает retry-job шанса повторить.
+
+            Calendar marks фильтрует source='auto' loser-метки по
+            `outbox.status='sent'`, поэтому пока поста в чате нет — короны на
+            календаре тоже нет (никаких фантомных «лохов без объявления»).
+            """
             text = compose_loser_message(
                 loser_name=loser.display_name,
                 reason_text=roll.reason_text or "",
@@ -150,11 +172,59 @@ async def _autoloser_job(bot: Bot) -> None:
                 header_emoji="🤡",
                 header_label="Автолох сегодня",
             )
-            await bot.send_message(
-                chat_id=settings.group_chat_id,
-                text=text,
-                parse_mode="HTML",
+            now = datetime.now(timezone.utc)
+            outbox = LoserOutbox(
+                loser_roll_id=roll.id,
+                status="pending",
+                attempts=0,
+                next_retry_at=now,
             )
+            session.add(outbox)
+            await session.flush()  # фиксируем outbox.id до send'а
+
+            # P0.2.d: transport-логирование для диагностики «висящего прокси».
+            transport = (
+                "proxy"
+                if getattr(bot.session, "_active_proxy_id", None) is not None
+                else "direct"
+            )
+            proxy_id = getattr(bot.session, "_active_proxy_id", None)
+            send_started = time.monotonic()
+            try:
+                msg = await asyncio.wait_for(
+                    bot.send_message(
+                        chat_id=settings.group_chat_id,
+                        text=text,
+                        parse_mode="HTML",
+                    ),
+                    timeout=_AUTOLOSER_SEND_TIMEOUT,
+                )
+                elapsed_ms = round((time.monotonic() - send_started) * 1000, 1)
+                outbox.status = "sent"
+                outbox.attempts = 1
+                outbox.sent_at = datetime.now(timezone.utc)
+                outbox.tg_message_id = getattr(msg, "message_id", None)
+                log.info(
+                    "autoloser.outbox_sent",
+                    transport=transport,
+                    proxy_id=proxy_id,
+                    elapsed_ms=elapsed_ms,
+                    tg_message_id=outbox.tg_message_id,
+                )
+            except Exception as exc:  # noqa: BLE001 — ловим всё, чтобы НЕ raise (откат транзакции уничтожил бы outbox-запись вместе с роллом)
+                elapsed_ms = round((time.monotonic() - send_started) * 1000, 1)
+                outbox.attempts = 1
+                outbox.last_error = f"{type(exc).__name__}: {exc}"[:500]
+                outbox.next_retry_at = (
+                    datetime.now(timezone.utc) + _AUTOLOSER_RETRY_DELAY
+                )
+                log.warning(
+                    "autoloser.outbox_pending",
+                    transport=transport,
+                    proxy_id=proxy_id,
+                    elapsed_ms=elapsed_ms,
+                    error=outbox.last_error,
+                )
 
         try:
             # GHG6 H1: source='auto' и bypass_cooldown=True — авто-лох не
