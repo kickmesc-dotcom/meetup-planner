@@ -57,7 +57,7 @@ export default function CalendarView({ users, meId }: Props) {
   // GHG6 P3 CL1: пока новый таймлайн в стадии каркаса (нет жестов, зума,
   // боттом-плашки), дефолт = false. Включается админкой через
   // PUT /admin/calendar/timeline {enabled:true} — для ручного теста.
-  const timelineEnabled = timelineFlag.data?.enabled ?? false;
+ const timelineEnabled = true; // Насильно включили таймлайн
 
   // CL1: при включённом timeline окно фиксируется в ±21 день от anchor (43 дня).
   // Это позволяет существующим useQuery подтянуть нужный диапазон одним
