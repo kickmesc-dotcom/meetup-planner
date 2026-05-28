@@ -23,10 +23,10 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
 from app.api.deps import CurrentUser, SessionDep
-from app.db.models import LoserRoll, Meeting, User, WeeklyChukhan
+from app.db.models import LoserOutbox, LoserRoll, Meeting, User, WeeklyChukhan
 
 router = APIRouter(tags=["calendar"])
 
@@ -98,15 +98,30 @@ async def calendar_marks(
 
     # LoserRoll: фильтр по timestamp, чтобы не натянуть лишний день из-за TZ
     # (`rolled_at` хранится в UTC).
+    #
+    # GHG7 P0.2.b.5: для source='auto' дополнительный фильтр через LEFT JOIN
+    # с loser_outbox — корону показываем только если запись доставлена
+    # (`outbox.status='sent'`), либо если outbox-записи нет (legacy роллы до
+    # миграции 0014). source='manual' (UI/chat/admin force-reroll) outbox
+    # не пишут — для них фильтр прозрачно пропускает по `LoserOutbox.id IS NULL`.
     loser_rows = list(
         (
-            await session.scalars(
+            await session.execute(
                 select(LoserRoll)
+                .outerjoin(LoserOutbox, LoserOutbox.loser_roll_id == LoserRoll.id)
                 .where(LoserRoll.rolled_at >= from_)
                 .where(LoserRoll.rolled_at < to)
+                .where(
+                    or_(
+                        LoserOutbox.id.is_(None),
+                        LoserOutbox.status == "sent",
+                    )
+                )
                 .order_by(LoserRoll.rolled_at)
             )
-        ).all()
+        )
+        .scalars()
+        .all()
     )
     loser_pairs = [
         (r.rolled_at.date(), r.loser_user_id, r.source or "manual") for r in loser_rows

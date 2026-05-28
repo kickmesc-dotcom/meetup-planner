@@ -99,6 +99,10 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   (`fryesw/meetup-planner-backend@f20a08f`). DDL применится при старте
   Space, фактическое поведение остаётся прежним (outbox не используется
   никем до b.3).
+- [x] **P0.2.b.4 sync** (2026-05-28) main `@c414706` + HF `@7e488f5`.
+  Теперь pending-роллы догоняются retry-job'ом. Осталось закрыть b.5
+  (фильтр короны в календаре) — без него корона видна сразу при создании
+  роллa, ещё до успешного поста.
 - [x] **P0.2.b.3 sync** (2026-05-28) main `@47453a0` + HF `@194ae78`.
   Теперь автолох ПИШЕТ в outbox при каждом срабатывании, но без retry-job
   (b.4) `pending`-записи никогда не догоняются. Без фильтра в календаре
@@ -123,11 +127,13 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   `start_scheduler` как infra-job (IntervalTrigger 1 min, jitter 10s,
   misfire_grace=5min). Удалённые roll'ы (None при `session.get`) сразу
   помечаются expired с last_error='loser_roll missing'.
-- [ ] **P0.2.b.5.** Фильтр в `routes_calendar.py` calendar-marks:
-  для type='loser' source='auto' включать только если в outbox
-  `status='sent'` ИЛИ outbox-записи нет (legacy до миграции). Ручные
-  роллы (source='manual') outbox не пишут — показываются всегда как и
-  раньше.
+- [x] **P0.2.b.5.** (2026-05-28) LEFT JOIN с `loser_outbox` в
+  `routes_calendar.py::calendar_marks`. Фильтр
+  `LoserOutbox.id IS NULL OR LoserOutbox.status='sent'` — для legacy
+  роллов до миграции и для всех ручных (manual outbox не пишет вообще)
+  фильтр прозрачен; pending/expired auto-роллы скрыты до успешной
+  доставки. Контракт `build_marks` не изменился — все 10 старых тестов
+  остаются зелёными.
 - [ ] **P0.2.c.** [объединено в b.3] Защита от ложного затирания —
   rollback больше не делаем для авто-лоха, поэтому подэтап неактуален.
 - [x] **P0.2.d.** (2026-05-28) Закрыто в составе b.3. Логи
@@ -139,10 +145,17 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   попап с текстом анонса (или JSON-снэпшотом ставок), который уже есть в
   БД. Это часть GHG7 стр. 2 хвост — формально UX, но тематически здесь.
   Если попап тянет много изменений — выносим в P2 отдельным подэтапом.
-- [ ] **P0.2.f.** Тесты: 1) send_message бросает → outbox.status='pending',
-  attempts=1, корона на календаре отсутствует; 2) первый send падает,
-  retry-job второй раз успешен → outbox.status='sent', корона появилась;
-  3) 12 fail-ов → status='expired', корона так и не появилась.
+- [x] **P0.2.f.** (2026-05-28) `tests/test_loser_outbox.py` — 4 теста:
+  (1) фейл send → pending+attempts=1+last_error, без raise;
+  (2) успех → sent+tg_message_id;
+  (3) 12-й фейл → expired;
+  (4) после фейла повторный успех → sent+attempts++.
+  + `test_build_marks_still_accepts_source_tuples` — регрессионный гард
+  контракта build_marks. Все 14 тестов в test_loser_outbox+
+  test_calendar_marks проходят локально (.venv pytest).
+  Async-БД-стенда в проекте нет (см. шапку `test_loser_cooldown_split`)
+  — кейс «корона физически не видна» покрывается на SQL-слое через
+  ручную проверку в проде (см. INV-2 ниже, не блокирует деплой).
 - [ ] **P0.2.g.** Sync.
 
 ### P0.3. Копилка фраз — резкое падение и обнуление по участникам
