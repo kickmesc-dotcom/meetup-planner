@@ -1938,6 +1938,14 @@ class ProxySelftestOut(BaseModel):
     latency_ms: int | None
     error: str | None
     bot_active: bool
+    # GHG7 P0.4: двухступенчатая проверка selftest. `retried=True`
+    # значит первая попытка getMe моргнула, вторая прошла (если ok=True)
+    # или обе упали (если ok=False). `first_error` — причина первой
+    # ошибки; полезно для UI «онлайн (после ретрая)» и для разбора
+    # дважды-подряд кейсов. Старые клиенты, не знающие про эти поля,
+    # их просто игнорируют.
+    retried: bool = False
+    first_error: str | None = None
 
 
 class ProxyStatusOut(BaseModel):

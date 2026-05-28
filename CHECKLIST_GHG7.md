@@ -202,14 +202,46 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
 
 ### P0.4. Healthcheck бота даёт false-negative ~80%
 Источник: GHG7.txt стр. 8.
-- [ ] **P0.4.a.** Найти текущую реализацию healthcheck (вероятно
-  `bot.get_me()` через прокси). Понять, ловит ли он временные fail прокси
-  как «бот недоступен».
-- [ ] **P0.4.b.** Заменить на двухступенчатую проверку: 1) `bot.get_me()` с
-  ретраем 2 попытки и переключением прокси; 2) если оба провала — тогда
-  «недоступен». Иначе «доступен (после ретрая)».
-- [ ] **P0.4.c.** Тест с моком прокси-фейла на 1 из 2 попыток.
-- [ ] **P0.4.d.** Sync.
+
+Контекст 2026-05-28: пользователь уточнил, что РКН добил MTProto-прокси
+почти полностью (Telegram должен менять алгоритм на своей стороне),
+поэтому **не углубляемся** в переключение/восстановление прокси.
+Главное — чтобы индикатор не врал в режиме direct, и не сломать сам
+путь отправки команд (он сейчас работает без перебоев).
+
+- [x] **P0.4.a.** (2026-05-28) Реализация: `selftest_send` в
+  `backend/app/services/proxies.py:1061` — одна попытка `bot.get_me()`
+  с таймаутом 15с (`SELFTEST_TIMEOUT_SEC`). Используется в трёх
+  местах: `proxy_health_tick` (periodic), `POST /admin/proxy/selftest`
+  (ручной запуск), `GET ProxyStatusOut.last_selftest`. Один тайм-аут/
+  exception — сразу `ok=False`, ретраев нет.
+- [x] **P0.4.b.** (2026-05-28) Двухступенчатая проверка БЕЗ касания
+  transport'а. Вынес тело попытки в `_attempt_selftest`, обернул в
+  `selftest_send` с логикой:
+  - первая попытка — как раньше;
+  - если ok → возврат сразу;
+  - если фейл и ошибка — `TelegramUnauthorizedError/BadRequest/
+    ForbiddenError` → НЕ ретраим (бот сам отверг, повтор не поможет);
+  - иначе пауза `_SELFTEST_RETRY_PAUSE_SEC=1.0s` и вторая попытка
+    через ту же session (никаких mark_proxy_failed / переключения
+    пула / invalidate — путь команд бота нетронут).
+  - результат содержит `retried`, `first_error` для прозрачности UI.
+  `ProxySelftestOut` в `routes_admin.py:1934` расширен теми же
+  полями (default'ы → backward-compatible для старого фронта).
+  `proxy_health_tick` логирует `retried`+`first_error` в
+  `proxy.health_tick`.
+- [x] **P0.4.c.** (2026-05-28) `tests/test_selftest_retry.py` — 4 кейса:
+  (1) первая ok → один вызов get_me, retried=False;
+  (2) первая timeout + вторая ok → retried=True, ok=True,
+      first_error='timeout';
+  (3) оба timeout → retried=True, ok=False, error='timeout';
+  (4) первая TelegramUnauthorizedError → НЕ ретраим (get_me_calls==1),
+      retried=False, bot_active=True.
+  Все 159/159 тестов зелёные.
+- [x] **P0.4.d sync** (2026-05-28) `meetup-planner-main/backend/` →
+  `meetup-planner-backend/`: `app/services/proxies.py`,
+  `app/api/routes_admin.py`, `tests/test_selftest_retry.py`.
+  Push в HF/GitHub отдельным шагом.
 
 ---
 

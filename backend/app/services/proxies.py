@@ -1046,6 +1046,12 @@ class SelftestResult:
     latency_ms: int | None
     error: str | None
     bot_active: bool  # True если бот вообще удалось дёрнуть (даже если send упал)
+    # GHG7 P0.4: была ли успешная попытка получена со 2-го захода.
+    # `False` — успех с первой попытки или оба фейла. `True` — первая упала,
+    # вторая прошла; в `error` тогда None, но `first_error` хранит причину
+    # первой ошибки (для логов/UI «было моргнуло, но восстановилось»).
+    retried: bool = False
+    first_error: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -1055,32 +1061,30 @@ class SelftestResult:
             "latency_ms": self.latency_ms,
             "error": self.error,
             "bot_active": self.bot_active,
+            "retried": self.retried,
+            "first_error": self.first_error,
         }
 
 
-async def selftest_send(bot: "Bot", *, session: AsyncSession | None = None) -> SelftestResult:
-    """Замеряет latency на getMe через текущую сессию бота.
+# GHG7 P0.4: пауза между двумя попытками getMe в selftest_send. Не таймаут,
+# а именно «вдох» — TCP/socks-стек должен успеть закрыть/переоткрыть
+# соединение, чтобы вторая попытка не уехала по тому же зависшему сокету.
+_SELFTEST_RETRY_PAUSE_SEC = 1.0
 
-    Дополнительно: если задан env `SELFTEST_CHAT_ID` — шлёт туда короткое
-    «ping» и сразу удаляет, чтобы реально проверить именно отправку.
-    Никаких сообщений в основные чаты — это «скрытая» проверка.
+
+async def _attempt_selftest(
+    bot: "Bot",
+    *,
+    selftest_chat_id: int | None,
+    mode_str: str,
+) -> SelftestResult:
+    """Одна попытка getMe (+опц. echo в SELFTEST_CHAT_ID).
+
+    Вынесено из `selftest_send` для двухступенчатой проверки P0.4. Логика
+    1-в-1 как было раньше — никаких касаний bot.session/_state.pool/transport.
+    Только синхронный вызов поверх той же session, что используют все
+    остальные команды бота (без переключения прокси, без mark_proxy_failed).
     """
-    selftest_chat_raw = os.getenv("SELFTEST_CHAT_ID")
-    selftest_chat_id: int | None = None
-    if selftest_chat_raw:
-        try:
-            selftest_chat_id = int(selftest_chat_raw)
-        except ValueError:
-            selftest_chat_id = None
-
-    # Получаем текущий режим — для отображения в UI.
-    mode_str = "unknown"
-    if session is not None:
-        mode_str = (await get_proxy_mode(session)).value
-    else:
-        # fallback — берём из state
-        mode_str = _state.mode.value
-
     started = time.monotonic()
     proxy_id_after_call: int | None = None
     try:
@@ -1130,6 +1134,77 @@ async def selftest_send(bot: "Bot", *, session: AsyncSession | None = None) -> S
             error=err,
             bot_active=bot_active,
         )
+
+
+async def selftest_send(bot: "Bot", *, session: AsyncSession | None = None) -> SelftestResult:
+    """Замеряет latency на getMe через текущую сессию бота.
+
+    Дополнительно: если задан env `SELFTEST_CHAT_ID` — шлёт туда короткое
+    «ping» и сразу удаляет, чтобы реально проверить именно отправку.
+    Никаких сообщений в основные чаты — это «скрытая» проверка.
+
+    GHG7 P0.4: двухступенчатая проверка. Жалоба «80% false-negative» —
+    selftest показывал «бот недоступен», хотя команды проходили. Причина:
+    одиночный getMe может моргнуть из-за флапающего соединения / прокси,
+    при этом реальные команды бота (на долгоживущих сессиях) этого
+    моргания не замечают. Решение: при первом фейле — пауза 1с и повтор
+    через ту же сессию (без переключения transport'а, без касания пула
+    прокси — реальный путь отправки и так работает). Если вторая попытка
+    проходит — `ok=True, retried=True, first_error=<причина первой>`,
+    UI может показать «онлайн (после ретрая)». Если обе валятся —
+    `ok=False`, поведение остаётся прежним.
+    """
+    selftest_chat_raw = os.getenv("SELFTEST_CHAT_ID")
+    selftest_chat_id: int | None = None
+    if selftest_chat_raw:
+        try:
+            selftest_chat_id = int(selftest_chat_raw)
+        except ValueError:
+            selftest_chat_id = None
+
+    # Получаем текущий режим — для отображения в UI.
+    mode_str = "unknown"
+    if session is not None:
+        mode_str = (await get_proxy_mode(session)).value
+    else:
+        # fallback — берём из state
+        mode_str = _state.mode.value
+
+    first = await _attempt_selftest(
+        bot, selftest_chat_id=selftest_chat_id, mode_str=mode_str
+    )
+    if first.ok:
+        return first
+
+    # Первая попытка упала. Если ошибка пришла из Telegram (Unauthorized/
+    # BadRequest/Forbidden) — она не «лечится» ретраем: бот жив, но
+    # запрос отвергнут по существу. Не тратим время на вторую попытку.
+    if first.bot_active and first.error and ":" in first.error:
+        err_class = first.error.split(":", 1)[0]
+        if err_class in {
+            "TelegramUnauthorizedError",
+            "TelegramBadRequest",
+            "TelegramForbiddenError",
+        }:
+            return first
+
+    await asyncio.sleep(_SELFTEST_RETRY_PAUSE_SEC)
+
+    second = await _attempt_selftest(
+        bot, selftest_chat_id=selftest_chat_id, mode_str=mode_str
+    )
+    if second.ok:
+        # Восстановилось. Помечаем результат как retried, в first_error —
+        # причина моргания, для прозрачности логов и UI.
+        second.retried = True
+        second.first_error = first.error
+        return second
+
+    # Оба фейла. Возвращаем второй (свежий), но first_error тоже сохраняем
+    # — даёт картину «дважды подряд, разные ли причины».
+    second.retried = True
+    second.first_error = first.error
+    return second
 
 
 # --- PX9: last error tail (для UI) ---
@@ -1274,5 +1349,9 @@ async def proxy_health_tick(bot: "Bot") -> None:
                 "ok": result.ok,
                 "latency_ms": result.latency_ms,
                 "mode": result.mode_used,
+                # GHG7 P0.4: «моргнуло, но восстановилось со второй» —
+                # видно в логах как retried=True+ok=True+first_error=...
+                "retried": result.retried,
+                "first_error": result.first_error,
             },
         )
