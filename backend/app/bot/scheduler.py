@@ -79,6 +79,7 @@ JOB_AVATAR_SYNC = "avatar_sync_daily"
 JOB_BIRTHDAYS = "birthdays_daily"
 JOB_BOT_PAUSE_AUTO_RESTORE = "bot_pause_auto_restore"  # GHG6 E11
 JOB_AUTO_ZAEBAL = "auto_zaebal"  # GHG6 E11.3
+JOB_MEETING_FEEDBACK = "meeting_feedback_daily"  # GHG6 N2.3
 
 
 def _env_int(name: str, default: int) -> int:
@@ -434,6 +435,30 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_BIRTHDAYS)
         log.info("scheduler.birthdays_disabled")
+
+    # --- Meeting feedback (GHG6 N2.3): пост-фактум 5★-опрос ---
+    # Дневной проход в 12:07 — встречи прошедшего дня (cutoff = now - 1d)
+    # получают свой feedback-полл. Master-toggle берётся из admin_config внутри
+    # самой job-функции (`run_meeting_feedback_job`), но чтобы не палить
+    # лишнюю job когда фича выключена — пропускаем регистрацию совсем.
+    from app.services.admin_config import get_meeting_feedback_enabled
+    from app.services.meeting_feedback import run_meeting_feedback_job
+
+    if await get_meeting_feedback_enabled(session):
+        sched.add_job(
+            _logged_job(JOB_MEETING_FEEDBACK, run_meeting_feedback_job),
+            CronTrigger(hour=12, minute=7, timezone=settings.scheduler_tz),
+            kwargs={"bot": bot},
+            id=JOB_MEETING_FEEDBACK,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        log.info("scheduler.meeting_feedback_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_MEETING_FEEDBACK)
+        log.info("scheduler.meeting_feedback_disabled")
 
 
 def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:

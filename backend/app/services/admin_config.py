@@ -149,6 +149,24 @@ async def reset_chukhan_weight(session: AsyncSession, *, tg_id: int) -> None:
         await session.commit()
 
 
+async def add_chukhan_weight(
+    session: AsyncSession, *, tg_id: int, delta: float
+) -> float:
+    """GHG6 N2: атомарный инкремент веса в admin_config.
+
+    Получаем текущий вес через `get_chukhan_weights` (учитывает env + оверрайды),
+    добавляем delta, записываем как новый оверрайд через `set_chukhan_weight`.
+    Не позволяем уйти ниже 0 — пользователь может «обнулить» себя только через
+    reset, не через отрицательную delta.
+    Возвращает новый вес — пригодится для логов / тостов в чат.
+    """
+    weights = await get_chukhan_weights(session)
+    current = weights.get(tg_id, 1.0)
+    new = max(0.0, current + delta)
+    await set_chukhan_weight(session, tg_id=tg_id, weight=new)
+    return new
+
+
 # --- Generic helpers ---
 
 async def _get_int(session: AsyncSession, key: str, default: int) -> int:
@@ -877,3 +895,73 @@ async def get_polls_pin_result(session: AsyncSession) -> bool:
 
 async def set_polls_pin_result(session: AsyncSession, value: bool) -> None:
     await _set_value(session, POLLS_PIN_RESULT_KEY, "true" if value else "false")
+
+
+# =============================================================================
+# GHG6 N2: пост-фактум 5★ опрос «как собрались» + штраф +0.5 за пропуск
+# =============================================================================
+#
+# `meeting_feedback.enabled` — master-toggle scheduler-job'а JOB_MEETING_FEEDBACK.
+#   По умолчанию false (фича для опытных групп — не каждый чат хочет «оценивать
+#   встречу» автопостом). Админ включает в UI.
+# `meeting_feedback.notify_absence` — отдельный toggle: писать ли в чат тост
+#   «@user пропустил встречу — +0.5 к весу чухана». Дефолт true: смысл фичи
+#   именно в публичности; админ может выключить если оно создаёт токсичную
+#   атмосферу.
+# `meeting_feedback.absence_weight_delta` — насколько поднимать вес чухана.
+#   Дефолт +0.5 как в исходной формулировке п.18.
+
+MEETING_FEEDBACK_ENABLED_KEY = "meeting_feedback.enabled"
+MEETING_FEEDBACK_NOTIFY_ABSENCE_KEY = "meeting_feedback.notify_absence"
+MEETING_FEEDBACK_ABSENCE_WEIGHT_KEY = "meeting_feedback.absence_weight_delta"
+
+_MEETING_FEEDBACK_ENABLED_DEFAULT = False
+_MEETING_FEEDBACK_NOTIFY_DEFAULT = True
+_MEETING_FEEDBACK_WEIGHT_DEFAULT = 0.5
+
+
+async def get_meeting_feedback_enabled(session: AsyncSession) -> bool:
+    return _parse_bool(
+        await _get_value(session, MEETING_FEEDBACK_ENABLED_KEY),
+        _MEETING_FEEDBACK_ENABLED_DEFAULT,
+    )
+
+
+async def set_meeting_feedback_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(
+        session, MEETING_FEEDBACK_ENABLED_KEY, "true" if value else "false"
+    )
+
+
+async def get_meeting_feedback_notify_absence(session: AsyncSession) -> bool:
+    return _parse_bool(
+        await _get_value(session, MEETING_FEEDBACK_NOTIFY_ABSENCE_KEY),
+        _MEETING_FEEDBACK_NOTIFY_DEFAULT,
+    )
+
+
+async def set_meeting_feedback_notify_absence(
+    session: AsyncSession, value: bool
+) -> None:
+    await _set_value(
+        session, MEETING_FEEDBACK_NOTIFY_ABSENCE_KEY, "true" if value else "false"
+    )
+
+
+async def get_meeting_feedback_absence_weight(session: AsyncSession) -> float:
+    """Сколько поднимать вес чухана при was_absent=True. Default +0.5."""
+    raw = await _get_value(session, MEETING_FEEDBACK_ABSENCE_WEIGHT_KEY)
+    if raw is None:
+        return _MEETING_FEEDBACK_WEIGHT_DEFAULT
+    try:
+        return max(0.0, float(raw))
+    except (ValueError, TypeError):
+        return _MEETING_FEEDBACK_WEIGHT_DEFAULT
+
+
+async def set_meeting_feedback_absence_weight(
+    session: AsyncSession, value: float
+) -> None:
+    await _set_value(
+        session, MEETING_FEEDBACK_ABSENCE_WEIGHT_KEY, str(max(0.0, value))
+    )

@@ -11,6 +11,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     SmallInteger,
     String,
@@ -103,6 +104,31 @@ class MeetingAttendance(Base):
     showed_up: Mapped[bool | None] = mapped_column(Boolean)
 
 
+class MeetingFeedback(Base):
+    """GHG6 N2: пост-фактум 5★ оценка встречи + опция «меня не было»."""
+
+    __tablename__ = "meeting_feedback"
+    __table_args__ = (
+        UniqueConstraint("meeting_id", "user_id", name="uq_feedback_meeting_user"),
+        Index("ix_feedback_meeting", "meeting_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    meeting_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("meetings.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 1..5; NULL когда was_absent=True (см. CHECK в миграции).
+    rating: Mapped[int | None] = mapped_column(SmallInteger)
+    was_absent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    reason_text: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class Poll(Base):
     __tablename__ = "polls"
 
@@ -175,6 +201,53 @@ class LoserRoll(Base):
     # admin force-reroll. Cooldown считается раздельно по семейству источников;
     # «лох дня» в календаре — только source='auto'.
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
+
+
+class LoserOutbox(Base):
+    """GHG7 P0.2 — статус доставки автолох-поста в групповой чат.
+
+    Domain (`LoserRoll`) и delivery (`LoserOutbox`) разделены: при срабатывании
+    autoloser-job в `loser_rolls` пишется запись о выпавшем лохе сразу, а
+    отдельно — строка в `loser_outbox` со `status='pending'`. Send в TG
+    пробуется внутри той же транзакции; результат обновляет outbox-строку,
+    но НЕ откатывает loser_roll. Так нет «фантомных» записей без поста: пока
+    `status != 'sent'`, корона на календаре не показывается (см.
+    `routes_calendar.py`).
+
+    Ретрай-job `loser_outbox_retry` каждую минуту повторяет SELECT FOR UPDATE
+    SKIP LOCKED по WHERE status='pending' AND attempts<12 AND
+    next_retry_at<=now(). После 12 fail-ов → `status='expired'`.
+
+    Ручные роллы (UI/chat-команда/admin force-reroll) outbox НЕ пишут — там
+    best-effort send как было после GHG6 E3, юзер видит результат сам.
+    """
+    __tablename__ = "loser_outbox"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'sent', 'failed', 'expired')",
+            name="ck_loser_outbox_status",
+        ),
+        Index("ix_loser_outbox_pending", "status", "next_retry_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    loser_roll_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("loser_rolls.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    next_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    loser_roll: Mapped["LoserRoll"] = relationship("LoserRoll")
 
 
 class WormAssignment(Base):

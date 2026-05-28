@@ -194,6 +194,7 @@ _JOB_LABELS: dict[str, str] = {
     "random_phrases": "💬 Автопост рандомных фраз",
     "autoloser": "🤡 Автолох",
     "birthdays_daily": "🎂 Дни рождения (ежедневная проверка)",
+    "meeting_feedback_daily": "🌟 5★ опрос по встречам (N2)",
 }
 
 @router.get("/admin/jobs", response_model=list[ScheduledJobOut])
@@ -659,6 +660,125 @@ async def put_polls_defaults(
     await set_polls_live_participants(session, body.live_participants_count)
     await set_polls_pin_result(session, body.pin_result)
     return body
+
+
+# --- N2: master-toggle и история feedback-опросов ---
+
+
+class MeetingFeedbackSettingsIO(BaseModel):
+    """GHG6 N2: настройки feedback-опроса по встречам.
+
+    `enabled` — master-toggle scheduler-job'а. Поднимается → перерегистрируется
+    job (см. PUT-handler с reload_dynamic_jobs).
+    `notify_absence` — публиковать ли тост «@user пропустил встречу +0.5».
+    `absence_weight_delta` — насколько поднимать вес. Default +0.5 как в п.18.
+    """
+
+    enabled: bool
+    notify_absence: bool
+    absence_weight_delta: float = Field(..., ge=0.0, le=5.0)
+
+
+@router.get("/admin/meeting-feedback", response_model=MeetingFeedbackSettingsIO)
+async def get_meeting_feedback_settings(
+    session: SessionDep,
+    user: CurrentUser,
+) -> MeetingFeedbackSettingsIO:
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        get_meeting_feedback_absence_weight,
+        get_meeting_feedback_enabled,
+        get_meeting_feedback_notify_absence,
+    )
+
+    return MeetingFeedbackSettingsIO(
+        enabled=await get_meeting_feedback_enabled(session),
+        notify_absence=await get_meeting_feedback_notify_absence(session),
+        absence_weight_delta=await get_meeting_feedback_absence_weight(session),
+    )
+
+
+@router.put("/admin/meeting-feedback", response_model=MeetingFeedbackSettingsIO)
+async def put_meeting_feedback_settings(
+    body: MeetingFeedbackSettingsIO,
+    session: SessionDep,
+    user: CurrentUser,
+) -> MeetingFeedbackSettingsIO:
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        set_meeting_feedback_absence_weight,
+        set_meeting_feedback_enabled,
+        set_meeting_feedback_notify_absence,
+    )
+
+    await set_meeting_feedback_enabled(session, body.enabled)
+    await set_meeting_feedback_notify_absence(session, body.notify_absence)
+    await set_meeting_feedback_absence_weight(session, body.absence_weight_delta)
+    # Перерегистрируем scheduler-job при изменении enabled.
+    from app.bot.dispatcher import get_bot
+
+    await reload_dynamic_jobs(get_bot())
+    log.info("admin.meeting_feedback_updated", **body.model_dump(), by=user.id)
+    return body
+
+
+class MeetingFeedbackRow(BaseModel):
+    """История 5★-оценок встречи. Группируется по meeting_id на фронте."""
+
+    meeting_id: int
+    meeting_title: str
+    meeting_starts_at: datetime
+    user_id: int
+    display_name: str | None
+    rating: int | None
+    was_absent: bool
+    reason_text: str | None
+    created_at: datetime
+
+
+@router.get("/admin/meeting-feedback/history", response_model=list[MeetingFeedbackRow])
+async def get_meeting_feedback_history(
+    session: SessionDep,
+    user: CurrentUser,
+    limit: int = 50,
+) -> list[MeetingFeedbackRow]:
+    """N2.5: история оценок последних N встреч. Лимит ограничен 200 сверху."""
+    _ensure_admin(user)
+    from app.db.models import MeetingFeedback
+
+    cap = max(1, min(limit, 200))
+    rows = list(
+        (
+            await session.execute(
+                select(
+                    MeetingFeedback,
+                    Meeting.title,
+                    Meeting.starts_at,
+                    User.display_name,
+                )
+                .join(Meeting, Meeting.id == MeetingFeedback.meeting_id)
+                .join(User, User.id == MeetingFeedback.user_id)
+                .order_by(desc(MeetingFeedback.created_at))
+                .limit(cap)
+            )
+        ).all()
+    )
+    out: list[MeetingFeedbackRow] = []
+    for fb, m_title, m_starts, u_name in rows:
+        out.append(
+            MeetingFeedbackRow(
+                meeting_id=fb.meeting_id,
+                meeting_title=m_title,
+                meeting_starts_at=m_starts,
+                user_id=fb.user_id,
+                display_name=u_name,
+                rating=fb.rating,
+                was_absent=fb.was_absent,
+                reason_text=fb.reason_text,
+                created_at=fb.created_at,
+            )
+        )
+    return out
 
 
 # --- N1: история опросов / игр (исходник п.18) ---

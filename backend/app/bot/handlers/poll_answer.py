@@ -18,6 +18,68 @@ async def on_poll_answer(answer: PollAnswer) -> None:
     try:
         sm = get_sessionmaker()
         async with sm() as session:
+            # GHG6 N2: если это feedback-полл, перехватываем тут — для него
+            # есть отдельная таблица meeting_feedback и побочный эффект на
+            # chukhan-веса. Остальные kind'ы (game_*, meetup, zaebal) идут
+            # через стандартный record_poll_answer (poll_votes).
+            from sqlalchemy import select as _select
+
+            from app.db.models import Poll as DbPoll, User as DbUser
+            from app.services.meeting_feedback import (
+                POLL_KIND_MEETING_FEEDBACK,
+                feedback_index_to_payload,
+                submit_feedback,
+            )
+
+            db_poll = (
+                await session.scalars(
+                    _select(DbPoll).where(DbPoll.tg_poll_id == answer.poll_id)
+                )
+            ).first()
+
+            if db_poll is not None and db_poll.kind == POLL_KIND_MEETING_FEEDBACK:
+                if not answer.option_ids:
+                    # Голос отозван — поллу с allows_multiple_answers=False
+                    # это означает, что юзер кликнул дважды. Игнорим: запись
+                    # в meeting_feedback оставляем (последний выбор побеждает).
+                    return
+                idx = int(answer.option_ids[0])
+                rating, was_absent = feedback_index_to_payload(idx)
+                if rating is None and not was_absent:
+                    log.warning(
+                        "meeting_feedback.bad_option_index",
+                        option=idx,
+                        tg_poll_id=answer.poll_id,
+                    )
+                    return
+                meeting_id = db_poll.game_nomination_id
+                if meeting_id is None:
+                    log.warning(
+                        "meeting_feedback.no_meeting_link", poll_id=db_poll.id
+                    )
+                    return
+                user = (
+                    await session.scalars(
+                        _select(DbUser).where(DbUser.telegram_id == answer.user.id)
+                    )
+                ).first()
+                if user is None:
+                    log.warning(
+                        "meeting_feedback.unknown_voter", tg_id=answer.user.id
+                    )
+                    return
+                from app.bot.dispatcher import get_bot
+
+                await submit_feedback(
+                    session,
+                    meeting_id=meeting_id,
+                    user_id=user.id,
+                    rating=rating,
+                    was_absent=was_absent,
+                    bot=get_bot(),
+                )
+                return
+
             await record_poll_answer(
                 session,
                 telegram_user_id=answer.user.id,
