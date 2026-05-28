@@ -242,13 +242,17 @@ export default function PollSheet(_props: Props) {
       </div>
 
       {/* G2.9: чекбокс «Закрепить» — над выбором длительности, чтобы он не
-          терялся между вариантами и кнопкой отправки. */}
-      <label className="mt-3 flex items-start gap-2 cursor-pointer text-sm">
+          терялся между вариантами и кнопкой отправки.
+          GHG7 P1.2 (попутно): .chk-tg + min-h-11 — тот же стандарт что и в
+          GamesScreen.tsx, чтобы не было «чёрного на чёрном» и hit-target
+          ≥44px. Не в чеклисте, но идентичный паттерн «чекбокс закрепить
+          опрос», логично выровнять одним заходом. */}
+      <label className="mt-3 flex items-center gap-2 cursor-pointer text-sm min-h-11 py-1.5">
         <input
           type="checkbox"
           checked={pin}
           onChange={(e) => setPin(e.target.checked)}
-          className="mt-0.5"
+          className="chk-tg"
         />
         <span>
           📌 Закрепить опрос в чате

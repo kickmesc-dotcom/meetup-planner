@@ -249,30 +249,62 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
 
 ### P1.1. Чекбокс «снимите галочку чтобы пропустить» в добавлении прокси
 Источник: GHG7.txt стр. 6. Чёрное на чёрном, нет индикации.
-- [ ] **P1.1.a.** Найти компонент. Подсветить unchecked state светлой
-  границей/фоном, checked — акцентным цветом (см. конвенцию проекта).
-- [ ] **P1.1.b.** Sync (frontend) — push в `kickmesc-dotcom/meetup-planner`.
+- [x] **P1.1.a.** (2026-05-28) `ProxyScreen.tsx:937` — нативный `<input
+  type="checkbox">` без классов. В проекте уже есть `.chk-tg` в
+  `styles.css:80` (рамка `tg-hint`, заливка `tg-link`, белая галка
+  при checked, WCAG AA). Добавлен `className="chk-tg"` к input,
+  плюс `min-h-11` на label — hit-target 44px по Apple/TG guideline.
+- [x] **P1.1.b sync** (2026-05-28) Только main. Frontend push в
+  `kickmesc-dotcom/meetup-planner` пользователь делает сам.
 
 ### P1.2. Чекбоксы «после победителя» / «закрепить опрос» в играх
 Источник: GHG7.txt стр. 11. Чёрное на чёрном + крошечный hit-target.
-- [ ] **P1.2.a.** Поднять hit-target до 44×44 (Apple/Telegram guideline),
-  применить тот же стиль чекбокса что и в P1.1 для консистентности.
-- [ ] **P1.2.b.** Sync.
+- [x] **P1.2.a.** (2026-05-28) `GamesScreen.tsx:219-252` —
+  два `<label>` (followUp + pinPoll). Применён `.chk-tg`,
+  `min-h-11 py-1.5`, `items-start → items-center`. Попутно тот же
+  паттерн применён к `PollSheet.tsx:246` (чекбокс «Закрепить опрос»)
+  — идентичная проблема, оставлять рассинхрон нелогично.
+- [x] **P1.2.b sync** (2026-05-28) Только main. Frontend push
+  пользователем.
 
 ### P1.3. Глобальный убрать `@gunghogunsbot` из отображения команд
 Источник: GHG7.txt стр. 44.
-- [ ] **P1.3.a.** Найти место, где формируются `BotCommand` / отображаемые
-  имена команд (aiogram registry или Telegram-меню).
-- [ ] **P1.3.b.** Решить — это поведение Telegram при mention или мы сами
-  где-то конкатим. Если Telegram — лечится настройкой `BotCommandScope` /
-  `setMyCommands`; если наш текст — глобальный sed по проекту.
-- [ ] **P1.3.c.** Sync.
+- [x] **P1.3.a.** (2026-05-28) `main.py::_register_bot_metadata` ставит
+  `BotCommand(command=c.cmd, ...)` — без `@`-суффикса в нашем коде.
+  Суффикс приписывает сам Telegram, когда видит в чате нескольких
+  ботов и неуверен в адресации. Сейчас scope = `AllPrivateChats` +
+  `AllGroupChats` — общий, TG страхуется.
+- [x] **P1.3.b.** (2026-05-28) Дополнительно вызываем `set_my_commands`
+  с прицельным `BotCommandScopeChat(chat_id=settings.group_chat_id)`
+  для нашей шестёрки. У TG приоритет scope'ов: специфический (Chat)
+  перекрывает общий (AllGroupChats), и в этом чате TG считает команды
+  «однозначно нашими» — не клеит `@gunghogunsbot`. Для других group
+  chat'ов (если бот когда-нибудь окажется в ещё одной группе)
+  остаётся AllGroupChats-fallback.
+- [x] **P1.3.c sync** (2026-05-28) `main/backend/app/main.py` →
+  `meetup-planner-backend/app/main.py`. Применяется при следующем
+  старте Space (вызов в `_register_telegram_metadata_with_retry`).
 
 ### P1.4. Индикация активной `/zaebal`-паузы в списке команд
 Источник: GHG7.txt стр. 13.
-- [ ] **P1.4.a.** Добавить badge / суффикс к команде `/zaebal` в Mini App
-  если пауза активна — с тиктайн-таймером до разморозки.
-- [ ] **P1.4.b.** Sync.
+- [x] **P1.4.a.** (2026-05-28) Через `BotCommand.description` TG-меню
+  нельзя обновлять часто (rate limit + кеш TG). Поэтому индикация
+  живёт в нашем `/help` (`backend/app/bot/handlers/help.py`):
+  - `render_help` получил опциональный `paused_until: datetime | None`
+    (backward-compatible default `None`). Если задан и > now —
+    к строке `/zaebal` дописывается `⏸️ пауза N` через хелпер
+    `_format_remaining` («2д 4ч 15м», «3ч 20м», «43м», «<1м» —
+    последний для race condition «пауза уже истекла, autorestore не
+    успел»).
+  - `on_help` подгружает `BotPause.ends_at` через `get_active_pause`
+    и передаёт в `render_help`.
+  - Badge только на `/zaebal`, не на `/zaebal_vote` (это запуск
+    голосования, не сама пауза).
+  Тесты в `tests/test_help_commands.py`: 6 новых кейсов
+  (`_format_remaining` × 4 ветки + 2 render-теста). Все 165/165
+  тестов зелёные.
+- [x] **P1.4.b sync** (2026-05-28) `main/backend/app/bot/handlers/help.py`
+  + `tests/test_help_commands.py` → `meetup-planner-backend/`.
 
 ---
 

@@ -11,6 +11,7 @@ from aiogram.types import (
     BotCommand,
     BotCommandScopeAllGroupChats,
     BotCommandScopeAllPrivateChats,
+    BotCommandScopeChat,
     MenuButtonWebApp,
     WebAppInfo,
 )
@@ -64,6 +65,20 @@ async def _register_bot_metadata() -> None:
         # Устанавливаем команды с коротким таймаутом
         await bot.set_my_commands(private_cmds, scope=BotCommandScopeAllPrivateChats(), request_timeout=10)
         await bot.set_my_commands(group_cmds, scope=BotCommandScopeAllGroupChats(), request_timeout=10)
+        # GHG7 P1.3: чтобы в нашем основном чате Telegram не дописывал
+        # `@gunghogunsbot` к каждой команде в autocomplete, ставим
+        # команды дополнительно прицельно на `group_chat_id` через
+        # BotCommandScopeChat. У TG приоритет scope'ов: специфический
+        # (Chat) перекрывает общий (AllGroupChats), и в этом конкретном
+        # чате TG считает команды «однозначно нашими» — не клеит суффикс.
+        # Для других group chat'ов (если бот когда-нибудь окажется в
+        # ещё одной группе) остаётся AllGroupChats-fallback.
+        if settings.group_chat_id:
+            await bot.set_my_commands(
+                group_cmds,
+                scope=BotCommandScopeChat(chat_id=settings.group_chat_id),
+                request_timeout=10,
+            )
     except Exception as exc:  # noqa: BLE001
         structlog.get_logger().warning("bot.set_commands_failed", error=str(exc))
 

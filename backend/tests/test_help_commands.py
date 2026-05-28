@@ -7,13 +7,15 @@ filter'ом и проверкой in `_whitelist_set`; вызов рендера
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from app.bot.commands_catalog import (
     COMMANDS,
     CommandSpec,
     bot_commands_for_scope,
     visible_for,
 )
-from app.bot.handlers.help import render_help
+from app.bot.handlers.help import _format_remaining, render_help
 
 
 def test_catalog_not_empty():
@@ -113,3 +115,54 @@ def test_private_user_help_contains_expected_public_commands():
     text = render_help(scope="private", is_admin=False)
     for cmd in ("/start", "/meetings", "/loser", "/phrase", "/whoami", "/help"):
         assert cmd in text, f"в private /help нет {cmd}"
+
+
+# --- GHG7 P1.4: индикация активной zaebal-паузы в /help ---
+
+
+def test_format_remaining_days_hours_minutes():
+    now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
+    ends = now + timedelta(days=2, hours=4, minutes=15)
+    assert _format_remaining(ends, now=now) == "2д 4ч 15м"
+
+
+def test_format_remaining_only_hours_and_minutes():
+    now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
+    ends = now + timedelta(hours=3, minutes=20)
+    assert _format_remaining(ends, now=now) == "3ч 20м"
+
+
+def test_format_remaining_only_minutes():
+    now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
+    ends = now + timedelta(minutes=43)
+    assert _format_remaining(ends, now=now) == "43м"
+
+
+def test_format_remaining_under_a_minute_clamps_to_lt_1m():
+    """Race: pause.ends_at чуть в прошлом или вот-вот закончится →
+    показываем «<1м», а не «-2м» или «0м». Handler покажет «активна»,
+    автореставрация скоро её снимет.
+    """
+    now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
+    assert _format_remaining(now + timedelta(seconds=30), now=now) == "<1м"
+    assert _format_remaining(now - timedelta(minutes=5), now=now) == "<1м"
+
+
+def test_render_help_no_pause_no_badge():
+    text = render_help(scope="group", is_admin=False)
+    assert "/zaebal" in text
+    assert "⏸️" not in text
+    assert "пауза" not in text
+
+
+def test_render_help_with_pause_adds_badge_to_zaebal():
+    now = datetime(2026, 5, 28, 12, 0, tzinfo=timezone.utc)
+    ends = now + timedelta(hours=5, minutes=30)
+    text = render_help(scope="group", is_admin=False, paused_until=ends, now=now)
+    # Badge только на /zaebal — не на /zaebal_vote.
+    lines = text.split("\n")
+    zaebal_line = next(line for line in lines if "<b>/zaebal</b>" in line)
+    assert "⏸️ пауза 5ч 30м" in zaebal_line
+    # /zaebal_vote — без badge (это запуск голосования, не сама пауза).
+    vote_line = next(line for line in lines if "<b>/zaebal_vote</b>" in line)
+    assert "⏸️" not in vote_line

@@ -930,12 +930,17 @@ function ParserBox({
             Найдено: {drafts.length}. Снимите галочки, чтобы пропустить.
           </div>
           {drafts.map((d, i) => (
+            // GHG7 P1.1: добавлен .chk-tg для контрастной рамки/заливки
+            // (раньше нативный input был «чёрное на чёрном» в TG dark theme,
+            // непонятно прожат или нет). min-h-11 поднимает hit-target всей
+            // строки до 44px по Apple/TG guideline — тыкать пальцем удобно.
             <label
               key={i}
-              className="flex items-center gap-2 rounded-md bg-tg-bg/40 px-2 py-1.5 text-sm cursor-pointer"
+              className="flex items-center gap-2 rounded-md bg-tg-bg/40 px-2 py-1.5 text-sm cursor-pointer min-h-11"
             >
               <input
                 type="checkbox"
+                className="chk-tg"
                 checked={selected.has(i)}
                 onChange={(e) => {
                   setSelected((s) => {

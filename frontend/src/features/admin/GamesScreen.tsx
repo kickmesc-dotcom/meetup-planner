@@ -216,12 +216,17 @@ export default function GamesScreen({ onBack }: Props) {
           />
         </div>
 
-        <label className="flex items-start gap-2 cursor-pointer">
+        {/* GHG7 P1.2: добавлен .chk-tg (раньше чекбокс был нативный
+            «чёрное на чёрном» в TG dark theme — нет индикации вкл/выкл).
+            min-h-11 + py-1.5 поднимают hit-target всей строки до 44px по
+            Apple/TG guideline. items-start → items-center, иначе чекбокс
+            прижимался к верху и попадать в него ещё сложнее. */}
+        <label className="flex items-center gap-2 cursor-pointer min-h-11 py-1.5">
           <input
             type="checkbox"
             checked={followUp}
             onChange={(e) => setFollowUp(e.target.checked)}
-            className="mt-0.5"
+            className="chk-tg"
           />
           <span className="text-sm text-tg-text">
             После победителя — follow-up «Когда играем»
@@ -233,13 +238,14 @@ export default function GamesScreen({ onBack }: Props) {
         </label>
 
         {/* G2.8: чекбокс пина. Для follow-up «Когда играем» бэк наследует
-            это же значение (см. services/games_poll.py: pinned проброс). */}
-        <label className="flex items-start gap-2 cursor-pointer">
+            это же значение (см. services/games_poll.py: pinned проброс).
+            GHG7 P1.2: тот же chk-tg / min-h-11 что и у followUp. */}
+        <label className="flex items-center gap-2 cursor-pointer min-h-11 py-1.5">
           <input
             type="checkbox"
             checked={pinPoll}
             onChange={(e) => setPinPoll(e.target.checked)}
-            className="mt-0.5"
+            className="chk-tg"
           />
           <span className="text-sm text-tg-text">
             📌 Закрепить опрос в чате
