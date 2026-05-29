@@ -147,10 +147,18 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   содержат `transport=direct|proxy`, `proxy_id`, `elapsed_ms`,
   `error/tg_message_id`. Для retry-job (b.4) аналогичные логи будут с
   префиксом `loser_outbox_retry.*`.
-- [ ] **P0.2.e.** Попап «причина ролла» по клику на корону в календаре:
-  попап с текстом анонса (или JSON-снэпшотом ставок), который уже есть в
-  БД. Это часть GHG7 стр. 2 хвост — формально UX, но тематически здесь.
-  Если попап тянет много изменений — выносим в P2 отдельным подэтапом.
+- [x] **P0.2.e.** (2026-05-29, main `@ff2c3d9`) Попап «причина ролла» по
+  клику на корону. Бэк: `GET /calendar/loser/{day}/{user_id}`
+  (`routes_calendar.py`) — последний `LoserRoll` за день/юзера
+  (`rolled_at DESC`), без outbox-фильтра (корона уже видна => ролл
+  доставлен/legacy/manual), 404 если записи нет; поля
+  `reason_text/source/rolled_by_name/was_worm`. Фронт: кликабельная 👑
+  (`ParticipantRow.tsx`, `pointer-events-auto` точечно + `stopPropagation`
+  + `haptic`), zustand `loserReasonPopover` (`store/ui.ts`),
+  `fetchLoserReason` (`api/birthdays.ts`), компонент
+  `LoserReasonPopover.tsx` (ветвление по source auto/manual/worm,
+  зеркалит `BirthdayPopover`). Тесты 165/165, tsc чист по затронутым
+  файлам (2 ошибки в `HistoryScreen.tsx` — предсущ., не наши).
 - [x] **P0.2.f.** (2026-05-28) `tests/test_loser_outbox.py` — 4 теста:
   (1) фейл send → pending+attempts=1+last_error, без raise;
   (2) успех → sent+tg_message_id;
@@ -162,7 +170,10 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
   Async-БД-стенда в проекте нет (см. шапку `test_loser_cooldown_split`)
   — кейс «корона физически не видна» покрывается на SQL-слое через
   ручную проверку в проде (см. INV-2 ниже, не блокирует деплой).
-- [ ] **P0.2.g.** Sync.
+- [x] **P0.2.g sync** (2026-05-29) `meetup-planner-main/backend/app/api/
+  routes_calendar.py` → `meetup-planner-backend/` (HF `@d13e888`). Только
+  этот файл изменён бэком в P0.2.e (frontend в HF не идёт). Push в HF/GitHub
+  делает пользователь.
 
 ### P0.3. Копилка фраз — резкое падение и обнуление по участникам
 Источник: GHG7.txt стр. 4.
