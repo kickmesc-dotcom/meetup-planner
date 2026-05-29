@@ -24,6 +24,7 @@ import StripView from "./views/StripView";
 import TimelineView from "./views/TimelineView";
 import TimelineNavBar from "./views/TimelineNavBar";
 import BirthdayPopover from "./BirthdayPopover";
+import LoserReasonPopover from "./LoserReasonPopover";
 import HoursView from "./views/HoursView";
 import MonthView from "./views/MonthView";
 import YearView from "./views/YearView";
@@ -287,6 +288,8 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
 
       {/* GHG6 BD2: глобальный поповер ДР; рендерится поверх всего календаря. */}
       <BirthdayPopover />
+      {/* GHG7 P0.2.e: попап причины ролла по клику на 👑. */}
+      <LoserReasonPopover />
     </div>
   );
 }

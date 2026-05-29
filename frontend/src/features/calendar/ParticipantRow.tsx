@@ -57,6 +57,7 @@ export default function ParticipantRow({
 }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
+  const setLoserReasonPopover = useUI((s) => s.setLoserReasonPopover);
   const qc = useQueryClient();
 
   const createMut = useMutation({
@@ -310,14 +311,49 @@ export default function ParticipantRow({
                     подряд (👑👑), либо 👑×2 в узких ячейках. */}
                 {(loserCount > 0 || showChukhan) && (
                   <div className="pointer-events-none absolute bottom-0.5 left-0.5 flex gap-0.5 text-[10px] leading-none">
+                    {/* GHG7 P0.2.e: 👑 — кликабельная, открывает попап с
+                        причиной ролла. pointer-events:auto точечно на
+                        корону; родительский div остаётся none, чтобы клик
+                        по фону ячейки уходил на основную кнопку. */}
                     {loserCount > 0 && (
                       compactLoser ? (
-                        <span aria-label={`Был лохом ${loserCount} раза`}>
+                        <button
+                          type="button"
+                          aria-label={`Был лохом ${loserCount} раза — причина`}
+                          title="Показать причину"
+                          className="pointer-events-auto active:scale-95"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            haptic("selection");
+                            setLoserReasonPopover({
+                              userId: user.id,
+                              date: dayKey,
+                              displayName: user.display_name,
+                            });
+                          }}
+                        >
                           👑×{loserCount}
-                        </span>
+                        </button>
                       ) : (
                         Array.from({ length: loserCount }).map((_, k) => (
-                          <span key={`crown-${k}`} aria-label="Был лохом">👑</span>
+                          <button
+                            key={`crown-${k}`}
+                            type="button"
+                            aria-label="Был лохом — причина"
+                            title="Показать причину"
+                            className="pointer-events-auto active:scale-95"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              haptic("selection");
+                              setLoserReasonPopover({
+                                userId: user.id,
+                                date: dayKey,
+                                displayName: user.display_name,
+                              });
+                            }}
+                          >
+                            👑
+                          </button>
                         ))
                       )
                     )}

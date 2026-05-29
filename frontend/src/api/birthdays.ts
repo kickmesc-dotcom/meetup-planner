@@ -41,6 +41,22 @@ export const fetchCalendarMarks = (from: Date, to: Date) =>
     `/api/calendar/marks?from=${from.toISOString()}&to=${to.toISOString()}`,
   );
 
+// GHG7 P0.2.e: попап «причина ролла» по клику на корону. Возвращает
+// последний роллов день/юзер — если их несколько, берём rolled_at DESC.
+// 404 — корона нарисована, а записи нет (cache mismatch).
+export interface LoserReason {
+  rolled_at: string; // ISO
+  reason_text: string | null;
+  source: "auto" | "manual" | null;
+  rolled_by_name: string | null;
+  was_worm: boolean;
+}
+
+export const fetchLoserReason = (day: string, userId: number) =>
+  api<LoserReason>(
+    `/api/calendar/loser/${encodeURIComponent(day)}/${userId}`,
+  );
+
 // GHG6 E8.4: активный «червь-пидор». Звание переходящее, одновременно ≤1.
 // Все поля = null, если никого не назначено.
 export interface WormCurrent {

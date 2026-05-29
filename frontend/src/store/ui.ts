@@ -89,6 +89,14 @@ interface UIState {
   setBirthdayPopover: (v: { userId: number; date: string; displayName: string } | null) => void;
 
   /**
+   * GHG7 P0.2.e: попап с причиной ролла по клику на корону 👑.
+   * userId — кому корона, date — день (YYYY-MM-DD), displayName — имя для
+   * заголовка. Закрывается через setLoserReasonPopover(null).
+   */
+  loserReasonPopover: { userId: number; date: string; displayName: string } | null;
+  setLoserReasonPopover: (v: { userId: number; date: string; displayName: string } | null) => void;
+
+  /**
    * GHG6 BD2: дата, с которой надо открыть PollSheet при «Назначить встречу»
    * из поповера. PollSheet читает её при монтаже и кладёт в первый вариант.
    */
@@ -171,6 +179,9 @@ export const useUI = create<UIState>((set, get) => ({
 
   birthdayPopover: null,
   setBirthdayPopover: (birthdayPopover) => set({ birthdayPopover }),
+
+  loserReasonPopover: null,
+  setLoserReasonPopover: (loserReasonPopover) => set({ loserReasonPopover }),
 
   pollSheetPresetDate: null,
   setPollSheetPresetDate: (pollSheetPresetDate) => set({ pollSheetPresetDate }),

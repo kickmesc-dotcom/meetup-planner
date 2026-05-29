@@ -19,7 +19,7 @@
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
@@ -171,6 +171,70 @@ async def get_worm_current(session: SessionDep, _user: CurrentUser) -> WormCurre
         user_id=row.user_id,
         display_name=target.display_name if target else None,
         started_at=row.started_at,
+    )
+
+
+# --- GHG7 P0.2.e: причина ролла по клику на корону ---
+
+
+class LoserReasonOut(BaseModel):
+    """Детали loser-ролла за конкретный (date, user_id).
+
+    Если за один день у юзера несколько роллов — берём САМЫЙ ПОЗДНИЙ
+    (rolled_at DESC), как и видит юзер «последнюю корону». Worm-роллы
+    (reason_text=WORM_REASON_TEXT) маркируются полем `was_worm=true`,
+    фронт может показать другую стилизацию попапа.
+    """
+    rolled_at: datetime
+    reason_text: str | None = None
+    source: str | None = None  # 'auto' | 'manual' | None для legacy
+    rolled_by_name: str | None = None  # display_name инициатора
+    was_worm: bool = False
+
+
+@router.get(
+    "/calendar/loser/{day}/{user_id}",
+    response_model=LoserReasonOut,
+)
+async def get_loser_reason(
+    day: date,
+    user_id: int,
+    session: SessionDep,
+    _user: CurrentUser,
+) -> LoserReasonOut:
+    """Вернуть последний loser-ролл за день для юзера. 404 если ничего нет.
+
+    Фильтрация по outbox — НЕ применяется: попап открывается по клику на
+    уже-видимую корону, значит соответствующий ролл либо доставлен, либо
+    legacy/manual. Если корону всё-таки рисует фронт без записи на бэке
+    (например клиент догнал кэш), отдаём 404 — попап не открыть.
+    """
+    from app.services.loser import WORM_REASON_TEXT
+
+    # rolled_at в UTC, day — локальная дата клиента. Берём окно [day, day+1)
+    # в UTC — для шестёрки одного TZ-пояса этого достаточно. Если когда-нибудь
+    # появятся юзеры в разных TZ, нужно будет передавать tz клиента.
+    start = datetime.combine(day, datetime.min.time(), tzinfo=timezone.utc)
+    end = start + timedelta(days=1)
+
+    row = await session.scalar(
+        select(LoserRoll)
+        .where(LoserRoll.loser_user_id == user_id)
+        .where(LoserRoll.rolled_at >= start)
+        .where(LoserRoll.rolled_at < end)
+        .order_by(LoserRoll.rolled_at.desc())
+        .limit(1)
+    )
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no roll for this day/user")
+
+    roller = await session.get(User, row.rolled_by)
+    return LoserReasonOut(
+        rolled_at=row.rolled_at,
+        reason_text=row.reason_text,
+        source=row.source,
+        rolled_by_name=roller.display_name if roller else None,
+        was_worm=(row.reason_text == WORM_REASON_TEXT),
     )
 
 
