@@ -68,6 +68,20 @@ export interface WormCurrent {
 export const fetchCurrentWorm = () =>
   api<WormCurrent>("/api/worm/current");
 
+// GHG7 P2.1.a: актуальные звания для «шапки» аватарки. Каждое поле — user_id
+// текущего носителя (или список), null/[] если носителя нет.
+// loser_today = 👑, main_loser = 🤡 (разные иконки — могут быть одновременно).
+export interface CurrentTitles {
+  worm_user_id: number | null;
+  chukhan_user_id: number | null;
+  loser_today_user_id: number | null;
+  main_loser_user_id: number | null;
+  birthday_today_user_ids: number[];
+}
+
+export const fetchCurrentTitles = () =>
+  api<CurrentTitles>("/api/titles/current");
+
 // GHG6 E6: запланированные игры (meeting.tag='game') в окне.
 // Используется для иконки 🎮 в углу дня в CalendarView.
 export interface GameSession {

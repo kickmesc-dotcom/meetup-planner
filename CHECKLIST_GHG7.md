@@ -33,17 +33,22 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
 ## INV — расследования перед P0
 
 ### INV-1. Где новый таймлайн в приложении (есть, но не виден)
-- [ ] **INV-1.a.** Подтвердить значение `calendar.timeline_enabled` в Neon
-  `admin_config` в проде. Способ: `GET /admin/calendar/timeline` через
-  curl/Postman с админ-токеном. Ожидание: `{"enabled": false}` (default).
-- [ ] **INV-1.b.** Если флаг `false`, включить:
-  `PUT /admin/calendar/timeline {"enabled": true}` и визуально проверить
-  Mini App при `zoom ∈ {day, week, month}` — должен рендериться
-  `TimelineView` (`frontend/src/features/calendar/views/TimelineView.tsx`).
-- [ ] **INV-1.c.** Зафиксировать вывод: достаточно ли таймлайна как
-  «по умолчанию для нас» или ждём UX-замечаний → решить, идёт ли UI-тогглер
-  в P2 (отдельный подэтап) или достаточно дефолта `true` в коде.
-- Закрывающая запись: дата + вывод + ссылка на созданные подэтапы.
+- [x] **INV-1.a.** (2026-05-29) Прочитано напрямую из Neon `admin_config`
+  (curl с initData недоступен — авторизация требует свежую TWA-подпись;
+  читал прямым asyncpg-коннектом по DATABASE_URL). Ключа
+  `calendar.timeline_enabled` в таблице **НЕТ** → действует дефолт `False`
+  (`get_calendar_timeline_enabled`, `admin_config.py:471-479`). Подтверждает
+  гипотезу: таймлайн в проде выключен, поэтому «не виден».
+- [x] **INV-1.b.** (2026-05-29) **НЕ включаем.** Пользователь проверил
+  таймлайн (включал ранее вручную) — «выглядит отвратительно и неюзабелен
+  даже хуже текущего функционала». Дефолт остаётся `False` (legacy-вид).
+  Флаг в БД не трогаем.
+- [x] **INV-1.c.** (2026-05-29) **Вывод:** новый таймлайн в текущем виде
+  непригоден; его либо уберут, либо перепишут в отдалённом будущем.
+  Персональный переключатель режимов в профиле (был в плане P4) —
+  **отменён**. Решение: глобальный тогглер новый/старый в админке, дефолт
+  старый. → P2.5 переведён из «опционально» в «делаем» (см. ниже,
+  закрыт в этой же сессии).
 
 Известные факты (по чтению кода 2026-05-28):
 - Бэк: `app/services/admin_config.py:468–482`, `app/api/routes_admin.py:2083–2099`.
@@ -203,14 +208,43 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
     total↔within_lookback покажет, режет ли TTL слишком много;
     малый `total` при «активный юзер» = не записывается на входе.
   Тесты: 155/155 зелёные (`pytest tests/`).
-- [ ] **P0.3.c.** Восстановление пропавших фраз. Ждёт прод-данных
-  через `/admin/random-phrases/pool/raw`. Если total в БД мал —
-  ничего восстановить нельзя (фиксируем «с этой даты заново»).
-  Если total нормальный, но within_lookback мал — был артефакт
-  TZ/cutoff, и сейчас фикс уже сработает с новых сообщений.
+- [x] **P0.3.c.** (2026-05-29) **Диагноз ПЕРЕОПРЕДЕЛЁН — это НЕ TZ/cutoff.**
+  Прочитал прод-данные напрямую из Neon (asyncpg по DATABASE_URL):
+  152 сообщения, диапазон `2026-05-15 .. 2026-05-22`, `user_id NULL = 0`.
+  **Запись встала 22 мая**, хотя чат активен после (подтвердил пользователь).
+  `loser_rolls` имеет запись от 28 мая → бот жив, scheduler-исходящие
+  работают. Значит проблема — во **входящих** групповых апдейтах до
+  `chat_capture`. Корень: `bot_reactions.router` (`@router.message(F.text)`)
+  зарегистрирован в `dispatcher.py` ДО `chat_capture.router`; его
+  `on_message` возвращал `None` при любом раннем `return`, а в aiogram 3.13
+  это останавливает пропагацию между роутерами (`router.py:170` —
+  `if response is not UNHANDLED: return`; `telegram.py:106-125` — `trigger`
+  возвращает результат первого сматчившегося handler'а). → `chat_capture`
+  никогда не вызывался с момента деплоя GHG6 E9 (~22 мая). Фикс P0.3.b
+  (TZ aware) корректен, но лечил не ту причину. **Восстановления нет** —
+  152 старых сообщения остаются (пользователь: «оставить как есть»),
+  cleanup сам их подчистит при первом новом сообщении. Follow-up: P0.3.e.
 - [x] **P0.3.d sync** (2026-05-28) `meetup-planner-main/backend/` →
   `meetup-planner-backend/`: `chat_capture.py`, `routes_admin.py`.
   Push в HF/GitHub отдельным шагом.
+- [x] **P0.3.e.** (2026-05-29) **Фикс корня (перехват апдейтов).**
+  - `bot_reactions.py`: логика реакции вынесена в `_maybe_react`, а
+    `on_message` теперь ВСЕГДА завершается `raise SkipHandler`
+    (import из `aiogram.dispatcher.event.bases`). Тогда `trigger` вернёт
+    `UNHANDLED`, и Dispatcher передаст апдейт следующему роутеру
+    (`chat_capture`), который сохранит сообщение. Реакция (mention/reply)
+    выполняется как побочный эффект до SkipHandler.
+  - `dispatcher.py:294-299`: исправлен ошибочный комментарий «порядок
+    aiogram-роутеров на срабатывание не влияет» — влияет; теперь явно
+    описан контракт SkipHandler.
+  - `bot_reactions.py` docstring модуля переписан под реальную семантику.
+  - Тест `tests/test_bot_reactions_propagation.py` (4 кейса): SkipHandler
+    поднимается во всех ветках (чужой чат / не whitelist / обычный текст /
+    mention с реакцией). Весь сьют 169/169 зелёный (было 165).
+- [x] **P0.3.f sync** (2026-05-29) `meetup-planner-main/backend/` →
+  `meetup-planner-backend/`: `app/bot/handlers/bot_reactions.py`,
+  `app/bot/dispatcher.py`, `tests/test_bot_reactions_propagation.py`
+  (diff -q пуст). Push в HF/GitHub делает пользователь.
 
 ### P0.4. Healthcheck бота даёт false-negative ~80%
 Источник: GHG7.txt стр. 8.
@@ -324,14 +358,40 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
 
 ### P2.1. Иконки др/лох/корона/червь — переделать как «шапку» аватарки
 Источник: GHG7.txt стр. 19.
-- [ ] **P2.1.a.** Дизайн: иконка сидит сверху телеграм-кружка с заплывом.
-  Аналог «шапки» — корона/какашка/тортик/червь поверх. Мокап — ASCII или
-  Figma-описание в комментарии PR.
-- [ ] **P2.1.b.** Не перекрывает ячейку (свободен/может/занят) — z-index
-  иконки выше круга, ниже статус-пилюли.
+
+Решения 2026-05-29/30: шапка = **актуальные звания** (кто кем является
+прямо сейчас), не агрегат по дням. Дневные 👑/💩/🎂 в ячейках остаются как
+есть (это события на дату). Несколько званий — **стеком рядом** по приоритету.
+Лох дня = 👑, главный лох = 🤡 (разные иконки).
+- [x] **P2.1.a.** (2026-05-30) **Backend:** новый read-only эндпоинт
+  `GET /api/titles/current` (`routes_calendar.py`, `CurrentTitlesOut`):
+  worm (`get_current_worm`), чухан текущей недели (прямой SELECT по
+  `current_week_start()` — НЕ `pick_chukhan_for_week`, она бы создала
+  запись), лох дня (последний `LoserRoll` за сегодня UTC), главный лох
+  (`pick_main_loser` — max по `loser_stats`, тай-брейк меньший user_id),
+  ДР сегодня (`Birthday` по дню/месяцу). Тест `test_titles_current.py`
+  (5 кейсов на `pick_main_loser`), сьют 174/174.
+  **Frontend:** `fetchCurrentTitles`/`CurrentTitles` (`api/birthdays.ts`),
+  query `["titles-current"]` в `CalendarView` (заменил отдельный
+  `["worm-current"]` — worm теперь приходит здесь), проп `titles`
+  прокинут в `StripView`/`TimelineView` → `ParticipantRow`.
+- [x] **P2.1.b.** (2026-05-30) `ParticipantRow.tsx`: per-user `titleBadges`
+  по `user.id`, отрисовка горизонтальным стеком над аватаркой
+  (`-top-2 left-1/2 -translate-x-1/2 z-20`, каждая иконка на плашке
+  `bg-tg-bg rounded-full` для читаемости). Приоритет слева-направо:
+  🎂 ДР · 👑 лох дня · 🤡 главный лох · 💩 чухан недели · 🪱 червь.
+  Прежний bottom-right 🪱-бейдж убран — червь теперь часть общего стека.
+  z-20 выше кружка (z-10), статус-пилюли в сетке ячеек не затрагиваются.
+  tsc по затронутым файлам чист (2 ошибки в `HistoryScreen.tsx` — предсущ.).
 - [ ] **P2.1.c.** Клик по иконке → попап-история номинации участника
-  (сколько раз был в этой роли, топ номинантов).
-- [ ] **P2.1.d.** Sync.
+  (сколько раз был в этой роли, топ номинантов). **Отложено отдельным
+  подэтапом** (требует истории по ролям: для лоха — частично `loser_stats`,
+  для чухана — leaderboard, для червя/ДР истории-API пока нет). Иконки
+  сейчас информативные (title/aria-label), некликабельные.
+- [x] **P2.1.d sync** (2026-05-30) Backend `routes_calendar.py` +
+  `test_titles_current.py` → `meetup-planner-backend/` (diff -q пуст).
+  Frontend (`api/birthdays.ts`, `CalendarView.tsx`, `views/StripView.tsx`,
+  `views/TimelineView.tsx`, `ParticipantRow.tsx`) — push пользователем.
 
 ### P2.2. Уведомления о паузе бота (через команду/voot vs админка)
 Источник: GHG7.txt стр. 14–15.
@@ -370,11 +430,18 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
   предзаполненным get-together контекстом.
 - [ ] **P2.4.d.** Sync.
 
-### P2.5. (опционально) UI-тогглер `calendar.timeline_enabled` в админке
-Зависит от вывода INV-1.c.
-- [ ] **P2.5.a.** Switch в админке Calendar settings, использует уже
-  существующие `fetchCalendarTimelineFlag` / `setCalendarTimelineFlag`.
-- [ ] **P2.5.b.** Sync.
+### P2.5. UI-тогглер `calendar.timeline_enabled` в админке
+По выводу INV-1.c — **делаем** (был «опционально»). Дефолт старый/legacy.
+- [x] **P2.5.a.** (2026-05-29) Компонент `CalendarSettingsScreen.tsx`
+  (Switch + react-query инвалидация под `CalendarView`) уже был написан в
+  коммите GHG7 P0.2 (`858c295`), но **не подключён** в `AdminScreen.tsx` —
+  был недостижим (orphan). Заврайрено: добавлен `Section`
+  `"calendar-settings"`, импорт, роутинг-строка и `Card` «Вид календаря»
+  (🆕, subtitle «Новый таймлайн / legacy-вид (по умолчанию legacy)») в
+  секцию «📅 Календарь». Сам экран не менялся. tsc по затронутым файлам
+  чист (2 ошибки в `HistoryScreen.tsx` — предсущ., не наши).
+- [x] **P2.5.b sync** (2026-05-29) Только main (`frontend/.../AdminScreen.tsx`).
+  Frontend push в `kickmesc-dotcom/meetup-planner` делает пользователь.
 
 ---
 

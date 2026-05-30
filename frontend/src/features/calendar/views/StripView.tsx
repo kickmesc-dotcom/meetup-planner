@@ -1,6 +1,6 @@
 import { format, isToday, isWeekend, startOfDay } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
-import type { BirthdayCalendarEntry, CalendarMark } from "@/api/birthdays";
+import type { BirthdayCalendarEntry, CalendarMark, CurrentTitles } from "@/api/birthdays";
 import { buildDaysWindow, ruWeekdayShort } from "../dateUtils";
 import ParticipantRow from "../ParticipantRow";
 
@@ -12,8 +12,8 @@ interface Props {
   ranges: AvailabilityRange[];
   birthdays?: BirthdayCalendarEntry[];
   marks?: CalendarMark[];
-  /** GHG6 E8.4: user.id активного «червя-пидора», если есть. */
-  wormUserId?: number | null;
+  /** GHG7 P2.1.a: актуальные звания для иконок-«шапок» поверх аватарки. */
+  titles?: CurrentTitles | null;
   /** GHG6 E6: даты (YYYY-MM-DD) с запланированной игрой — рисуем 🎮 в шапке дня. */
   gameDates?: Set<string>;
   isPending: boolean;
@@ -27,7 +27,7 @@ export default function StripView({
   ranges,
   birthdays = [],
   marks = [],
-  wormUserId = null,
+  titles = null,
   gameDates,
   isPending,
 }: Props) {
@@ -91,7 +91,7 @@ export default function StripView({
             windowSpan={span}
             birthdays={birthdays.filter((b) => b.user_id === u.id)}
             marks={marks.filter((m) => m.user_id === u.id)}
-            isWorm={wormUserId === u.id}
+            titles={titles}
           />
         ))}
         {isPending && (

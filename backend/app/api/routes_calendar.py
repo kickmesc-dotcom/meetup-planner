@@ -174,6 +174,93 @@ async def get_worm_current(session: SessionDep, _user: CurrentUser) -> WormCurre
     )
 
 
+# --- GHG7 P2.1.a: актуальные звания для «шапки» аватарки ---
+
+
+class CurrentTitlesOut(BaseModel):
+    """Кто СЕЙЧАС носит каждое звание — для иконок-«шапок» в ParticipantRow.
+
+    Все поля — user_id (или список) активных носителей на текущий момент;
+    None / [] если носителя нет. Доступно всем участникам (не только админу).
+    Read-only: ничего не создаёт (в отличие от pick_chukhan_for_week).
+
+    - worm_user_id        — активный «червь-пидор» (worm_assignments.ended_at IS NULL).
+    - chukhan_user_id     — чухан ТЕКУЩЕЙ недели (WeeklyChukhan по current_week_start).
+    - loser_today_user_id — последний loser-ролл за сегодня (UTC-день), 👑.
+    - main_loser_user_id  — «главный лох»: max по суммарному числу роллов, 🤡.
+                            Тай-брейк — меньший user_id (детерминизм). None если
+                            роллов не было вовсе.
+    - birthday_today_user_ids — у кого ДР сегодня (по дню/месяцу), 🎂. Список,
+                            т.к. в один день могут совпасть несколько.
+    """
+    worm_user_id: int | None = None
+    chukhan_user_id: int | None = None
+    loser_today_user_id: int | None = None
+    main_loser_user_id: int | None = None
+    birthday_today_user_ids: list[int] = []
+
+
+def pick_main_loser(stats: dict[int, int]) -> int | None:
+    """«Главный лох» из {user_id: count}: max по count, тай-брейк — меньший
+    user_id (детерминизм при ничьей). None если статистики нет."""
+    if not stats:
+        return None
+    return min(stats, key=lambda uid: (-stats[uid], uid))
+
+
+@router.get("/titles/current", response_model=CurrentTitlesOut)
+async def get_titles_current(
+    session: SessionDep, _user: CurrentUser
+) -> CurrentTitlesOut:
+    from app.db.models import Birthday
+    from app.services.chukhan import current_week_start
+    from app.services.loser import get_current_worm, loser_stats
+
+    out = CurrentTitlesOut()
+
+    # 1. Червь-пидор — активная переходящая запись.
+    worm = await get_current_worm(session)
+    if worm is not None:
+        out.worm_user_id = worm.user_id
+
+    # 2. Чухан текущей недели — read-only SELECT (НЕ pick_chukhan_for_week,
+    #    которая создала бы запись при отсутствии).
+    ws = current_week_start()
+    chukhan = await session.scalar(
+        select(WeeklyChukhan).where(WeeklyChukhan.week_start == ws)
+    )
+    if chukhan is not None:
+        out.chukhan_user_id = chukhan.user_id
+
+    # 3. Лох дня — последний loser-ролл, чей rolled_at попадает на сегодня (UTC).
+    now = datetime.now(timezone.utc)
+    today_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
+    today_end = today_start + timedelta(days=1)
+    last_today = await session.scalar(
+        select(LoserRoll)
+        .where(LoserRoll.rolled_at >= today_start, LoserRoll.rolled_at < today_end)
+        .order_by(LoserRoll.rolled_at.desc())
+        .limit(1)
+    )
+    if last_today is not None:
+        out.loser_today_user_id = last_today.loser_user_id
+
+    # 4. Главный лох — max по числу роллов; тай-брейк меньший user_id.
+    out.main_loser_user_id = pick_main_loser(await loser_stats(session))
+
+    # 5. ДР сегодня — совпадение дня и месяца с текущей датой.
+    bdays = (await session.scalars(select(Birthday).where(Birthday.bday.is_not(None)))).all()
+    out.birthday_today_user_ids = [
+        b.user_id
+        for b in bdays
+        if b.bday is not None
+        and b.bday.month == now.month
+        and b.bday.day == now.day
+    ]
+
+    return out
+
+
 # --- GHG7 P0.2.e: причина ролла по клику на корону ---
 
 

@@ -14,6 +14,7 @@ import RandomPhrasesGeneratorScreen from "./RandomPhrasesGeneratorScreen";
 import AutoLoserScreen from "./AutoLoserScreen";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
+import CalendarSettingsScreen from "./CalendarSettingsScreen";
 import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
 import GamesScreen from "./GamesScreen";
@@ -32,6 +33,7 @@ type Section =
   | "autoloser"
   | "history"
   | "birthdays"
+  | "calendar-settings"
   | "poll-presets"
   | "proxy"
   | "games"
@@ -70,6 +72,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "autoloser") return <AutoLoserScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
+  if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
   if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "games") return <GamesScreen onBack={back} />;
@@ -220,6 +223,12 @@ export default function AdminScreen({ users }: Props) {
       </SectionGroup>
 
       <SectionGroup icon="📅" title="Календарь">
+        <Card
+          icon="🆕"
+          title="Вид календаря"
+          subtitle="Новый таймлайн / legacy-вид (по умолчанию legacy)"
+          onClick={() => select("calendar-settings")}
+        />
         <Card
           icon="🎂"
           title="Дни рождения"

@@ -3,7 +3,7 @@ import { addDays, format, startOfDay } from "date-fns";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup } from "framer-motion";
 import type { AvailabilityRange, User } from "@/types";
-import type { BirthdayCalendarEntry, CalendarMark } from "@/api/birthdays";
+import type { BirthdayCalendarEntry, CalendarMark, CurrentTitles } from "@/api/birthdays";
 import { confidenceFillForDay, rangeToPillRect, statusLabel } from "./dateUtils";
 import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
@@ -20,8 +20,12 @@ interface Props {
   birthdays?: BirthdayCalendarEntry[];
   /** Отметки лох/чухан этого участника в окне. */
   marks?: CalendarMark[];
-  /** GHG6 E8.4: этот участник — активный «червь-пидор». Рисуем 🪱 у аватара. */
-  isWorm?: boolean;
+  /**
+   * GHG7 P2.1: актуальные звания (общие для всех участников). Per-user флаги
+   * вычисляются внутри по `user.id` → рисуются «шапкой» иконок над аватаркой.
+   * Заменяет прежний булев `isWorm` (червь теперь часть общего стека).
+   */
+  titles?: CurrentTitles | null;
   /**
    * GHG6 CL1: фикс-ширина одной ячейки в пикселях. Если задано — строка не
    * растягивается на flex-1, а имеет ширину windowSpan × cellWidth. Используется
@@ -50,7 +54,7 @@ export default function ParticipantRow({
   windowSpan,
   birthdays = [],
   marks = [],
-  isWorm = false,
+  titles = null,
   cellWidth,
   visibleStart,
   visibleEnd,
@@ -124,6 +128,30 @@ export default function ParticipantRow({
   }
   const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
 
+  // GHG7 P2.1.a/b: «шапка» актуальных званий поверх аватарки. Порядок в массиве
+  // = порядок отрисовки слева-направо (приоритет): ДР > лох дня > главный лох >
+  // чухан недели > червь. Несколько званий показываем стеком рядом.
+  // Лох дня = 👑, главный лох = 🤡 (разные иконки — могут совпасть у разных
+  // или у одного участника одновременно).
+  const titleBadges: { key: string; icon: string; label: string }[] = [];
+  if (titles) {
+    if (titles.birthday_today_user_ids.includes(user.id)) {
+      titleBadges.push({ key: "bday", icon: "🎂", label: "День рождения сегодня" });
+    }
+    if (titles.loser_today_user_id === user.id) {
+      titleBadges.push({ key: "loser-today", icon: "👑", label: "Лох дня" });
+    }
+    if (titles.main_loser_user_id === user.id) {
+      titleBadges.push({ key: "main-loser", icon: "🤡", label: "Главный лох" });
+    }
+    if (titles.chukhan_user_id === user.id) {
+      titleBadges.push({ key: "chukhan", icon: "💩", label: "Чухан недели" });
+    }
+    if (titles.worm_user_id === user.id) {
+      titleBadges.push({ key: "worm", icon: "🪱", label: "Червь-пидор" });
+    }
+  }
+
   return (
     <div className="relative flex items-center border-b border-tg-secondary-bg/60">
       {/* GHG6 CL1: sticky-left делает колонку аватара "вмороженной" при
@@ -134,7 +162,11 @@ export default function ParticipantRow({
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
             style={{ background: user.color_hex }}
-            title={isWorm ? `🪱 ${user.display_name} — червь-пидор` : user.display_name}
+            title={
+              titleBadges.length > 0
+                ? `${user.display_name} — ${titleBadges.map((b) => b.label).join(", ")}`
+                : user.display_name
+            }
           >
             {user.avatar_url ? (
               <img
@@ -146,15 +178,28 @@ export default function ParticipantRow({
               initials(user.display_name)
             )}
           </div>
-          {/* GHG6 E8.4: переходящее звание «червь-пидор». Бейдж висит у аватара
-              того, кто сейчас активный носитель. */}
-          {isWorm && (
-            <span
-              aria-label="Червь-пидор"
-              className="absolute -bottom-1 -right-1 text-[14px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
+          {/* GHG7 P2.1.a/b: «шапка» актуальных званий — горизонтальный стек
+              иконок поверх аватарки. z-20 выше кружка (z-10 колонки). Каждая
+              иконка на фон-плашке bg-tg-bg для читаемости поверх любого аватара.
+              -top-2 + центрирование по горизонтали — «сидит на макушке».
+              P2.1.c (клик → попап-история) — отдельный подэтап, пока иконки
+              информативные (title/aria-label). */}
+          {titleBadges.length > 0 && (
+            <div
+              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 flex gap-0.5"
+              aria-hidden={false}
             >
-              🪱
-            </span>
+              {titleBadges.map((b) => (
+                <span
+                  key={b.key}
+                  aria-label={b.label}
+                  title={b.label}
+                  className="text-[12px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
+                >
+                  {b.icon}
+                </span>
+              ))}
+            </div>
           )}
         </div>
         <div className="text-[10px] text-tg-hint truncate max-w-[60px] mt-0.5">

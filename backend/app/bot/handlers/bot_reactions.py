@@ -17,14 +17,18 @@
 Whitelist: реагируем только на сообщения от участников whitelist (как
 chat_capture). Чужие сообщения игнорируем молча.
 
-ВАЖНО: handler регистрируется ДО chat_capture в include_router, чтобы
-успеть на mention/reply ещё до сохранения в ChatMessage. Сохранение не
-блокируется — chat_capture тоже выстрелит, а тут только ответ.
+ВАЖНО (GHG7 P0.3.c): handler матчит `F.text` (любое текстовое сообщение) и
+регистрируется ДО chat_capture. В aiogram первый сматчившийся router-handler
+останавливает пропагацию, поэтому раньше chat_capture НЕ вызывался и копилка
+фраз перестала пополняться. Фикс: `on_message` всегда завершается
+`raise SkipHandler`, благодаря чему апдейт доходит до chat_capture и
+сохраняется. Реакция (mention/reply) при этом выполняется как побочный эффект.
 """
 from __future__ import annotations
 
 import structlog
 from aiogram import F, Router
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.types import Message
 
 from app.config import get_settings
@@ -106,8 +110,9 @@ async def _react(message: Message) -> None:
         log.warning("bot_reactions.send_failed", error=str(exc))
 
 
-@router.message(F.text)
-async def on_message(message: Message) -> None:
+async def _maybe_react(message: Message) -> None:
+    """Решить, реагировать ли на сообщение, и отреагировать. Без управления
+    пропагацией — этим занимается `on_message`."""
     # Реагируем только в группе и только на whitelist'е.
     settings = get_settings()
     if not settings.group_chat_id or message.chat.id != settings.group_chat_id:
@@ -148,3 +153,17 @@ async def on_message(message: Message) -> None:
                     is_phrase=is_phrase,
                 )
                 await _react(message)
+
+
+@router.message(F.text)
+async def on_message(message: Message) -> None:
+    """GHG7 P0.3.c фикс: этот handler матчит ЛЮБОЙ `F.text`, поэтому в aiogram
+    он останавливал пропагацию апдейта (router возвращал не-`UNHANDLED`) и
+    `chat_capture` ниже по цепочке НИКОГДА не вызывался — копилка фраз встала.
+    Раннего `return` достаточно, чтобы апдейт считался обработанным.
+
+    Поэтому делаем реакцию (если нужна) и ВСЕГДА `raise SkipHandler`: тогда
+    `trigger` вернёт `UNHANDLED`, и Dispatcher передаст апдейт следующему
+    роутеру (`chat_capture`), который сохранит сообщение."""
+    await _maybe_react(message)
+    raise SkipHandler

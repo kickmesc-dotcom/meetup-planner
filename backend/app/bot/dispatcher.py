@@ -291,10 +291,11 @@ def get_dispatcher() -> Dispatcher:
         # сохранение текста (Command-фильтры всё равно сработают первыми, но
         # для читаемости держим порядок).
         _dispatcher.include_router(zaebal.router)
-        # GHG6 E9: реакции бота — ДО chat_capture, чтобы успеть на mention/reply
-        # раньше, чем сообщение запишется в ChatMessage (порядок aiogram-роутеров
-        # на срабатывание не влияет, но семантически правильнее иметь mention-
-        # обработчик перед catch-all сохранением).
+        # GHG6 E9 / GHG7 P0.3.c: реакции бота — ДО chat_capture. Порядок
+        # роутеров ВАЖЕН: bot_reactions матчит `F.text` и в aiogram остановил
+        # бы пропагацию, поэтому on_message обязан завершаться `raise
+        # SkipHandler`, чтобы chat_capture ниже по цепочке всё же сохранил
+        # сообщение (см. bot_reactions.on_message).
         _dispatcher.include_router(bot_reactions.router)
         _dispatcher.include_router(chat_capture.router)
     return _dispatcher

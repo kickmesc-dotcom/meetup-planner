@@ -5,7 +5,7 @@ import { fetchRanges } from "@/api/availability";
 import {
   fetchBirthdaysInWindow,
   fetchCalendarMarks,
-  fetchCurrentWorm,
+  fetchCurrentTitles,
   fetchScheduledGames,
 } from "@/api/birthdays";
 import { fetchCalendarTimelineFlag } from "@/api/admin";
@@ -96,12 +96,13 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
     staleTime: 30_000,
   });
 
-  // GHG6 E8.4: текущий «червь-пидор» (≤1 одновременно). Перешедшее звание —
-  // ребёр-роллится при следующем worm-триггере в roll_loser. Не от окна,
-  // запрос «глобальный». 30s staleTime достаточно: ролл — событие редкое.
-  const worm = useQuery({
-    queryKey: ["worm-current"],
-    queryFn: fetchCurrentWorm,
+  // GHG7 P2.1.a: актуальные звания (червь, чухан недели, лох дня, главный лох,
+  // ДР сегодня) одним запросом — для иконок-«шапок» поверх аватарки. Не от
+  // окна, запрос «глобальный». 30s staleTime: звания меняются редко.
+  // Заменяет прежний отдельный ["worm-current"] — worm теперь приходит здесь.
+  const titles = useQuery({
+    queryKey: ["titles-current"],
+    queryFn: fetchCurrentTitles,
     staleTime: 30_000,
   });
 
@@ -190,7 +191,7 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
   const data = ranges.data ?? [];
   const bdays = birthdays.data ?? [];
   const calMarks = marks.data ?? [];
-  const wormUserId = worm.data?.user_id ?? null;
+  const titlesData = titles.data ?? null;
   const gameDates = new Set((games.data ?? []).map((g) => g.date));
   const isPending = ranges.isPending;
 
@@ -211,7 +212,7 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         ranges={data}
         birthdays={bdays}
         marks={calMarks}
-        wormUserId={wormUserId}
+        titles={titlesData}
         gameDates={gameDates}
         isPending={isPending}
       />
@@ -229,7 +230,7 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         ranges={data}
         birthdays={bdays}
         marks={calMarks}
-        wormUserId={wormUserId}
+        titles={titlesData}
         gameDates={gameDates}
         isPending={isPending}
       />
