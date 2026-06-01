@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from datetime import datetime, timedelta
 
@@ -253,7 +254,22 @@ async def ical_feed(
 # что _announce там глотает ошибки и roll_loser коммитит. Приводим к тому же
 # поведению: запись сохраняется всегда, send в чат — best-effort. На фронте
 # UX-крутилка живёт независимо (LoserSheet.tsx — локальный setInterval).
-_LOSER_SEND_TIMEOUT = 8.0  # короче 15с — фронт всё равно крутит ≥1.1с, а 15с никто не ждёт.
+#
+# GHG7 P8.2: таймаут теперь из env LOSER_SEND_TIMEOUT (дефолт 25с, общий с
+# автолохом — см. scheduler._AUTOLOSER_SEND_TIMEOUT). Прежние 8с резали доставку
+# при throttling канала (РКН): TG отвечает 8–30с, а сессия бота держит 30с.
+# 25с < 30с сессии: даём send успеть, не виснем дольше самой сессии.
+def _loser_send_timeout() -> float:
+    raw = os.getenv("LOSER_SEND_TIMEOUT")
+    if raw is None:
+        return 25.0
+    try:
+        return float(int(raw))
+    except ValueError:
+        return 25.0
+
+
+_LOSER_SEND_TIMEOUT = _loser_send_timeout()
 
 
 @router.post("/loser/roll", response_model=LoserRollResponse)
@@ -276,17 +292,17 @@ async def loser_roll_endpoint(
         from app.bot.dispatcher import get_bot
 
         try:
-            # Count BEFORE commit: existing rolls only. +1 for this one.
-            counts = await loser_stats(session)
-            cnt = counts.get(row.loser_user_id, 0) + 1
+            # GHG7 P9.1.b: публичный /loser/roll (LoserSheet) — «автолох-дуэль»
+            # (🤡 Автолох), НЕ «лох дня» (👑). loser_count=None: duel не идёт в
+            # статистику (P9.2), поэтому «N-й раз лох» здесь не имеет смысла.
             text = compose_loser_message(
                 roller_name=user.display_name,
                 loser_name=loser.display_name,
                 reason_text=row.reason_text or "",
-                loser_count=cnt,
+                loser_count=None,
                 extras=extras,
-                header_emoji="🎲",
-                header_label="Лох дня",
+                header_emoji="🤡",
+                header_label="Автолох",
             )
             send_started = time.monotonic()
             await asyncio.wait_for(
@@ -316,7 +332,9 @@ async def loser_roll_endpoint(
             log.warning("loser.announce_unexpected", error=str(exc), **timings)
 
     try:
-        row = await roll_loser(session, rolled_by=user, on_announce=_announce)
+        row = await roll_loser(
+            session, rolled_by=user, on_announce=_announce, source="duel"
+        )
     except CooldownError as exc:
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS,

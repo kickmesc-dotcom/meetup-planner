@@ -44,6 +44,31 @@ log = structlog.get_logger()
 
 VALID_REASONS = {"manual_admin", "zaebal_threshold", "zaebal_vote", "auto_monthly"}
 
+# P2.2: причины, инициированные чатом (команда/voot/авто-зэбал). Только для них
+# при авто-разморозке по таймеру шлём «злобное приветствие» в группу. Паузы из
+# админки (manual_admin) размораживаются молча.
+CHAT_INITIATED_REASONS = {"zaebal_threshold", "zaebal_vote", "auto_monthly"}
+
+
+def should_announce_restore(reason: str, announce: bool) -> bool:
+    """Чистый предикат для P2.2.c: анонсить возвращение бота в группу?
+    Только если вызывающий разрешил анонс (авто-разморозка) И пауза была
+    инициирована чатом. Ручное снятие (announce=False) и manual_admin-паузы
+    — silent."""
+    return announce and reason in CHAT_INITIATED_REASONS
+
+
+def _format_absence_hours(started_at: datetime, ended_at: datetime) -> int:
+    """Сколько целых часов длилась пауза (минимум 1 для читаемости).
+    Нормализуем tz: драйвер может вернуть `started_at` как naive — считаем
+    его UTC, чтобы вычитание с aware `ended_at` не упало."""
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    if ended_at.tzinfo is None:
+        ended_at = ended_at.replace(tzinfo=timezone.utc)
+    seconds = (ended_at - started_at).total_seconds()
+    return max(1, round(seconds / 3600))
+
 
 def build_snapshot(
     scheduled: dict, reactions: dict, zaebal: dict
@@ -205,6 +230,30 @@ async def _reload_jobs_safe() -> None:
         log.warning("bot_pause.reload_jobs_failed", error=str(exc))
 
 
+async def _announce_welcome_back_safe(hours: int) -> None:
+    """P2.2: «злобное приветствие» в группу при авто-разморозке zaebal-паузы.
+    Изолируем импорт Telegram-стека (как в `_reload_jobs_safe`), чтобы
+    юнит-тесты на чистую логику не тянули bot/dispatcher. Любая ошибка/
+    отсутствие group_chat_id — тихо логируется, restore уже закоммичен."""
+    try:
+        from app.bot.dispatcher import get_bot
+        from app.config import get_settings
+        from app.services.zaebal import _welcome_back_phrase
+
+        settings = get_settings()
+        if not settings.group_chat_id:
+            return
+        text = (
+            f"<i>{_welcome_back_phrase()}</i>\n\n"
+            f"▶️ Меня не было {hours} ч."
+        )
+        await get_bot().send_message(
+            settings.group_chat_id, text, parse_mode="HTML"
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("bot_pause.welcome_send_failed", error=str(exc))
+
+
 async def start_pause(
     session: AsyncSession,
     *,
@@ -252,14 +301,29 @@ async def start_pause(
     return pause
 
 
-async def stop_pause(session: AsyncSession, *, automatic: bool = False) -> BotPause | None:
+async def stop_pause(
+    session: AsyncSession,
+    *,
+    automatic: bool = False,
+    announce: bool = False,
+) -> BotPause | None:
     """Снимает активную паузу — restore из snapshot. Возвращает строку
-    или None, если паузы не было."""
+    или None, если паузы не было.
+
+    `announce=True` (передаётся только из `maybe_auto_restore`) разрешает
+    анонс возвращения в группу — но фактически шлём лишь для chat-инициированных
+    пауз (см. `should_announce_restore`). Ручное снятие (админка / `/zaebal_undo`)
+    оставляет `announce=False` → silent."""
     pause = await get_active_pause(session)
     if pause is None:
         return None
-    pause.ended_at = datetime.now(timezone.utc)
+    ended_at = datetime.now(timezone.utc)
+    pause.ended_at = ended_at
     await session.flush()
+
+    # Снимаем поля до commit — после него объект может стать expired.
+    reason = pause.reason
+    started_at = pause.started_at
 
     snapshot = pause.settings_snapshot or {}
     await _apply_settings(session, snapshot)
@@ -269,8 +333,12 @@ async def stop_pause(session: AsyncSession, *, automatic: bool = False) -> BotPa
         "bot_pause.stopped",
         id=pause.id,
         automatic=automatic,
-        reason=pause.reason,
+        reason=reason,
     )
+    if should_announce_restore(reason, announce):
+        await _announce_welcome_back_safe(
+            _format_absence_hours(started_at, ended_at)
+        )
     return pause
 
 
@@ -281,5 +349,5 @@ async def maybe_auto_restore(session: AsyncSession) -> bool:
         return False
     if pause.ends_at > datetime.now(timezone.utc):
         return False
-    await stop_pause(session, automatic=True)
+    await stop_pause(session, automatic=True, announce=True)
     return True

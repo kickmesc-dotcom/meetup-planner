@@ -237,3 +237,14 @@ def test_build_marks_still_accepts_source_tuples() -> None:
     )
     assert len(out) == 1
     assert out[0].source == "auto"
+
+    # GHG7 P9.5.c: 'duel' — валидный source, build_marks его принимает как
+    # обычную loser-метку (фронт нарисует 🤡 вместо 👑).
+    out_duel = build_marks(
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 5, 31),
+        loser_rolls=[(date(2026, 5, 10), 7, "duel")],
+        chukhan_weeks=[],
+    )
+    assert len(out_duel) == 1
+    assert out_duel[0].source == "duel"

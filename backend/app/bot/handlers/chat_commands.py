@@ -83,13 +83,17 @@ async def on_loser(message: Message) -> None:
                 roller_name=caller.display_name,
                 extras=extras,
                 header_emoji="🤡",
-                header_label="Лох дня",
+                header_label="Автолох",
             )
             target = chat_id if chat_id else message.chat.id
             await bot.send_message(chat_id=target, text=text, parse_mode="HTML")
 
         try:
-            await roll_loser(session, rolled_by=caller, on_announce=_announce)
+            # GHG7 P9.1.a: /loser — это «автолох-дуэль» (🤡), НЕ «лох дня» (👑).
+            # source="duel" исключает ролл из статистики/титулов (P9.2).
+            await roll_loser(
+                session, rolled_by=caller, on_announce=_announce, source="duel"
+            )
         except CooldownError as exc:
             mins = int(exc.remaining.total_seconds() // 60)
             await message.answer(f"⏳ Ещё рано — подожди ~{mins} мин.")

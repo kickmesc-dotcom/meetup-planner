@@ -66,6 +66,23 @@ def test_loser_auto_and_manual_same_day_both_kept():
     assert all(m.date == date(2026, 5, 10) and m.user_id == 7 for m in out)
 
 
+def test_loser_auto_and_duel_same_day_both_kept():
+    """GHG7 P9.5.a: авто-лох (👑) + дуэль (🤡) в один день — две отдельные
+    марки разных source, фронт рисует обе иконки рядом."""
+    out = build_marks(
+        start_date=date(2026, 5, 1),
+        end_date=date(2026, 5, 31),
+        loser_rolls=[
+            (date(2026, 5, 10), 7, "auto"),
+            (date(2026, 5, 10), 7, "duel"),
+        ],
+        chukhan_weeks=[],
+    )
+    assert len(out) == 2
+    assert {m.source for m in out} == {"auto", "duel"}
+    assert all(m.date == date(2026, 5, 10) and m.user_id == 7 for m in out)
+
+
 def test_chukhan_expands_to_7_days():
     out = build_marks(
         start_date=date(2026, 5, 1),

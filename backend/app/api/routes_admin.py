@@ -1322,7 +1322,9 @@ async def admin_loser_roll_now(
                     reason_text=roll.reason_text or "",
                     roller_name=user.display_name,
                     extras=extras,
-                    header_emoji="🤡",
+                    # GHG7 P9.1.c: admin force-reroll = тихий прокрут «лоха дня»
+                    # (👑), source остаётся "manual" → идёт в статистику/титулы.
+                    header_emoji="👑",
                     header_label="Лох дня",
                 ),
                 parse_mode="HTML",

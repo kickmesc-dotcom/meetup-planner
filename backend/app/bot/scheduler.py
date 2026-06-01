@@ -96,11 +96,20 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-PROXY_HEALTH_INTERVAL_SEC = _env_int("PROXY_HEALTH_INTERVAL_SEC", 600)  # GHG6 PX6
+# GHG6 PX6 / GHG7 P8.4: онлайн-статус раз в час (было 10 мин). Каждый тик —
+# исходящий bot.get_me() к api.telegram.org; 600с давали 144 «пустых» запроса/
+# сутки, что при throttling канала отъедало бюджет у реальных сообщений. 3600с
+# → 24/сутки. Свежесть индикатора падает до 1 часа — осознанный компромисс.
+PROXY_HEALTH_INTERVAL_SEC = _env_int("PROXY_HEALTH_INTERVAL_SEC", 3600)
 
-# GHG7 P0.2.b: 8 секунд достаточно — прокси с медленнее реальной доставкой
-# всё равно «не успеет» в чат к юзеру; ретрай-job переотправит через 5 мин.
-_AUTOLOSER_SEND_TIMEOUT = 8.0
+# GHG7 P8.1: таймаут отправки лоха настраивается через env LOSER_SEND_TIMEOUT
+# (дефолт 25с). Прежние 8с резали доставку при throttling канала (РКН): TG
+# отвечает за 8–30с, а сессия бота держит 30с (_IPv4AiohttpSession). «Случайная
+# фраза» шлёт БЕЗ wait_for и доходит — лох же оборачивался в wait_for(8s) и падал
+# в TimeoutError (прод 30.05: rolls 35/36 → outbox expired). 25с < 30с сессии:
+# даём send успеть, но не виснем дольше самой сессии. Ретрай-job догонит, если
+# и 25с не хватило.
+_AUTOLOSER_SEND_TIMEOUT = float(_env_int("LOSER_SEND_TIMEOUT", 25))
 # Шаг между попытками retry — ровно 5 минут (12 попыток × 5 мин = ~1ч лимит).
 _AUTOLOSER_RETRY_DELAY = timedelta(minutes=5)
 # Сколько раз пытаемся вообще (включая первую попытку). После — status='expired'.
@@ -166,12 +175,14 @@ async def _autoloser_job(bot: Bot) -> None:
             `outbox.status='sent'`, поэтому пока поста в чате нет — короны на
             календаре тоже нет (никаких фантомных «лохов без объявления»).
             """
+            # GHG7 P9.1.d: автолох-по-расписанию = «Лох дня» (👑), source="auto"
+            # идёт в статистику/титулы. 🤡 «Автолох» — это ручная дуэль (duel).
             text = compose_loser_message(
                 loser_name=loser.display_name,
                 reason_text=roll.reason_text or "",
                 extras=extras,
-                header_emoji="🤡",
-                header_label="Автолох сегодня",
+                header_emoji="👑",
+                header_label="Лох дня",
             )
             now = datetime.now(timezone.utc)
             outbox = LoserOutbox(
@@ -302,12 +313,14 @@ async def _loser_outbox_retry_job(bot: Bot) -> None:
             loser_name = (
                 loser_user.display_name if loser_user is not None else "?"
             )
+            # GHG7 P9.1.d: ретрай автолоха-по-расписанию — тоже «Лох дня» (👑),
+            # как и первичная отправка (_announce выше).
             text = compose_loser_message(
                 loser_name=loser_name,
                 reason_text=roll.reason_text or "",
                 extras=None,  # worm-стилизация при ретрае не повторяется
-                header_emoji="🤡",
-                header_label="Автолох сегодня",
+                header_emoji="👑",
+                header_label="Лох дня",
             )
 
             transport = (
@@ -707,12 +720,17 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         misfire_grace_time=600,  # GHG6 H4: 10мин — пауза не требует секундной точности
     )
 
-    # GHG7 P0.2.b.4: ретрай недоставленных автолох-постов. Раз в минуту тянем
-    # pending-записи из loser_outbox и пробуем отправить заново. Не зависит
-    # от admin-config — это infra-job, как proxy_health.
+    # GHG7 P0.2.b.4: ретрай недоставленных автолох-постов. Тянем pending-записи
+    # из loser_outbox и пробуем отправить заново. Не зависит от admin-config —
+    # это infra-job, как proxy_health.
+    # GHG7 P8.5: интервал 1мин → 5мин. Шаг ретрая (_AUTOLOSER_RETRY_DELAY) и так
+    # 5 минут, поэтому ежеминутный тик 4 раза из 5 находил только записи с
+    # next_retry_at в будущем и слал «пустой» SELECT в Neon (минус бюджет
+    # compute) — а реальную попытку send делал всё равно раз в 5 мин. Согласуем
+    # интервал с шагом ретрая: один осмысленный тик на окно.
     sched.add_job(
         _logged_job(JOB_LOSER_OUTBOX_RETRY, _loser_outbox_retry_job),
-        IntervalTrigger(minutes=1, jitter=10),
+        IntervalTrigger(minutes=5, jitter=30),
         kwargs={"bot": bot},
         id=JOB_LOSER_OUTBOX_RETRY,
         replace_existing=True,

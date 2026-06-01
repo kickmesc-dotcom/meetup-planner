@@ -35,9 +35,11 @@ class CalendarMark(BaseModel):
     date: date
     user_id: int
     type: str  # "loser" | "chukhan"
-    # GHG6 H2: source='auto' | 'manual' для loser-марок. Фронт рисует две
-    # короны рядом, если за день есть оба источника у одного юзера; для
-    # 'chukhan' поле всегда None.
+    # GHG6 H2 / GHG7 P9.3.b: source ∈ {'auto','manual','duel'} | None (legacy)
+    # для loser-марок. auto/manual → 👑 «Лох дня», duel → 🤡 «Автолох»
+    # (ручная дуэль /loser + LoserSheet). Дедуп по (date,uid,source): за день
+    # у одного юзера может быть несколько марок разных источников — все рядом.
+    # Для 'chukhan' поле всегда None.
     source: str | None = None
 
 
@@ -232,13 +234,18 @@ async def get_titles_current(
     if chukhan is not None:
         out.chukhan_user_id = chukhan.user_id
 
-    # 3. Лох дня — последний loser-ролл, чей rolled_at попадает на сегодня (UTC).
+    # 3. Лох дня — последний loser-ролл за сегодня (UTC). GHG7 P9.2.b: «дуэль»
+    # (source='duel') исключена — это 🤡 «Автолох», а не 👑 «Лох дня».
     now = datetime.now(timezone.utc)
     today_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
     today_end = today_start + timedelta(days=1)
     last_today = await session.scalar(
         select(LoserRoll)
-        .where(LoserRoll.rolled_at >= today_start, LoserRoll.rolled_at < today_end)
+        .where(
+            LoserRoll.rolled_at >= today_start,
+            LoserRoll.rolled_at < today_end,
+            or_(LoserRoll.source != "duel", LoserRoll.source.is_(None)),
+        )
         .order_by(LoserRoll.rolled_at.desc())
         .limit(1)
     )
