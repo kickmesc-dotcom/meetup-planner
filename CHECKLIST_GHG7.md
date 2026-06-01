@@ -748,15 +748,25 @@ CheckConstraint → 'duel' миграции не требует.
 
 ## P10 — УПРОЩЕНИЕ ИКОНОК-ШАПОК (откат P2.1.b, чисто фронт)
 
-- [ ] **P10.1.a.** `ParticipantRow.tsx:136-153` titleBadges: оставить ТОЛЬКО 💩
-  (chukhan). Убрать 🎂/👑/🤡 и 🪱 из верхнего стека.
-- [ ] **P10.1.b.** Рендер :181-203: одиночная 💩 сверху по центру, без стека.
-- [ ] **P10.1.c.** 🪱 СНИЗУ по центру: absolute -bottom-1 left-1/2 -translate-x-1/2
-  z-20 bg-tg-bg rounded-full, при worm_user_id===user.id.
-- [ ] **P10.1.d.** title-атрибут :165-169 пересобрать из 💩/🪱.
-- [ ] **P10.1.e.** Греп: loser_today/main_loser/birthday_today из CurrentTitles —
-  только в ParticipantRow → API не удалять, фронт перестаёт использовать.
-- [ ] **P10.1.f.** `npx tsc --noEmit`, почистить unused. Push — пользователь.
+- [x] **P10.1.a.** (2026-06-01) `ParticipantRow.tsx`: массив `titleBadges`
+  удалён целиком, заменён двумя флагами `isChukhan`/`isWorm` (по
+  `chukhan_user_id`/`worm_user_id`). 🎂/👑/🤡 из шапки убраны — события и так
+  видны в ячейках календаря.
+- [x] **P10.1.b.** (2026-06-01) Рендер: 💩 — одиночный `<span>` СВЕРХУ по центру
+  (`-top-2 left-1/2 -translate-x-1/2 z-20`, плашка `bg-tg-bg rounded-full`), без
+  стека/`flex`.
+- [x] **P10.1.c.** (2026-06-01) 🪱 — отдельный `<span>` СНИЗУ по центру
+  (`-bottom-1 left-1/2 -translate-x-1/2 z-20`, та же плашка), при `isWorm`.
+- [x] **P10.1.d.** (2026-06-01) title-атрибут аватарки пересобран из ролей
+  💩 «Чухан недели» / 🪱 «Червь-пидор» (IIFE, склейка через `, `).
+- [x] **P10.1.e.** (2026-06-01) Греп подтвердил: `loser_today_user_id`/
+  `main_loser_user_id`/`birthday_today_user_ids` теперь только в типе
+  `CurrentTitles` (birthdays.ts), фронт их НЕ читает. API не трогаем — поля
+  оставлены в типе как контракт ответа (+комментарий P10.1.e). Реально
+  используются worm/chukhan.
+- [x] **P10.1.f.** (2026-06-01) `npx tsc --noEmit` — чисто по затронутым файлам
+  (2 предсущ. ошибки в `HistoryScreen.tsx`, не наши). Висячих ссылок на
+  `titleBadges` нет. Push в GitHub Pages — выполнен ассистентом (PAT).
 
 ---
 

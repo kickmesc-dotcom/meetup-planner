@@ -131,29 +131,13 @@ export default function ParticipantRow({
   }
   const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
 
-  // GHG7 P2.1.a/b: «шапка» актуальных званий поверх аватарки. Порядок в массиве
-  // = порядок отрисовки слева-направо (приоритет): ДР > лох дня > главный лох >
-  // чухан недели > червь. Несколько званий показываем стеком рядом.
-  // Лох дня = 👑, главный лох = 🤡 (разные иконки — могут совпасть у разных
-  // или у одного участника одновременно).
-  const titleBadges: { key: string; icon: string; label: string }[] = [];
-  if (titles) {
-    if (titles.birthday_today_user_ids.includes(user.id)) {
-      titleBadges.push({ key: "bday", icon: "🎂", label: "День рождения сегодня" });
-    }
-    if (titles.loser_today_user_id === user.id) {
-      titleBadges.push({ key: "loser-today", icon: "👑", label: "Лох дня" });
-    }
-    if (titles.main_loser_user_id === user.id) {
-      titleBadges.push({ key: "main-loser", icon: "🤡", label: "Главный лох" });
-    }
-    if (titles.chukhan_user_id === user.id) {
-      titleBadges.push({ key: "chukhan", icon: "💩", label: "Чухан недели" });
-    }
-    if (titles.worm_user_id === user.id) {
-      titleBadges.push({ key: "worm", icon: "🪱", label: "Червь-пидор" });
-    }
-  }
+  // GHG7 P10.1.a: упрощение шапки (откат P2.1.b). В верхнем стеке оставляем
+  // ТОЛЬКО 💩 «чухан недели» — единственное «носимое» звание, уместное на
+  // макушке аватарки. ДР/лох-дня/главный-лох убраны из шапки (они и так видны
+  // событиями в ячейках календаря 🎂/👑). Червь 🪱 переехал ВНИЗ по центру
+  // (P10.1.c) — отдельная стилизация, не в этом стеке.
+  const isChukhan = !!titles && titles.chukhan_user_id === user.id;
+  const isWorm = !!titles && titles.worm_user_id === user.id;
 
   return (
     <div className="relative flex items-center border-b border-tg-secondary-bg/60">
@@ -165,11 +149,15 @@ export default function ParticipantRow({
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
             style={{ background: user.color_hex }}
-            title={
-              titleBadges.length > 0
-                ? `${user.display_name} — ${titleBadges.map((b) => b.label).join(", ")}`
-                : user.display_name
-            }
+            title={(() => {
+              // GHG7 P10.1.d: title собираем из оставшихся званий — 💩 чухан / 🪱 червь.
+              const roles: string[] = [];
+              if (isChukhan) roles.push("Чухан недели");
+              if (isWorm) roles.push("Червь-пидор");
+              return roles.length > 0
+                ? `${user.display_name} — ${roles.join(", ")}`
+                : user.display_name;
+            })()}
           >
             {user.avatar_url ? (
               <img
@@ -181,28 +169,28 @@ export default function ParticipantRow({
               initials(user.display_name)
             )}
           </div>
-          {/* GHG7 P2.1.a/b: «шапка» актуальных званий — горизонтальный стек
-              иконок поверх аватарки. z-20 выше кружка (z-10 колонки). Каждая
-              иконка на фон-плашке bg-tg-bg для читаемости поверх любого аватара.
-              -top-2 + центрирование по горизонтали — «сидит на макушке».
-              P2.1.c (клик → попап-история) — отдельный подэтап, пока иконки
-              информативные (title/aria-label). */}
-          {titleBadges.length > 0 && (
-            <div
-              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 flex gap-0.5"
-              aria-hidden={false}
+          {/* GHG7 P10.1.b: 💩 «чухан недели» — одиночная иконка СВЕРХУ по центру
+              (макушка), без стека. z-20 выше кружка (z-10 колонки), на фон-плашке
+              bg-tg-bg для читаемости поверх любого аватара. */}
+          {isChukhan && (
+            <span
+              aria-label="Чухан недели"
+              title="Чухан недели"
+              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
             >
-              {titleBadges.map((b) => (
-                <span
-                  key={b.key}
-                  aria-label={b.label}
-                  title={b.label}
-                  className="text-[12px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
-                >
-                  {b.icon}
-                </span>
-              ))}
-            </div>
+              💩
+            </span>
+          )}
+          {/* GHG7 P10.1.c: 🪱 «червь-пидор» — СНИЗУ по центру (под аватаркой),
+              та же фон-плашка. Отделён от чухана, чтобы две роли не наезжали. */}
+          {isWorm && (
+            <span
+              aria-label="Червь-пидор"
+              title="Червь-пидор"
+              className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
+            >
+              🪱
+            </span>
           )}
         </div>
         <div className="text-[10px] text-tg-hint truncate max-w-[60px] mt-0.5">

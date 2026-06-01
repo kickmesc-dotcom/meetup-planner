@@ -71,7 +71,9 @@ export const fetchCurrentWorm = () =>
 
 // GHG7 P2.1.a: актуальные звания для «шапки» аватарки. Каждое поле — user_id
 // текущего носителя (или список), null/[] если носителя нет.
-// loser_today = 👑, main_loser = 🤡 (разные иконки — могут быть одновременно).
+// GHG7 P10.1.e: после упрощения шапки фронт использует только worm/chukhan.
+// loser_today/main_loser/birthday_today бэк по-прежнему отдаёт (API не трогаем),
+// но ParticipantRow их больше НЕ читает — оставлены в типе как контракт ответа.
 export interface CurrentTitles {
   worm_user_id: number | null;
   chukhan_user_id: number | null;
