@@ -40,8 +40,8 @@ export default function AutoLoserScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🤡 Автолох"
-      subtitle="Бот сам выбирает лоха в окне дня"
+      title="👑 Лох дня"
+      subtitle="Бот сам назначает лоха дня и постит его в чат"
       onBack={onBack}
     >
       {cfg.isPending || !cfg.data ? (
@@ -108,13 +108,14 @@ function AutoLoserForm({
         <Toggle
           checked={enabled}
           onChange={setEnabled}
-          label={enabled ? "🤖 Автолох включён" : "💤 Автолох выключен"}
+          label={enabled ? "🤖 Лох дня включён" : "💤 Лох дня выключен"}
         />
 
         <div>
-          <div className="text-base font-semibold mb-1">🕐 Окно времени</div>
+          <div className="text-base font-semibold mb-1">🕐 В какие часы можно</div>
           <div className="text-xs text-tg-hint mb-2">
-            Запуск разрешён только внутри окна (в часах локального TZ scheduler'а).
+            Бот назначает лоха только в этом промежутке суток. Часы по времени
+            сервера (0–23). Например, с 10 до 22 — ночью лоха не выберет.
           </div>
           <div className="grid grid-cols-2 gap-2">
             <NumField label="с (0..23)" value={startH} onChange={setStartH} hint={`= ${startN}:00`} />
@@ -123,15 +124,16 @@ function AutoLoserForm({
         </div>
 
         <div>
-          <div className="text-base font-semibold mb-1">⏳ Интервал</div>
+          <div className="text-base font-semibold mb-1">⏳ Как часто</div>
           <div className="text-xs text-tg-hint mb-2">
-            0 = random раз в сутки в окне. ≥1 = фикс. интервал в часах (jitter 5 мин).
+            0 — один раз в день в случайное время внутри окна.
+            Число ≥ 1 — строго каждые столько часов (с разбросом ±5 мин).
           </div>
           <NumField
             label="часов (0..72)"
             value={interval}
             onChange={setInterval_}
-            hint={intervalN === 0 ? "= random раз в сутки" : `= каждые ${intervalN} ч`}
+            hint={intervalN === 0 ? "= раз в день, случайно" : `= каждые ${intervalN} ч`}
           />
         </div>
       </section>

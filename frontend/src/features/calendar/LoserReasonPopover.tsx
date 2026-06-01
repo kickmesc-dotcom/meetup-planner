@@ -5,12 +5,14 @@
  * причину (`reason_text`), время ролла, признак «червь-пидор» (особая
  * стилизация). Источники данных — `GET /api/calendar/loser/{date}/{user_id}`.
  *
- * Поведение по источникам:
- *  - `source='auto'` — «🤡 Автолох» (planner-сработка). Имя rolled_by не
- *    важно (системный юзер), показываем только причину.
- *  - `source='manual'` — «🎲 Ручная крутилка», обязательно показываем кто
- *    дёрнул (`rolled_by_name`).
- *  - `was_worm=true` — «🪱 Особая номинация: Червь-пидор» поверх всего;
+ * Поведение по источникам (GHG7 P9.4.c — ИСПРАВЛЕНА прежняя инверсия):
+ *  - `source='auto'`   — 👑 «Лох дня» (автолох-по-расписанию). Системный
+ *    rolled_by не важен, показываем только причину.
+ *  - `source='manual'` — 👑 «Лох дня» (тихий admin force-reroll). Официальный
+ *    лох, идёт в статистику.
+ *  - `source='duel'`   — 🤡 «Автолох» (ручная дуэль /loser + LoserSheet).
+ *    Обязательно показываем, кто дёрнул (`rolled_by_name`); в статистику НЕ идёт.
+ *  - `was_worm=true`   — «🪱 Особая номинация: Червь-пидор» поверх всего;
  *    причина = `WORM_REASON_TEXT`, фоном остаётся источник.
  */
 import { useQuery } from "@tanstack/react-query";
@@ -39,12 +41,9 @@ export default function LoserReasonPopover() {
   const close = () => setPopover(null);
 
   const reason = query.data;
-  const sourceLabel =
-    reason?.source === "auto"
-      ? "🤡 Автолох"
-      : reason?.source === "manual"
-        ? "🎲 Ручная крутилка"
-        : "👑 Лох дня";
+  // GHG7 P9.4.c: duel → 🤡 «Автолох», всё остальное (auto/manual/null) → 👑.
+  const isDuel = reason?.source === "duel";
+  const sourceLabel = isDuel ? "🤡 Автолох" : "👑 Лох дня";
 
   const rolledAtFormatted = reason
     ? new Date(reason.rolled_at).toLocaleString("ru-RU", {
@@ -68,7 +67,7 @@ export default function LoserReasonPopover() {
           <div className="text-base font-semibold">
             {reason?.was_worm
               ? `🪱 Червь-пидор — ${popover.displayName}`
-              : `👑 ${popover.displayName}`}
+              : `${isDuel ? "🤡" : "👑"} ${popover.displayName}`}
           </div>
           <button
             type="button"
@@ -110,7 +109,7 @@ export default function LoserReasonPopover() {
                   {reason.reason_text || "—"}
                 </div>
               )}
-              {reason.source === "manual" && reason.rolled_by_name && (
+              {isDuel && reason.rolled_by_name && (
                 <div className="mt-2 text-xs text-tg-hint">
                   Покрутил рулетку: {reason.rolled_by_name}
                 </div>

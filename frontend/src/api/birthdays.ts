@@ -33,7 +33,8 @@ export interface CalendarMark {
   date: string; // YYYY-MM-DD
   user_id: number;
   type: "loser" | "chukhan";
-  source?: "auto" | "manual" | null;
+  // GHG7 P9.4.a: auto/manual → 👑 «Лох дня», duel → 🤡 «Автолох» (ручная дуэль).
+  source?: "auto" | "manual" | "duel" | null;
 }
 
 export const fetchCalendarMarks = (from: Date, to: Date) =>
@@ -47,7 +48,7 @@ export const fetchCalendarMarks = (from: Date, to: Date) =>
 export interface LoserReason {
   rolled_at: string; // ISO
   reason_text: string | null;
-  source: "auto" | "manual" | null;
+  source: "auto" | "manual" | "duel" | null;
   rolled_by_name: string | null;
   was_worm: boolean;
 }

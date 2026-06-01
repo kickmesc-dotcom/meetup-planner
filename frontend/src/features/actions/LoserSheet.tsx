@@ -103,7 +103,7 @@ export default function LoserSheet() {
   const isSpinning = mut.isPending;
 
   return (
-    <BottomSheet title="🎲 Лох дня" onClose={close}>
+    <BottomSheet title="🤡 Автолох" onClose={close}>
       <button
         type="button"
         onClick={() => mut.mutate()}

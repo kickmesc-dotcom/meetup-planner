@@ -51,7 +51,7 @@ export default function ActionBar() {
       />
       <ActionBtn
         onClick={tap(() => setShowLoser(true))}
-        label="🎲 Лох дня"
+        label="🤡 Автолох"
       />
       {isAdmin && (
         <ActionBtn

@@ -209,8 +209,8 @@ export default function AdminScreen({ users }: Props) {
           onClick={() => select("rp-generator")}
         />
         <Card
-          icon="🤡"
-          title="Автолох"
+          icon="👑"
+          title="Лох дня"
           subtitle="Бот сам выбирает лоха в окне дня"
           onClick={() => select("autoloser")}
         />

@@ -111,8 +111,11 @@ export default function ParticipantRow({
   };
 
   // GHG6 BD1/BD5: индексы по YYYY-MM-DD, чтобы не сканить массивы в каждой ячейке.
-  // GHG6 J: для loser-меток храним множество источников ('auto'|'manual') —
-  // в одном дне может быть и автолох, и ручной ролл, тогда рисуем 👑×2.
+  // GHG6 J: для loser-меток храним множество источников — в одном дне может быть
+  // несколько роллов, тогда рисуем несколько иконок.
+  // GHG7 P9.4.b: разделяем по семантике source:
+  //   auto/manual/legacy-null → 👑 «Лох дня» (официальный),
+  //   duel                    → 🤡 «Автолох» (ручная дуэль /loser + LoserSheet).
   const bdayByDate = new Map(birthdays.map((b) => [b.date, b]));
   const chukhanByDate = new Set<string>();
   const loserSourcesByDate = new Map<string, Set<string>>();
@@ -270,10 +273,19 @@ export default function ParticipantRow({
             // на всякий случай защищаемся от часовых поясов и подмены даты).
             const isPast = dayKey < todayKey;
             const loserSources = isPast ? loserSourcesByDate.get(dayKey) : undefined;
-            const loserCount = loserSources?.size ?? 0;
+            // GHG7 P9.4.b: каждый источник → своя иконка. auto/manual/null → 👑,
+            // duel → 🤡. Порядок: сначала короны, потом клоуны (стабильный вид).
+            const loserIcons: string[] = [];
+            if (loserSources) {
+              for (const s of loserSources) {
+                if (s !== "duel") loserIcons.push("👑");
+              }
+              if (loserSources.has("duel")) loserIcons.push("🤡");
+            }
+            const loserCount = loserIcons.length;
             const showChukhan = isPast && chukhanByDate.has(dayKey);
-            // GHG6 J4: при узких ячейках (cellWidth<40) две короны рядом
-            // не помещаются — складываем в 👑×2. В legacy StripView без cellWidth
+            // GHG6 J4: при узких ячейках (cellWidth<40) несколько иконок рядом
+            // не помещаются — складываем в ×N. В legacy StripView без cellWidth
             // — всегда рисуем подряд (там ширина ячейки растягивается на 1fr).
             const compactLoser = loserCount > 1 && cellWidth !== undefined && cellWidth < 40;
             // GHG6 CL9: при partial=null (или fill отсутствует) фон рисуем
@@ -377,12 +389,12 @@ export default function ParticipantRow({
                             });
                           }}
                         >
-                          👑×{loserCount}
+                          {loserIcons[0]}×{loserCount}
                         </button>
                       ) : (
-                        Array.from({ length: loserCount }).map((_, k) => (
+                        loserIcons.map((icon, k) => (
                           <button
-                            key={`crown-${k}`}
+                            key={`loser-${k}`}
                             type="button"
                             aria-label="Был лохом — причина"
                             title="Показать причину"
@@ -397,7 +409,7 @@ export default function ParticipantRow({
                               });
                             }}
                           >
-                            👑
+                            {icon}
                           </button>
                         ))
                       )

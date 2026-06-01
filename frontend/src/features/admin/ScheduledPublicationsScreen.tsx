@@ -120,8 +120,8 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
           />
 
           <ToggleBlock
-            icon="🤡"
-            title="Автолох"
+            icon="👑"
+            title="Лох дня"
             hint="Бот сам выбирает лоха. Частота и окно — в «Интервалы и окна»."
             enabled={draft.loser.enabled}
             onToggle={(v) =>

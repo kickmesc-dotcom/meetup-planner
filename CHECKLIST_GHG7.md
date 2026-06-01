@@ -12,6 +12,17 @@ Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `
 - `[~]` — в работе (был обрыв или ждём чего-то)
 - `[x]` — закрыто
 
+###Добавлено 31.05.26 09:05
+В одной из последних итераций мы починили автолоха, а потом мы добавили принудительную проверку. Есть основание полагать что эта принудительная проверка спамится слишком часто и нам опять обрезают\перекрывают канал, поскольку бот уже два дня не выполнял задач по расписанию (отправка сообщений и автолок полностью пропущены) В прошлом мы уже и так сильно урезали частоту опроса сервера для таких ивентов как др и это положительно сказалось на стабильности модулей отправки сообщений. Нужно посмотреть все необязательные запросы на сервер которые летят с неоправданно высокой частотой и свести их к адекватному минимуму (например: новые др-ки проверять раз в сутки, онлайн статус бота - раз в час)
+
+###Добавлено 31.05.26 09:050
+На Neon получил такую плашку:
+Approaching limit
+You've used 96.2% of your monthly compute allowance for this project.
+Review usage
+Upgrade plan
+Хоть сегодня и 31 число месяца, это означает что вроде как мы уложились тютелька в тютельку. Но в будущем не исключено что проект будет более функционален и требователен, а переходить на платную основу я пока не готов. Нужно подумать наперед что мы можем сделать для оптимизации и сокращения количества лишних обращений к Neon.
+
 ## Правила работы с чеклистом (изменено vs GHG6)
 1. Каждый этап разбит на нумерованные подэтапы вида `P0.1`, `P0.2`, при
    необходимости — под-подэтапы `P0.1.a`, `P0.1.b`.
@@ -395,13 +406,33 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
 
 ### P2.2. Уведомления о паузе бота (через команду/voot vs админка)
 Источник: GHG7.txt стр. 14–15.
-- [ ] **P2.2.a.** Пауза через `/zaebal`/`zaebal-vote` → анонс в группу
-  «бот на паузе N часов/дней». При разморозке — «злобное» приветствие +
-  напоминание сколько часов отсутствовал.
-- [ ] **P2.2.b.** Пауза через админку → silent (без анонса). Снятие через
-  админку — тоже silent, даже если поставлено командой/voot'ом.
-- [ ] **P2.2.c.** Тест: матрица [пауза_способ × снятие_способ → анонс_да/нет].
-- [ ] **P2.2.d.** Sync.
+- [x] **P2.2.a.** (2026-05-31) Анонс паузы в группу уже был
+  (`/zaebal` порог → `handlers/zaebal.py:117`; `/zaebal-vote` close →
+  `handlers/poll_answer.py:148-178`; auto-monthly идёт тем же путём).
+  Главный пробел — **разморозка по таймеру была silent**. Добавлено:
+  `WELCOME_BACK_PHRASES`+`_welcome_back_phrase()` в `services/zaebal.py`;
+  `stop_pause(..., announce=False)` шлёт «злобное приветствие + меня не было
+  N ч» через `_announce_welcome_back_safe` (изолированный импорт бота, как
+  `_reload_jobs_safe`); `maybe_auto_restore` зовёт `stop_pause(automatic=True,
+  announce=True)`. Часы — `_format_absence_hours` (round, min 1, терпит naive
+  started_at).
+- [x] **P2.2.b.** (2026-05-31) Silent-режим подтверждён и закреплён предикатом
+  `should_announce_restore(reason, announce)` (`bot_pause.py`): анонс только
+  при `announce=True AND reason∈CHAT_INITIATED_REASONS` (zaebal_threshold/
+  zaebal_vote/auto_monthly). Админка start/stop (`routes_admin.py:2260-2288`)
+  и `/zaebal_undo` зовут `stop_pause(session)` без `announce` → всегда silent,
+  даже если пауза ставилась командой. `manual_admin`-пауза при авто-истечении
+  таймера тоже молчит (не в CHAT_INITIATED_REASONS). Код админки не менялся
+  (уже был silent).
+- [x] **P2.2.c.** (2026-05-31) `tests/test_bot_pause_announce.py` (8 кейсов):
+  фразы из пула, матрица анонса (chat-reasons при automatic → да; manual_admin
+  → нет; любое ручное снятие announce=False → нет), `CHAT_INITIATED_REASONS ⊆
+  VALID_REASONS` без manual_admin, расчёт часов (round/min-1/naive-tz). Весь
+  сьют 182/182 зелёный (было 174).
+- [x] **P2.2.d sync** (2026-05-31) `meetup-planner-main/backend/` →
+  `meetup-planner-backend/`: `app/services/zaebal.py`,
+  `app/services/bot_pause.py`, `tests/test_bot_pause_announce.py` (diff -q пуст,
+  тесты в HF-копии 8/8 зелёные). Push в HF/GitHub делает пользователь.
 
 ### P2.3. Реорганизация меню админки
 Источник: GHG7.txt стр. 32–37.
@@ -558,6 +589,174 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
   публикует фразу из пула соответствующего threshold (с anti-spam: один
   пост в threshold-окно).
 - [ ] **P7.1.d.** Sync.
+
+---
+
+## P8 — ПРОД-ИНЦИДЕНТ: доставка лоха + частоты (КРИТ, деплой первым)
+
+Диагностика 2026-05-31 (прямой коннект к Neon): бот жив (входящие апдейты
+обрабатываются, паузы нет, scheduler пишет proxy.last_error), но автолох
+30.05 (rolls 35/36) → loser_outbox `expired` по TimeoutError. Корень: все пути
+лоха оборачивают send в `asyncio.wait_for(8.0)`, а рабочая «случайная фраза»
+шлёт через тот же bot-синглтон БЕЗ обёртки (таймаут сессии 30с,
+`_IPv4AiohttpSession(timeout=30.0)`, dispatcher.py:252). При throttling канала
+(РКН) ответ TG 8–30с: фраза доходит, лох режется на 8с. Решение: env-таймаут
+LOSER_SEND_TIMEOUT (дефолт 25с) + снижение частоты «пустых» healthcheck.
+
+### P8.1. Env-таймаут отправки лоха в scheduler
+- [x] **P8.1.a.** (2026-06-01) `scheduler.py:112` `_AUTOLOSER_SEND_TIMEOUT =
+  float(_env_int("LOSER_SEND_TIMEOUT", 25))`. Подхватывают `_announce`
+  (autoloser-job) и `_loser_outbox_retry_job`. Дефолт 25с < 30с сессии бота
+  (`_IPv4AiohttpSession`): send успевает при throttling канала, не виснет
+  дольше сессии. Прежние 8с резали доставку (прод 30.05: rolls 35/36 →
+  outbox expired по TimeoutError). Комментарий-обоснование на :105-111.
+- [x] **P8.1.b sync** (2026-06-01) `scheduler.py` → `meetup-planner-backend/`
+  (diff -q пуст, см. P8.5.c — один общий sync scheduler.py).
+
+### P8.2. Env-таймаут в публичном `/loser/roll`
+- [x] **P8.2.a.** (2026-06-01) `routes_meetings.py` — добавлен локальный парсер
+  `_loser_send_timeout()` (env `LOSER_SEND_TIMEOUT`, дефолт 25.0, фолбэк на
+  мусоре/пустой строке/non-int). `_LOSER_SEND_TIMEOUT` теперь = вызов парсера.
+  Использование без изменений (`_announce` → `asyncio.wait_for(timeout=...)`).
+  Добавлен `import os`.
+- [x] **P8.2.b sync** (2026-06-01) `routes_meetings.py` →
+  `meetup-planner-backend/` (diff -q пуст).
+
+### P8.3. Консистентность admin force-reroll (verify-only)
+- [x] **P8.3.a.** (2026-06-01) **Проверено.** `routes_admin.py:1318`
+  `bot.send_message` идёт БЕЗ `asyncio.wait_for` — ограничен только таймаутом
+  самой сессии бота (30с), `_announce` глотает любое исключение
+  (`except Exception → log.warning`). То есть admin force-reroll и так не страдал
+  от 8с-обрезки. Код НЕ трогаем.
+
+### P8.4. proxy_health: онлайн-статус раз в час
+- [x] **P8.4.a.** (2026-06-01) `scheduler.py:103` `PROXY_HEALTH_INTERVAL_SEC`
+  дефолт `_env_int(..., 3600)` (было 600). get_me(): 144/сутки → 24/сутки.
+  Комментарий-обоснование :99-102. Свежесть индикатора падает до 1ч —
+  осознанный компромисс ради бюджета канала.
+
+### P8.5. loser_outbox_retry: 1 мин → 5 мин
+- [x] **P8.5.a.** (2026-06-01) `scheduler.py:728` `IntervalTrigger(minutes=1,
+  jitter=10)` → `minutes=5, jitter=30`. Шаг ретрая `_AUTOLOSER_RETRY_DELAY` и
+  так 5 мин — ежеминутный тик 4 из 5 раз слал «пустой» SELECT в Neon
+  (next_retry_at в будущем), минус бюджет Neon compute. Один осмысленный тик на
+  окно. Комментарий-обоснование :719-726.
+- [x] **P8.5.b.** (2026-06-01) **Зафиксировано (НЕ трогаем):**
+  `bot_pause_auto_restore` IntervalTrigger 5мин (scheduler.py:711),
+  reminders/birthdays — cron-job'ы (не интервальный спам). Только retry-job был
+  избыточно частым.
+- [x] **P8.5.c sync** (2026-06-01) `scheduler.py` → `meetup-planner-backend/`
+  (diff -q пуст — один файл несёт P8.1+P8.4+P8.5).
+
+### P8.6. Тесты + деплой P8
+- [x] **P8.6.a.** (2026-06-01) `tests/test_loser_send_timeout_env.py` — 14
+  кейсов: оба парсера (`routes_meetings._loser_send_timeout` float-обёртка и
+  `scheduler._env_int` целочисленный) × {не задан→дефолт25, число, 0-граница,
+  мусор→фолбэк, float-строка→фолбэк, пустая строка→фолбэк}. Прогон `.venv`
+  pytest: **196 passed** (было 182).
+- [x] **P8.6.b sync** (2026-06-01) `tests/test_loser_send_timeout_env.py` →
+  `meetup-planner-backend/tests/` (diff -q пуст).
+- [x] **P8.6.c.** (2026-06-01) **Запушено в HF** ассистентом (git PAT).
+  Коммит `GHG7 P8` (`064e0fe`) поверх remote `b467188`. Заодно запушен
+  «застрявший» P2.2 (`0f51cae`) — sync в HF-копию был, но не закоммичен.
+  Rebase поверх двух HF-web-UI коммитов (`Update loser.py`/`chukhan.py`,
+  `b467188`/`e4cbff4`) — их содержимое уже было в main (loser идентичен,
+  chukhan отличался хвостовой пустой строкой → выровнено). Также починен
+  `.gitignore` (был UTF-16, git его игнорировал → `.venv`/`__pycache__`
+  светились untracked; пересохранён UTF-8, `ec0982c`). DEPLOY_NOTES.md про
+  env `LOSER_SEND_TIMEOUT`/`PROXY_HEALTH_INTERVAL_SEC` — TODO перед финалом GHG7.
+
+---
+
+## P9 — РАЗДЕЛЕНИЕ СЕМАНТИКИ «Лох дня» (👑) vs «Автолох-дуэль» (🤡)
+
+Маппинг (гард от инверсии): `auto`→👑 «Лох дня» в историю · `manual` (admin
+force-reroll, тихий прокрут лоха дня)→👑 в историю · `duel` (NEW: `/loser` +
+LoserSheet)→🤡 «Автолох», НЕ в статистику. `LoserRoll.source` — String(16) без
+CheckConstraint → 'duel' миграции не требует.
+
+### P9.1. Backend: source='duel' + заголовки
+- [x] **P9.1.a.** (2026-06-01) `chat_commands.py` `/loser` → `source="duel"`;
+  header 🤡/«Лох дня» → 🤡/«Автолох».
+- [x] **P9.1.b.** (2026-06-01) `routes_meetings.py` `/loser/roll` →
+  `source="duel"`; `_announce` header 🎲/«Лох дня» → 🤡/«Автолох»;
+  `loser_count`→None (duel не идёт в статистику, счётчик не показываем).
+  Убран расчёт `counts`/`cnt`; `loser_stats` остаётся используемым в
+  `loser_stats_endpoint` — импорт не трогаем.
+- [x] **P9.1.c.** (2026-06-01) `routes_admin.py` force-reroll: `source="manual"`
+  ОСТАВЛЕН; header 🤡/«Лох дня» → 👑/«Лох дня».
+- [x] **P9.1.d.** (2026-06-01) `scheduler.py` (auto): `_announce` И retry-job —
+  оба header 🤡/«Автолох сегодня» → 👑/«Лох дня». source остаётся "auto".
+- [x] **P9.1.e sync** (2026-06-01) chat_commands, routes_meetings, routes_admin,
+  scheduler → HF-копия (diff -q пуст, см. P9.6).
+
+### P9.2. Backend: исключить duel из статистики/титулов
+- [x] **P9.2.a.** (2026-06-01) `loser.py` `loser_stats`:
+  `where(or_(source!='duel', source IS NULL))`. +импорт `or_`.
+- [x] **P9.2.b.** (2026-06-01) `routes_calendar.py` titles_current лох дня:
+  +фильтр `or_(source!='duel', source IS NULL)`. main_loser исключает duel
+  автоматически через `loser_stats`.
+- [x] **P9.2.c.** (2026-06-01) **Verify:** `time_until_next_roll` фильтрует
+  `where(LoserRoll.source == source)` → duel получает собственный 12ч-кулдаун
+  из коробки. Кода не трогали.
+- [x] **P9.2.d sync** (2026-06-01) loser.py, routes_calendar.py → HF-копия.
+
+### P9.3. Backend: 'duel' в calendar marks (verify-only)
+- [x] **P9.3.a.** (2026-06-01) **Verify:** `calendar_marks` LEFT JOIN outbox
+  прозрачен для duel (duel не пишет в outbox → `LoserOutbox.id IS NULL` →
+  проходит). `build_marks` дедупит по (date,uid,source) → duel-марка отдельная.
+  Кода не меняли.
+- [x] **P9.3.b.** (2026-06-01) docstring `CalendarMark.source`: source ∈
+  {auto,manual,duel}|None; auto/manual→👑, duel→🤡.
+- [x] **P9.3.c sync** (2026-06-01) routes_calendar.py → HF-копия (с P9.2.d).
+
+### P9.4. Frontend: исправить инверсию + duel
+- [x] **P9.4.a.** (2026-06-01) `birthdays.ts`: `CalendarMark.source` и
+  `LoserReason.source` → `"auto"|"manual"|"duel"|null`.
+- [x] **P9.4.b.** (2026-06-01) `ParticipantRow.tsx`: в ячейках per-source
+  иконки — auto/manual/null→👑, duel→🤡, рендерятся массивом `loserIcons`
+  (короны, затем клоуны); compactLoser → `{loserIcons[0]}×N`. titleBadges
+  (👑 лох дня / 🤡 главный лох) — это титулы, не source, не трогали.
+- [x] **P9.4.c.** (2026-06-01) `LoserReasonPopover.tsx`: **инверсия исправлена**.
+  `isDuel = source==='duel'` → 🤡 «Автолох» (+rolled_by_name); всё остальное
+  (auto/manual/null) → 👑 «Лох дня». Docstring/заголовок/sourceLabel/блок
+  rolled_by пересобраны (rolled_by теперь для duel, не manual).
+- [x] **P9.4.d.** (2026-06-01) `actions/LoserSheet.tsx` title и
+  `actions/ActionBar.tsx` label «🎲 Лох дня» → «🤡 Автолох» (публичная дуэль).
+- [x] **P9.4.e.** (2026-06-01) Админ авто-лоха = «Лох дня» 👑:
+  `AutoLoserScreen.tsx` (title + toggle-label), `AdminScreen.tsx` Card,
+  `IntervalsScreen.tsx` (Block + hint с явным различением 👑/🤡),
+  `ScheduledPublicationsScreen.tsx` ToggleBlock. Родовые `SectionGroup "Лох"`
+  /`LoserScreen`/`HistoryScreen` (🤡 как обобщённая иконка раздела) — не в
+  списке P9.4.e, не трогали.
+- [x] **P9.4.f.** (2026-06-01) `npx tsc --noEmit` — чисто по затронутым файлам
+  (2 предсущ. ошибки в `HistoryScreen.tsx`, не наши). Frontend push — пользователь.
+
+### P9.5. Unit-тесты P9 (чистые, без БД)
+- [x] **P9.5.a.** (2026-06-01) `test_calendar_marks.py::test_loser_auto_and_duel
+  _same_day_both_kept` — [(d,uid,'auto'),(d,uid,'duel')]→две марки.
+- [x] **P9.5.b.** (2026-06-01) `test_loser_header_mapping.py` (3 кейса):
+  👑/«Лох дня», 🤡/«Автолох»+rolled_by без счётчика, контроль печати счётчика
+  при заданном loser_count.
+- [x] **P9.5.c.** (2026-06-01) Расширен `test_build_marks_still_accepts_source
+  _tuples` ('duel'→марка с source='duel'). Прогон pytest: **200 passed**
+  (было 196).
+- [x] **P9.5.d sync** (2026-06-01) test_calendar_marks.py, test_loser_outbox.py,
+  test_loser_header_mapping.py → HF-копия (200 passed и в HF-копии).
+
+---
+
+## P10 — УПРОЩЕНИЕ ИКОНОК-ШАПОК (откат P2.1.b, чисто фронт)
+
+- [ ] **P10.1.a.** `ParticipantRow.tsx:136-153` titleBadges: оставить ТОЛЬКО 💩
+  (chukhan). Убрать 🎂/👑/🤡 и 🪱 из верхнего стека.
+- [ ] **P10.1.b.** Рендер :181-203: одиночная 💩 сверху по центру, без стека.
+- [ ] **P10.1.c.** 🪱 СНИЗУ по центру: absolute -bottom-1 left-1/2 -translate-x-1/2
+  z-20 bg-tg-bg rounded-full, при worm_user_id===user.id.
+- [ ] **P10.1.d.** title-атрибут :165-169 пересобрать из 💩/🪱.
+- [ ] **P10.1.e.** Греп: loser_today/main_loser/birthday_today из CurrentTitles —
+  только в ParticipantRow → API не удалять, фронт перестаёт использовать.
+- [ ] **P10.1.f.** `npx tsc --noEmit`, почистить unused. Push — пользователь.
 
 ---
 
