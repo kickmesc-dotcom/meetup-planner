@@ -17,6 +17,20 @@ interface Props {
 }
 
 export default function RandomPhrasesGeneratorScreen({ onBack }: Props) {
+  return (
+    <SubScreen
+      title="🧪 Генератор фраз"
+      subtitle="Длина цитаты, история, шансы"
+      onBack={onBack}
+    >
+      <GeneratorBody />
+    </SubScreen>
+  );
+}
+
+// GHG7 P2.3.b: «голое» тело без SubScreen-обёртки для встраивания в
+// объединённый RandomPhrasesScreen.
+export function GeneratorBody() {
   const qc = useQueryClient();
 
   const gen = useQuery({ queryKey: ["admin", "rp-generator"], queryFn: fetchRPGenerator });
@@ -34,11 +48,8 @@ export default function RandomPhrasesGeneratorScreen({ onBack }: Props) {
   });
 
   return (
-    <SubScreen
-      title="🧪 Генератор фраз"
-      subtitle="Длина цитаты, история, шансы"
-      onBack={onBack}
-    >
+    <>
+      <div className="text-base font-semibold px-1">🧪 Генератор</div>
       {gen.isPending || !gen.data ? (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
           <ListSkeleton rows={6} />
@@ -55,7 +66,7 @@ export default function RandomPhrasesGeneratorScreen({ onBack }: Props) {
           ⚠ {String((setGen.error as Error)?.message ?? setGen.error)}
         </div>
       )}
-    </SubScreen>
+    </>
   );
 }
 

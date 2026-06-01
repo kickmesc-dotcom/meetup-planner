@@ -26,6 +26,20 @@ const MODE_LABELS: Record<RPScheduleMode, string> = {
 };
 
 export default function RandomPhrasesScheduleScreen({ onBack }: Props) {
+  return (
+    <SubScreen
+      title="💬 Автопост рандомных фраз"
+      subtitle="Когда бот публикует Шизо-цитату"
+      onBack={onBack}
+    >
+      <ScheduleBody />
+    </SubScreen>
+  );
+}
+
+// GHG7 P2.3.b: «голое» тело без SubScreen-обёртки — чтобы его можно было
+// встроить в объединённый RandomPhrasesScreen рядом с GeneratorBody.
+export function ScheduleBody() {
   const qc = useQueryClient();
 
   const schedule = useQuery({ queryKey: ["admin", "rp-schedule"], queryFn: fetchRPSchedule });
@@ -69,12 +83,9 @@ export default function RandomPhrasesScheduleScreen({ onBack }: Props) {
   });
 
   return (
-    <SubScreen
-      title="💬 Автопост рандомных фраз"
-      subtitle="Когда бот публикует Шизо-цитату"
-      onBack={onBack}
-    >
+    <>
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-base font-semibold mb-2">💬 Автопост</div>
         {enable.isPending || !enable.data ? (
           <ListSkeleton rows={1} />
         ) : (
@@ -112,7 +123,7 @@ export default function RandomPhrasesScheduleScreen({ onBack }: Props) {
           </div>
         )}
       </section>
-    </SubScreen>
+    </>
   );
 }
 

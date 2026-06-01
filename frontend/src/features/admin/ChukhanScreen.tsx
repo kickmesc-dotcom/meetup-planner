@@ -152,6 +152,31 @@ export default function ChukhanScreen({ users, onBack }: Props) {
       </section>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-base font-semibold mb-1">💩 Шаблоны фраз чухана</div>
+        <div className="text-xs text-tg-hint mb-2">
+          Используются при объявлении чухана недели. Пустой список → дефолт из кода.
+        </div>
+        {reasons.isPending || !reasons.data ? (
+          <ListSkeleton rows={5} />
+        ) : (
+          <ReasonsEditor
+            initial={reasons.data.reasons}
+            isPending={saveReasons.isPending}
+            placeholder="например: на этой неделе вообще пропал"
+            onSave={(list) => saveReasons.mutate(list)}
+            useCounts={useCounts.data?.counts}
+            onResetCounts={() => resetCounts.mutate()}
+            resetCountsPending={resetCounts.isPending}
+          />
+        )}
+        {saveReasons.isError && (
+          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            ⚠ {String((saveReasons.error as Error)?.message ?? saveReasons.error)}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">📜 История чуханов</div>
         <div className="text-xs text-tg-hint mb-2">Последние записи по неделям.</div>
         {history.isPending ? (
@@ -182,31 +207,6 @@ export default function ChukhanScreen({ users, onBack }: Props) {
                 </div>
               );
             })}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="text-base font-semibold mb-1">💩 Шаблоны фраз чухана</div>
-        <div className="text-xs text-tg-hint mb-2">
-          Используются при объявлении чухана недели. Пустой список → дефолт из кода.
-        </div>
-        {reasons.isPending || !reasons.data ? (
-          <ListSkeleton rows={5} />
-        ) : (
-          <ReasonsEditor
-            initial={reasons.data.reasons}
-            isPending={saveReasons.isPending}
-            placeholder="например: на этой неделе вообще пропал"
-            onSave={(list) => saveReasons.mutate(list)}
-            useCounts={useCounts.data?.counts}
-            onResetCounts={() => resetCounts.mutate()}
-            resetCountsPending={resetCounts.isPending}
-          />
-        )}
-        {saveReasons.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
-            ⚠ {String((saveReasons.error as Error)?.message ?? saveReasons.error)}
           </div>
         )}
       </section>

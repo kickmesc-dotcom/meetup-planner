@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { fetchBirthdays, updateBirthdays, type BirthdayRow } from "@/api/admin";
+import {
+  fetchBirthdays,
+  fetchScheduledSettings,
+  updateBirthdays,
+  updateScheduledSettings,
+  type BirthdayRow,
+  type ScheduledSettingsIO,
+} from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
@@ -38,6 +45,7 @@ export default function BirthdaysScreen({ onBack }: Props) {
       subtitle="Дата + что напоминать"
       onBack={onBack}
     >
+      <BirthdaysMasterSwitch />
       {list.isPending || !list.data ? (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
           <ListSkeleton rows={6} />
@@ -55,6 +63,65 @@ export default function BirthdaysScreen({ onBack }: Props) {
         </div>
       )}
     </SubScreen>
+  );
+}
+
+// P2.3.e: глобальный мастер-рубильник всех ДР-напоминаний. Дублирует
+// birthdays.alerts_enabled из «Запланированных публикаций» (тот же queryKey
+// ["admin","scheduled"] → синхронизируется автоматически). Per-user тогглы
+// ниже не теряются — это отдельный слой; при выключенном рубильнике бот молчит
+// независимо от них.
+function BirthdaysMasterSwitch() {
+  const qc = useQueryClient();
+  const sched = useQuery({
+    queryKey: ["admin", "scheduled"],
+    queryFn: fetchScheduledSettings,
+  });
+
+  const save = useMutation({
+    mutationFn: updateScheduledSettings,
+    onMutate: async (next) => {
+      await qc.cancelQueries({ queryKey: ["admin", "scheduled"] });
+      const prev = qc.getQueryData<ScheduledSettingsIO>(["admin", "scheduled"]);
+      qc.setQueryData(["admin", "scheduled"], next);
+      return { prev };
+    },
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "scheduled"], data);
+    },
+    onError: (e, _vars, ctx) => {
+      haptic("error");
+      if (ctx?.prev) qc.setQueryData(["admin", "scheduled"], ctx.prev);
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  const enabled = sched.data?.birthdays.alerts_enabled ?? true;
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      {sched.isPending || !sched.data ? (
+        <ListSkeleton rows={1} />
+      ) : (
+        <>
+          <TgToggle
+            checked={enabled}
+            disabled={save.isPending}
+            label={enabled ? "🔔 Все ДР-напоминания" : "🔕 Напоминания отключены"}
+            onChange={(v) => {
+              const next = structuredClone(sched.data!);
+              next.birthdays.alerts_enabled = v;
+              save.mutate(next);
+            }}
+          />
+          <div className="mt-1 text-[11px] text-tg-hint">
+            Глобальный рубильник — гасит все ДР-уведомления у всех участников.
+            Персональные галочки ниже при этом сохраняются.
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

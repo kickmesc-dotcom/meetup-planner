@@ -9,13 +9,10 @@ import {
   closeAdminPoll,
   deleteAdminPoll,
   fetchAdminPolls,
-  fetchBotReactions,
   fetchPollsDefaults,
   fetchScheduledSettings,
-  updateBotReactions,
   updatePollsDefaults,
   updateScheduledSettings,
-  type BotReactionsSettings,
   type PollsDefaults,
   type ScheduledSettingsIO,
 } from "@/api/admin";
@@ -177,7 +174,8 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
             }
           />
 
-          <BotReactionsSection />
+          {/* GHG7 P2.3.f: «Реакции бота» вынесены в отдельный экран
+              BotReactionsScreen (меню админки → «🤖 Реакции»). */}
 
           {/* GHG6 H3 (п.16): расписание чухана (day + window) переехало в
               «🎛 Интервалы и окна». Master-toggle'a у чухана нет — он публикуется
@@ -509,108 +507,6 @@ function DefaultsRow({
       </div>
       {children}
     </div>
-  );
-}
-
-/**
- * GHG6 E9: три master-toggle реакций бота. Отдельная секция со своим
- * локальным state и save-mutation (не делит draft с ScheduledSettingsIO,
- * чтобы не плодить лишние поля в общей форме).
- */
-function BotReactionsSection() {
-  const qc = useQueryClient();
-  const q = useQuery({
-    queryKey: ["admin", "bot-reactions"],
-    queryFn: fetchBotReactions,
-  });
-  const [draft, setDraft] = useState<BotReactionsSettings | null>(null);
-  useEffect(() => {
-    if (q.data) setDraft({ ...q.data });
-  }, [q.data]);
-
-  const save = useMutation({
-    mutationFn: updateBotReactions,
-    onSuccess: (data) => {
-      haptic("success");
-      qc.setQueryData(["admin", "bot-reactions"], data);
-    },
-    onError: errAlert,
-  });
-
-  if (q.isPending || !draft) {
-    return (
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <ListSkeleton rows={3} />
-      </section>
-    );
-  }
-
-  const setField = (key: keyof BotReactionsSettings, v: boolean) => {
-    const next = { ...draft, [key]: v };
-    setDraft(next);
-    save.mutate(next);
-  };
-
-  return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-base">🤖</span>
-        <span className="text-base font-semibold">Реакции бота</span>
-      </div>
-      <div className="text-xs text-tg-hint mb-2">
-        Бот отвечает рандомной шизо-цитатой на упоминание и/или reply.
-      </div>
-
-      <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
-        <div className="min-w-0">
-          <div className="text-sm text-tg-text">@-упоминание</div>
-          <div className="text-[11px] text-tg-hint">
-            На тег <code>@бот</code> бот отвечает фразой.
-          </div>
-        </div>
-        <Switch
-          checked={draft.mention_enabled}
-          onChange={(v) => {
-            haptic("selection");
-            setField("mention_enabled", v);
-          }}
-        />
-      </div>
-
-      <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
-        <div className="min-w-0">
-          <div className="text-sm text-tg-text">Reply на любое сообщение бота</div>
-          <div className="text-[11px] text-tg-hint">
-            На любой ответ-реплай на сообщение бота — бот отвечает фразой
-            (включая reply к собственным цитатам).
-          </div>
-        </div>
-        <Switch
-          checked={draft.reply_all_enabled}
-          onChange={(v) => {
-            haptic("selection");
-            setField("reply_all_enabled", v);
-          }}
-        />
-      </div>
-
-      <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
-        <div className="min-w-0">
-          <div className="text-sm text-tg-text">Reply, кроме рандом-цитат</div>
-          <div className="text-[11px] text-tg-hint">
-            Бот отвечает на reply к своим сообщениям, кроме случаев, когда
-            оригинал — рандом-цитата. Работает независимо от верхнего тогла.
-          </div>
-        </div>
-        <Switch
-          checked={draft.reply_except_phrases_enabled}
-          onChange={(v) => {
-            haptic("selection");
-            setField("reply_except_phrases_enabled", v);
-          }}
-        />
-      </div>
-    </section>
   );
 }
 

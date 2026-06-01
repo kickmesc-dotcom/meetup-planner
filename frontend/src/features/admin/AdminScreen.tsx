@@ -9,9 +9,8 @@ import { haptic } from "@/tg/webapp";
 import ChukhanScreen from "./ChukhanScreen";
 import LoserScreen from "./loser/LoserScreen";
 import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
-import RandomPhrasesScheduleScreen from "./RandomPhrasesScheduleScreen";
-import RandomPhrasesGeneratorScreen from "./RandomPhrasesGeneratorScreen";
-import AutoLoserScreen from "./AutoLoserScreen";
+import RandomPhrasesScreen from "./RandomPhrasesScreen";
+import BotReactionsScreen from "./BotReactionsScreen";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
@@ -28,9 +27,8 @@ type Section =
   | "chukhan"
   | "loser"
   | "scheduled-pubs"
-  | "rp-schedule"
-  | "rp-generator"
-  | "autoloser"
+  | "rp"
+  | "bot-reactions"
   | "history"
   | "birthdays"
   | "calendar-settings"
@@ -67,9 +65,8 @@ export default function AdminScreen({ users }: Props) {
   if (section === "chukhan") return <ChukhanScreen users={users} onBack={back} />;
   if (section === "loser") return <LoserScreen users={users} onBack={back} />;
   if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
-  if (section === "rp-schedule") return <RandomPhrasesScheduleScreen onBack={back} />;
-  if (section === "rp-generator") return <RandomPhrasesGeneratorScreen onBack={back} />;
-  if (section === "autoloser") return <AutoLoserScreen onBack={back} />;
+  if (section === "rp") return <RandomPhrasesScreen onBack={back} />;
+  if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
@@ -196,29 +193,32 @@ export default function AdminScreen({ users }: Props) {
           subtitle="Master-toggles, дефолты опросов, опросы в чате"
           onClick={() => select("scheduled-pubs")}
         />
+        {/* GHG7 P2.3.b: «Автопост рандомных» + «Генератор фраз» объединены
+            в одну Card → один экран с двумя секциями. */}
         <Card
           icon="💬"
-          title="Автопост рандомных фраз"
-          subtitle="Расписание (N раз/день, фикс-времена, рандом-интервал)"
-          onClick={() => select("rp-schedule")}
+          title="Рандомные фразы"
+          subtitle="Расписание автопоста + параметры генератора"
+          onClick={() => select("rp")}
         />
-        <Card
-          icon="🧪"
-          title="Генератор рандомных фраз"
-          subtitle="Длина цитаты, глубина истории, шансы"
-          onClick={() => select("rp-generator")}
-        />
-        <Card
-          icon="👑"
-          title="Лох дня"
-          subtitle="Бот сам выбирает лоха в окне дня"
-          onClick={() => select("autoloser")}
-        />
+        {/* GHG7 P2.3.h: «Лох дня» (автовыбор) больше не отдельный пункт здесь —
+            настройки автовыбора влиты в единый экран «Лох» (см. ниже). */}
         <Card
           icon="⏸"
           title="Пауза и /zaebal"
           subtitle="Порог голосов, длительности, авто-зэбал"
           onClick={() => select("zaebal")}
+        />
+      </SectionGroup>
+
+      {/* GHG7 P2.3.a: «Интервалы» подняты сразу под «Запланированные
+          публикации» — это смежные настройки расписания. */}
+      <SectionGroup icon="⏱" title="Интервалы">
+        <Card
+          icon="🎛"
+          title="Интервалы и окна"
+          subtitle="Тик напоминаний, частота автолоха, окна фраз и чухана"
+          onClick={() => select("intervals")}
         />
       </SectionGroup>
 
@@ -256,9 +256,9 @@ export default function AdminScreen({ users }: Props) {
 
       <SectionGroup icon="🤡" title="Лох">
         <Card
-          icon="🎲"
+          icon="👑"
           title="Лох дня"
-          subtitle="Force-reroll, история, шаблоны фраз"
+          subtitle="Автовыбор, реролл, шаблоны, история"
           onClick={() => select("loser")}
         />
       </SectionGroup>
@@ -281,15 +281,14 @@ export default function AdminScreen({ users }: Props) {
         />
       </SectionGroup>
 
-      {/* GHG6 I (п.16): единый линейный экран всех числовых/временных параметров
-          расписания. Стоит самым нижним — «выставил и забыл», рубильники живут
-          в «Запланированных публикациях». */}
-      <SectionGroup icon="⏱" title="Интервалы">
+      {/* GHG7 P2.3.f: реакции бота вынесены из «Запланированных публикаций»
+          в отдельное меню верхнего уровня. */}
+      <SectionGroup icon="🤖" title="Реакции">
         <Card
-          icon="🎛"
-          title="Интервалы и окна"
-          subtitle="Тик напоминаний, частота автолоха, окна фраз и чухана"
-          onClick={() => select("intervals")}
+          icon="🤖"
+          title="Реакции бота"
+          subtitle="Ответы на @упоминание и reply"
+          onClick={() => select("bot-reactions")}
         />
       </SectionGroup>
     </div>
