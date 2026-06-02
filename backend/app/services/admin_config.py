@@ -815,6 +815,76 @@ async def set_bot_reactions_settings(
         )
 
 
+# --- GHG7 P5: реакции бота на медиа (мемы/подборки) ---
+# Пулы фраз и whitelist эмодзи — JSON-списки (паттерн loser_reasons, дефолты в
+# app/services/media_reactions.py, не пишутся в БД до первой правки админом).
+MEDIA_SINGLE_PHRASES_KEY = "media_reactions.single_phrases"
+MEDIA_COLLECTION_PHRASES_KEY = "media_reactions.collection_phrases"
+MEDIA_EMOJI_WHITELIST_KEY = "media_reactions.emoji_whitelist"
+
+# Поведение (см. handlers/media_reactions.py — серия отложенных проверок с
+# динамическим шансом). mode: always|chance|wait_then_chance|never.
+# single_response_mode: emoji|phrase|both|random_one (что слать на одиночный мем).
+MEDIA_ENABLED_KEY = "media_reactions.enabled"                      # master, default true
+MEDIA_SINGLE_ENABLED_KEY = "media_reactions.single_enabled"        # default true
+MEDIA_COLLECTION_ENABLED_KEY = "media_reactions.collection_enabled"  # default true
+MEDIA_MODE_KEY = "media_reactions.mode"                            # default wait_then_chance
+MEDIA_CHANCE_BASE_PCT_KEY = "media_reactions.chance_base_pct"      # default 10
+MEDIA_CHANCE_MAX_PCT_KEY = "media_reactions.chance_max_pct"        # default 50
+MEDIA_SINGLE_RESPONSE_MODE_KEY = "media_reactions.single_response_mode"  # default random_one
+
+_MEDIA_VALID_MODES = ("always", "chance", "wait_then_chance", "never")
+_MEDIA_VALID_SINGLE_MODES = ("emoji", "phrase", "both", "random_one")
+
+
+async def get_media_reactions_settings(session: AsyncSession) -> dict:
+    """Агрегат поведения медиа-реакций для UI (без пулов фраз — те отдельно)."""
+    mode = await _get_value(session, MEDIA_MODE_KEY) or "wait_then_chance"
+    if mode not in _MEDIA_VALID_MODES:
+        mode = "wait_then_chance"
+    single_mode = await _get_value(session, MEDIA_SINGLE_RESPONSE_MODE_KEY) or "random_one"
+    if single_mode not in _MEDIA_VALID_SINGLE_MODES:
+        single_mode = "random_one"
+    return {
+        "enabled": await _get_bool(session, MEDIA_ENABLED_KEY, True),
+        "single_enabled": await _get_bool(session, MEDIA_SINGLE_ENABLED_KEY, True),
+        "collection_enabled": await _get_bool(session, MEDIA_COLLECTION_ENABLED_KEY, True),
+        "mode": mode,
+        "chance_base_pct": max(0, min(100, await _get_int(session, MEDIA_CHANCE_BASE_PCT_KEY, 10))),
+        "chance_max_pct": max(0, min(100, await _get_int(session, MEDIA_CHANCE_MAX_PCT_KEY, 50))),
+        "single_response_mode": single_mode,
+    }
+
+
+async def set_media_reactions_settings(
+    session: AsyncSession,
+    *,
+    enabled: bool | None = None,
+    single_enabled: bool | None = None,
+    collection_enabled: bool | None = None,
+    mode: str | None = None,
+    chance_base_pct: int | None = None,
+    chance_max_pct: int | None = None,
+    single_response_mode: str | None = None,
+) -> None:
+    if enabled is not None:
+        await _set_value(session, MEDIA_ENABLED_KEY, "true" if enabled else "false")
+    if single_enabled is not None:
+        await _set_value(session, MEDIA_SINGLE_ENABLED_KEY, "true" if single_enabled else "false")
+    if collection_enabled is not None:
+        await _set_value(
+            session, MEDIA_COLLECTION_ENABLED_KEY, "true" if collection_enabled else "false"
+        )
+    if mode is not None and mode in _MEDIA_VALID_MODES:
+        await _set_value(session, MEDIA_MODE_KEY, mode)
+    if chance_base_pct is not None:
+        await _set_value(session, MEDIA_CHANCE_BASE_PCT_KEY, str(max(0, min(100, chance_base_pct))))
+    if chance_max_pct is not None:
+        await _set_value(session, MEDIA_CHANCE_MAX_PCT_KEY, str(max(0, min(100, chance_max_pct))))
+    if single_response_mode is not None and single_response_mode in _MEDIA_VALID_SINGLE_MODES:
+        await _set_value(session, MEDIA_SINGLE_RESPONSE_MODE_KEY, single_response_mode)
+
+
 # --- E7: per-user UI prefs (закрываемое приветствие) ---
 # Хранятся как `ui.hide_greeting:{tg_id}` -> "true"/"false". Per-user, потому что
 # баннер приветствия каждый прячет себе сам. tg_id (а не user.id) — стабильный

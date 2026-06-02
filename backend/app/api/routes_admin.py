@@ -1126,6 +1126,125 @@ async def admin_update_chukhan_reasons(
     return ChukhanReasonsOut(reasons=saved)
 
 
+# --- GHG7 P5: реакции бота на медиа (пулы фраз single/collection + эмодзи) ---
+
+from app.services.media_reactions import (
+    get_single_phrases as _get_single_phrases,
+    set_single_phrases as _set_single_phrases,
+    get_collection_phrases as _get_collection_phrases,
+    set_collection_phrases as _set_collection_phrases,
+    get_emoji_whitelist as _get_emoji_whitelist,
+    set_emoji_whitelist as _set_emoji_whitelist,
+)
+from app.services.admin_config import (
+    get_media_reactions_settings as _get_media_settings,
+    set_media_reactions_settings as _set_media_settings,
+)
+
+
+class MediaPhrasesOut(BaseModel):
+    phrases: list[str]
+
+
+class MediaPhrasesUpdate(BaseModel):
+    phrases: list[str] = Field(..., max_length=500)
+
+
+@router.get("/admin/media-reactions/single-phrases", response_model=MediaPhrasesOut)
+async def admin_get_media_single_phrases(
+    session: SessionDep, user: CurrentUser
+) -> MediaPhrasesOut:
+    _ensure_admin(user)
+    return MediaPhrasesOut(phrases=await _get_single_phrases(session))
+
+
+@router.put("/admin/media-reactions/single-phrases", response_model=MediaPhrasesOut)
+async def admin_update_media_single_phrases(
+    body: MediaPhrasesUpdate, session: SessionDep, user: CurrentUser
+) -> MediaPhrasesOut:
+    _ensure_admin(user)
+    await _set_single_phrases(session, body.phrases)
+    saved = await _get_single_phrases(session)
+    log.info("admin.media_single_phrases_updated", count=len(saved), by=user.id)
+    return MediaPhrasesOut(phrases=saved)
+
+
+@router.get("/admin/media-reactions/collection-phrases", response_model=MediaPhrasesOut)
+async def admin_get_media_collection_phrases(
+    session: SessionDep, user: CurrentUser
+) -> MediaPhrasesOut:
+    _ensure_admin(user)
+    return MediaPhrasesOut(phrases=await _get_collection_phrases(session))
+
+
+@router.put("/admin/media-reactions/collection-phrases", response_model=MediaPhrasesOut)
+async def admin_update_media_collection_phrases(
+    body: MediaPhrasesUpdate, session: SessionDep, user: CurrentUser
+) -> MediaPhrasesOut:
+    _ensure_admin(user)
+    await _set_collection_phrases(session, body.phrases)
+    saved = await _get_collection_phrases(session)
+    log.info("admin.media_collection_phrases_updated", count=len(saved), by=user.id)
+    return MediaPhrasesOut(phrases=saved)
+
+
+@router.get("/admin/media-reactions/emoji-whitelist", response_model=MediaPhrasesOut)
+async def admin_get_media_emoji_whitelist(
+    session: SessionDep, user: CurrentUser
+) -> MediaPhrasesOut:
+    _ensure_admin(user)
+    return MediaPhrasesOut(phrases=await _get_emoji_whitelist(session))
+
+
+@router.put("/admin/media-reactions/emoji-whitelist", response_model=MediaPhrasesOut)
+async def admin_update_media_emoji_whitelist(
+    body: MediaPhrasesUpdate, session: SessionDep, user: CurrentUser
+) -> MediaPhrasesOut:
+    _ensure_admin(user)
+    await _set_emoji_whitelist(session, body.phrases)
+    saved = await _get_emoji_whitelist(session)
+    log.info("admin.media_emoji_whitelist_updated", count=len(saved), by=user.id)
+    return MediaPhrasesOut(phrases=saved)
+
+
+class MediaReactionsSettingsIO(BaseModel):
+    enabled: bool
+    single_enabled: bool
+    collection_enabled: bool
+    mode: str  # always|chance|wait_then_chance|never
+    chance_base_pct: int = Field(..., ge=0, le=100)
+    chance_max_pct: int = Field(..., ge=0, le=100)
+    single_response_mode: str  # emoji|phrase|both|random_one
+
+
+@router.get("/admin/media-reactions/settings", response_model=MediaReactionsSettingsIO)
+async def admin_get_media_settings(
+    session: SessionDep, user: CurrentUser
+) -> MediaReactionsSettingsIO:
+    _ensure_admin(user)
+    return MediaReactionsSettingsIO(**await _get_media_settings(session))
+
+
+@router.put("/admin/media-reactions/settings", response_model=MediaReactionsSettingsIO)
+async def admin_update_media_settings(
+    body: MediaReactionsSettingsIO, session: SessionDep, user: CurrentUser
+) -> MediaReactionsSettingsIO:
+    _ensure_admin(user)
+    await _set_media_settings(
+        session,
+        enabled=body.enabled,
+        single_enabled=body.single_enabled,
+        collection_enabled=body.collection_enabled,
+        mode=body.mode,
+        chance_base_pct=body.chance_base_pct,
+        chance_max_pct=body.chance_max_pct,
+        single_response_mode=body.single_response_mode,
+    )
+    saved = await _get_media_settings(session)
+    log.info("admin.media_settings_updated", by=user.id)
+    return MediaReactionsSettingsIO(**saved)
+
+
 # --- GHG6 E5.3: счётчики использований фраз (для подписи `(use:N)` в UI) ---
 # Хранятся в admin_config как `{phrase_hash: count}` — формат, удобный для
 # weighted_choice (вес = 1/(1+count)). Фронту удобнее {phrase: count}, поэтому
