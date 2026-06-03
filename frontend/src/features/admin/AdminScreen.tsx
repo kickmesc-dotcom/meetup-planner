@@ -11,6 +11,7 @@ import LoserScreen from "./loser/LoserScreen";
 import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
 import RandomPhrasesScreen from "./RandomPhrasesScreen";
 import BotReactionsScreen from "./BotReactionsScreen";
+import MediaReactionsScreen from "./MediaReactionsScreen";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
@@ -29,6 +30,7 @@ type Section =
   | "scheduled-pubs"
   | "rp"
   | "bot-reactions"
+  | "media-reactions"
   | "history"
   | "birthdays"
   | "calendar-settings"
@@ -67,6 +69,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
   if (section === "rp") return <RandomPhrasesScreen onBack={back} />;
   if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
+  if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
@@ -289,6 +292,12 @@ export default function AdminScreen({ users }: Props) {
           title="Реакции бота"
           subtitle="Ответы на @упоминание и reply"
           onClick={() => select("bot-reactions")}
+        />
+        <Card
+          icon="🎭"
+          title="Реакции на медиа"
+          subtitle="Мемы и подборки: эмодзи + фразы"
+          onClick={() => select("media-reactions")}
         />
       </SectionGroup>
     </div>

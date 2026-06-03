@@ -632,11 +632,20 @@ get/set настроек) + грязный handler `app/bot/handlers/media_react
   закоммичены поверх `@42dc7b8`. Прогон pytest: **220 passed** (ядро 12 +
   детектор 8 поверх 200 из P9). `pick_phrase`/`pick_emoji`/`tick_chance`/
   `roll_chance` принимают опц. `rng` для детерминированных тестов.
-- [ ] **P5.6.b.** Админ-UI: экран `MediaReactionsScreen` (фронт) — две секции
-  пулов (single/collection фразы + emoji whitelist, редактируемые списки как у
-  loser-шаблонов), тумблеры поведения (mode/chance/single_response/enabled-флаги),
-  две force-кнопки (single/collection). API-обёртки в `api/admin.ts`, Card в
-  `AdminScreen` (рядом с «🤖 Реакции» BotReactionsScreen). Push — пользователь.
+- [x] **P5.6.b.** (2026-06-03) Админ-UI `MediaReactionsScreen.tsx`: (1) секция
+  поведения — master `enabled`, select `mode` (always/chance/wait_then_chance/
+  never), при chance/wait — числовые `chance_base_pct`/`chance_max_pct`, select
+  `single_response_mode`, тоглы single/collection_enabled; **авто-save** при
+  каждом изменении (паттерн BotReactionsScreen). (2) три пула через переиспольз.
+  `ReasonsEditor` (single-фразы, collection-фразы, emoji-whitelist; каждый со
+  своим save). (3) две force-кнопки → `POST /media-reactions/force/{kind}`,
+  алерт по message_id. API-обёртки в `api/admin.ts` (`fetchMediaSettings`/
+  `updateMediaSettings`/`fetch|updateMedia{Single|Collection}Phrases`/
+  `fetch|updateMediaEmojiWhitelist`/`forceMediaReaction`, типы `MediaMode`/
+  `MediaSingleResponseMode`). В `AdminScreen` новая Card «🎭 Реакции на медиа» в
+  группе «🤖 Реакции» + Section `media-reactions` + роутинг. `npx tsc --noEmit`
+  чист по затронутым (baseline: 2 предсущ. ошибки `HistoryScreen.tsx`). Push в
+  `kickmesc-dotcom/meetup-planner` (Pages) — пользователь.
 - [x] **P5.6.c sync** (2026-06-03) 8 файлов backend P5
   (`services/media_reactions.py`, `services/admin_config.py`, `routes_admin.py`,
   `dispatcher.py`, `main.py`, `handlers/media_reactions.py`,

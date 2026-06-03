@@ -694,6 +694,71 @@ export const updateBotReactions = (s: BotReactionsSettings) =>
     body: JSON.stringify(s),
   });
 
+// --- GHG7 P5: реакции бота на медиа (мемы/подборки) ---
+// Пулы фраз/эмодзи — JSON-списки в admin_config (бэк: services/media_reactions.py).
+// Поведение — серия отложенных проверок с растущим шансом (wait_then_chance).
+
+export type MediaMode = "always" | "chance" | "wait_then_chance" | "never";
+export type MediaSingleResponseMode = "emoji" | "phrase" | "both" | "random_one";
+
+export interface MediaReactionsSettings {
+  enabled: boolean;
+  single_enabled: boolean;
+  collection_enabled: boolean;
+  mode: MediaMode;
+  chance_base_pct: number;
+  chance_max_pct: number;
+  single_response_mode: MediaSingleResponseMode;
+}
+
+export interface MediaPhrases {
+  phrases: string[];
+}
+
+export interface MediaForceResult {
+  ok: boolean;
+  message_id: number;
+}
+
+export const fetchMediaSettings = () =>
+  api<MediaReactionsSettings>("/api/admin/media-reactions/settings");
+
+export const updateMediaSettings = (s: MediaReactionsSettings) =>
+  api<MediaReactionsSettings>("/api/admin/media-reactions/settings", {
+    method: "PUT",
+    body: JSON.stringify(s),
+  });
+
+export const fetchMediaSinglePhrases = () =>
+  api<MediaPhrases>("/api/admin/media-reactions/single-phrases");
+export const updateMediaSinglePhrases = (phrases: string[]) =>
+  api<MediaPhrases>("/api/admin/media-reactions/single-phrases", {
+    method: "PUT",
+    body: JSON.stringify({ phrases }),
+  });
+
+export const fetchMediaCollectionPhrases = () =>
+  api<MediaPhrases>("/api/admin/media-reactions/collection-phrases");
+export const updateMediaCollectionPhrases = (phrases: string[]) =>
+  api<MediaPhrases>("/api/admin/media-reactions/collection-phrases", {
+    method: "PUT",
+    body: JSON.stringify({ phrases }),
+  });
+
+export const fetchMediaEmojiWhitelist = () =>
+  api<MediaPhrases>("/api/admin/media-reactions/emoji-whitelist");
+export const updateMediaEmojiWhitelist = (phrases: string[]) =>
+  api<MediaPhrases>("/api/admin/media-reactions/emoji-whitelist", {
+    method: "PUT",
+    body: JSON.stringify({ phrases }),
+  });
+
+// kind: "single" | "collection" — принудительная реакция на последнее медиа.
+export const forceMediaReaction = (kind: "single" | "collection") =>
+  api<MediaForceResult>(`/api/admin/media-reactions/force/${kind}`, {
+    method: "POST",
+  });
+
 // --- GHG6 E10: avatars — разовый sync + одноразовое расписание ---
 
 export interface AvatarsSyncNowResult {
