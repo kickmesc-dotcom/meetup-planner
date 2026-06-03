@@ -637,11 +637,14 @@ get/set настроек) + грязный handler `app/bot/handlers/media_react
   loser-шаблонов), тумблеры поведения (mode/chance/single_response/enabled-флаги),
   две force-кнопки (single/collection). API-обёртки в `api/admin.ts`, Card в
   `AdminScreen` (рядом с «🤖 Реакции» BotReactionsScreen). Push — пользователь.
-- [ ] **P5.6.c.** Sync backend P5 (`services/media_reactions.py`,
-  `admin_config.py`, `routes_admin.py`, `dispatcher.py`, `main.py`,
-  `handlers/media_reactions.py`, `tests/test_media_reactions*.py`) →
-  `meetup-planner-backend/`, `diff -q` проверка. Push в HF — пользователь
-  (ассистент кладёт в HF-копию).
+- [x] **P5.6.c sync** (2026-06-03) 8 файлов backend P5
+  (`services/media_reactions.py`, `services/admin_config.py`, `routes_admin.py`,
+  `dispatcher.py`, `main.py`, `handlers/media_reactions.py`,
+  `tests/test_media_reactions.py`, `tests/test_media_reactions_detector.py`) →
+  `meetup-planner-backend/` (`diff -q` пуст по всем 8, HF-копия **220 passed**).
+  **HF env-напоминание:** новый `allowed_updates` включает `message_reaction` —
+  применится при следующем рестарте Space (вебхук переустанавливается в
+  `_set_webhook`). Push в HF — пользователь.
 
 ---
 
