@@ -18,6 +18,7 @@ from app.bot.handlers import (
     chat_capture,
     chat_commands,
     help as help_handler,
+    media_reactions,
     next_meeting,
     poll_answer,
     start,
@@ -297,5 +298,10 @@ def get_dispatcher() -> Dispatcher:
         # SkipHandler`, чтобы chat_capture ниже по цепочке всё же сохранил
         # сообщение (см. bot_reactions.on_message).
         _dispatcher.include_router(bot_reactions.router)
+        # GHG7 P5: медиа-реакции. Матчат контент-типы (photo/video/...), НЕ
+        # F.text, поэтому с bot_reactions/chat_capture не конфликтуют. on_media
+        # всё равно завершается raise SkipHandler (пропагация). Содержит и
+        # @message_reaction-роутер (приём живых реакций для wait_then_chance).
+        _dispatcher.include_router(media_reactions.router)
         _dispatcher.include_router(chat_capture.router)
     return _dispatcher

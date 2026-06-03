@@ -548,38 +548,100 @@ non-bot, не `/`-commands. RETENTION_DAYS=7. Чтение в admin-UI —
 
 Источник: GHG7.txt стр. 21–23, 53–149.
 
+**Решение по хранению (2026-06-03):** НЕ отдельная таблица
+`media_reaction_phrases`, а JSON-списки в `admin_config` (ключи
+`media_reactions.*`) — паттерн `loser_reasons`/`bot_reactions`: дефолты живут в
+коде (`services/media_reactions.py`), в БД пишется только кастомизация. Так нет
+лишней миграции и нагрузки на Neon. Архитектура: чистое ядро
+`app/services/media_reactions.py` (пулы-дефолты, выбор/подстановка, ролл шанса,
+get/set настроек) + грязный handler `app/bot/handlers/media_reactions.py`
+(детектор альбомов, серия `asyncio`-тиков, вызовы TG API). **Backend P5 закрыт
+целиком; остаётся только админ-UI (frontend) — вынесен в P5.6.**
+
 ### P5.1. Хранилища пулов
-- [ ] **P5.1.a.** Таблица `media_reaction_phrases` (id, kind ∈ {single,
-  collection}, text, enabled, created_at). CRUD-эндпоинты в админке.
-- [ ] **P5.1.b.** Seed пулов из GHG7.txt стр. 58–101 (single) и 105–140
-  (collection).
-- [ ] **P5.1.c.** Sync.
+- [x] **P5.1.a.** (2026-06-03, main `@42dc7b8`) Пулы single/collection фраз +
+  emoji whitelist хранятся как JSON в `admin_config`
+  (`MEDIA_SINGLE_PHRASES_KEY`/`MEDIA_COLLECTION_PHRASES_KEY`/
+  `MEDIA_EMOJI_WHITELIST_KEY`, см. `admin_config.py`). CRUD-эндпоинты:
+  `GET/PUT /admin/media-reactions/{single-phrases,collection-phrases,
+  emoji-whitelist}` (`routes_admin.py:1153-1207`, `MediaPhrasesOut`,
+  дедуп+чистка через `_clean_list` при записи).
+- [x] **P5.1.b.** (2026-06-03, main `@42dc7b8`) Seed пулов из GHG7.txt:
+  `DEFAULT_SINGLE_PHRASES` (43 фразы, стр. 58–101), `DEFAULT_COLLECTION_PHRASES`
+  (34 фразы, стр. 105–140), `DEFAULT_EMOJI_WHITELIST` (12 TG-реакц.-эмодзи).
+  Дефолты в коде — подхватываются до первой правки админом (как loser_reasons).
+- [x] **P5.1.c sync** (2026-06-03) Закрыт общим sync P5.6.c (один проход
+  backend → HF-копия по всем файлам P5).
 
 ### P5.2. Детектор медиа-сообщений
-- [ ] **P5.2.a.** Классификатор входящих сообщений: одиночный мем (1–2
-  медиа), подборка (2+ медиа подряд от одного автора в окне N минут).
-- [ ] **P5.2.b.** Хранилище последнего мема/подборки на чат —
-  для «принудительной реакции на последний».
-- [ ] **P5.2.c.** Sync.
+- [x] **P5.2.a.** (2026-06-03, main `@<P5-handler>`) `on_media`
+  (`handlers/media_reactions.py`) матчит `F.content_type.in_(_MEDIA_CONTENT_TYPES)`
+  (photo/video/animation/document/sticker/voice/video_note/audio). Альбом
+  собирается по `media_group_id` в `_AlbumBuf` с debounce `_ALBUM_DEBOUNCE_SEC=2с`,
+  затем `classify_album(count)`: 2+ → `collection`, иначе `single`. Фильтры:
+  только group_chat_id, не-бот, whitelist. on_media завершается `raise
+  SkipHandler` (пропагация к chat_capture, как P0.3.e).
+- [x] **P5.2.b.** (2026-06-03) In-memory `_recent[chat_id]=(kind,message_id,
+  author_name)` + `get_recent(chat_id,kind)` для force-кнопок (P5.5.c). Теряется
+  при рестарте Space — приемлемо (эфемерно). `_reacted` set — медиа с уже
+  случившейся живой реакцией (через `@message_reaction`-роутер `on_reaction`).
+- [x] **P5.2.c sync** (2026-06-03) Закрыт общим sync P5.6.c.
 
 ### P5.3. Реакции эмодзи на одиночный мем
-- [ ] **P5.3.a.** Whitelist эмодзи (смех/слёзы/огонь/100/огурчик и т.п.) —
-  редактируемый в админке.
-- [ ] **P5.3.b.** Использовать `bot.set_message_reaction`.
-- [ ] **P5.3.c.** Sync.
+- [x] **P5.3.a.** (2026-06-03) Whitelist эмодзи редактируемый в админке
+  (см. P5.1.a, `emoji-whitelist` CRUD; UI — P5.6). Дефолт
+  `DEFAULT_EMOJI_WHITELIST`.
+- [x] **P5.3.b.** (2026-06-03) `_send_emoji_reaction` →
+  `bot.set_message_reaction([ReactionTypeEmoji(emoji=...)])`, best-effort
+  (неподдерж. эмодзи/сетевые сбои логируются и глотаются). `single_response_mode`
+  ∈ {emoji,phrase,both,random_one} управляет, слать ли эмодзи и/или фразу на
+  одиночный мем.
+- [x] **P5.3.c sync** (2026-06-03) Закрыт общим sync P5.6.c.
 
 ### P5.4. Реакции фразами на подборку
-- [ ] **P5.4.a.** Reply из пула `collection` с подстановкой `%username%`.
-- [ ] **P5.4.b.** Sync.
+- [x] **P5.4.a.** (2026-06-03) Подборка → всегда reply-фразой из `collection`-пула
+  (`_do_react` ветка `kind=="collection"`), `%username%` → имя автора через
+  `substitute_username`. Одиночный мем — фраза из `single`-пула (если режим
+  это предусматривает).
+- [x] **P5.4.b sync** (2026-06-03) Закрыт общим sync P5.6.c.
 
 ### P5.5. Поведение / шансы / выжидание
-- [ ] **P5.5.a.** Тумблеры в админке: `always` / `chance_X%` / `wait_then_chance` /
-  `never`. Параметры: `chance_pct`, `wait_human_minutes`.
-- [ ] **P5.5.b.** `wait_then_chance`: ждать живую реакцию `wait_human_minutes`,
-  если её нет — ролл по `chance_pct`.
-- [ ] **P5.5.c.** Кнопки в админке: «принудительно отреагировать на последний
-  мем», «...на последнюю подборку».
-- [ ] **P5.5.d.** Sync.
+- [x] **P5.5.a.** (2026-06-03) Настройки в `admin_config`:
+  `mode` ∈ {always,chance,wait_then_chance,never} (дефолт wait_then_chance),
+  `chance_base_pct`/`chance_max_pct` (дефолт 10/50), `single_response_mode`,
+  master `enabled` + `single_enabled`/`collection_enabled`.
+  `get/set_media_reactions_settings` + `GET/PUT /admin/media-reactions/settings`
+  (`MediaReactionsSettingsIO`). UI-тумблеры — P5.6.
+- [x] **P5.5.b.** (2026-06-03) `wait_then_chance`: серия отложенных проверок
+  `WAIT_TICKS_MIN=(5,10,15,30,45,60,90,120,180,260)` мин. На каждом тике: если
+  уже была живая реакция (`_reacted`) — молча выходим; иначе ролл `tick_chance`
+  (линейный рост base→max по номеру тика) → при успехе реагируем. Режим `chance`
+  идёт той же серией, `always`/`never` — без серии (мгновенно/молчим).
+- [x] **P5.5.c.** (2026-06-03) Backend готов:
+  `POST /admin/media-reactions/force/{kind}` (`routes_admin.py`, `MediaForceOut`)
+  → `react_now` на последнем медиа из `get_recent` (404 если нет недавнего/после
+  рестарта). Кнопки в самом UI — P5.6.
+- [x] **P5.5.d sync** (2026-06-03) Закрыт общим sync P5.6.c.
+
+### P5.6. Backend-консолидация + админ-UI (frontend)
+- [x] **P5.6.a.** (2026-06-03) **Backend-консолидация.** Незакоммиченный handler
+  (`handlers/media_reactions.py`), регистрация роутера в `dispatcher.py` (после
+  bot_reactions, перед chat_capture), `message_reaction` в `allowed_updates`
+  вебхука (`main.py` — иначе TG не шлёт апдейты живых реакций), force-эндпоинт
+  (`routes_admin.py`) и тесты детектора (`test_media_reactions_detector.py`)
+  закоммичены поверх `@42dc7b8`. Прогон pytest: **220 passed** (ядро 12 +
+  детектор 8 поверх 200 из P9). `pick_phrase`/`pick_emoji`/`tick_chance`/
+  `roll_chance` принимают опц. `rng` для детерминированных тестов.
+- [ ] **P5.6.b.** Админ-UI: экран `MediaReactionsScreen` (фронт) — две секции
+  пулов (single/collection фразы + emoji whitelist, редактируемые списки как у
+  loser-шаблонов), тумблеры поведения (mode/chance/single_response/enabled-флаги),
+  две force-кнопки (single/collection). API-обёртки в `api/admin.ts`, Card в
+  `AdminScreen` (рядом с «🤖 Реакции» BotReactionsScreen). Push — пользователь.
+- [ ] **P5.6.c.** Sync backend P5 (`services/media_reactions.py`,
+  `admin_config.py`, `routes_admin.py`, `dispatcher.py`, `main.py`,
+  `handlers/media_reactions.py`, `tests/test_media_reactions*.py`) →
+  `meetup-planner-backend/`, `diff -q` проверка. Push в HF — пользователь
+  (ассистент кладёт в HF-копию).
 
 ---
 

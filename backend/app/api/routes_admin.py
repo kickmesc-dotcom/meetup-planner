@@ -1245,6 +1245,39 @@ async def admin_update_media_settings(
     return MediaReactionsSettingsIO(**saved)
 
 
+class MediaForceOut(BaseModel):
+    ok: bool
+    message_id: int
+
+
+@router.post("/admin/media-reactions/force/{kind}", response_model=MediaForceOut)
+async def admin_media_force_react(
+    kind: str, session: SessionDep, user: CurrentUser
+) -> MediaForceOut:
+    """P5.5: принудительно отреагировать на последний мем/подборку в группе.
+
+    Берёт последнее сохранённое медиа нужного типа из in-memory store handler'а
+    (теряется при рестарте Space — тогда 404 «нет недавнего медиа»). Реагирует
+    немедленно, без серии/проверки шанса. Импорт handler'а ленивый — не тащим
+    aiogram в роуты на импорте модуля."""
+    _ensure_admin(user)
+    if kind not in {"single", "collection"}:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_kind")
+    group_chat_id = get_settings().group_chat_id
+    if not group_chat_id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_group_chat_id")
+
+    from app.bot.handlers.media_reactions import get_recent, react_now
+
+    recent = get_recent(group_chat_id, kind)  # type: ignore[arg-type]
+    if recent is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no_recent_media")
+    message_id, author_name = recent
+    await react_now(kind, group_chat_id, message_id, author_name)  # type: ignore[arg-type]
+    log.info("admin.media_force_react", kind=kind, message_id=message_id, by=user.id)
+    return MediaForceOut(ok=True, message_id=message_id)
+
+
 # --- GHG6 E5.3: счётчики использований фраз (для подписи `(use:N)` в UI) ---
 # Хранятся в admin_config как `{phrase_hash: count}` — формат, удобный для
 # weighted_choice (вес = 1/(1+count)). Фронту удобнее {phrase: count}, поэтому

@@ -103,7 +103,15 @@ async def _set_webhook() -> None:
     await bot.set_webhook(
         url=url,
         secret_token=settings.tg_webhook_secret,
-        allowed_updates=["message", "callback_query", "poll_answer"],
+        # GHG7 P5: "message_reaction" нужен, чтобы детектировать живую реакцию
+        # человека на медиа (режим wait_then_chance). Telegram НЕ шлёт апдейты,
+        # которых нет в списке — добавляем, не заменяя существующие.
+        allowed_updates=[
+            "message",
+            "callback_query",
+            "poll_answer",
+            "message_reaction",
+        ],
         drop_pending_updates=False,
         request_timeout=20,
     )
