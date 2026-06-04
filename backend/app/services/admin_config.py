@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import json
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import AdminConfig
+
+log = structlog.get_logger()
 
 CHUKHAN_WEIGHT_PREFIX = "chukhan_weight:"
 
@@ -538,13 +541,32 @@ async def set_birthdays_greeting_templates(
 async def get_chukhan_reasons(session: AsyncSession) -> list[str]:
     raw = await _get_value(session, CHUKHAN_REASONS_KEY)
     if raw is None:
+        # GHG8 Q5: ключа нет — отдаём дефолт из кода (6 фраз). Это «6 унылых
+        # причин из первого билда», которые видел пользователь: значит его
+        # правка в Neon легла НЕ под этот ключ (или не сохранилась).
+        log.info("chukhan_reasons.fallback_default", reason="key_missing")
         return list(_DEFAULT_CHUKHAN_REASONS)
     try:
         data = json.loads(raw)
         if isinstance(data, list) and all(isinstance(x, str) for x in data):
             return data
-    except (ValueError, TypeError):
-        pass
+        # GHG8 Q5: ключ есть, но не список строк (например объект/число) —
+        # тихий фолбэк раньше маскировал это под «6 старых фраз». Логируем.
+        log.warning(
+            "chukhan_reasons.fallback_default",
+            reason="not_list_of_str",
+            value_type=type(data).__name__,
+        )
+    except (ValueError, TypeError) as exc:
+        # GHG8 Q5: невалидный JSON в admin_config (ручная правка Neon с косяком,
+        # напр. лишняя/недостающая запятая) → фолбэк на дефолт. Это и есть
+        # корень жалобы п.5: правка не применялась, а ошибка глоталась молча.
+        log.warning(
+            "chukhan_reasons.fallback_default",
+            reason="invalid_json",
+            error=str(exc),
+            raw_len=len(raw),
+        )
     return list(_DEFAULT_CHUKHAN_REASONS)
 
 

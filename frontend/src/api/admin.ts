@@ -210,6 +210,25 @@ export const updateChukhanReasons = (reasons: string[]) =>
     body: JSON.stringify({ reasons }),
   });
 
+// --- GHG8 Q5: диагностика + сброс причин чухана к дефолтам ---
+
+export interface ChukhanReasonsRaw {
+  key: string;
+  key_present: boolean;
+  raw_value: string | null;
+  raw_len: number;
+  parse_ok: boolean;
+  parsed_count: number;
+  using_default: boolean;
+  default_count: number;
+}
+
+export const fetchChukhanReasonsRaw = () =>
+  api<ChukhanReasonsRaw>("/api/admin/chukhan-reasons/raw");
+
+export const resetChukhanReasons = () =>
+  api<LoserReasons>("/api/admin/chukhan-reasons/reset", { method: "POST" });
+
 // --- GHG6 E5: use-counts фраз (вес = 1/(1+use_count)) ---
 
 export interface ReasonUseCountsOut {

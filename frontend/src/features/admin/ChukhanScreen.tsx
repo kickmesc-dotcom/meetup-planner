@@ -5,16 +5,18 @@ import {
   clearChukhanReasonUseCounts,
   fetchChukhanHistory,
   fetchChukhanReasons,
+  fetchChukhanReasonsRaw,
   fetchChukhanReasonUseCounts,
   fetchWeights,
   forceReroll,
+  resetChukhanReasons,
   resetWeight,
   updateChukhanReasons,
   updateWeight,
 } from "@/api/admin";
 import type { User } from "@/types";
 import { humanizeApiError } from "@/api/client";
-import { haptic, showAlert } from "@/tg/webapp";
+import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
@@ -86,6 +88,24 @@ export default function ChukhanScreen({ users, onBack }: Props) {
     mutationFn: clearChukhanReasonUseCounts,
     onSuccess: () => {
       haptic("success");
+      qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons-use-counts"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+  // GHG8 Q5: диагностика «почему 6 старых причин» + сброс к дефолтам из кода.
+  const reasonsRaw = useQuery({
+    queryKey: ["admin", "chukhan-reasons-raw"],
+    queryFn: fetchChukhanReasonsRaw,
+  });
+  const resetReasons = useMutation({
+    mutationFn: resetChukhanReasons,
+    onSuccess: () => {
+      haptic("success");
+      qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons"] });
+      qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons-raw"] });
       qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons-use-counts"] });
     },
     onError: (e) => {
@@ -174,6 +194,47 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             ⚠ {String((saveReasons.error as Error)?.message ?? saveReasons.error)}
           </div>
         )}
+
+        {/* GHG8 Q5: диагностика + сброс. Чинит «правлю Neon, а в приложении 6
+            старых фраз» — показывает что реально в admin_config и даёт залить
+            дефолты одной кнопкой (вытесняет кривой/пустой ключ валидным JSON). */}
+        {reasonsRaw.data && (
+          <div className="mt-3 rounded-md bg-tg-bg/40 p-2 text-[11px] text-tg-hint">
+            <div className="font-medium text-tg-text mb-1">🔍 Диагностика</div>
+            {reasonsRaw.data.using_default ? (
+              <div className="text-status-busy">
+                Сейчас активны дефолтные {reasonsRaw.data.default_count} фраз из
+                кода
+                {reasonsRaw.data.key_present
+                  ? !reasonsRaw.data.parse_ok
+                    ? ` — в базе под «${reasonsRaw.data.key}» лежит НЕвалидный JSON (${reasonsRaw.data.raw_len} симв.), он игнорируется.`
+                    : ` — ключ есть, но не распознан как список строк.`
+                  : ` — кастомного списка в базе нет (ключ «${reasonsRaw.data.key}» отсутствует).`}
+              </div>
+            ) : (
+              <div className="text-status-free">
+                Активен кастомный список: {reasonsRaw.data.parsed_count} фраз из
+                базы. ✓
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            haptic("light");
+            void (async () => {
+              const ok = await showConfirm(
+                "Перезаписать причины чухана дефолтами из кода? Текущий список в базе будет заменён.",
+              );
+              if (ok) resetReasons.mutate();
+            })();
+          }}
+          disabled={resetReasons.isPending}
+          className="mt-2 w-full rounded-lg border border-tg-hint/30 py-2 text-xs text-tg-text active:scale-[0.99] disabled:opacity-50"
+        >
+          {resetReasons.isPending ? "Сбрасываю…" : "↩ Сбросить к дефолтам из кода"}
+        </button>
       </section>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">

@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 from datetime import date, datetime, timedelta, timezone
 import structlog
 # Добавлен импорт Response
@@ -1097,6 +1098,11 @@ from app.services.admin_config import (
     get_scheduled_settings as _get_sched,
     set_scheduled_settings as _set_sched,
 )
+from app.services.admin_config import (
+    CHUKHAN_REASONS_KEY as _CHUKHAN_REASONS_KEY,
+    _DEFAULT_CHUKHAN_REASONS,
+    _get_value as _admin_get_value,
+)
 
 
 class ChukhanReasonsOut(BaseModel):
@@ -1105,6 +1111,25 @@ class ChukhanReasonsOut(BaseModel):
 
 class ChukhanReasonsUpdate(BaseModel):
     reasons: list[str] = Field(..., max_length=500)
+
+
+class ChukhanReasonsRaw(BaseModel):
+    """GHG8 Q5: диагностика расхождения «правлю Neon, а в приложении 6 фраз».
+
+    Показывает что РЕАЛЬНО лежит в admin_config под ключом chukhan_reasons.list
+    и как это парсится. Если `key_present=false` — правка пользователя легла не
+    под этот ключ. Если `parsed_count` падает к 6 при непустом `raw_value` —
+    значит JSON невалиден и сработал тихий фолбэк на дефолт (см. логи
+    chukhan_reasons.fallback_default)."""
+
+    key: str
+    key_present: bool
+    raw_value: str | None
+    raw_len: int
+    parse_ok: bool
+    parsed_count: int
+    using_default: bool
+    default_count: int
 
 
 @router.get("/admin/chukhan-reasons", response_model=ChukhanReasonsOut)
@@ -1123,6 +1148,56 @@ async def admin_update_chukhan_reasons(
     await _set_chukhan_reasons(session, body.reasons)
     saved = await _get_chukhan_reasons(session)
     log.info("admin.chukhan_reasons_updated", count=len(saved), by=user.id)
+    return ChukhanReasonsOut(reasons=saved)
+
+
+@router.get("/admin/chukhan-reasons/raw", response_model=ChukhanReasonsRaw)
+async def admin_get_chukhan_reasons_raw(
+    session: SessionDep, user: CurrentUser
+) -> ChukhanReasonsRaw:
+    """GHG8 Q5: диагностика «почему в приложении 6 старых причин чухана».
+
+    Read-only. Возвращает сырое значение ключа из admin_config + результат
+    парсинга, чтобы отличить «ключ не тот» от «невалидный JSON → фолбэк»."""
+    _ensure_admin(user)
+    raw = await _admin_get_value(session, _CHUKHAN_REASONS_KEY)
+    parse_ok = False
+    parsed_count = 0
+    if raw is not None:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list) and all(isinstance(x, str) for x in data):
+                parse_ok = True
+                parsed_count = len(data)
+        except (ValueError, TypeError):
+            parse_ok = False
+    effective = await _get_chukhan_reasons(session)
+    using_default = list(effective) == list(_DEFAULT_CHUKHAN_REASONS)
+    return ChukhanReasonsRaw(
+        key=_CHUKHAN_REASONS_KEY,
+        key_present=raw is not None,
+        raw_value=raw,
+        raw_len=len(raw) if raw is not None else 0,
+        parse_ok=parse_ok,
+        parsed_count=parsed_count,
+        using_default=using_default,
+        default_count=len(_DEFAULT_CHUKHAN_REASONS),
+    )
+
+
+@router.post("/admin/chukhan-reasons/reset", response_model=ChukhanReasonsOut)
+async def admin_reset_chukhan_reasons(
+    session: SessionDep, user: CurrentUser
+) -> ChukhanReasonsOut:
+    """GHG8 Q5: перезаписать причины чухана дефолтами из кода.
+
+    Чинит кейс «в Neon лежит кривой/пустой ключ → тихий фолбэк на 6 старых
+    фраз, правки не применяются». Кнопка в админ-UI пишет валидный JSON через
+    `set_chukhan_reasons`, гарантированно вытесняя битое значение."""
+    _ensure_admin(user)
+    await _set_chukhan_reasons(session, list(_DEFAULT_CHUKHAN_REASONS))
+    saved = await _get_chukhan_reasons(session)
+    log.info("admin.chukhan_reasons_reset", count=len(saved), by=user.id)
     return ChukhanReasonsOut(reasons=saved)
 
 
