@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 from datetime import datetime, time, timedelta, timezone
 
@@ -29,6 +30,22 @@ from app.services.phrase_weights import (
 )
 
 log = structlog.get_logger()
+
+
+# GHG7 P11: таймаут отправки чухан-поста. Раньше обёртки не было вовсе — send
+# полагался только на 30с-таймаут сессии бота (`_IPv4AiohttpSession`), и при
+# throttling канала (РКН, TG отвечает 8–30с) основной пост мог «зависнуть»
+# дольше барабанной дроби и отвалиться, оставив в чате огрызок drumroll'а
+# (прод-инцидент 03.06). Переиспользуем общий env `LOSER_SEND_TIMEOUT`
+# (дефолт 25с < 30с сессии) — зеркало `routes_meetings._loser_send_timeout`.
+def _chukhan_send_timeout() -> float:
+    raw = os.getenv("LOSER_SEND_TIMEOUT")
+    if raw is None:
+        return 25.0
+    try:
+        return float(int(raw))
+    except ValueError:
+        return 25.0
 
 
 def current_week_start(now: datetime | None = None) -> datetime:
@@ -169,18 +186,27 @@ def _format_announcement(user: User, *, reason: str | None = None) -> str:
     )
 
 
-async def _drumroll(bot: Bot, chat_id: int, name: str) -> None:
+async def _drumroll(bot: Bot, chat_id: int, name: str) -> int | None:
     """Серия edit'ов одного сообщения для эффекта барабанной дроби.
 
     Шаги: 💩 → 💩💩💩 → 🥁🥁🥁 → имя. Между шагами 0.6с (Telegram rate-limit
-    edit_message ≈ 1/с на чат, держим запас)."""
+    edit_message ≈ 1/с на чат, держим запас).
+
+    GHG7 P11: возвращает message_id своего сообщения (или None, если даже
+    первый кадр не ушёл). Вызывающий код использует id, чтобы удалить огрызок
+    дроби, если основной пост не доставится (иначе в чате висит «🎉 Имя 🎉» без
+    самого поста — прод-инцидент 03.06)."""
     frames = [
         "💩  …  💩",
         "💩💩  …  💩💩",
         "🥁🥁🥁 <b>чухан недели…</b> 🥁🥁🥁",
         f"🎉 <b>{name}</b> 🎉",
     ]
-    msg = await bot.send_message(chat_id=chat_id, text=frames[0])
+    try:
+        msg = await bot.send_message(chat_id=chat_id, text=frames[0])
+    except TelegramAPIError as exc:
+        log.warning("chukhan.drumroll_start_failed", error=str(exc))
+        return None
     for frame in frames[1:]:
         await asyncio.sleep(0.6)
         try:
@@ -190,6 +216,7 @@ async def _drumroll(bot: Bot, chat_id: int, name: str) -> None:
         except TelegramAPIError as exc:
             log.warning("chukhan.drumroll_frame_failed", error=str(exc))
             break
+    return msg.message_id
 
 
 async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | None:
@@ -222,35 +249,58 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
         reason = weighted_choice(custom_reasons, use_counts) or random.choice(custom_reasons)
         await increment_use_count(session, CHUKHAN_USE_COUNTS_KEY, reason)
     text = _format_announcement(user, reason=reason)
-    # «Барабанная дробь» — best-effort, не блокирует основной пост.
+    # «Барабанная дробь» — best-effort, не блокирует основной пост. Запоминаем
+    # message_id дроби, чтобы удалить огрызок, если основной пост не доедет
+    # (GHG7 P11, прод-инцидент 03.06: в чате остался висеть «🎉 Имя 🎉» без поста).
+    drumroll_msg_id: int | None = None
     try:
-        await _drumroll(bot, settings.group_chat_id, user.display_name)
+        drumroll_msg_id = await _drumroll(bot, settings.group_chat_id, user.display_name)
     except TelegramAPIError as exc:
         log.warning("chukhan.drumroll_failed", error=str(exc))
 
-    # Основной пост. Если TG не примет ни фото, ни текст — откатываем row.
+    send_timeout = _chukhan_send_timeout()
+    # Основной пост. Send'ы обёрнуты в asyncio.wait_for(send_timeout) — GHG7 P11.
     msg = None
     try:
         if user.avatar_url:
             try:
-                msg = await bot.send_photo(
-                    chat_id=settings.group_chat_id,
-                    photo=URLInputFile(user.avatar_url),
-                    caption=text,
-                    disable_notification=False,
+                msg = await asyncio.wait_for(
+                    bot.send_photo(
+                        chat_id=settings.group_chat_id,
+                        photo=URLInputFile(user.avatar_url),
+                        caption=text,
+                        disable_notification=False,
+                    ),
+                    timeout=send_timeout,
                 )
-            except TelegramAPIError as exc:
+            except (TelegramAPIError, asyncio.TimeoutError) as exc:
+                # Фото не ушло — пробуем текстовый фолбэк ниже.
                 log.warning("chukhan.send_photo_failed", error=str(exc))
         if msg is None:
-            msg = await bot.send_message(
-                chat_id=settings.group_chat_id,
-                text=text,
-                disable_notification=False,
+            msg = await asyncio.wait_for(
+                bot.send_message(
+                    chat_id=settings.group_chat_id,
+                    text=text,
+                    disable_notification=False,
+                ),
+                timeout=send_timeout,
             )
     except Exception as exc:  # noqa: BLE001
-        log.warning("chukhan.send_failed_rollback", error=str(exc))
-        if created:
-            await session.rollback()
+        # GHG7 P11: пост не доехал. (1) чистим огрызок барабанной дроби, чтобы в
+        # чате не висел «🎉 Имя 🎉» без поста. (2) НЕ откатываем пик — фиксируем
+        # строку как недоставленную (posted_at остаётся None). Календарь/титул её
+        # не покажут (фильтр posted_at IS NOT NULL в routes_calendar), а ретрай
+        # (retry_undelivered_chukhan / следующий триггер) найдёт ту же строку и
+        # добьёт доставку тем же юзером — не выбирая нового чухана.
+        log.warning("chukhan.send_failed_pick_kept", error=str(exc))
+        if drumroll_msg_id is not None:
+            try:
+                await bot.delete_message(
+                    chat_id=settings.group_chat_id, message_id=drumroll_msg_id
+                )
+            except TelegramAPIError as del_exc:
+                log.warning("chukhan.drumroll_cleanup_failed", error=str(del_exc))
+        await session.commit()
         return None
 
     row.posted_at = datetime.now(timezone.utc)
@@ -286,3 +336,35 @@ async def run_chukhan_job(bot: Bot) -> None:
             await announce_chukhan(bot, session)
         except Exception:  # noqa: BLE001
             log.exception("chukhan.job_failed")
+
+
+async def retry_undelivered_chukhan(bot: Bot) -> bool:
+    """GHG7 P11: дотянуть недоставленного чухана ТЕКУЩЕЙ недели.
+
+    Лечит инцидент №1 (03.06): cron-ролл понедельника мог упасть в окно
+    недоступности канала/Neon и не повториться до след. недели. После P11.1 такой
+    пик не теряется — строка `WeeklyChukhan` остаётся с `posted_at IS NULL`. Эта
+    функция ищет её и зовёт `announce_chukhan`, который добьёт доставку тем же
+    юзером (идемпотентность `pick_chukhan_for_week` по `week_start`).
+
+    Дёшево для Neon: в обычном случае один SELECT, который ничего не находит.
+    Возвращает True, если доставка прошла в этом вызове, иначе False.
+    """
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ws = current_week_start()
+        pending = await session.scalar(
+            select(WeeklyChukhan).where(
+                WeeklyChukhan.week_start == ws,
+                WeeklyChukhan.posted_at.is_(None),
+            )
+        )
+        if pending is None:
+            return False
+        log.info("chukhan.retry_undelivered", week_start=ws.isoformat())
+        try:
+            row = await announce_chukhan(bot, session)
+        except Exception:  # noqa: BLE001
+            log.exception("chukhan.retry_failed")
+            return False
+        return row is not None and row.posted_at is not None

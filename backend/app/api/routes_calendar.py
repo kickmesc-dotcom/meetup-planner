@@ -130,12 +130,16 @@ async def calendar_marks(
     ]
 
     # WeeklyChukhan: с запасом ±7 дней (неделя может «зацепиться» одним концом).
+    # GHG7 P11: только доставленные (posted_at IS NOT NULL). Недоставленный пик
+    # (cron-ролл упал в окно недоступности канала, posted_at=None) держится в БД
+    # для ретрая, но 💩 на календаре до фактической публикации показывать нельзя.
     chukhan_rows = list(
         (
             await session.scalars(
                 select(WeeklyChukhan)
                 .where(WeeklyChukhan.week_start >= from_ - timedelta(days=7))
                 .where(WeeklyChukhan.week_start < to)
+                .where(WeeklyChukhan.posted_at.is_not(None))
                 .order_by(WeeklyChukhan.week_start)
             )
         ).all()
@@ -226,10 +230,15 @@ async def get_titles_current(
         out.worm_user_id = worm.user_id
 
     # 2. Чухан текущей недели — read-only SELECT (НЕ pick_chukhan_for_week,
-    #    которая создала бы запись при отсутствии).
+    #    которая создала бы запись при отсутствии). GHG7 P11: только
+    #    доставленный (posted_at IS NOT NULL) — недоставленный пик висит в БД
+    #    для ретрая, но в шапку звание попадает лишь после реальной публикации.
     ws = current_week_start()
     chukhan = await session.scalar(
-        select(WeeklyChukhan).where(WeeklyChukhan.week_start == ws)
+        select(WeeklyChukhan).where(
+            WeeklyChukhan.week_start == ws,
+            WeeklyChukhan.posted_at.is_not(None),
+        )
     )
     if chukhan is not None:
         out.chukhan_user_id = chukhan.user_id

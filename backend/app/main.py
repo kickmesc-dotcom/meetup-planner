@@ -30,6 +30,7 @@ from app.api import (
 from app.bot import webhook as bot_webhook
 from app.bot.dispatcher import get_bot
 from app.bot.scheduler import shutdown_scheduler, start_scheduler
+from app.services.chukhan import retry_undelivered_chukhan
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.seed import seed_users
@@ -145,6 +146,33 @@ async def _register_telegram_metadata_with_retry() -> None:
         backoff = min(backoff * 2, 160)
     log.error("tg.registration_gave_up")
 
+
+async def _retry_undelivered_chukhan_on_startup() -> None:
+    """GHG7 P11: фоновое дотягивание недоставленного чухана текущей недели.
+
+    Лечит инцидент №1 (03.06): если понедельничный cron-ролл упал в окно
+    недоступности канала/Neon, пик остался в БД с `posted_at IS NULL` (P11.1).
+    Ближайший рестарт/redeploy Space добивает доставку без отдельного частого
+    job (Neon-бюджет). Каждая попытка изолирована try/except, чтобы лагающая
+    сеть HF не уронила startup. Ждём перед первой попыткой — на старте канал и
+    вебхук ещё могут лежать (см. webhook.set_failed в логах).
+    """
+    log = structlog.get_logger()
+    backoff = 30
+    for attempt in range(1, 6):  # ~30+60+120+240+480s ≈ 15 мин окно
+        await asyncio.sleep(backoff)
+        try:
+            delivered = await retry_undelivered_chukhan(get_bot())
+            if delivered:
+                log.info("chukhan.startup_retry_delivered", attempt=attempt)
+                return
+            # Нечего дотягивать (нет недоставленного пика) — выходим тихо.
+            return
+        except Exception as exc:  # noqa: BLE001
+            log.warning("chukhan.startup_retry_failed", attempt=attempt, error=str(exc))
+        backoff = min(backoff * 2, 480)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -171,6 +199,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # сеть HF не блокировала FastAPI startup и первый входящий webhook.
     tg_task = asyncio.create_task(_register_telegram_metadata_with_retry())
 
+    # GHG7 P11: фоновое дотягивание недоставленного чухана текущей недели
+    # (если cron-ролл упал в окно недоступности — см. инцидент 03.06).
+    chukhan_retry_task = asyncio.create_task(_retry_undelivered_chukhan_on_startup())
+
     # 3. Планировщик стартует независимо от состояния сети.
     try:
         start_scheduler(get_bot())
@@ -179,12 +211,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
     yield
 
-    # Завершение: гасим фоновую регистрацию, если она ещё бежит.
-    tg_task.cancel()
-    try:
-        await tg_task
-    except (asyncio.CancelledError, Exception):  # noqa: BLE001
-        pass
+    # Завершение: гасим фоновые задачи, если они ещё бегут.
+    for _task in (tg_task, chukhan_retry_task):
+        _task.cancel()
+        try:
+            await _task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
 
     await shutdown_scheduler()
     bot = get_bot()

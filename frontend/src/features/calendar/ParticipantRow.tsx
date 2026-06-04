@@ -170,24 +170,28 @@ export default function ParticipantRow({
             )}
           </div>
           {/* GHG7 P10.1.b: 💩 «чухан недели» — одиночная иконка СВЕРХУ по центру
-              (макушка), без стека. z-20 выше кружка (z-10 колонки), на фон-плашке
-              bg-tg-bg для читаемости поверх любого аватара. */}
+              (макушка), без стека. z-20 выше кружка (z-10 колонки).
+              GHG7 P11 (инцидент 03.06 #4): убрана фон-плашка `bg-tg-bg` — в тёмной
+              теме она рисовала чёрный непрозрачный круг под эмодзи и убивала
+              визуал. Читаемость поверх любого аватара держим лёгким
+              drop-shadow (как у 💩 в ячейках календаря — там фона нет вообще). */}
           {isChukhan && (
             <span
               aria-label="Чухан недели"
               title="Чухан недели"
-              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
+              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.45))]"
             >
               💩
             </span>
           )}
-          {/* GHG7 P10.1.c: 🪱 «червь-пидор» — СНИЗУ по центру (под аватаркой),
-              та же фон-плашка. Отделён от чухана, чтобы две роли не наезжали. */}
+          {/* GHG7 P10.1.c: 🪱 «червь-пидор» — СНИЗУ по центру (под аватаркой).
+              Отделён от чухана, чтобы две роли не наезжали. Та же правка P11 —
+              без фон-плашки, читаемость через drop-shadow. */}
           {isWorm && (
             <span
               aria-label="Червь-пидор"
               title="Червь-пидор"
-              className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none bg-tg-bg rounded-full px-0.5 shadow-sm"
+              className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.45))]"
             >
               🪱
             </span>

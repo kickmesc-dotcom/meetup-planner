@@ -83,6 +83,7 @@ JOB_BOT_PAUSE_AUTO_RESTORE = "bot_pause_auto_restore"  # GHG6 E11
 JOB_AUTO_ZAEBAL = "auto_zaebal"  # GHG6 E11.3
 JOB_MEETING_FEEDBACK = "meeting_feedback_daily"  # GHG6 N2.3
 JOB_LOSER_OUTBOX_RETRY = "loser_outbox_retry"  # GHG7 P0.2.b.4
+JOB_CHUKHAN_RETRY = "chukhan_retry"  # GHG7 P11 (инцидент 03.06 #1)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -737,6 +738,32 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=300,  # GHG6 H4: 5 мин — таков же шаг ретрая
+    )
+
+    # GHG7 P11 (инцидент 03.06 #1): дотягиваем недоставленного чухана текущей
+    # недели. Cron-ролл понедельника мог упасть в окно недоступности канала/Neon
+    # (см. incidentlog.txt: connection reset, webhook.set_failed timeouts) —
+    # раньше пик при этом откатывался (rollback) и не повторялся до след. недели.
+    # Теперь announce_chukhan при фейле оставляет строку WeeklyChukhan с
+    # posted_at IS NULL, а этот job находит её и добивает доставку тем же юзером
+    # (идемпотентность pick_chukhan_for_week по week_start). Интервал 30 мин —
+    # компромисс с бюджетом Neon: в обычном случае один дешёвый SELECT, который
+    # ничего не находит (48/сутки vs 288 у loser_outbox). misfire_grace 30 мин —
+    # скип-окно не требует секундной точности.
+    async def _chukhan_retry_tick(*, bot: Bot) -> None:
+        from app.services.chukhan import retry_undelivered_chukhan
+
+        await retry_undelivered_chukhan(bot)
+
+    sched.add_job(
+        _logged_job(JOB_CHUKHAN_RETRY, _chukhan_retry_tick),
+        IntervalTrigger(minutes=30, jitter=60),
+        kwargs={"bot": bot},
+        id=JOB_CHUKHAN_RETRY,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=1800,  # 30 мин — скип чухана не критичен к секундам
     )
 
     sched.start()
