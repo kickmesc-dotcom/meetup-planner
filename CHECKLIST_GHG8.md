@@ -127,8 +127,9 @@ HF Space). Frontend пользователь синхронизирует сам
   `not_list_of_str`/`invalid_json`) + `raw_len`/`error`/`value_type` — раньше
   невалидный JSON глотался молча и маскировался под «6 старых фраз». Диагностика
   в проде теперь видна и в логах, и через `/raw`-эндпоинт.
-- [ ] **Q5.c.** Sync (backend → HF-копия). pytest main 220 passed,
-  `npx tsc --noEmit` чист (baseline = 2 ошибки HistoryScreen, игнор).
+- [x] **Q5.c.** (2026-06-05) Sync. Backend → HF-копия (`acc5f3b`), запушено в
+  HF (`8fc7230`) + GitHub/Pages-source (`78f4af4`). pytest main и HF-копия
+  220 passed, `npx tsc --noEmit` чист (baseline = 2 ошибки HistoryScreen, игнор).
 
 ### Q4. Чёрный непрозрачный фон у 💩-шапки (косметика) — ЗАКРЫТО
 - [x] **Q4.a.** (2026-06-04) `ParticipantRow.tsx`: у 💩-бейджа (шапка, `-top-2`)
@@ -137,8 +138,8 @@ HF Space). Frontend пользователь синхронизирует сам
   (как у 💩 в ячейках календаря — там фона нет). Правка была сделана прошлой
   сессией в рабочем дереве (метка «GHG7 P11 инцидент 03.06 #4»), но НЕ
   закоммичена/задеплоена — зафиксирована сейчас.
-- [ ] **Q4.b.** Sync (frontend push — пользователь). Изменён только
-  `ParticipantRow.tsx`.
+- [x] **Q4.b.** (2026-06-05) Sync. `ParticipantRow.tsx` в коммите `3dd3f2a`,
+  запушен в GitHub/Pages-source (`78f4af4`). Pages пересоберётся автоматически.
 
 ### Q7. Реакции на медиа: не летят + история теряется при рестарте
 - [ ] **Q7.a.** По выводу Q-INV-2: короткий таймаут на TG-вызовы внутри
@@ -194,9 +195,10 @@ HF Space). Frontend пользователь синхронизирует сам
   Новая БД-логика (retry/posted_at-фильтр) не покрыта юнит-тестом — async-БД-
   стенда в проекте нет (зафиксированное ограничение); `build_marks` принимает
   уже отфильтрованный список, его контракт прежний и зелёный.
-- [ ] **P11.8 sync** `meetup-planner-main/backend/` → `meetup-planner-backend/`:
-  `chukhan.py`, `scheduler.py`, `main.py`, `routes_calendar.py` (diff -q пуст,
-  HF-копия 220 passed). Коммит + push в HF/GitHub — ниже.
+- [x] **P11.8 sync** (2026-06-05) `meetup-planner-main/backend/` →
+  `meetup-planner-backend/`: `chukhan.py`, `scheduler.py`, `main.py`,
+  `routes_calendar.py`. HF-копия 220 passed. Запушено в HF (`8fc7230`) и в
+  GitHub/Pages-source (`78f4af4`) вместе с Q5/Q-FIX.
   **HF env-напоминание:** P11 использует существующий `LOSER_SEND_TIMEOUT` —
   новых env НЕ требуется.
 
