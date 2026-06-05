@@ -393,5 +393,9 @@ HF Space). Frontend пользователь синхронизирует сам
   свежак почти не попадает). `_FakeSession` в `test_random_phrases_mode.py`
   дополнен `sent_at` (48ч — за карантином, счётчики слов не зависят от весов).
   Сьют: **234 passed** (было 220), tsc чист (baseline HistoryScreen).
-- [ ] **P13.4.a.** Sync backend → HF-копия + push (HF/GitHub). Frontend → Pages.
+- [x] **P13.4.a.** (2026-06-06) Sync: backend P13-файлы уже были скопированы в
+  `meetup-planner-backend/` (diff identical, сьют 234 passed) — закоммичены
+  (`2f4e04e`) и запушены в HF. Main (P13 `4dd8ae1` + merge web-UI README
+  `7305981` → `5cbbbc3`) запушен в GitHub/Pages-source. Frontend (P13.2.c)
+  уезжает тем же push — Pages пересоберётся автоматически.
   **HF env-напоминание:** новых env НЕ требуется (всё в `admin_config`).
