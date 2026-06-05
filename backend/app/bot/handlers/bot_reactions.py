@@ -97,11 +97,23 @@ async def _react(message: Message) -> None:
     вместо `compose_random_phrase` (с 🗣/👤). Reply бота — это голос самого
     бота, а не цитата от другого участника.
     """
+    from app.services.admin_config import (
+        get_random_phrases_recency_quarantine_hours,
+        get_random_phrases_recency_quarantine_weight,
+    )
     from app.services.random_phrases import compose_bot_reply_phrase
 
     sm = get_sessionmaker()
     async with sm() as session:
-        text = await compose_bot_reply_phrase(session)
+        # P13: reply — главный источник «передразнивания» свежих сообщений,
+        # поэтому карантин свежести применяется и здесь.
+        recency_hours = await get_random_phrases_recency_quarantine_hours(session)
+        recency_weight = await get_random_phrases_recency_quarantine_weight(session)
+        text = await compose_bot_reply_phrase(
+            session,
+            recency_quarantine_hours=recency_hours,
+            recency_quarantine_weight=recency_weight,
+        )
     if not text:
         return
     try:

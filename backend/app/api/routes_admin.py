@@ -23,6 +23,8 @@ from app.services.admin_config import (
     get_random_phrases_enabled,
     get_random_phrases_lookback_days,
     get_random_phrases_mode,
+    get_random_phrases_recency_quarantine_hours,
+    get_random_phrases_recency_quarantine_weight,
     get_random_phrases_schedule,
     get_random_phrases_user_chance,
     get_reminders_tick_minutes,
@@ -37,6 +39,8 @@ from app.services.admin_config import (
     set_random_phrases_enabled,
     set_random_phrases_lookback_days,
     set_random_phrases_mode,
+    set_random_phrases_recency_quarantine_hours,
+    set_random_phrases_recency_quarantine_weight,
     set_random_phrases_schedule,
     set_random_phrases_user_chance,
     set_reminders_tick_minutes,
@@ -1647,6 +1651,9 @@ class GeneratorSettingsOut(BaseModel):
     user_chance: float
     # GHG6 L: режим сбора фраз — отдельные слова / целые фразы / смесь.
     mode: str = Field("mix", pattern="^(words|phrases|mix)$")
+    # P13: карантин свежести — сообщения младше N часов почти не цитируются.
+    recency_quarantine_hours: float = Field(18.0, ge=0.0, le=168.0)
+    recency_quarantine_weight: float = Field(0.05, ge=0.0, le=1.0)
 
 
 class GeneratorSettingsUpdate(BaseModel):
@@ -1657,6 +1664,9 @@ class GeneratorSettingsUpdate(BaseModel):
     user_chance: float = Field(..., ge=0.0, le=1.0)
     # GHG6 L: дефолт 'mix' — старые клиенты не присылают mode.
     mode: str = Field("mix", pattern="^(words|phrases|mix)$")
+    # P13: дефолты — старые клиенты не присылают эти поля.
+    recency_quarantine_hours: float = Field(18.0, ge=0.0, le=168.0)
+    recency_quarantine_weight: float = Field(0.05, ge=0.0, le=1.0)
 
 
 @router.get("/admin/random-phrases/generator", response_model=GeneratorSettingsOut)
@@ -1670,6 +1680,8 @@ async def get_rp_generator(session: SessionDep, user: CurrentUser) -> GeneratorS
         collective_chance=await get_random_phrases_collective_chance(session),
         user_chance=await get_random_phrases_user_chance(session),
         mode=await get_random_phrases_mode(session),
+        recency_quarantine_hours=await get_random_phrases_recency_quarantine_hours(session),
+        recency_quarantine_weight=await get_random_phrases_recency_quarantine_weight(session),
     )
 
 
@@ -1683,6 +1695,12 @@ async def update_rp_generator(
     await set_random_phrases_collective_chance(session, body.collective_chance)
     await set_random_phrases_user_chance(session, body.user_chance)
     await set_random_phrases_mode(session, body.mode)
+    await set_random_phrases_recency_quarantine_hours(
+        session, body.recency_quarantine_hours
+    )
+    await set_random_phrases_recency_quarantine_weight(
+        session, body.recency_quarantine_weight
+    )
     log.info("admin.rp_generator_updated", body=body.model_dump(), by=user.id)
     return body
 

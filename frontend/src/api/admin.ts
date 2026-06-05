@@ -367,6 +367,10 @@ export interface RPGenerator {
   collective_chance: number;
   user_chance: number;
   mode: RandomPhrasesMode;
+  // P13: карантин свежести — сообщения младше N часов почти не цитируются
+  // (вес 0..1 вместо 1.0). Убирает «передразнивание» последних сообщений.
+  recency_quarantine_hours: number;
+  recency_quarantine_weight: number;
 }
 
 export const fetchRPGenerator = () =>

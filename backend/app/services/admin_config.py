@@ -26,6 +26,9 @@ RANDOM_PHRASES_COUNT_MIN_KEY = "random_phrases.count_min"  # A4: диапазо�
 RANDOM_PHRASES_COUNT_MAX_KEY = "random_phrases.count_max"
 RANDOM_PHRASES_LOOKBACK_DAYS_KEY = "random_phrases.lookback_days"
 RANDOM_PHRASES_COLLECTIVE_CHANCE_KEY = "random_phrases.collective_chance"
+# P13: «порог + плато» — карантин свежих сообщений при выборе цитат.
+RANDOM_PHRASES_RECENCY_HOURS_KEY = "random_phrases.recency_quarantine_hours"
+RANDOM_PHRASES_RECENCY_WEIGHT_KEY = "random_phrases.recency_quarantine_weight"
 RANDOM_PHRASES_USER_CHANCE_KEY = "random_phrases.user_chance"
 # A3: расписание автопостинга
 RANDOM_PHRASES_SCHEDULE_MODE_KEY = "random_phrases.schedule_mode"   # daily_n|weekly_n|fixed_times|random_interval
@@ -324,6 +327,33 @@ async def get_random_phrases_collective_chance(session: AsyncSession) -> float:
 async def set_random_phrases_collective_chance(session: AsyncSession, chance: float) -> None:
     await _set_value(
         session, RANDOM_PHRASES_COLLECTIVE_CHANCE_KEY, str(max(0.0, min(1.0, chance)))
+    )
+
+
+async def get_random_phrases_recency_quarantine_hours(session: AsyncSession) -> float:
+    """P13: возраст (часы), младше которого сообщение почти не цитируется.
+    0 = карантин выключен (все веса равны). Дефолт 18ч («отстояться сутки»)."""
+    return max(0.0, min(168.0, await _get_float(session, RANDOM_PHRASES_RECENCY_HOURS_KEY, 18.0)))
+
+
+async def set_random_phrases_recency_quarantine_hours(
+    session: AsyncSession, hours: float
+) -> None:
+    await _set_value(
+        session, RANDOM_PHRASES_RECENCY_HOURS_KEY, str(max(0.0, min(168.0, hours)))
+    )
+
+
+async def get_random_phrases_recency_quarantine_weight(session: AsyncSession) -> float:
+    """P13: вес «свежего» чанка (0..1). 1.0 = веса фактически выключены."""
+    return max(0.0, min(1.0, await _get_float(session, RANDOM_PHRASES_RECENCY_WEIGHT_KEY, 0.05)))
+
+
+async def set_random_phrases_recency_quarantine_weight(
+    session: AsyncSession, weight: float
+) -> None:
+    await _set_value(
+        session, RANDOM_PHRASES_RECENCY_WEIGHT_KEY, str(max(0.0, min(1.0, weight)))
     )
 
 

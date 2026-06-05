@@ -360,28 +360,38 @@ HF Space). Frontend пользователь синхронизирует сам
   `random_phrases.recency_quarantine_weight` + контролы в `RandomPhrasesScreen`.
 
 ### Подэтапы
-- [ ] **P13.1.a.** `random_phrases.py`: при сборке пула сохранять возраст каждого
-  чанка/слова (наследуется от `sent_at` его сообщения). Сейчас `rows` уже
-  содержит строки; добавить `ChatMessage.sent_at` в SELECT и протащить возраст
-  в структуру пула (чанк → его `age_hours`).
-- [ ] **P13.1.b.** Хелпер `_recency_weight(age_hours, *, quarantine_hours,
-  quarantine_weight) -> float`: `quarantine_weight if age < quarantine_hours
-  else 1.0`. Чистая функция → покрывается юнит-тестом (async-стенд не нужен).
-- [ ] **P13.1.c.** Заменить равновесные `random.choice(pool)` на
-  `random.choices(pool, weights=[_recency_weight(...) ...], k=...)` в обеих
-  ветках `compose_random_phrase` (collective + per-user) и в
-  `compose_bot_reply_phrase`/`format_bot_reply`. Граничный случай: если ВСЕ
-  веса околонулевые (весь пул свежий) — фолбэк на равновесный выбор, чтобы не
-  делить на ноль и не отдавать пустоту.
-- [ ] **P13.2.a.** `admin_config.py`: геттеры
-  `get_random_phrases_recency_*` (hours дефолт 18, weight дефолт 0.05) по
-  образцу существующих `get_random_phrases_*`. Валидация диапазонов
-  (hours 0..168, weight 0.0..1.0).
-- [ ] **P13.2.b.** `routes_admin.py`: расширить settings-эндпоинт рандом-фраз
-  (или новый) на чтение/запись двух ключей.
-- [ ] **P13.2.c.** Frontend `RandomPhrasesScreen` (ScheduleBody): два контрола —
-  «карантин свежести (ч)» и «вес свежих (0–1)» + `admin.ts` IO-типы.
-- [ ] **P13.3.a.** Тесты `_recency_weight` (порог, плато, границы) + «весь пул
-  свежий → фолбэк». Прогон сьюта.
+- [x] **P13.1.a.** (2026-06-05) `random_phrases.py`: `ChatMessage.sent_at`
+  добавлен в SELECT обоих композеров (основной + fallback-100); пул теперь
+  `list[tuple[str, float]]` — каждый чанк/слово несёт `age_hours` своего
+  сообщения. `by_user`/`all_units` перестроены на кортежи.
+- [x] **P13.1.b.** (2026-06-05) Хелпер `_recency_weight` («порог + плато»):
+  `quarantine_weight if age < quarantine_hours else 1.0`. Константы
+  `RECENCY_QUARANTINE_HOURS_DEFAULT=18.0` / `..._WEIGHT_DEFAULT=0.05`.
+  Отрицательный возраст (рассинхрон часов) = свежее.
+- [x] **P13.1.c.** (2026-06-05) `_weighted_sample(pool, k)` —
+  `random.choices(texts, weights=...)`, фолбэк на равновесный при суммарном
+  весе 0. Включён в обе ветки `compose_random_phrase` (collective + per-user),
+  в `format_bot_reply` (новый опц. параметр `aged_chunks` — без него прежний
+  равновесный путь, обратная совместимость) и `compose_bot_reply_phrase`.
+  `bot_reactions._react` читает настройки и передаёт их в reply-композер.
+- [x] **P13.2.a.** (2026-06-05) `admin_config.py`: ключи
+  `random_phrases.recency_quarantine_hours/weight`, геттеры/сеттеры с клампом
+  (hours 0..168, weight 0..1), дефолты 18.0/0.05. `run_random_phrases_job`
+  читает и логирует оба значения.
+- [x] **P13.2.b.** (2026-06-05) `routes_admin.py`: `GeneratorSettingsOut/Update`
+  расширены полями `recency_quarantine_hours/weight` (с дефолтами — старые
+  клиенты не присылают), GET/PUT `/admin/random-phrases/generator` читает/пишет.
+- [x] **P13.2.c.** (2026-06-05) Frontend: `RPGenerator` (admin.ts) + секция
+  «🕰 Карантин свежести» в `RandomPhrasesGeneratorScreen` (`GeneratorBody`,
+  встраивается в RandomPhrasesScreen): NumField часов + PercentSlider веса,
+  dirty-учёт, `?? 18`/`?? 0.05` для старых серверов. NaN-guard: `|| 0` нельзя,
+  0 часов валиден (карантин выключен).
+- [x] **P13.3.a.** (2026-06-05) `tests/test_recency_weight.py` — 14 тестов:
+  порог/плато/границы/отрицательный возраст; `_weighted_sample` (пустой пул,
+  k=0, статистика >85% старых, весь пул свежий, нулевой суммарный вес →
+  фолбэк); `format_bot_reply` (без aged_chunks — прежний путь; с aged_chunks —
+  свежак почти не попадает). `_FakeSession` в `test_random_phrases_mode.py`
+  дополнен `sent_at` (48ч — за карантином, счётчики слов не зависят от весов).
+  Сьют: **234 passed** (было 220), tsc чист (baseline HistoryScreen).
 - [ ] **P13.4.a.** Sync backend → HF-копия + push (HF/GitHub). Frontend → Pages.
   **HF env-напоминание:** новых env НЕ требуется (всё в `admin_config`).

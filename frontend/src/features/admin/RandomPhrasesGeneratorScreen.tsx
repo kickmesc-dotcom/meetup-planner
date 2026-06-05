@@ -86,6 +86,13 @@ function GeneratorForm({
   const [uchance, setUchance] = useState(Math.round(initial.user_chance * 100));
   // GHG6 L: режим сбора. Старые серверы возвращают undefined → подставляем 'mix'.
   const [mode, setMode] = useState<RandomPhrasesMode>(initial.mode ?? "mix");
+  // P13: карантин свежести. Старые серверы возвращают undefined → дефолты.
+  const [recHours, setRecHours] = useState(
+    String(initial.recency_quarantine_hours ?? 18),
+  );
+  const [recWeight, setRecWeight] = useState(
+    Math.round((initial.recency_quarantine_weight ?? 0.05) * 100),
+  );
 
   useEffect(() => {
     setCmin(String(initial.count_min));
@@ -94,11 +101,16 @@ function GeneratorForm({
     setColl(Math.round(initial.collective_chance * 100));
     setUchance(Math.round(initial.user_chance * 100));
     setMode(initial.mode ?? "mix");
+    setRecHours(String(initial.recency_quarantine_hours ?? 18));
+    setRecWeight(Math.round((initial.recency_quarantine_weight ?? 0.05) * 100));
   }, [initial]);
 
   const cminN = clamp(parseInt(cmin, 10) || 2, 2, 6);
   const cmaxN = clamp(parseInt(cmax, 10) || 6, 2, 6);
   const lookbackN = clamp(parseInt(lookback, 10) || 7, 1, 365);
+  // P13: «|| 0» нельзя — 0 валиден (карантин выключен). parseInt('') = NaN.
+  const recHoursParsed = parseInt(recHours, 10);
+  const recHoursN = clamp(Number.isNaN(recHoursParsed) ? 18 : recHoursParsed, 0, 168);
 
   const body: RPGenerator = {
     count_min: Math.min(cminN, cmaxN),
@@ -107,6 +119,8 @@ function GeneratorForm({
     collective_chance: coll / 100,
     user_chance: uchance / 100,
     mode,
+    recency_quarantine_hours: recHoursN,
+    recency_quarantine_weight: recWeight / 100,
   };
 
   const dirty =
@@ -115,7 +129,11 @@ function GeneratorForm({
     body.lookback_days !== initial.lookback_days ||
     Math.abs(body.collective_chance - initial.collective_chance) > 0.005 ||
     Math.abs(body.user_chance - initial.user_chance) > 0.005 ||
-    body.mode !== initial.mode;
+    body.mode !== initial.mode ||
+    body.recency_quarantine_hours !== (initial.recency_quarantine_hours ?? 18) ||
+    Math.abs(
+      body.recency_quarantine_weight - (initial.recency_quarantine_weight ?? 0.05),
+    ) > 0.005;
 
   // GHG6 L: лейблы count_min/count_max и хинт зависят от mode.
   const unitLabel =
@@ -214,6 +232,29 @@ function GeneratorForm({
             100% = job постит каждый раз. Понизь, чтобы было реже.
           </div>
           <PercentSlider value={uchance} onChange={setUchance} />
+        </div>
+
+        {/* P13: карантин свежести — чтобы бот не «передразнивал» последние
+            сообщения. Свежие (младше N часов) почти не цитируются, старые
+            «настоявшиеся» — равновесно. Применяется и к автопосту, и к
+            reply-реакциям на @mention. */}
+        <div>
+          <div className="text-base font-semibold mb-1">🕰 Карантин свежести</div>
+          <div className="text-xs text-tg-hint mb-2">
+            Сообщения младше N часов почти не попадают в цитаты — бот перестаёт
+            «передразнивать» последние сообщения. 0 часов = карантин выключен.
+          </div>
+          <NumField
+            label="карантин, часов (0..168)"
+            value={recHours}
+            onChange={setRecHours}
+            hint={`= ${recHoursN}ч`}
+          />
+          <div className="text-xs text-tg-hint mt-2 mb-2">
+            Вес свежих: 0% — свежее не цитируется вообще, 100% — карантин
+            фактически выключен (все сообщения равны).
+          </div>
+          <PercentSlider value={recWeight} onChange={setRecWeight} />
         </div>
       </section>
 

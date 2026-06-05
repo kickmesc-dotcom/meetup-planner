@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import random
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from app.services.random_phrases import (
@@ -80,22 +81,32 @@ class _FakeSession:
     """Минимальный async-стенд под compose_random_phrase.
 
     Функция делает один `session.execute(select(ChatMessage.user_id,
-    ChatMessage.text).where(...))` (или fallback на последние 100), затем
-    `session.get(User, uid)`. Мы отдаём готовые `(uid, text)`-пары и
+    ChatMessage.text, ChatMessage.sent_at).where(...))` (или fallback на
+    последние 100), затем `session.get(User, uid)`. Мы отдаём готовые
+    `(uid, text)`-пары (sent_at дополняется автоматически: 48ч назад — за
+    пределами P13-карантина, чтобы счётчики слов не зависели от весов) и
     None для User (fallback на «Кто-то из наших»).
     """
 
-    def __init__(self, rows: list[tuple[int, str]]) -> None:
+    def __init__(
+        self,
+        rows: list[tuple[int, str]],
+        *,
+        sent_at: datetime | None = None,
+    ) -> None:
         self._rows = rows
+        self._sent_at = sent_at or (
+            datetime.now(timezone.utc) - timedelta(hours=48)
+        )
 
     async def execute(self, stmt: Any) -> Any:  # noqa: ARG002 — игнорим stmt
-        rows = list(self._rows)
+        rows = [(uid, text, self._sent_at) for uid, text in self._rows]
 
         class _Result:
-            def __init__(self, r: list[tuple[int, str]]) -> None:
+            def __init__(self, r: list[tuple[int, str, datetime]]) -> None:
                 self._r = r
 
-            def all(self) -> list[tuple[int, str]]:
+            def all(self) -> list[tuple[int, str, datetime]]:
                 return self._r
 
         return _Result(rows)
