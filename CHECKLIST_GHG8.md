@@ -97,13 +97,16 @@ HF Space). Frontend пользователь синхронизирует сам
   старых». Правка `chukhan.py` (дефолт) by design не применяется при наличии
   валидного ключа. У лоха правки «появились», т.к. он правил через UI
   (`set_loser_reasons` → валидный JSON). Follow-up: Q5.a/Q5.b закрыты ниже.
-- [ ] **Q-INV-2 (Q7). Медиа-реакция: handler виснет 32с, _recent эфемерен.**
-  Подтвердить по коду: (а) `on_media`/серия тиков шлёт TG-вызовы без
-  отдельного короткого таймаута → виснет на ~30с сессии (см. memefail
-  Duration ~32с); (б) `_recent`/`_reacted` — in-memory, обнуляются при
-  рестарте Space → force «не найдено». Решить, переносить ли «последнее медиа»
-  в БД/persist или ограничиться коротким таймаутом + понятным сообщением.
-  **Вывод + follow-up в Q7.**
+- [x] **Q-INV-2 (Q7). Медиа-реакция: handler виснет 32с, _recent эфемерен.**
+  (2026-06-06) Подтверждено по коду: (а) `_send_emoji_reaction`/
+  `_send_reply_phrase`/`_bot_id().me()` в `handlers/media_reactions.py` шли БЕЗ
+  `asyncio.wait_for` — висели на 30с-таймауте сессии (`_IPv4AiohttpSession`,
+  `dispatcher.py:253`), а `on_media`/`on_reaction` зовутся синхронно из
+  `dp.feed_update` → webhook блокировался ~32с (memefail Duration). При
+  таймауте внутри make_request прокси-ретраи были, но 3 попытки × 30с только
+  усугубляли. (б) `_recent`/`_reacted` — module-level in-memory
+  (`media_reactions.py:79-81`), рестарт Space обнуляет → force 404. Решение:
+  и короткий таймаут, И persist (оба дёшевы). Follow-up: Q7.a–d закрыты ниже.
 - [x] **Q-INV-3 (Q2). Обрыв второй части поста чухана.** (2026-06-04) Разрешён:
   «две части» = `_drumroll` (барабанная дробь, серия edit'ов, заканчивается
   «🎉 Имя 🎉») + основной пост. Основной пост виснул на таймауте сессии (нет
@@ -142,17 +145,30 @@ HF Space). Frontend пользователь синхронизирует сам
   запушен в GitHub/Pages-source (`78f4af4`). Pages пересоберётся автоматически.
 
 ### Q7. Реакции на медиа: не летят + история теряется при рестарте
-- [ ] **Q7.a.** По выводу Q-INV-2: короткий таймаут на TG-вызовы внутри
-  media-handler (по аналогии с `LOSER_SEND_TIMEOUT`), чтобы не виснуть 32с и
-  не ловить `webhook.handler_error`. Реакция best-effort — фейл логируется,
-  не валит апдейт.
-- [ ] **Q7.b.** Persist «последнего медиа» для force-кнопок (чтобы переживало
-  рестарт Space): лёгкая запись в `admin_config` или мини-таблица (взвесить
-  нагрузку на Neon — паттерн P5: лучше без миграции). Либо явное сообщение в
-  UI «нет недавнего медиа (память сбрасывается при рестарте бота)».
-- [ ] **Q7.c.** Force-эндпоинт: при пустом `_recent` отдавать понятный текст
-  вместо «не найдено».
-- [ ] **Q7.d.** Тесты + sync.
+- [x] **Q7.a.** (2026-06-06) `handlers/media_reactions.py`: `_media_send_timeout()`
+  (env `LOSER_SEND_TIMEOUT`, дефолт 25с < 30с сессии — зеркало chukhan/
+  routes_meetings); `set_message_reaction`, reply-`send_message` и `me()` в
+  `_bot_id` обёрнуты в `asyncio.wait_for`. Фейл логируется (`emoji_failed`/
+  `reply_failed`), апдейт не валится (try/except были и раньше — best-effort).
+- [x] **Q7.b.** (2026-06-06) Persist в `admin_config` БЕЗ миграции (паттерн P5):
+  ключ `media_reactions.recent_media` (JSON `{chat_id: {kind, message_id,
+  author_name}}`, `admin_config.py`). `services/media_reactions.py`:
+  `parse_recent_media` (чистый парсер, кривой JSON → `{}`),
+  `get_recent_media_persisted`, `save_recent_media` (UPSERT одной строки).
+  `_schedule_reaction` пишет best-effort (сбой Neon не ломает реакцию,
+  лог `persist_recent_failed`). Нагрузка ≈ chat_capture (1 UPSERT на медиа).
+- [x] **Q7.c.** (2026-06-06) Force-эндпоинт (`routes_admin.py`): при промахе
+  in-memory — фолбэк на `get_recent_media_persisted`; если нет нигде — 404
+  `no_recent_media`, который фронт (`client.ts:humanizeApiError`) теперь
+  переводит в «Бот ещё не видел ни одного мема такого типа…» вместо
+  «Не найдено».
+- [x] **Q7.d.** (2026-06-06) Тесты: `tests/test_media_recent_persist.py` — 13
+  новых (env-таймаут по паттерну test_loser_send_timeout_env; парсер: None/
+  мусор/мульти-чат/частично-валидный/roundtrip формата save). Сьют **247
+  passed** (было 234), tsc чист (baseline HistoryScreen). Sync: backend →
+  HF-копия (247 passed), HF push `a4c74fa`; main + frontend (client.ts) →
+  GitHub/Pages. **HF env-напоминание:** новых env НЕ требуется (переиспользован
+  `LOSER_SEND_TIMEOUT`, persist — в `admin_config`).
 
 ### Q2 + Q1. Обрыв поста чухана / скип чухана — закрыто блоком P11
 См. **P11** ниже. Q-INV-3 разрешён: «две части» = барабанная дробь

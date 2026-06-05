@@ -1335,8 +1335,10 @@ async def admin_media_force_react(
 ) -> MediaForceOut:
     """P5.5: принудительно отреагировать на последний мем/подборку в группе.
 
-    Берёт последнее сохранённое медиа нужного типа из in-memory store handler'а
-    (теряется при рестарте Space — тогда 404 «нет недавнего медиа»). Реагирует
+    Берёт последнее сохранённое медиа нужного типа: сперва in-memory store
+    handler'а, при промахе — persist из admin_config (GHG8 Q7.b: in-memory
+    обнуляется при рестарте Space, БД-копия переживает). Если нет нигде —
+    404 `no_recent_media` (Q7.c: фронт показывает человечный текст). Реагирует
     немедленно, без серии/проверки шанса. Импорт handler'а ленивый — не тащим
     aiogram в роуты на импорте модуля."""
     _ensure_admin(user)
@@ -1347,8 +1349,12 @@ async def admin_media_force_react(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_group_chat_id")
 
     from app.bot.handlers.media_reactions import get_recent, react_now
+    from app.services.media_reactions import get_recent_media_persisted
 
     recent = get_recent(group_chat_id, kind)  # type: ignore[arg-type]
+    if recent is None:
+        # Q7.b: фолбэк на персистнутую запись (рестарт Space стёр in-memory).
+        recent = await get_recent_media_persisted(session, group_chat_id, kind)  # type: ignore[arg-type]
     if recent is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no_recent_media")
     message_id, author_name = recent

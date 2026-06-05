@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.admin_config import (
     MEDIA_COLLECTION_PHRASES_KEY,
     MEDIA_EMOJI_WHITELIST_KEY,
+    MEDIA_RECENT_MEDIA_KEY,
     MEDIA_SINGLE_PHRASES_KEY,
     _get_value,
     _set_value,
@@ -176,6 +177,74 @@ async def set_collection_phrases(session: AsyncSession, phrases: list[str]) -> N
     await _set_value(
         session, MEDIA_COLLECTION_PHRASES_KEY,
         json.dumps(_clean_list(phrases), ensure_ascii=False),
+    )
+
+
+# --- GHG8 Q7.b: persist «последнего медиа» для force-кнопок ---
+# In-memory `_recent` хендлера обнуляется при рестарте Space — force-кнопки
+# отвечали «не найдено», хотя мем в чате был. Дублируем последнюю запись в
+# admin_config (один JSON-ключ на бот, UPSERT при каждом медиа).
+
+def parse_recent_media(raw: str | None) -> dict[int, tuple[str, int, str]]:
+    """Чистый парсер значения MEDIA_RECENT_MEDIA_KEY → {chat_id: (kind,
+    message_id, author_name)}. Невалидный JSON/структура → пустой dict
+    (force-кнопка честно скажет «нет недавнего медиа», не упадёт)."""
+    if raw is None:
+        return {}
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    out: dict[int, tuple[str, int, str]] = {}
+    for chat_id_str, rec in data.items():
+        try:
+            chat_id = int(chat_id_str)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(rec, dict):
+            continue
+        kind = rec.get("kind")
+        message_id = rec.get("message_id")
+        author_name = rec.get("author_name", "")
+        if kind not in ("single", "collection") or not isinstance(message_id, int):
+            continue
+        if not isinstance(author_name, str):
+            author_name = ""
+        out[chat_id] = (kind, message_id, author_name)
+    return out
+
+
+async def get_recent_media_persisted(
+    session: AsyncSession, chat_id: int, kind: MediaKind
+) -> tuple[int, str] | None:
+    """Последнее персистнутое медиа нужного типа: (message_id, author_name)
+    или None. Зеркало контракта handlers.get_recent, но из БД."""
+    stored = parse_recent_media(await _get_value(session, MEDIA_RECENT_MEDIA_KEY))
+    rec = stored.get(chat_id)
+    if rec is None or rec[0] != kind:
+        return None
+    return rec[1], rec[2]
+
+
+async def save_recent_media(
+    session: AsyncSession,
+    chat_id: int,
+    kind: MediaKind,
+    message_id: int,
+    author_name: str,
+) -> None:
+    """UPSERT записи «последнего медиа» чата в общий JSON-ключ. Записи других
+    чатов сохраняются (на практике чат один — group_chat_id)."""
+    stored = parse_recent_media(await _get_value(session, MEDIA_RECENT_MEDIA_KEY))
+    stored[chat_id] = (kind, message_id, author_name)
+    payload = {
+        str(cid): {"kind": k, "message_id": mid, "author_name": name}
+        for cid, (k, mid, name) in stored.items()
+    }
+    await _set_value(
+        session, MEDIA_RECENT_MEDIA_KEY, json.dumps(payload, ensure_ascii=False)
     )
 
 

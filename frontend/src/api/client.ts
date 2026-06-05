@@ -36,6 +36,9 @@ export function humanizeApiError(e: unknown): string {
     if (d === "telegram_send_failed") {
       return "Не получилось отправить сообщение в чат. Попробуй ещё раз.";
     }
+    if (d === "no_recent_media") {
+      return "Бот ещё не видел ни одного мема такого типа — нужно, чтобы кто-то скинул медиа в чат после запуска бота.";
+    }
     if (e.status === 502 || e.status === 503 || e.status === 504) {
       return "Сервис временно недоступен. Попробуй через минуту.";
     }

@@ -15,8 +15,16 @@
 - `_recent` — последний одиночный мем / последняя подборка на чат (для
   принудительных кнопок в админке, P5.5);
 - `_albums` — буферы собираемых сейчас альбомов (debounce по `media_group_id`).
-При рестарте Space состояние теряется — это приемлемо (эфемерные серии и
-«последний мем» не критичны к перезапуску).
+При рестарте Space серии/`_reacted` теряются — приемлемо (эфемерны). А вот
+«последний мем» с GHG8 Q7.b дублируется в `admin_config` (best-effort, см.
+`save_recent_media`), чтобы force-кнопки переживали рестарт: in-memory store
+остаётся быстрым путём, БД — фолбэк в force-эндпоинте.
+
+GHG8 Q7.a: все TG-вызовы здесь обёрнуты в `asyncio.wait_for` с общим env
+`LOSER_SEND_TIMEOUT` (дефолт 25с < 30с сессии, зеркало chukhan/routes_meetings).
+Раньше обёртки не было — при throttling канала (РКН) send/`me()` висели на
+30с-таймауте сессии, и webhook-хендлер блокировался на ~32с
+(memefail: `Update ... is not handled. Duration ~31-32 сек`).
 
 ВАЖНО (пропагация, ср. GHG7 P0.3.c): media-хэндлер матчит контент-типы, НЕ
 `F.text`, поэтому с `bot_reactions` (F.text → SkipHandler) и `chat_capture`
@@ -26,6 +34,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 from dataclasses import dataclass, field
 from typing import Literal
@@ -47,6 +56,7 @@ from app.services.media_reactions import (
     pick_emoji,
     pick_phrase,
     roll_chance,
+    save_recent_media,
     substitute_username,
     tick_chance,
 )
@@ -98,17 +108,35 @@ _albums: dict[str, _AlbumBuf] = {}
 
 # --- helpers -----------------------------------------------------------------
 
+# GHG8 Q7.a: таймаут TG-вызовов медиа-подсистемы. Без обёртки send/me() висели
+# на 30с-таймауте сессии бота при throttling канала, блокируя webhook-хендлер
+# на ~32с (memefail: `Update ... is not handled. Duration ~31-32 сек`).
+# Переиспользуем общий env LOSER_SEND_TIMEOUT (дефолт 25с < 30с сессии) —
+# зеркало chukhan._chukhan_send_timeout / routes_meetings._loser_send_timeout.
+def _media_send_timeout() -> float:
+    raw = os.getenv("LOSER_SEND_TIMEOUT")
+    if raw is None:
+        return 25.0
+    try:
+        return float(int(raw))
+    except ValueError:
+        return 25.0
+
+
 _BOT_ID: int | None = None
 
 
 async def _bot_id() -> int:
     """Кэш id бота (как в bot_reactions). Нужен, чтобы отличать живую реакцию
-    человека от реакции самого бота."""
+    человека от реакции самого бота. Обёрнут в таймаут (Q7.a): зов происходит
+    внутри on_reaction-хендлера — зависший me() блокировал бы webhook."""
     global _BOT_ID
     if _BOT_ID is None:
         from app.bot.dispatcher import get_bot
 
-        _BOT_ID = (await get_bot().me()).id
+        _BOT_ID = (
+            await asyncio.wait_for(get_bot().me(), timeout=_media_send_timeout())
+        ).id
     return _BOT_ID
 
 
@@ -144,10 +172,13 @@ async def _send_emoji_reaction(chat_id: int, message_id: int, emoji: str) -> boo
     from app.bot.dispatcher import get_bot
 
     try:
-        await get_bot().set_message_reaction(
-            chat_id=chat_id,
-            message_id=message_id,
-            reaction=[ReactionTypeEmoji(emoji=emoji)],
+        await asyncio.wait_for(
+            get_bot().set_message_reaction(
+                chat_id=chat_id,
+                message_id=message_id,
+                reaction=[ReactionTypeEmoji(emoji=emoji)],
+            ),
+            timeout=_media_send_timeout(),
         )
         return True
     except Exception as exc:  # noqa: BLE001
@@ -160,8 +191,11 @@ async def _send_reply_phrase(chat_id: int, message_id: int, text: str) -> bool:
     from app.bot.dispatcher import get_bot
 
     try:
-        await get_bot().send_message(
-            chat_id=chat_id, text=text, reply_to_message_id=message_id
+        await asyncio.wait_for(
+            get_bot().send_message(
+                chat_id=chat_id, text=text, reply_to_message_id=message_id
+            ),
+            timeout=_media_send_timeout(),
         )
         return True
     except Exception as exc:  # noqa: BLE001
@@ -291,8 +325,15 @@ async def _schedule_reaction(
     if kind == "collection" and not settings["collection_enabled"]:
         return
 
-    # Запомним как «последнее медиа» для force-кнопок.
+    # Запомним как «последнее медиа» для force-кнопок: in-memory (быстрый путь)
+    # + persist в admin_config (Q7.b — переживает рестарт Space). Persist
+    # best-effort: сбой Neon не должен ломать реакцию на сам мем.
     _recent[chat_id] = (kind, message_id, author_name)
+    try:
+        async with sm() as session:
+            await save_recent_media(session, chat_id, kind, message_id, author_name)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("media_reactions.persist_recent_failed", error=str(exc))
 
     mode = settings["mode"]
     if mode == "never":

@@ -873,6 +873,12 @@ async def set_bot_reactions_settings(
 MEDIA_SINGLE_PHRASES_KEY = "media_reactions.single_phrases"
 MEDIA_COLLECTION_PHRASES_KEY = "media_reactions.collection_phrases"
 MEDIA_EMOJI_WHITELIST_KEY = "media_reactions.emoji_whitelist"
+# GHG8 Q7.b: persist «последнего медиа» для force-кнопок — переживает рестарт
+# Space (in-memory `_recent` хендлера обнуляется). Один ключ на весь бот, JSON:
+# {str(chat_id): {"kind": "single"|"collection", "message_id": int,
+#  "author_name": str}}. Пишется best-effort при каждом новом медиа (одна
+# UPSERT-строка, нагрузка на Neon сопоставима с chat_capture).
+MEDIA_RECENT_MEDIA_KEY = "media_reactions.recent_media"
 
 # Поведение (см. handlers/media_reactions.py — серия отложенных проверок с
 # динамическим шансом). mode: always|chance|wait_then_chance|never.
