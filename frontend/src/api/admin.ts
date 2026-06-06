@@ -294,6 +294,9 @@ export interface ScheduledAvatarsIO {
 
 export interface ScheduledBirthdaysIO {
   alerts_enabled: boolean;
+  // GHG8 P3: режим иммунитета именинника к лоху/чухану. Опционален —
+  // старые серверы поля не отдают, фронт подставляет "announce".
+  immunity_mode?: "announce" | "silent";
 }
 
 export interface ScheduledChukhanIO {

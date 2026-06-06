@@ -123,7 +123,14 @@ async def _render(
     quote = ""
     if phrase:
         quote = f"\n\n{phrase}"
-    return f"🎉🎂 Сегодня день рождения у <b>{name}</b>{age_part}! Поздравляем!{quote}"
+    # GHG8 P3.1.d: напоминание про иммунитет к лоху/чухану в сам день ДР.
+    immunity_note = (
+        "\n\n🛡 Бонус: сегодня у тебя иммунитет — лохом или чуханом не станешь."
+    )
+    return (
+        f"🎉🎂 Сегодня день рождения у <b>{name}</b>{age_part}! "
+        f"Поздравляем!{quote}{immunity_note}"
+    )
 
 
 def _days_diff(today: date, occ: date) -> int:

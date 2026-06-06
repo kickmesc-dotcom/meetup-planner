@@ -98,6 +98,16 @@ function BirthdaysMasterSwitch() {
   });
 
   const enabled = sched.data?.birthdays.alerts_enabled ?? true;
+  // GHG8 P3: старые серверы поля не отдают → дефолт "announce" (как на бэке).
+  const immunityMode = sched.data?.birthdays.immunity_mode ?? "announce";
+
+  const setImmunityMode = (mode: "announce" | "silent") => {
+    if (mode === immunityMode || !sched.data) return;
+    haptic("selection");
+    const next = structuredClone(sched.data);
+    next.birthdays.immunity_mode = mode;
+    save.mutate(next);
+  };
 
   return (
     <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
@@ -119,9 +129,67 @@ function BirthdaysMasterSwitch() {
             Глобальный рубильник — гасит все ДР-уведомления у всех участников.
             Персональные галочки ниже при этом сохраняются.
           </div>
+
+          {/* GHG8 P3.1.a: режим иммунитета именинника к лоху/чухану. Выключить
+              иммунитет нельзя by design — настраивается только подача. */}
+          <div className="mt-3">
+            <div className="text-sm font-semibold text-tg-text mb-1">
+              🛡 Иммунитет именинника
+            </div>
+            <div className="text-[11px] text-tg-hint mb-2">
+              {immunityMode === "announce"
+                ? "Именинник участвует в рулетке, но при выпадении бот объявит «мог бы стать…, но у него ДР» и перекрутит."
+                : "Именинник молча исключается из рулетки — никаких объявлений."}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <ModeChip
+                active={immunityMode === "announce"}
+                disabled={save.isPending}
+                onClick={() => setImmunityMode("announce")}
+              >
+                📣 С оглашением
+              </ModeChip>
+              <ModeChip
+                active={immunityMode === "silent"}
+                disabled={save.isPending}
+                onClick={() => setImmunityMode("silent")}
+              >
+                🤫 Без оглашения
+              </ModeChip>
+            </div>
+          </div>
         </>
       )}
     </section>
+  );
+}
+
+// GHG8 P3: chip-кнопка выбора режима (паттерн ModeChip из
+// RandomPhrasesGeneratorScreen + disabled на время мутации).
+function ModeChip({
+  active,
+  disabled,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={
+        active
+          ? "min-h-11 rounded-md bg-tg-button px-2 py-2 text-xs font-medium text-tg-button-text active:scale-[0.98] transition-transform disabled:opacity-60"
+          : "min-h-11 rounded-md bg-tg-bg/70 px-2 py-2 text-xs text-tg-text border border-tg-hint/30 active:scale-[0.98] transition-transform disabled:opacity-60"
+      }
+    >
+      {children}
+    </button>
   );
 }
 

@@ -1477,6 +1477,9 @@ class ScheduledAvatarsIO(BaseModel):
 
 class ScheduledBirthdaysIO(BaseModel):
     alerts_enabled: bool
+    # GHG8 P3: режим иммунитета именинника. Дефолт — чтобы старые клиенты
+    # (не присылающие поле) не сбрасывали настройку.
+    immunity_mode: Literal["announce", "silent"] = "announce"
 
 
 class ScheduledChukhanIO(BaseModel):
@@ -1551,6 +1554,13 @@ async def admin_loser_roll_now(
     async def _announce(roll, loser, extras=None):
         if not settings.group_chat_id:
             return
+        # GHG8 P3: оглашение «черновых» именинников (announce-режим).
+        if extras is not None and getattr(extras, "immunity_skipped", None):
+            from app.services.birthday_immunity import announce_immunity_skips
+
+            await announce_immunity_skips(
+                bot, settings.group_chat_id, extras.immunity_skipped
+            )
         try:
             await bot.send_message(
                 chat_id=settings.group_chat_id,

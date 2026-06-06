@@ -40,8 +40,14 @@ class WormEvent:
 @dataclass
 class RollExtras:
     """Контейнер «лишних» сведений о ролле для `on_announce`. Расширяемый —
-    в будущем сюда могут попасть, например, «лох недели/месяца»-хайлайты."""
+    в будущем сюда могут попасть, например, «лох недели/месяца»-хайлайты.
+
+    GHG8 P3: `immunity_skipped` — display_name именинников, выпадавших до
+    финального лоха (announce-режим иммунитета). Вызывающий код оглашает их
+    («мог бы стать…, но ДР») с задержкой ПЕРЕД основным постом. В БД эти
+    «черновые» попытки не пишутся — row создаётся только для финального."""
     worm: WormEvent = field(default_factory=WormEvent)
+    immunity_skipped: list[str] = field(default_factory=list)
 
 COOLDOWN = timedelta(hours=12)
 
@@ -196,7 +202,13 @@ async def roll_loser(
     if not users:
         raise RuntimeError("no users in DB")
 
-    loser = random.choice(users)
+    # GHG8 P3: иммунитет именинника. silent — исключаем из пула; announce —
+    # имена «черновых» именинников уезжают в extras.immunity_skipped, в БД
+    # попадает только финальный (не-именинник).
+    from app.services.birthday_immunity import immune_pick
+
+    pick = await immune_pick(session, users, random.choice)
+    loser = pick.user
 
     # E8: бросаем «червь-пидор»
     worm_enabled = await is_worm_enabled(session)
@@ -253,7 +265,14 @@ async def roll_loser(
                 worm_event.triggered = True
                 if on_announce is not None:
                     try:
-                        await on_announce(row, loser, RollExtras(worm=worm_event))
+                        await on_announce(
+                            row,
+                            loser,
+                            RollExtras(
+                                worm=worm_event,
+                                immunity_skipped=pick.skipped_names,
+                            ),
+                        )
                     except Exception:
                         await session.rollback()
                         raise
@@ -271,7 +290,7 @@ async def roll_loser(
         await session.flush()
         worm_event.triggered = True
 
-    extras = RollExtras(worm=worm_event)
+    extras = RollExtras(worm=worm_event, immunity_skipped=pick.skipped_names)
 
     if on_announce is not None:
         try:

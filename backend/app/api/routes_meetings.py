@@ -292,6 +292,17 @@ async def loser_roll_endpoint(
         from app.bot.dispatcher import get_bot
 
         try:
+            # GHG8 P3: оглашаем «черновых» именинников (announce-режим
+            # иммунитета) перед основным постом. Best-effort внутри.
+            if extras is not None and getattr(extras, "immunity_skipped", None):
+                from app.services.birthday_immunity import announce_immunity_skips
+
+                await announce_immunity_skips(
+                    get_bot(),
+                    target_chat,
+                    extras.immunity_skipped,
+                    send_timeout=_LOSER_SEND_TIMEOUT,
+                )
             # GHG7 P9.1.b: публичный /loser/roll (LoserSheet) — «автолох-дуэль»
             # (🤡 Автолох), НЕ «лох дня» (👑). loser_count=None: duel не идёт в
             # статистику (P9.2), поэтому «N-й раз лох» здесь не имеет смысла.

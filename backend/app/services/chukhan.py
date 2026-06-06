@@ -66,9 +66,13 @@ async def pick_chukhan_for_week(
     session: AsyncSession,
     *,
     week_start: datetime | None = None,
-) -> tuple[WeeklyChukhan, User, bool]:
-    """Возвращает (роу, пользователь, created): created=False если на эту неделю
-    чухан уже был назначен.
+) -> tuple[WeeklyChukhan, User, bool, list[str]]:
+    """Возвращает (роу, пользователь, created, immunity_skipped):
+    created=False если на эту неделю чухан уже был назначен.
+
+    GHG8 P3: четвёртый элемент — display_name именинников, выпавших до
+    финального чухана (announce-режим иммунитета; пуст в silent/без ДР).
+    «Черновые» попытки в БД не пишутся — row создаётся только финальному.
 
     Внимание: при created=True вызывающий код обязан либо commit'нуть session
     после успешной публикации, либо rollback'нуть, если в TG ничего не ушло.
@@ -81,14 +85,20 @@ async def pick_chukhan_for_week(
     if existing is not None:
         user = await session.get(User, existing.user_id)
         assert user is not None
-        return existing, user, False
+        return existing, user, False, []
 
     users = list((await session.scalars(select(User))).all())
     if not users:
         raise RuntimeError("no users to pick from")
 
     weights = await get_chukhan_weights(session)
-    chosen = _pick_weighted(users, weights)
+    # GHG8 P3: иммунитет именинника — стратегия выбора остаётся взвешенной.
+    from app.services.birthday_immunity import immune_pick
+
+    pick = await immune_pick(
+        session, users, lambda pool: _pick_weighted(pool, weights)
+    )
+    chosen = pick.user
     snapshot = {
         str(u.telegram_id): weights.get(u.telegram_id, 1.0) for u in users
     }
@@ -99,7 +109,7 @@ async def pick_chukhan_for_week(
     )
     session.add(row)
     await session.flush()
-    return row, chosen, True
+    return row, chosen, True, pick.skipped_names
 
 
 CHUKHAN_TAGLINES = [
@@ -225,7 +235,7 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
         log.info("chukhan.skip_no_group_chat")
         return None
 
-    row, user, created = await pick_chukhan_for_week(session)
+    row, user, created, immunity_skipped = await pick_chukhan_for_week(session)
     if not created and row.posted_at is not None:
         log.info("chukhan.already_posted", week_start=row.week_start.isoformat())
         return row
@@ -249,6 +259,19 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
         reason = weighted_choice(custom_reasons, use_counts) or random.choice(custom_reasons)
         await increment_use_count(session, CHUKHAN_USE_COUNTS_KEY, reason)
     text = _format_announcement(user, reason=reason)
+    # GHG8 P3: «мог бы стать %name%, но ДР» — до дроби и основного поста.
+    # Best-effort: фейл оглашения не блокирует пост. Оглашаем только при
+    # свежем пике (created): у ретрая недоставленного поста скипы уже
+    # оглашались в первую попытку.
+    if created and immunity_skipped:
+        from app.services.birthday_immunity import announce_immunity_skips
+
+        await announce_immunity_skips(
+            bot,
+            settings.group_chat_id,
+            immunity_skipped,
+            send_timeout=_chukhan_send_timeout(),
+        )
     # «Барабанная дробь» — best-effort, не блокирует основной пост. Запоминаем
     # message_id дроби, чтобы удалить огрызок, если основной пост не доедет
     # (GHG7 P11, прод-инцидент 03.06: в чате остался висеть «🎉 Имя 🎉» без поста).

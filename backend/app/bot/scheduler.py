@@ -176,6 +176,17 @@ async def _autoloser_job(bot: Bot) -> None:
             `outbox.status='sent'`, поэтому пока поста в чате нет — короны на
             календаре тоже нет (никаких фантомных «лохов без объявления»).
             """
+            # GHG8 P3: оглашение «черновых» именинников (announce-режим
+            # иммунитета). Best-effort: фейл не трогает outbox/roll.
+            if extras is not None and getattr(extras, "immunity_skipped", None):
+                from app.services.birthday_immunity import announce_immunity_skips
+
+                await announce_immunity_skips(
+                    bot,
+                    settings.group_chat_id,
+                    extras.immunity_skipped,
+                    send_timeout=_AUTOLOSER_SEND_TIMEOUT,
+                )
             # GHG7 P9.1.d: автолох-по-расписанию = «Лох дня» (👑), source="auto"
             # идёт в статистику/титулы. 🤡 «Автолох» — это ручная дуэль (duel).
             text = compose_loser_message(

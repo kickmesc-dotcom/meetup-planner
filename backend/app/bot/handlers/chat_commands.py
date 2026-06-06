@@ -77,6 +77,14 @@ async def on_loser(message: Message) -> None:
             return
 
         async def _announce(roll, loser, extras=None):
+            target = chat_id if chat_id else message.chat.id
+            # GHG8 P3: «мог бы стать %name%, но ДР» — перед основным постом.
+            if extras is not None and getattr(extras, "immunity_skipped", None):
+                from app.services.birthday_immunity import announce_immunity_skips
+
+                await announce_immunity_skips(
+                    bot, target, extras.immunity_skipped
+                )
             text = compose_loser_message(
                 loser_name=loser.display_name,
                 reason_text=roll.reason_text or "",
@@ -85,7 +93,6 @@ async def on_loser(message: Message) -> None:
                 header_emoji="🤡",
                 header_label="Автолох",
             )
-            target = chat_id if chat_id else message.chat.id
             await bot.send_message(chat_id=target, text=text, parse_mode="HTML")
 
         try:

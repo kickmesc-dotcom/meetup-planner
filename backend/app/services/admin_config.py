@@ -637,6 +637,27 @@ AVATARS_SYNC_PER_DAY_KEY = "avatars.sync_per_day"  # float, >=0.14 (раз в н
 # birthdays — глобальный switch
 BIRTHDAYS_ALERTS_ENABLED_KEY = "birthdays.alerts_enabled"
 
+# GHG8 P3: иммунитет именинника к лоху/чухану.
+#  - "announce" — именинник может выпасть в рулетке, но вместо записи идёт
+#    оглашение «мог бы стать %name%, но у него ДР» + реролл (default).
+#  - "silent"   — именинник исключается из выборки молча.
+# Режима «off» нет by design (GHG7.txt стр. 47): иммунитет в ДР есть всегда,
+# настраивается только подача.
+BIRTHDAYS_IMMUNITY_MODE_KEY = "birthdays.immunity_mode"
+IMMUNITY_MODES = ("announce", "silent")
+IMMUNITY_MODE_DEFAULT = "announce"
+
+
+async def get_birthdays_immunity_mode(session: AsyncSession) -> str:
+    raw = await _get_value(session, BIRTHDAYS_IMMUNITY_MODE_KEY)
+    return raw if raw in IMMUNITY_MODES else IMMUNITY_MODE_DEFAULT
+
+
+async def set_birthdays_immunity_mode(session: AsyncSession, mode: str) -> None:
+    if mode not in IMMUNITY_MODES:
+        raise ValueError(f"invalid immunity mode: {mode!r}")
+    await _set_value(session, BIRTHDAYS_IMMUNITY_MODE_KEY, mode)
+
 # chukhan weekly publish window
 CHUKHAN_WEEKDAY_KEY = "chukhan.weekday"            # int 0..6 (0=пн)
 CHUKHAN_WINDOW_START_KEY = "chukhan.window_start"  # "HH:MM"
@@ -692,6 +713,8 @@ async def get_scheduled_settings(session: AsyncSession) -> dict:
         },
         "birthdays": {
             "alerts_enabled": await _get_bool(session, BIRTHDAYS_ALERTS_ENABLED_KEY, True),
+            # GHG8 P3: режим иммунитета именинника (announce|silent).
+            "immunity_mode": await get_birthdays_immunity_mode(session),
         },
         "chukhan": {
             "weekday": max(0, min(6, await _get_int(session, CHUKHAN_WEEKDAY_KEY, 0))),
@@ -762,6 +785,10 @@ async def set_scheduled_settings(session: AsyncSession, body: dict) -> None:
             BIRTHDAYS_ALERTS_ENABLED_KEY,
             "true" if birthdays["alerts_enabled"] else "false",
         )
+    if "immunity_mode" in birthdays:
+        mode = birthdays["immunity_mode"]
+        if mode in IMMUNITY_MODES:
+            await _set_value(session, BIRTHDAYS_IMMUNITY_MODE_KEY, mode)
 
     chukhan = body.get("chukhan") or {}
     if "weekday" in chukhan:
