@@ -67,11 +67,16 @@ function fmtDateRu(d: string): string {
 export default function PollSheet(_props: Props) {
   const close = () => {
     useUI.getState().setShowPollSheet(false);
-    // Очищаем пресетную дату после закрытия, чтобы следующий ручной вызов
+    // Очищаем пресеты после закрытия, чтобы следующий ручной вызов
     // PollSheet начинался с обычных дефолтов.
     useUI.getState().setPollSheetPresetDate(null);
+    useUI.getState().setPollSheetPresetQuestion(null);
   };
-  const [question, setQuestion] = useState("Когда собираемся?");
+  // GHG8 P2.4.c: ДР-поповер кладёт сюда «Собираемся на ДР {имя}?».
+  const presetQuestion = useUI((s) => s.pollSheetPresetQuestion);
+  const [question, setQuestion] = useState(
+    presetQuestion ?? "Когда собираемся?",
+  );
 
   // Public presets подтягиваем — нужен дефолт-час, если включат «Указать время».
   const presetsQ = useQuery({

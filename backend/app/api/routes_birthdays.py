@@ -1,19 +1,30 @@
 from __future__ import annotations
 
+import asyncio
+import os
 import random
 from datetime import date, datetime
 
+import structlog
+from aiogram.exceptions import (
+    TelegramAPIError,
+    TelegramForbiddenError,
+    TelegramNetworkError,
+    TelegramRetryAfter,
+)
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.config import get_settings
 from app.db.models import Birthday, User
 from app.services.admin_config import (
     get_birthdays_greeting_templates,
     get_poll_time_presets,
 )
 
+log = structlog.get_logger()
 router = APIRouter(tags=["birthdays"])
 
 
@@ -181,3 +192,118 @@ async def birthday_greeting(
     idx = random.randrange(len(templates))
     text = render_greeting(templates[idx], name=user.display_name, age=age)
     return GreetingOut(text=text, template_index=idx)
+
+
+# --- GHG8 P2.4: публикация поздравления ботом в группу ---
+
+# Зеркало routes_meetings._loser_send_timeout: 25с < 30с сессии бота, env
+# LOSER_SEND_TIMEOUT переиспользуем (один рубильник на все send-операции).
+def _greeting_send_timeout() -> float:
+    raw = os.getenv("LOSER_SEND_TIMEOUT")
+    if raw is None:
+        return 25.0
+    try:
+        return float(int(raw))
+    except ValueError:
+        return 25.0
+
+
+_GREETING_SEND_TIMEOUT = _greeting_send_timeout()
+
+# Лимит TG на text message — 4096; оставляем запас под подпись «Поздравил …».
+_GREETING_MAX_LEN = 3500
+
+
+class GreetingPostIn(BaseModel):
+    """Тело «Пост от лица бота».
+
+    `text` — финальный текст из textarea поповера (юзер мог отредактировать).
+    `signed=True` → к посту дописывается «Поздравил {имя нажавшего}» —
+    режим «от своего имени» (отправить за юзера напрямую TG не позволяет).
+    """
+
+    text: str = Field(min_length=1, max_length=_GREETING_MAX_LEN)
+    signed: bool = False
+
+
+class GreetingPostOut(BaseModel):
+    ok: bool
+    signed: bool
+
+
+def compose_greeting_post(text: str, *, signed_by: str | None) -> str:
+    """Чистая сборка поста: текст + опциональная подпись. HTML не экранируем —
+    текст идёт как есть (parse_mode не используем, чтобы юзерские <, & не
+    ломали отправку)."""
+    out = text.strip()
+    if signed_by:
+        out += f"\n\n— Поздравил {signed_by}"
+    return out
+
+
+@router.post(
+    "/birthdays/{user_id}/greeting/post",
+    response_model=GreetingPostOut,
+)
+async def birthday_greeting_post(
+    session: SessionDep,
+    user: CurrentUser,
+    user_id: int,
+    body: GreetingPostIn,
+) -> GreetingPostOut:
+    """Опубликовать поздравление в групповой чат от лица бота.
+
+    В отличие от best-effort рассылок (loser/_announce) здесь юзер ждёт
+    результат в UI — фейл отдаём явным HTTP-кодом, фронт покажет alert
+    (маппинг в client.ts: telegram_retry_after/telegram_network_timeout/...).
+    """
+    settings = get_settings()
+    if not settings.group_chat_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "group_chat_id_not_configured"
+        )
+    # user_id именинника нужен только для валидации, что кнопку жмут из
+    # реального ДР-поповера (юзер существует) — текст уже собран фронтом.
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+
+    text = compose_greeting_post(
+        body.text, signed_by=user.display_name if body.signed else None
+    )
+    from app.bot.dispatcher import get_bot
+
+    try:
+        await asyncio.wait_for(
+            get_bot().send_message(chat_id=settings.group_chat_id, text=text),
+            timeout=_GREETING_SEND_TIMEOUT,
+        )
+    except TelegramRetryAfter as exc:
+        log.warning("birthday_post.tg_retry_after", retry=exc.retry_after)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            f"telegram_retry_after:{exc.retry_after}",
+        ) from None
+    except TelegramForbiddenError as exc:
+        log.warning("birthday_post.tg_forbidden", error=str(exc))
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "telegram_forbidden"
+        ) from None
+    except (TelegramNetworkError, asyncio.TimeoutError):
+        log.warning("birthday_post.tg_network_failed")
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "telegram_network_timeout"
+        ) from None
+    except TelegramAPIError as exc:
+        log.warning("birthday_post.tg_api_error", error=str(exc))
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "telegram_api_error"
+        ) from None
+
+    log.info(
+        "birthday_post.sent",
+        birthday_user_id=user_id,
+        signed=body.signed,
+        by=user.id,
+    )
+    return GreetingPostOut(ok=True, signed=body.signed)

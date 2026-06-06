@@ -104,6 +104,13 @@ interface UIState {
   setPollSheetPresetDate: (date: string | null) => void;
 
   /**
+   * GHG8 P2.4.c: предзаполненный вопрос опроса при открытии PollSheet из
+   * ДР-поповера («Собираемся на ДР {имя}?»). Очищается вместе с presetDate.
+   */
+  pollSheetPresetQuestion: string | null;
+  setPollSheetPresetQuestion: (q: string | null) => void;
+
+  /**
    * GHG6 P3 CL5: пользовательский cellWidth для TimelineView. null = «авто»
    * (TimelineView сам считает по ResizeObserver — CL6.a). Когда пользователь
    * двинул слайдер зума или нажал пресет «День»/«Неделя»/«Месяц», сюда
@@ -185,6 +192,10 @@ export const useUI = create<UIState>((set, get) => ({
 
   pollSheetPresetDate: null,
   setPollSheetPresetDate: (pollSheetPresetDate) => set({ pollSheetPresetDate }),
+
+  pollSheetPresetQuestion: null,
+  setPollSheetPresetQuestion: (pollSheetPresetQuestion) =>
+    set({ pollSheetPresetQuestion }),
 
   timelineCellWidth: null,
   setTimelineCellWidth: (timelineCellWidth) => set({ timelineCellWidth }),

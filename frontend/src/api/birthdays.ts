@@ -25,6 +25,24 @@ export const fetchBirthdayGreeting = (userId: number, date: string) =>
     { method: "POST" },
   );
 
+// GHG8 P2.4: публикация поздравления в группу от лица бота.
+// signed=true → бот допишет «— Поздравил {имя нажавшего}» (режим «от своего
+// имени»: TG не даёт постить за юзера, подпись — честная замена).
+export interface GreetingPostResult {
+  ok: boolean;
+  signed: boolean;
+}
+
+export const postBirthdayGreeting = (
+  userId: number,
+  text: string,
+  signed: boolean,
+) =>
+  api<GreetingPostResult>(`/api/birthdays/${userId}/greeting/post`, {
+    method: "POST",
+    body: JSON.stringify({ text, signed }),
+  });
+
 // GHG6 BD4: отметки лох/чухан в окне (для рисования 👑/💩 в ячейках).
 // GHG6 J: для type='loser' приходит source ('auto' | 'manual'). Один и тот же
 // день у одного юзера может содержать обе метки — фронт рисует 👑×2.

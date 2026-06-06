@@ -1,9 +1,12 @@
 /**
  * GHG6 BD2: модалка-поповер, который открывается при клике по 🎂.
  *
- * Содержит две кнопки:
+ * Содержит кнопки:
  *  - «✨ Креативное поздравление» — POST /api/birthdays/{user_id}/greeting,
  *    результат показывается в textarea с кнопкой «📋 Скопировать».
+ *  - GHG8 P2.4: после генерации — публикация текста из textarea в группу:
+ *    «🤖 Пост от лица бота» (как есть) и «✍️ Пост от своего имени» (бот
+ *    допишет «— Поздравил {имя}»; отправить за юзера напрямую TG не даёт).
  *  - «📅 Назначить встречу» — закрывает поповер, выставляет
  *    `pollSheetPresetDate` и открывает PollSheet.
  *
@@ -12,9 +15,9 @@
  */
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { fetchBirthdayGreeting } from "@/api/birthdays";
+import { fetchBirthdayGreeting, postBirthdayGreeting } from "@/api/birthdays";
 import { useUI } from "@/store/ui";
-import { haptic, showAlert } from "@/tg/webapp";
+import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
 import { Spinner } from "@/components/Spinner";
 
@@ -23,6 +26,7 @@ export default function BirthdayPopover() {
   const setPopover = useUI((s) => s.setBirthdayPopover);
   const setPollSheet = useUI((s) => s.setShowPollSheet);
   const setPresetDate = useUI((s) => s.setPollSheetPresetDate);
+  const setPresetQuestion = useUI((s) => s.setPollSheetPresetQuestion);
   const [greeting, setGreeting] = useState<string | null>(null);
 
   const greetingMut = useMutation({
@@ -40,6 +44,26 @@ export default function BirthdayPopover() {
     },
   });
 
+  // GHG8 P2.4: «Пост от лица бота» / «Пост от своего имени» (signed).
+  const postMut = useMutation({
+    mutationFn: (signed: boolean) => {
+      if (!popover || !greeting?.trim()) throw new Error("no_greeting");
+      return postBirthdayGreeting(popover.userId, greeting.trim(), signed);
+    },
+    onSuccess: (resp) => {
+      haptic("success");
+      void showAlert(
+        resp.signed
+          ? "Запостил в чат с подписью от тебя ✍️"
+          : "Запостил в чат от лица бота 🤖",
+      );
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
   if (!popover) return null;
 
   const close = () => {
@@ -50,6 +74,8 @@ export default function BirthdayPopover() {
   const onAssignMeeting = () => {
     haptic("selection");
     setPresetDate(popover.date);
+    // P2.4.c: get-together контекст — вопрос опроса сразу про ДР.
+    setPresetQuestion(`Собираемся на ДР ${popover.displayName}?`);
     setPopover(null);
     setGreeting(null);
     setPollSheet(true);
@@ -65,6 +91,18 @@ export default function BirthdayPopover() {
       haptic("error");
       void showAlert("Не получилось скопировать — выдели текст вручную.");
     }
+  };
+
+  const onPost = async (signed: boolean) => {
+    if (!greeting?.trim() || postMut.isPending) return;
+    haptic("selection");
+    const ok = await showConfirm(
+      signed
+        ? "Бот запостит этот текст в чат и подпишет, что поздравил — ты. Отправляем?"
+        : "Бот запостит этот текст в чат от своего лица. Отправляем?",
+    );
+    if (!ok) return;
+    postMut.mutate(signed);
   };
 
   return (
@@ -109,7 +147,7 @@ export default function BirthdayPopover() {
                 rows={4}
                 className="w-full bg-transparent text-sm outline-none resize-none"
               />
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={onCopy}
@@ -123,6 +161,27 @@ export default function BirthdayPopover() {
                   className="rounded bg-tg-secondary-bg text-tg-text text-xs px-2 py-1"
                 >
                   🔄 Ещё вариант
+                </button>
+              </div>
+              {/* GHG8 P2.4: публикация в группу. Кнопки доступны только когда
+                  есть текст; во время отправки обе блокируются. */}
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => void onPost(false)}
+                  disabled={postMut.isPending || !greeting.trim()}
+                  className="rounded bg-tg-button/80 text-tg-button-text text-xs px-2 py-1 disabled:opacity-60 flex items-center gap-1"
+                >
+                  {postMut.isPending && <Spinner size={10} />}
+                  🤖 Пост от лица бота
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onPost(true)}
+                  disabled={postMut.isPending || !greeting.trim()}
+                  className="rounded bg-tg-secondary-bg text-tg-text text-xs px-2 py-1 disabled:opacity-60"
+                >
+                  ✍️ Пост от своего имени
                 </button>
               </div>
             </div>
