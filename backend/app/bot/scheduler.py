@@ -84,6 +84,7 @@ JOB_AUTO_ZAEBAL = "auto_zaebal"  # GHG6 E11.3
 JOB_MEETING_FEEDBACK = "meeting_feedback_daily"  # GHG6 N2.3
 JOB_LOSER_OUTBOX_RETRY = "loser_outbox_retry"  # GHG7 P0.2.b.4
 JOB_CHUKHAN_RETRY = "chukhan_retry"  # GHG7 P11 (инцидент 03.06 #1)
+JOB_DEAD_CHAT = "dead_chat_hourly"  # GHG8 P7
 
 
 def _env_int(name: str, default: int) -> int:
@@ -775,6 +776,27 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=1800,  # 30 мин — скип чухана не критичен к секундам
+    )
+
+    # GHG8 P7: «мёртвый чат» — часовой тик проверки тишины. Master-toggle
+    # (`dead_chat.enabled`) и пауза бота проверяются ВНУТРИ job'а, поэтому он
+    # не участвует в reload_dynamic_jobs (как bot_pause_auto_restore). Дёшево
+    # для Neon: 3–4 point-SELECT по admin_config в час; пост — редкое событие
+    # (пороги от 24ч).
+    async def _dead_chat_tick(*, bot: Bot) -> None:
+        from app.services.dead_chat import run_dead_chat_job
+
+        await run_dead_chat_job(bot)
+
+    sched.add_job(
+        _logged_job(JOB_DEAD_CHAT, _dead_chat_tick),
+        IntervalTrigger(hours=1, jitter=120),
+        kwargs={"bot": bot},
+        id=JOB_DEAD_CHAT,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600,  # час — тишина суток не требует точности
     )
 
     sched.start()

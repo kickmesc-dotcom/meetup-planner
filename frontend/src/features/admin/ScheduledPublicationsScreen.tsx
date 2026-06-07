@@ -174,6 +174,20 @@ export default function ScheduledPublicationsScreen({ onBack }: Props) {
             }
           />
 
+          {/* GHG8 P7: «мёртвый чат». ?? true — старые серверы блок не отдают. */}
+          <ToggleBlock
+            icon="🪦"
+            title="Пинок мёртвого чата"
+            hint="Тишина 24ч/72ч/неделя/месяц/полгода/год → шутка из пула порога. Один пост на порог за окно тишины."
+            enabled={draft.dead_chat?.enabled ?? true}
+            onToggle={(v) =>
+              patch((d) => {
+                d.dead_chat = { enabled: v };
+                return d;
+              })
+            }
+          />
+
           {/* GHG7 P2.3.f: «Реакции бота» вынесены в отдельный экран
               BotReactionsScreen (меню админки → «🤖 Реакции»). */}
 

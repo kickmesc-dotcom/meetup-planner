@@ -305,6 +305,12 @@ export interface ScheduledChukhanIO {
   window_end: string;
 }
 
+// GHG8 P7: «мёртвый чат» — пост при долгой тишине (пороги 24ч…год).
+// Опционален: старые серверы блок не отдают.
+export interface ScheduledDeadChatIO {
+  enabled: boolean;
+}
+
 export interface ScheduledSettingsIO {
   reminders: ScheduledRemindersIO;
   loser: ScheduledLoserIO;
@@ -312,6 +318,7 @@ export interface ScheduledSettingsIO {
   avatars: ScheduledAvatarsIO;
   birthdays: ScheduledBirthdaysIO;
   chukhan: ScheduledChukhanIO;
+  dead_chat?: ScheduledDeadChatIO;
 }
 
 export const fetchScheduledSettings = () =>

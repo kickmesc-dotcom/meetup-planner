@@ -721,6 +721,11 @@ async def get_scheduled_settings(session: AsyncSession) -> dict:
             "window_start": await _get_hhmm(session, CHUKHAN_WINDOW_START_KEY, "07:30"),
             "window_end": await _get_hhmm(session, CHUKHAN_WINDOW_END_KEY, "12:00"),
         },
+        # GHG8 P7: «мёртвый чат». Ключ живёт в services/dead_chat.py, здесь —
+        # только проводка в агрегат master-toggles (job сам читает enabled).
+        "dead_chat": {
+            "enabled": await _get_bool(session, "dead_chat.enabled", True),
+        },
     }
 
 
@@ -808,6 +813,15 @@ async def set_scheduled_settings(session: AsyncSession, body: dict) -> None:
             session,
             CHUKHAN_WINDOW_END_KEY,
             _validate_hhmm(chukhan["window_end"], "12:00"),
+        )
+
+    # GHG8 P7: master-toggle «мёртвого чата».
+    dead_chat = body.get("dead_chat") or {}
+    if "enabled" in dead_chat:
+        await _set_value(
+            session,
+            "dead_chat.enabled",
+            "true" if dead_chat["enabled"] else "false",
         )
 
 

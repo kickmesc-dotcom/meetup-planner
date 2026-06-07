@@ -81,5 +81,11 @@ async def on_group_message(message: Message) -> None:
             # Это держит базу в идеальном тонусе
             await cleanup_old_messages(session)
 
+        # GHG8 P7: текст от участника = чат жив. Внутри — троттлинг 15 мин
+        # и best-effort, сюда исключения не долетают.
+        from app.services.dead_chat import touch_chat_activity
+
+        await touch_chat_activity(message.date)
+
     except Exception as exc:  # noqa: BLE001
         log.warning("chat_capture.failed", error=str(exc))

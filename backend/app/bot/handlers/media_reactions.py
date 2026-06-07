@@ -383,6 +383,12 @@ async def _on_media_impl(message: Message) -> None:
     if message.from_user.id not in _whitelist_set():
         return
 
+    # GHG8 P7: медиа от участника = чат жив (решение пользователя: цепочка
+    # мемов без текста — не «мёртвый чат»). Троттлинг/best-effort внутри.
+    from app.services.dead_chat import touch_chat_activity
+
+    await touch_chat_activity(message.date)
+
     chat_id = message.chat.id
     author_id = message.from_user.id
     mgid = message.media_group_id

@@ -1488,6 +1488,11 @@ class ScheduledChukhanIO(BaseModel):
     window_end: str
 
 
+class ScheduledDeadChatIO(BaseModel):
+    # GHG8 P7: «мёртвый чат» — пост при долгой тишине (пороги 24ч…год).
+    enabled: bool = True
+
+
 class ScheduledSettingsIO(BaseModel):
     reminders: ScheduledRemindersIO
     loser: ScheduledLoserIO
@@ -1495,6 +1500,10 @@ class ScheduledSettingsIO(BaseModel):
     avatars: ScheduledAvatarsIO
     birthdays: ScheduledBirthdaysIO
     chukhan: ScheduledChukhanIO
+    # GHG8 P7: дефолт — чтобы старые клиенты (не присылающие блок) не падали
+    # на валидации и не сбрасывали настройку (set_* пишет только присланное —
+    # но default_factory даёт {"enabled": True}; см. примечание в admin_config).
+    dead_chat: ScheduledDeadChatIO = Field(default_factory=ScheduledDeadChatIO)
 
 
 @router.get("/admin/scheduled", response_model=ScheduledSettingsIO)
