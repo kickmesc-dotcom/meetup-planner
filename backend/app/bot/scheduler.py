@@ -85,6 +85,7 @@ JOB_MEETING_FEEDBACK = "meeting_feedback_daily"  # GHG6 N2.3
 JOB_LOSER_OUTBOX_RETRY = "loser_outbox_retry"  # GHG7 P0.2.b.4
 JOB_CHUKHAN_RETRY = "chukhan_retry"  # GHG7 P11 (инцидент 03.06 #1)
 JOB_DEAD_CHAT = "dead_chat_hourly"  # GHG8 P7
+JOB_SPACE_RESTART = "space_restart_tick"  # GHG8 P14
 
 
 def _env_int(name: str, default: int) -> int:
@@ -797,6 +798,25 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=3600,  # час — тишина суток не требует точности
+    )
+
+    # GHG8 P14: тик расписания рестартов Space. Раз в 5 мин (паттерн
+    # bot_pause_auto_restore): расписание (`space_restart.schedule`) и анти-луп
+    # проверяются ВНУТРИ job'а, в reload_dynamic_jobs не участвует. Дёшево для
+    # Neon: при mode=off — один point-SELECT на тик.
+    async def _space_restart_tick() -> None:
+        from app.services.space_restart import run_space_restart_tick
+
+        await run_space_restart_tick()
+
+    sched.add_job(
+        _logged_job(JOB_SPACE_RESTART, _space_restart_tick),
+        IntervalTrigger(minutes=5, jitter=30),
+        id=JOB_SPACE_RESTART,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=600,  # рестарт не требует секундной точности
     )
 
     sched.start()

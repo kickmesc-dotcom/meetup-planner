@@ -22,6 +22,7 @@ import ZaebalSettingsScreen from "./ZaebalSettingsScreen";
 import IntervalsScreen from "./IntervalsScreen";
 import BotPauseBar from "./BotPauseBar";
 import JobsQueueScreen from "./JobsQueueScreen";
+import SpaceRestartScreen from "./SpaceRestartScreen";
 
 type Section =
   | "root"
@@ -39,7 +40,8 @@ type Section =
   | "games"
   | "zaebal"
   | "intervals"
-  | "jobs";
+  | "jobs"
+  | "space-restart";
 
 interface Props {
   users: User[];
@@ -79,6 +81,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "zaebal") return <ZaebalSettingsScreen onBack={back} />;
   if (section === "intervals") return <IntervalsScreen onBack={back} />;
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;
+  if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -173,6 +176,14 @@ export default function AdminScreen({ users }: Props) {
           title="Прокси"
           subtitle="Пул прокси, индикаторы, парсер, авто-фолбэк"
           onClick={() => select("proxy")}
+        />
+        {/* GHG8 P14: рестарт Space — рядом с прокси, это смежная
+            «сеть зависла, расклинь» история. */}
+        <Card
+          icon="🔄"
+          title="Рестарт Space"
+          subtitle="Кнопка + расписание (once / каждые N часов)"
+          onClick={() => select("space-restart")}
         />
       </SectionGroup>
 

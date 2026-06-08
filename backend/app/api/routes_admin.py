@@ -200,6 +200,7 @@ _JOB_LABELS: dict[str, str] = {
     "autoloser": "🤡 Автолох",
     "birthdays_daily": "🎂 Дни рождения (ежедневная проверка)",
     "meeting_feedback_daily": "🌟 5★ опрос по встречам (N2)",
+    "space_restart_tick": "🔄 Рестарт Space (тик расписания)",
 }
 
 @router.get("/admin/jobs", response_model=list[ScheduledJobOut])
@@ -2886,3 +2887,113 @@ async def admin_games_poll_create(
         closes_at=poll.closes_at,
         follow_up_when=body.follow_up_when,
     )
+
+
+# --- GHG8 P14: рестарт HF Space (кнопка + расписание) ---
+
+class SpaceRestartScheduleIO(BaseModel):
+    """`space_restart.schedule`: off | once (at, ISO) | interval (every_hours)."""
+
+    mode: str = Field(..., pattern="^(off|once|interval)$")
+    at: str | None = None
+    every_hours: int | None = Field(None, ge=1, le=720)
+
+
+class SpaceRestartStatusOut(BaseModel):
+    available: bool  # env HF_TOKEN задан — рестарт вообще возможен
+    schedule: SpaceRestartScheduleIO
+    last_restart_at: datetime | None
+    next_restart_at: datetime | None
+
+
+async def _space_restart_status(session) -> SpaceRestartStatusOut:
+    from app.services.space_restart import (
+        compute_next_restart,
+        get_last_restart_at,
+        get_schedule,
+        hf_token_configured,
+    )
+
+    schedule = await get_schedule(session)
+    last = await get_last_restart_at(session)
+    nxt = compute_next_restart(schedule, last, datetime.now(timezone.utc))
+    return SpaceRestartStatusOut(
+        available=hf_token_configured(),
+        schedule=SpaceRestartScheduleIO(**schedule),
+        last_restart_at=last,
+        next_restart_at=nxt,
+    )
+
+
+@router.get("/admin/space/restart-settings", response_model=SpaceRestartStatusOut)
+async def admin_space_restart_get(
+    session: SessionDep, user: CurrentUser
+) -> SpaceRestartStatusOut:
+    _ensure_admin(user)
+    return await _space_restart_status(session)
+
+
+@router.put("/admin/space/restart-settings", response_model=SpaceRestartStatusOut)
+async def admin_space_restart_put(
+    body: SpaceRestartScheduleIO, session: SessionDep, user: CurrentUser
+) -> SpaceRestartStatusOut:
+    _ensure_admin(user)
+    from app.services.space_restart import set_schedule
+
+    # once в прошлом — отклоняем сразу: иначе job рестартанул бы «мгновенно»,
+    # что админ вряд ли имел в виду (для мгновенного есть кнопка).
+    if body.mode == "once":
+        if body.at is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "at_required_for_once")
+        _parse_iso_future(body.at)
+    if body.mode == "interval" and body.every_hours is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "every_hours_required_for_interval"
+        )
+
+    normalized = await set_schedule(session, body.model_dump())
+    log.info("space_restart.schedule_updated", schedule=normalized, by=user.id)
+    return await _space_restart_status(session)
+
+
+@router.post(
+    "/admin/space/restart", status_code=status.HTTP_202_ACCEPTED
+)
+async def admin_space_restart_now(
+    session: SessionDep, user: CurrentUser
+) -> dict[str, str]:
+    """Ручной рестарт Space. 202 уходит клиенту ДО фактического вызова HF API:
+    хоть P14-INV и показал даунтайм HTTP ≈ 0, страховаться от обрыва ответа
+    дешевле, чем объяснять фронту «request failed» при успешном рестарте.
+
+    Анти-луп 30 мин на ручной рестарт НЕ распространяется: это аварийный
+    инструмент «расклинить», и админ уже подтвердил действие в UI. Но
+    last_restart_at пишем — чтобы scheduled-тик не добавил второй рестарт
+    следом за ручным.
+    """
+    _ensure_admin(user)
+    from app.services.space_restart import (
+        hf_token_configured,
+        set_last_restart_at,
+        trigger_hf_restart,
+    )
+
+    if not hf_token_configured():
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "hf_token_not_configured"
+        )
+
+    await set_last_restart_at(session, datetime.now(timezone.utc))
+    log.info("space_restart.requested", source="manual", by=user.id)
+
+    async def _fire() -> None:
+        # Даём ASGI-ответу секунду на доставку до пересоздания контейнера.
+        import asyncio as _aio
+
+        await _aio.sleep(1.0)
+        await trigger_hf_restart(source="manual")
+
+    import asyncio as _asyncio
+
+    _asyncio.create_task(_fire())
+    return {"status": "restarting"}

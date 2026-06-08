@@ -1,3 +1,21 @@
+# ⚠️ GHG8 P14 (2026-06-08): новый env-секрет `HF_TOKEN`
+
+Рестарт HF Space из админки («🔄 Рестарт Space» в секции Прокси) работает
+через HF Hub API: `POST huggingface.co/api/spaces/fryesw/meetup-planner-backend/restart`.
+
+**Что сделать руками в Space (Settings → Variables and secrets):**
+- `HF_TOKEN` — **write**-токен HF (huggingface.co → Settings → Access Tokens →
+  New token, role: write). Без него эндпоинт отвечает 503, кнопка в админке
+  дизейблится с подсказкой — ничего не ломается.
+- `SPACE_ID` HF проставляет в контейнер сам; фолбэк в коде —
+  `fryesw/meetup-planner-backend`.
+
+Настройки расписания — в `admin_config` (`space_restart.schedule`,
+`space_restart.last_restart_at`), миграций нет. Анти-луп: не чаще раза в
+30 мин (первые ~7 мин после рестарта исходящие к TG деградированы — P14-INV).
+
+---
+
 # Инструкция по выкладке GHG6 (2026-05-27)
 
 Итерация GHG6 (старт 2026-05-18, закрытие основной массы — 2026-05-26..27).

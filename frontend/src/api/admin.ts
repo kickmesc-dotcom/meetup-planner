@@ -886,3 +886,33 @@ export const updatePollsDefaults = (body: PollsDefaults) =>
     method: "PUT",
     body: JSON.stringify(body),
   });
+
+// --- GHG8 P14: рестарт HF Space (кнопка + расписание) ---
+
+export interface SpaceRestartSchedule {
+  mode: "off" | "once" | "interval";
+  /** ISO-datetime для mode=once. */
+  at: string | null;
+  /** Часы для mode=interval (1..720). */
+  every_hours: number | null;
+}
+
+export interface SpaceRestartStatus {
+  /** env HF_TOKEN задан на Space — рестарт вообще возможен. */
+  available: boolean;
+  schedule: SpaceRestartSchedule;
+  last_restart_at: string | null;
+  next_restart_at: string | null;
+}
+
+export const fetchSpaceRestartSettings = () =>
+  api<SpaceRestartStatus>("/api/admin/space/restart-settings");
+
+export const updateSpaceRestartSettings = (s: SpaceRestartSchedule) =>
+  api<SpaceRestartStatus>("/api/admin/space/restart-settings", {
+    method: "PUT",
+    body: JSON.stringify(s),
+  });
+
+export const restartSpaceNow = () =>
+  api<{ status: string }>("/api/admin/space/restart", { method: "POST" });
