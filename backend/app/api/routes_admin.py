@@ -16,6 +16,7 @@ from app.services.admin_config import (
     get_autoloser_settings,
     get_chukhan_weights,
     get_loser_reasons,
+    get_phrase_generator_version,
     get_poll_time_presets,
     get_random_phrases_collective_chance,
     get_random_phrases_count,
@@ -32,6 +33,7 @@ from app.services.admin_config import (
     set_autoloser_settings,
     set_chukhan_weight,
     set_loser_reasons,
+    set_phrase_generator_version,
     set_poll_time_presets,
     set_random_phrases_collective_chance,
     set_random_phrases_count,
@@ -1680,6 +1682,8 @@ class GeneratorSettingsOut(BaseModel):
     # P13: карантин свежести — сообщения младше N часов почти не цитируются.
     recency_quarantine_hours: float = Field(18.0, ge=0.0, le=168.0)
     recency_quarantine_weight: float = Field(0.05, ge=0.0, le=1.0)
+    # GHG8 P6.3: версия генератора — legacy (нарезка v1) | personas (типажи v2).
+    generator_version: str = Field("legacy", pattern="^(legacy|personas)$")
 
 
 class GeneratorSettingsUpdate(BaseModel):
@@ -1693,6 +1697,8 @@ class GeneratorSettingsUpdate(BaseModel):
     # P13: дефолты — старые клиенты не присылают эти поля.
     recency_quarantine_hours: float = Field(18.0, ge=0.0, le=168.0)
     recency_quarantine_weight: float = Field(0.05, ge=0.0, le=1.0)
+    # GHG8 P6.3: дефолт legacy — старые клиенты не присылают поле.
+    generator_version: str = Field("legacy", pattern="^(legacy|personas)$")
 
 
 @router.get("/admin/random-phrases/generator", response_model=GeneratorSettingsOut)
@@ -1708,6 +1714,7 @@ async def get_rp_generator(session: SessionDep, user: CurrentUser) -> GeneratorS
         mode=await get_random_phrases_mode(session),
         recency_quarantine_hours=await get_random_phrases_recency_quarantine_hours(session),
         recency_quarantine_weight=await get_random_phrases_recency_quarantine_weight(session),
+        generator_version=await get_phrase_generator_version(session),
     )
 
 
@@ -1727,8 +1734,127 @@ async def update_rp_generator(
     await set_random_phrases_recency_quarantine_weight(
         session, body.recency_quarantine_weight
     )
+    await set_phrase_generator_version(session, body.generator_version)
     log.info("admin.rp_generator_updated", body=body.model_dump(), by=user.id)
     return body
+
+
+# --- GHG8 P6.1: персоналии участников (генератор фраз v2) ---
+# Тексты живут только в Neon (открытый git) — сидинг руками через эти
+# эндпоинты (P6.1.b), не коммитом. Формат persona_text — [шаблоны]/[слоты],
+# парсер в services/personas.py.
+
+class PersonaRow(BaseModel):
+    user_id: int
+    display_name: str
+    # Текст None = персоналия не заведена (юзер виден в списке всё равно —
+    # админ понимает, кого ещё не просидировал).
+    persona_text: str | None = None
+    templates_count: int = 0
+    broken_templates_count: int = 0  # шаблоны с плейсхолдером без слота
+
+
+class PersonaUpdate(BaseModel):
+    persona_text: str = Field(..., max_length=20_000)
+
+
+class PersonaPreviewOut(BaseModel):
+    phrase: str | None  # None = ни одного пригодного шаблона
+
+
+def _persona_counts(text: str | None) -> tuple[int, int]:
+    """(всего шаблонов, из них битых). Чистая обёртка для списка."""
+    from app.services.personas import _PLACEHOLDER_RE, parse_persona
+
+    p = parse_persona(text)
+    broken = sum(
+        1
+        for t in p.templates
+        if not all(
+            p.slots.get(name.strip().lower())
+            for name in _PLACEHOLDER_RE.findall(t)
+        )
+    )
+    return len(p.templates), broken
+
+
+@router.get("/admin/personas", response_model=list[PersonaRow])
+async def list_personas(session: SessionDep, user: CurrentUser) -> list[PersonaRow]:
+    _ensure_admin(user)
+    from app.db.models import ParticipantPersona
+
+    users = list((await session.scalars(select(User).order_by(User.id))).all())
+    personas = {
+        p.user_id: p.persona_text
+        for p in (await session.scalars(select(ParticipantPersona))).all()
+    }
+    out: list[PersonaRow] = []
+    for u in users:
+        text = personas.get(u.id)
+        total, broken = _persona_counts(text)
+        out.append(
+            PersonaRow(
+                user_id=u.id,
+                display_name=u.display_name,
+                persona_text=text,
+                templates_count=total,
+                broken_templates_count=broken,
+            )
+        )
+    return out
+
+
+@router.put("/admin/personas/{user_id}", response_model=PersonaRow)
+async def upsert_persona(
+    user_id: int, body: PersonaUpdate, session: SessionDep, user: CurrentUser
+) -> PersonaRow:
+    _ensure_admin(user)
+    from app.db.models import ParticipantPersona
+
+    target = await session.get(User, user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="user not found")
+    row = await session.get(ParticipantPersona, user_id)
+    text = body.persona_text.strip()
+    if not text:
+        # Пустой текст = удаление персоналии (юзер вернётся на legacy-пул).
+        if row is not None:
+            await session.delete(row)
+        await session.commit()
+        log.info("admin.persona_deleted", user_id=user_id, by=user.id)
+        return PersonaRow(user_id=user_id, display_name=target.display_name)
+    if row is None:
+        session.add(ParticipantPersona(user_id=user_id, persona_text=text))
+    else:
+        row.persona_text = text
+    await session.commit()
+    total, broken = _persona_counts(text)
+    log.info(
+        "admin.persona_upserted",
+        user_id=user_id,
+        templates=total,
+        broken=broken,
+        chars=len(text),
+        by=user.id,
+    )
+    return PersonaRow(
+        user_id=user_id,
+        display_name=target.display_name,
+        persona_text=text,
+        templates_count=total,
+        broken_templates_count=broken,
+    )
+
+
+@router.post("/admin/personas/{user_id}/preview", response_model=PersonaPreviewOut)
+async def preview_persona(
+    user_id: int, body: PersonaUpdate, session: SessionDep, user: CurrentUser
+) -> PersonaPreviewOut:
+    """Превью БЕЗ сохранения — админ проверяет текст до коммита в Neon."""
+    _ensure_admin(user)
+    from app.services.personas import parse_persona, render_phrase
+
+    return PersonaPreviewOut(phrase=render_phrase(parse_persona(body.persona_text)))
 
 
 # --- A6: Auto-loser ---

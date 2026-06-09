@@ -370,6 +370,10 @@ export const updateRPSchedule = (body: RPSchedule) =>
 // для обратной совместимости со старыми клиентами.
 export type RandomPhrasesMode = "words" | "phrases" | "mix";
 
+// GHG8 P6.3: версия генератора — legacy (нарезка сообщений v1) | personas
+// (типажи v2). Расписание/шансы общие, переключается только composer.
+export type PhraseGeneratorVersion = "legacy" | "personas";
+
 export interface RPGenerator {
   count_min: number;
   count_max: number;
@@ -381,6 +385,8 @@ export interface RPGenerator {
   // (вес 0..1 вместо 1.0). Убирает «передразнивание» последних сообщений.
   recency_quarantine_hours: number;
   recency_quarantine_weight: number;
+  // GHG8 P6.3: старые серверы не возвращают поле → undefined → 'legacy'.
+  generator_version?: PhraseGeneratorVersion;
 }
 
 export const fetchRPGenerator = () =>
@@ -390,6 +396,32 @@ export const updateRPGenerator = (body: RPGenerator) =>
   api<RPGenerator>("/api/admin/random-phrases/generator", {
     method: "PUT",
     body: JSON.stringify(body),
+  });
+
+// --- GHG8 P6.1: персоналии участников (генератор v2) ---
+// Тексты живут только в Neon (открытый git); сидинг — руками через админку
+// (P6.1.b). Пустой текст в updatePersona = удаление персоналии.
+
+export interface PersonaRow {
+  user_id: number;
+  display_name: string;
+  persona_text: string | null;
+  templates_count: number;
+  broken_templates_count: number;
+}
+
+export const fetchPersonas = () => api<PersonaRow[]>("/api/admin/personas");
+
+export const updatePersona = (userId: number, personaText: string) =>
+  api<PersonaRow>(`/api/admin/personas/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({ persona_text: personaText }),
+  });
+
+export const previewPersona = (userId: number, personaText: string) =>
+  api<{ phrase: string | null }>(`/api/admin/personas/${userId}/preview`, {
+    method: "POST",
+    body: JSON.stringify({ persona_text: personaText }),
   });
 
 // --- A6: Auto-loser ---

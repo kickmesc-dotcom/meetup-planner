@@ -10,6 +10,7 @@ import ChukhanScreen from "./ChukhanScreen";
 import LoserScreen from "./loser/LoserScreen";
 import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
 import RandomPhrasesScreen from "./RandomPhrasesScreen";
+import PersonasScreen from "./PersonasScreen";
 import BotReactionsScreen from "./BotReactionsScreen";
 import MediaReactionsScreen from "./MediaReactionsScreen";
 import HistoryScreen from "./HistoryScreen";
@@ -30,6 +31,7 @@ type Section =
   | "loser"
   | "scheduled-pubs"
   | "rp"
+  | "personas"
   | "bot-reactions"
   | "media-reactions"
   | "history"
@@ -70,6 +72,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "loser") return <LoserScreen users={users} onBack={back} />;
   if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
   if (section === "rp") return <RandomPhrasesScreen onBack={back} />;
+  if (section === "personas") return <PersonasScreen onBack={back} />;
   if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
   if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
@@ -214,6 +217,13 @@ export default function AdminScreen({ users }: Props) {
           title="Рандомные фразы"
           subtitle="Расписание автопоста + параметры генератора"
           onClick={() => select("rp")}
+        />
+        {/* GHG8 P6.1: редактор типажей для генератора v2. */}
+        <Card
+          icon="🎭"
+          title="Персоналии"
+          subtitle="Типажи участников для генератора фраз v2"
+          onClick={() => select("personas")}
         />
         {/* GHG7 P2.3.h: «Лох дня» (автовыбор) больше не отдельный пункт здесь —
             настройки автовыбора влиты в единый экран «Лох» (см. ниже). */}

@@ -475,6 +475,29 @@ class GameNomination(Base):
     )
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
+class ParticipantPersona(Base):
+    """GHG8 P6.1 — типаж участника для генератора фраз v2.
+
+    Тексты живут ТОЛЬКО в Neon (проект — открытый git, персоналии в репо
+    нельзя; GHG7.txt стр. 160). Сидинг — руками через админку (P6.1.b),
+    не миграцией. Формат `persona_text` (секции [слоты]/[шаблоны]) —
+    парсер в `services/personas.py`.
+    """
+
+    __tablename__ = "participant_personas"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    persona_text: Mapped[str] = mapped_column(Text, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event

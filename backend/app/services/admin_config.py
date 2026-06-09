@@ -380,6 +380,27 @@ async def set_random_phrases_mode(session: AsyncSession, mode: str) -> None:
     await _set_value(session, RANDOM_PHRASES_MODE_KEY, mode)
 
 
+# --- GHG8 P6.3: версия генератора фраз (legacy = нарезка сообщений v1,
+# personas = типажи v2). Расписание/шанс/ручной триггер ОБЩИЕ для обеих
+# версий (P6.2.b) — переключается только composer.
+PHRASE_GENERATOR_VERSION_KEY = "phrase_generator.version"
+PHRASE_GENERATOR_VERSIONS = ("legacy", "personas")
+_PHRASE_GENERATOR_VERSION_DEFAULT = "legacy"
+
+
+async def get_phrase_generator_version(session: AsyncSession) -> str:
+    raw = await _get_value(session, PHRASE_GENERATOR_VERSION_KEY)
+    return raw if raw in PHRASE_GENERATOR_VERSIONS else _PHRASE_GENERATOR_VERSION_DEFAULT
+
+
+async def set_phrase_generator_version(session: AsyncSession, version: str) -> None:
+    if version not in PHRASE_GENERATOR_VERSIONS:
+        raise ValueError(
+            f"phrase_generator.version must be one of {PHRASE_GENERATOR_VERSIONS}, got {version!r}"
+        )
+    await _set_value(session, PHRASE_GENERATOR_VERSION_KEY, version)
+
+
 # --- GHG5 POLL-HOURS1: Human-friendly time presets for polls/auto-pick ---
 
 POLL_TIME_PRESETS_KEY = "poll.time_presets"

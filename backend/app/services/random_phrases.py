@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.models import ChatMessage, User
 from app.services.admin_config import (
+    get_phrase_generator_version,
     get_random_phrases_collective_chance,
     get_random_phrases_count_range,
     get_random_phrases_enabled,
@@ -499,6 +500,9 @@ async def run_random_phrases_job(bot: Bot) -> None:
         mode = await get_random_phrases_mode(session)
         recency_hours = await get_random_phrases_recency_quarantine_hours(session)
         recency_weight = await get_random_phrases_recency_quarantine_weight(session)
+        # GHG8 P6.3: версия генератора. Расписание/шанс/кулдауны выше — общие
+        # для обеих версий (P6.2.b), переключается только composer.
+        generator_version = await get_phrase_generator_version(session)
         n = random.randint(cmin, cmax)
         log.info(
             "random_phrases.starting",
@@ -506,6 +510,7 @@ async def run_random_phrases_job(bot: Bot) -> None:
             cmin=cmin,
             cmax=cmax,
             mode=mode,
+            generator_version=generator_version,
             lookback_days=lookback_days,
             collective_chance=collective_chance,
             recency_quarantine_hours=recency_hours,
@@ -514,15 +519,27 @@ async def run_random_phrases_job(bot: Bot) -> None:
         )
 
         try:
-            text = await compose_random_phrase(
-                session,
-                n,
-                lookback_days=lookback_days,
-                collective_chance=collective_chance,
-                mode=mode,
-                recency_quarantine_hours=recency_hours,
-                recency_quarantine_weight=recency_weight,
-            )
+            text = None
+            if generator_version == "personas":
+                # P6.2: v2 «с типажами». None (нет пригодных персоналий) →
+                # фолбэк на legacy ниже — пост не срывается (GHG7.txt стр. 162).
+                from app.services.personas import compose_persona_phrase
+
+                text = await compose_persona_phrase(
+                    session, lookback_days=lookback_days
+                )
+                if text is None:
+                    log.info("random_phrases.personas_empty_fallback_legacy")
+            if text is None:
+                text = await compose_random_phrase(
+                    session,
+                    n,
+                    lookback_days=lookback_days,
+                    collective_chance=collective_chance,
+                    mode=mode,
+                    recency_quarantine_hours=recency_hours,
+                    recency_quarantine_weight=recency_weight,
+                )
         except Exception:
             log.exception("random_phrases.compose_failed")
             text = "<i>(Ошибка при сборке цитаты, техник уже выехал)</i>"

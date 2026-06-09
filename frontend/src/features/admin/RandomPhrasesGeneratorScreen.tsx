@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchRPGenerator,
   updateRPGenerator,
+  type PhraseGeneratorVersion,
   type RPGenerator,
   type RandomPhrasesMode,
 } from "@/api/admin";
@@ -93,6 +94,10 @@ function GeneratorForm({
   const [recWeight, setRecWeight] = useState(
     Math.round((initial.recency_quarantine_weight ?? 0.05) * 100),
   );
+  // GHG8 P6.3: версия генератора. Старые серверы → undefined → 'legacy'.
+  const [genVersion, setGenVersion] = useState<PhraseGeneratorVersion>(
+    initial.generator_version ?? "legacy",
+  );
 
   useEffect(() => {
     setCmin(String(initial.count_min));
@@ -103,6 +108,7 @@ function GeneratorForm({
     setMode(initial.mode ?? "mix");
     setRecHours(String(initial.recency_quarantine_hours ?? 18));
     setRecWeight(Math.round((initial.recency_quarantine_weight ?? 0.05) * 100));
+    setGenVersion(initial.generator_version ?? "legacy");
   }, [initial]);
 
   const cminN = clamp(parseInt(cmin, 10) || 2, 2, 6);
@@ -121,6 +127,7 @@ function GeneratorForm({
     mode,
     recency_quarantine_hours: recHoursN,
     recency_quarantine_weight: recWeight / 100,
+    generator_version: genVersion,
   };
 
   const dirty =
@@ -133,7 +140,8 @@ function GeneratorForm({
     body.recency_quarantine_hours !== (initial.recency_quarantine_hours ?? 18) ||
     Math.abs(
       body.recency_quarantine_weight - (initial.recency_quarantine_weight ?? 0.05),
-    ) > 0.005;
+    ) > 0.005 ||
+    genVersion !== (initial.generator_version ?? "legacy");
 
   // GHG6 L: лейблы count_min/count_max и хинт зависят от mode.
   const unitLabel =
@@ -148,6 +156,37 @@ function GeneratorForm({
   return (
     <>
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+        {/* GHG8 P6.3: переключатель версии генератора. Personas без единой
+            заведённой персоналии тихо фолбэчится на legacy (бэкенд). */}
+        <div>
+          <div className="text-base font-semibold mb-1">🎭 Версия генератора</div>
+          <div className="text-xs text-tg-hint mb-2">
+            {genVersion === "personas"
+              ? "Типажи: фраза собирается из шаблонов персоналии участника (редактор — «Персоналии» ниже по меню). Если ни одной персоналии нет — авто-фолбэк на нарезку."
+              : "Нарезка: классическая шизо-цитата из кусков реальных сообщений чата."}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <ModeChip
+              active={genVersion === "legacy"}
+              onClick={() => {
+                haptic("selection");
+                setGenVersion("legacy");
+              }}
+            >
+              ✂️ Нарезка
+            </ModeChip>
+            <ModeChip
+              active={genVersion === "personas"}
+              onClick={() => {
+                haptic("selection");
+                setGenVersion("personas");
+              }}
+            >
+              🎭 Типажи
+            </ModeChip>
+          </div>
+        </div>
+
         <div>
           <div className="text-base font-semibold mb-1">🧩 Режим сбора</div>
           <div className="text-xs text-tg-hint mb-2">{modeHint}</div>
