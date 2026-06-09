@@ -9,7 +9,8 @@ import {
 import CalendarView from "./features/calendar/CalendarView";
 import MeetingsScreen from "./features/meetings/MeetingsScreen";
 import PollsScreen from "./features/polls/PollsScreen";
-import LeaderboardScreen from "./features/leaderboard/LeaderboardScreen";
+import ProfileScreen from "./features/profile/ProfileScreen";
+import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import { useUI } from "./store/ui";
@@ -25,7 +26,10 @@ export default function App() {
     onMutate: async () => {
       await qc.cancelQueries({ queryKey: ["ui-prefs"] });
       const prev = qc.getQueryData<UiPrefs>(["ui-prefs"]);
-      qc.setQueryData<UiPrefs>(["ui-prefs"], { hide_greeting: true });
+      qc.setQueryData<UiPrefs>(["ui-prefs"], {
+        welcome_format: prev?.welcome_format ?? "avatar",
+        hide_greeting: true,
+      });
       return { prev };
     },
     onError: (_e, _v, ctx) => {
@@ -88,28 +92,16 @@ export default function App() {
   if (tab === "calendar") {
     content = (
       <>
+        {/* GHG8 P4: приветствие с быстрой инфой по званиям (welcome-screen).
+            Закрытие — confirm внутри баннера (P4.1.c), сама пометка —
+            та же ui-prefs мутация что и раньше. */}
         {!greetingHidden && (
-          <header className="relative px-4 py-3 border-b border-tg-secondary-bg pr-10">
-            <div className="text-base font-medium">Привет, {meData.display_name} 👋</div>
-            <div className="text-xs text-tg-hint">
-              Не размечен день = считается{" "}
-              <span className="text-status-busy">занятым</span>. Тапай по дате,
-              чтобы открыть редактор.
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                haptic("warning");
-                hideGreeting.mutate();
-              }}
-              disabled={hideGreeting.isPending}
-              aria-label="Скрыть приветствие"
-              title="Не показывать в следующий раз"
-              className="absolute top-2 right-2 min-h-8 min-w-8 rounded-md text-tg-hint hover:text-tg-text active:scale-95 transition-transform disabled:opacity-50"
-            >
-              ✕
-            </button>
-          </header>
+          <WelcomeBanner
+            users={users.data}
+            meName={meData.display_name}
+            format={uiPrefs.data?.welcome_format ?? "avatar"}
+            onHide={() => hideGreeting.mutate()}
+          />
         )}
         <main className="flex-1 overflow-hidden">
           <CalendarView users={users.data} meId={meData.id} />
@@ -144,17 +136,17 @@ export default function App() {
         </main>
       </>
     );
-  } else if (tab === "leaderboard") {
+  } else if (tab === "profile") {
     content = (
       <>
         <header className="px-4 py-3 border-b border-tg-secondary-bg">
-          <div className="text-base font-medium">🏆 Топы</div>
+          <div className="text-base font-medium">👤 Профиль</div>
           <div className="text-xs text-tg-hint">
-            Кто чаще всех попадает в чуханы и лохи.
+            Топы, история и настройки приветствия.
           </div>
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
-          <LeaderboardScreen users={users.data} />
+          <ProfileScreen users={users.data} me={meData} />
         </main>
       </>
     );

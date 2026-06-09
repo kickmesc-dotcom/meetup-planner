@@ -170,6 +170,60 @@ async def on_meetings(message: Message) -> None:
     await message.answer("\n".join(lines))
 
 
+# ---------------------- GHG8 P4.1.d: /top ----------------------
+
+@router.message(Command("top"))
+async def on_top(message: Message) -> None:
+    """Топы лохов/чуханов за всё время — текстовое зеркало экрана «Профиль →
+    Топы» в Mini App (P4.1.d: «команда /top ведёт туда же»)."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from sqlalchemy import func as _func
+
+    from app.db.models import WeeklyChukhan
+    from app.services.loser import loser_stats
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        loser_counts = await loser_stats(session)
+        chukhan_rows = (
+            await session.execute(
+                select(WeeklyChukhan.user_id, _func.count())
+                .where(WeeklyChukhan.posted_at.is_not(None))
+                .group_by(WeeklyChukhan.user_id)
+                .order_by(_func.count().desc())
+            )
+        ).all()
+        uids = set(loser_counts) | {int(uid) for uid, _ in chukhan_rows}
+        names = {
+            u.id: u.display_name
+            for u in (
+                await session.scalars(select(User).where(User.id.in_(uids)))
+            ).all()
+        } if uids else {}
+
+    def _block(title: str, pairs: list[tuple[int, int]], empty: str) -> list[str]:
+        out = [f"<b>{title}</b>"]
+        if not pairs:
+            out.append(f"  {empty}")
+            return out
+        medals = ("🥇", "🥈", "🥉")
+        for i, (uid, cnt) in enumerate(pairs):
+            mark = medals[i] if i < len(medals) else f"{i + 1}."
+            out.append(f"  {mark} {names.get(uid, f'#{uid}')} — {cnt}")
+        return out
+
+    loser_pairs = sorted(loser_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    chukhan_pairs = [(int(uid), int(cnt)) for uid, cnt in chukhan_rows]
+    lines = (
+        ["🏆 <b>Топы за всё время</b>", ""]
+        + _block("💩 Чуханы недели", chukhan_pairs, "пока никого")
+        + [""]
+        + _block("👑 Лохи дня", loser_pairs, "пока никого")
+    )
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
 # ---------------------- C4: /tasks ----------------------
 
 # Дублируем словарь меток из routes_admin, чтобы не тащить FastAPI-роутер в импортах.

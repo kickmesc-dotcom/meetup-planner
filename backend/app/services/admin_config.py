@@ -1004,6 +1004,27 @@ async def set_ui_hide_greeting(
     )
 
 
+# GHG8 P4.1.b: формат отображения юзера в welcome-блоках. Один селектор на
+# ВСЕ блоки (чухан/гл.лох/лох дня/червь) — решение из GHG7.txt стр. 27.
+# Per-user (как hide_greeting): каждый настраивает себе сам.
+UI_WELCOME_FORMAT_PREFIX = "ui.welcome_format:"
+WELCOME_FORMATS = ("name", "avatar", "both")
+_WELCOME_FORMAT_DEFAULT = "avatar"
+
+
+async def get_ui_welcome_format(session: AsyncSession, tg_id: int) -> str:
+    raw = await _get_value(session, f"{UI_WELCOME_FORMAT_PREFIX}{tg_id}")
+    return raw if raw in WELCOME_FORMATS else _WELCOME_FORMAT_DEFAULT
+
+
+async def set_ui_welcome_format(
+    session: AsyncSession, tg_id: int, fmt: str
+) -> None:
+    if fmt not in WELCOME_FORMATS:
+        fmt = _WELCOME_FORMAT_DEFAULT
+    await _set_value(session, f"{UI_WELCOME_FORMAT_PREFIX}{tg_id}", fmt)
+
+
 # --- G2/G3: настройки опросов в чате ---
 
 def _parse_bool(raw: str | None, default: bool) -> bool:

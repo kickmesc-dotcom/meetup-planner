@@ -97,11 +97,23 @@ export interface CurrentTitles {
   chukhan_user_id: number | null;
   loser_today_user_id: number | null;
   main_loser_user_id: number | null;
+  /** GHG8 P4.1.a: сколько раз главный лох был лохом (0 если нет). */
+  main_loser_count: number;
   birthday_today_user_ids: number[];
 }
 
 export const fetchCurrentTitles = () =>
   api<CurrentTitles>("/api/titles/current");
+
+// GHG8 P4.1.e: публичная история чуханов (профиль). Только доставленные.
+export interface ChukhanHistoryEntry {
+  week_start: string; // ISO
+  user_id: number;
+  posted_at: string; // ISO
+}
+
+export const fetchChukhanHistory = (limit = 20) =>
+  api<ChukhanHistoryEntry[]>(`/api/chukhan/history?limit=${limit}`);
 
 // GHG6 E6: запланированные игры (meeting.tag='game') в окне.
 // Используется для иконки 🎮 в углу дня в CalendarView.

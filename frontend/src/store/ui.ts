@@ -50,7 +50,9 @@ export function isMonthGridZoom(z: ZoomLevel): boolean {
   return z === "month" || z === "threeMonths" || z === "sixMonths";
 }
 
-export type Tab = "calendar" | "meetings" | "polls" | "leaderboard" | "admin";
+// GHG8 P4.1.d: вкладка "leaderboard" (Топы) заменена на "profile" — топы
+// переехали внутрь профиля вместе с историей и настройками приветствия.
+export type Tab = "calendar" | "meetings" | "polls" | "profile" | "admin";
 
 interface UIState {
   tab: Tab;

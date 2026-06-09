@@ -12,7 +12,8 @@ const BASE_ITEMS: Item[] = [
   { id: "calendar", label: "Календарь", icon: "📅" },
   { id: "meetings", label: "Встречи", icon: "🤝" },
   { id: "polls", label: "Опросы", icon: "🗳️" },
-  { id: "leaderboard", label: "Топы", icon: "🏆" },
+  // GHG8 P4.1.d: «Топы» → «Профиль» (топы и история — внутри).
+  { id: "profile", label: "Профиль", icon: "👤" },
 ];
 
 const ADMIN_ITEM: Item = { id: "admin", label: "Админ", icon: "⚙️" };

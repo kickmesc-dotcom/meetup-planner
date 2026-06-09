@@ -43,6 +43,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("next", "Ближайшая встреча с RSVP", scope="both"),
     CommandSpec("meetings", "5 ближайших встреч + RSVP", scope="both"),
     CommandSpec("chukhan", "Чухан недели", scope="both"),
+    CommandSpec("top", "Топы лохов и чуханов за всё время", scope="both"),
     CommandSpec("tasks", "Запланированные задачи бота", scope="both"),
     # --- Действия ---
     CommandSpec("loser", "Назначить лоха дня (ручная рулетка)", scope="both"),

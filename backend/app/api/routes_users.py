@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -10,7 +10,9 @@ from app.db.models import User
 from app.schemas.user import UserOut
 from app.services.admin_config import (
     get_ui_hide_greeting,
+    get_ui_welcome_format,
     set_ui_hide_greeting,
+    set_ui_welcome_format,
 )
 
 router = APIRouter(tags=["users"])
@@ -44,21 +46,42 @@ async def list_users(session: SessionDep, _: CurrentUser) -> list[UserOut]:
 
 
 # --- E7: per-user UI prefs (закрываемое приветствие) ---
+# GHG8 P4: + welcome_format (name|avatar|both, P4.1.b — один селектор на все
+# welcome-блоки). В PUT оба поля опциональны — клиенты шлют только то, что
+# меняют (старый фронт слал {hide_greeting} без формата — совместимо).
 
 
-class UiPrefsIO(BaseModel):
+class UiPrefsOut(BaseModel):
     hide_greeting: bool
+    welcome_format: str  # name | avatar | both
 
 
-@router.get("/me/ui-prefs", response_model=UiPrefsIO)
-async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsIO:
-    hide = await get_ui_hide_greeting(session, user.telegram_id)
-    return UiPrefsIO(hide_greeting=hide)
+class UiPrefsPatch(BaseModel):
+    hide_greeting: bool | None = None
+    welcome_format: str | None = Field(
+        None, pattern="^(name|avatar|both)$"
+    )
 
 
-@router.put("/me/ui-prefs", response_model=UiPrefsIO)
+@router.get("/me/ui-prefs", response_model=UiPrefsOut)
+async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
+    return UiPrefsOut(
+        hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
+        welcome_format=await get_ui_welcome_format(session, user.telegram_id),
+    )
+
+
+@router.put("/me/ui-prefs", response_model=UiPrefsOut)
 async def put_ui_prefs(
-    body: UiPrefsIO, session: SessionDep, user: CurrentUser
-) -> UiPrefsIO:
-    await set_ui_hide_greeting(session, user.telegram_id, body.hide_greeting)
-    return UiPrefsIO(hide_greeting=body.hide_greeting)
+    body: UiPrefsPatch, session: SessionDep, user: CurrentUser
+) -> UiPrefsOut:
+    if body.hide_greeting is not None:
+        await set_ui_hide_greeting(session, user.telegram_id, body.hide_greeting)
+    if body.welcome_format is not None:
+        await set_ui_welcome_format(
+            session, user.telegram_id, body.welcome_format
+        )
+    return UiPrefsOut(
+        hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
+        welcome_format=await get_ui_welcome_format(session, user.telegram_id),
+    )

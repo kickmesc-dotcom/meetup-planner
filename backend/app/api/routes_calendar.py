@@ -203,6 +203,9 @@ class CurrentTitlesOut(BaseModel):
     chukhan_user_id: int | None = None
     loser_today_user_id: int | None = None
     main_loser_user_id: int | None = None
+    # GHG8 P4.1.a: сколько раз главный лох был лохом — для welcome-блока
+    # «Главный лох: %user% %N раз%». 0 если main_loser_user_id is None.
+    main_loser_count: int = 0
     birthday_today_user_ids: list[int] = []
 
 
@@ -262,7 +265,10 @@ async def get_titles_current(
         out.loser_today_user_id = last_today.loser_user_id
 
     # 4. Главный лох — max по числу роллов; тай-брейк меньший user_id.
-    out.main_loser_user_id = pick_main_loser(await loser_stats(session))
+    stats = await loser_stats(session)
+    out.main_loser_user_id = pick_main_loser(stats)
+    if out.main_loser_user_id is not None:
+        out.main_loser_count = stats.get(out.main_loser_user_id, 0)
 
     # 5. ДР сегодня — совпадение дня и месяца с текущей датой.
     bdays = (await session.scalars(select(Birthday).where(Birthday.bday.is_not(None)))).all()
@@ -275,6 +281,39 @@ async def get_titles_current(
     ]
 
     return out
+
+
+# --- GHG8 P4.1.e: история чуханов для меню профиля (не-админ) ---
+
+
+class ChukhanHistoryRow(BaseModel):
+    """Публичная история чуханов (профиль → история). В отличие от
+    /admin/chukhan/history доступна всем участникам и отдаёт только
+    ДОСТАВЛЕННЫЕ недели (posted_at IS NOT NULL — паттерн GHG7 P11:
+    недоставленный пик ждёт ретрая и званием ещё не является)."""
+    week_start: datetime
+    user_id: int
+    posted_at: datetime
+
+
+@router.get("/chukhan/history", response_model=list[ChukhanHistoryRow])
+async def chukhan_history_public(
+    session: SessionDep, _user: CurrentUser, limit: int = Query(20, ge=1, le=100)
+) -> list[ChukhanHistoryRow]:
+    rows = (
+        await session.scalars(
+            select(WeeklyChukhan)
+            .where(WeeklyChukhan.posted_at.is_not(None))
+            .order_by(WeeklyChukhan.week_start.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        ChukhanHistoryRow(
+            week_start=r.week_start, user_id=r.user_id, posted_at=r.posted_at
+        )
+        for r in rows
+    ]
 
 
 # --- GHG7 P0.2.e: причина ролла по клику на корону ---
