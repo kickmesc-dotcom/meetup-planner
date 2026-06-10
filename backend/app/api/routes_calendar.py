@@ -316,6 +316,38 @@ async def chukhan_history_public(
     ]
 
 
+# --- GHG8 P2.1.c: история червей для попапа по клику на 🪱 в шапке ---
+
+
+class WormHistoryRow(BaseModel):
+    """Публичная история «червей-пидоров» (worm_assignments). ended_at IS NULL
+    = текущий носитель звания."""
+    user_id: int
+    started_at: datetime
+    ended_at: datetime | None = None
+
+
+@router.get("/worm/history", response_model=list[WormHistoryRow])
+async def worm_history_public(
+    session: SessionDep, _user: CurrentUser, limit: int = Query(20, ge=1, le=100)
+) -> list[WormHistoryRow]:
+    from app.db.models import WormAssignment
+
+    rows = (
+        await session.scalars(
+            select(WormAssignment)
+            .order_by(WormAssignment.started_at.desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        WormHistoryRow(
+            user_id=r.user_id, started_at=r.started_at, ended_at=r.ended_at
+        )
+        for r in rows
+    ]
+
+
 # --- GHG7 P0.2.e: причина ролла по клику на корону ---
 
 

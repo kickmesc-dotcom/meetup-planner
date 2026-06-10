@@ -62,6 +62,7 @@ export default function ParticipantRow({
   const setEditing = useUI((s) => s.setEditingRangeId);
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
   const setLoserReasonPopover = useUI((s) => s.setLoserReasonPopover);
+  const setShowWormHistory = useUI((s) => s.setShowWormHistory);
   const qc = useQueryClient();
 
   const createMut = useMutation({
@@ -186,15 +187,23 @@ export default function ParticipantRow({
           )}
           {/* GHG7 P10.1.c: 🪱 «червь-пидор» — СНИЗУ по центру (под аватаркой).
               Отделён от чухана, чтобы две роли не наезжали. Та же правка P11 —
-              без фон-плашки, читаемость через drop-shadow. */}
+              без фон-плашки, читаемость через drop-shadow.
+              GHG8 P2.1.c: бейдж кликабелен — открывает попап-историю звания
+              (общую, не per-user — звание переходящее). */}
           {isWorm && (
-            <span
-              aria-label="Червь-пидор"
-              title="Червь-пидор"
-              className="pointer-events-none absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.45))]"
+            <button
+              type="button"
+              aria-label="Червь-пидор — история"
+              title="История звания «Червь-пидор»"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptic("selection");
+                setShowWormHistory(true);
+              }}
+              className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.45))] active:scale-95"
             >
               🪱
-            </span>
+            </button>
           )}
         </div>
         <div className="text-[10px] text-tg-hint truncate max-w-[60px] mt-0.5">

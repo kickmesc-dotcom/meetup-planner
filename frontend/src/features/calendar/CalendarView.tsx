@@ -25,6 +25,7 @@ import TimelineView from "./views/TimelineView";
 import TimelineNavBar from "./views/TimelineNavBar";
 import BirthdayPopover from "./BirthdayPopover";
 import LoserReasonPopover from "./LoserReasonPopover";
+import WormHistoryPopover from "./WormHistoryPopover";
 import HoursView from "./views/HoursView";
 import MonthView from "./views/MonthView";
 import YearView from "./views/YearView";
@@ -291,6 +292,8 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
       <BirthdayPopover />
       {/* GHG7 P0.2.e: попап причины ролла по клику на 👑. */}
       <LoserReasonPopover />
+      {/* GHG8 P2.1.c: попап-история звания «Червь-пидор» по клику на 🪱. */}
+      <WormHistoryPopover />
     </div>
   );
 }

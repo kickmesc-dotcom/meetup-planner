@@ -99,6 +99,14 @@ interface UIState {
   setLoserReasonPopover: (v: { userId: number; date: string; displayName: string } | null) => void;
 
   /**
+   * GHG8 P2.1.c: попап-история звания «🪱 Червь-пидор» по клику на бейдж под
+   * аватаркой. Звание переходящее и одно на всех — храним просто флаг
+   * открытия, без per-user полей.
+   */
+  showWormHistory: boolean;
+  setShowWormHistory: (v: boolean) => void;
+
+  /**
    * GHG6 BD2: дата, с которой надо открыть PollSheet при «Назначить встречу»
    * из поповера. PollSheet читает её при монтаже и кладёт в первый вариант.
    */
@@ -191,6 +199,9 @@ export const useUI = create<UIState>((set, get) => ({
 
   loserReasonPopover: null,
   setLoserReasonPopover: (loserReasonPopover) => set({ loserReasonPopover }),
+
+  showWormHistory: false,
+  setShowWormHistory: (showWormHistory) => set({ showWormHistory }),
 
   pollSheetPresetDate: null,
   setPollSheetPresetDate: (pollSheetPresetDate) => set({ pollSheetPresetDate }),

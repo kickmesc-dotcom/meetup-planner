@@ -115,6 +115,17 @@ export interface ChukhanHistoryEntry {
 export const fetchChukhanHistory = (limit = 20) =>
   api<ChukhanHistoryEntry[]>(`/api/chukhan/history?limit=${limit}`);
 
+// GHG8 P2.1.c: публичная история «червей-пидоров» (worm_assignments).
+// ended_at = null → текущий носитель звания.
+export interface WormHistoryEntry {
+  user_id: number;
+  started_at: string; // ISO
+  ended_at: string | null; // ISO | null (null = активный)
+}
+
+export const fetchWormHistory = (limit = 20) =>
+  api<WormHistoryEntry[]>(`/api/worm/history?limit=${limit}`);
+
 // GHG6 E6: запланированные игры (meeting.tag='game') в окне.
 // Используется для иконки 🎮 в углу дня в CalendarView.
 export interface GameSession {
