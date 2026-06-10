@@ -1,10 +1,15 @@
 # Meetup Planner — чеклист GHG7
 
-> ⚠️ **АРХИВ (2026-06-04).** Итерация GHG7 закрыта и задеплоена (релиз P0–P10,
+> ⚠️ **АРХИВ.** Итерация GHG7 закрыта и задеплоена (релиз P0–P10,
 > HF `cf79c18` / Pages `773f688`, 2026-06-01). Рабочий чеклист теперь —
 > `CHECKLIST_GHG8.md`. Этот файл НЕ удалять: хранит детали и file:line по
 > закрытым задачам + исходный прод-фидбек 03.05.26 (пункты 1–10), разложенный
 > в GHG8 как блок Q.
+>
+> **(2026-06-10) Сюда же перенесены закрытые блоки GHG8** — однострочники
+> в самом низу файла («ЗАКРЫТО GHG8»). Сделано, чтобы рабочий `CHECKLIST_GHG8.md`
+> не таскал ~150 строк готового кода в контекст каждой сессии. Детали закрытых
+> задач — в `git log --grep "GHG8"` по указанным коммитам.
 
 Источник: `C:\Users\fa1nt\GHG7.txt`. Дата старта итерации: 2026-05-28.
 Single source of truth: `C:\Users\fa1nt\meetup-planner-main` (монорепо `backend/` +
@@ -917,3 +922,77 @@ CheckConstraint → 'duel' миграции не требует.
   P8.6.c/P10.1.f) + гард про устаревающий `origin/main` ref (fetch перед
   выводами «ahead N»). Проверка деплоя: `git fetch` обоих remote → HF `cf79c18`
   (P9), Pages `773f688` (P10), локально `0 0` — всё на remote.
+
+---
+
+## ЗАКРЫТО GHG8 (перенесено сюда 2026-06-10; детали — `git log --grep "GHG8"`)
+
+Релиз GHG8 шёл поверх P0–P10. Ниже — все закрытые блоки одной строкой
+(что сделано + ключевой коммит). Открытое осталось в `CHECKLIST_GHG8.md`.
+
+**Блок Q (прод-фидбек 03.05/инциденты, 2026-06-04…06):**
+- **Q-INV-1/Q5.** Причины чухана «6 старых» — невалидный JSON в `admin_config`
+  молча фолбэчил на дефолты; фикс «↩ Сбросить к дефолтам» + `/admin/chukhan-reasons/raw`
+  + лог fallback_default. HF `8fc7230`, Pages `78f4af4`.
+- **Q-FIX.** `chukhan.py:147` — пропущенная запятая в `CHUKHAN_TAGLINES`
+  (implicit concat); web-UI-коммит `e594e79` смёрджен.
+- **Q4.** Чёрный фон 💩/🪱-бейджей → drop-shadow без плашки (`ParticipantRow.tsx`).
+  Pages `78f4af4`.
+- **Q-INV-2/Q7.** Медиа-реакции: send без таймаута висел 30с (фикс `asyncio.wait_for` 25с)
+  + `_recent` терялся при рестарте (persist в `admin_config[media_reactions.recent_media]`
+  + фолбэк в force + человечный 404). HF `a4c74fa`. Сьют 247.
+- **Q-INV-3/Q2/Q1 = P11.** Отказоустойчивость чухан-поста: таймаут send 25с,
+  удаление огрызка дроби при фейле, пик не откатывается + `retry_undelivered_chukhan`
+  (job 30мин + on-startup), фильтр `posted_at IS NOT NULL` в calendar/titles.
+  HF `8fc7230`, Pages `78f4af4`.
+- **Q3/Q6/Q8/Q9.** Подтверждение мемов / актуализация чеклиста / прокси-констрейнты
+  и диагностика — учтены в Q-NET (план в GHG8).
+
+**Плановые P-блоки:**
+- **P13.** (06-05/06) Рекурси-вес рандом-фраз «порог+плато» (карантин 18ч, вес 0.05)
+  в обоих композерах + «🕰 Карантин свежести» в админке. Без новых запросов к Neon.
+  Сьют 234. HF `2f4e04e`, Pages `5cbbbc3`.
+- **P2.4.** (06-06) ДР-меню: 4 кнопки в `BirthdayPopover` (пост от бота/от своего
+  имени, `POST /api/birthdays/{id}/greeting/post`), poll-пресет «Собираемся на ДР {имя}?».
+  Сьют 262. HF `8eef976`, Pages `bd455c3`.
+- **P3.** (06-06/07) Иммунитет именинника к лоху/чухану: `birthdays.immunity_mode`
+  ∈ {announce, silent}, `services/birthday_immunity.py` (`resolve_immune_pick`),
+  встроено во все 4 точки публикации + чухан; чипы в `BirthdaysScreen`. Сьют 274.
+  HF `2c13d2c`, Pages `3f01ab1`.
+- **P7.** (06-07) Пул шуток на «мёртвый чат»: `services/dead_chat.py` (пороги 24h…год,
+  фразы/метка/анти-спам в admin_config, активность = текст+медиа c троттлингом 15мин),
+  job `dead_chat_hourly`, тогглер «🪦 Пинок мёртвого чата». Сьют 312. HF `d7c5c20`, Pages `4db9223`.
+- **P14.** (06-07/08) Рестарт HF Space из админки + по расписанию. INV: выбран
+  вариант A (HF Hub API `POST .../restart`, Bearer `HF_TOKEN`), подтверждён живым
+  тестом — даунтайм ≈0, вебхук переустанавливается сам (~6.5 мин до боеготовности).
+  `services/space_restart.py`, `SpaceRestartScreen.tsx`; schedule off|once|interval,
+  job `space_restart_tick` (5 мин), анти-луп 30 мин, кламп every_hours 1..720.
+  Требует env `HF_TOKEN` (write) — без него 503 + кнопка дизейбл. `test_space_restart.py`
+  (20). Сьют 332. (DEPLOY_NOTES — секция про `HF_TOKEN`.)
+- **P4.** (06-09) Экран приветствия: welcome-баннер над календарём (Чухан недели,
+  Главный лох +`main_loser_count` в `/titles/current`, Лох дня, Червь — если есть),
+  `WelcomeBanner.tsx`; единый формат `name|avatar|both` per-user в admin_config
+  (`ui.welcome_format:<tg_id>`, PUT `/me/ui-prefs` → PATCH-подобный `UiPrefsPatch`);
+  закрытие баннера → per-user `hide_greeting` + тогглер в Профиле; вкладка «Топы» →
+  «Профиль» (`ProfileScreen.tsx`: шапка/Топы/История/настройки), команда `/top` в чате
+  (`chat_commands.py:on_top`); история чуханов — публичный `GET /api/chukhan/history`
+  (posted_at IS NOT NULL). `test_welcome_prefs.py` (12). Сьют 344. HF `1f9ae95`, Pages `97e1b2f`.
+- **P6.** (06-09) Генератор фраз v2 «типажи»: Neon-таблица `participant_personas`
+  (миграция `0015`, модель `ParticipantPersona`, нагрузка нулевая — SELECT только
+  при генерации/в админке); CRUD `GET /admin/personas`, `PUT /admin/personas/{uid}`
+  (пустой текст = удаление), `POST .../preview`; UI `PersonasScreen.tsx` («🎭 Персоналии»);
+  `services/personas.py` (`parse_persona`/`render_phrase`/`weighted_pick_user`/
+  `compose_persona_phrase`, без LLM); v2 встроен в `run_random_phrases_job` с авто-фолбэком
+  на legacy; `phrase_generator.version` ∈ {legacy, personas} (default legacy) + сегмент
+  «🎭 Версия генератора». `test_personas.py` (18). Сьют 362. HF `f4b0fbf`, Pages `9e685fd`.
+  ⚠️ Открытым остался ручной шаг **P6.1.b** (сидинг 6 персоналий через админку) — он в GHG8.
+- **Q-NET.b.** (06-10) Таймауты и пул бот-сессии: keepalive_timeout=15 + гранулярный
+  `ClientTimeout(total=25, sock_connect=8)` на direct/proxy-коннекторе (env-тюнеры
+  `BOT_KEEPALIVE_TIMEOUT`/`BOT_TOTAL_TIMEOUT`/`BOT_SOCK_CONNECT_TIMEOUT`, дефолты);
+  `BOT_FORCE_CLOSE=true` — аварийный «без пула» (keepalive не шлём, иначе aiohttp ValueError);
+  направление proxy↔direct не трогаем (Q8). `test_net_pool.py` (8). Сьют 370.
+  HF `ef08ca5`, GitHub `41addb8`. (Q-NET a/c/d — открыты в GHG8.)
+- **P2.1.c.** (06-10) Клик по 🪱-бейджу → попап-история звания «Червь-пидор» (общая):
+  публичный `GET /api/worm/history` (worm_assignments DESC, ended_at=null = текущий);
+  `fetchWormHistory` + `showWormHistory` в UI-сторе, `WormHistoryPopover.tsx`
+  (имена из кэша `["users"]`). HF `ef08ca5`, GitHub `41addb8`.
