@@ -40,6 +40,48 @@ def _env_truthy(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on", "y"}
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+# GHG8 Q-NET.b: параметры пула/таймаутов коннектора. Лечат корень «зависает,
+# рестарт расклинивает»: при РКН-throttling полудохлое keep-alive-соединение
+# оставалось в пуле и переиспользовалось → каждый следующий запрос виснул на
+# нём до плоских 30с. keepalive_timeout режет такие соединения, гранулярный
+# ClientTimeout фейлит быстрее, BOT_FORCE_CLOSE — аварийный «вообще без пула».
+def _resolve_keepalive_timeout() -> float:
+    return float(_env_int("BOT_KEEPALIVE_TIMEOUT", 15))
+
+
+def _resolve_force_close() -> bool:
+    return _env_truthy("BOT_FORCE_CLOSE", False)
+
+
+def _resolve_timeouts() -> tuple[float, float]:
+    """(total, sock_connect) в секундах. total < 30с сессии — даём send успеть,
+    но не виснем дольше; sock_connect ловит «коннект не устанавливается»."""
+    return float(_env_int("BOT_TOTAL_TIMEOUT", 25)), float(
+        _env_int("BOT_SOCK_CONNECT_TIMEOUT", 8)
+    )
+
+
+def _pool_connector_kwargs() -> dict[str, Any]:
+    """Общие kwargs пула для direct- и proxy-коннектора.
+
+    aiohttp запрещает keepalive_timeout вместе с force_close=True
+    (ValueError), поэтому при force_close keepalive не передаём.
+    """
+    if _resolve_force_close():
+        return {"force_close": True}
+    return {"keepalive_timeout": _resolve_keepalive_timeout()}
+
+
 def _make_direct_connector() -> aiohttp.TCPConnector:
     return aiohttp.TCPConnector(
         family=socket.AF_INET,
@@ -47,12 +89,18 @@ def _make_direct_connector() -> aiohttp.TCPConnector:
         ttl_dns_cache=300,
         limit=20,
         enable_cleanup_closed=True,
+        **_pool_connector_kwargs(),
     )
 
 
 def _make_proxy_connector(rec: Any) -> aiohttp.BaseConnector | None:
     """SOCKS5/HTTP-прокси через aiohttp_socks. MTProto-прокси не подходят
-    для HTTP Bot API — для них возвращаем None и пропускаем."""
+    для HTTP Bot API — для них возвращаем None и пропускаем.
+
+    GHG8 Q-NET.b: те же keepalive/force_close, что у direct — это свойство
+    пула, не направление (выбор прокси/первый зелёный прокси не трогаем, Q8).
+    ProxyConnector наследует TCPConnector и принимает эти kwargs.
+    """
     proxy_type = (rec.type or "").lower()
     if proxy_type not in {"socks5", "http"}:
         return None
@@ -68,6 +116,7 @@ def _make_proxy_connector(rec: Any) -> aiohttp.BaseConnector | None:
         port=rec.port,
         password=rec.secret if proxy_type == "socks5" else None,
         rdns=True,
+        **_pool_connector_kwargs(),
     )
 
 
@@ -244,13 +293,19 @@ def _proxy_pool_snapshot() -> list[Any]:
 def _build_session() -> AiohttpSession | None:
     """Return a session that forces IPv4, or None to use aiogram default.
 
-    aiogram 3.13 expects a numeric `timeout` (seconds, float) on the session;
-    it is passed straight to `aiohttp.ClientSession.post(timeout=...)` per call.
-    30 s total is enough for Telegram and short enough to fail fast on HF.
+    aiogram 3.13 хранит `timeout` в BaseSession.timeout и передаёт его как есть
+    в `aiohttp.ClientSession.post(timeout=...)` (make_request). aiohttp 3.10
+    принимает там как число, так и `ClientTimeout`-объект — поэтому даём
+    гранулярный таймаут (GHG8 Q-NET.b): `total` < 30с (даём send успеть, но
+    не виснем дольше), `sock_connect` ловит «коннект не встаёт». Per-request
+    `request_timeout=N` (set_my_commands/set_webhook) по-прежнему перекрывает
+    его числом — это ок, отдельные короткие вызовы.
     """
     if not _env_truthy("BOT_FORCE_IPV4", True):
         return None
-    return _IPv4AiohttpSession(timeout=30.0)
+    total, sock_connect = _resolve_timeouts()
+    timeout = aiohttp.ClientTimeout(total=total, sock_connect=sock_connect)
+    return _IPv4AiohttpSession(timeout=timeout)
 
 
 def get_bot() -> Bot:
