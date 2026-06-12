@@ -19,6 +19,7 @@ from app.bot.dispatcher import (
     _make_direct_connector,
     _make_proxy_connector,
     _pool_connector_kwargs,
+    _resolve_api_server,
     _resolve_force_close,
     _resolve_keepalive_timeout,
     _resolve_timeouts,
@@ -98,15 +99,74 @@ async def test_direct_connector_force_close_builds(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_session_uses_granular_timeout(monkeypatch):
+async def test_session_uses_flat_timeout(monkeypatch):
+    # HOTFIX 2026-06-12: Q-NET.b ставил ClientTimeout(total=25, sock_connect=8);
+    # sock_connect=8 рубил TLS-handshake к Telegram под РКН-throttling и ослепил
+    # прод (100% исходящих → timeout). Откатили на плоский float-таймаут (как до
+    # f629fa0). aiogram передаёт его в session.post(timeout=...) как число.
     monkeypatch.delenv("BOT_TOTAL_TIMEOUT", raising=False)
-    monkeypatch.delenv("BOT_SOCK_CONNECT_TIMEOUT", raising=False)
     monkeypatch.setenv("BOT_FORCE_IPV4", "true")
     s = _build_session()
     try:
-        assert isinstance(s.timeout, aiohttp.ClientTimeout)
-        assert s.timeout.total == 25.0
-        assert s.timeout.sock_connect == 8.0
+        assert s.timeout == 30.0
+    finally:
+        await s.close()
+
+    monkeypatch.setenv("BOT_TOTAL_TIMEOUT", "40")
+    s2 = _build_session()
+    try:
+        assert s2.timeout == 40.0
+    finally:
+        await s2.close()
+
+
+# --- BOT_API_SERVER: кастомный реверс-прокси (инцидент 12.06) ---
+# Корень «бот молчал 2 дня»: Bot(server=...) МОЛЧА игнорируется в aiogram 3.x —
+# server проваливается в **kwargs. Кастомный сервер задаётся ТОЛЬКО на сессии
+# (BaseSession(api=...)). Эти тесты пинят, что api реально доходит до сессии и
+# собранный URL указывает на воркер, а не на api.telegram.org.
+
+def test_api_server_unset_is_none(monkeypatch):
+    monkeypatch.delenv("BOT_API_SERVER", raising=False)
+    assert _resolve_api_server() is None
+
+
+def test_api_server_resolves_from_env(monkeypatch):
+    monkeypatch.setenv("BOT_API_SERVER", "https://telegram-proxy.kickmesc.workers.dev")
+    api = _resolve_api_server()
+    assert api is not None
+    assert api.base == "https://telegram-proxy.kickmesc.workers.dev/bot{token}/{method}"
+
+
+def test_api_server_blank_is_none(monkeypatch):
+    monkeypatch.setenv("BOT_API_SERVER", "   ")
+    assert _resolve_api_server() is None
+
+
+@pytest.mark.asyncio
+async def test_session_carries_custom_api(monkeypatch):
+    # Главное: api долетает до session.api, а не теряется (как было с
+    # Bot(server=...)). Собранный URL должен бить в воркер.
+    monkeypatch.setenv("BOT_API_SERVER", "https://telegram-proxy.kickmesc.workers.dev")
+    monkeypatch.setenv("BOT_FORCE_IPV4", "true")
+    s = _build_session()
+    try:
+        url = s.api.api_url(token="123:abc", method="getMe")
+        assert url.startswith("https://telegram-proxy.kickmesc.workers.dev/")
+        assert "api.telegram.org" not in url
+    finally:
+        await s.close()
+
+
+@pytest.mark.asyncio
+async def test_session_default_api_is_telegram(monkeypatch):
+    # Без BOT_API_SERVER сессия ходит напрямую (дефолт aiogram).
+    monkeypatch.delenv("BOT_API_SERVER", raising=False)
+    monkeypatch.setenv("BOT_FORCE_IPV4", "true")
+    s = _build_session()
+    try:
+        url = s.api.api_url(token="123:abc", method="getMe")
+        assert "api.telegram.org" in url
     finally:
         await s.close()
 

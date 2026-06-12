@@ -11,6 +11,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
+from aiogram.client.telegram import TelegramAPIServer
 
 from app.bot.handlers import (
     admin_chukhan,
@@ -290,22 +291,44 @@ def _proxy_pool_snapshot() -> list[Any]:
     return list(_state.pool)
 
 
+def _resolve_api_server() -> TelegramAPIServer | None:
+    """BOT_API_SERVER (опц.): базовый URL Bot API. Пусто = напрямую на
+    api.telegram.org (дефолт aiogram). Если HF режет прямой egress в TG
+    (РКН-блокировка), задаём URL cloudflare-воркера-реверс-прокси (worker
+    переписывает host → api.telegram.org), напр.
+    https://telegram-proxy.kickmesc.workers.dev
+
+    ВАЖНО: кастомный сервер в aiogram 3.x задаётся ТОЛЬКО на сессии
+    (`BaseSession(api=...)`). `Bot(server=...)` молча уходит в **kwargs и
+    игнорируется — поэтому api пробрасываем в `_IPv4AiohttpSession`.
+    """
+    raw = (os.getenv("BOT_API_SERVER") or "").strip()
+    if not raw:
+        return None
+    return TelegramAPIServer.from_base(raw)
+
+
 def _build_session() -> AiohttpSession | None:
-    """Return a session that forces IPv4, or None to use aiogram default.
+    """Return a session that forces IPv4 / custom API server, or None.
 
     aiogram 3.13 хранит `timeout` в BaseSession.timeout и передаёт его как есть
-    в `aiohttp.ClientSession.post(timeout=...)` (make_request). aiohttp 3.10
-    принимает там как число, так и `ClientTimeout`-объект — поэтому даём
-    гранулярный таймаут (GHG8 Q-NET.b): `total` < 30с (даём send успеть, но
-    не виснем дольше), `sock_connect` ловит «коннект не встаёт». Per-request
-    `request_timeout=N` (set_my_commands/set_webhook) по-прежнему перекрывает
-    его числом — это ок, отдельные короткие вызовы.
+    в `aiohttp.ClientSession.post(timeout=...)` (make_request). Плоский total
+    (HOTFIX 2026-06-12: Q-NET.b sock_connect=8 рубил TLS-handshake под
+    РКН-throttling из HF → бот слеп; вернули поведение до f629fa0). Per-request
+    `request_timeout=N` (set_my_commands/set_webhook) перекрывает его числом.
+
+    Кастомный `api` (BOT_API_SERVER) задаётся здесь, на сессии — это
+    единственное рабочее место (Bot(server=...) игнорируется в aiogram 3.x).
     """
-    if not _env_truthy("BOT_FORCE_IPV4", True):
+    api = _resolve_api_server()
+    force_ipv4 = _env_truthy("BOT_FORCE_IPV4", True)
+    if not force_ipv4 and api is None:
         return None
-    total, sock_connect = _resolve_timeouts()
-    timeout = aiohttp.ClientTimeout(total=total, sock_connect=sock_connect)
-    return _IPv4AiohttpSession(timeout=timeout)
+    total = float(_env_int("BOT_TOTAL_TIMEOUT", 30))
+    kwargs: dict = {"timeout": total}
+    if api is not None:
+        kwargs["api"] = api
+    return _IPv4AiohttpSession(**kwargs)
 
 
 def get_bot() -> Bot:
@@ -319,6 +342,7 @@ def get_bot() -> Bot:
             token = token.get_secret_value()
 
         session = _build_session()
+
         kwargs: dict = {
             "token": str(token),
             "default": DefaultBotProperties(parse_mode=ParseMode.HTML),
