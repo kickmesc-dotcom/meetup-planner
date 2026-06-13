@@ -15,6 +15,8 @@ dist/
 .vite/
 *.tsbuildinfo
 .eslintcache
+# скомпилированный мусор от tsc -b рядом с исходниками (.tsx → .js)
+frontend/src/**/*.js
 
 .DS_Store
 Thumbs.db

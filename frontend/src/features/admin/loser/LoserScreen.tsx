@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import {
   adminLoserRollNow,
   clearLoserReasonUseCounts,
+  setLoserReasonUseCount,
   fetchAutoLoser,
   fetchLoserHistory,
   fetchLoserReasons,
@@ -106,6 +107,18 @@ export default function LoserScreen({ users, onBack }: Props) {
       void showAlert(humanizeApiError(e));
     },
   });
+  const setCount = useMutation({
+    mutationFn: ({ phrase, count }: { phrase: string; count: number }) =>
+      setLoserReasonUseCount(phrase, count),
+    onSuccess: (res) => {
+      haptic("success");
+      qc.setQueryData(["admin", "loser-reasons-use-counts"], res);
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
 
   const userById = Object.fromEntries(users.map((u) => [u.id, u] as const));
 
@@ -186,6 +199,7 @@ export default function LoserScreen({ users, onBack }: Props) {
             useCounts={useCounts.data?.counts}
             onResetCounts={() => resetCounts.mutate()}
             resetCountsPending={resetCounts.isPending}
+            onSetCount={(phrase, count) => setCount.mutate({ phrase, count })}
           />
         )}
         {saveReasons.isError && (

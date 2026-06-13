@@ -92,6 +92,24 @@ async def clear_use_counts(session: AsyncSession, key: str) -> int:
     return len(counts)
 
 
+async def set_one_use_count(
+    session: AsyncSession, key: str, phrase: str, count: int
+) -> None:
+    """Точечно выставить счётчик одной фразы (ручная правка из админки).
+
+    `count <= 0` трактуется как сброс — запись фразы удаляется из словаря
+    (вес вернётся к 1.0, как у нетронутой фразы), а не хранится как `0`.
+    Это держит словарь компактным и согласованным с `cleanup_use_counts`.
+    """
+    counts = await get_use_counts(session, key)
+    h = phrase_hash(phrase)
+    if count <= 0:
+        counts.pop(h, None)
+    else:
+        counts[h] = count
+    await set_use_counts(session, key, counts)
+
+
 async def cleanup_use_counts(
     session: AsyncSession, key: str, active_phrases: list[str]
 ) -> int:

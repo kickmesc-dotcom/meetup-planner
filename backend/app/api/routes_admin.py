@@ -1378,6 +1378,7 @@ from app.services.phrase_weights import (
     clear_use_counts,
     get_use_counts,
     phrase_hash,
+    set_one_use_count,
 )
 
 
@@ -1390,6 +1391,12 @@ class ReasonUseCountsOut(BaseModel):
 
 class ReasonUseCountsCleared(BaseModel):
     cleared: int
+
+
+class ReasonUseCountSet(BaseModel):
+    """Точечная правка счётчика одной фразы из админки. `count=0` — сброс."""
+    phrase: str
+    count: int = Field(..., ge=0)
 
 
 async def _merge_counts_by_phrase(
@@ -1426,6 +1433,25 @@ async def admin_clear_loser_reason_use_counts(
     return ReasonUseCountsCleared(cleared=n)
 
 
+@router.put(
+    "/admin/loser-reasons/use-counts", response_model=ReasonUseCountsOut
+)
+async def admin_set_loser_reason_use_count(
+    payload: ReasonUseCountSet, session: SessionDep, user: CurrentUser
+) -> ReasonUseCountsOut:
+    _ensure_admin(user)
+    await set_one_use_count(
+        session, LOSER_USE_COUNTS_KEY, payload.phrase, payload.count
+    )
+    await session.commit()
+    log.info(
+        "admin.loser_reason_use_count_set", count=payload.count, by=user.id
+    )
+    reasons = await get_loser_reasons(session)
+    counts = await get_use_counts(session, LOSER_USE_COUNTS_KEY)
+    return ReasonUseCountsOut(counts=await _merge_counts_by_phrase(reasons, counts))
+
+
 @router.get(
     "/admin/chukhan-reasons/use-counts", response_model=ReasonUseCountsOut
 )
@@ -1449,6 +1475,25 @@ async def admin_clear_chukhan_reason_use_counts(
     await session.commit()
     log.info("admin.chukhan_reason_use_counts_cleared", removed=n, by=user.id)
     return ReasonUseCountsCleared(cleared=n)
+
+
+@router.put(
+    "/admin/chukhan-reasons/use-counts", response_model=ReasonUseCountsOut
+)
+async def admin_set_chukhan_reason_use_count(
+    payload: ReasonUseCountSet, session: SessionDep, user: CurrentUser
+) -> ReasonUseCountsOut:
+    _ensure_admin(user)
+    await set_one_use_count(
+        session, CHUKHAN_USE_COUNTS_KEY, payload.phrase, payload.count
+    )
+    await session.commit()
+    log.info(
+        "admin.chukhan_reason_use_count_set", count=payload.count, by=user.id
+    )
+    reasons = await _get_chukhan_reasons(session)
+    counts = await get_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
+    return ReasonUseCountsOut(counts=await _merge_counts_by_phrase(reasons, counts))
 
 
 # --- GHG6 AD4/AD7/AD8: scheduled settings (агрегат master-toggles) ---
@@ -2182,6 +2227,12 @@ async def admin_set_proxy_mode(
 ) -> ProxyModeOut:
     _ensure_admin(user)
     await set_proxy_mode(session, ProxyMode(body.mode))
+    # GHG8 G: proxy_health-tick регистрируется только в ALWAYS_ON. Смена режима
+    # → перевзвод (job появляется при включении ALWAYS_ON, снимается при выходе).
+    from app.bot.dispatcher import get_bot
+    from app.bot.scheduler import reschedule_proxy_health
+
+    await reschedule_proxy_health(get_bot())
     log.info("admin.proxy_mode_set", mode=body.mode, by=user.id)
     return ProxyModeOut(mode=body.mode)
 
@@ -3078,6 +3129,12 @@ async def admin_space_restart_put(
         )
 
     normalized = await set_schedule(session, body.model_dump())
+    # GHG8 G: расписание сменилось → перевзводим событийный one-shot (DateTrigger
+    # на новое время / снимаем job при off). Без этого новое расписание
+    # подхватилось бы только при следующем рестарте процесса.
+    from app.bot.scheduler import reschedule_space_restart
+
+    await reschedule_space_restart()
     log.info("space_restart.schedule_updated", schedule=normalized, by=user.id)
     return await _space_restart_status(session)
 

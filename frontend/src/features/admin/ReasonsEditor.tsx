@@ -16,6 +16,8 @@ export interface ReasonsEditorProps {
   useCounts?: Record<string, number>;
   onResetCounts?: () => void;
   resetCountsPending?: boolean;
+  /** Точечный сброс счётчика одной фразы (use:N → 0). */
+  onSetCount?: (phrase: string, count: number) => void;
 }
 
 export default function ReasonsEditor({
@@ -27,6 +29,7 @@ export default function ReasonsEditor({
   useCounts,
   onResetCounts,
   resetCountsPending = false,
+  onSetCount,
 }: ReasonsEditorProps) {
   const [list, setList] = useState<string[]>(initial);
   const [draft, setDraft] = useState("");
@@ -90,14 +93,27 @@ export default function ReasonsEditor({
               <div key={`${i}:${r}`} className="flex items-center gap-2 px-2 py-1.5">
                 <div className="text-[10px] text-tg-hint w-6 tabular-nums">{i + 1}</div>
                 <div className="flex-1 text-sm text-tg-text truncate">{r}</div>
-                {useCounts !== undefined && (
-                  <div
-                    className="text-[10px] text-tg-hint tabular-nums shrink-0"
-                    title={`Использовано ${count} раз${count === 1 ? "" : "а"}`}
-                  >
-                    use:{count}
-                  </div>
-                )}
+                {useCounts !== undefined &&
+                  (onSetCount && count > 0 && initial.includes(r) ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        haptic("warning");
+                        onSetCount(r, 0);
+                      }}
+                      className="text-[10px] text-tg-hint tabular-nums shrink-0 rounded px-1 py-0.5 hover:bg-tg-secondary-bg/60 active:scale-95 transition"
+                      title={`Использовано ${count} раз${count === 1 ? "" : "а"} — нажми, чтобы сбросить в 0`}
+                    >
+                      use:{count} ↺
+                    </button>
+                  ) : (
+                    <div
+                      className="text-[10px] text-tg-hint tabular-nums shrink-0"
+                      title={`Использовано ${count} раз${count === 1 ? "" : "а"}`}
+                    >
+                      use:{count}
+                    </div>
+                  ))}
                 <button
                   type="button"
                   onClick={() => remove(i)}

@@ -7,7 +7,6 @@ import {
   fetchLoserHistory,
   fetchMeetingFeedbackHistory,
   fetchPollsHistory,
-  type MeetingFeedbackRow,
   type PollHistoryRow,
 } from "@/api/admin";
 import type { User } from "@/types";
@@ -46,11 +45,14 @@ export default function HistoryScreen({ users, onBack }: Props) {
     queryFn: () => fetchGamesHistory(30),
     enabled: tab === "games",
   });
+  // Задел под вкладку «meetings feedback» (рендер ещё не дописан). Держим
+  // query, чтобы не потерять проводку; void — чтобы tsc не ругался на unused.
   const meetingsHistory = useQuery({
     queryKey: ["admin", "meetings-feedback-history"],
     queryFn: () => fetchMeetingFeedbackHistory(50),
     enabled: tab === "meetings",
   });
+  void meetingsHistory;
 
   const userById = Object.fromEntries(users.map((u) => [u.id, u] as const));
 

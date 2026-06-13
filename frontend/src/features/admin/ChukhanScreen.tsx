@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
   clearChukhanReasonUseCounts,
+  setChukhanReasonUseCount,
   fetchChukhanHistory,
   fetchChukhanReasons,
   fetchChukhanReasonsRaw,
@@ -89,6 +90,18 @@ export default function ChukhanScreen({ users, onBack }: Props) {
     onSuccess: () => {
       haptic("success");
       qc.invalidateQueries({ queryKey: ["admin", "chukhan-reasons-use-counts"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+  const setCount = useMutation({
+    mutationFn: ({ phrase, count }: { phrase: string; count: number }) =>
+      setChukhanReasonUseCount(phrase, count),
+    onSuccess: (res) => {
+      haptic("success");
+      qc.setQueryData(["admin", "chukhan-reasons-use-counts"], res);
     },
     onError: (e) => {
       haptic("error");
@@ -187,6 +200,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             useCounts={useCounts.data?.counts}
             onResetCounts={() => resetCounts.mutate()}
             resetCountsPending={resetCounts.isPending}
+            onSetCount={(phrase, count) => setCount.mutate({ phrase, count })}
           />
         )}
         {saveReasons.isError && (

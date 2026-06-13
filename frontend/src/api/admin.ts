@@ -254,6 +254,20 @@ export const clearChukhanReasonUseCounts = () =>
     method: "DELETE",
   });
 
+// Точечная правка счётчика одной фразы (count=0 — сброс). Возвращает
+// свежий словарь {фраза: count} по всему пулу.
+export const setLoserReasonUseCount = (phrase: string, count: number) =>
+  api<ReasonUseCountsOut>("/api/admin/loser-reasons/use-counts", {
+    method: "PUT",
+    body: JSON.stringify({ phrase, count }),
+  });
+
+export const setChukhanReasonUseCount = (phrase: string, count: number) =>
+  api<ReasonUseCountsOut>("/api/admin/chukhan-reasons/use-counts", {
+    method: "PUT",
+    body: JSON.stringify({ phrase, count }),
+  });
+
 // --- GHG6 AD5: Quick action — крутануть лоха из админки ---
 
 export interface LoserRollNow {
