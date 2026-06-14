@@ -32,8 +32,8 @@ const errAlert = (e: unknown) => {
 
 const MODE_LABELS: Record<MediaMode, string> = {
   always: "Всегда — реагировать сразу на каждый мем",
-  chance: "С шансом — серия проверок с растущей вероятностью",
-  wait_then_chance: "Выждать → шанс — дать людям отреагировать, потом ролл",
+  chance: "С шансом — один ролл, реакция сразу при успехе",
+  wait_then_chance: "Выждать → шанс — ролл, потом пауза (уступить людям)",
   never: "Никогда — подсистема молчит",
 };
 
@@ -133,6 +133,7 @@ export default function MediaReactionsScreen({ onBack }: Props) {
   });
 
   const usesChance = draft?.mode === "chance" || draft?.mode === "wait_then_chance";
+  const usesWindow = draft?.mode === "wait_then_chance";
 
   return (
     <SubScreen
@@ -186,17 +187,21 @@ export default function MediaReactionsScreen({ onBack }: Props) {
             {usesChance && (
               <div className="rounded-md bg-tg-bg/40 px-2 py-2 space-y-2">
                 <PctRow
-                  label="Стартовый шанс"
-                  hint="Вероятность на первой проверке (раньше — ниже)."
-                  value={draft.chance_base_pct}
-                  onChange={(v) => patch({ chance_base_pct: v })}
+                  label="Шанс реакции"
+                  hint="Вероятность, что бот вообще среагирует на мем (один ролл)."
+                  value={draft.chance_pct}
+                  onChange={(v) => patch({ chance_pct: v })}
                 />
-                <PctRow
-                  label="Максимальный шанс"
-                  hint="К концу серии вероятность дорастает до этого значения."
-                  value={draft.chance_max_pct}
-                  onChange={(v) => patch({ chance_max_pct: v })}
-                />
+                {usesWindow && (
+                  <NumRow
+                    label="Грейс-окно, мин"
+                    hint="Пауза после ролла — даём людям отреагировать самим (1–360)."
+                    value={draft.wait_window_min}
+                    min={1}
+                    max={360}
+                    onChange={(v) => patch({ wait_window_min: v })}
+                  />
+                )}
               </div>
             )}
 
@@ -392,6 +397,42 @@ function PctRow({
         />
         <span className="text-xs text-tg-hint">%</span>
       </div>
+    </div>
+  );
+}
+
+function NumRow({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0">
+        <div className="text-sm text-tg-text">{label}</div>
+        {hint && <div className="text-[11px] text-tg-hint">{hint}</div>}
+      </div>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => {
+          const n = Math.max(min, Math.min(max, Number(e.target.value) || min));
+          onChange(n);
+        }}
+        className="w-16 shrink-0 rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right outline-none border border-transparent focus:border-tg-link tabular-nums"
+      />
     </div>
   );
 }

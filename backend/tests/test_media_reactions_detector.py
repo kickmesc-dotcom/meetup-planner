@@ -1,9 +1,10 @@
-"""GHG7 P5: тесты детектора медиа-реакций (классификация + in-memory store).
+"""GHG7 P5 / GHG8 F-media-fix: тесты детектора медиа-реакций (классификация +
+in-memory store).
 
 Без БД/сети: проверяем чистую классификацию альбома, store «последнего медиа»
-для force-кнопок и интеграцию шанса по тикам (tick_chance+roll_chance) с
-детерминированным random.Random(seed). Async-БД-стенда в проекте нет — здесь
-только pure-логика handler'а (как в test_media_reactions.py).
+для force-кнопок и одиночный ролл шанса (roll_chance) с детерминированным
+random.Random(seed). Async-БД-стенда в проекте нет — здесь только pure-логика
+handler'а (как в test_media_reactions.py).
 """
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ import random
 import pytest
 
 from app.bot.handlers import media_reactions as mr
-from app.services.media_reactions import WAIT_TICKS_MIN, roll_chance, tick_chance
+from app.services.media_reactions import roll_chance
 
 
 def test_classify_album_single_vs_collection():
@@ -58,25 +59,23 @@ def test_recent_overwrite_keeps_latest():
     assert mr.get_recent(1, "collection") == (20, "B")
 
 
-def test_tick_chance_series_is_monotonic_and_bounded():
-    """Серия шансов по реальным тикам растёт от base к max и зажата в [0,100]."""
-    n = len(WAIT_TICKS_MIN)
-    series = [tick_chance(i, 10, 50, n) for i in range(n)]
-    assert series[0] == 10
-    assert series[-1] == 50
-    assert series == sorted(series)
-    assert all(0 <= p <= 100 for p in series)
-
-
-def test_reaction_fires_eventually_at_high_chance():
-    """С высоким шансом (always-like 100/100) первый же ролл срабатывает."""
+def test_single_roll_fires_at_full_chance():
+    """Шанс 100% → одиночный ролл всегда срабатывает (детерминированно)."""
     rng = random.Random(0)
-    # base=max=100 → tick_chance==100 на любом тике → roll_chance True.
-    assert tick_chance(0, 100, 100, len(WAIT_TICKS_MIN)) == 100
     assert roll_chance(100, rng) is True
 
 
-def test_reaction_never_fires_at_zero_chance():
+def test_single_roll_never_fires_at_zero_chance():
+    """Шанс 0% → бот не реагирует никогда (это и есть честная семантика)."""
     rng = random.Random(0)
-    assert tick_chance(0, 0, 0, len(WAIT_TICKS_MIN)) == 0
     assert roll_chance(0, rng) is False
+
+
+def test_single_roll_respects_probability():
+    """Один ролл на мем: при шансе X% доля срабатываний ≈ X% (без накопления
+    серии, которая раньше копила ~98% из «10–50%»)."""
+    rng = random.Random(12345)
+    pct = 30
+    hits = sum(roll_chance(pct, rng) for _ in range(10000))
+    # Допуск ±3 п.п. от 30% — гард, что ролл одиночный и честный.
+    assert 0.27 <= hits / 10000 <= 0.33

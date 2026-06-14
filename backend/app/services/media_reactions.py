@@ -1,11 +1,18 @@
 """GHG7 P5: реакции бота на медиа (мемы/подборки).
 
-Подсистема «оживляет» мемы участников, но не заменяет живое общение: реакция
-ставится только если люди сами не отреагировали (серия отложенных проверок с
-динамическим шансом — см. handlers/media_reactions.py).
+Подсистема «оживляет» мемы участников, но не заменяет живое общение.
+
+Модель шанса (GHG8 F-media-fix, переписана): **один честный ролл на мем**.
+Заданный `chance_pct` — это вероятность, что бот вообще среагирует на медиа
+(а не per-tick шанс, который раньше копился по серии из 10 проверок до ~98%).
+- `chance`           — ролл сразу, при успехе реагируем без задержки.
+- `wait_then_chance` — выждать `wait_window_min` (дать людям отреагировать),
+  затем, если живой реакции не было, тот же одиночный ролл.
+Серия отложенных проверок (`WAIT_TICKS_MIN`/`tick_chance`) удалена — именно она
+превращала «шанс 10–50%» в почти-гарантию.
 
 Этот модуль — чистое ядро (фразы-дефолты, выбор/подстановка, ролл шанса) +
-get/set настроек в admin_config. Грязная часть (aiogram-handler, asyncio-серия)
+get/set настроек в admin_config. Грязная часть (aiogram-handler, asyncio-ожидание)
 живёт в app/bot/handlers/media_reactions.py.
 """
 
@@ -28,10 +35,12 @@ from app.services.admin_config import (
 
 MediaKind = Literal["single", "collection"]
 
-# Серия отложенных проверок «отсутствия реакции» — моменты в минутах ОТ мема.
-# Чем раньше тик, тем ниже шанс (растёт равномерно по номеру тика, см.
-# tick_chance). Решено с пользователем (GHG7 P5).
-WAIT_TICKS_MIN: tuple[int, ...] = (5, 10, 15, 30, 45, 60, 90, 120, 180, 260)
+# Грейс-окно по умолчанию (мин) для режима wait_then_chance: сколько бот ждёт
+# после мема, давая людям отреагировать самим, прежде чем сделать одиночный
+# ролл. Настраивается в админке (admin_config: media_reactions.wait_window_min).
+DEFAULT_WAIT_WINDOW_MIN = 15
+# Границы клампа окна (мин): от 1 минуты до 6 часов.
+WAIT_WINDOW_MIN_BOUNDS: tuple[int, int] = (1, 360)
 
 # Дефолтные фразы — из GHG7.txt (стр. 58-101 single, 105-140 collection).
 # Хранятся в admin_config как JSON; пока админ не кастомизировал — берём отсюда
@@ -282,21 +291,10 @@ def pick_emoji(whitelist: list[str], rng: random.Random | None = None) -> str | 
     return (rng or random).choice(whitelist)
 
 
-def tick_chance(
-    tick_index: int, base_pct: int, max_pct: int, n_ticks: int = len(WAIT_TICKS_MIN)
-) -> int:
-    """Шанс (в %) на тике серии выжидания.
-
-    Растёт равномерно по НОМЕРУ тика: tick_index=0 → base_pct,
-    tick_index=n_ticks-1 → max_pct (линейная интерполяция). Решено с
-    пользователем: чем раньше проверка, тем ниже шанс среагировать сейчас.
-    """
-    if n_ticks <= 1:
-        return max(0, min(100, max_pct))
-    idx = max(0, min(n_ticks - 1, tick_index))
-    span = max_pct - base_pct
-    pct = base_pct + round(span * idx / (n_ticks - 1))
-    return max(0, min(100, pct))
+def clamp_wait_window(minutes: int) -> int:
+    """Зажимает грейс-окно в допустимые границы (1..360 мин)."""
+    lo, hi = WAIT_WINDOW_MIN_BOUNDS
+    return max(lo, min(hi, minutes))
 
 
 def roll_chance(pct: int, rng: random.Random | None = None) -> bool:

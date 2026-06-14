@@ -775,7 +775,8 @@ export const updateBotReactions = (s: BotReactionsSettings) =>
 
 // --- GHG7 P5: реакции бота на медиа (мемы/подборки) ---
 // Пулы фраз/эмодзи — JSON-списки в admin_config (бэк: services/media_reactions.py).
-// Поведение — серия отложенных проверок с растущим шансом (wait_then_chance).
+// Поведение — один честный ролл на мем. chance_pct = вероятность среагировать
+// вообще; wait_window_min = грейс-окно для режима wait_then_chance.
 
 export type MediaMode = "always" | "chance" | "wait_then_chance" | "never";
 export type MediaSingleResponseMode = "emoji" | "phrase" | "both" | "random_one";
@@ -785,8 +786,8 @@ export interface MediaReactionsSettings {
   single_enabled: boolean;
   collection_enabled: boolean;
   mode: MediaMode;
-  chance_base_pct: number;
-  chance_max_pct: number;
+  chance_pct: number;
+  wait_window_min: number;
   single_response_mode: MediaSingleResponseMode;
 }
 

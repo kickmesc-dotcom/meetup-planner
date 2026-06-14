@@ -1294,8 +1294,8 @@ class MediaReactionsSettingsIO(BaseModel):
     single_enabled: bool
     collection_enabled: bool
     mode: str  # always|chance|wait_then_chance|never
-    chance_base_pct: int = Field(..., ge=0, le=100)
-    chance_max_pct: int = Field(..., ge=0, le=100)
+    chance_pct: int = Field(..., ge=0, le=100)  # один честный ролл на мем
+    wait_window_min: int = Field(..., ge=1, le=360)  # грейс-окно wait_then_chance
     single_response_mode: str  # emoji|phrase|both|random_one
 
 
@@ -1318,8 +1318,8 @@ async def admin_update_media_settings(
         single_enabled=body.single_enabled,
         collection_enabled=body.collection_enabled,
         mode=body.mode,
-        chance_base_pct=body.chance_base_pct,
-        chance_max_pct=body.chance_max_pct,
+        chance_pct=body.chance_pct,
+        wait_window_min=body.wait_window_min,
         single_response_mode=body.single_response_mode,
     )
     saved = await _get_media_settings(session)

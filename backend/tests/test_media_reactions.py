@@ -1,19 +1,20 @@
-"""GHG7 P5: тесты чистого ядра медиа-реакций (без БД/aiogram).
+"""GHG7 P5 / GHG8 F-media-fix: тесты чистого ядра медиа-реакций (без БД/aiogram).
 
-Покрывает substitute_username, pick_phrase/pick_emoji, tick_chance, roll_chance.
-Детерминизм рандома — через random.Random(seed).
+Покрывает substitute_username, pick_phrase/pick_emoji, roll_chance,
+clamp_wait_window. Модель шанса — один честный ролл на мем (серия tick_chance
+удалена). Детерминизм рандома — через random.Random(seed).
 """
 from __future__ import annotations
 
 import random
 
 from app.services.media_reactions import (
-    WAIT_TICKS_MIN,
+    WAIT_WINDOW_MIN_BOUNDS,
+    clamp_wait_window,
     pick_emoji,
     pick_phrase,
     roll_chance,
     substitute_username,
-    tick_chance,
 )
 
 
@@ -44,29 +45,17 @@ def test_pick_emoji_from_nonempty():
     assert pick_emoji(["🔥", "😁"], rng) in {"🔥", "😁"}
 
 
-def test_tick_chance_endpoints():
-    n = len(WAIT_TICKS_MIN)  # 10
-    # Первый тик = база, последний = потолок.
-    assert tick_chance(0, base_pct=10, max_pct=50, n_ticks=n) == 10
-    assert tick_chance(n - 1, base_pct=10, max_pct=50, n_ticks=n) == 50
+def test_clamp_wait_window_within_bounds():
+    assert clamp_wait_window(15) == 15
+    assert clamp_wait_window(1) == 1
+    assert clamp_wait_window(360) == 360
 
 
-def test_tick_chance_monotonic_increasing():
-    n = len(WAIT_TICKS_MIN)
-    vals = [tick_chance(i, 10, 50, n) for i in range(n)]
-    assert vals == sorted(vals)  # не убывает
-    assert vals[0] == 10 and vals[-1] == 50
-
-
-def test_tick_chance_clamps_index():
-    n = len(WAIT_TICKS_MIN)
-    # Индекс за границами зажимается, не выходит за base/max.
-    assert tick_chance(-5, 10, 50, n) == 10
-    assert tick_chance(999, 10, 50, n) == 50
-
-
-def test_tick_chance_single_tick():
-    assert tick_chance(0, base_pct=10, max_pct=50, n_ticks=1) == 50
+def test_clamp_wait_window_clamps_out_of_range():
+    lo, hi = WAIT_WINDOW_MIN_BOUNDS
+    assert clamp_wait_window(0) == lo
+    assert clamp_wait_window(-100) == lo
+    assert clamp_wait_window(99999) == hi
 
 
 def test_roll_chance_boundaries():

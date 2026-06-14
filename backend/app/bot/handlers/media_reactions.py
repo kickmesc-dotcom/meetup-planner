@@ -49,7 +49,6 @@ from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.models import User
 from app.services.media_reactions import (
-    WAIT_TICKS_MIN,
     get_collection_phrases,
     get_emoji_whitelist,
     get_single_phrases,
@@ -58,7 +57,6 @@ from app.services.media_reactions import (
     roll_chance,
     save_recent_media,
     substitute_username,
-    tick_chance,
 )
 from app.services.admin_config import get_media_reactions_settings
 
@@ -275,45 +273,38 @@ def get_recent(chat_id: int, kind: MediaKind) -> tuple[int, str] | None:
     return rec[1], rec[2]
 
 
-# --- серия отложенных проверок ----------------------------------------------
+# --- отложенная реакция (wait_then_chance) ----------------------------------
 
-async def _reaction_series(
-    kind: MediaKind, chat_id: int, message_id: int, author_name: str
+async def _wait_then_react(
+    kind: MediaKind, chat_id: int, message_id: int, author_name: str, window_min: int
 ) -> None:
-    """Серия тиков WAIT_TICKS_MIN. На каждом: если уже была живая реакция —
-    выходим молча; иначе ролл tick_chance → при успехе реагируем и выходим.
+    """Грейс-окно для wait_then_chance: ждём `window_min` минут, давая людям
+    отреагировать самим. Если живая реакция случилась — молчим. Иначе реагируем.
 
-    Режим wait_then_chance проходит всю серию (растущий шанс). Режим chance
-    тоже использует эту серию (живая реакция всё равно отменяет — это ок,
-    «дать людям шанс» осмысленно для обоих). Режимы always/never обрабатываются
-    в `_schedule_reaction` до запуска серии.
+    Ролл шанса УЖЕ сделан в `_schedule_reaction` (один честный ролл на мем):
+    сюда задача попадает, только если бот решил реагировать. Окно лишь сдвигает
+    реакцию во времени и уступает дорогу живым людям.
     """
-    sm = get_sessionmaker()
-    async with sm() as session:
-        settings = await get_media_reactions_settings(session)
-    base = settings["chance_base_pct"]
-    mx = settings["chance_max_pct"]
-
-    prev_min = 0
-    for i, tick_min in enumerate(WAIT_TICKS_MIN):
-        await asyncio.sleep((tick_min - prev_min) * 60)
-        prev_min = tick_min
-        if (chat_id, message_id) in _reacted:
-            log.info(
-                "media_reactions.skipped_human", kind=kind, message_id=message_id
-            )
-            return
-        pct = tick_chance(i, base, mx)
-        if roll_chance(pct):
-            await _do_react(kind, chat_id, message_id, author_name)
-            return
-    log.info("media_reactions.series_exhausted", kind=kind, message_id=message_id)
+    await asyncio.sleep(window_min * 60)
+    if (chat_id, message_id) in _reacted:
+        log.info("media_reactions.skipped_human", kind=kind, message_id=message_id)
+        return
+    await _do_react(kind, chat_id, message_id, author_name)
 
 
 async def _schedule_reaction(
     kind: MediaKind, chat_id: int, message_id: int, author_id: int, author_name: str
 ) -> None:
-    """Решить, реагировать ли на медиа, и запустить нужный путь по настройкам."""
+    """Решить, реагировать ли на медиа, и запустить нужный путь по настройкам.
+
+    Модель шанса — ОДИН ролл на мем (GHG8 F-media-fix): `chance_pct` — это
+    вероятность среагировать вообще, а не per-tick шанс копящейся серии.
+    - always           → реагируем сразу;
+    - never            → молчим;
+    - chance           → ролл; успех → реагируем сразу;
+    - wait_then_chance → ролл; успех → ждём грейс-окно и реагируем, если люди
+      за это время не отреагировали сами.
+    """
     sm = get_sessionmaker()
     async with sm() as session:
         settings = await get_media_reactions_settings(session)
@@ -341,9 +332,20 @@ async def _schedule_reaction(
     if mode == "always":
         await _do_react(kind, chat_id, message_id, author_name)
         return
-    # chance / wait_then_chance — серия отложенных проверок.
+
+    # chance / wait_then_chance — один честный ролл на заданный chance_pct.
+    if not roll_chance(settings["chance_pct"]):
+        log.info("media_reactions.roll_missed", kind=kind, message_id=message_id)
+        return
+
+    if mode == "chance":
+        await _do_react(kind, chat_id, message_id, author_name)
+        return
+    # wait_then_chance — реагируем после грейс-окна, уступая живым реакциям.
     asyncio.create_task(
-        _reaction_series(kind, chat_id, message_id, author_name)
+        _wait_then_react(
+            kind, chat_id, message_id, author_name, settings["wait_window_min"]
+        )
     )
 
 

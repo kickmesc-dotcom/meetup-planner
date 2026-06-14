@@ -942,15 +942,18 @@ MEDIA_EMOJI_WHITELIST_KEY = "media_reactions.emoji_whitelist"
 # UPSERT-строка, нагрузка на Neon сопоставима с chat_capture).
 MEDIA_RECENT_MEDIA_KEY = "media_reactions.recent_media"
 
-# Поведение (см. handlers/media_reactions.py — серия отложенных проверок с
-# динамическим шансом). mode: always|chance|wait_then_chance|never.
+# Поведение (см. handlers/media_reactions.py — один честный ролл на мем).
+# mode: always|chance|wait_then_chance|never.
 # single_response_mode: emoji|phrase|both|random_one (что слать на одиночный мем).
 MEDIA_ENABLED_KEY = "media_reactions.enabled"                      # master, default true
 MEDIA_SINGLE_ENABLED_KEY = "media_reactions.single_enabled"        # default true
 MEDIA_COLLECTION_ENABLED_KEY = "media_reactions.collection_enabled"  # default true
 MEDIA_MODE_KEY = "media_reactions.mode"                            # default wait_then_chance
-MEDIA_CHANCE_BASE_PCT_KEY = "media_reactions.chance_base_pct"      # default 10
-MEDIA_CHANCE_MAX_PCT_KEY = "media_reactions.chance_max_pct"        # default 50
+# Единый честный шанс среагировать на мем (раньше было base/max для серии тиков,
+# что копилось до ~98%). Старые ключи base/max больше не читаются.
+MEDIA_CHANCE_PCT_KEY = "media_reactions.chance_pct"                # default 30
+# Грейс-окно (мин) для wait_then_chance: ждать перед роллом, давая людям время.
+MEDIA_WAIT_WINDOW_MIN_KEY = "media_reactions.wait_window_min"      # default 15
 MEDIA_SINGLE_RESPONSE_MODE_KEY = "media_reactions.single_response_mode"  # default random_one
 
 _MEDIA_VALID_MODES = ("always", "chance", "wait_then_chance", "never")
@@ -965,13 +968,17 @@ async def get_media_reactions_settings(session: AsyncSession) -> dict:
     single_mode = await _get_value(session, MEDIA_SINGLE_RESPONSE_MODE_KEY) or "random_one"
     if single_mode not in _MEDIA_VALID_SINGLE_MODES:
         single_mode = "random_one"
+    from app.services.media_reactions import clamp_wait_window
+
     return {
         "enabled": await _get_bool(session, MEDIA_ENABLED_KEY, True),
         "single_enabled": await _get_bool(session, MEDIA_SINGLE_ENABLED_KEY, True),
         "collection_enabled": await _get_bool(session, MEDIA_COLLECTION_ENABLED_KEY, True),
         "mode": mode,
-        "chance_base_pct": max(0, min(100, await _get_int(session, MEDIA_CHANCE_BASE_PCT_KEY, 10))),
-        "chance_max_pct": max(0, min(100, await _get_int(session, MEDIA_CHANCE_MAX_PCT_KEY, 50))),
+        "chance_pct": max(0, min(100, await _get_int(session, MEDIA_CHANCE_PCT_KEY, 30))),
+        "wait_window_min": clamp_wait_window(
+            await _get_int(session, MEDIA_WAIT_WINDOW_MIN_KEY, 15)
+        ),
         "single_response_mode": single_mode,
     }
 
@@ -983,8 +990,8 @@ async def set_media_reactions_settings(
     single_enabled: bool | None = None,
     collection_enabled: bool | None = None,
     mode: str | None = None,
-    chance_base_pct: int | None = None,
-    chance_max_pct: int | None = None,
+    chance_pct: int | None = None,
+    wait_window_min: int | None = None,
     single_response_mode: str | None = None,
 ) -> None:
     if enabled is not None:
@@ -997,10 +1004,14 @@ async def set_media_reactions_settings(
         )
     if mode is not None and mode in _MEDIA_VALID_MODES:
         await _set_value(session, MEDIA_MODE_KEY, mode)
-    if chance_base_pct is not None:
-        await _set_value(session, MEDIA_CHANCE_BASE_PCT_KEY, str(max(0, min(100, chance_base_pct))))
-    if chance_max_pct is not None:
-        await _set_value(session, MEDIA_CHANCE_MAX_PCT_KEY, str(max(0, min(100, chance_max_pct))))
+    if chance_pct is not None:
+        await _set_value(session, MEDIA_CHANCE_PCT_KEY, str(max(0, min(100, chance_pct))))
+    if wait_window_min is not None:
+        from app.services.media_reactions import clamp_wait_window
+
+        await _set_value(
+            session, MEDIA_WAIT_WINDOW_MIN_KEY, str(clamp_wait_window(wait_window_min))
+        )
     if single_response_mode is not None and single_response_mode in _MEDIA_VALID_SINGLE_MODES:
         await _set_value(session, MEDIA_SINGLE_RESPONSE_MODE_KEY, single_response_mode)
 
