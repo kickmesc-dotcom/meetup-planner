@@ -1208,6 +1208,62 @@ async def admin_reset_chukhan_reasons(
     return ChukhanReasonsOut(reasons=saved)
 
 
+# --- T3.4: advice («магический шар») ---
+
+from app.services.admin_config import (
+    get_advice_enabled as _get_advice_enabled,
+    set_advice_enabled as _set_advice_enabled,
+    get_advice_phrases as _get_advice_phrases,
+    set_advice_phrases as _set_advice_phrases,
+)
+
+
+class AdviceOut(BaseModel):
+    enabled: bool
+    phrases: list[str]
+
+
+class AdvicePhrasesUpdate(BaseModel):
+    phrases: list[str] = Field(..., max_length=500)
+
+
+class AdviceEnabledUpdate(BaseModel):
+    enabled: bool
+
+
+@router.get("/admin/advice", response_model=AdviceOut)
+async def admin_get_advice(session: SessionDep, user: CurrentUser) -> AdviceOut:
+    _ensure_admin(user)
+    return AdviceOut(
+        enabled=await _get_advice_enabled(session),
+        phrases=await _get_advice_phrases(session),
+    )
+
+
+@router.put("/admin/advice/phrases", response_model=AdviceOut)
+async def admin_update_advice_phrases(
+    body: AdvicePhrasesUpdate, session: SessionDep, user: CurrentUser
+) -> AdviceOut:
+    _ensure_admin(user)
+    await _set_advice_phrases(session, body.phrases)
+    saved = await _get_advice_phrases(session)
+    log.info("admin.advice_phrases_updated", count=len(saved), by=user.id)
+    return AdviceOut(enabled=await _get_advice_enabled(session), phrases=saved)
+
+
+@router.put("/admin/advice/enabled", response_model=AdviceOut)
+async def admin_update_advice_enabled(
+    body: AdviceEnabledUpdate, session: SessionDep, user: CurrentUser
+) -> AdviceOut:
+    _ensure_admin(user)
+    await _set_advice_enabled(session, body.enabled)
+    log.info("admin.advice_enabled_updated", enabled=body.enabled, by=user.id)
+    return AdviceOut(
+        enabled=await _get_advice_enabled(session),
+        phrases=await _get_advice_phrases(session),
+    )
+
+
 # --- GHG7 P5: реакции бота на медиа (пулы фраз single/collection + эмодзи) ---
 
 from app.services.media_reactions import (

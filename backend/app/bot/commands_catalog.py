@@ -48,6 +48,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
     # --- Действия ---
     CommandSpec("loser", "Назначить лоха дня (ручная рулетка)", scope="both"),
     CommandSpec("phrase", "Прогнать рандомную фразу", scope="both"),
+    CommandSpec("advice", "🔮 Случайный совет (или #совет / @бот …?)", scope="both"),
     CommandSpec("nominate", "🎮 Добавить игру в номинации", scope="both"),
     CommandSpec(
         "remove_nominated_game",

@@ -53,6 +53,41 @@ async def on_phrase(message: Message) -> None:
         await message.answer("⚠️ Не получилось сочинить фразу — посмотри логи.")
 
 
+# ---------------------- T3.4: /advice («магический шар») ----------------------
+
+@router.message(Command("advice"))
+async def on_advice(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    await reply_advice(message)
+
+
+async def reply_advice(message: Message) -> bool:
+    """Сгенерировать и отправить совет (reply на исходное сообщение).
+
+    Возвращает True если совет отправлен (или попытались), False если фича
+    выключена / пул пуст — вызывающий код (bot_reactions альт-триггер) по
+    этому решает, продолжать ли обычный сценарий. Уважает тогл
+    `advice.enabled`.
+    """
+    from app.services.admin_config import get_advice_enabled, get_advice_phrases
+    from app.services.advice import pick_advice
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await get_advice_enabled(session):
+            return False
+        phrases = await get_advice_phrases(session)
+    text = pick_advice(phrases)
+    if not text:
+        return False
+    try:
+        await message.reply(f"🔮 {text}", parse_mode="HTML")
+    except Exception:
+        log.exception("chat.advice_failed", by=message.from_user.id if message.from_user else None)
+    return True
+
+
 # ---------------------- C2: /loser ----------------------
 
 @router.message(Command("loser"))

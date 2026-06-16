@@ -54,6 +54,10 @@ AUTOLOSER_WINDOW_START_HOUR_KEY = "autoloser.window_start_hour"  # default 7
 AUTOLOSER_WINDOW_END_HOUR_KEY = "autoloser.window_end_hour"      # default 22
 AUTOLOSER_INTERVAL_HOURS_KEY = "autoloser.interval_hours"        # 0 = random раз в сутки
 
+# --- T3.4: «магический шар» (/advice / #совет) ---
+ADVICE_ENABLED_KEY = "advice.enabled"   # default True
+ADVICE_LIST_KEY = "advice.list"
+
 # --- E8: «Червь-пидор» (особая номинация при ролле лоха) ---
 WORM_ENABLED_KEY = "worm.enabled"          # default true (механика работает)
 WORM_CHANCE_KEY = "worm.chance"            # default 0.01 (1/100)
@@ -636,6 +640,47 @@ async def set_chukhan_reasons(session: AsyncSession, reasons: list[str]) -> None
     # GHG6 E5: дроп счётчиков для фраз, которых больше нет в активном списке.
     from app.services.phrase_weights import CHUKHAN_USE_COUNTS_KEY, cleanup_use_counts
     await cleanup_use_counts(session, CHUKHAN_USE_COUNTS_KEY, cleaned)
+
+
+# --- T3.4: advice («магический шар») ---
+
+async def get_advice_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(session, ADVICE_ENABLED_KEY, True)
+
+
+async def set_advice_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(session, ADVICE_ENABLED_KEY, "true" if enabled else "false")
+
+
+async def get_advice_phrases(session: AsyncSession) -> list[str]:
+    """Кастомный пул советов или дефолт из app.services.advice.
+
+    Дефолт НЕ пишем в БД при чтении — новые фразы из кода подхватятся, пока
+    пользователь не начал кастомизацию (как loser_reasons)."""
+    from app.services.advice import DEFAULT_ADVICE_PHRASES
+
+    raw = await _get_value(session, ADVICE_LIST_KEY)
+    if raw is None:
+        return list(DEFAULT_ADVICE_PHRASES)
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list) and all(isinstance(x, str) for x in data):
+            return data
+    except (ValueError, TypeError):
+        pass
+    return list(DEFAULT_ADVICE_PHRASES)
+
+
+async def set_advice_phrases(session: AsyncSession, phrases: list[str]) -> None:
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for p in phrases:
+        p = p.strip()
+        if not p or p in seen:
+            continue
+        seen.add(p)
+        cleaned.append(p)
+    await _set_value(session, ADVICE_LIST_KEY, json.dumps(cleaned, ensure_ascii=False))
 
 
 # --- AD6: master-toggles для запланированных процессов ---

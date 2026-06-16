@@ -199,6 +199,27 @@ export const updateLoserReasons = (reasons: string[]) =>
     body: JSON.stringify({ reasons }),
   });
 
+// --- T3.4: advice («магический шар») ---
+
+export interface AdviceConfig {
+  enabled: boolean;
+  phrases: string[];
+}
+
+export const fetchAdvice = () => api<AdviceConfig>("/api/admin/advice");
+
+export const updateAdvicePhrases = (phrases: string[]) =>
+  api<AdviceConfig>("/api/admin/advice/phrases", {
+    method: "PUT",
+    body: JSON.stringify({ phrases }),
+  });
+
+export const updateAdviceEnabled = (enabled: boolean) =>
+  api<AdviceConfig>("/api/admin/advice/enabled", {
+    method: "PUT",
+    body: JSON.stringify({ enabled }),
+  });
+
 // --- GHG6 AD6: Chukhan reasons CRUD (отдельные шаблоны фраз чухана) ---
 
 export const fetchChukhanReasons = () =>

@@ -140,10 +140,26 @@ async def _maybe_react(message: Message) -> None:
     async with sm() as session:
         cfg = await get_bot_reactions_settings(session)
 
-    # 1. @-mention
-    if cfg["mention_enabled"] and bot_username and _mentions_bot(
-        message, bot_username, bot_id
-    ):
+    # T3.4 «магический шар». Два триггера совета, оба ДО обычной реакции:
+    #  - хештег #совет/#advice — самостоятельный, не зависит от тоглов реакций;
+    #  - @-mention бота + текст заканчивается на «?» — «однозначный триггер»
+    #    (см. фидбек 13.06 #1). Без «?» mention идёт по старому сценарию ниже.
+    # Оба гейтятся advice.enabled внутри reply_advice (вернёт False если выкл/пуст).
+    from app.bot.handlers.chat_commands import reply_advice
+    from app.services.advice import ends_with_question, text_has_advice_hashtag
+
+    text = message.text or ""
+    mentions_bot = bool(bot_username) and _mentions_bot(message, bot_username, bot_id)
+
+    if text_has_advice_hashtag(text):
+        if await reply_advice(message):
+            return
+    if mentions_bot and ends_with_question(text):
+        if await reply_advice(message):
+            return
+
+    # 1. @-mention (старый сценарий: рандом-фраза в ответ на упоминание без «?»)
+    if cfg["mention_enabled"] and mentions_bot:
         log.info("bot_reactions.mention", from_id=message.from_user.id)
         await _react(message)
         return
