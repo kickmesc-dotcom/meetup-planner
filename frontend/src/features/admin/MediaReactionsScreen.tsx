@@ -117,7 +117,15 @@ export default function MediaReactionsScreen({ onBack }: Props) {
     mutationFn: updateMediaEmojiWhitelist,
     onSuccess: (data) => {
       haptic("success");
-      qc.setQueryData(["admin", "media-reactions", "emoji-whitelist"], data);
+      qc.setQueryData(["admin", "media-reactions", "emoji-whitelist"], {
+        phrases: data.phrases,
+      });
+      if (data.rejected.length > 0) {
+        void showAlert(
+          `Telegram не принимает как реакцию: ${data.rejected.join(" ")}. ` +
+            `Эти эмодзи не сохранены.`,
+        );
+      }
     },
     onError: errAlert,
   });

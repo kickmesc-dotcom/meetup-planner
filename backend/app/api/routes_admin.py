@@ -1232,6 +1232,13 @@ class MediaPhrasesUpdate(BaseModel):
     phrases: list[str] = Field(..., max_length=500)
 
 
+class MediaEmojiWhitelistOut(BaseModel):
+    """Ответ сохранения emoji-whitelist: что реально записано + что отброшено
+    как неподдерживаемая TG-реакция (п.15: показать админу, а не глотать молча)."""
+    phrases: list[str]
+    rejected: list[str] = []
+
+
 @router.get("/admin/media-reactions/single-phrases", response_model=MediaPhrasesOut)
 async def admin_get_media_single_phrases(
     session: SessionDep, user: CurrentUser
@@ -1278,15 +1285,22 @@ async def admin_get_media_emoji_whitelist(
     return MediaPhrasesOut(phrases=await _get_emoji_whitelist(session))
 
 
-@router.put("/admin/media-reactions/emoji-whitelist", response_model=MediaPhrasesOut)
+@router.put(
+    "/admin/media-reactions/emoji-whitelist", response_model=MediaEmojiWhitelistOut
+)
 async def admin_update_media_emoji_whitelist(
     body: MediaPhrasesUpdate, session: SessionDep, user: CurrentUser
-) -> MediaPhrasesOut:
+) -> MediaEmojiWhitelistOut:
     _ensure_admin(user)
-    await _set_emoji_whitelist(session, body.phrases)
+    rejected = await _set_emoji_whitelist(session, body.phrases)
     saved = await _get_emoji_whitelist(session)
-    log.info("admin.media_emoji_whitelist_updated", count=len(saved), by=user.id)
-    return MediaPhrasesOut(phrases=saved)
+    log.info(
+        "admin.media_emoji_whitelist_updated",
+        count=len(saved),
+        rejected=len(rejected),
+        by=user.id,
+    )
+    return MediaEmojiWhitelistOut(phrases=saved, rejected=rejected)
 
 
 class MediaReactionsSettingsIO(BaseModel):

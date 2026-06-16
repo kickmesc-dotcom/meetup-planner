@@ -24,7 +24,48 @@ const errAlert = (e: unknown) => {
  * в отдельное меню верхнего уровня. Компонент самодостаточен — свой query
  * `["admin","bot-reactions"]`, авто-save при каждом тогле (как было раньше).
  * Логика реакций (GHG6 E9): три master-toggle на упоминание/reply.
+ *
+ * GHG8 T2.3/п.13: переподписаны контролы. @-упоминание — независимый тогл (а).
+ * Поведение reply раньше показывалось двумя путаными независимыми свитчами
+ * (`reply_all` / `reply_except_phrases`), хотя в бэке это ВЗАИМОИСКЛЮЧАЮЩИЙ
+ * выбор (`reply_all` перекрывает `except`). Теперь это один сегментированный
+ * выбор из трёх режимов: Выкл / На все reply (б) / Кроме рандом-цитат (в, дефолт).
+ * Маппинг радио↔флаги без потерь, контракт `BotReactionsSettings` и механизм
+ * отправки НЕ тронуты (бэк читает те же 3 bool).
  */
+type ReplyMode = "off" | "all" | "except";
+
+// reply_all перекрывает except в бэке → при чтении all имеет приоритет.
+function toReplyMode(s: BotReactionsSettings): ReplyMode {
+  if (s.reply_all_enabled) return "all";
+  if (s.reply_except_phrases_enabled) return "except";
+  return "off";
+}
+
+// Канонический набор флагов под выбранный режим (чистый, без «висящих» битов).
+function replyModeFlags(
+  m: ReplyMode,
+): Pick<BotReactionsSettings, "reply_all_enabled" | "reply_except_phrases_enabled"> {
+  return {
+    reply_all_enabled: m === "all",
+    reply_except_phrases_enabled: m === "except",
+  };
+}
+
+const REPLY_MODES: { value: ReplyMode; label: string; hint: string }[] = [
+  { value: "off", label: "Выкл", hint: "Бот не отвечает на reply к своим сообщениям." },
+  {
+    value: "all",
+    label: "На все reply",
+    hint: "Отвечает на любой reply к своему сообщению — включая reply к рандом-цитатам.",
+  },
+  {
+    value: "except",
+    label: "Кроме цитат",
+    hint: "Отвечает на reply к своим сообщениям, КРОМЕ reply к рандом-цитатам (чтобы шизо-цитату можно было прокомментировать без ответа бота). Режим по умолчанию.",
+  },
+];
+
 export default function BotReactionsScreen({ onBack }: Props) {
   const qc = useQueryClient();
   const q = useQuery({
@@ -52,6 +93,13 @@ export default function BotReactionsScreen({ onBack }: Props) {
     save.mutate(next);
   };
 
+  const setReplyMode = (m: ReplyMode) => {
+    if (!draft) return;
+    const next = { ...draft, ...replyModeFlags(m) };
+    setDraft(next);
+    save.mutate(next);
+  };
+
   return (
     <SubScreen
       title="🤖 Реакции бота"
@@ -63,16 +111,18 @@ export default function BotReactionsScreen({ onBack }: Props) {
           <ListSkeleton rows={3} />
         </section>
       ) : (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
-          <div className="text-xs text-tg-hint mb-2">
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+          <div className="text-xs text-tg-hint">
             Бот отвечает рандомной шизо-цитатой на упоминание и/или reply.
           </div>
 
+          {/* (а) @-упоминание — независимый тогл */}
           <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
             <div className="min-w-0">
-              <div className="text-sm text-tg-text">@-упоминание</div>
+              <div className="text-sm text-tg-text">Отвечать на @-упоминание</div>
               <div className="text-[11px] text-tg-hint">
-                На тег <code>@бот</code> бот отвечает фразой.
+                Когда в сообщении тегнут <code>@бот</code> — бот отвечает фразой.
+                Работает независимо от настройки reply ниже.
               </div>
             </div>
             <Switch
@@ -84,38 +134,36 @@ export default function BotReactionsScreen({ onBack }: Props) {
             />
           </div>
 
-          <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
-            <div className="min-w-0">
-              <div className="text-sm text-tg-text">Reply на любое сообщение бота</div>
-              <div className="text-[11px] text-tg-hint">
-                На любой ответ-реплай на сообщение бота — бот отвечает фразой
-                (включая reply к собственным цитатам).
-              </div>
+          {/* (б)/(в) reply — взаимоисключающий выбор режима */}
+          <div className="rounded-md bg-tg-bg/40 px-2 py-2 space-y-2">
+            <div className="text-sm text-tg-text">Ответ на reply сообщений бота</div>
+            <div className="flex gap-1 rounded-lg bg-tg-secondary-bg/80 p-0.5">
+              {REPLY_MODES.map((m) => {
+                const active = toReplyMode(draft) === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => {
+                      haptic("selection");
+                      setReplyMode(m.value);
+                    }}
+                    aria-pressed={active}
+                    className={[
+                      "flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
+                      active
+                        ? "bg-tg-button text-tg-button-text"
+                        : "text-tg-hint",
+                    ].join(" ")}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
             </div>
-            <Switch
-              checked={draft.reply_all_enabled}
-              onChange={(v) => {
-                haptic("selection");
-                setField("reply_all_enabled", v);
-              }}
-            />
-          </div>
-
-          <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
-            <div className="min-w-0">
-              <div className="text-sm text-tg-text">Reply, кроме рандом-цитат</div>
-              <div className="text-[11px] text-tg-hint">
-                Бот отвечает на reply к своим сообщениям, кроме случаев, когда
-                оригинал — рандом-цитата. Работает независимо от верхнего тогла.
-              </div>
+            <div className="text-[11px] text-tg-hint">
+              {REPLY_MODES.find((m) => m.value === toReplyMode(draft))?.hint}
             </div>
-            <Switch
-              checked={draft.reply_except_phrases_enabled}
-              onChange={(v) => {
-                haptic("selection");
-                setField("reply_except_phrases_enabled", v);
-              }}
-            />
           </div>
         </section>
       )}

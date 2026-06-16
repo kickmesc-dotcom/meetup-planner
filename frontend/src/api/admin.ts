@@ -825,10 +825,16 @@ export const updateMediaCollectionPhrases = (phrases: string[]) =>
     body: JSON.stringify({ phrases }),
   });
 
+// rejected — эмодзи вне поддерживаемого TG набора реакций, отброшенные при
+// сохранении (п.15). Экран показывает их админу, а не глотает молча.
+export interface MediaEmojiWhitelist {
+  phrases: string[];
+  rejected: string[];
+}
 export const fetchMediaEmojiWhitelist = () =>
   api<MediaPhrases>("/api/admin/media-reactions/emoji-whitelist");
 export const updateMediaEmojiWhitelist = (phrases: string[]) =>
-  api<MediaPhrases>("/api/admin/media-reactions/emoji-whitelist", {
+  api<MediaEmojiWhitelist>("/api/admin/media-reactions/emoji-whitelist", {
     method: "PUT",
     body: JSON.stringify({ phrases }),
   });

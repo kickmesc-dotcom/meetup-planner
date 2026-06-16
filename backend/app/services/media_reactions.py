@@ -136,6 +136,51 @@ DEFAULT_EMOJI_WHITELIST: list[str] = [
     "👍", "🔥", "❤️", "😁", "🤣", "💯", "👏", "🤝", "🥰", "😱", "🤯", "🫡",
 ]
 
+# GHG8 T2.2/п.15: канонический набор эмодзи, которые Telegram принимает как
+# free-реакцию на сообщение (поле `available_reactions`, type "emoji"). Список
+# статический — добываем НЕ через live-API (это тронуло бы коннект, который
+# заморожен 15.06), а зашиваем из документации Bot API. Если TG расширит набор,
+# дополнить здесь. Набор именно для message-реакций (≠ произвольные emoji).
+# Источник: Telegram available reactions (≈ те, что видны в пикере реакций).
+TELEGRAM_ALLOWED_REACTIONS: frozenset[str] = frozenset({
+    "👍", "👎", "❤️", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢",
+    "🎉", "🤩", "🤮", "💩", "🙏", "👌", "🕊", "🤡", "🥱", "🥴", "😍", "🐳",
+    "❤‍🔥", "🌚", "🌭", "💯", "🤣", "⚡", "🍌", "🏆", "💔", "🤨", "😐", "🍓",
+    "🍾", "💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻", "👀", "🎃", "🙈",
+    "😇", "😨", "🤝", "✍", "🤗", "🫡", "🎅", "🎄", "☃️", "💅", "🤪", "🗿",
+    "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂️", "🤷", "🤷‍♀️",
+    "😡",
+})
+
+# Варианты с/без VS16 (U+FE0F) — TG порой присылает «голый» кодпоинт. Нормализуем
+# по «base» (без VS16), чтобы и "❤" и "❤️" считались валидными.
+def _strip_vs16(s: str) -> str:
+    return s.replace("️", "")
+
+
+_ALLOWED_NORMALIZED: frozenset[str] = frozenset(
+    _strip_vs16(e) for e in TELEGRAM_ALLOWED_REACTIONS
+)
+
+
+def is_allowed_reaction(emoji: str) -> bool:
+    """True, если эмодзи входит в набор разрешённых TG message-реакций
+    (сравнение устойчиво к наличию/отсутствию VS16)."""
+    e = emoji.strip()
+    return e in TELEGRAM_ALLOWED_REACTIONS or _strip_vs16(e) in _ALLOWED_NORMALIZED
+
+
+def filter_allowed_reactions(emojis: list[str]) -> tuple[list[str], list[str]]:
+    """Разделяет список на (валидные, отброшенные). Порядок валидных сохраняется,
+    дедуп делается уровнем выше (`_clean_list`). Используется при сохранении
+    whitelist'а из админки — чтобы не дать положить эмодзи, который бот всё
+    равно не сможет поставить как реакцию (прод-фидбек п.15)."""
+    valid: list[str] = []
+    rejected: list[str] = []
+    for e in emojis:
+        (valid if is_allowed_reaction(e) else rejected).append(e)
+    return valid, rejected
+
 
 def _clean_list(items: list[str]) -> list[str]:
     """Дедуп + чистка пустых, порядок сохраняется."""
@@ -263,11 +308,19 @@ async def get_emoji_whitelist(session: AsyncSession) -> list[str]:
     )
 
 
-async def set_emoji_whitelist(session: AsyncSession, emojis: list[str]) -> None:
+async def set_emoji_whitelist(
+    session: AsyncSession, emojis: list[str]
+) -> list[str]:
+    """Сохраняет whitelist, ОТСЕКАЯ эмодзи вне набора разрешённых TG-реакций
+    (п.15: не давать положить то, что бот не сможет поставить). Возвращает
+    список отброшенных значений — endpoint показывает их админу."""
+    cleaned = _clean_list(emojis)
+    valid, rejected = filter_allowed_reactions(cleaned)
     await _set_value(
         session, MEDIA_EMOJI_WHITELIST_KEY,
-        json.dumps(_clean_list(emojis), ensure_ascii=False),
+        json.dumps(valid, ensure_ascii=False),
     )
+    return rejected
 
 
 # --- Чистые функции (юнит-тестируемые без БД) ---

@@ -147,6 +147,17 @@ async def find_best_slots(
 
     slots.sort(key=lambda s: (-s.score, s.starts_at))
 
+    # GHG8 T2.1 (прод-фидбек п.5/10): де-оверлап применяем ТОЛЬКО к
+    # fallback-режиму скользящего окна, где соседние окна (cursor += step)
+    # действительно избыточно пересекаются. В режиме `presets` пресеты —
+    # это курируемые пользователем варианты, которые он МОЖЕТ намеренно
+    # задать внахлёст (напр. 17-21/18-22/19-23/20-00, чтобы голосовать между
+    # ними). Прежний жадный де-оверлап схлопывал их в один слот → автоподбор
+    # отдавал <2 вариантов → опрос не стартовал (`not_enough_slots`). В
+    # preset-режиме отдаём top_n по score как есть (пересечения допустимы).
+    if presets:
+        return slots[:top_n]
+
     # Greedy de-overlap: keep the highest-scoring slots that don't overlap each other.
     chosen: list[Slot] = []
     for s in slots:

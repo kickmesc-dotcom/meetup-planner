@@ -104,16 +104,27 @@ export default function BotPauseBar() {
 
   const [modalOpen, setModalOpen] = useState(false);
 
+  // GHG8 T2.4/п.20: pending/error/idle делят одну высоту с компактной плашкой
+  // «в эфире» (две строки + p-3), чтобы при резолве статуса меню админки НЕ
+  // прыгало — карточки ниже (Прокси / Рестарт Space) остаются на месте. Это
+  // единственный элемент в корне, меняющий высоту на обычном открытии; сами
+  // карточки статичны и не рефлоутятся. Active-пауза (sticky) — отдельная ветка.
+  const RESERVE_H = "min-h-[3.75rem]";
+
   if (state.isPending) {
     return (
-      <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+      <div
+        className={`flex items-center rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint ${RESERVE_H}`}
+      >
         Загрузка статуса паузы…
       </div>
     );
   }
   if (state.isError) {
     return (
-      <div className="rounded-xl bg-status-busy/10 p-3 text-xs text-status-busy">
+      <div
+        className={`flex items-center rounded-xl bg-status-busy/10 p-3 text-xs text-status-busy ${RESERVE_H}`}
+      >
         ⚠ {humanizeApiError(state.error)}
       </div>
     );
@@ -171,8 +182,8 @@ export default function BotPauseBar() {
   // Нет активной паузы — кнопка инициации.
   return (
     <>
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className={`flex items-center rounded-xl bg-tg-secondary-bg/60 p-3 ${RESERVE_H}`}>
+        <div className="flex w-full items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-base">▶️</span>
             <div className="min-w-0">

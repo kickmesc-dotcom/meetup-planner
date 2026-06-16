@@ -11,6 +11,8 @@ import random
 from app.services.media_reactions import (
     WAIT_WINDOW_MIN_BOUNDS,
     clamp_wait_window,
+    filter_allowed_reactions,
+    is_allowed_reaction,
     pick_emoji,
     pick_phrase,
     roll_chance,
@@ -73,3 +75,48 @@ def test_roll_chance_deterministic_with_seed():
     assert roll_chance(int(first) + 1, rng2) is True
     rng3 = random.Random(0)
     assert roll_chance(int(first) - 1, rng3) is False
+
+
+# --- GHG8 T2.2/п.15: валидация emoji-реакций ---
+
+def test_is_allowed_reaction_accepts_known():
+    assert is_allowed_reaction("🔥") is True
+    assert is_allowed_reaction("👍") is True
+    assert is_allowed_reaction("🤣") is True
+
+
+def test_is_allowed_reaction_rejects_unknown():
+    # Эмодзи есть, но TG не принимает их как реакцию на сообщение.
+    assert is_allowed_reaction("🍕") is False
+    assert is_allowed_reaction("🚀") is False
+    # Не-эмодзи / мусор.
+    assert is_allowed_reaction("abc") is False
+    assert is_allowed_reaction("") is False
+
+
+def test_is_allowed_reaction_tolerates_vs16():
+    # ❤️ (с VS16 U+FE0F) и ❤ (голый кодпоинт) — оба валидны.
+    assert is_allowed_reaction("❤️") is True
+    assert is_allowed_reaction("❤") is True
+    # ✍ хранится без VS16 в наборе — вариант с VS16 тоже должен пройти.
+    assert is_allowed_reaction("✍️") is True
+
+
+def test_is_allowed_reaction_strips_whitespace():
+    assert is_allowed_reaction("  🔥 ") is True
+
+
+def test_filter_allowed_reactions_splits_and_preserves_order():
+    valid, rejected = filter_allowed_reactions(["🔥", "🍕", "👍", "🚀"])
+    assert valid == ["🔥", "👍"]
+    assert rejected == ["🍕", "🚀"]
+
+
+def test_filter_allowed_reactions_all_valid():
+    valid, rejected = filter_allowed_reactions(["👍", "❤️", "😁"])
+    assert valid == ["👍", "❤️", "😁"]
+    assert rejected == []
+
+
+def test_filter_allowed_reactions_empty():
+    assert filter_allowed_reactions([]) == ([], [])
