@@ -220,6 +220,38 @@ export const updateAdviceEnabled = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
+// --- T3.1: снапшот/экспорт базы причин-реакций ---
+
+export interface PhraseSnapshot {
+  format: string;
+  version: number;
+  pools: Record<string, string[]>;
+  use_counts: Record<string, Record<string, number>>;
+  personas: Array<{
+    telegram_id: number;
+    display_name: string;
+    persona_text: string;
+  }>;
+}
+
+export interface SnapshotImportSummary {
+  mode: "replace" | "merge";
+  pools: Record<string, { count: number }>;
+  personas: { restored?: number; skipped?: number };
+}
+
+export const fetchPhrasesSnapshot = () =>
+  api<PhraseSnapshot>("/api/admin/phrases/snapshot");
+
+export const importPhrasesSnapshot = (
+  snapshot: unknown,
+  mode: "replace" | "merge",
+) =>
+  api<SnapshotImportSummary>("/api/admin/phrases/snapshot/import", {
+    method: "POST",
+    body: JSON.stringify({ snapshot, mode }),
+  });
+
 // --- GHG6 AD6: Chukhan reasons CRUD (отдельные шаблоны фраз чухана) ---
 
 export const fetchChukhanReasons = () =>

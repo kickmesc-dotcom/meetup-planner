@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
 import structlog
 # Добавлен импорт Response
 from fastapi import APIRouter, HTTPException, status, Response
@@ -1262,6 +1263,52 @@ async def admin_update_advice_enabled(
         enabled=await _get_advice_enabled(session),
         phrases=await _get_advice_phrases(session),
     )
+
+
+# --- T3.1: снапшот/экспорт базы причин-реакций ---
+
+from app.services.phrase_snapshot import (
+    apply_snapshot as _apply_snapshot,
+    build_snapshot as _build_snapshot,
+    validate_snapshot as _validate_snapshot,
+)
+
+
+class PhraseSnapshotImport(BaseModel):
+    snapshot: dict[str, Any]
+    mode: str = Field("replace", pattern="^(replace|merge)$")
+
+
+@router.get("/admin/phrases/snapshot")
+async def admin_get_phrases_snapshot(
+    session: SessionDep, user: CurrentUser
+) -> dict[str, Any]:
+    """T3.1: полный снапшот всех редактируемых пулов фраз + use_counts +
+    персонажей. Фронт даёт скопировать/скачать как страховку от потери."""
+    _ensure_admin(user)
+    snap = await _build_snapshot(session)
+    log.info(
+        "admin.phrases_snapshot_built",
+        pools={k: len(v) for k, v in snap["pools"].items()},
+        personas=len(snap["personas"]),
+        by=user.id,
+    )
+    return snap
+
+
+@router.post("/admin/phrases/snapshot/import")
+async def admin_import_phrases_snapshot(
+    body: PhraseSnapshotImport, session: SessionDep, user: CurrentUser
+) -> dict[str, Any]:
+    """T3.1: залить снапшот обратно. mode=replace перезаписывает пулы, merge —
+    дописывает без дублей. Возвращает summary по каждому пулу/персонажам."""
+    _ensure_admin(user)
+    ok, err = _validate_snapshot(body.snapshot)
+    if not ok:
+        raise HTTPException(status_code=422, detail=f"невалидный снапшот: {err}")
+    summary = await _apply_snapshot(session, body.snapshot, mode=body.mode)
+    log.info("admin.phrases_snapshot_imported", summary=summary, by=user.id)
+    return summary
 
 
 # --- GHG7 P5: реакции бота на медиа (пулы фраз single/collection + эмодзи) ---

@@ -14,6 +14,7 @@ import PersonasScreen from "./PersonasScreen";
 import BotReactionsScreen from "./BotReactionsScreen";
 import MediaReactionsScreen from "./MediaReactionsScreen";
 import AdviceScreen from "./AdviceScreen";
+import PhrasesSnapshotScreen from "./PhrasesSnapshotScreen";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
@@ -36,6 +37,7 @@ type Section =
   | "bot-reactions"
   | "media-reactions"
   | "advice"
+  | "phrases-snapshot"
   | "history"
   | "birthdays"
   | "calendar-settings"
@@ -78,6 +80,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
   if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "advice") return <AdviceScreen onBack={back} />;
+  if (section === "phrases-snapshot") return <PhrasesSnapshotScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
@@ -328,6 +331,15 @@ export default function AdminScreen({ users }: Props) {
           title="Магический шар"
           subtitle="/advice · #совет · @бот …?"
           onClick={() => select("advice")}
+        />
+      </SectionGroup>
+
+      <SectionGroup icon="🗄" title="Данные">
+        <Card
+          icon="🗄"
+          title="Снапшот фраз"
+          subtitle="Бэкап причин / реакций / типажей"
+          onClick={() => select("phrases-snapshot")}
         />
       </SectionGroup>
     </div>
