@@ -252,6 +252,37 @@ export const importPhrasesSnapshot = (
     body: JSON.stringify({ snapshot, mode }),
   });
 
+// --- T3.3: алёрты «лох/чухан не запостился» ---
+
+export interface PostingLoserAlert {
+  outbox_id: number;
+  rolled_at: string | null;
+  loser_name: string | null;
+  reason_text: string | null;
+  attempts: number;
+  last_error: string | null;
+}
+
+export interface PostingChukhanAlert {
+  week_start: string;
+  user_name: string | null;
+  created_at: string | null;
+}
+
+export interface PostingAlerts {
+  total: number;
+  loser: PostingLoserAlert[];
+  chukhan: PostingChukhanAlert | null;
+}
+
+export const fetchPostingAlerts = () =>
+  api<PostingAlerts>("/api/admin/posting-alerts");
+
+export const retryChukhanPosting = () =>
+  api<{ delivered: boolean }>("/api/admin/posting-alerts/chukhan-retry", {
+    method: "POST",
+  });
+
 // --- GHG6 AD6: Chukhan reasons CRUD (отдельные шаблоны фраз чухана) ---
 
 export const fetchChukhanReasons = () =>

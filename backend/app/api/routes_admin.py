@@ -1311,6 +1311,40 @@ async def admin_import_phrases_snapshot(
     return summary
 
 
+# --- T3.3: алёрты «лох/чухан не запостился» ---
+
+from app.services.posting_alerts import get_posting_alerts as _get_posting_alerts
+
+
+@router.get("/admin/posting-alerts")
+async def admin_posting_alerts(
+    session: SessionDep, user: CurrentUser
+) -> dict[str, Any]:
+    """T3.3: read-only сводка терминально-незапостившихся лох/чухан.
+
+    ⚠️ Только SELECT (loser_outbox/weekly_chukhan), никаких записей. outbox лоха
+    не трогаем — лишь показываем expired-строки. Обычно total=0."""
+    _ensure_admin(user)
+    return await _get_posting_alerts(session)
+
+
+@router.post("/admin/posting-alerts/chukhan-retry")
+async def admin_posting_alerts_chukhan_retry(
+    session: SessionDep, user: CurrentUser
+) -> dict[str, Any]:
+    """T3.3: дослать недоставленного чухана текущей недели. Зовёт СУЩЕСТВУЮЩУЮ
+    `retry_undelivered_chukhan` (тот же штатный путь, что job каждые 30 мин;
+    без «алерта в чат что вручную»). Перепрогона лоха здесь НЕТ — его outbox
+    работает сам и его мы не трогаем."""
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+    from app.services.chukhan import retry_undelivered_chukhan
+
+    delivered = await retry_undelivered_chukhan(get_bot())
+    log.info("admin.posting_alerts_chukhan_retry", delivered=delivered, by=user.id)
+    return {"delivered": delivered}
+
+
 # --- GHG7 P5: реакции бота на медиа (пулы фраз single/collection + эмодзи) ---
 
 from app.services.media_reactions import (

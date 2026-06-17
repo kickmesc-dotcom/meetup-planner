@@ -15,6 +15,8 @@ import BotReactionsScreen from "./BotReactionsScreen";
 import MediaReactionsScreen from "./MediaReactionsScreen";
 import AdviceScreen from "./AdviceScreen";
 import PhrasesSnapshotScreen from "./PhrasesSnapshotScreen";
+import PostingAlertsScreen from "./PostingAlertsScreen";
+import { fetchPostingAlerts } from "@/api/admin";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
@@ -38,6 +40,7 @@ type Section =
   | "media-reactions"
   | "advice"
   | "phrases-snapshot"
+  | "posting-alerts"
   | "history"
   | "birthdays"
   | "calendar-settings"
@@ -70,6 +73,13 @@ export default function AdminScreen({ users }: Props) {
     staleTime: 30_000,
   });
 
+  // T3.3: счётчик пропущенных постов для бейджа на карточке (read-only, обычно 0).
+  const postingAlerts = useQuery({
+    queryKey: ["admin", "posting-alerts"],
+    queryFn: fetchPostingAlerts,
+    staleTime: 30_000,
+  });
+
   const back = () => setSection("root");
 
   if (section === "chukhan") return <ChukhanScreen users={users} onBack={back} />;
@@ -81,6 +91,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "advice") return <AdviceScreen onBack={back} />;
   if (section === "phrases-snapshot") return <PhrasesSnapshotScreen onBack={back} />;
+  if (section === "posting-alerts") return <PostingAlertsScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
@@ -193,6 +204,15 @@ export default function AdminScreen({ users }: Props) {
           title="Рестарт Space"
           subtitle="Кнопка + расписание (once / каждые N часов)"
           onClick={() => select("space-restart")}
+        />
+        {/* GHG8 T3.3 (п.18): алёрты «лох/чухан не запостился» — по соседству с
+            прокси, как просил пользователь. Бейдж = число пропусков (обычно 0). */}
+        <Card
+          icon="🚨"
+          title="Алёрты постинга"
+          subtitle="Лох / чухан не вышли в чат + дослать"
+          onClick={() => select("posting-alerts")}
+          badge={postingAlerts.data?.total}
         />
       </SectionGroup>
 
@@ -382,11 +402,14 @@ function Card({
   title,
   subtitle,
   onClick,
+  badge,
 }: {
   icon: string;
   title: string;
   subtitle: string;
   onClick: () => void;
+  /** Опц. счётчик-бейдж справа (T3.3: число пропущенных постов). >0 → красный. */
+  badge?: number;
 }) {
   return (
     <button
@@ -401,6 +424,11 @@ function Card({
         <div className="text-sm font-semibold text-tg-text">{title}</div>
         <div className="text-[11px] text-tg-hint truncate">{subtitle}</div>
       </div>
+      {badge !== undefined && badge > 0 && (
+        <div className="min-w-5 h-5 px-1.5 rounded-full bg-status-busy text-white text-[11px] font-semibold tabular-nums flex items-center justify-center shrink-0">
+          {badge}
+        </div>
+      )}
       <div className="text-tg-hint text-base">›</div>
     </button>
   );
