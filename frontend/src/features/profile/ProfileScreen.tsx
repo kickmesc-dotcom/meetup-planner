@@ -106,47 +106,56 @@ function GreetingSettings() {
 
   const p = prefs.data;
 
+  // GHG8 T1.3 (F2/F3): обе настройки ужаты в одну строку каждая (label слева,
+  // контрол справа) — раньше блок занимал ~четверть экрана, а фича не настолько
+  // важная (прод-фидбек 10.06 п.2/п.3).
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
-      <div>
-        <div className="text-sm font-semibold text-tg-text">👋 Приветствие</div>
-        <div className="text-[11px] text-tg-hint">
-          Баннер с быстрой инфой (чухан, лохи, червь) над календарём.
-        </div>
-      </div>
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 divide-y divide-tg-bg/40">
       {!p ? (
         <ListSkeleton rows={2} />
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-sm text-tg-text">Показывать баннер</div>
+          {/* F2: приветствие — описание-лейбл + тогл в одну строку. */}
+          <div className="flex items-center justify-between gap-3 pb-2.5">
+            <div className="min-w-0">
+              <div className="text-sm text-tg-text">👋 Приветствие</div>
+              <div className="text-[11px] text-tg-hint truncate">
+                Баннер званий над календарём
+              </div>
+            </div>
             <Switch
               checked={!p.hide_greeting}
               onChange={(show) => save.mutate({ hide_greeting: !show })}
             />
           </div>
-          <div>
-            <div className="text-[11px] text-tg-hint mb-1">
-              Формат участника в блоках званий (один на все блоки)
-            </div>
-            <div className="flex rounded-lg bg-tg-bg/60 p-0.5 text-xs">
+          {/* F3: формат участника — лейбл + компактный сегмент-контрол в строку. */}
+          <div className="flex items-center justify-between gap-3 pt-2.5">
+            <div className="text-sm text-tg-text shrink-0">Формат</div>
+            <div className="flex rounded-lg bg-tg-bg/60 p-0.5 text-xs shrink-0">
               {(
                 [
-                  ["avatar", "Аватарка"],
+                  ["avatar", "Аватар"],
                   ["name", "Имя"],
-                  ["both", "Имя + аватарка"],
+                  ["both", "Оба"],
                 ] as [WelcomeFormat, string][]
               ).map(([fmt, label]) => (
                 <button
                   key={fmt}
                   type="button"
+                  aria-label={
+                    fmt === "avatar"
+                      ? "Аватарка"
+                      : fmt === "name"
+                        ? "Имя"
+                        : "Имя + аватарка"
+                  }
                   onClick={() => {
                     if (p.welcome_format === fmt) return;
                     haptic("selection");
                     save.mutate({ welcome_format: fmt });
                   }}
                   className={[
-                    "flex-1 min-h-9 rounded-md transition-colors",
+                    "min-h-8 px-2.5 rounded-md transition-colors",
                     p.welcome_format === fmt
                       ? "bg-tg-button text-tg-button-text font-medium"
                       : "text-tg-hint",
