@@ -186,13 +186,16 @@ def _format_announcement(user: User, *, reason: str | None = None) -> str:
     # старые CHUKHAN_TAGLINES. Аргумент `reason` пробрасывается извне (см.
     # announce_chukhan), чтобы тест/UI могли проверить, какая фраза выбрана.
     tagline = reason or random.choice(CHUKHAN_TAGLINES)
+    # GHG8 T1.2: префикс «Причина:» — раньше фраза висела голой и иногда читалась
+    # конфузно (прод-фидбек 15.06 п.1). Формат выровнен с анонсом лоха
+    # (loser.py: «Причина: …»).
     return (
         "💩💩💩 <b>ЧУХАН НЕДЕЛИ</b> 💩💩💩\n"
         "🤮🤢🤮🤢🤮🤢🤮🤢🤮\n\n"
         f"На этой неделе чуханом назначен:\n"
         f"👉 <b>{name}</b> ({handle}) 👈\n\n"
         "🪰💨🪰💨🪰💨🪰💨🪰\n"
-        f"<i>{tagline}</i>"
+        f"<i>Причина: {tagline}</i>"
     )
 
 
@@ -246,19 +249,35 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
     except Exception:  # noqa: BLE001
         log.warning("chukhan.avatar_sync_failed", user_id=user.id)
 
-    # GHG6 AD6: подтянем кастомные фразы чухана из admin_config (если заданы).
-    try:
-        custom_reasons = await get_chukhan_reasons(session)
-    except Exception:  # noqa: BLE001
-        custom_reasons = []
-    # GHG6 E5: взвешенный выбор по use_count для кастомных фраз. Для дефолтных
-    # CHUKHAN_TAGLINES счётчики не ведём — фолбэк остаётся равномерным.
-    reason = None
-    if custom_reasons:
-        use_counts = await get_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
-        reason = weighted_choice(custom_reasons, use_counts) or random.choice(custom_reasons)
-        await increment_use_count(session, CHUKHAN_USE_COUNTS_KEY, reason)
+    # GHG8 T1.2: на ретрае недоставленного пика причина уже зафиксирована в
+    # строке — переиспользуем её, чтобы текст не «перероллился» между попытками
+    # и use_counts не инкрементились повторно (прод-фидбек 15.06 п.1 «повтор»).
+    if row.reason_text:
+        reason = row.reason_text
+    else:
+        # GHG6 AD6: подтянем кастомные фразы чухана из admin_config (если заданы).
+        try:
+            custom_reasons = await get_chukhan_reasons(session)
+        except Exception:  # noqa: BLE001
+            custom_reasons = []
+        # GHG6 E5: взвешенный выбор по use_count для кастомных фраз. Для дефолтных
+        # CHUKHAN_TAGLINES счётчики не ведём — фолбэк остаётся равномерным.
+        if custom_reasons:
+            use_counts = await get_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
+            reason = weighted_choice(custom_reasons, use_counts) or random.choice(
+                custom_reasons
+            )
+            await increment_use_count(session, CHUKHAN_USE_COUNTS_KEY, reason)
+        else:
+            # Дефолтная ветка: раньше random.choice жил внутри _format_announcement
+            # и не сохранялся. Резолвим здесь, чтобы зафиксировать ровно ту фразу,
+            # что уйдёт в чат.
+            reason = random.choice(CHUKHAN_TAGLINES)
     text = _format_announcement(user, reason=reason)
+    # Фиксируем причину на строке до отправки: на failure-ветке (commit ниже)
+    # она сохранится и ретрай переиспользует ту же фразу; на успехе уедет вместе
+    # с posted_at. История (профиль) читает это поле.
+    row.reason_text = reason
     # GHG8 P3: «мог бы стать %name%, но ДР» — до дроби и основного поста.
     # Best-effort: фейл оглашения не блокирует пост. Оглашаем только при
     # свежем пике (created): у ретрая недоставленного поста скипы уже

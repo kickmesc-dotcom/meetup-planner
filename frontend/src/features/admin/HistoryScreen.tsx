@@ -93,12 +93,12 @@ export default function HistoryScreen({ users, onBack }: Props) {
               {(chukhanHistory.data ?? []).map((h) => {
                 const u = userById[h.user_id];
                 return (
-                  <div key={h.id} className="flex items-center gap-2 py-1.5">
-                    <div className="text-xs text-tg-hint w-20">
+                  <div key={h.id} className="flex items-start gap-2 py-1.5">
+                    <div className="text-xs text-tg-hint w-20 shrink-0">
                       {format(new Date(h.week_start), "dd.MM.yy")}
                     </div>
                     <div
-                      className="w-6 h-6 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-[10px]"
+                      className="w-6 h-6 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-[10px] shrink-0"
                       style={{ background: u?.color_hex ?? "#888" }}
                     >
                       {u?.avatar_url ? (
@@ -107,12 +107,20 @@ export default function HistoryScreen({ users, onBack }: Props) {
                         u?.display_name[0] ?? "?"
                       )}
                     </div>
-                    <div className="flex-1 truncate text-sm text-tg-text">
-                      {u?.display_name ?? `id=${h.user_id}`}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-tg-text truncate">
+                        {u?.display_name ?? `id=${h.user_id}`}
+                      </div>
+                      {/* GHG8 T1.2: причина чухана (как у лоха в соседней вкладке). */}
+                      {h.reason_text && (
+                        <div className="text-[11px] text-tg-hint italic line-clamp-2">
+                          «{h.reason_text}»
+                        </div>
+                      )}
                     </div>
                     <div
                       className={[
-                        "text-[10px] rounded-full px-1.5 py-0.5",
+                        "text-[10px] rounded-full px-1.5 py-0.5 shrink-0",
                         h.posted_at
                           ? "bg-status-free/15 text-status-free"
                           : "bg-status-maybe/15 text-status-maybe",

@@ -13,6 +13,7 @@ export interface ChukhanWeek {
   user_id: number;
   posted_at: string | null;
   tg_message_id: number | null;
+  reason_text: string | null; // GHG8 T1.2
 }
 
 export interface ChukhanLeaderRow {

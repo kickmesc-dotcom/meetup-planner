@@ -110,6 +110,7 @@ export interface ChukhanHistoryEntry {
   week_start: string; // ISO
   user_id: number;
   posted_at: string; // ISO
+  reason_text: string | null; // GHG8 T1.2
 }
 
 export const fetchChukhanHistory = (limit = 20) =>

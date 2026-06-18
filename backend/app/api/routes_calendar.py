@@ -294,6 +294,7 @@ class ChukhanHistoryRow(BaseModel):
     week_start: datetime
     user_id: int
     posted_at: datetime
+    reason_text: str | None = None  # GHG8 T1.2: причина для сводной истории
 
 
 @router.get("/chukhan/history", response_model=list[ChukhanHistoryRow])
@@ -310,7 +311,10 @@ async def chukhan_history_public(
     ).all()
     return [
         ChukhanHistoryRow(
-            week_start=r.week_start, user_id=r.user_id, posted_at=r.posted_at
+            week_start=r.week_start,
+            user_id=r.user_id,
+            posted_at=r.posted_at,
+            reason_text=r.reason_text,
         )
         for r in rows
     ]

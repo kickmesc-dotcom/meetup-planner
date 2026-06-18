@@ -75,6 +75,7 @@ class ChukhanWeekOut(BaseModel):
     user_id: int
     posted_at: datetime | None
     tg_message_id: int | None
+    reason_text: str | None = None  # GHG8 T1.2
 
 class ChukhanLeaderRow(BaseModel):
     user_id: int
