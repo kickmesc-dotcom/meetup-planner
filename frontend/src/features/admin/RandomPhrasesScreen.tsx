@@ -1,6 +1,9 @@
 import SubScreen from "./SubScreen";
 import { ScheduleBody } from "./RandomPhrasesScheduleScreen";
-import { GeneratorBody } from "./RandomPhrasesGeneratorScreen";
+import {
+  GeneratorBody,
+  GeneratorVersionBody,
+} from "./RandomPhrasesGeneratorScreen";
 
 interface Props {
   onBack: () => void;
@@ -18,6 +21,7 @@ export default function RandomPhrasesScreen({ onBack }: Props) {
       subtitle="Расписание автопоста + параметры генератора"
       onBack={onBack}
     >
+      <GeneratorVersionBody />
       <ScheduleBody />
       <GeneratorBody />
     </SubScreen>

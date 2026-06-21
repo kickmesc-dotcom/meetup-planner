@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  fetchPersonas,
   fetchRPGenerator,
   updateRPGenerator,
   type PhraseGeneratorVersion,
@@ -24,6 +25,7 @@ export default function RandomPhrasesGeneratorScreen({ onBack }: Props) {
       subtitle="Длина цитаты, история, шансы"
       onBack={onBack}
     >
+      <GeneratorVersionBody />
       <GeneratorBody />
     </SubScreen>
   );
@@ -71,6 +73,109 @@ export function GeneratorBody() {
   );
 }
 
+// GHG8 T1.4: версия генератора (нарезка/типажи) — это переключатель РЕЖИМА,
+// а не настройка-тюнер. Раньше тап только менял локальный стейт и сохранялся
+// лишь вместе с bulk «💾 Сохранить» из GeneratorForm; пользователь тапал
+// «Типажи», уходил в «Персоналии» посмотреть тексты, возвращался — refetch
+// сбрасывал чип обратно на сохранённую «нарезку» (фидбек п.9). Теперь у
+// селектора своя query+мутация и он сохраняется СРАЗУ по тапу. Заодно, когда
+// выбраны «Типажи», но ни одной персоналии не заведено, показываем явное
+// предупреждение — это и есть то «пусто», из-за которого бэкенд молча
+// фолбэчится на нарезку (random_phrases.py: personas_empty_fallback_legacy).
+export function GeneratorVersionBody() {
+  const qc = useQueryClient();
+
+  const gen = useQuery({ queryKey: ["admin", "rp-generator"], queryFn: fetchRPGenerator });
+  // Сколько персоналий реально заведено — чтобы предупредить о фолбэке.
+  const personas = useQuery({ queryKey: ["admin", "personas"], queryFn: fetchPersonas });
+
+  const setVersion = useMutation({
+    mutationFn: (version: PhraseGeneratorVersion) => {
+      if (!gen.data) throw new Error("настройки генератора ещё не загружены");
+      return updateRPGenerator({ ...gen.data, generator_version: version });
+    },
+    // GHG8 T1.4: оптимистично переключаем чип, чтобы UI не «прыгал» туда-обратно
+    // на время запроса (и не сбрасывался при гонке с другими мутациями того же
+    // ключа). При ошибке откатываем к снимку.
+    onMutate: async (version) => {
+      await qc.cancelQueries({ queryKey: ["admin", "rp-generator"] });
+      const prev = qc.getQueryData<RPGenerator>(["admin", "rp-generator"]);
+      if (prev) {
+        qc.setQueryData<RPGenerator>(["admin", "rp-generator"], {
+          ...prev,
+          generator_version: version,
+        });
+      }
+      return { prev };
+    },
+    onError: (e, _version, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["admin", "rp-generator"], ctx.prev);
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+    onSuccess: () => haptic("success"),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "rp-generator"] }),
+  });
+
+  const genVersion: PhraseGeneratorVersion =
+    gen.data?.generator_version ?? "legacy";
+  const seededCount = personas.data?.filter((p) => p.persona_text != null).length;
+  const noPersonas =
+    genVersion === "personas" && personas.data != null && seededCount === 0;
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+      <div>
+        <div className="text-base font-semibold mb-1">🎭 Версия генератора</div>
+        <div className="text-xs text-tg-hint mb-2">
+          {genVersion === "personas"
+            ? "Типажи: фраза собирается из шаблонов персоналии участника (редактор — «Персоналии» отдельным пунктом меню). Если ни одной персоналии нет — авто-фолбэк на нарезку."
+            : "Нарезка: классическая шизо-цитата из кусков реальных сообщений чата."}
+        </div>
+        {gen.isPending || !gen.data ? (
+          <ListSkeleton rows={2} />
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <ModeChip
+              active={genVersion === "legacy"}
+              onClick={() => {
+                if (genVersion === "legacy" || setVersion.isPending) return;
+                haptic("selection");
+                setVersion.mutate("legacy");
+              }}
+            >
+              ✂️ Нарезка
+            </ModeChip>
+            <ModeChip
+              active={genVersion === "personas"}
+              onClick={() => {
+                if (genVersion === "personas" || setVersion.isPending) return;
+                haptic("selection");
+                setVersion.mutate("personas");
+              }}
+            >
+              🎭 Типажи
+            </ModeChip>
+          </div>
+        )}
+        {/* GHG8 T1.4: выбрано «Типажи», но пул пуст → бэкенд молча уйдёт в
+            нарезку. Объясняем «пусто», которое видел пользователь. */}
+        {noPersonas && (
+          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            ⚠ Ни одной персоналии не заведено — бот будет генерировать «нарезкой»,
+            пока вы не заполните хотя бы одного участника в «Персоналии».
+          </div>
+        )}
+        {setVersion.isPending && (
+          <div className="mt-2 inline-flex items-center gap-2 text-xs text-tg-hint">
+            <Spinner /> Сохраняем…
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function GeneratorForm({
   initial,
   isPending,
@@ -94,10 +199,6 @@ function GeneratorForm({
   const [recWeight, setRecWeight] = useState(
     Math.round((initial.recency_quarantine_weight ?? 0.05) * 100),
   );
-  // GHG8 P6.3: версия генератора. Старые серверы → undefined → 'legacy'.
-  const [genVersion, setGenVersion] = useState<PhraseGeneratorVersion>(
-    initial.generator_version ?? "legacy",
-  );
 
   useEffect(() => {
     setCmin(String(initial.count_min));
@@ -108,7 +209,6 @@ function GeneratorForm({
     setMode(initial.mode ?? "mix");
     setRecHours(String(initial.recency_quarantine_hours ?? 18));
     setRecWeight(Math.round((initial.recency_quarantine_weight ?? 0.05) * 100));
-    setGenVersion(initial.generator_version ?? "legacy");
   }, [initial]);
 
   const cminN = clamp(parseInt(cmin, 10) || 2, 2, 6);
@@ -127,7 +227,10 @@ function GeneratorForm({
     mode,
     recency_quarantine_hours: recHoursN,
     recency_quarantine_weight: recWeight / 100,
-    generator_version: genVersion,
+    // GHG8 T1.4: версия генератора управляется отдельным самосохраняющимся
+    // селектором (GeneratorVersionBody). Пробрасываем текущее серверное
+    // значение, чтобы bulk-сейв тюнинга не затёр выбор обратно на 'legacy'.
+    generator_version: initial.generator_version ?? "legacy",
   };
 
   const dirty =
@@ -140,8 +243,7 @@ function GeneratorForm({
     body.recency_quarantine_hours !== (initial.recency_quarantine_hours ?? 18) ||
     Math.abs(
       body.recency_quarantine_weight - (initial.recency_quarantine_weight ?? 0.05),
-    ) > 0.005 ||
-    genVersion !== (initial.generator_version ?? "legacy");
+    ) > 0.005;
 
   // GHG6 L: лейблы count_min/count_max и хинт зависят от mode.
   const unitLabel =
@@ -156,37 +258,6 @@ function GeneratorForm({
   return (
     <>
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
-        {/* GHG8 P6.3: переключатель версии генератора. Personas без единой
-            заведённой персоналии тихо фолбэчится на legacy (бэкенд). */}
-        <div>
-          <div className="text-base font-semibold mb-1">🎭 Версия генератора</div>
-          <div className="text-xs text-tg-hint mb-2">
-            {genVersion === "personas"
-              ? "Типажи: фраза собирается из шаблонов персоналии участника (редактор — «Персоналии» ниже по меню). Если ни одной персоналии нет — авто-фолбэк на нарезку."
-              : "Нарезка: классическая шизо-цитата из кусков реальных сообщений чата."}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <ModeChip
-              active={genVersion === "legacy"}
-              onClick={() => {
-                haptic("selection");
-                setGenVersion("legacy");
-              }}
-            >
-              ✂️ Нарезка
-            </ModeChip>
-            <ModeChip
-              active={genVersion === "personas"}
-              onClick={() => {
-                haptic("selection");
-                setGenVersion("personas");
-              }}
-            >
-              🎭 Типажи
-            </ModeChip>
-          </div>
-        </div>
-
         <div>
           <div className="text-base font-semibold mb-1">🧩 Режим сбора</div>
           <div className="text-xs text-tg-hint mb-2">{modeHint}</div>
