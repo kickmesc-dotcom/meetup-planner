@@ -66,6 +66,28 @@ WORM_CHANCE_KEY = "worm.chance"            # default 0.01 (1/100)
 _WORM_ENABLED_DEFAULT = True
 _WORM_CHANCE_DEFAULT = 0.01
 
+# --- T3.6: «червь-господин» (носитель звания червя как господин бота) ---
+# Тумблеры/проценты режима. Фича-тогл `enabled` default False — выкатываем
+# поэтапно, чтобы поведение не включилось до готовности фронта и пулов.
+WORM_MASTER_ENABLED_KEY = "worm_master.enabled"            # default False
+WORM_MASTER_PUNISH_ENABLED_KEY = "worm_master.punish_enabled"  # default True
+WORM_MASTER_YES_ENABLED_KEY = "worm_master.yes_enabled"    # поддакивание, default False
+WORM_MASTER_YES_PCT_KEY = "worm_master.yes_pct"            # шанс поддакнуть, default 15
+WORM_MASTER_YES_COOLDOWN_MIN_KEY = "worm_master.yes_cooldown_min"  # default 60
+# Пулы фраз (JSON-списки, как loser_reasons/advice).
+WORM_MASTER_PREFIXES_KEY = "worm_master.prefixes"
+WORM_MASTER_SUFFIXES_KEY = "worm_master.suffixes"
+WORM_MASTER_AGREES_KEY = "worm_master.agrees"
+WORM_MASTER_NAG_KEY = "worm_master.nag"
+WORM_PUNISH_KEY = "worm_master.punish"
+WORM_ANNOUNCE_LINES_KEY = "worm_master.announce_lines"
+
+_WORM_MASTER_ENABLED_DEFAULT = False
+_WORM_MASTER_PUNISH_ENABLED_DEFAULT = True
+_WORM_MASTER_YES_ENABLED_DEFAULT = False
+_WORM_MASTER_YES_PCT_DEFAULT = 15
+_WORM_MASTER_YES_COOLDOWN_MIN_DEFAULT = 60
+
 # --- G2/G3: настройки опросов в чате ---
 # G2: закрепление сообщения с опросом после публикации
 POLLS_PIN_DEFAULT_KEY = "polls.pin_default"              # default False
@@ -919,6 +941,168 @@ async def get_worm_chance(session: AsyncSession) -> float:
 async def set_worm_chance(session: AsyncSession, chance: float) -> None:
     v = max(0.0, min(1.0, float(chance)))
     await _set_value(session, WORM_CHANCE_KEY, f"{v:.6f}")
+
+
+# --- T3.6: «червь-господин» ---
+
+def _dedup_clean(phrases: list[str]) -> list[str]:
+    """strip + дроп пустых + дедуп с сохранением порядка (как set_*_reasons)."""
+    seen: set[str] = set()
+    cleaned: list[str] = []
+    for p in phrases:
+        p = p.strip()
+        if not p or p in seen:
+            continue
+        seen.add(p)
+        cleaned.append(p)
+    return cleaned
+
+
+async def _get_pool(session: AsyncSession, key: str, default: list[str]) -> list[str]:
+    """Кастомный JSON-пул или дефолт из кода (дефолт НЕ пишем в БД при чтении —
+    новые фразы из кода подхватятся, пока админ не начал кастомизацию)."""
+    raw = await _get_value(session, key)
+    if raw is None:
+        return list(default)
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list) and all(isinstance(x, str) for x in data):
+            return data
+    except (ValueError, TypeError):
+        pass
+    return list(default)
+
+
+async def _set_pool(
+    session: AsyncSession, key: str, phrases: list[str], use_counts_key: str | None = None
+) -> None:
+    cleaned = _dedup_clean(phrases)
+    await _set_value(session, key, json.dumps(cleaned, ensure_ascii=False))
+    if use_counts_key is not None:
+        from app.services.phrase_weights import cleanup_use_counts
+
+        await cleanup_use_counts(session, use_counts_key, cleaned)
+
+
+# Тумблеры/проценты.
+async def is_worm_master_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(session, WORM_MASTER_ENABLED_KEY, _WORM_MASTER_ENABLED_DEFAULT)
+
+
+async def set_worm_master_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(session, WORM_MASTER_ENABLED_KEY, "true" if enabled else "false")
+
+
+async def is_worm_master_punish_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, WORM_MASTER_PUNISH_ENABLED_KEY, _WORM_MASTER_PUNISH_ENABLED_DEFAULT
+    )
+
+
+async def set_worm_master_punish_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(session, WORM_MASTER_PUNISH_ENABLED_KEY, "true" if enabled else "false")
+
+
+async def is_worm_master_yes_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, WORM_MASTER_YES_ENABLED_KEY, _WORM_MASTER_YES_ENABLED_DEFAULT
+    )
+
+
+async def set_worm_master_yes_enabled(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(session, WORM_MASTER_YES_ENABLED_KEY, "true" if enabled else "false")
+
+
+async def get_worm_master_yes_pct(session: AsyncSession) -> int:
+    v = await _get_int(session, WORM_MASTER_YES_PCT_KEY, _WORM_MASTER_YES_PCT_DEFAULT)
+    return max(0, min(100, v))
+
+
+async def set_worm_master_yes_pct(session: AsyncSession, pct: int) -> None:
+    await _set_value(session, WORM_MASTER_YES_PCT_KEY, str(max(0, min(100, int(pct)))))
+
+
+async def get_worm_master_yes_cooldown_min(session: AsyncSession) -> int:
+    v = await _get_int(
+        session, WORM_MASTER_YES_COOLDOWN_MIN_KEY, _WORM_MASTER_YES_COOLDOWN_MIN_DEFAULT
+    )
+    return max(0, min(1440, v))
+
+
+async def set_worm_master_yes_cooldown_min(session: AsyncSession, minutes: int) -> None:
+    await _set_value(
+        session, WORM_MASTER_YES_COOLDOWN_MIN_KEY, str(max(0, min(1440, int(minutes))))
+    )
+
+
+# Пулы фраз. use_counts ведём для всех, кроме nag и announce (одноразовые/честный
+# random — см. worm_master.py).
+async def get_worm_master_prefixes(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_MASTER_PREFIXES
+
+    return await _get_pool(session, WORM_MASTER_PREFIXES_KEY, DEFAULT_WORM_MASTER_PREFIXES)
+
+
+async def set_worm_master_prefixes(session: AsyncSession, phrases: list[str]) -> None:
+    from app.services.phrase_weights import WORM_MASTER_PREFIX_USE_COUNTS_KEY
+
+    await _set_pool(session, WORM_MASTER_PREFIXES_KEY, phrases, WORM_MASTER_PREFIX_USE_COUNTS_KEY)
+
+
+async def get_worm_master_suffixes(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_MASTER_SUFFIXES
+
+    return await _get_pool(session, WORM_MASTER_SUFFIXES_KEY, DEFAULT_WORM_MASTER_SUFFIXES)
+
+
+async def set_worm_master_suffixes(session: AsyncSession, phrases: list[str]) -> None:
+    from app.services.phrase_weights import WORM_MASTER_SUFFIX_USE_COUNTS_KEY
+
+    await _set_pool(session, WORM_MASTER_SUFFIXES_KEY, phrases, WORM_MASTER_SUFFIX_USE_COUNTS_KEY)
+
+
+async def get_worm_master_agrees(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_MASTER_AGREES
+
+    return await _get_pool(session, WORM_MASTER_AGREES_KEY, DEFAULT_WORM_MASTER_AGREES)
+
+
+async def set_worm_master_agrees(session: AsyncSession, phrases: list[str]) -> None:
+    from app.services.phrase_weights import WORM_MASTER_AGREE_USE_COUNTS_KEY
+
+    await _set_pool(session, WORM_MASTER_AGREES_KEY, phrases, WORM_MASTER_AGREE_USE_COUNTS_KEY)
+
+
+async def get_worm_master_nag(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_MASTER_NAG
+
+    return await _get_pool(session, WORM_MASTER_NAG_KEY, DEFAULT_WORM_MASTER_NAG)
+
+
+async def set_worm_master_nag(session: AsyncSession, phrases: list[str]) -> None:
+    await _set_pool(session, WORM_MASTER_NAG_KEY, phrases)
+
+
+async def get_worm_punish(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_PUNISH_PHRASES
+
+    return await _get_pool(session, WORM_PUNISH_KEY, DEFAULT_WORM_PUNISH_PHRASES)
+
+
+async def set_worm_punish(session: AsyncSession, phrases: list[str]) -> None:
+    from app.services.phrase_weights import WORM_PUNISH_USE_COUNTS_KEY
+
+    await _set_pool(session, WORM_PUNISH_KEY, phrases, WORM_PUNISH_USE_COUNTS_KEY)
+
+
+async def get_worm_announce_lines(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_ANNOUNCE_LINES
+
+    return await _get_pool(session, WORM_ANNOUNCE_LINES_KEY, DEFAULT_WORM_ANNOUNCE_LINES)
+
+
+async def set_worm_announce_lines(session: AsyncSession, phrases: list[str]) -> None:
+    await _set_pool(session, WORM_ANNOUNCE_LINES_KEY, phrases)
 
 
 # --- E9: реакции бота на @-mention и reply ---

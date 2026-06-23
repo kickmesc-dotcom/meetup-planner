@@ -32,7 +32,23 @@ class User(Base):
     telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     username: Mapped[str | None] = mapped_column(Text)
+    # ⚠️ ПРОТУХАЮЩАЯ TG file-ссылка (`…/file/bot<token>/<file_path>`): TG-овский
+    # file_path живёт ≥1ч и затем 404. Колонку читает ТОЛЬКО чухан-постинг
+    # (chukhan.py, синкает аватар прямо перед send_photo → ссылка свежая) — она
+    # в frozen-зоне, поэтому НЕ меняем её семантику. Для мини-аппа (где ссылка
+    # успевала протухнуть → «приложуха забывает аватарки», прод-фидбек 18.06 #2)
+    # используем стабильный `avatar_file_id` через прокси /api/avatar/{id}.
     avatar_url: Mapped[str | None] = mapped_column(Text)
+    # GHG8 (18.06 #2): СТАБИЛЬНЫЙ TG file_id последнего синканного фото — не
+    # протухает (в отличие от file_path). Прокси-роут резолвит по нему свежий
+    # file_path на лету. None → фото в TG ещё не запрашивалось.
+    avatar_file_id: Mapped[str | None] = mapped_column(Text)
+    # GHG8 (18.06 #2): ручная аватарка-ссылка (перекрывает TG для ОТОБРАЖЕНИЯ в
+    # мини-аппе; принудительный синк тянет TG-шную и пишет file_id, ручную не
+    # трогает). Кейс Серж/Митян: приватность TG → подставлены смешные картинки.
+    avatar_manual_url: Mapped[str | None] = mapped_column(Text)
+    # GHG8 (18.06 #2): когда последний раз успешно синкали TG-аватар (для меню).
+    avatar_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     color_hex: Mapped[str] = mapped_column(String(7), nullable=False)
     timezone: Mapped[str] = mapped_column(Text, nullable=False, default="Europe/Moscow")
     created_at: Mapped[datetime] = mapped_column(

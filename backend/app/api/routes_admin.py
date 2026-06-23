@@ -3057,6 +3057,87 @@ async def admin_avatars_schedule_once_delete(
     return AvatarsScheduleOnceOut(scheduled=False)
 
 
+# --- GHG8 (18.06 #2): ручная подстановка аватарки на участника ---
+# Пользователь: «можно вручную подставить ссылкой для каждого участника
+# отдельно особую смешную аватарку» (кейс Серж/Митян — приватность TG не даёт
+# тянуть фото). avatar_manual_url ПЕРЕКРЫВАЕТ TG для ОТОБРАЖЕНИЯ в мини-аппе
+# (см. _avatar_display_url), но принудительный sync всё равно тянет TG-фото и
+# пишет file_id — ручная остаётся как фолбэк, если TG-фото недоступно.
+
+
+class AvatarRow(BaseModel):
+    user_id: int
+    display_name: str
+    # Что реально показывается в мини-аппе (manual → прокси → None).
+    display_url: str | None = None
+    has_tg_photo: bool  # есть ли стабильный file_id (синканное TG-фото)
+    manual_url: str | None = None
+    synced_at: datetime | None = None
+
+
+class AvatarManualIn(BaseModel):
+    # Пусто/None → сброс ручной ссылки (вернуться к TG-аватарке).
+    manual_url: str | None = Field(None, max_length=2048)
+
+
+@router.get("/admin/avatars/list", response_model=list[AvatarRow])
+async def admin_avatars_list(
+    session: SessionDep, user: CurrentUser
+) -> list[AvatarRow]:
+    _ensure_admin(user)
+    from app.api.routes_users import _avatar_display_url
+
+    result = await session.scalars(select(User).order_by(User.display_name))
+    rows: list[AvatarRow] = []
+    for u in result.all():
+        rows.append(
+            AvatarRow(
+                user_id=u.id,
+                display_name=u.display_name,
+                display_url=_avatar_display_url(u),
+                has_tg_photo=bool(u.avatar_file_id),
+                manual_url=u.avatar_manual_url,
+                synced_at=u.avatar_synced_at,
+            )
+        )
+    return rows
+
+
+@router.put("/admin/avatars/{user_id}/manual", response_model=AvatarRow)
+async def admin_avatars_set_manual(
+    user_id: int,
+    body: AvatarManualIn,
+    session: SessionDep,
+    user: CurrentUser,
+) -> AvatarRow:
+    _ensure_admin(user)
+    from app.api.routes_users import _avatar_display_url
+
+    u = await session.get(User, user_id)
+    if u is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+
+    raw = (body.manual_url or "").strip()
+    if raw and not (raw.startswith("http://") or raw.startswith("https://")):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "manual_url_must_be_http")
+    u.avatar_manual_url = raw or None
+    await session.commit()
+    log.info(
+        "admin.avatar_manual_set",
+        target=user_id,
+        cleared=not bool(raw),
+        by=user.id,
+    )
+    return AvatarRow(
+        user_id=u.id,
+        display_name=u.display_name,
+        display_url=_avatar_display_url(u),
+        has_tg_photo=bool(u.avatar_file_id),
+        manual_url=u.avatar_manual_url,
+        synced_at=u.avatar_synced_at,
+    )
+
+
 # --- GHG6 E6: номинированные игры + голосование ---
 
 class GameNominationOut(BaseModel):

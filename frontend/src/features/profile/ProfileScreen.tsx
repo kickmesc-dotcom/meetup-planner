@@ -12,8 +12,9 @@ import {
   type UiPrefs,
   type WelcomeFormat,
 } from "@/api/availability";
-import { fetchLoserHistory } from "@/api/meetings";
+import { fetchLoserHistory, fetchLoserStats } from "@/api/meetings";
 import { fetchChukhanHistory } from "@/api/birthdays";
+import { fetchChukhanLeaderboard } from "@/api/admin";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
@@ -46,25 +47,8 @@ export default function ProfileScreen({ users, me }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      {/* Шапка профиля */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 flex items-center gap-3">
-        <div
-          className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-white text-lg font-medium shrink-0"
-          style={{ background: me.color_hex ?? "#888" }}
-        >
-          {me.avatar_url ? (
-            <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
-          ) : (
-            me.display_name[0]
-          )}
-        </div>
-        <div className="min-w-0">
-          <div className="text-base font-semibold truncate">{me.display_name}</div>
-          {me.username && (
-            <div className="text-xs text-tg-hint truncate">@{me.username}</div>
-          )}
-        </div>
-      </section>
+      {/* F1 (T1.5): крупная аватарка по центру → сводка → Топы → История. */}
+      <ProfileHeader me={me} />
 
       <NavCard
         icon="🏆"
@@ -86,6 +70,76 @@ export default function ProfileScreen({ users, me }: Props) {
       />
 
       <GreetingSettings />
+    </div>
+  );
+}
+
+/**
+ * F1 (T1.5): шапка профиля — крупная аватарка по центру, имя/@username, ниже
+ * сводка «сколько раз был лохом / чуханом». Счётчики берём из тех же публичных
+ * эндпоинтов, что и Топы (loser/stats + chukhan/leaderboard) — отдельного API
+ * не заводим.
+ */
+function ProfileHeader({ me }: { me: User }) {
+  const loserStats = useQuery({
+    queryKey: ["loser", "stats"],
+    queryFn: fetchLoserStats,
+  });
+  const chukhanLeaders = useQuery({
+    queryKey: ["chukhan", "leaderboard"],
+    queryFn: fetchChukhanLeaderboard,
+  });
+
+  const loserCount = loserStats.data?.counts?.[me.id] ?? 0;
+  const chukhanCount =
+    chukhanLeaders.data?.find((r) => r.user_id === me.id)?.count ?? 0;
+  const loading = loserStats.isPending || chukhanLeaders.isPending;
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-4 flex flex-col items-center text-center">
+      <div
+        className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center text-white text-3xl font-semibold shrink-0"
+        style={{ background: me.color_hex ?? "#888" }}
+      >
+        {me.avatar_url ? (
+          <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          me.display_name[0]
+        )}
+      </div>
+      <div className="mt-3 text-lg font-semibold">{me.display_name}</div>
+      {me.username && (
+        <div className="text-xs text-tg-hint">@{me.username}</div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-2 w-full">
+        <StatCell icon="🤡" label="Был лохом" value={loserCount} loading={loading} />
+        <StatCell icon="💩" label="Был чуханом" value={chukhanCount} loading={loading} />
+      </div>
+    </section>
+  );
+}
+
+function StatCell({
+  icon,
+  label,
+  value,
+  loading,
+}: {
+  icon: string;
+  label: string;
+  value: number;
+  loading: boolean;
+}) {
+  return (
+    <div className="rounded-lg bg-tg-bg/50 px-3 py-2 flex items-center gap-2">
+      <span className="text-xl shrink-0">{icon}</span>
+      <div className="min-w-0 text-left">
+        <div className="text-lg font-semibold tabular-nums leading-tight">
+          {loading ? "…" : value}
+        </div>
+        <div className="text-[11px] text-tg-hint truncate">{label}</div>
+      </div>
     </div>
   );
 }
@@ -172,7 +226,8 @@ function GreetingSettings() {
   );
 }
 
-/** P4.1.e: история лохов дня + чуханов недели (публичные эндпоинты). */
+/** P4.1.e: история лохов дня + чуханов недели (публичные эндпоинты).
+ *  F1 (T1.5): в строке теперь и причина (у лоха уже была, у чухана — после T1.2). */
 function HistorySection({ users }: { users: User[] }) {
   const losers = useQuery({
     queryKey: ["loser", "history"],
@@ -183,7 +238,6 @@ function HistorySection({ users }: { users: User[] }) {
     queryFn: () => fetchChukhanHistory(20),
   });
   const byId = Object.fromEntries(users.map((u) => [u.id, u] as const));
-  const name = (uid: number) => byId[uid]?.display_name ?? `id=${uid}`;
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
@@ -195,12 +249,14 @@ function HistorySection({ users }: { users: User[] }) {
         ) : !chukhans.data?.length ? (
           <div className="text-xs text-tg-hint py-2">Чуханов ещё не было.</div>
         ) : (
-          <div className="space-y-1">
+          <div className="divide-y divide-tg-bg/40">
             {chukhans.data.map((r) => (
               <Row
                 key={r.week_start}
                 date={r.week_start}
-                label={name(r.user_id)}
+                user={byId[r.user_id]}
+                fallback={`id=${r.user_id}`}
+                reason={r.reason_text}
               />
             ))}
           </div>
@@ -215,9 +271,15 @@ function HistorySection({ users }: { users: User[] }) {
         ) : !losers.data?.length ? (
           <div className="text-xs text-tg-hint py-2">Никто ещё не попадался.</div>
         ) : (
-          <div className="space-y-1">
+          <div className="divide-y divide-tg-bg/40">
             {losers.data.map((r) => (
-              <Row key={r.id} date={r.rolled_at} label={name(r.loser_user_id)} />
+              <Row
+                key={r.id}
+                date={r.rolled_at}
+                user={byId[r.loser_user_id]}
+                fallback={`id=${r.loser_user_id}`}
+                reason={r.reason_text}
+              />
             ))}
           </div>
         )}
@@ -226,14 +288,43 @@ function HistorySection({ users }: { users: User[] }) {
   );
 }
 
-function Row({ date, label }: { date: string; label: string }) {
+function Row({
+  date,
+  user,
+  fallback,
+  reason,
+}: {
+  date: string;
+  user: User | undefined;
+  fallback: string;
+  reason: string | null;
+}) {
   const d = new Date(date);
   const dateStr = isNaN(d.getTime())
     ? date
-    : d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    : d.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+      });
   return (
-    <div className="flex items-center justify-between gap-2 text-sm">
-      <span className="truncate">{label}</span>
+    <div className="flex items-start gap-2 py-1.5">
+      <div
+        className="w-6 h-6 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-[10px] shrink-0"
+        style={{ background: user?.color_hex ?? "#888" }}
+      >
+        {user?.avatar_url ? (
+          <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          (user?.display_name[0] ?? "?")
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-sm truncate">{user?.display_name ?? fallback}</div>
+        {reason && (
+          <div className="text-[11px] text-tg-hint italic line-clamp-2">«{reason}»</div>
+        )}
+      </div>
       <span className="text-xs text-tg-hint tabular-nums shrink-0">{dateStr}</span>
     </div>
   );

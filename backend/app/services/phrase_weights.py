@@ -29,6 +29,12 @@ from app.services.admin_config import _get_value, _set_value
 # Ключи в admin_config.
 LOSER_USE_COUNTS_KEY = "loser_reasons.use_counts"
 CHUKHAN_USE_COUNTS_KEY = "chukhan_reasons.use_counts"
+# T3.6: пулы режима «червь-господин» (префикс/суффикс лоху-господину,
+# поддакивание, punish). Чередуем без частых повторов — те же веса.
+WORM_MASTER_PREFIX_USE_COUNTS_KEY = "worm_master.prefixes.use_counts"
+WORM_MASTER_SUFFIX_USE_COUNTS_KEY = "worm_master.suffixes.use_counts"
+WORM_MASTER_AGREE_USE_COUNTS_KEY = "worm_master.agrees.use_counts"
+WORM_PUNISH_USE_COUNTS_KEY = "worm_master.punish.use_counts"
 
 
 def phrase_hash(phrase: str) -> str:

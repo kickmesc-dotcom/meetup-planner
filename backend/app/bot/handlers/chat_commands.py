@@ -88,6 +88,96 @@ async def reply_advice(message: Message) -> bool:
     return True
 
 
+# ---------------------- T3.6 (в): /punish (только червь-господин) ----------------------
+
+def _extract_target_from_entities(message: Message) -> str | None:
+    """Цель наказания из сущностей сообщения (приоритетнее текстового разбора).
+
+    `mention` (@username) — берём как есть. `text_mention` (без username) —
+    отдаём display_name из профиля, чтобы хотя бы упомянуть человека текстом.
+    None если явных упоминаний нет — тогда вызывающий код пробует текст.
+    """
+    if not message.entities or not message.text:
+        return None
+    for ent in message.entities:
+        if ent.type == "mention":
+            return message.text[ent.offset : ent.offset + ent.length]
+        if ent.type == "text_mention" and ent.user:
+            return ent.user.full_name or (
+                f"@{ent.user.username}" if ent.user.username else None
+            )
+    return None
+
+
+@router.message(Command(commands=["punish", "наказать"]))
+async def on_punish(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    await _handle_punish(message)
+
+
+async def _handle_punish(message: Message) -> bool:
+    """Червь-господин натравливает бота на недруга. Гейт жёстче whitelist:
+    вызвать может ТОЛЬКО текущий червь-господин, и только при включённых
+    `worm_master.enabled` + `worm_master.punish_enabled`.
+
+    Возвращает True, если что-то ответили (для альт-триггера #punish из
+    bot_reactions — чтобы тот понял, что сценарий отработал)."""
+    from app.services.admin_config import (
+        get_worm_punish,
+        is_worm_master_enabled,
+        is_worm_master_punish_enabled,
+    )
+    from app.services.loser import get_current_worm
+    from app.services.phrase_weights import (
+        WORM_PUNISH_USE_COUNTS_KEY,
+        get_use_counts,
+        increment_use_count,
+    )
+    from app.services.worm_master import choose, extract_punish_target, render
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return False
+        if not await is_worm_master_punish_enabled(session):
+            return False
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            return False
+        worm = await get_current_worm(session)
+        if worm is None or worm.user_id != caller.id:
+            # Не господин — тихо игнорируем (как и прочие «не для тебя» команды).
+            return False
+
+        # Цель: сначала сущности (@mention/text_mention), потом текстовый фолбэк.
+        target = _extract_target_from_entities(message) or extract_punish_target(
+            message.text
+        )
+        if not target:
+            await message.answer(
+                "⚔️ Кого карать-то? Использование: <code>/punish @недруг</code>",
+                parse_mode="HTML",
+            )
+            return True
+
+        pool = await get_worm_punish(session)
+        counts = await get_use_counts(session, WORM_PUNISH_USE_COUNTS_KEY)
+        raw = choose(pool, counts)
+        if raw is None:
+            return False
+        await increment_use_count(session, WORM_PUNISH_USE_COUNTS_KEY, raw)
+        await session.commit()
+    text = render(raw, target=target)
+    try:
+        await message.answer(f"⚔️ {text}", parse_mode="HTML")
+    except Exception:
+        log.exception("chat.punish_failed", by=message.from_user.id)
+    return True
+
+
 # ---------------------- C2: /loser ----------------------
 
 @router.message(Command("loser"))

@@ -179,7 +179,13 @@ CHUKHAN_TAGLINES = [
     "Провел на параше столько времени, что выучил состав освежителя на казахском",
 ]
 
-def _format_announcement(user: User, *, reason: str | None = None) -> str:
+def _format_announcement(
+    user: User,
+    *,
+    reason: str | None = None,
+    master_prefix: str | None = None,
+    master_suffix: str | None = None,
+) -> str:
     name = user.display_name
     handle = f"@{user.username}" if user.username else name
     # GHG6 AD6: если админ настроил chukhan_reasons — берём из них; иначе
@@ -189,14 +195,26 @@ def _format_announcement(user: User, *, reason: str | None = None) -> str:
     # GHG8 T1.2: префикс «Причина:» — раньше фраза висела голой и иногда читалась
     # конфузно (прод-фидбек 15.06 п.1). Формат выровнен с анонсом лоха
     # (loser.py: «Причина: …»).
-    return (
-        "💩💩💩 <b>ЧУХАН НЕДЕЛИ</b> 💩💩💩\n"
-        "🤮🤢🤮🤢🤮🤢🤮🤢🤮\n\n"
-        f"На этой неделе чуханом назначен:\n"
-        f"👉 <b>{name}</b> ({handle}) 👈\n\n"
-        "🪰💨🪰💨🪰💨🪰💨🪰\n"
-        f"<i>Причина: {tagline}</i>"
-    )
+    lines: list[str] = []
+    # T3.6 (а): подхалимский префикс, если чухан недели — текущий господин.
+    if master_prefix:
+        lines.append(f"<i>{master_prefix}</i>")
+        lines.append("")
+    lines.extend([
+        "💩💩💩 <b>ЧУХАН НЕДЕЛИ</b> 💩💩💩",
+        "🤮🤢🤮🤢🤮🤢🤮🤢🤮",
+        "",
+        "На этой неделе чуханом назначен:",
+        f"👉 <b>{name}</b> ({handle}) 👈",
+        "",
+        "🪰💨🪰💨🪰💨🪰💨🪰",
+        f"<i>Причина: {tagline}</i>",
+    ])
+    # T3.6 (а): подхалимский суффикс — последней строкой.
+    if master_suffix:
+        lines.append("")
+        lines.append(f"<i>{master_suffix}</i>")
+    return "\n".join(lines)
 
 
 async def _drumroll(bot: Bot, chat_id: int, name: str) -> int | None:
@@ -252,6 +270,8 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
     # GHG8 T1.2: на ретрае недоставленного пика причина уже зафиксирована в
     # строке — переиспользуем её, чтобы текст не «перероллился» между попытками
     # и use_counts не инкрементились повторно (прод-фидбек 15.06 п.1 «повтор»).
+    master_prefix: str | None = None
+    master_suffix: str | None = None
     if row.reason_text:
         reason = row.reason_text
     else:
@@ -273,7 +293,22 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
             # и не сохранялся. Резолвим здесь, чтобы зафиксировать ровно ту фразу,
             # что уйдёт в чат.
             reason = random.choice(CHUKHAN_TAGLINES)
-    text = _format_announcement(user, reason=reason)
+        # T3.6 (а): подхалимаж — ТОЛЬКО на свежем посте (в else, как и выбор
+        # причины). На ретрае (row.reason_text задан) не резолвим: иначе
+        # use_counts инкрементились бы повторно. Подхалимаж в колонке не храним,
+        # поэтому на ретрае его просто нет — приемлемо (текст уже ушёл/уйдёт).
+        try:
+            from app.services.loser import resolve_master_sycophancy
+
+            sycophancy = await resolve_master_sycophancy(session, user)
+        except Exception:  # noqa: BLE001
+            sycophancy = None
+        if sycophancy is not None:
+            master_prefix = sycophancy.prefix
+            master_suffix = sycophancy.suffix
+    text = _format_announcement(
+        user, reason=reason, master_prefix=master_prefix, master_suffix=master_suffix
+    )
     # Фиксируем причину на строке до отправки: на failure-ветке (commit ниже)
     # она сохранится и ретрай переиспользует ту же фразу; на успехе уедет вместе
     # с posted_at. История (профиль) читает это поле.

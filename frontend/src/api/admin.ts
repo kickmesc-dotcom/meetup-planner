@@ -957,6 +957,25 @@ export const avatarsScheduleOnceDelete = () =>
     method: "DELETE",
   });
 
+// GHG8 (18.06 #2): ручная подстановка аватарки на участника.
+export interface AvatarRow {
+  user_id: number;
+  display_name: string;
+  display_url: string | null;
+  has_tg_photo: boolean;
+  manual_url: string | null;
+  synced_at: string | null;
+}
+
+export const avatarsList = () =>
+  api<AvatarRow[]>("/api/admin/avatars/list");
+
+export const avatarsSetManual = (userId: number, manualUrl: string | null) =>
+  api<AvatarRow>(`/api/admin/avatars/${userId}/manual`, {
+    method: "PUT",
+    body: JSON.stringify({ manual_url: manualUrl }),
+  });
+
 // --- GHG6 E6: номинированные игры + голосование ---
 
 export interface GameNomination {

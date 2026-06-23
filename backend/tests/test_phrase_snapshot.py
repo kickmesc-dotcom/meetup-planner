@@ -9,6 +9,9 @@ from __future__ import annotations
 from app.services.phrase_snapshot import (
     SNAPSHOT_FORMAT,
     SNAPSHOT_VERSION,
+    _POOL_KEYS,
+    _USE_COUNT_KEYS,
+    _use_count_key_map,
     merge_pool,
     validate_snapshot,
 )
@@ -94,3 +97,40 @@ def test_validate_rejects_bad_use_counts_type():
     snap["use_counts"] = ["x"]
     ok, _ = validate_snapshot(snap)
     assert not ok
+
+
+# ----- T3.6: новые пулы червя-господина учтены в снапшоте -----
+
+def test_worm_master_pools_enumerated():
+    for name in (
+        "worm_master_prefixes",
+        "worm_master_suffixes",
+        "worm_master_agrees",
+        "worm_master_nag",
+        "worm_punish",
+        "worm_announce_lines",
+    ):
+        assert name in _POOL_KEYS
+
+
+def test_worm_use_count_pools_consistent():
+    # use_counts ведём для prefix/suffix/agree/punish; nag/announce — нет.
+    for name in (
+        "worm_master_prefixes",
+        "worm_master_suffixes",
+        "worm_master_agrees",
+        "worm_punish",
+    ):
+        assert name in _USE_COUNT_KEYS
+    assert "worm_master_nag" not in _USE_COUNT_KEYS
+    assert "worm_announce_lines" not in _USE_COUNT_KEYS
+
+
+def test_use_count_key_map_matches_use_count_keys():
+    # каждый снапшот-пул со счётчиком имеет запись в key_map, и наоборот.
+    assert set(_use_count_key_map().keys()) == set(_USE_COUNT_KEYS)
+
+
+def test_use_count_key_map_values_unique():
+    vals = list(_use_count_key_map().values())
+    assert len(vals) == len(set(vals)), "ключи use_counts в admin_config не должны дублироваться"

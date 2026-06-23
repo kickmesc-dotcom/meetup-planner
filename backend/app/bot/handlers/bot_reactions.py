@@ -158,6 +158,17 @@ async def _maybe_react(message: Message) -> None:
         if await reply_advice(message):
             return
 
+    # T3.6 (в): хештег #punish/#наказать — альт-триггер /punish (помимо команды).
+    # Гейт целиком внутри _handle_punish (только текущий господин + тоглы), так
+    # что для не-господина это тихий no-op. Стоит ДО обычных реакций.
+    from app.services.worm_master import text_has_punish_hashtag
+
+    if text_has_punish_hashtag(text):
+        from app.bot.handlers.chat_commands import _handle_punish
+
+        if await _handle_punish(message):
+            return
+
     # 1. @-mention (старый сценарий: рандом-фраза в ответ на упоминание без «?»)
     if cfg["mention_enabled"] and mentions_bot:
         log.info("bot_reactions.mention", from_id=message.from_user.id)

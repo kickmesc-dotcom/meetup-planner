@@ -35,6 +35,19 @@ class WormEvent:
     triggered: bool = False
     prev_worm_name: str | None = None  # display_name предыдущего червя, если был
     chance_used: float = 0.0
+    # T3.6 (г): расширение анонса «что даёт звание господина». Заполняется в
+    # roll_loser ТОЛЬКО если включён режим worm_master (иначе None → анонс как
+    # раньше). Готовый многострочный блок (БД из форматтера не дёргаем).
+    announce_extra: str | None = None
+
+
+@dataclass
+class MasterSycophancy:
+    """T3.6 (а): подхалимское обрамление обычного анонса лоха, когда «жертва»
+    сама является ТЕКУЩИМ червём-господином. prefix/suffix уже с подставленным
+    именем (рендерятся в roll_loser). Любое из полей может быть None."""
+    prefix: str | None = None
+    suffix: str | None = None
 
 
 @dataclass
@@ -48,6 +61,9 @@ class RollExtras:
     «черновые» попытки не пишутся — row создаётся только для финального."""
     worm: WormEvent = field(default_factory=WormEvent)
     immunity_skipped: list[str] = field(default_factory=list)
+    # T3.6 (а): заполняется, только если лох == текущий червь-господин и режим
+    # worm_master включён. None → обычный анонс без подхалимажа.
+    worm_master: MasterSycophancy | None = None
 
 COOLDOWN = timedelta(hours=12)
 
@@ -248,6 +264,23 @@ async def roll_loser(
     # ошибке отправки в TG откатывал и переход звания тоже.
     worm_event = WormEvent(chance_used=worm_chance)
     if is_worm:
+        # T3.6 (г): если режим «червь-господин» включён — дописываем к анонсу
+        # блок «что это даёт». Читаем пул и собираем готовый текст здесь (в
+        # форматтер БД не тащим). chance — в процентах, без хвостовых нулей.
+        from app.services.admin_config import (
+            get_worm_announce_lines,
+            is_worm_master_enabled,
+        )
+
+        if await is_worm_master_enabled(session):
+            from app.services.worm_master import build_announce_extra
+
+            lines = await get_worm_announce_lines(session)
+            chance_pct = f"{worm_chance * 100:g}"
+            worm_event.announce_extra = build_announce_extra(
+                lines, username=loser.display_name, chance_pct=chance_pct
+            )
+    if is_worm:
         prev_worm = await session.scalar(
             select(WormAssignment).where(WormAssignment.ended_at.is_(None))
         )
@@ -290,7 +323,18 @@ async def roll_loser(
         await session.flush()
         worm_event.triggered = True
 
-    extras = RollExtras(worm=worm_event, immunity_skipped=pick.skipped_names)
+    # T3.6 (а): если лох — действующий червь-господин (и это НЕ момент
+    # становления червём), обрамляем обычный анонс подхалимажем. На worm-trigger
+    # показывается особый анонс, подхалимаж туда не лепим.
+    sycophancy = None
+    if not is_worm:
+        sycophancy = await resolve_master_sycophancy(session, loser)
+
+    extras = RollExtras(
+        worm=worm_event,
+        immunity_skipped=pick.skipped_names,
+        worm_master=sycophancy,
+    )
 
     if on_announce is not None:
         try:
@@ -309,6 +353,55 @@ async def get_current_worm(session: AsyncSession) -> WormAssignment | None:
     return await session.scalar(
         select(WormAssignment).where(WormAssignment.ended_at.is_(None))
     )
+
+
+async def resolve_master_sycophancy(
+    session: AsyncSession, user: User
+) -> "MasterSycophancy | None":
+    """T3.6 (а): подхалимский префикс/суффикс, если `user` — действующий
+    червь-господин и режим worm_master включён. Иначе None.
+
+    Выбор взвешенный (use_counts, чередование без частых повторов) с инкрементом
+    счётчика — как у пула лоха. Переиспользуется анонсом чухана (T3.6.4).
+    Сетевого IO нет: только SELECT/UPDATE в текущей транзакции.
+    """
+    from app.services.admin_config import (
+        get_worm_master_prefixes,
+        get_worm_master_suffixes,
+        is_worm_master_enabled,
+    )
+
+    if not await is_worm_master_enabled(session):
+        return None
+    worm = await get_current_worm(session)
+    if worm is None or worm.user_id != user.id:
+        return None
+
+    from app.services.phrase_weights import (
+        WORM_MASTER_PREFIX_USE_COUNTS_KEY,
+        WORM_MASTER_SUFFIX_USE_COUNTS_KEY,
+    )
+    from app.services.worm_master import choose, render
+
+    name = user.display_name
+    prefix_pool = await get_worm_master_prefixes(session)
+    suffix_pool = await get_worm_master_suffixes(session)
+    prefix_counts = await get_use_counts(session, WORM_MASTER_PREFIX_USE_COUNTS_KEY)
+    suffix_counts = await get_use_counts(session, WORM_MASTER_SUFFIX_USE_COUNTS_KEY)
+
+    raw_prefix = choose(prefix_pool, prefix_counts)
+    raw_suffix = choose(suffix_pool, suffix_counts)
+    prefix = None
+    suffix = None
+    if raw_prefix is not None:
+        await increment_use_count(session, WORM_MASTER_PREFIX_USE_COUNTS_KEY, raw_prefix)
+        prefix = render(raw_prefix, username=name)
+    if raw_suffix is not None:
+        await increment_use_count(session, WORM_MASTER_SUFFIX_USE_COUNTS_KEY, raw_suffix)
+        suffix = render(raw_suffix, username=name)
+    if prefix is None and suffix is None:
+        return None
+    return MasterSycophancy(prefix=prefix, suffix=suffix)
 
 
 def decide_worm(*, enabled: bool, chance: float, rng_value: float) -> bool:
@@ -361,6 +454,12 @@ def compose_loser_message(
                 f"<i>Старый червь «{prev}» слагает полномочия. "
                 f"Корона переходит.</i>"
             )
+        # T3.6 (г): расширение «что даёт звание господина» (если режим включён).
+        # Ставим ДО роллера/счётчика — это смысловая часть анонса.
+        announce_extra = extras.worm.announce_extra if extras else None
+        if announce_extra:
+            lines.append("")
+            lines.append(announce_extra)
         if roller_name:
             lines.append("")
             lines.append(f"<i>Покрутил рулетку: {roller_name}</i>")
@@ -371,13 +470,22 @@ def compose_loser_message(
         return "\n".join(lines)
 
     # Обычный лох
-    lines = [f"{header_emoji} <b>{header_label}</b> — {loser_name}!"]
+    sycophancy = extras.worm_master if extras else None
+
+    lines: list[str] = []
+    # T3.6 (а): подхалимский префикс — отдельной строкой ПЕРЕД хедером.
+    if sycophancy and sycophancy.prefix:
+        lines.append(f"<i>{sycophancy.prefix}</i>")
+    lines.append(f"{header_emoji} <b>{header_label}</b> — {loser_name}!")
     if reason_text:
         lines.append(f"Причина: {reason_text}")
     if loser_count is not None:
         lines.append(f"Уже {loser_count}-й раз становится лохом.")
     if roller_name:
         lines.append(f"<i>Покрутил рулетку: {roller_name}</i>")
+    # T3.6 (а): подхалимский суффикс — последней строкой ПОСЛЕ всего.
+    if sycophancy and sycophancy.suffix:
+        lines.append(f"<i>{sycophancy.suffix}</i>")
     return "\n".join(lines)
 
 

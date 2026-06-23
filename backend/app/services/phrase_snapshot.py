@@ -37,9 +37,46 @@ _POOL_KEYS = (
     "media_single",
     "media_collection",
     "media_emoji",
+    # T3.6: пулы режима «червь-господин».
+    "worm_master_prefixes",
+    "worm_master_suffixes",
+    "worm_master_agrees",
+    "worm_master_nag",
+    "worm_punish",
+    "worm_announce_lines",
 )
 
-_USE_COUNT_KEYS = ("loser_reasons", "chukhan_reasons")
+# Пулы со счётчиками использования (use_counts). nag/announce — без счётчиков
+# (одноразовые/честный random, см. worm_master.py).
+_USE_COUNT_KEYS = (
+    "loser_reasons",
+    "chukhan_reasons",
+    "worm_master_prefixes",
+    "worm_master_suffixes",
+    "worm_master_agrees",
+    "worm_punish",
+)
+
+
+def _use_count_key_map() -> dict[str, str]:
+    """Снапшот-имя пула → ключ use_counts в admin_config. Лениво (импорт-цикл)."""
+    from app.services.phrase_weights import (
+        CHUKHAN_USE_COUNTS_KEY,
+        LOSER_USE_COUNTS_KEY,
+        WORM_MASTER_AGREE_USE_COUNTS_KEY,
+        WORM_MASTER_PREFIX_USE_COUNTS_KEY,
+        WORM_MASTER_SUFFIX_USE_COUNTS_KEY,
+        WORM_PUNISH_USE_COUNTS_KEY,
+    )
+
+    return {
+        "loser_reasons": LOSER_USE_COUNTS_KEY,
+        "chukhan_reasons": CHUKHAN_USE_COUNTS_KEY,
+        "worm_master_prefixes": WORM_MASTER_PREFIX_USE_COUNTS_KEY,
+        "worm_master_suffixes": WORM_MASTER_SUFFIX_USE_COUNTS_KEY,
+        "worm_master_agrees": WORM_MASTER_AGREE_USE_COUNTS_KEY,
+        "worm_punish": WORM_PUNISH_USE_COUNTS_KEY,
+    }
 
 
 def merge_pool(current: list[str], incoming: list[str]) -> list[str]:
@@ -105,6 +142,18 @@ async def _pool_getter(session: AsyncSession, name: str) -> list[str]:
         return await mr.get_collection_phrases(session)
     if name == "media_emoji":
         return await mr.get_emoji_whitelist(session)
+    if name == "worm_master_prefixes":
+        return await ac.get_worm_master_prefixes(session)
+    if name == "worm_master_suffixes":
+        return await ac.get_worm_master_suffixes(session)
+    if name == "worm_master_agrees":
+        return await ac.get_worm_master_agrees(session)
+    if name == "worm_master_nag":
+        return await ac.get_worm_master_nag(session)
+    if name == "worm_punish":
+        return await ac.get_worm_punish(session)
+    if name == "worm_announce_lines":
+        return await ac.get_worm_announce_lines(session)
     raise KeyError(name)
 
 
@@ -124,6 +173,18 @@ async def _pool_setter(session: AsyncSession, name: str, phrases: list[str]) -> 
         await mr.set_collection_phrases(session, phrases)
     elif name == "media_emoji":
         await mr.set_emoji_whitelist(session, phrases)
+    elif name == "worm_master_prefixes":
+        await ac.set_worm_master_prefixes(session, phrases)
+    elif name == "worm_master_suffixes":
+        await ac.set_worm_master_suffixes(session, phrases)
+    elif name == "worm_master_agrees":
+        await ac.set_worm_master_agrees(session, phrases)
+    elif name == "worm_master_nag":
+        await ac.set_worm_master_nag(session, phrases)
+    elif name == "worm_punish":
+        await ac.set_worm_punish(session, phrases)
+    elif name == "worm_announce_lines":
+        await ac.set_worm_announce_lines(session, phrases)
     else:
         raise KeyError(name)
 
@@ -131,19 +192,15 @@ async def _pool_setter(session: AsyncSession, name: str, phrases: list[str]) -> 
 async def build_snapshot(session: AsyncSession) -> dict[str, Any]:
     """Собрать полный снапшот всех редактируемых пулов + use_counts + персонажей."""
     from app.db.models import ParticipantPersona, User
-    from app.services.phrase_weights import (
-        CHUKHAN_USE_COUNTS_KEY,
-        LOSER_USE_COUNTS_KEY,
-        get_use_counts,
-    )
+    from app.services.phrase_weights import get_use_counts
 
     pools: dict[str, list[str]] = {}
     for name in _POOL_KEYS:
         pools[name] = await _pool_getter(session, name)
 
+    key_map = _use_count_key_map()
     use_counts = {
-        "loser_reasons": await get_use_counts(session, LOSER_USE_COUNTS_KEY),
-        "chukhan_reasons": await get_use_counts(session, CHUKHAN_USE_COUNTS_KEY),
+        name: await get_use_counts(session, key) for name, key in key_map.items()
     }
 
     # Персонажи: ключуем по telegram_id (стабилен между пересборками БД).
@@ -202,17 +259,10 @@ async def apply_snapshot(
 
     # use_counts — только replace (см. докстринг).
     if mode == "replace":
-        from app.services.phrase_weights import (
-            CHUKHAN_USE_COUNTS_KEY,
-            LOSER_USE_COUNTS_KEY,
-            set_use_counts,
-        )
+        from app.services.phrase_weights import set_use_counts
 
         uc = data.get("use_counts") or {}
-        key_map = {
-            "loser_reasons": LOSER_USE_COUNTS_KEY,
-            "chukhan_reasons": CHUKHAN_USE_COUNTS_KEY,
-        }
+        key_map = _use_count_key_map()
         for name, key in key_map.items():
             counts = uc.get(name)
             if isinstance(counts, dict):

@@ -2,10 +2,13 @@ import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
+  avatarsList,
   avatarsScheduleOnceDelete,
   avatarsScheduleOnceGet,
   avatarsScheduleOncePost,
+  avatarsSetManual,
   avatarsSyncNow,
+  type AvatarRow,
   closeAdminPoll,
   deleteAdminPoll,
   fetchAdminPolls,
@@ -643,6 +646,120 @@ function AvatarsActions({ onJobsChanged }: { onJobsChanged: () => void }) {
           </div>
         )}
       </div>
+
+      <ManualAvatars />
+    </div>
+  );
+}
+
+/**
+ * GHG8 (18.06 #2): ручная подстановка аватарки ссылкой на конкретного участника.
+ * Кейс Серж/Митян — приватность TG не даёт тянуть фото, подставляем смешную
+ * картинку ссылкой. Ручная ПЕРЕКРЫВАЕТ TG для отображения в мини-аппе; пустое
+ * поле → сброс к TG-аватарке.
+ */
+function ManualAvatars() {
+  const qc = useQueryClient();
+  const list = useQuery({
+    queryKey: ["admin", "avatars-list"],
+    queryFn: avatarsList,
+    staleTime: 10_000,
+  });
+
+  const save = useMutation({
+    mutationFn: ({ id, url }: { id: number; url: string | null }) =>
+      avatarsSetManual(id, url),
+    onSuccess: (row) => {
+      haptic("success");
+      qc.setQueryData<AvatarRow[]>(["admin", "avatars-list"], (prev) =>
+        prev?.map((r) => (r.user_id === row.user_id ? row : r)),
+      );
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: errAlert,
+  });
+
+  return (
+    <div className="rounded-lg bg-tg-bg/40 p-2 space-y-2">
+      <div className="text-[11px] text-tg-hint">
+        🖌 Ручная аватарка (перекрывает TG; пусто — сброс)
+      </div>
+      {list.isPending ? (
+        <ListSkeleton rows={3} />
+      ) : (
+        <div className="divide-y divide-tg-bg/40">
+          {list.data?.map((row) => (
+            <ManualAvatarRow
+              key={row.user_id}
+              row={row}
+              saving={save.isPending}
+              onSave={(url) => save.mutate({ id: row.user_id, url })}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManualAvatarRow({
+  row,
+  saving,
+  onSave,
+}: {
+  row: AvatarRow;
+  saving: boolean;
+  onSave: (url: string | null) => void;
+}) {
+  const [draft, setDraft] = useState(row.manual_url ?? "");
+  useEffect(() => {
+    setDraft(row.manual_url ?? "");
+  }, [row.manual_url]);
+
+  const dirty = (draft.trim() || null) !== (row.manual_url ?? null);
+
+  return (
+    <div className="flex items-center gap-2 py-2">
+      <div
+        className="w-8 h-8 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-xs shrink-0 bg-tg-secondary-bg"
+      >
+        {row.display_url ? (
+          <img src={row.display_url} alt="" className="w-full h-full object-cover" />
+        ) : (
+          (row.display_name[0] ?? "?")
+        )}
+      </div>
+      <div className="flex-1 min-w-0 space-y-1">
+        <div className="text-xs truncate">
+          {row.display_name}
+          {row.manual_url ? (
+            <span className="ml-1 text-tg-hint">· ручная</span>
+          ) : row.has_tg_photo ? (
+            <span className="ml-1 text-tg-hint">· TG</span>
+          ) : (
+            <span className="ml-1 text-status-busy">· нет фото</span>
+          )}
+        </div>
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://… (пусто — TG)"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="w-full rounded-md bg-tg-bg/70 px-2 py-1.5 text-xs text-tg-text outline-none border border-transparent focus:border-tg-link"
+        />
+      </div>
+      <button
+        type="button"
+        disabled={!dirty || saving}
+        onClick={() => {
+          haptic("medium");
+          onSave(draft.trim() || null);
+        }}
+        className="min-h-9 shrink-0 rounded-md bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+      >
+        {row.manual_url && !draft.trim() ? "Сброс" : "ОК"}
+      </button>
     </div>
   );
 }
