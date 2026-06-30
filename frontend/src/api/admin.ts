@@ -221,6 +221,51 @@ export const updateAdviceEnabled = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
+// --- T3.6.6: worm-master (режим «червь-господин») ---
+
+export interface WormMasterSettings {
+  enabled: boolean;
+  punish_enabled: boolean;
+  yes_enabled: boolean;
+  yes_pct: number;
+  yes_cooldown_min: number;
+}
+
+export type WormMasterPool =
+  | "prefixes"
+  | "suffixes"
+  | "agrees"
+  | "nag"
+  | "punish"
+  | "announce_lines";
+
+export interface WormMasterPools {
+  prefixes: string[];
+  suffixes: string[];
+  agrees: string[];
+  nag: string[];
+  punish: string[];
+  announce_lines: string[];
+}
+
+export const fetchWormMasterSettings = () =>
+  api<WormMasterSettings>("/api/admin/worm-master");
+
+export const updateWormMasterSettings = (s: WormMasterSettings) =>
+  api<WormMasterSettings>("/api/admin/worm-master", {
+    method: "PUT",
+    body: JSON.stringify(s),
+  });
+
+export const fetchWormMasterPools = () =>
+  api<WormMasterPools>("/api/admin/worm-master/pools");
+
+export const updateWormMasterPool = (pool: WormMasterPool, phrases: string[]) =>
+  api<WormMasterPools>(`/api/admin/worm-master/pools/${pool}`, {
+    method: "PUT",
+    body: JSON.stringify({ phrases }),
+  });
+
 // --- T3.1: снапшот/экспорт базы причин-реакций ---
 
 export interface PhraseSnapshot {

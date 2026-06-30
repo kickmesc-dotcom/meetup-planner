@@ -14,6 +14,7 @@ import PersonasScreen from "./PersonasScreen";
 import BotReactionsScreen from "./BotReactionsScreen";
 import MediaReactionsScreen from "./MediaReactionsScreen";
 import AdviceScreen from "./AdviceScreen";
+import WormMasterScreen from "./WormMasterScreen";
 import PhrasesSnapshotScreen from "./PhrasesSnapshotScreen";
 import PostingAlertsScreen from "./PostingAlertsScreen";
 import { fetchPostingAlerts } from "@/api/admin";
@@ -39,6 +40,7 @@ type Section =
   | "bot-reactions"
   | "media-reactions"
   | "advice"
+  | "worm-master"
   | "phrases-snapshot"
   | "posting-alerts"
   | "history"
@@ -90,6 +92,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
   if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "advice") return <AdviceScreen onBack={back} />;
+  if (section === "worm-master") return <WormMasterScreen onBack={back} />;
   if (section === "phrases-snapshot") return <PhrasesSnapshotScreen onBack={back} />;
   if (section === "posting-alerts") return <PostingAlertsScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
@@ -351,6 +354,13 @@ export default function AdminScreen({ users }: Props) {
           title="Магический шар"
           subtitle="/advice · #совет · @бот …?"
           onClick={() => select("advice")}
+        />
+        {/* GHG8 T3.6.6: режим «червь-господин» — подхалимаж/punish/анонс. */}
+        <Card
+          icon="🪱"
+          title="Червь-господин"
+          subtitle="Подхалимаж, /punish, анонс становления"
+          onClick={() => select("worm-master")}
         />
       </SectionGroup>
 

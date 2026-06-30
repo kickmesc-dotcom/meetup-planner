@@ -1266,6 +1266,154 @@ async def admin_update_advice_enabled(
     )
 
 
+# --- T3.6.6: worm-master (режим «червь-господин») ---
+# Бэк-логика (анонс/подхалимаж/punish) уже в проде, но gated worm_master.enabled.
+# Здесь — единственный UI-вход: тоглы поведения + CRUD 6 пулов фраз. Конфиг-слой
+# (тоглы, геттеры/сеттеры пулов) готов в admin_config; снапшот их уже учитывает.
+
+from app.services.admin_config import (
+    is_worm_master_enabled as _wm_get_enabled,
+    set_worm_master_enabled as _wm_set_enabled,
+    is_worm_master_punish_enabled as _wm_get_punish_enabled,
+    set_worm_master_punish_enabled as _wm_set_punish_enabled,
+    is_worm_master_yes_enabled as _wm_get_yes_enabled,
+    set_worm_master_yes_enabled as _wm_set_yes_enabled,
+    get_worm_master_yes_pct as _wm_get_yes_pct,
+    set_worm_master_yes_pct as _wm_set_yes_pct,
+    get_worm_master_yes_cooldown_min as _wm_get_yes_cooldown,
+    set_worm_master_yes_cooldown_min as _wm_set_yes_cooldown,
+    get_worm_master_prefixes as _wm_get_prefixes,
+    set_worm_master_prefixes as _wm_set_prefixes,
+    get_worm_master_suffixes as _wm_get_suffixes,
+    set_worm_master_suffixes as _wm_set_suffixes,
+    get_worm_master_agrees as _wm_get_agrees,
+    set_worm_master_agrees as _wm_set_agrees,
+    get_worm_master_nag as _wm_get_nag,
+    set_worm_master_nag as _wm_set_nag,
+    get_worm_punish as _wm_get_punish,
+    set_worm_punish as _wm_set_punish,
+    get_worm_announce_lines as _wm_get_announce,
+    set_worm_announce_lines as _wm_set_announce,
+)
+
+
+class WormMasterSettingsOut(BaseModel):
+    enabled: bool
+    punish_enabled: bool
+    yes_enabled: bool
+    yes_pct: int
+    yes_cooldown_min: int
+
+
+class WormMasterSettingsUpdate(BaseModel):
+    enabled: bool | None = None
+    punish_enabled: bool | None = None
+    yes_enabled: bool | None = None
+    yes_pct: int | None = Field(default=None, ge=0, le=100)
+    yes_cooldown_min: int | None = Field(default=None, ge=0, le=1440)
+
+
+class WormMasterPoolsOut(BaseModel):
+    prefixes: list[str]
+    suffixes: list[str]
+    agrees: list[str]
+    nag: list[str]
+    punish: list[str]
+    announce_lines: list[str]
+
+
+class WormMasterPoolUpdate(BaseModel):
+    phrases: list[str] = Field(..., max_length=500)
+
+
+# pool-имя → (getter, setter). Один источник правды для PUT-диспетчера и
+# сборки WormMasterPoolsOut, чтобы не разъезжались.
+_WORM_MASTER_POOLS = {
+    "prefixes": (_wm_get_prefixes, _wm_set_prefixes),
+    "suffixes": (_wm_get_suffixes, _wm_set_suffixes),
+    "agrees": (_wm_get_agrees, _wm_set_agrees),
+    "nag": (_wm_get_nag, _wm_set_nag),
+    "punish": (_wm_get_punish, _wm_set_punish),
+    "announce_lines": (_wm_get_announce, _wm_set_announce),
+}
+
+
+async def _worm_master_pools_out(session: SessionDep) -> WormMasterPoolsOut:
+    return WormMasterPoolsOut(
+        prefixes=await _wm_get_prefixes(session),
+        suffixes=await _wm_get_suffixes(session),
+        agrees=await _wm_get_agrees(session),
+        nag=await _wm_get_nag(session),
+        punish=await _wm_get_punish(session),
+        announce_lines=await _wm_get_announce(session),
+    )
+
+
+async def _worm_master_settings_out(session: SessionDep) -> WormMasterSettingsOut:
+    return WormMasterSettingsOut(
+        enabled=await _wm_get_enabled(session),
+        punish_enabled=await _wm_get_punish_enabled(session),
+        yes_enabled=await _wm_get_yes_enabled(session),
+        yes_pct=await _wm_get_yes_pct(session),
+        yes_cooldown_min=await _wm_get_yes_cooldown(session),
+    )
+
+
+@router.get("/admin/worm-master", response_model=WormMasterSettingsOut)
+async def admin_get_worm_master(
+    session: SessionDep, user: CurrentUser
+) -> WormMasterSettingsOut:
+    _ensure_admin(user)
+    return await _worm_master_settings_out(session)
+
+
+@router.put("/admin/worm-master", response_model=WormMasterSettingsOut)
+async def admin_update_worm_master(
+    body: WormMasterSettingsUpdate, session: SessionDep, user: CurrentUser
+) -> WormMasterSettingsOut:
+    _ensure_admin(user)
+    if body.enabled is not None:
+        await _wm_set_enabled(session, body.enabled)
+    if body.punish_enabled is not None:
+        await _wm_set_punish_enabled(session, body.punish_enabled)
+    if body.yes_enabled is not None:
+        await _wm_set_yes_enabled(session, body.yes_enabled)
+    if body.yes_pct is not None:
+        await _wm_set_yes_pct(session, body.yes_pct)
+    if body.yes_cooldown_min is not None:
+        await _wm_set_yes_cooldown(session, body.yes_cooldown_min)
+    log.info(
+        "admin.worm_master_updated",
+        body=body.model_dump(exclude_unset=True),
+        by=user.id,
+    )
+    return await _worm_master_settings_out(session)
+
+
+@router.get("/admin/worm-master/pools", response_model=WormMasterPoolsOut)
+async def admin_get_worm_master_pools(
+    session: SessionDep, user: CurrentUser
+) -> WormMasterPoolsOut:
+    _ensure_admin(user)
+    return await _worm_master_pools_out(session)
+
+
+@router.put("/admin/worm-master/pools/{pool}", response_model=WormMasterPoolsOut)
+async def admin_update_worm_master_pool(
+    pool: str, body: WormMasterPoolUpdate, session: SessionDep, user: CurrentUser
+) -> WormMasterPoolsOut:
+    _ensure_admin(user)
+    entry = _WORM_MASTER_POOLS.get(pool)
+    if entry is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="unknown_pool")
+    _, setter = entry
+    await setter(session, body.phrases)
+    log.info(
+        "admin.worm_master_pool_updated", pool=pool, count=len(body.phrases), by=user.id
+    )
+    return await _worm_master_pools_out(session)
+
+
 # --- T3.1: снапшот/экспорт базы причин-реакций ---
 
 from app.services.phrase_snapshot import (
