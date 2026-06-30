@@ -255,14 +255,18 @@ Amvera подрубаем ВЫБОРОЧНО** (периоды сбоев / ис
     `extract_punish_target`). +9 тестов, сьют **473 passed**. **Sync ✅**
     (worm_master/chat_commands/bot_reactions/commands_catalog + тест, diff -q
     пуст). **PUSH ✅** (PUSH #1, HF `767586c..5700d5f`).
-  - [~] **T3.6.6.** Админка червя: тогл/шанс/CRUD 6 пулов + экран
-    `WormMasterScreen.tsx`. ⚠️ **КОД ГОТОВ В РАБОЧЕМ ДЕРЕВЕ, НЕ ЗАКОММИЧЕН/НЕ
-    ЗАПУШЕН** (обнаружено 30.06). Файлы: `WormMasterScreen.tsx` (untracked),
-    `routes_admin.py` (+148, worm-CRUD: settings + 6 пулов), `admin.ts` (+45),
-    `AdminScreen.tsx` (+10, карточка «червь-господин»). Сплит от блока G —
-    чистый по файлам (G живёт в `scheduler.py`/`space_restart.py`). Осталось:
-    выборочный `git add` worm-файлов → тесты → sync backend → push HF+Pages.
-    Приоритет №1 (новая стратегия 30.06).
+  - [x] **T3.6.6.** (2026-06-30) Админка червя: тогл/шанс/CRUD 6 пулов + экран
+    `WormMasterScreen.tsx` (399 строк). Закрыт рассинхрон `/punish`↔редактор
+    (код был написан, лежал незакоммиченным с PUSH #1). Бэк
+    `GET/PUT /admin/worm-master` (settings) + `/pools` + `PUT /pools/{pool}`
+    (CRUD 6 пулов) — `routes_admin.py` (+148). Фронт: `admin.ts` (+45, типы +
+    API), `AdminScreen.tsx` (+10, карточка), `WormMasterScreen.tsx`. Режим
+    остаётся gated `worm_master.enabled=False` (включение тоглом из админки).
+    Блок G НЕ затронут (выборочный `git add`). Сьют **477 passed**, tsc чист.
+    **Sync ✅** (routes_admin, diff -q пуст; scheduler/space_restart намеренно
+    не синканы — это WIP блока G). **PUSH ✅ (двойной)** GitHub Pages
+    `f966d7f..f41506a`; бэк HF `5700d5f..d6ead1e` + Amvera `efcc041..d6ead1e`
+    (→master).
 - [ ] **T3.PUSH.**
 
 **Tier 1 (мелкая полировка):**
