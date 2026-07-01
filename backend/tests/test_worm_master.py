@@ -13,9 +13,14 @@ from app.services.worm_master import (
     DEFAULT_WORM_MASTER_NAG,
     DEFAULT_WORM_MASTER_PREFIXES,
     DEFAULT_WORM_MASTER_SUFFIXES,
+    DEFAULT_WORM_PUNISH_DENIED,
+    DEFAULT_WORM_PUNISH_DENIED_NAMED,
     DEFAULT_WORM_PUNISH_PHRASES,
+    NAG_EVERY,
     build_announce_extra,
     choose,
+    decide_agree,
+    decide_nag,
     extract_punish_target,
     pick_nag,
     render,
@@ -162,3 +167,52 @@ def test_extract_target_none_when_empty():
 def test_render_punish_substitutes_target():
     raw = choose(["бью {target} с ноги"])
     assert render(raw, target="@kos") == "бью @kos с ноги"
+
+
+# --- T3.6.8 (б): решение о поддакивании ---
+
+def test_decide_agree_disabled_never():
+    assert decide_agree(enabled=False, pct=100, rng_value=0.0) is False
+
+
+def test_decide_agree_zero_pct_never():
+    assert decide_agree(enabled=True, pct=0, rng_value=0.0) is False
+
+
+def test_decide_agree_full_pct_always():
+    # pct=100 → всегда (rng < 1.0 всегда истинно для 0..1)
+    for v in (0.0, 0.5, 0.999):
+        assert decide_agree(enabled=True, pct=100, rng_value=v) is True
+
+
+def test_decide_agree_threshold():
+    # pct=15 → порог 0.15
+    assert decide_agree(enabled=True, pct=15, rng_value=0.14) is True
+    assert decide_agree(enabled=True, pct=15, rng_value=0.15) is False
+    assert decide_agree(enabled=True, pct=15, rng_value=0.20) is False
+
+
+def test_decide_nag_threshold():
+    thresh = 1.0 / NAG_EVERY
+    assert decide_nag(0.0) is True
+    assert decide_nag(thresh - 0.001) is True
+    assert decide_nag(thresh + 0.001) is False
+    assert decide_nag(0.99) is False
+
+
+# --- T3.6.8 (в'): отповедь не-господину на /punish ---
+
+def test_punish_denied_pools_nonempty_strings():
+    for pool in (DEFAULT_WORM_PUNISH_DENIED, DEFAULT_WORM_PUNISH_DENIED_NAMED):
+        assert pool
+        assert all(isinstance(p, str) and p.strip() for p in pool)
+
+
+def test_punish_denied_named_has_username_placeholder():
+    # named-пул обязан уметь назвать текущего господина по имени
+    assert all("{username}" in p for p in DEFAULT_WORM_PUNISH_DENIED_NAMED)
+
+
+def test_punish_denied_unnamed_has_no_placeholder():
+    # безымянный пул используется когда червя нет — плейсхолдер остался бы сырым
+    assert all("{username}" not in p for p in DEFAULT_WORM_PUNISH_DENIED)

@@ -26,6 +26,9 @@ chat_capture). Чужие сообщения игнорируем молча.
 """
 from __future__ import annotations
 
+import random
+import time
+
 import structlog
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -37,6 +40,12 @@ from app.services.admin_config import get_bot_reactions_settings
 
 log = structlog.get_logger()
 router = Router()
+
+# T3.6.8 (б): кулдаун поддакивания — in-memory, `chat_id -> monotonic-время
+# последнего поддакивания`. Намеренно БЕЗ persist: после рестарта словарь пуст,
+# бот может поддакнуть сразу — по согласованию с пользователем это допустимо
+# (поддакивания редкие). monotonic() не зависит от системных часов.
+_last_agree_at: dict[int, float] = {}
 
 # Сигнатуры рандом-цитат (см. services/random_phrases.py::compose_random_phrase).
 # Если reply пришёл на сообщение бота, которое начинается с одной из этих
@@ -169,6 +178,13 @@ async def _maybe_react(message: Message) -> None:
         if await _handle_punish(message):
             return
 
+    # T3.6.8 (б): поддакивание господину. Реагируем на ЛЮБОЕ его сообщение (не
+    # только mention/reply), поэтому стоит отдельной веткой ДО обычных реакций.
+    # Гейт целиком внутри — для не-господина тихий no-op. Не return'им после:
+    # поддакивание — «побочный» комментарий, не мешает mention/reply-сценарию
+    # ниже, если сообщение заодно тегает бота.
+    await _maybe_agree(message)
+
     # 1. @-mention (старый сценарий: рандом-фраза в ответ на упоминание без «?»)
     if cfg["mention_enabled"] and mentions_bot:
         log.info("bot_reactions.mention", from_id=message.from_user.id)
@@ -194,6 +210,84 @@ async def _maybe_react(message: Message) -> None:
                 await _react(message)
 
 
+async def _maybe_agree(message: Message) -> None:
+    """T3.6.8 (б): бот-подхалим изредка поддакивает сообщениям господина.
+
+    Гейт: worm_master.enabled + yes_enabled + отправитель == текущий
+    червь-господин. Затем честный ролл yes_pct и in-memory кулдаун
+    yes_cooldown_min. Изредка (decide_nag) подмешиваем напоминание про /отвали.
+
+    Не трогает пропагацию — как и остальной _maybe_react, финальный SkipHandler
+    в on_message сохранит сообщение в chat_capture."""
+    from app.services.admin_config import (
+        get_worm_master_agrees,
+        get_worm_master_nag,
+        get_worm_master_yes_cooldown_min,
+        get_worm_master_yes_pct,
+        is_worm_master_enabled,
+        is_worm_master_yes_enabled,
+    )
+    from app.services.loser import get_current_worm
+    from app.services.phrase_weights import (
+        WORM_MASTER_AGREE_USE_COUNTS_KEY,
+        get_use_counts,
+        increment_use_count,
+    )
+    from app.services.worm_master import choose, decide_agree, decide_nag, pick_nag, render
+
+    from app.db.models import User
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return
+        if not await is_worm_master_yes_enabled(session):
+            return
+        # Отправитель — текущий господин?
+        worm = await get_current_worm(session)
+        if worm is None:
+            return
+        master = await session.get(User, worm.user_id)
+        if master is None or master.telegram_id != message.from_user.id:
+            return
+
+        # Ролл шанса.
+        pct = await get_worm_master_yes_pct(session)
+        if not decide_agree(enabled=True, pct=pct, rng_value=random.random()):
+            return
+
+        # Кулдаун (in-memory, без persist).
+        cooldown_min = await get_worm_master_yes_cooldown_min(session)
+        now = time.monotonic()
+        last = _last_agree_at.get(message.chat.id)
+        if last is not None and (now - last) < cooldown_min * 60:
+            return
+
+        # Выбор фразы (взвешенно, как у лоха/чухана).
+        pool = await get_worm_master_agrees(session)
+        counts = await get_use_counts(session, WORM_MASTER_AGREE_USE_COUNTS_KEY)
+        raw = choose(pool, counts)
+        if raw is None:
+            return
+        await increment_use_count(session, WORM_MASTER_AGREE_USE_COUNTS_KEY, raw)
+        await session.commit()
+
+        agree = render(raw, username=master.display_name)
+
+        # Изредка подмешиваем напоминание про /отвали.
+        nag_text: str | None = None
+        if decide_nag(random.random()):
+            nag_pool = await get_worm_master_nag(session)
+            nag_text = pick_nag(nag_pool, username=master.display_name)
+
+    _last_agree_at[message.chat.id] = now
+    out = agree if nag_text is None else f"{agree}\n\n{nag_text}"
+    try:
+        await message.reply(out, parse_mode="HTML")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("worm_master.agree_send_failed", error=str(exc))
+
+
 @router.message(F.text)
 async def on_message(message: Message) -> None:
     """GHG7 P0.3.c фикс: этот handler матчит ЛЮБОЙ `F.text`, поэтому в aiogram
@@ -203,6 +297,13 @@ async def on_message(message: Message) -> None:
 
     Поэтому делаем реакцию (если нужна) и ВСЕГДА `raise SkipHandler`: тогда
     `trigger` вернёт `UNHANDLED`, и Dispatcher передаст апдейт следующему
-    роутеру (`chat_capture`), который сохранит сообщение."""
-    await _maybe_react(message)
+    роутеру (`chat_capture`), который сохранит сообщение.
+
+    Реакция обёрнута в try: любой сбой внутри (сеть/БД/поддакивание) НЕ должен
+    съесть `SkipHandler` — иначе chat_capture не вызовется и копилка встанет
+    (тот самый инвариант, что чинил P0.3.c)."""
+    try:
+        await _maybe_react(message)
+    except Exception:  # noqa: BLE001
+        log.exception("bot_reactions.maybe_react_failed")
     raise SkipHandler

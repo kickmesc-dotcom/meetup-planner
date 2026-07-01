@@ -113,13 +113,21 @@ def _extract_target_from_entities(message: Message) -> str | None:
 async def on_punish(message: Message) -> None:
     if not message.from_user or not _is_member(message.from_user.id):
         return
-    await _handle_punish(message)
+    # Явная команда → отповедь не-господину (QOL). Хештег #punish (альт-триггер
+    # из bot_reactions) вызывает _handle_punish с deny_if_not_master=False, чтобы
+    # случайный тег в сообщении не спамил «ты мне не господин».
+    await _handle_punish(message, deny_if_not_master=True)
 
 
-async def _handle_punish(message: Message) -> bool:
+async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) -> bool:
     """Червь-господин натравливает бота на недруга. Гейт жёстче whitelist:
     вызвать может ТОЛЬКО текущий червь-господин, и только при включённых
     `worm_master.enabled` + `worm_master.punish_enabled`.
+
+    `deny_if_not_master`: если True и вызвал НЕ господин — бот отвечает
+    отповедью («ты мне не господин, слушаюсь только его»). False (хештег) —
+    тихий no-op, как раньше. Отповедь даём только когда режим/тогл включены —
+    иначе выдали бы существование фичи тем, кому она недоступна.
 
     Возвращает True, если что-то ответили (для альт-триггера #punish из
     bot_reactions — чтобы тот понял, что сценарий отработал)."""
@@ -149,8 +157,16 @@ async def _handle_punish(message: Message) -> bool:
             return False
         worm = await get_current_worm(session)
         if worm is None or worm.user_id != caller.id:
-            # Не господин — тихо игнорируем (как и прочие «не для тебя» команды).
-            return False
+            if not deny_if_not_master:
+                # Хештег-триггер — тихо игнорируем (случайный #punish не спамит).
+                return False
+            # QOL: явная команда от не-господина → бот ставит на место.
+            master_name: str | None = None
+            if worm is not None:
+                master = await session.get(User, worm.user_id)
+                master_name = master.display_name if master else None
+            await _reply_punish_denied(message, master_name)
+            return True
 
         # Цель: сначала сущности (@mention/text_mention), потом текстовый фолбэк.
         target = _extract_target_from_entities(message) or extract_punish_target(
@@ -176,6 +192,69 @@ async def _handle_punish(message: Message) -> bool:
     except Exception:
         log.exception("chat.punish_failed", by=message.from_user.id)
     return True
+
+
+# ---------------------- T3.6.8: /отвали (только червь-господин) ----------------------
+
+@router.message(Command(commands=["отвали", "otvali"]))
+async def on_otvali(message: Message) -> None:
+    """Господин затыкает подхалима: /отвали → выключаем тумблер поддакивания
+    в админке (worm_master.yes_enabled=false). Пользователь потом вернёт его
+    руками в Mini App. Вызвать может ТОЛЬКО текущий червь-господин при включённом
+    режиме; для остальных — тихий no-op."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.admin_config import (
+        is_worm_master_enabled,
+        is_worm_master_yes_enabled,
+        set_worm_master_yes_enabled,
+    )
+    from app.services.loser import get_current_worm
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            return
+        worm = await get_current_worm(session)
+        if worm is None or worm.user_id != caller.id:
+            # Не господин — тихо игнорируем.
+            return
+        if not await is_worm_master_yes_enabled(session):
+            # Уже выключено — мягко подтвердим, чтобы команда не «молчала».
+            await message.reply("🤫 Я и так нем как рыба, мой господин.")
+            return
+        await set_worm_master_yes_enabled(session, False)
+    try:
+        await message.reply("🤫 Умолкаю, повелитель. Поддакивания выключены.")
+    except Exception:
+        log.exception("chat.otvali_failed", by=message.from_user.id)
+
+
+async def _reply_punish_denied(message: Message, master_name: str | None) -> None:
+    """QOL: отповедь не-господину, дёрнувшему /punish. Если червь назначен —
+    называем его по имени (named-пул), иначе безымянная отповедь."""
+    import random
+
+    from app.services.worm_master import (
+        DEFAULT_WORM_PUNISH_DENIED,
+        DEFAULT_WORM_PUNISH_DENIED_NAMED,
+        render,
+    )
+
+    if master_name:
+        raw = random.choice(DEFAULT_WORM_PUNISH_DENIED_NAMED)
+        text = render(raw, username=master_name)
+    else:
+        text = random.choice(DEFAULT_WORM_PUNISH_DENIED)
+    try:
+        await message.reply(f"🪱 {text}", parse_mode="HTML")
+    except Exception:
+        log.exception("chat.punish_denied_failed", by=message.from_user.id)
 
 
 # ---------------------- C2: /loser ----------------------

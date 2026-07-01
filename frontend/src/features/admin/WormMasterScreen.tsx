@@ -31,9 +31,8 @@ const errAlert = (e: unknown) => {
  * тоглы поведения (авто-save, как MediaReactionsScreen) + CRUD 6 пулов фраз
  * через универсальный ReasonsEditor.
  *
- * ⚠️ Поддакивание (agrees/nag + шанс + кулдаун) — поведение ещё в разработке
- * (T3.6.8), поэтому контролы помечены «скоро»: редактировать пулы можно, но бот
- * пока на них не реагирует.
+ * T3.6.8: поддакивание (agrees/nag + шанс + кулдаун) реализовано — бот изредка
+ * одобряет сообщения господина; господин глушит его командой /отвали.
  */
 export default function WormMasterScreen({ onBack }: Props) {
   const qc = useQueryClient();
@@ -121,18 +120,15 @@ export default function WormMasterScreen({ onBack }: Props) {
               onChange={(v) => patch({ punish_enabled: v })}
             />
 
-            {/* Поддакивание — поведение в разработке (T3.6.8). */}
+            {/* Поддакивание (T3.6.8). */}
             <div className="rounded-md bg-tg-bg/40 px-2 py-2 space-y-2">
               <div className="flex items-center gap-2">
                 <div className="text-sm text-tg-text">🤫 Поддакивание</div>
-                <span className="text-[10px] rounded bg-status-busy/15 px-1.5 py-0.5 text-status-busy">
-                  ⏳ скоро
-                </span>
               </div>
               <div className="text-[11px] text-tg-hint">
-                Бот изредка одобрительно комментирует сообщения господина. Пулы
-                фраз ниже уже можно редактировать, но реакция включится в
-                следующем обновлении.
+                Бот изредка одобрительно комментирует сообщения господина.
+                Господин может заткнуть подхалима командой <b>/отвали</b> — тогда
+                этот тумблер выключится, и его нужно будет включить здесь снова.
               </div>
               <ToggleRow
                 label="Поддакивать сообщениям господина"
@@ -201,7 +197,6 @@ export default function WormMasterScreen({ onBack }: Props) {
       />
       <PoolSection
         title="🤫 Поддакивания"
-        badge="⏳ скоро"
         hint="Короткие одобрения сообщений господина. {username} — имя господина."
         placeholder="например: Господин {username} не может ошибаться."
         pool="agrees"
@@ -212,7 +207,6 @@ export default function WormMasterScreen({ onBack }: Props) {
       />
       <PoolSection
         title="🔔 Напоминания /отвали"
-        badge="⏳ скоро"
         hint="Изредка напоминают господину, как заткнуть подхалима. {username} — имя."
         placeholder="например: Шепните /отвали, мой господин, и я умолкну."
         pool="nag"

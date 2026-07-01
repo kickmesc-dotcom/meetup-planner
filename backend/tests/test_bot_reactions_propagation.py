@@ -58,6 +58,9 @@ def _make_message(
 def _patch_common(monkeypatch, *, settings: _Settings, react: AsyncMock) -> None:
     monkeypatch.setattr(br, "get_settings", lambda: settings)
     monkeypatch.setattr(br, "_react", react)
+    # T3.6.8: поддакивание — отдельная DB-ветка, здесь не в фокусе (см.
+    # test_worm_master для его логики). Мокаем no-op, чтобы стенд не лез в БД.
+    monkeypatch.setattr(br, "_maybe_agree", AsyncMock())
     # _bot_identity и cfg — на случай, если дойдём до реакции.
     monkeypatch.setattr(br, "_bot_identity", AsyncMock(return_value=(999, "gunghogunsbot")))
     monkeypatch.setattr(
