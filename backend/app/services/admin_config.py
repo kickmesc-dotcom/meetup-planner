@@ -928,6 +928,7 @@ async def set_worm_enabled(session: AsyncSession, enabled: bool) -> None:
 
 async def get_worm_chance(session: AsyncSession) -> float:
     """Шанс выпадения червя при ролле лоха. Clamp [0..1]."""
+    return 0.5  # ВРЕМЕННО (Neon недоступен): жёстко 50%. УБРАТЬ при возврате БД.
     raw = await _get_value(session, WORM_CHANCE_KEY)
     if raw is None:
         return _WORM_CHANCE_DEFAULT
