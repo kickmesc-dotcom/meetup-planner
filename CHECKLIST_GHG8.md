@@ -278,11 +278,17 @@ Amvera подрубаем ВЫБОРОЧНО** (периоды сбоев / ис
     без `_maybe_agree`). БД/тоглы были корректны (Neon2: enabled/yes_enabled=true,
     yes_pct=50). Фикс: `git push amvera main:master` (03.07). Диагностика-паттерн
     и правило веток — память `incident_meetup_planner_amvera_master_branch`.
-  - [~] **T3.6.9.** Настройка ШАНСА ВЫПАДЕНИЯ титула червя (`worm.chance`) в
-    Mini App. Проблема: бэк-эндпоинт `/admin/worm` (enabled/chance) есть, но
-    UI-входа НЕТ — шанс правился руками в БД (был мусорный коммит «temp hardcode
-    worm.chance»); при `chance=0.1` титул скакал дважды за 2 дня. Добавляем
-    рубильник `worm.enabled` + инпут `worm.chance` в `WormMasterScreen`.
+  - [x] **T3.6.9.** (2026-07-03) Настройка ШАНСА ВЫПАДЕНИЯ титула червя в
+    Mini App + снятие хардкода. **Корневая причина скачков титула:**
+    `get_worm_chance` возвращал жёстко `return 0.5` (временная заглушка на
+    время недоступности Neon) — игнорировал БД, титул выпадал с 50% на КАЖДОМ
+    ролле лоха. Убран (Neon давно вернулся). UI: секция «🎲 Выпадение титула»
+    в `WormMasterScreen` — рубильник `worm.enabled` + инпут шанса в %
+    (хранится как доля 0..1), авто-save через существующий `GET/PUT /admin/worm`
+    (бэк-эндпоинт был, UI-входа не было). Сьют **485 passed**, tsc чист.
+    **Sync ✅** (admin_config → meetup-planner-backend). **PUSH ✅ (тройной):**
+    бэк HF `10a2adc..2f7c4bb` + Amvera `→master 2f7c4bb`; фронт GitHub
+    `b615d3a..1629350`.
 - [ ] **T3.PUSH.**
 
 **Tier 1 (мелкая полировка):**
