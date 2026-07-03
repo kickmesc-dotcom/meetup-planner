@@ -266,6 +266,21 @@ export const updateWormMasterPool = (pool: WormMasterPool, phrases: string[]) =>
     body: JSON.stringify({ phrases }),
   });
 
+// --- E8/T3.6.9: базовая механика червя — шанс ВЫПАДЕНИЯ титула на ролле лоха.
+// Отдельно от worm-master (тот про поведение господина); `chance` — доля 0..1.
+export interface WormSettings {
+  enabled: boolean;
+  chance: number; // 0..1
+}
+
+export const fetchWormSettings = () => api<WormSettings>("/api/admin/worm");
+
+export const updateWormSettings = (s: Partial<WormSettings>) =>
+  api<WormSettings>("/api/admin/worm", {
+    method: "PUT",
+    body: JSON.stringify(s),
+  });
+
 // --- T3.1: снапшот/экспорт базы причин-реакций ---
 
 export interface PhraseSnapshot {

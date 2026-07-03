@@ -5,8 +5,11 @@ import {
   updateWormMasterSettings,
   fetchWormMasterPools,
   updateWormMasterPool,
+  fetchWormSettings,
+  updateWormSettings,
   type WormMasterSettings,
   type WormMasterPool,
+  type WormSettings,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -64,6 +67,33 @@ export default function WormMasterScreen({ onBack }: Props) {
     saveSettings.mutate(next);
   };
 
+  // --- E8: выпадение титула червя (worm.enabled + worm.chance), авто-save ---
+  const wormQ = useQuery({
+    queryKey: ["admin", "worm", "settings"],
+    queryFn: fetchWormSettings,
+    staleTime: 30_000,
+  });
+  const [wormDraft, setWormDraft] = useState<WormSettings | null>(null);
+  useEffect(() => {
+    if (wormQ.data) setWormDraft({ ...wormQ.data });
+  }, [wormQ.data]);
+
+  const saveWorm = useMutation({
+    mutationFn: updateWormSettings,
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "worm", "settings"], data);
+    },
+    onError: errAlert,
+  });
+
+  const patchWorm = (p: Partial<WormSettings>) => {
+    if (!wormDraft) return;
+    const next = { ...wormDraft, ...p };
+    setWormDraft(next);
+    saveWorm.mutate(next);
+  };
+
   // --- пулы ---
   const poolsQ = useQuery({
     queryKey: ["admin", "worm-master", "pools"],
@@ -87,6 +117,37 @@ export default function WormMasterScreen({ onBack }: Props) {
       subtitle="Подхалимаж · /punish · анонс"
       onBack={onBack}
     >
+      {/* 0. Выпадение титула (E8): базовая механика — кто вообще становится
+          червём. Без неё «господина» не появится, поэтому секция первая. */}
+      {wormQ.isPending || !wormDraft ? (
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 mb-3">
+          <ListSkeleton rows={2} />
+        </section>
+      ) : (
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 mb-3 space-y-2">
+          <div className="text-sm font-semibold text-tg-text">
+            🎲 Выпадение титула
+          </div>
+          <div className="text-[11px] text-tg-hint">
+            На каждом ролле лоха с этим шансом вместо обычного лоха выпадает
+            «червь-пидор» — и титул переходит к нему. Слишком высокий шанс = титул
+            скачет каждый день.
+          </div>
+          <ToggleRow
+            label="Червь может выпадать"
+            hint="Выключено — титул никому не назначается, старый червь остаётся."
+            checked={wormDraft.enabled}
+            onChange={(v) => patchWorm({ enabled: v })}
+          />
+          <PctRow
+            label="Шанс выпадения"
+            hint="Вероятность на один ролл лоха (0–100%)."
+            value={Math.round(wormDraft.chance * 100)}
+            onChange={(v) => patchWorm({ chance: v / 100 })}
+          />
+        </section>
+      )}
+
       {/* 1. Поведение */}
       {settingsQ.isPending || !draft ? (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
