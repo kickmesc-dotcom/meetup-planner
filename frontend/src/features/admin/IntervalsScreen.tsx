@@ -81,11 +81,11 @@ export default function IntervalsScreen({ onBack }: Props) {
       onBack={onBack}
     >
       <Block icon="⏰" title="Тик напоминаний" hint="Раз в N минут бот проверяет очередь напоминаний к встречам.">
-        <Field label="Интервал, мин (1–120)">
+        <Field label="Интервал, мин (1–360)">
           <NumberInput
             value={draft.reminders.tick_minutes}
             min={1}
-            max={120}
+            max={360}
             onChange={(v) =>
               patch((d) => {
                 d.reminders.tick_minutes = v;
