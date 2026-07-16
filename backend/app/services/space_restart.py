@@ -140,6 +140,28 @@ def should_fire(
     return True
 
 
+def compute_next_fire(
+    schedule: dict, last_restart_at: datetime | None, now: datetime
+) -> datetime | None:
+    """G (space_restart): когда one-shot job должен РЕАЛЬНО выстрелить.
+
+    Это `compute_next_restart`, но не раньше анти-лупа: если последний рестарт
+    (в т.ч. ручной) был < MIN_RESTART_INTERVAL назад, сдвигаем к
+    `last + MIN_RESTART_INTERVAL`. Без этого пола событийная модель встала бы
+    в busy-loop: заблокированный анти-лупом `once`/`interval` перевзводил бы
+    DateTrigger «в прошлом» → мгновенный повторный выстрел → снова блок.
+    off → None (job не регистрируется).
+    """
+    nxt = compute_next_restart(schedule, last_restart_at, now)
+    if nxt is None:
+        return None
+    if last_restart_at is not None:
+        floor = last_restart_at + MIN_RESTART_INTERVAL
+        if nxt < floor:
+            return floor
+    return nxt
+
+
 # --- get/set admin_config ---
 
 async def get_schedule(session: AsyncSession) -> dict:

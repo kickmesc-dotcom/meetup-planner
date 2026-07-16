@@ -269,13 +269,19 @@ async def set_loser_reasons(session: AsyncSession, reasons: list[str]) -> None:
 
 # --- A2: Reminders tick ---
 
+# GHG8 G (03.07): верхний кламп 120→360 мин (п.14 «по-хорошему раз в ~6ч»).
+# Реже опрашивать напоминания = меньше SELECT в Neon. Значение задаётся из
+# админки; тут только расширен потолок.
+_REMINDERS_TICK_MAX = 360
+
+
 async def get_reminders_tick_minutes(session: AsyncSession) -> int:
-    return max(1, min(120, await _get_int(session, REMINDERS_TICK_MINUTES_KEY, 10)))
+    return max(1, min(_REMINDERS_TICK_MAX, await _get_int(session, REMINDERS_TICK_MINUTES_KEY, 10)))
 
 
 async def set_reminders_tick_minutes(session: AsyncSession, minutes: int) -> None:
     await _set_value(
-        session, REMINDERS_TICK_MINUTES_KEY, str(max(1, min(120, minutes)))
+        session, REMINDERS_TICK_MINUTES_KEY, str(max(1, min(_REMINDERS_TICK_MAX, minutes)))
     )
 
 

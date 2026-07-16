@@ -13,6 +13,7 @@ from app.services.space_restart import (
     EVERY_HOURS_MAX,
     EVERY_HOURS_MIN,
     MIN_RESTART_INTERVAL,
+    compute_next_fire,
     compute_next_restart,
     parse_schedule,
     should_fire,
@@ -141,3 +142,60 @@ def test_fire_antiloop_blocks_within_30_min():
     # Ровно на границе 30 мин — уже можно.
     edge = NOW - MIN_RESTART_INTERVAL
     assert should_fire(sched, edge, NOW)
+
+
+# --- compute_next_fire (GHG8 G: событийный one-shot) ---
+
+def test_next_fire_off_is_none():
+    # off → job не регистрируется.
+    assert compute_next_fire(OFF, None, NOW) is None
+    assert compute_next_fire(OFF, NOW - timedelta(hours=1), NOW) is None
+
+
+def test_next_fire_once_future_unchanged():
+    # once в будущем без недавнего рестарта — стреляем ровно в `at`.
+    at = NOW + timedelta(hours=2)
+    sched = _sched("once", at=at.isoformat())
+    assert compute_next_fire(sched, None, NOW) == at
+
+
+def test_next_fire_interval_first_time_is_now():
+    # interval без якоря — первый рестарт «прямо сейчас» (как should_fire=True).
+    sched = _sched("interval", every_hours=24)
+    assert compute_next_fire(sched, None, NOW) == NOW
+
+
+def test_next_fire_floors_to_antiloop():
+    # Расписание говорит «пора», но рестарт был 10 мин назад → сдвиг к
+    # last + 30 мин (анти-busy-loop событийной модели).
+    sched = _sched("once", at=(NOW - timedelta(hours=1)).isoformat())
+    recent = NOW - timedelta(minutes=10)
+    assert compute_next_fire(sched, recent, NOW) == recent + MIN_RESTART_INTERVAL
+
+
+def test_next_fire_no_floor_when_due_after_antiloop():
+    # Якорь старше 30 мин — пол не влияет, отдаём естественное время.
+    sched = _sched("interval", every_hours=6)
+    anchor = NOW - timedelta(hours=2)
+    assert compute_next_fire(sched, anchor, NOW) == anchor + timedelta(hours=6)
+
+
+def test_next_fire_consistent_with_should_fire():
+    # Инвариант: если should_fire=True, то next_fire <= now (job выстрелит
+    # немедленно); если False — next_fire в будущем или None.
+    cases = [
+        (OFF, None),
+        (_sched("once", at=(NOW - timedelta(minutes=1)).isoformat()), None),
+        (_sched("once", at=(NOW + timedelta(hours=1)).isoformat()), None),
+        (_sched("interval", every_hours=24), None),
+        (_sched("interval", every_hours=24), NOW - timedelta(hours=23)),
+        (_sched("once", at=(NOW - timedelta(hours=1)).isoformat()),
+         NOW - timedelta(minutes=10)),
+    ]
+    for sched, last in cases:
+        fires = should_fire(sched, last, NOW)
+        nxt = compute_next_fire(sched, last, NOW)
+        if fires:
+            assert nxt is not None and nxt <= NOW, (sched, last)
+        else:
+            assert nxt is None or nxt > NOW, (sched, last)

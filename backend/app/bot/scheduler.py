@@ -692,17 +692,39 @@ def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:
         sched.remove_job(job_id)
 
 
-def start_scheduler(bot: Bot) -> AsyncIOScheduler:
-    settings = get_settings()
+async def _space_restart_job() -> None:
+    """GHG8 G (антиспам): one-shot job рестарта Space. Делает решение+вызов HF
+    (`run_space_restart_tick`), затем перевзводит следующий one-shot
+    (`reschedule_space_restart`): interval → следующий DateTrigger от
+    last_restart_at; once → расписание стало off → job снимается."""
+    from app.services.space_restart import run_space_restart_tick
+
+    await run_space_restart_tick()
+    await reschedule_space_restart()
+
+
+async def reschedule_proxy_health(bot: Bot) -> None:
+    """GHG8 G (антиспам): регистрируем proxy_health-tick ТОЛЬКО в режиме
+    ALWAYS_ON.
+
+    Тик шлёт selftest (getMe к api.telegram.org) и алёртит админов про мёртвые
+    прокси — но алёрт срабатывает лишь когда `mode is ALWAYS_ON` (см.
+    `proxy_health_tick`). В AUTO_FALLBACK/ALWAYS_OFF (прод обычно тут — прокси
+    в проде не работали) тик = 24 холостых исходящих getMe/сутки без пользы:
+    fallback управляется per-request в dispatcher, не этим тиком. Поэтому вне
+    ALWAYS_ON job не регистрируем (0 запросов). Переключение режима из админки
+    дёргает этот reschedule → job появляется/исчезает на лету.
+    """
+    from app.services.proxies import ProxyMode, get_proxy_mode, proxy_health_tick
+
     sched = get_scheduler()
-    if sched.running:
-        return sched
-
-    # GHG6 AD6: chukhan/avatars/birthdays теперь регистрирует
-    # `reload_dynamic_jobs` — респектят master-toggles из admin_config.
-    # Прокси-health-tick — независимая инфра, регистрируем здесь.
-    from app.services.proxies import proxy_health_tick
-
+    sm = get_sessionmaker()
+    async with sm() as session:
+        mode = await get_proxy_mode(session)
+    if mode is not ProxyMode.ALWAYS_ON:
+        _remove_job_if_exists(sched, JOB_PROXY_HEALTH)
+        log.info("scheduler.proxy_health_disarmed", mode=mode.value)
+        return
     sched.add_job(
         _logged_job(JOB_PROXY_HEALTH, proxy_health_tick),
         IntervalTrigger(seconds=PROXY_HEALTH_INTERVAL_SEC, jitter=30),
@@ -713,6 +735,66 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         coalesce=True,
         misfire_grace_time=PROXY_HEALTH_INTERVAL_SEC,  # GHG6 H4
     )
+    log.info("scheduler.proxy_health_armed", interval_sec=PROXY_HEALTH_INTERVAL_SEC)
+
+
+async def reschedule_space_restart() -> None:
+    """GHG8 G: событийное планирование рестарта Space вместо 5-мин поллинга.
+
+    Ставит ОДИН `DateTrigger` ровно на `compute_next_fire` (учитывает 30-мин
+    анти-луп). off → job не регистрируется (0 запросов в простое — это 99%
+    времени, режим обычно off/раз-в-неделю). Вызывается на старте и из
+    admin PUT при смене расписания. После каждого выстрела job сам себя
+    перевзводит через `_space_restart_job`.
+    """
+    from app.services.space_restart import (
+        compute_next_fire,
+        get_last_restart_at,
+        get_schedule,
+    )
+
+    sched = get_scheduler()
+    sm = get_sessionmaker()
+    async with sm() as session:
+        schedule = await get_schedule(session)
+        last = await get_last_restart_at(session)
+    now = datetime.now(timezone.utc)
+    nxt = compute_next_fire(schedule, last, now)
+    if nxt is None:
+        _remove_job_if_exists(sched, JOB_SPACE_RESTART)
+        log.info("scheduler.space_restart_disarmed")
+        return
+    # Просроченный once (контейнер лежал) → стреляем немедленно: anti-loop пол
+    # внутри compute_next_fire уже не даст частить. APScheduler примет run_date
+    # в прошлом в пределах misfire_grace, но max(nxt, now) надёжнее.
+    run_date = nxt if nxt > now else now
+    sched.add_job(
+        _logged_job(JOB_SPACE_RESTART, _space_restart_job),
+        DateTrigger(run_date=run_date),
+        id=JOB_SPACE_RESTART,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600,  # рестарт не требует секундной точности
+    )
+    log.info(
+        "scheduler.space_restart_armed",
+        next_fire=run_date.isoformat(),
+        mode=schedule["mode"],
+    )
+
+
+def start_scheduler(bot: Bot) -> AsyncIOScheduler:
+    settings = get_settings()
+    sched = get_scheduler()
+    if sched.running:
+        return sched
+
+    # GHG6 AD6: chukhan/avatars/birthdays теперь регистрирует
+    # `reload_dynamic_jobs` — респектят master-toggles из admin_config.
+    # GHG8 G: proxy_health-tick теперь регистрируется условно — только в режиме
+    # ALWAYS_ON (см. reschedule_proxy_health). Перевзвод после start (нужен
+    # running sched + чтение режима из БД), рядом с reload_dynamic_jobs.
 
     # GHG6 E11: фоновая проверка истечения паузы. Раз в 5 минут — пауза
     # не требует точности до секунды. Этот job не отключается reload_dynamic_jobs
@@ -726,7 +808,10 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
 
     sched.add_job(
         _logged_job(JOB_BOT_PAUSE_AUTO_RESTORE, _auto_restore_tick),
-        IntervalTrigger(minutes=5, jitter=30),
+        # HOTFIX 2026-06-12: 5мин→12ч. Neon free-tier суспендится после 5мин
+        # простоя; тик каждые 5мин = БД никогда не спит = выжигание compute.
+        # Цена: выход из автопаузы теперь проверяется 2×/сутки (терпимо).
+        IntervalTrigger(hours=12, jitter=300),
         id=JOB_BOT_PAUSE_AUTO_RESTORE,
         replace_existing=True,
         max_instances=1,
@@ -744,7 +829,9 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     # интервал с шагом ретрая: один осмысленный тик на окно.
     sched.add_job(
         _logged_job(JOB_LOSER_OUTBOX_RETRY, _loser_outbox_retry_job),
-        IntervalTrigger(minutes=5, jitter=30),
+        # HOTFIX 2026-06-12: 5мин→12ч (тот же мотив, что у auto_restore выше —
+        # не будить Neon). Цена: ретрай недоставленных лох-постов раз в 12ч.
+        IntervalTrigger(hours=12, jitter=300),
         kwargs={"bot": bot},
         id=JOB_LOSER_OUTBOX_RETRY,
         replace_existing=True,
@@ -770,13 +857,16 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
 
     sched.add_job(
         _logged_job(JOB_CHUKHAN_RETRY, _chukhan_retry_tick),
-        IntervalTrigger(minutes=30, jitter=60),
+        # GHG8 G (03.07): 30мин→2ч. Ретрай нужен лишь в окно после недельного
+        # ролла чухана (пн), 99% времени SELECT холостой (48→12/сутки в Neon).
+        # Недоставленного чухана добьём в пределах 2ч — некритично.
+        IntervalTrigger(hours=2, jitter=300),
         kwargs={"bot": bot},
         id=JOB_CHUKHAN_RETRY,
         replace_existing=True,
         max_instances=1,
         coalesce=True,
-        misfire_grace_time=1800,  # 30 мин — скип чухана не критичен к секундам
+        misfire_grace_time=7200,  # 2ч — скип чухана не критичен к секундам
     )
 
     # GHG8 P7: «мёртвый чат» — часовой тик проверки тишины. Master-toggle
@@ -791,33 +881,23 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
 
     sched.add_job(
         _logged_job(JOB_DEAD_CHAT, _dead_chat_tick),
-        IntervalTrigger(hours=1, jitter=120),
+        # GHG8 G (03.07): 1ч→6ч. Порог тишины ≥24ч, поэтому часовой опрос
+        # избыточен (24→4 тика/сутки в Neon); тишину суток ловим с запасом.
+        IntervalTrigger(hours=6, jitter=600),
         kwargs={"bot": bot},
         id=JOB_DEAD_CHAT,
         replace_existing=True,
         max_instances=1,
         coalesce=True,
-        misfire_grace_time=3600,  # час — тишина суток не требует точности
+        misfire_grace_time=3600,  # тишина суток не требует точности
     )
 
-    # GHG8 P14: тик расписания рестартов Space. Раз в 5 мин (паттерн
-    # bot_pause_auto_restore): расписание (`space_restart.schedule`) и анти-луп
-    # проверяются ВНУТРИ job'а, в reload_dynamic_jobs не участвует. Дёшево для
-    # Neon: при mode=off — один point-SELECT на тик.
-    async def _space_restart_tick() -> None:
-        from app.services.space_restart import run_space_restart_tick
-
-        await run_space_restart_tick()
-
-    sched.add_job(
-        _logged_job(JOB_SPACE_RESTART, _space_restart_tick),
-        IntervalTrigger(minutes=5, jitter=30),
-        id=JOB_SPACE_RESTART,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=600,  # рестарт не требует секундной точности
-    )
+    # GHG8 G (антиспам, заменил P14-поллинг): рестарт Space теперь событийный —
+    # ОДИН DateTrigger на точное время следующего рестарта (`compute_next_fire`),
+    # а не 5-мин поллинг (288 холостых SELECT/сутки → 0 в простое). Режим обычно
+    # off/раз-в-неделю, поэтому job чаще всего не зарегистрирован вовсе.
+    # Перевзвод — после start (sched должен быть running), рядом с
+    # reload_dynamic_jobs.
 
     sched.start()
     log.info("scheduler.started", chukhan_cron=settings.chukhan_cron, tz=settings.scheduler_tz)
@@ -827,6 +907,11 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     import asyncio as _asyncio
 
     _asyncio.create_task(reload_dynamic_jobs(bot))
+    # GHG8 G: событийный перевзвод one-shot рестарта Space (см.
+    # reschedule_space_restart). Отдельная таска — не блокирует старт.
+    _asyncio.create_task(reschedule_space_restart())
+    # GHG8 G: условная регистрация proxy_health (только ALWAYS_ON).
+    _asyncio.create_task(reschedule_proxy_health(bot))
 
     return sched
 

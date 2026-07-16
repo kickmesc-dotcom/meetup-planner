@@ -1,0 +1,22 @@
+# Конфиг сборки/запуска для Amvera Cloud (cloud.amvera.ru).
+# Сборка идёт по существующему Dockerfile (в корне backend-репо), код не трогаем.
+# Dockerfile слушает $PORT (дефолт 7860) и сам гонит `alembic upgrade head`
+# перед uvicorn — поэтому здесь только пробрасываем порт контейнера.
+#
+# ВАЖНО (переезд с HF под РКН): на российском Amvera прямой доступ к
+# api.telegram.org есть, поэтому env BOT_API_SERVER на Amvera НЕ задаём —
+# бот ходит на Telegram напрямую (dispatcher._resolve_api_server: пусто = direct).
+meta:
+  environment: docker
+  toolchain:
+    name: docker
+
+build:
+  dockerfile: Dockerfile
+
+run:
+  # Порт, который слушает приложение внутри контейнера (uvicorn --port $PORT).
+  # Должен совпадать с ENV PORT в Dockerfile (7860).
+  containerPort: 7860
+  # Постоянное хранилище нам не нужно (вся персистентность — в Neon Postgres),
+  # но путь по умолчанию /data безвреден; оставляем дефолт.
