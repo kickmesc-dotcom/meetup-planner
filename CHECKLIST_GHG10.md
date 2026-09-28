@@ -361,11 +361,25 @@ Push бэка: ПАРАЛЛЕЛЬНО `git push origin main` (HF) + `git push am
   контейнера; app жив → 200 на `/healthz`). Новые ручки проверены живьём:
   `/api/me/game` и `/api/game/ranks` → 401 (есть, требуют auth), а несуществующий
   путь → 404. Рубильник ВКЛЮЧЁН (дефолт `True`) — система видна в приложении.
-- ФРОНТЕНД НЕ ЗАДЕПЛОЕН: пуш монорепы в GitHub Pages (origin =
-  kickmesc-dotcom/meetup-planner) блокирован — `credential.helper=manager`
-  виснет без интерактивного входа. Нужно один раз запустить в терминале
-  `git push origin main` из `meetup-planner-main` и войти в GitHub (или задать
-  PAT). После пуша GitHub Pages пересоберёт мини-апп и игровые блоки появятся
-  в профиле.
-- ЗАБЛОКИРОВАНО на пользователе: п.0.4 (снапшот Neon — миграции уже применены)
-  и push в GitHub (PAT — `credential.helper=manager` виснет; см. §Этап 0).
+- 2026-09-28 (фронтенд задеплоен): `git push origin main` из
+  `meetup-planner-main` прошёл — `affed3b..3443326 main -> main`, локальная
+  ветка в синхроне с `origin/main`. ⚠️ Уточнение топологии: фронт живёт НЕ на
+  GitHub Pages (у репо `kickmesc-dotcom/meetup-planner` GitHub Pages не создан,
+  API отдаёт 404; `.github/workflows` в репо нет), а на **Cloudflare Pages**,
+  проект `meetup-planner1` — <https://meetup-planner1.pages.dev>. CF подключён
+  к этому же репо и собирает сам на push в `main` (как в `docs/deployment.md`).
+  Старый §DEPLOY_NOTES про «GitHub Pages» — устаревшая формулировка.
+- 2026-09-28 (проверка живости фронта): собранный бандл содержит код этапов
+  2–8 — в `GET /assets/index-*.js` есть `rank_required` и строка
+  «🔒 Откроется с N ранга» (гейтинг Э8), блок достижений и рангов. Base-URL API
+  в собранном бандле = `https://meetup-planner-youmakemefry.waw0.amvera.tech`
+  (Cloudflare подставляет его на сборке; локальная сборка оставляет `""` —
+  поэтому хеши бандла у CF и локально не совпадают, это НЕ расхождение кода).
+  Живой `/openapi.json` бэкенда содержит `/api/me/game`, `/api/me/game/profile`,
+  `/api/me/game/level-up/ack`, `/api/game/ranks`, `/api/game/achievements`;
+  без auth они отдают 401, `/healthz` → 200 на обоих хостах (HF Space + Amvera).
+  Итог: игровые блоки видны в мини-аппе, деплой этапов 2–8 завершён.
+- ЗАБЛОКИРОВАНО на пользователе: п.0.4 (снапшот Neon — миграции уже применены).
+  Пуш в GitHub больше не блокирует (сделан 2026-09-28, см. выше); остаётся
+  «долг» по авторизации — `credential.helper=manager` не даёт пушить без
+  интерактивного окна, поэтому push лучше запускать из своего терминала.

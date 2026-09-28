@@ -1,3 +1,21 @@
+# ⚠️ Уточнение топологии фронта (2026-09-28): фронт — Cloudflare Pages, НЕ GitHub Pages
+
+В инструкциях ниже встречается «GitHub Pages соберёт» — это **устаревшая
+формулировка**. Реальный фронтенд живёт на **Cloudflare Pages**, проект
+`meetup-planner1`, домен <https://meetup-planner1.pages.dev>; CF подключён к
+репо `kickmesc-dotcom/meetup-planner` и пересобирает сам на push в `main`
+(как и описано в `docs/deployment.md`). В самом репо GitHub Pages не создан
+(`GET /repos/.../pages` → 404) и `.github/workflows` отсутствует.
+
+Практическое следствие: пуш в `origin/main` из `meetup-planner-main` деплоит и
+бэкенд-независимую часть — фронт пересоберётся CF в течение ~1–2 мин. Проверка,
+что доехало: в живом бандле должен быть код последней итерации (например, для
+GHG10 — строки `rank_required` и «🔒 Откроется с N ранга»), а base-URL API в
+бандле = `https://meetup-planner-youmakemefry.waw0.amvera.tech` (CF подставляет
+его на сборке, поэтому локальная сборка даёт другой хеш файла — это нормально).
+
+---
+
 # ⚠️ GHG8 P14 (2026-06-08): новый env-секрет `HF_TOKEN`
 
 Рестарт HF Space из админки («🔄 Рестарт Space» в секции Прокси) работает
