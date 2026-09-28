@@ -355,5 +355,17 @@ Push бэка: ПАРАЛЛЕЛЬНО `git push origin main` (HF) + `git push am
   набора опыта. Выключить: ключ `game.enabled=false` в `admin_config` или
   вернуть дефолт в коде. `alembic upgrade head` в контейнере применяет
   миграции 0018–0020 на старте.
+- 2026-09-28 (итог выкладки): БЭКЕНД ЗАДЕПЛОЕН — `meetup-planner-backend`
+  запушен в HF Space (`33ddc93..37ed94a`) и Amvera (`main -> master`).
+  Миграции 0018–0020 применились на Neon (`alembic upgrade head` на старте
+  контейнера; app жив → 200 на `/healthz`). Новые ручки проверены живьём:
+  `/api/me/game` и `/api/game/ranks` → 401 (есть, требуют auth), а несуществующий
+  путь → 404. Рубильник ВКЛЮЧЁН (дефолт `True`) — система видна в приложении.
+- ФРОНТЕНД НЕ ЗАДЕПЛОЕН: пуш монорепы в GitHub Pages (origin =
+  kickmesc-dotcom/meetup-planner) блокирован — `credential.helper=manager`
+  виснет без интерактивного входа. Нужно один раз запустить в терминале
+  `git push origin main` из `meetup-planner-main` и войти в GitHub (или задать
+  PAT). После пуша GitHub Pages пересоберёт мини-апп и игровые блоки появятся
+  в профиле.
 - ЗАБЛОКИРОВАНО на пользователе: п.0.4 (снапшот Neon — миграции уже применены)
   и push в GitHub (PAT — `credential.helper=manager` виснет; см. §Этап 0).
