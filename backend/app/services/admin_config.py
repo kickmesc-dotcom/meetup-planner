@@ -1482,3 +1482,51 @@ async def set_meeting_feedback_absence_weight(
     await _set_value(
         session, MEETING_FEEDBACK_ABSENCE_WEIGHT_KEY, str(max(0.0, value))
     )
+
+
+# --- GHG10: игровая подсистема (опыт/уровни/ранги/ачивки) ---
+# Рубильник и отладочное исключение живут здесь (конфиг — наше всё),
+# а семантика игровой системы — в `app/services/game/`.
+GAME_ENABLED_KEY = "game.enabled"
+# TG-id через запятую — кому гейтинг по рангам не указ («Серж нео»).
+GAME_DEBUG_TG_IDS_KEY = "game.debug_tg_ids"
+
+# Default False — поэтапная выкатка: код можно деплоить выключенным
+# (как `worm_master.enabled`), включение — кнопкой в админке.
+_GAME_ENABLED_DEFAULT = False
+
+
+def _parse_tg_id_list(raw: str | None) -> list[int]:
+    """"1, 2,3" → [1, 2, 3]. Мусор молча игнорируем."""
+    if not raw:
+        return []
+    out: list[int] = []
+    for chunk in raw.replace(";", ",").split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            out.append(int(chunk))
+        except (ValueError, TypeError):
+            log.warning("admin_config.bad_tg_id_in_list", value=chunk)
+    return out
+
+
+async def get_game_enabled(session: AsyncSession) -> bool:
+    """Главный рубильник GHG10. Выключен по умолчанию."""
+    return await _get_bool(session, GAME_ENABLED_KEY, _GAME_ENABLED_DEFAULT)
+
+
+async def set_game_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_ENABLED_KEY, "true" if value else "false")
+
+
+async def get_game_debug_tg_ids(session: AsyncSession) -> list[int]:
+    """Кому ранг-гейтинг не указ (отладка всех функций)."""
+    return _parse_tg_id_list(await _get_value(session, GAME_DEBUG_TG_IDS_KEY))
+
+
+async def set_game_debug_tg_ids(session: AsyncSession, ids: list[int]) -> None:
+    await _set_value(
+        session, GAME_DEBUG_TG_IDS_KEY, ",".join(str(i) for i in ids)
+    )

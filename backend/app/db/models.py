@@ -518,6 +518,169 @@ class ParticipantPersona(Base):
         nullable=False,
     )
 
+
+# ---------------------------------------------------------------------------
+# GHG10 — геймификация (опыт, уровни, ранги, ачивки).
+#
+# Каталог ачивок живёт В КОДЕ (`services/game/achievements_catalog.py`), а не в
+# таблице: у каждой ачивки есть трекер в коде, и держать рядом ещё и строку в
+# БД — это два источника правды. `user_achievements.code` — обычная строка без
+# FK, поэтому переделка каталога не требует миграции (требование задания
+# «перелопатить систему в один промт»).
+# ---------------------------------------------------------------------------
+
+
+class GameProfile(Base):
+    """GHG10: игровой профиль участника.
+
+    Единственный источник правды по опыту — `xp`. Уровень, ранг и престиж
+    ВЫВОДЯТСЯ из него (`services/game/levels.py`), а не хранятся: иначе они
+    разъезжаются при любой правке баланса в `config.py`.
+    """
+
+    __tablename__ = "game_profiles"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Суммарный опыт за всё время. Никогда не обнуляется (в отличие от дневной
+    # истории, которая просто фильтруется по дате).
+    xp: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Ранг 8/10: своё имя и своё название ранга в приложении (гейтинг по уровню).
+    custom_name: Mapped[str | None] = mapped_column(Text)
+    custom_rank_title: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class XpDaily(Base):
+    """GHG10: дневная история начислений (агрегат).
+
+    Задание: «по ходу дня у пользователя накапливается история действий и
+    пополнения опыта... в 00-00 история обнуляется (но не опыт!)».
+    Обнуление — это просто фильтр по `day`, а не удаление: история нужна для
+    «зашёл в 23:30 и посмотрел, за что плюсануло».
+
+    Агрегат (а не строка на каждое сообщение): 1 сообщение = 1 опыт, и держать
+    по строке на сообщение — это тысячи строк в месяц на шестерых.
+    """
+
+    __tablename__ = "xp_daily"
+    __table_args__ = (
+        Index("ix_xp_daily_user_day", "user_id", "day"),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    # UTC-сутки (как везде в проекте — aware UTC).
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    # Код события из `config.XP_RULES`.
+    event: Mapped[str] = mapped_column(String(32), primary_key=True)
+    points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class XpGrant(Base):
+    """GHG10: маркеры идемпотентности для лимитированных начислений.
+
+    `config.XpRule.limit` = "day"/"week"/"year"/"once" → пишем маркер с
+    оконным ключом, и повторное событие в том же окне опыта не даёт. Строк
+    мало (недельный календарь = 6/неделю, ДР = 6/год), поэтому таблица не
+    растёт заметно.
+    """
+
+    __tablename__ = "xp_grants"
+    __table_args__ = (
+        Index("ix_xp_grant_key", "user_id", "idem_key", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # Например "availability:2026-W39" или "birthday:2026".
+    idem_key: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class UserAchievement(Base):
+    """GHG10: собранные ачивки. Каждую можно взять только один раз на юзера.
+
+    `code` — код из каталога в коде; для юбилейных тиров код включает тир
+    ("first_loser:10"), поэтому одна и та же база даёт несколько записей.
+    """
+
+    __tablename__ = "user_achievements"
+    __table_args__ = (
+        Index("uq_user_achievement", "user_id", "code", unique=True),
+        Index("ix_user_achievement_unlocked", "unlocked_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    unlocked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ChatActivityDaily(Base):
+    """GHG10: счётчик сообщений по дням — для недельных званий.
+
+    Почему не из `chat_messages`: та таблица чистится через 7 дней и хранит
+    только текст, а для «рупор поколения» / «Read only» и для «сообщение = 1
+    опыт» нужен durable счётчик (включая медиа и стикеры).
+    """
+
+    __tablename__ = "chat_activity_daily"
+    __table_args__ = (
+        Index("ix_chat_activity_day", "day"),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class GameHoliday(Base):
+    """GHG10: пул праздников (дата + сообщение). По умолчанию — Новый год.
+
+    `month`/`day` без года — праздник ежегодный, как ДР в `birthdays`
+    (сравнение месяц+день).
+    """
+
+    __tablename__ = "game_holidays"
+    __table_args__ = (
+        UniqueConstraint("month", "day", name="uq_game_holiday_md"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    month: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    day: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event
