@@ -26,6 +26,7 @@ from app.services.admin_config import (
     get_chukhan_weights,
 )
 from app.services.avatars import sync_user_avatar
+from app.services.immunity import ImmuneSkip
 from app.services.phrase_meta import effective_pool
 from app.services.phrase_weights import (
     CHUKHAN_USE_COUNTS_KEY,
@@ -91,12 +92,13 @@ async def pick_chukhan_for_week(
     session: AsyncSession,
     *,
     week_start: datetime | None = None,
-) -> tuple[WeeklyChukhan, User, bool, list[str]]:
+) -> tuple[WeeklyChukhan, User, bool, list[ImmuneSkip]]:
     """Возвращает (роу, пользователь, created, immunity_skipped):
     created=False если на эту неделю чухан уже был назначен.
 
-    GHG8 P3: четвёртый элемент — display_name именинников, выпавших до
-    финального чухана (announce-режим иммунитета; пуст в silent/без ДР).
+    GHG8 P3 + GHG10 Э9: четвёртый элемент — «черновые» кандидаты (именинники
+    и пожизненно иммунные за 10 ранг) с готовым текстом оглашения, выпавшие до
+    финального чухана (announce-режим иммунитета; пуст в silent/без причин).
     «Черновые» попытки в БД не пишутся — row создаётся только финальному.
 
     Внимание: при created=True вызывающий код обязан либо commit'нуть session
@@ -117,11 +119,16 @@ async def pick_chukhan_for_week(
         raise RuntimeError("no users to pick from")
 
     weights = await get_chukhan_weights(session)
-    # GHG8 P3: иммунитет именинника — стратегия выбора остаётся взвешенной.
+    # GHG8 P3 + GHG10 Э9: иммунитет именинника и пожизненный за 10 ранг —
+    # стратегия выбора остаётся взвешенной.
     from app.services.birthday_immunity import immune_pick
+    from app.services.game.immunity import rank_immune_reasons
 
     pick = await immune_pick(
-        session, users, lambda pool: _pick_weighted(pool, weights)
+        session,
+        users,
+        lambda pool: _pick_weighted(pool, weights),
+        reasons=await rank_immune_reasons(session, kind="chukhan"),
     )
     chosen = pick.user
     snapshot = {
@@ -134,7 +141,7 @@ async def pick_chukhan_for_week(
     )
     session.add(row)
     await session.flush()
-    return row, chosen, True, pick.skipped_names
+    return row, chosen, True, pick.skipped
 
 
 CHUKHAN_TAGLINES = [

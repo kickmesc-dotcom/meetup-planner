@@ -14,6 +14,7 @@ from app.services.admin_config import (
     get_worm_chance,
     is_worm_enabled,
 )
+from app.services.immunity import ImmuneSkip
 from app.services.phrase_meta import effective_pool
 from app.services.phrase_weights import (
     LOSER_USE_COUNTS_KEY,
@@ -21,7 +22,6 @@ from app.services.phrase_weights import (
     increment_use_count,
     weighted_choice,
 )
-
 
 WORM_REASON_TEXT = "Особая номинация: Червь-пидор"
 
@@ -56,12 +56,14 @@ class RollExtras:
     """Контейнер «лишних» сведений о ролле для `on_announce`. Расширяемый —
     в будущем сюда могут попасть, например, «лох недели/месяца»-хайлайты.
 
-    GHG8 P3: `immunity_skipped` — display_name именинников, выпадавших до
-    финального лоха (announce-режим иммунитета). Вызывающий код оглашает их
-    («мог бы стать…, но ДР») с задержкой ПЕРЕД основным постом. В БД эти
-    «черновые» попытки не пишутся — row создаётся только для финального."""
+    GHG8 P3 + GHG10 Э9: `immunity_skipped` — «черновые» кандидаты
+    (именинники и пожизненно иммунные за 9 ранг), выпадавшие до финального
+    лоха (announce-режим иммунитета) — вместе с готовым текстом оглашения.
+    Вызывающий код отправляет их («мог бы стать…, но …») с задержкой ПЕРЕД
+    основным постом. В БД эти «черновые» попытки не пишутся — row создаётся
+    только для финального."""
     worm: WormEvent = field(default_factory=WormEvent)
-    immunity_skipped: list[str] = field(default_factory=list)
+    immunity_skipped: list[ImmuneSkip] = field(default_factory=list)
     # T3.6 (а): заполняется, только если лох == текущий червь-господин и режим
     # worm_master включён. None → обычный анонс без подхалимажа.
     worm_master: MasterSycophancy | None = None
@@ -241,12 +243,18 @@ async def roll_loser(
     if not users:
         raise RuntimeError("no users in DB")
 
-    # GHG8 P3: иммунитет именинника. silent — исключаем из пула; announce —
-    # имена «черновых» именинников уезжают в extras.immunity_skipped, в БД
-    # попадает только финальный (не-именинник).
+    # GHG8 P3 + GHG10 Э9: иммунитет — именинник и пожизненный за 9 ранг.
+    # silent — исключаем из пула; announce — «черновые» кандидаты уезжают в
+    # extras.immunity_skipped, в БД попадает только финальный.
     from app.services.birthday_immunity import immune_pick
+    from app.services.game.immunity import rank_immune_reasons
 
-    pick = await immune_pick(session, users, random.choice)
+    pick = await immune_pick(
+        session,
+        users,
+        random.choice,
+        reasons=await rank_immune_reasons(session, kind="loser"),
+    )
     loser = pick.user
 
     # E8: бросаем «червь-пидор»
@@ -332,7 +340,7 @@ async def roll_loser(
                             loser,
                             RollExtras(
                                 worm=worm_event,
-                                immunity_skipped=pick.skipped_names,
+                                immunity_skipped=pick.skipped,
                             ),
                         )
                     except Exception:
@@ -362,7 +370,7 @@ async def roll_loser(
 
     extras = RollExtras(
         worm=worm_event,
-        immunity_skipped=pick.skipped_names,
+        immunity_skipped=pick.skipped,
         worm_master=sycophancy,
     )
 
