@@ -670,6 +670,49 @@ async def set_chukhan_reasons(session: AsyncSession, reasons: list[str]) -> None
     await cleanup_use_counts(session, CHUKHAN_USE_COUNTS_KEY, cleaned)
 
 
+# --- H.3: таймер оспаривания чухана (прод-фидбек 22.06 #1) ---
+# Сразу после анонса чухана бот публикует опрос-обжалование. Раньше `open_period`
+# был захардкожен (3600с = 1ч) — «никто не успел толком проголосовать». Теперь
+# длительность настраивается из чухан-подменю, дефолт поднят до 6 часов.
+
+CHUKHAN_APPEAL_POLL_MINUTES_KEY = "chukhan.appeal_poll_minutes"
+_CHUKHAN_APPEAL_POLL_MINUTES_DEFAULT = 360
+CHUKHAN_APPEAL_POLL_MINUTES_BOUNDS: tuple[int, int] = (15, 1440)
+
+
+def clamp_appeal_poll_minutes(minutes: int) -> int:
+    """Ограничить длительность опроса-обжалования (15 мин … 24 ч).
+
+    Нечисловое/мусорное значение → дефолт (тот же приём, что у
+    `media_reactions.clamp_wait_window`)."""
+    lo, hi = CHUKHAN_APPEAL_POLL_MINUTES_BOUNDS
+    try:
+        v = int(minutes)
+    except (TypeError, ValueError):
+        return _CHUKHAN_APPEAL_POLL_MINUTES_DEFAULT
+    return max(lo, min(hi, v))
+
+
+async def get_chukhan_appeal_poll_minutes(session: AsyncSession) -> int:
+    return clamp_appeal_poll_minutes(
+        await _get_int(
+            session,
+            CHUKHAN_APPEAL_POLL_MINUTES_KEY,
+            _CHUKHAN_APPEAL_POLL_MINUTES_DEFAULT,
+        )
+    )
+
+
+async def set_chukhan_appeal_poll_minutes(
+    session: AsyncSession, minutes: int
+) -> None:
+    await _set_value(
+        session,
+        CHUKHAN_APPEAL_POLL_MINUTES_KEY,
+        str(clamp_appeal_poll_minutes(minutes)),
+    )
+
+
 # --- T3.4: advice («магический шар») ---
 
 async def get_advice_enabled(session: AsyncSession) -> bool:
@@ -1124,6 +1167,9 @@ async def set_worm_announce_lines(session: AsyncSession, phrases: list[str]) -> 
 BOT_REACT_MENTION_KEY = "bot_reactions.mention_enabled"                  # default true
 BOT_REACT_REPLY_ALL_KEY = "bot_reactions.reply_all_enabled"              # default false
 BOT_REACT_REPLY_EXCEPT_PHRASES_KEY = "bot_reactions.reply_except_phrases_enabled"  # default true
+# H.1 (фидбек 19.06 #3): ОТДЕЛЬНЫЙ пул коротких реплик для ответа на reply/mention.
+# JSON-список, как loser_reasons/advice (дефолт в code не пишется в БД до правки).
+BOT_REACT_REPLY_PHRASES_KEY = "bot_reactions.reply_phrases"
 
 
 async def get_bot_reactions_settings(session: AsyncSession) -> dict:
@@ -1162,6 +1208,20 @@ async def set_bot_reactions_settings(
             BOT_REACT_REPLY_EXCEPT_PHRASES_KEY,
             "true" if reply_except_phrases_enabled else "false",
         )
+
+
+# H.1: пул коротких реплик бота (reply/mention). use_counts ведём — чередуем, чтобы
+# одна и та же фраза подряд не повторялась.
+async def get_reply_phrases(session: AsyncSession) -> list[str]:
+    from app.services.random_phrases import DEFAULT_REPLY_PHRASES
+
+    return await _get_pool(session, BOT_REACT_REPLY_PHRASES_KEY, list(DEFAULT_REPLY_PHRASES))
+
+
+async def set_reply_phrases(session: AsyncSession, phrases: list[str]) -> None:
+    from app.services.phrase_weights import REPLY_USE_COUNTS_KEY
+
+    await _set_pool(session, BOT_REACT_REPLY_PHRASES_KEY, phrases, REPLY_USE_COUNTS_KEY)
 
 
 # --- GHG7 P5: реакции бота на медиа (мемы/подборки) ---

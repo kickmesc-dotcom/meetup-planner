@@ -190,7 +190,7 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={[
-        "flex-1 min-h-9 min-w-[80px] rounded-md text-sm font-medium transition-colors px-2 whitespace-nowrap",
+        "flex-1 min-h-11 min-w-[80px] rounded-md text-sm font-medium transition-colors px-2 whitespace-nowrap",
         active
           ? "bg-tg-button text-tg-button-text"
           : "bg-transparent text-tg-hint",

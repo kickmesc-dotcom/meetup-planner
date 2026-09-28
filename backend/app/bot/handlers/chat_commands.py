@@ -72,12 +72,15 @@ async def reply_advice(message: Message) -> bool:
     """
     from app.services.admin_config import get_advice_enabled, get_advice_phrases
     from app.services.advice import pick_advice
+    from app.services.phrase_meta import effective_pool
 
     sm = get_sessionmaker()
     async with sm() as session:
         if not await get_advice_enabled(session):
             return False
         phrases = await get_advice_phrases(session)
+        # J.1: мягкое скрытие — hidden-советы не выпадают.
+        phrases = await effective_pool(session, "advice", phrases)
     text = pick_advice(phrases)
     if not text:
         return False
@@ -137,6 +140,7 @@ async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) 
         is_worm_master_punish_enabled,
     )
     from app.services.loser import get_current_worm
+    from app.services.phrase_meta import effective_pool
     from app.services.phrase_weights import (
         WORM_PUNISH_USE_COUNTS_KEY,
         get_use_counts,
@@ -179,7 +183,10 @@ async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) 
             )
             return True
 
-        pool = await get_worm_punish(session)
+        # J.1: мягкое скрытие — hidden-фразы кары не выпадают.
+        pool = await effective_pool(
+            session, "worm_punish", await get_worm_punish(session)
+        )
         counts = await get_use_counts(session, WORM_PUNISH_USE_COUNTS_KEY)
         raw = choose(pool, counts)
         if raw is None:

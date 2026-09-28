@@ -167,14 +167,29 @@ export function summarizeDay(
   };
 }
 
+/** DESIGN_SYSTEM §1.2: fill color for large tinted areas (cells, drag preview).
+ * No text sits on these — use `statusPillBg` when a label goes on top. */
 export function statusColor(status: 1 | 2 | 3): string {
   switch (status) {
     case 1:
-      return "#22c55e";
+      return "var(--status-free-fill)";
     case 2:
-      return "#f59e0b";
+      return "var(--status-maybe-fill)";
     case 3:
-      return "#ef4444";
+      return "var(--status-busy-fill)";
+  }
+}
+
+/** DESIGN_SYSTEM §1.2/§6: darkened status background for pills/labels that carry
+ * white text at 11px — the 500-shades failed WCAG AA (~2.0:1). */
+export function statusPillBg(status: 1 | 2 | 3): string {
+  switch (status) {
+    case 1:
+      return "var(--status-free-pill)";
+    case 2:
+      return "var(--status-maybe-pill)";
+    case 3:
+      return "var(--status-busy-pill)";
   }
 }
 

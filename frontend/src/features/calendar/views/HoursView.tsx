@@ -3,7 +3,7 @@ import { addHours, addMinutes, startOfDay } from "date-fns";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import type { AvailabilityRange, User } from "@/types";
-import { rangeToHourRect, statusColor, statusLabel } from "../dateUtils";
+import { rangeToHourRect, statusPillBg, statusLabel } from "../dateUtils";
 import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
 import { haptic } from "@/tg/webapp";
@@ -227,12 +227,12 @@ function UserSlot({
                 e.stopPropagation();
                 onTapRange(r);
               }}
-              className="absolute inset-x-1 rounded-md text-white text-[10px] font-medium flex items-start justify-start px-1.5 py-1 shadow-sm overflow-hidden"
+              className="absolute inset-x-1 rounded-md text-white text-[11px] font-medium flex items-start justify-start px-1.5 py-1 shadow-sm overflow-hidden"
               style={{
                 top: offsetY,
                 height: totalHeight - 2,
-                background: statusColor(r.status),
-                opacity: r.confidence >= 4 ? 0.7 : 0.95,
+                // DESIGN_SYSTEM §1.2/§6: darkened pill bg + white text = WCAG AA.
+                background: statusPillBg(r.status),
                 pointerEvents: isMe ? "auto" : "none",
                 zIndex: 5,
               }}

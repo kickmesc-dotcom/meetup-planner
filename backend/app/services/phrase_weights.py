@@ -35,6 +35,9 @@ WORM_MASTER_PREFIX_USE_COUNTS_KEY = "worm_master.prefixes.use_counts"
 WORM_MASTER_SUFFIX_USE_COUNTS_KEY = "worm_master.suffixes.use_counts"
 WORM_MASTER_AGREE_USE_COUNTS_KEY = "worm_master.agrees.use_counts"
 WORM_PUNISH_USE_COUNTS_KEY = "worm_master.punish.use_counts"
+# H.1 (фидбек 19.06 #3): отдельный пул коротких ответов бота на reply/упоминание.
+# Раньше отвечал шизо-цитатой из общего пула → «в 99% ахинея».
+REPLY_USE_COUNTS_KEY = "bot_reactions.reply.use_counts"
 
 
 def phrase_hash(phrase: str) -> str:

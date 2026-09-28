@@ -160,7 +160,7 @@ export default function IntervalsScreen({ onBack }: Props) {
                   });
                 }}
                 className={[
-                  "min-h-9 min-w-9 rounded-md px-2 text-xs",
+                  "min-h-11 min-w-11 rounded-md px-2 text-xs",
                   draft.chukhan.weekday === idx
                     ? "bg-tg-button text-tg-button-text"
                     : "bg-tg-bg/70 text-tg-text",

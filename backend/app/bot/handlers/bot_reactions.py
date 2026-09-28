@@ -10,9 +10,9 @@
   «шире», цитаты тоже попадают). При выключенном `reply_all` и включённом
   `reply_except_phrases` — отвечаем только на не-цитаты.
 
-Ответ — короткая «шизо-цитата» через `compose_random_phrase(session, n=1)`.
-Используется тот же пул, что и для автопоста, но без жирной шапки —
-просто текст без обёртки.
+Ответ — короткая реплика из ОТДЕЛЬНОГО пула `reply_phrases` (H.1, фидбек
+19.06 #3; см. `services/random_phrases.py::compose_reply_phrase`). Раньше брали
+цитату из общего пула — получалась «ахинея». Пул курируется в админке.
 
 Whitelist: реагируем только на сообщения от участников whitelist (как
 chat_capture). Чужие сообщения игнорируем молча.
@@ -99,30 +99,19 @@ def _whitelist_set() -> set[int]:
 
 
 async def _react(message: Message) -> None:
-    """Сгенерировать и отправить ответ. Reply на исходное сообщение —
-    чтобы в групповом чате было понятно, на что бот реагирует.
+    """Отправить ответ бота. Reply на исходное сообщение — чтобы в групповом
+    чате было понятно, на что бот реагирует.
 
-    GHG6 hotfix: используем `compose_bot_reply_phrase` (без шапки автора)
-    вместо `compose_random_phrase` (с 🗣/👤). Reply бота — это голос самого
-    бота, а не цитата от другого участника.
+    H.1 (фидбек 19.06 #3): ответ берётся из ОТДЕЛЬНОГО пула коротких реплик
+    (`reply_phrases`) — раньше бот цитировал общий пул и «в 99% выходила
+    ахинея». Пул курируется в админке («🤖 Реакции бота»), учитывает скрытые
+    фразы и use_counts. Пусто → бот молчит.
     """
-    from app.services.admin_config import (
-        get_random_phrases_recency_quarantine_hours,
-        get_random_phrases_recency_quarantine_weight,
-    )
-    from app.services.random_phrases import compose_bot_reply_phrase
+    from app.services.random_phrases import compose_reply_phrase
 
     sm = get_sessionmaker()
     async with sm() as session:
-        # P13: reply — главный источник «передразнивания» свежих сообщений,
-        # поэтому карантин свежести применяется и здесь.
-        recency_hours = await get_random_phrases_recency_quarantine_hours(session)
-        recency_weight = await get_random_phrases_recency_quarantine_weight(session)
-        text = await compose_bot_reply_phrase(
-            session,
-            recency_quarantine_hours=recency_hours,
-            recency_quarantine_weight=recency_weight,
-        )
+        text = await compose_reply_phrase(session)
     if not text:
         return
     try:
@@ -228,12 +217,20 @@ async def _maybe_agree(message: Message) -> None:
         is_worm_master_yes_enabled,
     )
     from app.services.loser import get_current_worm
+    from app.services.phrase_meta import effective_pool
     from app.services.phrase_weights import (
         WORM_MASTER_AGREE_USE_COUNTS_KEY,
         get_use_counts,
         increment_use_count,
     )
-    from app.services.worm_master import choose, decide_agree, decide_nag, pick_nag, render
+    from app.services.worm_master import (
+        choose,
+        decide_agree,
+        decide_nag,
+        format_nag_message,
+        pick_nag,
+        render,
+    )
 
     from app.db.models import User
 
@@ -264,7 +261,10 @@ async def _maybe_agree(message: Message) -> None:
             return
 
         # Выбор фразы (взвешенно, как у лоха/чухана).
-        pool = await get_worm_master_agrees(session)
+        # J.1: мягкое скрытие — hidden-поддакивания не выпадают.
+        pool = await effective_pool(
+            session, "worm_master_agrees", await get_worm_master_agrees(session)
+        )
         counts = await get_use_counts(session, WORM_MASTER_AGREE_USE_COUNTS_KEY)
         raw = choose(pool, counts)
         if raw is None:
@@ -277,13 +277,18 @@ async def _maybe_agree(message: Message) -> None:
         # Изредка подмешиваем напоминание про /отвали.
         nag_text: str | None = None
         if decide_nag(random.random()):
-            nag_pool = await get_worm_master_nag(session)
+            nag_pool = await effective_pool(
+                session, "worm_master_nag", await get_worm_master_nag(session)
+            )
             nag_text = pick_nag(nag_pool, username=master.display_name)
 
     _last_agree_at[message.chat.id] = now
-    out = agree if nag_text is None else f"{agree}\n\n{nag_text}"
     try:
-        await message.reply(out, parse_mode="HTML")
+        await message.reply(agree, parse_mode="HTML")
+        # H.5 (12.07 #1): напоминание про /отвали — ОТДЕЛЬНЫМ сообщением
+        # курсивом (раньше склеивалось с фразой и рушило её забавность).
+        if nag_text is not None:
+            await message.answer(format_nag_message(nag_text), parse_mode="HTML")
     except Exception as exc:  # noqa: BLE001
         log.warning("worm_master.agree_send_failed", error=str(exc))
 

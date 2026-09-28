@@ -44,6 +44,8 @@ _POOL_KEYS = (
     "worm_master_nag",
     "worm_punish",
     "worm_announce_lines",
+    # H.1: короткие реплики бота на reply/mention (фидбек 19.06 #3).
+    "reply_phrases",
 )
 
 # Пулы со счётчиками использования (use_counts). nag/announce — без счётчиков
@@ -55,6 +57,7 @@ _USE_COUNT_KEYS = (
     "worm_master_suffixes",
     "worm_master_agrees",
     "worm_punish",
+    "reply_phrases",
 )
 
 
@@ -67,6 +70,7 @@ def _use_count_key_map() -> dict[str, str]:
         WORM_MASTER_PREFIX_USE_COUNTS_KEY,
         WORM_MASTER_SUFFIX_USE_COUNTS_KEY,
         WORM_PUNISH_USE_COUNTS_KEY,
+        REPLY_USE_COUNTS_KEY,
     )
 
     return {
@@ -76,6 +80,7 @@ def _use_count_key_map() -> dict[str, str]:
         "worm_master_suffixes": WORM_MASTER_SUFFIX_USE_COUNTS_KEY,
         "worm_master_agrees": WORM_MASTER_AGREE_USE_COUNTS_KEY,
         "worm_punish": WORM_PUNISH_USE_COUNTS_KEY,
+        "reply_phrases": REPLY_USE_COUNTS_KEY,
     }
 
 
@@ -92,6 +97,14 @@ def merge_pool(current: list[str], incoming: list[str]) -> list[str]:
             seen.add(p)
             out.append(p)
     return out
+
+
+async def get_pool_phrases(session: AsyncSession, name: str) -> list[str]:
+    """Публичный доступ к пулу по снапшот-имени.
+
+    J.1: используется admin-API метаданных фраз, чтобы не дублировать карту
+    имён в routes_admin."""
+    return await _pool_getter(session, name)
 
 
 def validate_snapshot(data: Any) -> tuple[bool, str]:
@@ -123,6 +136,9 @@ def validate_snapshot(data: Any) -> tuple[bool, str]:
         for i, p in enumerate(personas):
             if not isinstance(p, dict) or "telegram_id" not in p or "persona_text" not in p:
                 return False, f"personas[{i}] должен иметь telegram_id и persona_text"
+    meta = data.get("meta")
+    if meta is not None and not isinstance(meta, dict):
+        return False, "meta должен быть объектом"
     return True, ""
 
 
@@ -154,6 +170,8 @@ async def _pool_getter(session: AsyncSession, name: str) -> list[str]:
         return await ac.get_worm_punish(session)
     if name == "worm_announce_lines":
         return await ac.get_worm_announce_lines(session)
+    if name == "reply_phrases":
+        return await ac.get_reply_phrases(session)
     raise KeyError(name)
 
 
@@ -185,6 +203,8 @@ async def _pool_setter(session: AsyncSession, name: str, phrases: list[str]) -> 
         await ac.set_worm_punish(session, phrases)
     elif name == "worm_announce_lines":
         await ac.set_worm_announce_lines(session, phrases)
+    elif name == "reply_phrases":
+        await ac.set_reply_phrases(session, phrases)
     else:
         raise KeyError(name)
 
@@ -220,17 +240,28 @@ async def build_snapshot(session: AsyncSession) -> dict[str, Any]:
             }
         )
 
+    # J.1: метаданные фраз (source/hidden) — едут вместе со снапшотом,
+    # чтобы бэкап/восстановление не теряли пометки ИИ-слопа и скрытые фразы.
+    from app.services.phrase_meta import load_meta
+
+    meta = await load_meta(session)
+
     return {
         "format": SNAPSHOT_FORMAT,
         "version": SNAPSHOT_VERSION,
         "pools": pools,
         "use_counts": use_counts,
         "personas": personas,
+        "meta": meta,
     }
 
 
 async def apply_snapshot(
-    session: AsyncSession, data: dict[str, Any], *, mode: str
+    session: AsyncSession,
+    data: dict[str, Any],
+    *,
+    mode: str,
+    source: str | None = None,
 ) -> dict[str, Any]:
     """Применить снапшот. mode = 'replace' (перезаписать) | 'merge' (дописать
     без дублей). Возвращает summary: по каждому пулу итоговый размер +
@@ -238,7 +269,11 @@ async def apply_snapshot(
 
     use_counts применяются только в режиме replace и только для пулов, которые
     в снапшоте присутствуют (merge их не трогает — иначе веса разъедутся с
-    реально слитым списком)."""
+    реально слитым списком).
+
+    J.1: `source` — пометить все импортируемые фразы источником (например `ai`
+    для контент-дропа). Секция `meta` снапшота (если есть) мерджится в хранимые
+    метаданные — так восстанавливаются пометки source/hidden."""
     if mode not in ("replace", "merge"):
         raise ValueError(f"unknown mode {mode!r}")
 
@@ -249,13 +284,26 @@ async def apply_snapshot(
         incoming = pools.get(name)
         if incoming is None:
             continue
+        current = await _pool_getter(session, name)
         if mode == "merge":
-            current = await _pool_getter(session, name)
             final = merge_pool(current, incoming)
         else:
             final = [p.strip() for p in incoming if p and p.strip()]
         await _pool_setter(session, name, final)
-        summary["pools"][name] = {"count": len(final)}
+        # H.4 (01.07 #1): дельта-сводка — сколько добавилось/убавилось в пуле.
+        before = {p.strip() for p in current if p and p.strip()}
+        after = {p.strip() for p in final}
+        summary["pools"][name] = {
+            "count": len(final),
+            "before": len(before),
+            "added": len(after - before),
+            "removed": len(before - after),
+        }
+        # J.1: пометить импортируемые фразы источником ("ai" для дропов).
+        if source:
+            from app.services.phrase_meta import tag_source
+
+            await tag_source(session, name, incoming, source)
 
     # use_counts — только replace (см. докстринг).
     if mode == "replace":
@@ -300,5 +348,22 @@ async def apply_snapshot(
             restored += 1
         await session.commit()
         summary["personas"] = {"restored": restored, "skipped": skipped}
+
+    # J.1: восстановить метаданные фраз из снапшота (source/hidden).
+    snap_meta = data.get("meta")
+    if isinstance(snap_meta, dict):
+        from app.services.phrase_meta import load_meta, normalize_meta, save_meta
+
+        stored = await load_meta(session)
+        incoming_meta = normalize_meta(snap_meta)
+        merged = 0
+        for pool, entries in incoming_meta.items():
+            bucket = stored.setdefault(pool, {})
+            for h, entry in entries.items():
+                bucket[h] = {**bucket.get(h, {}), **entry}
+                merged += 1
+        if merged:
+            await save_meta(session, stored)
+        summary["meta"] = {"merged": merged}
 
     return summary

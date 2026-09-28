@@ -4,6 +4,7 @@ import {
   fetchPhrasesSnapshot,
   importPhrasesSnapshot,
   type PhraseSnapshot,
+  type PhraseSource,
   type SnapshotImportSummary,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
@@ -23,9 +24,32 @@ const POOL_LABELS: Record<string, string> = {
   media_single: "🎭 Реакт-фразы (мем)",
   media_collection: "🎭 Реакт-фразы (подборка)",
   media_emoji: "😀 Эмодзи-реакции",
+  worm_master_prefixes: "🙇 Червь: префиксы",
+  worm_master_suffixes: "🙇 Червь: суффиксы",
+  worm_master_agrees: "🤫 Червь: поддакивания",
+  worm_master_nag: "🔔 Червь: напоминания",
+  worm_punish: "🤬 Червь: кары",
+  worm_announce_lines: "👑 Червь: анонсы",
+  reply_phrases: "🫡 Ответы бота (reply)",
 };
 
 const poolLabel = (k: string) => POOL_LABELS[k] ?? k;
+
+/**
+ * H.4 (прод-фидбек 01.07 #1): дельта по пулу — «было N, стало M (+a/−r)».
+ * Для replace-импорта считаем сами (бэк отдаёт before, но «было» в режиме
+ * замены нужно показывать именно как разницу с текущим содержимым).
+ */
+const deltaText = (p: { count: number; before?: number; added?: number; removed?: number }) => {
+  if (p.added == null && p.removed == null) return `${p.count}`;
+  const add = p.added ?? 0;
+  const rem = p.removed ?? 0;
+  const parts: string[] = [];
+  if (add) parts.push(`+${add}`);
+  if (rem) parts.push(`−${rem}`);
+  const delta = parts.length ? ` (${parts.join(" / ")})` : " (без изменений)";
+  return `${p.before ?? p.count} → ${p.count}${delta}`;
+};
 
 function countPools(snap: PhraseSnapshot | null): Array<[string, number]> {
   if (!snap?.pools) return [];
@@ -79,6 +103,9 @@ export default function PhrasesSnapshotScreen({ onBack }: Props) {
   // --- Импорт ---
   const [importRaw, setImportRaw] = useState("");
   const [mode, setMode] = useState<"replace" | "merge">("merge");
+  // J.1: чем пометить въезжающие фразы. «Мои» — дефолт (ничего не меняем),
+  // «ИИ-слоп» — для контент-дропов: всё помечается и фильтруется пачкой.
+  const [source, setSource] = useState<"manual" | "ai">("manual");
 
   const parsed = useMemo<{ data: PhraseSnapshot | null; error: string | null }>(() => {
     const t = importRaw.trim();
@@ -104,20 +131,32 @@ export default function PhrasesSnapshotScreen({ onBack }: Props) {
   };
 
   const doImport = useMutation({
-    mutationFn: () => importPhrasesSnapshot(parsed.data, mode),
+    mutationFn: () =>
+      importPhrasesSnapshot(
+        parsed.data,
+        mode,
+        source === "manual" ? undefined : (source as PhraseSource),
+      ),
     onSuccess: (summary: SnapshotImportSummary) => {
       haptic("success");
       void snapshot.refetch();
+      // H.4: показываем дельту по каждому пулу, а не только итоговый размер.
       const pools = Object.entries(summary.pools)
-        .map(([k, v]) => `• ${poolLabel(k)}: ${v.count}`)
+        .map(([k, v]) => `• ${poolLabel(k)}: ${deltaText(v)}`)
         .join("\n");
       const persona =
         summary.personas?.restored != null
           ? `\n🎭 Персонажи: восстановлено ${summary.personas.restored}` +
             (summary.personas.skipped ? `, пропущено ${summary.personas.skipped}` : "")
           : "";
+      const tagged =
+        source === "ai" ? "\n🤖 Новые фразы помечены как ИИ-слоп." : "";
+      const meta =
+        summary.meta?.merged != null
+          ? `\n🏷 Метаданные фраз: восстановлено ${summary.meta.merged}.`
+          : "";
       void showAlert(
-        `✅ Импорт (${summary.mode === "replace" ? "замена" : "слияние"}):\n${pools}${persona}`,
+        `✅ Импорт (${summary.mode === "replace" ? "замена" : "слияние"}):\n${pools}${persona}${tagged}${meta}`,
       );
       setImportRaw("");
     },
@@ -242,7 +281,7 @@ export default function PhrasesSnapshotScreen({ onBack }: Props) {
                     haptic("selection");
                     setMode(m);
                   }}
-                  className={`flex-1 min-h-9 rounded-md px-2 text-xs transition ${
+                  className={`flex-1 min-h-11 rounded-md px-2 text-xs transition ${
                     mode === m
                       ? "bg-tg-button text-tg-button-text font-medium"
                       : "bg-tg-bg/70 text-tg-hint"
@@ -253,15 +292,47 @@ export default function PhrasesSnapshotScreen({ onBack }: Props) {
               ))}
             </div>
 
+            {/* J.1: тег источника для въезжающих фраз — чтобы контент-дроп
+                (ИИ-слоп) можно было отфильтровать и скрыть пачкой. */}
+            <div className="space-y-1">
+              <div className="text-[11px] text-tg-hint">Пометить новые фразы как:</div>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ["manual", "✍️ Мои"],
+                    ["ai", "🤖 ИИ-слоп"],
+                  ] as const
+                ).map(([s, label]) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      haptic("selection");
+                      setSource(s);
+                    }}
+                    className={`flex-1 min-h-11 rounded-md px-2 text-xs transition ${
+                      source === s
+                        ? "bg-tg-button text-tg-button-text font-medium"
+                        : "bg-tg-bg/70 text-tg-hint"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
               type="button"
               disabled={doImport.isPending}
               onClick={() => {
                 haptic("medium");
+                const tag =
+                  source === "ai" ? " Новые фразы будут помечены как ИИ-слоп." : "";
                 const warn =
-                  mode === "replace"
+                  (mode === "replace"
                     ? "Заменить ВСЕ пулы фраз содержимым снапшота? Текущие будут перезаписаны."
-                    : "Дописать фразы из снапшота к текущим (без дублей)?";
+                    : "Дописать фразы из снапшота к текущим (без дублей)?") + tag;
                 if (confirm(warn)) doImport.mutate();
               }}
               className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"

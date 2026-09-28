@@ -24,6 +24,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
+import { Switch } from "@/components/Checkbox";
 
 const errAlert = (e: unknown) => {
   haptic("error");
@@ -342,27 +343,6 @@ function ToggleBlock({
   );
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors",
-        checked ? "bg-tg-button" : "bg-tg-hint/30",
-      ].join(" ")}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        ].join(" ")}
-      />
-    </button>
-  );
-}
 
 /**
  * GHG6 G2.10 + G3.6: дефолты опросов в чате.
@@ -639,7 +619,7 @@ function AvatarsActions({ onJobsChanged }: { onJobsChanged: () => void }) {
                   cancel.mutate();
                 }
               }}
-              className="min-h-9 rounded-md bg-status-busy/15 px-2 text-status-busy disabled:opacity-50"
+              className="min-h-11 rounded-md bg-status-busy/15 px-2 text-status-busy disabled:opacity-50"
             >
               ✕
             </button>
@@ -756,7 +736,7 @@ function ManualAvatarRow({
           haptic("medium");
           onSave(draft.trim() || null);
         }}
-        className="min-h-9 shrink-0 rounded-md bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+        className="min-h-11 shrink-0 rounded-md bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
       >
         {row.manual_url && !draft.trim() ? "Сброс" : "ОК"}
       </button>

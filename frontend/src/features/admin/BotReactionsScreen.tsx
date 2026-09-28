@@ -2,13 +2,17 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchBotReactions,
+  fetchReplyPhrases,
   updateBotReactions,
+  updateReplyPhrases,
   type BotReactionsSettings,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
+import PhrasePoolEditor from "./PhrasePoolEditor";
+import { Switch } from "@/components/Checkbox";
 
 interface Props {
   onBack: () => void;
@@ -77,6 +81,21 @@ export default function BotReactionsScreen({ onBack }: Props) {
     if (q.data) setDraft({ ...q.data });
   }, [q.data]);
 
+  // H.1: отдельный пул коротких реплик бота (reply/mention).
+  const rp = useQuery({
+    queryKey: ["admin", "reply-phrases"],
+    queryFn: fetchReplyPhrases,
+    staleTime: 30_000,
+  });
+  const savePhrases = useMutation({
+    mutationFn: updateReplyPhrases,
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["admin", "reply-phrases"], data);
+    },
+    onError: errAlert,
+  });
+
   const save = useMutation({
     mutationFn: updateBotReactions,
     onSuccess: (data) => {
@@ -113,7 +132,7 @@ export default function BotReactionsScreen({ onBack }: Props) {
       ) : (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
           <div className="text-xs text-tg-hint">
-            Бот отвечает рандомной шизо-цитатой на упоминание и/или reply.
+            Бот отвечает короткой репликой из пула ниже на упоминание и/или reply.
           </div>
 
           {/* (а) @-упоминание — независимый тогл */}
@@ -127,10 +146,7 @@ export default function BotReactionsScreen({ onBack }: Props) {
             </div>
             <Switch
               checked={draft.mention_enabled}
-              onChange={(v) => {
-                haptic("selection");
-                setField("mention_enabled", v);
-              }}
+              onChange={(v) => setField("mention_enabled", v)}
             />
           </div>
 
@@ -167,28 +183,28 @@ export default function BotReactionsScreen({ onBack }: Props) {
           </div>
         </section>
       )}
+
+      {/* H.1: отдельный пул ответов на reply/упоминание */}
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-base font-semibold mb-1">💬 Фразы-ответы</div>
+        <div className="text-xs text-tg-hint mb-2">
+          Короткие реплики, которыми бот отвечает на reply/упоминание (собственный
+          пул вместо общей шизо-цитаты). Пусто → бот молчит.
+        </div>
+        {rp.isPending || !rp.data ? (
+          <ListSkeleton rows={4} />
+        ) : (
+          <PhrasePoolEditor
+            pool="reply_phrases"
+            initial={rp.data.phrases}
+            isPending={savePhrases.isPending}
+            placeholder="например: Так точно 🫡"
+            emptyHint="Пусто — бот не отвечает на reply/упоминание."
+            onSave={(list) => savePhrases.mutate(list)}
+          />
+        )}
+      </section>
     </SubScreen>
   );
 }
 
-function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors",
-        checked ? "bg-tg-button" : "bg-tg-hint/30",
-      ].join(" ")}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        ].join(" ")}
-      />
-    </button>
-  );
-}

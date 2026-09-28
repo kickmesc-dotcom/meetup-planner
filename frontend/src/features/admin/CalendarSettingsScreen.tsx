@@ -21,6 +21,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
+import { Switch } from "@/components/Checkbox";
 
 interface Props {
   onBack: () => void;
@@ -104,33 +105,3 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
   );
 }
 
-function Switch({
-  checked,
-  disabled,
-  onChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50",
-        checked ? "bg-tg-button" : "bg-tg-hint/30",
-      ].join(" ")}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        ].join(" ")}
-      />
-    </button>
-  );
-}

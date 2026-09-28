@@ -560,3 +560,50 @@ async def run_random_phrases_job(bot: Bot) -> None:
         log.warning("random_phrases.telegram_api_error", error=str(exc))
     except Exception:
         log.exception("random_phrases.unexpected_error")
+
+
+# --- H.1: отдельный пул коротких ответов бота (фидбек 19.06 #3) ---
+# Раньше reply/mention отвечали шизо-цитатой из общего пула → «в 99% ахинея».
+# Теперь у режима ответа СВОЙ короткий пул «согласия/отмазки» — он курируется в
+# админке («🤖 Реакции бота»), учитывается в снапшоте и мягком скрытии (J.1).
+DEFAULT_REPLY_PHRASES: tuple[str, ...] = (
+    "Так точно 🫡",
+    "Ну так, епт",
+    "Да конечно, хуле там",
+    "Заранее извиняюсь",
+    "Вы все правильно поняли",
+    "Я это и хотел сказать",
+    "Не пали контору",
+    "Тссс…",
+    "Ну все все успокойся",
+    "Да не ной бля",
+)
+
+
+async def compose_reply_phrase(session: AsyncSession) -> str | None:
+    """H.1: короткая реплика бота для ответа на reply/@-mention.
+
+    Берём фразу из пула `reply_phrases` (админ-редактор, дефолт
+    `DEFAULT_REPLY_PHRASES`) с учётом скрытых фраз (J.1) и взвешенно по
+    `use_count` (одинаковые подряд не выпадают). Возвращает HTML (`<i>…</i>`) или
+    `None`, если пул пуст — тогда бот лучше промолчит, чем выдаст ахинею.
+    """
+    from app.services.admin_config import get_reply_phrases
+    from app.services.phrase_meta import effective_pool
+    from app.services.phrase_weights import (
+        REPLY_USE_COUNTS_KEY,
+        get_use_counts,
+        increment_use_count,
+        weighted_choice,
+    )
+
+    pool = await get_reply_phrases(session)
+    phrases = await effective_pool(session, "reply_phrases", pool)
+    if not phrases:
+        return None
+    counts = await get_use_counts(session, REPLY_USE_COUNTS_KEY)
+    picked = weighted_choice(phrases, counts)
+    if not picked:
+        return None
+    await increment_use_count(session, REPLY_USE_COUNTS_KEY, picked)
+    return f"<i>{picked}</i>"

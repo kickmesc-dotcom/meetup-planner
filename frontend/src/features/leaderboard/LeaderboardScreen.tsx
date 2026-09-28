@@ -8,6 +8,12 @@ interface Props {
   users: User[];
 }
 
+/**
+ * Топы — «реестр званий». Identity: цифры ведём моношрифтом с tabular-nums
+ * (это счётчик, а не текст), мерная линейка квадратная (скругления — язык
+ * карточек, а не реестра), а лидер строки получает единственную печать
+ * приложения — штамп `ink-stamp`. Всё остальное намеренно тихое.
+ */
 export default function LeaderboardScreen({ users }: Props) {
   const losers = useQuery({
     queryKey: ["loser", "stats"],
@@ -21,15 +27,17 @@ export default function LeaderboardScreen({ users }: Props) {
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
       <Section
-        title="💩 Топ чуханов"
-        subtitle="Кому чаще всего выпадало звание чухана недели"
+        icon="💩"
+        title="Топ чуханов"
+        subtitle="Сколько недель каждый носил звание"
         rows={(chukhans.data ?? []).map((r) => ({ user_id: r.user_id, count: r.count }))}
         users={users}
         empty="Чуханов ещё не было."
         loading={chukhans.isPending}
       />
       <Section
-        title="🎲 Топ лохов дня"
+        icon="🎲"
+        title="Топ лохов дня"
         subtitle="Сколько раз каждого выкатывало в лохи"
         rows={Object.entries(losers.data?.counts ?? {}).map(
           ([uid, cnt]) => ({ user_id: Number(uid), count: cnt }),
@@ -43,6 +51,7 @@ export default function LeaderboardScreen({ users }: Props) {
 }
 
 function Section({
+  icon,
   title,
   subtitle,
   rows,
@@ -50,6 +59,7 @@ function Section({
   empty,
   loading,
 }: {
+  icon: string;
   title: string;
   subtitle: string;
   rows: ChukhanLeaderRow[];
@@ -62,50 +72,80 @@ function Section({
   const max = sorted[0]?.count ?? 1;
 
   return (
-    <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
-      <div className="text-base font-semibold">{title}</div>
-      <div className="text-xs text-tg-hint mb-2">{subtitle}</div>
+    <section className="rounded-xl bg-tg-secondary-bg border border-tg-hint/10 p-3">
+      <header className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="grid h-8 w-8 shrink-0 place-items-center bg-ink-stamp text-[17px] leading-none text-white"
+        >
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold uppercase leading-tight tracking-[0.08em]">
+            {title}
+          </h2>
+          <p className="truncate text-2xs text-muted">{subtitle}</p>
+        </div>
+      </header>
+
       {loading ? (
-        <ListSkeleton rows={4} />
+        <div className="mt-3">
+          <ListSkeleton rows={4} />
+        </div>
       ) : sorted.length === 0 ? (
-        <div className="text-xs text-tg-hint py-2">{empty}</div>
+        <p className="mt-3 text-xs text-muted">{empty}</p>
       ) : (
-        <div className="space-y-1.5">
+        <ol className="mt-3 space-y-2">
           {sorted.map((r, i) => {
             const u = userById[r.user_id];
             const ratio = (r.count / max) * 100;
+            const leader = i === 0;
             return (
-              <div key={r.user_id} className="flex items-center gap-2">
-                <div className="text-xs w-4 text-tg-hint text-right">{i + 1}</div>
+              <li
+                key={r.user_id}
+                className="relative flex items-center gap-2 overflow-hidden px-1.5 py-1"
+              >
+                {/* Мера — заливка строки (как на табло), а не линейка под именем:
+                    подчёркивание читалось как типографика, а не как величина. */}
+                <span
+                  aria-hidden
+                  className={[
+                    "absolute inset-y-0 left-0",
+                    leader ? "bg-ink-stamp/10" : "bg-tg-hint/10",
+                  ].join(" ")}
+                  style={{ width: `${ratio}%` }}
+                />
+                <span className="relative w-4 shrink-0 text-right font-mono text-2xs tabular-nums text-muted">
+                  {i + 1}
+                </span>
                 <div
-                  className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-white text-xs font-medium shrink-0"
+                  className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-2xs font-medium text-white"
                   style={{ background: u?.color_hex ?? "#888" }}
                 >
                   {u?.avatar_url ? (
-                    <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                    <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
                   ) : (
                     (u?.display_name[0] ?? "?")
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm truncate">
-                    {u?.display_name ?? `id=${r.user_id}`}
-                  </div>
-                  <div className="h-1.5 rounded-full bg-tg-bg/50 mt-0.5 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-tg-link"
-                      style={{ width: `${ratio}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="text-sm font-semibold tabular-nums w-7 text-right">
+                <span className="relative min-w-0 flex-1 truncate text-sm font-medium">
+                  {u?.display_name ?? `id=${r.user_id}`}
+                </span>
+                {/* Лидера выделяем ВЕСОМ, а не цветом: `ink-stamp` как текст не
+                    проходит контраст на тёмной теме (он задуман как фон печати). */}
+                <span
+                  className={[
+                    "relative shrink-0 font-mono text-sm tabular-nums text-tg-text",
+                    leader ? "font-bold" : "font-semibold",
+                  ].join(" ")}
+                >
                   {r.count}
-                </div>
-              </div>
+                </span>
+              </li>
             );
           })}
-        </div>
+        </ol>
       )}
-    </div>
+    </section>
   );
 }

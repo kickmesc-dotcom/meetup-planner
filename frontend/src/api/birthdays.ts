@@ -99,6 +99,9 @@ export interface CurrentTitles {
   main_loser_user_id: number | null;
   /** GHG8 P4.1.a: сколько раз главный лох был лохом (0 если нет). */
   main_loser_count: number;
+  /** H.2 (19.06 #2): «главный чухан» — 4-й блок welcome-сводки. */
+  main_chukhan_user_id: number | null;
+  main_chukhan_count: number;
   birthday_today_user_ids: number[];
 }
 

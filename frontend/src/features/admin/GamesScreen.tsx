@@ -152,7 +152,7 @@ export default function GamesScreen({ onBack }: Props) {
                   type="button"
                   onClick={() => onRemove(it.id, it.name)}
                   disabled={remove.isPending}
-                  className="min-h-8 min-w-8 rounded-md bg-status-busy/15 px-2 text-sm text-status-busy disabled:opacity-50 active:scale-95 transition-transform"
+                  className="min-h-11 min-w-11 rounded-md bg-status-busy/15 px-2 text-sm text-status-busy disabled:opacity-50 active:scale-95 transition-transform"
                   aria-label={`Удалить ${it.name}`}
                 >
                   🗑

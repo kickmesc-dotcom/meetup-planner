@@ -20,7 +20,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { Toggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "../SubScreen";
-import ReasonsEditor from "../ReasonsEditor";
+import PhrasePoolEditor from "../PhrasePoolEditor";
 
 interface Props {
   users: User[];
@@ -191,7 +191,8 @@ export default function LoserScreen({ users, onBack }: Props) {
         {reasons.isPending || !reasons.data ? (
           <ListSkeleton rows={5} />
         ) : (
-          <ReasonsEditor
+          <PhrasePoolEditor
+            pool="loser_reasons"
             initial={reasons.data.reasons}
             isPending={saveReasons.isPending}
             placeholder="например: снова забыл выпить таблетки"

@@ -442,7 +442,7 @@ export default function ProxyScreen({ onBack }: Props) {
                   haptic("medium");
                   pingAllM.mutate();
                 }}
-                className="min-h-9 rounded-md bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
+                className="min-h-11 rounded-md bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
                 title="Пинг всех (медленно)"
               >
                 {pingAllM.isPending && <Spinner />}
@@ -457,7 +457,7 @@ export default function ProxyScreen({ onBack }: Props) {
                     delDead.mutate();
                   }
                 }}
-                className="min-h-9 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
+                className="min-h-11 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
                 title="Удалить мёртвые"
               >
                 🗑 dead
@@ -466,7 +466,7 @@ export default function ProxyScreen({ onBack }: Props) {
                 type="button"
                 onClick={() => setSortBySpeed((v) => !v)}
                 className={[
-                  "min-h-9 rounded-md px-2 text-xs",
+                  "min-h-11 rounded-md px-2 text-xs",
                   sortBySpeed ? "bg-tg-link/20 text-tg-link" : "bg-tg-bg/50 text-tg-text",
                 ].join(" ")}
                 title="Сортировать по скорости (свежее last_ok сверху)"
@@ -583,7 +583,7 @@ function SelftestCard({
             haptic("medium");
             onRun();
           }}
-          className="ml-auto min-h-8 rounded-md bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
+          className="ml-auto min-h-11 rounded-md bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
         >
           {isRunning && <Spinner />}
           🧪 Проверить
@@ -697,7 +697,7 @@ function ProxyRow({
             haptic("medium");
             onPing();
           }}
-          className="min-h-9 min-w-9 rounded-md bg-tg-bg/50 px-2 text-xs text-tg-text disabled:opacity-50 inline-flex items-center justify-center gap-1"
+          className="min-h-11 min-w-11 rounded-md bg-tg-bg/50 px-2 text-xs text-tg-text disabled:opacity-50 inline-flex items-center justify-center gap-1"
           title="Ping"
         >
           {pingPending ? <Spinner /> : "📶"}
@@ -705,7 +705,7 @@ function ProxyRow({
         <button
           type="button"
           onClick={() => (editing ? onEditCancel() : onEditStart())}
-          className="min-h-9 min-w-9 rounded-md bg-tg-bg/50 px-2 text-xs text-tg-text"
+          className="min-h-11 min-w-11 rounded-md bg-tg-bg/50 px-2 text-xs text-tg-text"
           title="Edit"
         >
           {editing ? "↩" : "✎"}
@@ -718,7 +718,7 @@ function ProxyRow({
             haptic("warning");
             onDelete();
           }}
-          className="min-h-9 min-w-9 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
+          className="min-h-11 min-w-11 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
           title="Удалить"
         >
           ✕
@@ -1141,7 +1141,7 @@ function AddErrorsSection({
           onClick={() => {
             if (confirm("Очистить ленту ошибок добавления?")) onClear();
           }}
-          className="min-h-9 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
+          className="min-h-11 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
         >
           {isClearing && <Spinner />}✕ Очистить
         </button>

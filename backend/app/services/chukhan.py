@@ -14,14 +14,19 @@ import structlog
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import URLInputFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.models import User, WeeklyChukhan
-from app.services.admin_config import get_chukhan_reasons, get_chukhan_weights
+from app.services.admin_config import (
+    get_chukhan_appeal_poll_minutes,
+    get_chukhan_reasons,
+    get_chukhan_weights,
+)
 from app.services.avatars import sync_user_avatar
+from app.services.phrase_meta import effective_pool
 from app.services.phrase_weights import (
     CHUKHAN_USE_COUNTS_KEY,
     get_use_counts,
@@ -30,6 +35,26 @@ from app.services.phrase_weights import (
 )
 
 log = structlog.get_logger()
+
+
+async def chukhan_stats(session: AsyncSession) -> dict[int, int]:
+    """Сколько раз каждый участник был чуханом недели — для «главного чухана».
+
+    Считаем только ДОСТАВЛЕННЫЕ недели (GHG7 P11: недоставленный пик висит в БД
+    для ретрая и званием ещё не является) — тот же фильтр, что в
+    `/api/titles/current` и в публичной истории чуханов.
+
+    H.2: нужно welcome-баннеру для 4-го симметричного блока. Один агрегатный
+    SELECT (вызывается только из `/api/titles/current`, не в циклах).
+    """
+    rows = (
+        await session.execute(
+            select(WeeklyChukhan.user_id, func.count())
+            .where(WeeklyChukhan.posted_at.is_not(None))
+            .group_by(WeeklyChukhan.user_id)
+        )
+    ).all()
+    return {int(uid): int(cnt) for uid, cnt in rows}
 
 
 # GHG7 P11: таймаут отправки чухан-поста. Раньше обёртки не было вовсе — send
@@ -280,6 +305,10 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
             custom_reasons = await get_chukhan_reasons(session)
         except Exception:  # noqa: BLE001
             custom_reasons = []
+        # J.1: мягкое скрытие — hidden-фразы не участвуют в ротации.
+        custom_reasons = await effective_pool(
+            session, "chukhan_reasons", custom_reasons
+        )
         # GHG6 E5: взвешенный выбор по use_count для кастомных фраз. Для дефолтных
         # CHUKHAN_TAGLINES счётчики не ведём — фолбэк остаётся равномерным.
         if custom_reasons:
@@ -390,14 +419,16 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
     )
 
     # Опрос-обжалование — best-effort, не критично для атомарности.
+    # H.3: длительность настраивается (дефолт 6ч вместо прежнего часа).
     try:
+        appeal_minutes = await get_chukhan_appeal_poll_minutes(session)
         await bot.send_poll(
             chat_id=settings.group_chat_id,
             question=f"Согласны с тем, что {user.display_name} — чухан недели?",
             options=["✅ Согласны", "🙅 Обжаловать"],
             is_anonymous=False,
             allows_multiple_answers=False,
-            open_period=3600,
+            open_period=appeal_minutes * 60,
             reply_to_message_id=msg.message_id,
         )
     except TelegramAPIError as exc:

@@ -14,6 +14,9 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    // GHG8 J.2: без noEmit `tsc -b` печатал .js рядом с исходниками, и Vite
+    // (резолв .js раньше .tsx) крутил устаревший скомпилированный код.
+    "noEmit": true,
     "allowSyntheticDefaultImports": true,
     "useDefineForClassFields": true,
     "baseUrl": ".",

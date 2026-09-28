@@ -147,7 +147,11 @@ function MonthBlock({
               }
               className={[
                 "aspect-square rounded-lg flex flex-col items-center justify-start py-1 px-1 text-xs transition-transform active:scale-95 relative",
-                inMonth ? "text-tg-text" : "text-tg-hint/60",
+                // DESIGN_SYSTEM §2: было `text-tg-hint/60` — модификатор не
+                // применялся, и дни соседних месяцев рисовались полным цветом
+                // текста (то есть как текущие). Теперь альфа работает, берём
+                // `muted`: день видно, но иерархия месяца сохраняется.
+                inMonth ? "text-tg-text" : "text-muted",
                 today ? "ring-2 ring-tg-link" : "",
                 bg,
               ].join(" ")}

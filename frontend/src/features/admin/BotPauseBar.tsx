@@ -201,7 +201,7 @@ export default function BotPauseBar() {
               haptic("selection");
               setModalOpen(true);
             }}
-            className="shrink-0 min-h-9 rounded-lg bg-tg-bg/60 px-3 text-xs text-tg-text active:scale-[0.98] transition-transform"
+            className="shrink-0 min-h-11 rounded-lg bg-tg-bg/60 px-3 text-xs text-tg-text active:scale-[0.98] transition-transform"
           >
             ⏸ Пауза
           </button>
@@ -272,7 +272,7 @@ function PauseDurationModal({ onCancel, onPick, pending }: PauseModalProps) {
             haptic("light");
             onCancel();
           }}
-          className="mt-3 w-full min-h-9 rounded-lg bg-tg-bg px-3 py-2 text-xs text-tg-link border border-tg-hint/20 active:scale-[0.98] transition-transform"
+          className="mt-3 w-full min-h-11 rounded-lg bg-tg-bg px-3 py-2 text-xs text-tg-link border border-tg-hint/20 active:scale-[0.98] transition-transform"
         >
           Отмена
         </button>

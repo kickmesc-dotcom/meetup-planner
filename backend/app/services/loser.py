@@ -14,6 +14,7 @@ from app.services.admin_config import (
     get_worm_chance,
     is_worm_enabled,
 )
+from app.services.phrase_meta import effective_pool
 from app.services.phrase_weights import (
     LOSER_USE_COUNTS_KEY,
     get_use_counts,
@@ -239,6 +240,8 @@ async def roll_loser(
         # Берём актуальный список из admin_config (с фолбэком на in-code LOSER_REASONS).
         reasons = await get_loser_reasons(session)
         pool = reasons or list(LOSER_REASONS)
+        # J.1: мягкое скрытие — hidden-фразы не участвуют в ротации.
+        pool = await effective_pool(session, "loser_reasons", pool)
         # GHG6 E5: взвешенный выбор — вес 1/(1+use_count). Свежие фразы чаще,
         # но «нулевого приоритета» нет: уже-использованные всё равно могут
         # выпасть, просто реже.
@@ -275,7 +278,11 @@ async def roll_loser(
         if await is_worm_master_enabled(session):
             from app.services.worm_master import build_announce_extra
 
-            lines = await get_worm_announce_lines(session)
+            lines = await effective_pool(
+                session,
+                "worm_announce_lines",
+                await get_worm_announce_lines(session),
+            )
             chance_pct = f"{worm_chance * 100:g}"
             worm_event.announce_extra = build_announce_extra(
                 lines, username=loser.display_name, chance_pct=chance_pct
@@ -384,8 +391,13 @@ async def resolve_master_sycophancy(
     from app.services.worm_master import choose, render
 
     name = user.display_name
-    prefix_pool = await get_worm_master_prefixes(session)
-    suffix_pool = await get_worm_master_suffixes(session)
+    # J.1: мягкое скрытие для пулов червя-господина.
+    prefix_pool = await effective_pool(
+        session, "worm_master_prefixes", await get_worm_master_prefixes(session)
+    )
+    suffix_pool = await effective_pool(
+        session, "worm_master_suffixes", await get_worm_master_suffixes(session)
+    )
     prefix_counts = await get_use_counts(session, WORM_MASTER_PREFIX_USE_COUNTS_KEY)
     suffix_counts = await get_use_counts(session, WORM_MASTER_SUFFIX_USE_COUNTS_KEY)
 

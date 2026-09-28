@@ -152,7 +152,7 @@ export default function AdminScreen({ users }: Props) {
             haptic("selection");
             setPoolOpen((v) => !v);
           }}
-          className="mt-2 w-full min-h-9 rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs text-tg-text flex items-center justify-between active:scale-[0.99] transition-transform"
+          className="mt-2 w-full min-h-11 rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs text-tg-text flex items-center justify-between active:scale-[0.99] transition-transform"
         >
           <span>📊 Пул фраз сейчас{pool.data ? ` (${pool.data.total_chunks})` : ""}</span>
           <span className="text-tg-hint">{poolOpen ? "▾" : "▸"}</span>

@@ -213,10 +213,14 @@ async def _do_react(
         both       — и эмодзи, и фраза;
         random_one — случайно одно из двух.
     """
+    from app.services.phrase_meta import effective_pool
+
     sm = get_sessionmaker()
     async with sm() as session:
         if kind == "collection":
-            phrases = await get_collection_phrases(session)
+            phrases = await effective_pool(
+                session, "media_collection", await get_collection_phrases(session)
+            )
             phrase = pick_phrase(phrases)
             if phrase:
                 await _send_reply_phrase(
@@ -226,7 +230,9 @@ async def _do_react(
             return
 
         settings = await get_media_reactions_settings(session)
-        single_phrases = await get_single_phrases(session)
+        single_phrases = await effective_pool(
+            session, "media_single", await get_single_phrases(session)
+        )
         whitelist = await get_emoji_whitelist(session)
 
     response_mode = settings["single_response_mode"]

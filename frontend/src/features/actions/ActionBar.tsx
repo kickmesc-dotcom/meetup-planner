@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useUI } from "@/store/ui";
@@ -8,6 +9,11 @@ import { humanizeApiError } from "@/api/client";
 import { Spinner } from "@/components/Spinner";
 
 export default function ActionBar() {
+  // H.2 (19.06 #2): панель кнопок схлопывается в строку со стрелкой — на
+  // телефоне 4 кнопки съедали четверть экрана. По умолчанию РАЗВЁРНУТА
+  // (как и приветствие), состояние живёт до перезагрузки мини-аппа.
+  const [open, setOpen] = useState(true);
+
   const setShowAuto = useUI((s) => s.setShowAutoPickSheet);
   const setShowLoser = useUI((s) => s.setShowLoserSheet);
   const setShowPoll = useUI((s) => s.setShowPollSheet);
@@ -33,6 +39,22 @@ export default function ActionBar() {
     fn();
   };
 
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          haptic("light");
+          setOpen(true);
+        }}
+        aria-expanded={false}
+        className="flex w-full items-center justify-center gap-1.5 border-t border-tg-secondary-bg bg-tg-bg px-2 py-2 text-[11px] text-tg-hint"
+      >
+        <span aria-hidden>▴</span> Кнопки действий — развернуть
+      </button>
+    );
+  }
+
   return (
     <div
       className={[
@@ -40,6 +62,19 @@ export default function ActionBar() {
         isAdmin ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3",
       ].join(" ")}
     >
+      {/* H.2: симметрично приветствию — своей строкой, а не поверх кнопок. */}
+      <button
+        type="button"
+        onClick={() => {
+          haptic("light");
+          setOpen(false);
+        }}
+        aria-expanded
+        title="Свернуть кнопки действий"
+        className="col-span-full -mt-1 flex items-center justify-center gap-1 text-[10px] text-tg-hint"
+      >
+        <span aria-hidden>▾</span> свернуть кнопки
+      </button>
       <ActionBtn
         onClick={tap(() => setShowAuto(true))}
         label="🎯 Авто-подбор"

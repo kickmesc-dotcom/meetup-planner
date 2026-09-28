@@ -196,6 +196,8 @@ class CurrentTitlesOut(BaseModel):
     - main_loser_user_id  — «главный лох»: max по суммарному числу роллов, 🤡.
                             Тай-брейк — меньший user_id (детерминизм). None если
                             роллов не было вовсе.
+    - main_chukhan_user_id — «главный чухан» (H.2): max по числу ДОСТАВЛЕННЫХ
+                            недель, та же тай-брейк-логика. None если недель не было.
     - birthday_today_user_ids — у кого ДР сегодня (по дню/месяцу), 🎂. Список,
                             т.к. в один день могут совпасть несколько.
     """
@@ -206,6 +208,10 @@ class CurrentTitlesOut(BaseModel):
     # GHG8 P4.1.a: сколько раз главный лох был лохом — для welcome-блока
     # «Главный лох: %user% %N раз%». 0 если main_loser_user_id is None.
     main_loser_count: int = 0
+    # H.2 (19.06 #2): «главный чухан» — 4-й блок welcome-сводки, чтобы сетка
+    # 2×2 не выглядела несимметрично (чухан недели / лох дня / гл. лох / гл. чухан).
+    main_chukhan_user_id: int | None = None
+    main_chukhan_count: int = 0
     birthday_today_user_ids: list[int] = []
 
 
@@ -222,7 +228,7 @@ async def get_titles_current(
     session: SessionDep, _user: CurrentUser
 ) -> CurrentTitlesOut:
     from app.db.models import Birthday
-    from app.services.chukhan import current_week_start
+    from app.services.chukhan import chukhan_stats, current_week_start
     from app.services.loser import get_current_worm, loser_stats
 
     out = CurrentTitlesOut()
@@ -269,6 +275,13 @@ async def get_titles_current(
     out.main_loser_user_id = pick_main_loser(stats)
     if out.main_loser_user_id is not None:
         out.main_loser_count = stats.get(out.main_loser_user_id, 0)
+
+    # 4b. Главный чухан (H.2) — та же логика выбора: max по числу недель,
+    #     тай-брейк меньший user_id. Только доставленные недели.
+    ch_stats = await chukhan_stats(session)
+    out.main_chukhan_user_id = pick_main_loser(ch_stats)
+    if out.main_chukhan_user_id is not None:
+        out.main_chukhan_count = ch_stats.get(out.main_chukhan_user_id, 0)
 
     # 5. ДР сегодня — совпадение дня и месяца с текущей датой.
     bdays = (await session.scalars(select(Birthday).where(Birthday.bday.is_not(None)))).all()

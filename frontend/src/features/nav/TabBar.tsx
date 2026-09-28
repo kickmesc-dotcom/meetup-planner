@@ -51,7 +51,11 @@ export default function TabBar({ isAdmin }: { isAdmin: boolean }) {
                 transition={{ type: "spring", stiffness: 500, damping: 32 }}
               />
             )}
-            <span className="text-lg leading-none">{it.icon}</span>
+            {/* Иконка декоративная — рядом есть подпись, поэтому её не должно
+                быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
+            <span className="text-lg leading-none" aria-hidden>
+              {it.icon}
+            </span>
             <span className="mt-0.5">{it.label}</span>
           </button>
         );

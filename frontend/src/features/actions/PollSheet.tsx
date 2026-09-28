@@ -218,7 +218,7 @@ export default function PollSheet(_props: Props) {
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
-                  className="min-h-9 min-w-9 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
+                  className="min-h-11 min-w-11 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
                   title="Убрать"
                 >
                   ✕

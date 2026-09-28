@@ -15,6 +15,7 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
+import { Switch } from "@/components/Checkbox";
 
 interface Props {
   onBack: () => void;
@@ -242,33 +243,3 @@ function RangeInput({
   );
 }
 
-function Switch({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        haptic("selection");
-        onChange(!checked);
-      }}
-      className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors",
-        checked ? "bg-tg-button" : "bg-tg-hint/30",
-      ].join(" ")}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        ].join(" ")}
-      />
-    </button>
-  );
-}

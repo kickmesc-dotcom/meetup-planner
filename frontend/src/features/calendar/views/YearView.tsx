@@ -83,7 +83,7 @@ function MiniMonth({
             key={d.toISOString()}
             className={[
               "aspect-square rounded-[3px] flex items-center justify-center text-[8px]",
-              inMonth ? "text-tg-text" : "text-tg-hint/40",
+              inMonth ? "text-tg-text" : "text-muted",
               today ? "ring-1 ring-tg-link" : "",
               bg,
             ].join(" ")}

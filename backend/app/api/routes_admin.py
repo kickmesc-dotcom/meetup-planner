@@ -1210,6 +1210,50 @@ async def admin_reset_chukhan_reasons(
     return ChukhanReasonsOut(reasons=saved)
 
 
+# --- H.3: таймер оспаривания чухана (прод-фидбек 22.06 #1) ---
+
+from app.services.admin_config import (
+    CHUKHAN_APPEAL_POLL_MINUTES_BOUNDS as _CHUKHAN_APPEAL_BOUNDS,
+    get_chukhan_appeal_poll_minutes as _get_chukhan_appeal_minutes,
+    set_chukhan_appeal_poll_minutes as _set_chukhan_appeal_minutes,
+)
+
+
+class ChukhanAppealPollOut(BaseModel):
+    minutes: int
+    # Допустимый диапазон — отдаём фронту, чтобы инпут не расходился с бэком.
+    bounds: tuple[int, int] = _CHUKHAN_APPEAL_BOUNDS
+
+
+class ChukhanAppealPollUpdate(BaseModel):
+    minutes: int = Field(
+        ..., ge=_CHUKHAN_APPEAL_BOUNDS[0], le=_CHUKHAN_APPEAL_BOUNDS[1]
+    )
+
+
+@router.get("/admin/chukhan/appeal-poll", response_model=ChukhanAppealPollOut)
+async def admin_get_chukhan_appeal_poll(
+    session: SessionDep, user: CurrentUser
+) -> ChukhanAppealPollOut:
+    """H.3: длительность опроса-обжалования чухана в минутах."""
+    _ensure_admin(user)
+    return ChukhanAppealPollOut(
+        minutes=await _get_chukhan_appeal_minutes(session), bounds=_CHUKHAN_APPEAL_BOUNDS
+    )
+
+
+@router.put("/admin/chukhan/appeal-poll", response_model=ChukhanAppealPollOut)
+async def admin_update_chukhan_appeal_poll(
+    body: ChukhanAppealPollUpdate, session: SessionDep, user: CurrentUser
+) -> ChukhanAppealPollOut:
+    _ensure_admin(user)
+    await _set_chukhan_appeal_minutes(session, body.minutes)
+    log.info("admin.chukhan_appeal_poll_updated", minutes=body.minutes, by=user.id)
+    return ChukhanAppealPollOut(
+        minutes=await _get_chukhan_appeal_minutes(session), bounds=_CHUKHAN_APPEAL_BOUNDS
+    )
+
+
 # --- T3.4: advice («магический шар») ---
 
 from app.services.admin_config import (
@@ -1417,8 +1461,10 @@ async def admin_update_worm_master_pool(
 # --- T3.1: снапшот/экспорт базы причин-реакций ---
 
 from app.services.phrase_snapshot import (
+    _POOL_KEYS as _PH_POOL_KEYS,
     apply_snapshot as _apply_snapshot,
     build_snapshot as _build_snapshot,
+    get_pool_phrases as _get_pool_phrases,
     validate_snapshot as _validate_snapshot,
 )
 
@@ -1426,6 +1472,8 @@ from app.services.phrase_snapshot import (
 class PhraseSnapshotImport(BaseModel):
     snapshot: dict[str, Any]
     mode: str = Field("replace", pattern="^(replace|merge)$")
+    # J.1: пометить все импортируемые фразы источником (обычно "ai" для дропов).
+    source: str | None = None
 
 
 @router.get("/admin/phrases/snapshot")
@@ -1455,9 +1503,120 @@ async def admin_import_phrases_snapshot(
     ok, err = _validate_snapshot(body.snapshot)
     if not ok:
         raise HTTPException(status_code=422, detail=f"невалидный снапшот: {err}")
-    summary = await _apply_snapshot(session, body.snapshot, mode=body.mode)
-    log.info("admin.phrases_snapshot_imported", summary=summary, by=user.id)
+    summary = await _apply_snapshot(
+        session, body.snapshot, mode=body.mode, source=body.source
+    )
+    log.info(
+        "admin.phrases_snapshot_imported",
+        summary=summary,
+        source=body.source,
+        by=user.id,
+    )
     return summary
+
+
+# --- J.1: метаданные фраз (source/hidden) — для редакторов ---
+
+from app.services.phrase_meta import (
+    bulk_set_flags as _pm_bulk_set_flags,
+    is_hidden as _pm_is_hidden,
+    items_for as _pm_items_for,
+    load_meta as _pm_load_meta,
+    set_flags as _pm_set_flags,
+    source_of as _pm_source_of,
+)
+
+
+class PhraseMetaItemOut(BaseModel):
+    phrase: str
+    source: str
+    hidden: bool
+
+
+class PhraseMetaOut(BaseModel):
+    pool: str
+    items: list[PhraseMetaItemOut]
+
+
+class PhraseMetaUpdate(BaseModel):
+    pool: str
+    phrase: str
+    source: str | None = None
+    hidden: bool | None = None
+
+
+class PhraseMetaBulkUpdate(BaseModel):
+    pool: str
+    phrases: list[str] = Field(..., max_length=2000)
+    source: str | None = None
+    hidden: bool | None = None
+
+
+def _ensure_known_pool(name: str) -> None:
+    if name not in _PH_POOL_KEYS:
+        raise HTTPException(status_code=422, detail=f"неизвестный пул: {name}")
+
+
+@router.get("/admin/phrases/meta", response_model=PhraseMetaOut)
+async def admin_get_phrase_meta(
+    pool: str, session: SessionDep, user: CurrentUser
+) -> PhraseMetaOut:
+    """J.1: источник и флаг скрытия для каждой фразы пула (в порядке пула).
+    Фронт-редактор накладывает это на список фраз из своих GET-эндпоинтов."""
+    _ensure_admin(user)
+    _ensure_known_pool(pool)
+    phrases = await _get_pool_phrases(session, pool)
+    meta = await _pm_load_meta(session)
+    return PhraseMetaOut(pool=pool, items=_pm_items_for(meta, pool, phrases))
+
+
+@router.post("/admin/phrases/meta", response_model=PhraseMetaItemOut)
+async def admin_set_phrase_meta(
+    body: PhraseMetaUpdate, session: SessionDep, user: CurrentUser
+) -> PhraseMetaItemOut:
+    """J.1: проставить источник/флаг скрытия одной фразе."""
+    _ensure_admin(user)
+    _ensure_known_pool(body.pool)
+    await _pm_set_flags(
+        session,
+        body.pool,
+        body.phrase,
+        source=body.source,
+        hidden=body.hidden,
+        added_by=user.id,
+    )
+    meta = await _pm_load_meta(session)
+    return PhraseMetaItemOut(
+        phrase=body.phrase,
+        source=_pm_source_of(meta, body.pool, body.phrase),
+        hidden=_pm_is_hidden(meta, body.pool, body.phrase),
+    )
+
+
+@router.post("/admin/phrases/meta/bulk")
+async def admin_bulk_phrase_meta(
+    body: PhraseMetaBulkUpdate, session: SessionDep, user: CurrentUser
+) -> dict[str, Any]:
+    """J.1: массово проставить флаги (например «скрыть все ИИ-фразы»)."""
+    _ensure_admin(user)
+    _ensure_known_pool(body.pool)
+    updated = await _pm_bulk_set_flags(
+        session,
+        body.pool,
+        body.phrases,
+        source=body.source,
+        hidden=body.hidden,
+        added_by=user.id,
+    )
+    log.info(
+        "admin.phrases_meta_bulk",
+        pool=body.pool,
+        updated=updated,
+        source=body.source,
+        hidden=body.hidden,
+        by=user.id,
+    )
+    return {"pool": body.pool, "updated": updated}
 
 
 # --- T3.3: алёрты «лох/чухан не запостился» ---
@@ -3097,6 +3256,38 @@ async def admin_put_bot_reactions(
     )
     log.info("admin.bot_reactions_updated", by=user.id, **body.model_dump())
     return body
+
+
+# --- H.1: пул коротких реплик бота (reply/mention, фидбек 19.06 #3) ---
+
+
+class ReplyPhrasesIO(BaseModel):
+    phrases: list[str] = Field(..., max_length=2000)
+
+
+@router.get("/admin/bot-reactions/reply-phrases", response_model=ReplyPhrasesIO)
+async def admin_get_reply_phrases(
+    session: SessionDep, user: CurrentUser
+) -> ReplyPhrasesIO:
+    """H.1: пул фраз, которыми бот отвечает на reply/упоминание."""
+    _ensure_admin(user)
+    from app.services.admin_config import get_reply_phrases
+
+    return ReplyPhrasesIO(phrases=await get_reply_phrases(session))
+
+
+@router.put("/admin/bot-reactions/reply-phrases", response_model=ReplyPhrasesIO)
+async def admin_put_reply_phrases(
+    body: ReplyPhrasesIO, session: SessionDep, user: CurrentUser
+) -> ReplyPhrasesIO:
+    """H.1: сохранить пул ответных фраз. Пустой список → бот молчит."""
+    _ensure_admin(user)
+    from app.services.admin_config import get_reply_phrases, set_reply_phrases
+
+    await set_reply_phrases(session, body.phrases)
+    saved = await get_reply_phrases(session)
+    log.info("admin.reply_phrases_updated", count=len(saved), by=user.id)
+    return ReplyPhrasesIO(phrases=saved)
 
 
 # --- GHG6 E10: avatars — разовый sync + одноразовое расписание ---

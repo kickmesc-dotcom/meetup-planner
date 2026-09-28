@@ -15,7 +15,9 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
-import ReasonsEditor from "./ReasonsEditor";
+import { Switch } from "@/components/Checkbox";
+import PhrasePoolEditor from "./PhrasePoolEditor";
+import type { PhrasePool } from "@/api/admin";
 
 interface Props {
   onBack: () => void;
@@ -280,11 +282,23 @@ export default function WormMasterScreen({ onBack }: Props) {
   );
 }
 
+/** J.2: ключ админ-пула → имя пула в снапшоте/метаданных фраз.
+ *  `punish` и `announce_lines` не носят префикс `worm_master_`. */
+const SNAPSHOT_POOL: Record<WormMasterPool, PhrasePool> = {
+  prefixes: "worm_master_prefixes",
+  suffixes: "worm_master_suffixes",
+  agrees: "worm_master_agrees",
+  nag: "worm_master_nag",
+  punish: "worm_punish",
+  announce_lines: "worm_announce_lines",
+};
+
 function PoolSection({
   title,
   badge,
   hint,
   placeholder,
+  pool,
   data,
   isPending,
   saving,
@@ -314,7 +328,8 @@ function PoolSection({
       {isPending || data === undefined ? (
         <ListSkeleton rows={3} />
       ) : (
-        <ReasonsEditor
+        <PhrasePoolEditor
+          pool={SNAPSHOT_POOL[pool]}
           initial={data}
           isPending={saving}
           placeholder={placeholder}
@@ -425,30 +440,3 @@ function NumRow({
   );
 }
 
-function Switch({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors",
-        checked ? "bg-tg-button" : "bg-tg-hint/30",
-      ].join(" ")}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        ].join(" ")}
-      />
-    </button>
-  );
-}

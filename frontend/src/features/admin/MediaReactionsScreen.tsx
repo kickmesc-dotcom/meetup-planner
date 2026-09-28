@@ -19,7 +19,8 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
-import ReasonsEditor from "./ReasonsEditor";
+import { Switch } from "@/components/Checkbox";
+import PhrasePoolEditor from "./PhrasePoolEditor";
 
 interface Props {
   onBack: () => void;
@@ -266,7 +267,8 @@ export default function MediaReactionsScreen({ onBack }: Props) {
         {singleQ.isPending || !singleQ.data ? (
           <ListSkeleton rows={3} />
         ) : (
-          <ReasonsEditor
+          <PhrasePoolEditor
+            pool="media_single"
             initial={singleQ.data.phrases}
             isPending={saveSingle.isPending}
             placeholder="новая фраза…"
@@ -285,7 +287,8 @@ export default function MediaReactionsScreen({ onBack }: Props) {
         {collectionQ.isPending || !collectionQ.data ? (
           <ListSkeleton rows={3} />
         ) : (
-          <ReasonsEditor
+          <PhrasePoolEditor
+            pool="media_collection"
             initial={collectionQ.data.phrases}
             isPending={saveCollection.isPending}
             placeholder="новая фраза…"
@@ -305,7 +308,8 @@ export default function MediaReactionsScreen({ onBack }: Props) {
         {emojiQ.isPending || !emojiQ.data ? (
           <ListSkeleton rows={2} />
         ) : (
-          <ReasonsEditor
+          <PhrasePoolEditor
+            pool="media_emoji"
             initial={emojiQ.data.phrases}
             isPending={saveEmoji.isPending}
             placeholder="новый эмодзи…"
@@ -467,30 +471,3 @@ function ForceButton({
   );
 }
 
-function Switch({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors",
-        checked ? "bg-tg-button" : "bg-tg-hint/30",
-      ].join(" ")}
-      role="switch"
-      aria-checked={checked}
-    >
-      <span
-        className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
-        ].join(" ")}
-      />
-    </button>
-  );
-}

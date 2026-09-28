@@ -308,7 +308,7 @@ function GestureHint({ edge }: { edge: "left" | "right" | "in" | "out" | null })
     const label = edge === "left" ? "вперёд" : "назад";
     return (
       <div
-        className={`${common} ${side} top-1/2 -translate-y-1/2 h-12 w-12 text-2xl font-bold animate-in fade-in zoom-in duration-150`}
+        className={`${common} ${side} top-1/2 -translate-y-1/2 h-12 w-12 text-2xl font-bold fade-in-soft`}
         title={label}
       >
         {arrow}
@@ -318,8 +318,7 @@ function GestureHint({ edge }: { edge: "left" | "right" | "in" | "out" | null })
   const icon = edge === "in" ? "+" : "−";
   const label = edge === "in" ? "детальнее" : "общий вид";
   return (
-    <div
-      className={`${common} left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-14 w-14 text-3xl font-bold animate-in fade-in zoom-in duration-150`}
+    <div        className={`${common} left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-14 w-14 text-3xl font-bold fade-in-soft`}
       title={label}
     >
       {icon}

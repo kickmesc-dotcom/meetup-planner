@@ -267,6 +267,13 @@ def build_announce_extra(
     return "\n".join(out)
 
 
+def format_nag_message(nag_text: str) -> str:
+    """H.5 (12.07 #1): оформить напоминание про /отвали как ОТДЕЛЬНОЕ служебное
+    сообщение — курсивом. Раньше nag склеивался с фразой поддакивания через
+    `\n\n` и рушил её забавность; теперь уходит самостоятельным сообщением."""
+    return f"<i>{nag_text}</i>"
+
+
 def pick_nag(phrases: list[str] | None, *, username: str) -> str | None:
     """Напоминание про /отвали. Честный random (счётчиков не держим).
 

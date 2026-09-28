@@ -13,6 +13,7 @@ import ProfileScreen from "./features/profile/ProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
+import ErrorState from "./components/ErrorState";
 import { useUI } from "./store/ui";
 import { haptic } from "./tg/webapp";
 
@@ -43,7 +44,7 @@ export default function App() {
 
   if (me.isPending || users.isPending) {
     return (
-      <div className="flex h-full flex-col p-4 gap-3 animate-pulse">
+      <div className="mx-auto flex h-full w-full max-w-[560px] flex-col p-4 gap-3 animate-pulse">
         <div className="h-12 rounded-xl bg-tg-secondary-bg/60" />
         <div className="h-24 rounded-xl bg-tg-secondary-bg/60" />
         <div className="h-24 rounded-xl bg-tg-secondary-bg/60" />
@@ -68,14 +69,22 @@ export default function App() {
       );
     }
     return (
-      <div className="p-6 text-status-busy">
-        Ошибка авторизации: {String(me.error)}
-      </div>
+      <ErrorState
+        error={me.error}
+        onRetry={() => me.refetch()}
+        title="Ошибка авторизации"
+      />
     );
   }
 
   if (users.isError || !users.data) {
-    return <div className="p-6 text-status-busy">Не удалось загрузить участников</div>;
+    return (
+      <ErrorState
+        error={users.error}
+        onRetry={() => users.refetch()}
+        title="Не удалось загрузить участников"
+      />
+    );
   }
 
   const meData = me.data!;
@@ -167,7 +176,9 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    // DESIGN_SYSTEM §9: центрированная колонка 560px — на планшете/десктопе
+    // приложение читается как мини-апп, а не растягивается на всю ширину.
+    <div className="mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
       {content}
       <TabBar isAdmin={isAdmin} />
     </div>

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import type { AvailabilityRange } from "@/types";
-import { PillRect, statusColor, statusLabel, statusLabelShort } from "./dateUtils";
+import { PillRect, statusPillBg, statusLabel, statusLabelShort } from "./dateUtils";
 
 interface Props {
   range: AvailabilityRange;
@@ -64,8 +64,10 @@ export default function RangePill({
       style={{
         left,
         width,
-        background: statusColor(range.status),
-        opacity: range.confidence >= 4 ? 0.7 : 1,
+        // DESIGN_SYSTEM §1.2/§6: darkened pill bg + white text = WCAG AA at 11px.
+        // Confidence is already encoded by the cell fill, so we no longer fade the
+        // pill (the old opacity<1 pushed the label below AA contrast).
+        background: statusPillBg(range.status),
         borderTopLeftRadius: radiusL,
         borderBottomLeftRadius: radiusL,
         borderTopRightRadius: radiusR,

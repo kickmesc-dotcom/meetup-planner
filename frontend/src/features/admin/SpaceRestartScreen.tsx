@@ -159,7 +159,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
                   });
                 }}
                 className={[
-                  "flex-1 min-h-9 rounded-md transition-colors",
+                  "flex-1 min-h-11 rounded-md transition-colors",
                   draft.mode === mode
                     ? "bg-tg-button text-tg-button-text font-medium"
                     : "text-tg-hint",

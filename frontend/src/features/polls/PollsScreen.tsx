@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { ru } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { fetchPolls, type Poll } from "@/api/meetings";
+import ErrorState from "@/components/ErrorState";
 import type { User } from "@/types";
 
 interface Props {
@@ -20,7 +22,7 @@ export default function PollsScreen({ users, meId }: Props) {
     return <PollsSkeleton />;
   }
   if (polls.isError) {
-    return <div className="p-6 text-status-busy">Ошибка: {String(polls.error)}</div>;
+    return <ErrorState error={polls.error} onRetry={() => polls.refetch()} />;
   }
   const list = polls.data ?? [];
   if (list.length === 0) {
@@ -78,7 +80,9 @@ function PollCard({
             {closesAt && (
               <>
                 {" · "}
-                {isClosed ? "закрыт" : `до ${format(closesAt, "d MMM HH:mm")}`}
+                {isClosed
+                  ? "закрыт"
+                  : `до ${format(closesAt, "d MMM HH:mm", { locale: ru })}`}
               </>
             )}
           </div>
@@ -120,7 +124,8 @@ function PollCard({
                 <div className="min-w-0">
                   <div className="font-medium truncate">
                     {isWinner && "🏆 "}
-                    {o.label ?? format(new Date(o.starts_at), "d MMM HH:mm")}
+                    {o.label ??
+                      format(new Date(o.starts_at), "d MMM HH:mm", { locale: ru })}
                   </div>
                   {o.voter_user_ids.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap gap-1">

@@ -18,7 +18,7 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
             haptic("light");
             onBack();
           }}
-          className="min-h-9 min-w-9 rounded-md bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
+          className="min-h-11 min-w-11 rounded-md bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
           aria-label="Назад"
         >
           ←

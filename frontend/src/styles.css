@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* DESIGN_SYSTEM §1.2: availability status scale. `*-fill` = large tinted areas
+   (cells, drag preview); `*-pill` = darkened background that carries white text
+   at 11px (>= 4.5:1 WCAG AA, verified in both light and Telegram-dark themes).
+   Fixed hexes on purpose: status must read identically regardless of the theme. */
+:root {
+  --status-free-fill: #22c55e;
+  --status-maybe-fill: #f59e0b;
+  --status-busy-fill: #ef4444;
+  --status-free-pill: #15803d;
+  --status-maybe-pill: #b45309;
+  --status-busy-pill: #b91c1c;
+}
+
 html,
 body,
 #root {
@@ -44,6 +57,21 @@ body,
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* DESIGN_SYSTEM §7: мягкое появление оверлеев. Раньше здесь были Tailwind-классы
+   `animate-in fade-in zoom-in` — но `tailwindcss-animate` не установлен, поэтому
+   они резолвились в animation-name:none (проверено в браузере). Анимируем только
+   opacity: transform-анимация сломала бы центрирование через -translate-*/. */
+@keyframes fade-in-soft {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in-soft {
+  animation: fade-in-soft 150ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-soft { animation: none; }
 }
 
 /* Поля ввода: наследуют тему TG (var из @twa-dev). Конкретный фон/цвет
@@ -155,4 +183,23 @@ header .text-base.font-medium {
   white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
+}
+
+/* DESIGN_SYSTEM §7: клавиатурный фокус. Приложение — Mini App, но Telegram
+   Desktop и внешние клавиатуры на Android — реальные поверхности, а до этого
+   правила не было ни одного: 41 `outline-none` в формах заменял обводку
+   сменой цвета рамки, а кнопки/ссылки/кастомные чекбоксы не показывали фокус
+   вообще. `:focus-visible` (а не `:focus`) — чтобы тапы не рисовали кольцо.
+   Цвет — `tg-link`, т.е. тема остаётся источником правды. */
+:focus-visible {
+  outline: 2px solid var(--tg-theme-link-color, #2481cc);
+  outline-offset: 2px;
+}
+
+/* Текстовые поля уже сигналят фокус сменой цвета рамки (`focus:border-tg-link`)
+   — второе кольцо поверх было бы шумом в плотных админ-формах. */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }

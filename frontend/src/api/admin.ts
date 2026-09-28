@@ -42,6 +42,22 @@ export const fetchChukhanHistory = () =>
 export const fetchChukhanLeaderboard = () =>
   api<ChukhanLeaderRow[]>("/api/chukhan/leaderboard");
 
+// --- H.3: длительность опроса-обжалования чухана (прод-фидбек 22.06 #1) ---
+
+export interface ChukhanAppealPoll {
+  minutes: number;
+  bounds: [number, number];
+}
+
+export const fetchChukhanAppealPoll = () =>
+  api<ChukhanAppealPoll>("/api/admin/chukhan/appeal-poll");
+
+export const updateChukhanAppealPoll = (minutes: number) =>
+  api<ChukhanAppealPoll>("/api/admin/chukhan/appeal-poll", {
+    method: "PUT",
+    body: JSON.stringify({ minutes }),
+  });
+
 export interface ScheduledJob {
   id: string;
   // GHG6 M: backend стал возвращать также "date" и "unknown" для системных,
@@ -295,10 +311,19 @@ export interface PhraseSnapshot {
   }>;
 }
 
+export interface SnapshotPoolSummary {
+  count: number;
+  // H.4: дельта по пулу (сколько добавилось/убавилось при импорте).
+  before?: number;
+  added?: number;
+  removed?: number;
+}
+
 export interface SnapshotImportSummary {
   mode: "replace" | "merge";
-  pools: Record<string, { count: number }>;
+  pools: Record<string, SnapshotPoolSummary>;
   personas: { restored?: number; skipped?: number };
+  meta?: { merged: number };
 }
 
 export const fetchPhrasesSnapshot = () =>
@@ -307,10 +332,66 @@ export const fetchPhrasesSnapshot = () =>
 export const importPhrasesSnapshot = (
   snapshot: unknown,
   mode: "replace" | "merge",
+  // J.1: пометить все импортируемые фразы источником ("ai" для дропов).
+  source?: PhraseSource,
 ) =>
   api<SnapshotImportSummary>("/api/admin/phrases/snapshot/import", {
     method: "POST",
-    body: JSON.stringify({ snapshot, mode }),
+    body: JSON.stringify({ snapshot, mode, source }),
+  });
+
+// --- J.1: метаданные фраз (источник + мягкое скрытие) ---
+
+/** Имена пулов совпадают со снапшот-ключами (`phrase_snapshot._POOL_KEYS`). */
+export type PhrasePool =
+  | "loser_reasons"
+  | "chukhan_reasons"
+  | "advice"
+  | "media_single"
+  | "media_collection"
+  | "media_emoji"
+  | "worm_master_prefixes"
+  | "worm_master_suffixes"
+  | "worm_master_agrees"
+  | "worm_master_nag"
+  | "worm_punish"
+  | "worm_announce_lines"
+  | "reply_phrases";
+
+export type PhraseSource = "manual" | "ai" | "import" | "persona";
+
+export interface PhraseMetaItem {
+  phrase: string;
+  source: PhraseSource;
+  hidden: boolean;
+}
+
+export interface PhraseMetaOut {
+  pool: PhrasePool;
+  items: PhraseMetaItem[];
+}
+
+export const fetchPhraseMeta = (pool: PhrasePool) =>
+  api<PhraseMetaOut>(`/api/admin/phrases/meta?pool=${encodeURIComponent(pool)}`);
+
+export const updatePhraseMeta = (
+  pool: PhrasePool,
+  phrase: string,
+  patch: { source?: PhraseSource; hidden?: boolean },
+) =>
+  api<PhraseMetaItem>("/api/admin/phrases/meta", {
+    method: "POST",
+    body: JSON.stringify({ pool, phrase, ...patch }),
+  });
+
+export const bulkPhraseMeta = (
+  pool: PhrasePool,
+  phrases: string[],
+  patch: { source?: PhraseSource; hidden?: boolean },
+) =>
+  api<{ pool: string; updated: number }>("/api/admin/phrases/meta/bulk", {
+    method: "POST",
+    body: JSON.stringify({ pool, phrases, ...patch }),
   });
 
 // --- T3.3: алёрты «лох/чухан не запостился» ---
@@ -916,6 +997,20 @@ export const updateBotReactions = (s: BotReactionsSettings) =>
   api<BotReactionsSettings>("/api/admin/bot-reactions", {
     method: "PUT",
     body: JSON.stringify(s),
+  });
+
+// H.1: отдельный пул коротких реплик бота (reply/mention).
+export interface ReplyPhrases {
+  phrases: string[];
+}
+
+export const fetchReplyPhrases = () =>
+  api<ReplyPhrases>("/api/admin/bot-reactions/reply-phrases");
+
+export const updateReplyPhrases = (phrases: string[]) =>
+  api<ReplyPhrases>("/api/admin/bot-reactions/reply-phrases", {
+    method: "PUT",
+    body: JSON.stringify({ phrases }),
   });
 
 // --- GHG7 P5: реакции бота на медиа (мемы/подборки) ---

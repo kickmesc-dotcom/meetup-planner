@@ -9,7 +9,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Toggle } from "@/components/Checkbox";
 import SubScreen from "./SubScreen";
-import ReasonsEditor from "./ReasonsEditor";
+import PhrasePoolEditor from "./PhrasePoolEditor";
 
 interface Props {
   onBack: () => void;
@@ -90,7 +90,8 @@ export default function AdviceScreen({ onBack }: Props) {
         {advice.isPending || !advice.data ? (
           <ListSkeleton rows={5} />
         ) : (
-          <ReasonsEditor
+          <PhrasePoolEditor
+            pool="advice"
             initial={advice.data.phrases}
             isPending={savePhrases.isPending}
             placeholder="например: Звёзды говорят да, но звёзды — лохи"

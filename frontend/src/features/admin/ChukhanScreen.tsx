@@ -6,12 +6,14 @@ import {
   setChukhanReasonUseCount,
   fetchChukhanHistory,
   fetchChukhanReasons,
+  fetchChukhanAppealPoll,
   fetchChukhanReasonsRaw,
   fetchChukhanReasonUseCounts,
   fetchWeights,
   forceReroll,
   resetChukhanReasons,
   resetWeight,
+  updateChukhanAppealPoll,
   updateChukhanReasons,
   updateWeight,
 } from "@/api/admin";
@@ -21,7 +23,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
-import ReasonsEditor from "./ReasonsEditor";
+import PhrasePoolEditor from "./PhrasePoolEditor";
 
 interface Props {
   users: User[];
@@ -127,6 +129,24 @@ export default function ChukhanScreen({ users, onBack }: Props) {
     },
   });
 
+  // H.3 (прод-фидбек 22.06 #1): длительность опроса-обжалования чухана.
+  // Раньше `open_period` был захардкожен (1ч) — «никто не успел проголосовать».
+  const appeal = useQuery({
+    queryKey: ["admin", "chukhan-appeal-poll"],
+    queryFn: fetchChukhanAppealPoll,
+  });
+  const saveAppeal = useMutation({
+    mutationFn: updateChukhanAppealPoll,
+    onSuccess: (res) => {
+      haptic("success");
+      qc.setQueryData(["admin", "chukhan-appeal-poll"], res);
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
   const userByTg = Object.fromEntries(users.map((u) => [u.telegram_id, u] as const));
   const userById = Object.fromEntries(users.map((u) => [u.id, u] as const));
 
@@ -192,7 +212,8 @@ export default function ChukhanScreen({ users, onBack }: Props) {
         {reasons.isPending || !reasons.data ? (
           <ListSkeleton rows={5} />
         ) : (
-          <ReasonsEditor
+          <PhrasePoolEditor
+            pool="chukhan_reasons"
             initial={reasons.data.reasons}
             isPending={saveReasons.isPending}
             placeholder="например: на этой неделе вообще пропал"
@@ -249,6 +270,29 @@ export default function ChukhanScreen({ users, onBack }: Props) {
         >
           {resetReasons.isPending ? "Сбрасываю…" : "↩ Сбросить к дефолтам из кода"}
         </button>
+      </section>
+
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-base font-semibold mb-1">⏱ Оспаривание чухана</div>
+        <div className="text-xs text-tg-hint mb-2">
+          Сколько длится опрос «согласны с чуханом?» после анонса. Раньше был жёстко
+          1 час — никто не успевал проголосовать.
+        </div>
+        {appeal.isPending || !appeal.data ? (
+          <ListSkeleton rows={2} />
+        ) : (
+          <MinutesRow
+            value={appeal.data.minutes}
+            bounds={appeal.data.bounds}
+            saving={saveAppeal.isPending}
+            onSave={(m) => saveAppeal.mutate(m)}
+          />
+        )}
+        {appeal.isError && (
+          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            ⚠ {humanizeApiError(appeal.error)}
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
@@ -350,6 +394,89 @@ function WeightRow({
       >
         ↺
       </button>
+    </div>
+  );
+}
+
+/**
+ * H.3: длительность опроса-обжалования в минутах (15 мин … 24 ч).
+ *
+ * Границы диапазона приходят с бэка (единый источник правды), а пресеты —
+ * чтобы не считать часы в голове.
+ */
+function MinutesRow({
+  value,
+  bounds,
+  saving,
+  onSave,
+}: {
+  value: number;
+  bounds: [number, number];
+  saving: boolean;
+  onSave: (minutes: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const parsed = parseInt(draft, 10);
+  const [lo, hi] = bounds;
+  const valid = !Number.isNaN(parsed) && parsed >= lo && parsed <= hi;
+  const dirty = valid && parsed !== value;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={lo}
+          max={hi}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="w-24 rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right tabular-nums outline-none border border-transparent focus:border-tg-link"
+        />
+        <span className="text-xs text-tg-hint">
+          минут · сейчас ≈ {(value / 60).toFixed(value % 60 === 0 ? 0 : 1)} ч
+        </span>
+        <button
+          type="button"
+          disabled={!dirty || saving}
+          onClick={() => onSave(parsed)}
+          className="ml-auto min-h-11 min-w-11 rounded-md bg-tg-link/15 px-3 text-xs text-tg-link disabled:opacity-40"
+        >
+          {saving ? "…" : "OK"}
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-1.5 text-[11px]">
+        {(
+          [
+            [60, "1 ч"],
+            [360, "6 ч"],
+            [720, "12 ч"],
+            [1440, "24 ч"],
+          ] as Array<[number, string]>
+        ).map(([m, label]) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => {
+              haptic("selection");
+              onSave(m);
+            }}
+            className={`rounded-full px-2 py-1 transition ${
+              value === m ? "bg-tg-button text-tg-button-text" : "bg-tg-bg/70 text-tg-hint"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {!valid && draft.trim() !== "" && (
+        <div className="text-[11px] text-status-busy">
+          Допустимо от {lo} до {hi} минут.
+        </div>
+      )}
     </div>
   );
 }

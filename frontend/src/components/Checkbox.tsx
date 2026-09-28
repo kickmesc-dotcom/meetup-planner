@@ -44,6 +44,58 @@ export function Checkbox({
   );
 }
 
+interface SwitchProps {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+  /** Тактильная отдача при переключении (по умолчанию — да). */
+  hapticOnChange?: boolean;
+}
+
+/**
+ * DESIGN_SYSTEM §8: единый on/off-переключатель.
+ *
+ * Раньше был скопирован локально в 7 экранах (Profile, CalendarSettings,
+ * BotReactions, MediaReactions, ScheduledPublications, Zaebal, WormMaster) —
+ * каждая копия слегка отличалась. Теперь это единственный источник.
+ *
+ * `haptic("selection")` внутри по умолчанию — переключение всегда «отзывается»
+ * одинаково на всех экранах. Отключается через `hapticOnChange={false}`.
+ */
+export function Switch({
+  checked,
+  onChange,
+  disabled,
+  className,
+  hapticOnChange = true,
+}: SwitchProps) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => {
+        if (hapticOnChange) haptic("selection");
+        onChange(!checked);
+      }}
+      className={[
+        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50",
+        checked ? "bg-tg-button" : "bg-tg-hint/30",
+        className ?? "",
+      ].join(" ")}
+      role="switch"
+      aria-checked={checked}
+    >
+      <span
+        className={[
+          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+          checked ? "translate-x-5" : "translate-x-0.5",
+        ].join(" ")}
+      />
+    </button>
+  );
+}
+
 interface ToggleProps {
   checked: boolean;
   onChange: (next: boolean) => void;

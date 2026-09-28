@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addMonths, format } from "date-fns";
+import { ru } from "date-fns/locale";
 import { motion } from "framer-motion";
 import {
   cancelMeeting,
@@ -11,6 +12,7 @@ import {
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
 import { CardSkeleton } from "@/components/Skeleton";
+import ErrorState from "@/components/ErrorState";
 
 const RSVP_LABELS: Record<number, string> = {
   0: "?",
@@ -83,7 +85,9 @@ export default function MeetingsScreen({ users, meId }: Props) {
     );
   }
   if (meetings.isError) {
-    return <div className="p-6 text-status-busy">Ошибка: {String(meetings.error)}</div>;
+    return (
+      <ErrorState error={meetings.error} onRetry={() => meetings.refetch()} />
+    );
   }
   const list = (meetings.data ?? []).filter((m) => m.status !== "cancelled");
   if (list.length === 0) {
@@ -149,7 +153,8 @@ function Card({
         <div className="min-w-0">
           <div className="text-base font-semibold truncate">{meeting.title}</div>
           <div className="text-xs text-tg-hint">
-            {format(start, "EEE d MMM, HH:mm")} – {format(end, "HH:mm")}
+            {format(start, "EEE d MMM, HH:mm", { locale: ru })} –{" "}
+            {format(end, "HH:mm", { locale: ru })}
           </div>
           {meeting.location && (
             <div className="text-xs text-tg-hint mt-0.5">📍 {meeting.location}</div>
