@@ -347,20 +347,34 @@ async def bot_reply_by_tg(session: AsyncSession, telegram_id: int) -> None:
     await achievements.on_bot_reply(session, int(uid))
 
 
+@_guarded("meme_all_reacted")
+async def meme_all_reacted(session: AsyncSession, user_id: int) -> None:
+    """Э7: на мем отреагировали все живые → «Мемолог» (зовёт телеметрия)."""
+    if not await _enabled(session):
+        return
+    await achievements.on_meme_all_reacted(session, user_id)
+
+
 @_guarded("meme_reactions")
 async def meme_reactions(session: AsyncSession, user_id: int) -> None:
-    """Э7: пост с мемом собрал реакции (зовёт телеметрия мем-ачивок)."""
+    """Э7: пост закрылся с реакциями → счётчик «Успешного успеха»."""
     if not await _enabled(session):
         return
     await achievements.on_meme_reactions(session, user_id)
 
 
 @_guarded("dead_post")
-async def dead_post(session: AsyncSession, user_id: int) -> None:
-    """Э7: 12 часов тишины после поста."""
+async def dead_post(
+    session: AsyncSession, user_id: int, *, silent_chat: bool = True
+) -> None:
+    """Э7: 12 часов без откликов на пост.
+
+    `silent_chat=False` — пост проигнорировали в живом чате: «Опиум» начислим,
+    «Forever alone» — нет (он про полную тишину, а не про игнор).
+    """
     if not await _enabled(session):
         return
-    await achievements.on_dead_post(session, user_id)
+    await achievements.on_dead_post(session, user_id, silent_chat=silent_chat)
 
 
 @_guarded("donation_sent")

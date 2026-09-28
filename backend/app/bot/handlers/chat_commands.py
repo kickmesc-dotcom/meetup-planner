@@ -37,6 +37,87 @@ def _is_member(tg_id: int | None) -> bool:
     return tg_id in _whitelist_set()
 
 
+# ---------------------- GHG10 Э5.4: /rank, /ranks, /xp ----------------------
+#
+# Отчёты живут в `services/game/report.py` (чистые форматтеры + по одному
+# SELECT), здесь только транспорт. Все три команды молчат, когда рубильник
+# выключен: игра, выключенная снаружи, не должна отвечать в чате вообще.
+
+
+async def _game_user_pk(session, tg_id: int) -> tuple[int, str] | None:
+    """PK и display_name участника по TG-id. None — такого в базе нет."""
+    row = (
+        await session.execute(
+            select(User.id, User.display_name).where(User.telegram_id == tg_id)
+        )
+    ).first()
+    if row is None:
+        return None
+    return int(row[0]), row[1]
+
+
+@router.message(Command("rank"))
+async def on_rank(message: Message) -> None:
+    """«Мой ранг»: ранг, шкала до следующего, дневной итог, что открыто."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            found = await _game_user_pk(session, message.from_user.id)
+            if found is None:
+                return
+            text = await report.my_rank_text(
+                session, user_id=found[0], display_name=found[1]
+            )
+    except Exception as exc:  # noqa: BLE001 — отчёт не стоит падения хендлера
+        log.warning("chat.rank_failed", error=str(exc))
+        return
+    if text is None:  # игра выключена
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.message(Command("ranks"))
+async def on_ranks(message: Message) -> None:
+    """Чарт рангов: все участники от большего опыта к меньшему."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            text = await report.ranks_chart_text(session)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("chat.ranks_failed", error=str(exc))
+        return
+    if text is None:
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.message(Command("xp"))
+async def on_xp(message: Message) -> None:
+    """Правила начисления опыта. Список статический — но рубильник уважаем."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.game import report
+    from app.services.game.flags import is_game_enabled
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            if not await is_game_enabled(session):
+                return
+    except Exception as exc:  # noqa: BLE001 — молчим, если игру не спросить
+        log.warning("chat.xp_failed", error=str(exc))
+        return
+    await message.answer(report.xp_rules_text(), parse_mode="HTML")
+
+
 # ---------------------- C1: /phrase ----------------------
 
 @router.message(Command("phrase"))

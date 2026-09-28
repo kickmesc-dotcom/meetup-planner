@@ -584,14 +584,24 @@ async def on_bot_reply(
     )
 
 
+async def on_meme_all_reacted(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э7: на мем отреагировали ВСЕ живые участники → «Мемолог».
+
+    Отдельно от счётчика «Успешного успеха»: «все отреагировали» и «пост собрал
+    хоть одну реакцию» — разные события, и первое не должно выпадать каждому,
+    кому просто ответили смайликом.
+    """
+    ach = await grant(session, user_id, "memelog", announce=announce)
+    return [ach] if ach else []
+
+
 async def on_meme_reactions(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
-    """Э7: пост с мемом собрал реакции → «Мемолог» + счётчик «Успешного успеха»."""
+    """Э7: пост с мемом закрылся С реакциями → счётчик «Успешного успеха»."""
     out: list[Achievement] = []
-    ach = await grant(session, user_id, "memelog", announce=announce)
-    if ach:
-        out.append(ach)
     succ = get("successful_success")
     assert succ is not None and succ.threshold is not None
     count = await bump_counter(session, user_id, COUNTER_SUCCESS)
@@ -602,13 +612,24 @@ async def on_meme_reactions(
 
 
 async def on_dead_post(
-    session: AsyncSession, user_id: int, *, announce: bool = True
+    session: AsyncSession,
+    user_id: int,
+    *,
+    silent_chat: bool = True,
+    announce: bool = True,
 ) -> list[Achievement]:
-    """Э7: 12 часов тишины после поста → «Forever alone» + счётчик «Опиума»."""
+    """Э7: 12 часов без откликов на пост.
+
+    - счётчик «Опиума» растёт всегда: это и есть «пост, на который не
+      отреагировали 12 часов»;
+    - «Forever alone» — только если в чате вообще молчали (`silent_chat`):
+      мем, проигнорированный посреди живого флуда, — не «forever alone».
+    """
     out: list[Achievement] = []
-    ach = await grant(session, user_id, "forever_alone", announce=announce)
-    if ach:
-        out.append(ach)
+    if silent_chat:
+        ach = await grant(session, user_id, "forever_alone", announce=announce)
+        if ach:
+            out.append(ach)
     opium = get("opium_for_nobody")
     assert opium is not None and opium.threshold is not None
     count = await bump_counter(session, user_id, COUNTER_OPIUM)

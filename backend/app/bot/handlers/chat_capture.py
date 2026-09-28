@@ -100,5 +100,28 @@ async def on_group_message(message: Message) -> None:
             async with sm() as gsession:
                 await awards.message(gsession, user_pk, at=message.date)
 
+            # GHG10 Э7: сообщение может быть откликом на мем — reply на пост
+            # или «ответ сразу под постом». Своя сессия и best-effort: телеметрия
+            # не имеет права стоить нам самого сообщения (как и опыт — порядок
+            # «сначала факт, потом игра» соблюдён).
+            from app.services.game import memes
+
+            reply_to = (
+                message.reply_to_message.message_id
+                if message.reply_to_message is not None
+                else None
+            )
+            try:
+                async with sm() as msession:
+                    await memes.record_message_response(
+                        msession,
+                        chat_id=message.chat.id,
+                        telegram_id=message.from_user.id,
+                        at=message.date,
+                        reply_to_tg_message_id=reply_to,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("chat_capture.game_response_failed", error=str(exc))
+
     except Exception as exc:  # noqa: BLE001
         log.warning("chat_capture.failed", error=str(exc))

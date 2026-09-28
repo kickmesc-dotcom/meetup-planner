@@ -10,27 +10,35 @@
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
-from fastapi import APIRouter, Response, status
+import structlog
+from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, SessionDep
-from app.db.models import GameProfile, UserAchievement
+from app.config import get_settings
+from app.db.models import GameProfile, User, UserAchievement
 from app.schemas.game import (
     AchievementHolderOut,
     AchievementItemOut,
     DailyEventOut,
+    DonationIn,
+    DonationOut,
     FeatureOut,
     GameCustomizePatch,
     GameProfileOut,
+    HolidayCreate,
+    HolidayOut,
+    HolidaysOut,
     LevelUpOut,
     RankOut,
     RankRowOut,
     XpRuleOut,
 )
-from app.services.game import achievements, gates, levels, xp
+from app.services.game import achievements, donations, gates, holidays, levels, xp
 from app.services.game.achievements_catalog import base_achievements
 from app.services.game.config import (
     MAX_LEVEL,
@@ -43,6 +51,24 @@ from app.services.game.config import (
 from app.services.game.flags import is_game_enabled
 
 router = APIRouter(tags=["game"])
+
+log = structlog.get_logger()
+
+# Код фичи-праздников в `LEVEL_UNLOCKS` (открывается с 6 ранга).
+FEATURE_HOLIDAYS = "holidays_manage"
+
+# Код отказа доната → HTTP-статус. 409 — «уже было/нельзя сейчас», 400 — «нельзя
+# в принципе»: фронт показывает разные подсказки, поэтому коды не смешиваем.
+_DONATION_STATUS = {
+    donations.SELF_DONATION: status.HTTP_400_BAD_REQUEST,
+    donations.NOT_BIRTHDAY: status.HTTP_409_CONFLICT,
+    donations.ALREADY_DONATED: status.HTTP_409_CONFLICT,
+    donations.NOT_ENOUGH_XP: status.HTTP_400_BAD_REQUEST,
+}
+
+# Таймаут насмешки в чат (см. `_tease_in_chat`): как у остальных TG-вызовов из
+# API — не блокируем webhook дольше сессии.
+_TEASE_TIMEOUT = 15.0
 
 
 def _rank_out(level: int) -> RankOut:
@@ -207,6 +233,74 @@ async def ack_level_up(session: SessionDep, user: CurrentUser) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# --------------------------------------------------------------------------
+# Э11: донат опыта имениннику
+# --------------------------------------------------------------------------
+
+
+async def _tease_in_chat(display_name: str, *, xp_now: int) -> None:
+    """Насмешка в общий чат над попыткой задонатить то, чего нет (спека Э11).
+
+    Best-effort и с таймаутом: кнопка в мини-аппе не должна зависеть от того,
+    сможет ли бот сейчас написать в группу (РКН/троттлинг — регулярная история).
+    """
+    settings = get_settings()
+    if not settings.group_chat_id:
+        return
+    from app.bot.dispatcher import get_bot
+
+    text = donations.teasing_message(display_name, xp_now=xp_now)
+    try:
+        await asyncio.wait_for(
+            get_bot().send_message(
+                chat_id=settings.group_chat_id, text=text, parse_mode="HTML"
+            ),
+            timeout=_TEASE_TIMEOUT,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("game.donation_tease_failed", error=str(exc))
+
+
+@router.post("/game/donate", response_model=DonationOut)
+async def donate_xp(
+    body: DonationIn, session: SessionDep, user: CurrentUser
+) -> DonationOut:
+    """Подарить 100 XP имениннику, списав свои (кнопка у тортика в ДР)."""
+    if not await is_game_enabled(session):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
+
+    if body.user_id is None and body.telegram_id is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "recipient_required")
+    if body.user_id is not None:
+        recipient = await session.get(User, body.user_id)
+    else:
+        recipient = await session.scalar(
+            select(User).where(User.telegram_id == body.telegram_id)
+        )
+    if recipient is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+
+    res = await donations.donate(
+        session, donor_id=user.id, recipient_id=recipient.id
+    )
+    if not res.ok:
+        if res.code == donations.NOT_ENOUGH_XP:
+            # Спека: «можно высмеять в чат такую наивную попытку».
+            await _tease_in_chat(user.display_name, xp_now=res.donor_xp)
+        raise HTTPException(
+            _DONATION_STATUS.get(res.code, status.HTTP_400_BAD_REQUEST), res.code
+        )
+
+    return DonationOut(
+        ok=True,
+        code=res.code,
+        amount=res.amount,
+        donor_xp=res.donor_xp,
+        recipient_xp=res.recipient_xp,
+        recipient_name=recipient.display_name,
+    )
+
+
 @router.get("/game/achievements", response_model=list[AchievementHolderOut])
 async def achievements_chart(
     session: SessionDep, _: CurrentUser
@@ -216,6 +310,88 @@ async def achievements_chart(
         return []
     rows = await achievements.leaderboard(session)
     return [AchievementHolderOut(user_id=uid, count=cnt) for uid, cnt in rows]
+
+
+# --------------------------------------------------------------------------
+# Э10.3: пул праздников — «дата + сообщение»
+# --------------------------------------------------------------------------
+
+
+def _holiday_out(row) -> HolidayOut:
+    return HolidayOut(
+        id=row.id,
+        month=row.month,
+        day=row.day,
+        message=row.message,
+        enabled=row.enabled,
+    )
+
+
+@router.get("/game/holidays", response_model=HolidaysOut)
+async def holidays_list(session: SessionDep, user: CurrentUser) -> HolidaysOut:
+    """Список праздников + можно ли править (по заданию — с 6 ранга или админу).
+
+    Читать можно всем: праздник влияет на всех (+50 XP всему чату), поэтому
+    состав пула не секрет. Править — по гейту `holidays_manage`.
+    """
+    if not await is_game_enabled(session):
+        return HolidaysOut()
+    gate = await gates.check_feature(
+        session, FEATURE_HOLIDAYS, user_id=user.id, telegram_id=user.telegram_id
+    )
+    rows = await holidays.list_holidays(session)
+    return HolidaysOut(
+        can_manage=gate.allowed,
+        required_level=gate.required_level,
+        items=[_holiday_out(row) for row in rows],
+    )
+
+
+@router.post(
+    "/game/holidays",
+    response_model=HolidayOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def holiday_add(
+    body: HolidayCreate, session: SessionDep, user: CurrentUser
+) -> HolidayOut:
+    """Добавить праздник (гейт `holidays_manage`, Э10.3)."""
+    if not await is_game_enabled(session):
+        # У выключенной игры нет и её функций: иначе праздник завели бы в пустоту
+        # (job не работает, опыт не начисляется) и он бы «выстрелил» потом.
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
+    await gates.require_feature(session, user, FEATURE_HOLIDAYS)
+    try:
+        row = await holidays.add_holiday(
+            session,
+            month=body.month,
+            day=body.day,
+            message=body.message,
+            created_by_user_id=user.id,
+        )
+    except holidays.HolidayError as exc:
+        # Занятая дата — это конфликт, кривой ввод — 400: фронт показывает разные
+        # подсказки, поэтому коды должны различаться. Пересказ в текст — на клиенте.
+        code = (
+            status.HTTP_409_CONFLICT
+            if exc.code == "holiday_date_taken"
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(code, exc.code) from exc
+    return _holiday_out(row)
+
+
+@router.delete("/game/holidays/{holiday_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def holiday_delete(
+    holiday_id: int, session: SessionDep, user: CurrentUser
+) -> Response:
+    """Убрать праздник. Гейт тот же, что на добавление (одно право — обе ручки)."""
+    if not await is_game_enabled(session):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
+    await gates.require_feature(session, user, FEATURE_HOLIDAYS)
+    if not await holidays.remove_holiday(session, holiday_id=holiday_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "holiday_not_found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/game/ranks", response_model=list[RankRowOut])

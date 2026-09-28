@@ -45,6 +45,10 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("chukhan", "Чухан недели", scope="both"),
     CommandSpec("top", "Топы лохов и чуханов за всё время", scope="both"),
     CommandSpec("tasks", "Запланированные задачи бота", scope="both"),
+    # --- Игра (GHG10 Э5.4) ---
+    CommandSpec("rank", "🏅 Мой ранг и сколько до следующего", scope="both"),
+    CommandSpec("ranks", "📊 Чарт рангов участников", scope="both"),
+    CommandSpec("xp", "⚡️ За что дают опыт", scope="both"),
     # --- Действия ---
     CommandSpec("loser", "Назначить лоха дня (ручная рулетка)", scope="both"),
     CommandSpec("phrase", "Прогнать рандомную фразу", scope="both"),

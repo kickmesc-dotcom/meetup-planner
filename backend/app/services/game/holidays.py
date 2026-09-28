@@ -30,6 +30,99 @@ from app.services.game import awards
 
 log = structlog.get_logger()
 
+# Сколько символов в поздравлении. Длинное сообщение не влезает в анонс чата и
+# ломает ритм праздника, поэтому режем, а не отклоняем.
+MAX_HOLIDAY_MESSAGE = 200
+
+# Длины месяцев: 29 февраля принимаем (праздник ежегодный, в високосный год он
+# существует - запрещать его из-за трёх невисокосных лет подряд глупо).
+_DAYS_IN_MONTH = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
+class HolidayError(ValueError):
+    """Некорректный праздник. `code` уезжает в API как `detail` (Э10.3).
+
+    Коды, а не текст: фронт переводит их сам (`humanizeApiError`), а бот —
+    в `denial_message`. Так одна ошибка обслуживает обе поверхности.
+    """
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+def normalize_message(raw: str | None) -> str:
+    """Текст поздравления: края срезаем, пустое - ошибка.
+
+    Праздник без сообщения бессмыслен: анонс в чат состоит из него.
+    """
+    text = (raw or "").strip()
+    if not text:
+        raise HolidayError("holiday_message_empty")
+    return text[:MAX_HOLIDAY_MESSAGE]
+
+
+def validate_month_day(month: int, day: int) -> None:
+    """Месяц 1-12 и день в пределах месяца. Чистая - тестируется без БД."""
+    if not 1 <= month <= 12:
+        raise HolidayError("holiday_month_invalid")
+    if not 1 <= day <= _DAYS_IN_MONTH[month - 1]:
+        raise HolidayError("holiday_day_invalid")
+
+
+async def list_holidays(
+    session: AsyncSession, *, only_enabled: bool = False
+) -> list[GameHoliday]:
+    """Все праздники в календарном порядке (Э10.3 - для админской поверхности)."""
+    stmt = select(GameHoliday).order_by(GameHoliday.month, GameHoliday.day)
+    if only_enabled:
+        stmt = stmt.where(GameHoliday.enabled.is_(True))
+    return list((await session.scalars(stmt)).all())
+
+
+async def add_holiday(
+    session: AsyncSession,
+    *,
+    month: int,
+    day: int,
+    message: str | None,
+    created_by_user_id: int | None = None,
+) -> GameHoliday:
+    """Добавить праздник. Дубликат даты - `HolidayError('holiday_date_taken')`.
+
+    Одна дата = один праздник (unique в БД): иначе в день начислилось бы дважды,
+    а анонс стал бы неоднозначным (что именно празднуем?).
+    """
+    validate_month_day(month, day)
+    text = normalize_message(message)
+    existing = await session.scalar(
+        select(GameHoliday).where(
+            GameHoliday.month == month, GameHoliday.day == day
+        )
+    )
+    if existing is not None:
+        raise HolidayError("holiday_date_taken")
+    row = GameHoliday(
+        month=month,
+        day=day,
+        message=text,
+        enabled=True,
+        created_by_user_id=created_by_user_id,
+    )
+    session.add(row)
+    await session.commit()
+    return row
+
+
+async def remove_holiday(session: AsyncSession, *, holiday_id: int) -> bool:
+    """Удалить праздник. False - такого нет (роут отдаст 404)."""
+    row = await session.get(GameHoliday, holiday_id)
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.commit()
+    return True
+
 
 async def holidays_today(
     session: AsyncSession, *, today: date | None = None

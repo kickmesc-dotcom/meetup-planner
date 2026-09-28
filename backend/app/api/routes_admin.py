@@ -6,7 +6,7 @@ import structlog
 # Добавлен импорт Response
 from fastapi import APIRouter, HTTPException, status, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.deps import CurrentUser, SessionDep
@@ -3783,3 +3783,257 @@ async def admin_space_restart_now(
 
     _asyncio.create_task(_fire())
     return {"status": "restarting"}
+
+
+# --- GHG10 Э5.5: экран игры в админке ---------------------------------------
+#
+# До этого экрана рубильник жил только в БД: включить игру было нечем, а
+# выключить — только руками через `admin_config`. Здесь тот же набор, что и в
+# мини-аппе, плюс инструменты отладки (ручная выдача ачивок и правка опыта),
+# без которых новые ранги/ачивки не проверить иначе как SQL'ем.
+#
+# Гейтинга по рангам тут НЕТ и быть не должно: админ — это админ (Э8:
+# «гейтинг добавляется только как дополнительная проверка поверх текущих прав»),
+# а рубильник обязан быть доступен в любой момент — иначе он бесполезен.
+
+
+class GameAdminOut(BaseModel):
+    """Состояние игровой системы для экрана админки."""
+
+    enabled: bool
+    debug_tg_ids: list[int]
+    max_level: int
+    achievements_total: int
+    players: int
+
+
+class GameToggleIn(BaseModel):
+    """Рубильник (Э1) + список отладочных TG-id («Серж нео»).
+
+    `debug_tg_ids=None` — не трогать (частая правка одного рубильника не должна
+    случайно затирать список отладчиков).
+    """
+
+    enabled: bool
+    debug_tg_ids: list[int] | None = None
+
+
+class GamePlayerOut(BaseModel):
+    """Карточка игрока: ранг, опыт и собранные ачивки (для проверки руками)."""
+
+    telegram_id: int
+    name: str
+    xp: int
+    level: int
+    rank_name: str
+    prestige: int
+    achievements: list[str]
+    counters: dict[str, int]
+
+
+class GamePlayerIn(BaseModel):
+    """Цель отладочного действия: по TG-id (удобнее из UI) или PK юзера."""
+
+    telegram_id: int | None = None
+    user_id: int | None = None
+
+
+class GameGrantIn(GamePlayerIn):
+    code: str
+
+
+class GameResetIn(GamePlayerIn):
+    """Сброс ачивок. `code=None` — сбросить все; `counters=True` — ещё и накопители."""
+
+    code: str | None = None
+    counters: bool = False
+
+
+class GameXpIn(GamePlayerIn):
+    """Установить опыт АБСОЛЮТНО (не «прибавить»): для проверки рангов нужно
+    предсказуемое число — «поставь 800 и покажи, что иммунитет включился»."""
+
+    xp_total: int = Field(..., ge=0, le=100000)
+
+
+async def _game_player(session, *, telegram_id: int | None, user_id: int | None) -> User:
+    """Найти отлаживаемого участника по TG-id или PK. 404 — ни того, ни другого."""
+    if user_id is not None:
+        found = await session.get(User, user_id)
+    elif telegram_id is not None:
+        from app.services.game.awards import user_id_for_tg
+
+        pk = await user_id_for_tg(session, telegram_id)
+        found = await session.get(User, pk) if pk is not None else None
+    else:
+        found = None
+    if found is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user_not_found")
+    return found
+
+
+async def _game_player_out(session, user: User) -> GamePlayerOut:
+    """Карточка игрока одним запросом на ачивки и одним на накопители."""
+    from app.services.game import levels, xp
+    from app.services.game.achievements import collected_codes, progress
+
+    total = await xp.get_xp(session, user.id)
+    prog = levels.progress_for_xp(total)
+    return GamePlayerOut(
+        telegram_id=user.telegram_id,
+        name=user.display_name,
+        xp=total,
+        level=prog.level,
+        rank_name=prog.rank.name,
+        prestige=prog.prestige,
+        achievements=sorted(await collected_codes(session, user.id)),
+        counters=await progress(session, user.id),
+    )
+
+
+@router.get("/admin/game", response_model=GameAdminOut)
+async def admin_game_get(session: SessionDep, user: CurrentUser) -> GameAdminOut:
+    """Состояние игровой системы (рубильник + отладочные id + счётчики)."""
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        get_game_debug_tg_ids,
+        get_game_enabled,
+    )
+    from app.services.game.achievements_catalog import all_achievements
+    from app.services.game.config import MAX_LEVEL
+    from app.db.models import GameProfile
+
+    return GameAdminOut(
+        enabled=await get_game_enabled(session),
+        debug_tg_ids=await get_game_debug_tg_ids(session),
+        max_level=MAX_LEVEL,
+        achievements_total=len(all_achievements()),
+        players=int(
+            await session.scalar(select(func.count()).select_from(GameProfile)) or 0
+        ),
+    )
+
+
+@router.put("/admin/game", response_model=GameAdminOut)
+async def admin_game_put(
+    body: GameToggleIn, session: SessionDep, user: CurrentUser
+) -> GameAdminOut:
+    """Переключить рубильник и/или список отладочных id, затем пересобрать job'ы.
+
+    `reload_dynamic_jobs` зовём сразу: игровые job'ы (праздники, недельный итог,
+    разбор мемов) регистрируются ТОЛЬКО при включённой игре — без перезагрузки
+    выключение оставило бы их тикать до следующего рестарта Space.
+    """
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        get_game_debug_tg_ids,
+        set_game_debug_tg_ids,
+        set_game_enabled,
+    )
+
+    await set_game_enabled(session, body.enabled)
+    if body.debug_tg_ids is not None:
+        await set_game_debug_tg_ids(session, body.debug_tg_ids)
+    log.info(
+        "admin.game_toggled",
+        enabled=body.enabled,
+        debug=await get_game_debug_tg_ids(session),
+        by=user.id,
+    )
+    try:
+        from app.bot.dispatcher import get_bot
+
+        await reload_dynamic_jobs(get_bot())
+    except Exception as exc:  # noqa: BLE001 — состояние уже сохранено
+        log.warning("admin.game_reload_failed", error=str(exc))
+    return await admin_game_get(session, user)
+
+
+@router.get("/admin/game/player", response_model=GamePlayerOut)
+async def admin_game_player(
+    telegram_id: int, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Карточка игрока: ранг, опыт, собранные ачивки, накопители."""
+    _ensure_admin(user)
+    return await _game_player_out(
+        session, await _game_player(session, telegram_id=telegram_id, user_id=None)
+    )
+
+
+@router.post("/admin/game/grant", response_model=GamePlayerOut)
+async def admin_game_grant(
+    body: GameGrantIn, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Выдать ачивку по коду (через фасад — значит за рубильником и с анонсом)."""
+    _ensure_admin(user)
+    from app.services.game import awards
+    from app.services.game.achievements_catalog import get as catalog_get
+
+    if catalog_get(body.code) is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown_achievement")
+    target = await _game_player(
+        session, telegram_id=body.telegram_id, user_id=body.user_id
+    )
+    await awards.achievement(session, target.id, body.code)
+    log.info("admin.game_granted", code=body.code, target=target.id, by=user.id)
+    return await _game_player_out(session, target)
+
+
+@router.post("/admin/game/reset", response_model=GamePlayerOut)
+async def admin_game_reset(
+    body: GameResetIn, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Сбросить ачивки (одну или все) и, по желанию, накопители под них."""
+    _ensure_admin(user)
+    from app.db.models import AchievementCounter, UserAchievement
+
+    target = await _game_player(
+        session, telegram_id=body.telegram_id, user_id=body.user_id
+    )
+    stmt = delete(UserAchievement).where(UserAchievement.user_id == target.id)
+    if body.code:
+        stmt = stmt.where(UserAchievement.code == body.code)
+    removed = (await session.execute(stmt)).rowcount or 0
+    if body.counters:
+        # Накопители сбрасываем отдельно: сами они не «ачивки», а их источник
+        # (иначе после сброса «Опиума» следующая же реакция выдала бы его назад).
+        await session.execute(
+            delete(AchievementCounter).where(
+                AchievementCounter.user_id == target.id
+            )
+        )
+    await session.commit()
+    log.info(
+        "admin.game_reset",
+        target=target.id,
+        code=body.code,
+        removed=removed,
+        counters=body.counters,
+        by=user.id,
+    )
+    return await _game_player_out(session, target)
+
+
+@router.post("/admin/game/xp", response_model=GamePlayerOut)
+async def admin_game_set_xp(
+    body: GameXpIn, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Поставить опыт вручную (отладка рангов/иммунитетов без ожидания в чате)."""
+    _ensure_admin(user)
+    from app.db.models import GameProfile
+
+    target = await _game_player(
+        session, telegram_id=body.telegram_id, user_id=body.user_id
+    )
+    profile = await session.get(GameProfile, target.id)
+    if profile is None:
+        profile = GameProfile(user_id=target.id, xp=body.xp_total)
+        session.add(profile)
+    else:
+        # Уведомление о левел-апе не выставляем: ручная правка — не «игровое»
+        # событие, и подсовывать игроку окно «ты поднял ранг» после отладки
+        # означает, что отладка видна чату.
+        profile.xp = body.xp_total
+    await session.commit()
+    log.info("admin.game_xp_set", target=target.id, xp=body.xp_total, by=user.id)
+    return await _game_player_out(session, target)

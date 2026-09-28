@@ -1228,3 +1228,62 @@ export const updateSpaceRestartSettings = (s: SpaceRestartSchedule) =>
 
 export const restartSpaceNow = () =>
   api<{ status: string }>("/api/admin/space/restart", { method: "POST" });
+
+// --- GHG10 Э5.5: экран игры ---
+
+export interface GameAdminState {
+  enabled: boolean;
+  /** TG-id, которым ранг-гейтинг не указ («Серж нео»). */
+  debug_tg_ids: number[];
+  max_level: number;
+  achievements_total: number;
+  players: number;
+}
+
+export interface GamePlayerState {
+  telegram_id: number;
+  name: string;
+  xp: number;
+  level: number;
+  rank_name: string;
+  prestige: number;
+  achievements: string[];
+  counters: Record<string, number>;
+}
+
+export const fetchGameAdmin = () => api<GameAdminState>("/api/admin/game");
+
+export const updateGameAdmin = (body: {
+  enabled: boolean;
+  debug_tg_ids?: number[];
+}) =>
+  api<GameAdminState>("/api/admin/game", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+export const fetchGamePlayer = (telegramId: number) =>
+  api<GamePlayerState>(
+    `/api/admin/game/player?telegram_id=${encodeURIComponent(telegramId)}`,
+  );
+
+export const grantGameAchievement = (telegramId: number, code: string) =>
+  api<GamePlayerState>("/api/admin/game/grant", {
+    method: "POST",
+    body: JSON.stringify({ telegram_id: telegramId, code }),
+  });
+
+export const resetGameAchievements = (
+  telegramId: number,
+  opts: { code?: string; counters?: boolean } = {},
+) =>
+  api<GamePlayerState>("/api/admin/game/reset", {
+    method: "POST",
+    body: JSON.stringify({ telegram_id: telegramId, ...opts }),
+  });
+
+export const setGamePlayerXp = (telegramId: number, xpTotal: number) =>
+  api<GamePlayerState>("/api/admin/game/xp", {
+    method: "POST",
+    body: JSON.stringify({ telegram_id: telegramId, xp_total: xpTotal }),
+  });

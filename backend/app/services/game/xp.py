@@ -22,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +34,8 @@ from app.services.game.config import (
     limit_for,
     points_for,
 )
+
+log = structlog.get_logger()
 
 # Ограничение на длину оконного ключа из-за колонки XpGrant.idem_key (Text —
 # без ограничения, но осмысленный предел удобен для чтения в БД).
@@ -191,6 +194,16 @@ async def award(
         session.add(profile)
     xp_before = profile.xp
     xp_after = xp_before + gain
+    if xp_after < 0:
+        # Отрицательный опыт возможен только у списаний (донат, Э11). Баланс
+        # проверяется до перевода, поэтому сюда попасть можно лишь при гонке
+        # двух писателей на одном юзере: не даём опыту уйти в минус, но и не
+        # падаем (иначе игровая аномалия сломала бы сам донат).
+        log.warning(
+            "game.xp_floor_clamped", user_id=user_id, xp_before=xp_before, gain=gain
+        )
+        xp_after = 0
+        gain = -xp_before
     profile.xp = xp_after
 
     # Э3: запоминаем подъём, чтобы профиль показал уведомление «был ранг → стал

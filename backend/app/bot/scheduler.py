@@ -88,6 +88,7 @@ JOB_DEAD_CHAT = "dead_chat_hourly"  # GHG8 P7
 JOB_SPACE_RESTART = "space_restart_tick"  # GHG8 P14
 JOB_GAME_HOLIDAYS = "game_holidays_daily"  # GHG10 Э10
 JOB_GAME_WEEK_ACTIVITY = "game_week_activity_weekly"  # GHG10 Э6
+JOB_GAME_MEMES = "game_memes_sweep"  # GHG10 Э7
 
 
 def _env_int(name: str, default: int) -> int:
@@ -737,6 +738,27 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_GAME_WEEK_ACTIVITY)
         log.info("scheduler.game_week_activity_disabled")
+
+    # --- GHG10 (Э7): разбор мем-постов.
+    # Каждые 10 минут закрываем окно реакции и выносим 12-часовой вердикт. Две
+    # фазы в одном прогоне (см. `memes.resolve_due`), поэтому частота — компромисс:
+    # чаще = быстрее ачивка, реже = дешевле (в простое это один SELECT).
+    if game_on:
+        from app.services.game.memes import run_memes_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_MEMES, run_memes_job),
+            IntervalTrigger(minutes=10),
+            id=JOB_GAME_MEMES,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=600,
+        )
+        log.info("scheduler.game_memes_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_MEMES)
+        log.info("scheduler.game_memes_disabled")
 
 
 def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:

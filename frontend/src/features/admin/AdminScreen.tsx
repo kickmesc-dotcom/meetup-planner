@@ -29,6 +29,7 @@ import IntervalsScreen from "./IntervalsScreen";
 import BotPauseBar from "./BotPauseBar";
 import JobsQueueScreen from "./JobsQueueScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
+import GameScreen from "./GameScreen";
 
 type Section =
   | "root"
@@ -52,6 +53,7 @@ type Section =
   | "zaebal"
   | "intervals"
   | "jobs"
+  | "game"
   | "space-restart";
 
 interface Props {
@@ -105,6 +107,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "intervals") return <IntervalsScreen onBack={back} />;
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
+  if (section === "game") return <GameScreen users={users} onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -361,6 +364,17 @@ export default function AdminScreen({ users }: Props) {
           title="Червь-господин"
           subtitle="Подхалимаж, /punish, анонс становления"
           onClick={() => select("worm-master")}
+        />
+      </SectionGroup>
+
+      {/* GHG10 Э5.5: игровая система — отдельной группой: это не «настройки
+          бота», а целая подсистема со своим рубильником и отладкой. */}
+      <SectionGroup icon="🏅" title="Игровая система">
+        <Card
+          icon="🎮"
+          title="Игра"
+          subtitle="Рубильник, выдача/сброс ачивок, ручной опыт"
+          onClick={() => select("game")}
         />
       </SectionGroup>
 

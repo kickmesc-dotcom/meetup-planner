@@ -116,3 +116,50 @@ export const fetchAchievementsChart = () =>
   api<AchievementHolder[]>("/api/game/achievements");
 
 export const fetchRanksChart = () => api<RankRow[]>("/api/game/ranks");
+
+/** Э10.3: праздник — ежегодная дата + текст поздравления. */
+export interface GameHoliday {
+  id: number;
+  month: number;
+  day: number;
+  message: string;
+  enabled: boolean;
+}
+
+export interface GameHolidays {
+  /** С 6 ранга или админу-отладчику; остальным — только чтение. */
+  can_manage: boolean;
+  required_level: number | null;
+  items: GameHoliday[];
+}
+
+export const fetchHolidays = () => api<GameHolidays>("/api/game/holidays");
+
+export const createHoliday = (month: number, day: number, message: string) =>
+  api<GameHoliday>("/api/game/holidays", {
+    method: "POST",
+    body: JSON.stringify({ month, day, message }),
+  });
+
+export const deleteHoliday = (holidayId: number) =>
+  api<void>(`/api/game/holidays/${holidayId}`, { method: "DELETE" });
+
+/** Э11: подарок опыта имениннику (100 XP со своего счёта, раз в год на человека). */
+export interface DonationResult {
+  ok: boolean;
+  code: string;
+  amount: number;
+  donor_xp: number;
+  recipient_xp: number;
+  recipient_name: string;
+}
+
+/**
+ * `userId` — ВНУТРЕННИЙ id участника (как в `/api/users` и поповере ДР), а не
+ * TG-id: мини-апп работает с участниками по своему id. Сервер принимает оба.
+ */
+export const donateXp = (userId: number) =>
+  api<DonationResult>("/api/game/donate", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  });

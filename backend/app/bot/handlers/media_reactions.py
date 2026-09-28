@@ -37,6 +37,7 @@ import asyncio
 import os
 import random
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Literal
 
 import structlog
@@ -48,6 +49,7 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.models import User
+from app.services.admin_config import get_media_reactions_settings
 from app.services.media_reactions import (
     get_collection_phrases,
     get_emoji_whitelist,
@@ -58,9 +60,12 @@ from app.services.media_reactions import (
     save_recent_media,
     substitute_username,
 )
-from app.services.admin_config import get_media_reactions_settings
 
 log = structlog.get_logger()
+
+# GHG10 Э7: телеметрия мем-ачивок живёт в БД (`game_media_posts`), а не в
+# in-memory состоянии ниже. Эти две функции — тонкие обёртки: сбой игры не
+# должен ломать реакцию на мем (телеметрия — побочный эффект, а не задача).
 router = Router()
 
 MediaKind = Literal["single", "collection"]
@@ -97,6 +102,9 @@ class _AlbumBuf:
     author_id: int
     author_name: str
     first_message_id: int
+    # GHG10 Э7: время первого элемента — телеметрии нужна дата поста, а не
+    # дата «альбом дособрался» (разница — окно debounce).
+    posted_at: datetime | None = None
     count: int = 1
     task: asyncio.Task | None = field(default=None, repr=False)
 
@@ -262,6 +270,55 @@ async def _do_react(
     )
 
 
+async def _record_game_post(
+    kind: MediaKind,
+    chat_id: int,
+    message_id: int,
+    author_id: int,
+    at: datetime | None,
+) -> None:
+    """GHG10 Э7: записать пост в телеметрию мем-ачивок (best-effort).
+
+    Внутри сам решает, включена ли игра — здесь дублировать проверку незачем:
+    функция не должна ничего знать про рубильник, кроме того, что он есть.
+    """
+    from app.services.game import memes
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            await memes.record_post(
+                session,
+                chat_id=chat_id,
+                tg_message_id=message_id,
+                telegram_id=author_id,
+                kind=kind,
+                at=at,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("media_reactions.game_record_failed", error=str(exc))
+
+
+async def _record_game_reaction(
+    chat_id: int, message_id: int, user_id: int, at: datetime | None
+) -> None:
+    """GHG10 Э7: живая реакция человека — отклик на наш мем-пост (best-effort)."""
+    from app.services.game import memes
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            await memes.record_reaction(
+                session,
+                chat_id=chat_id,
+                tg_message_id=message_id,
+                telegram_id=user_id,
+                at=at,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("media_reactions.game_response_failed", error=str(exc))
+
+
 async def react_now(
     kind: MediaKind, chat_id: int, message_id: int, author_name: str
 ) -> None:
@@ -377,6 +434,9 @@ async def _finalize_album(media_group_id: str) -> None:
         count=buf.count,
         kind=kind,
     )
+    await _record_game_post(
+        kind, buf.chat_id, buf.first_message_id, buf.author_id, buf.posted_at
+    )
     await _schedule_reaction(
         kind, buf.chat_id, buf.first_message_id, buf.author_id, buf.author_name
     )
@@ -404,6 +464,9 @@ async def _on_media_impl(message: Message) -> None:
     if mgid is None:
         # Одиночное медиа — реагируем сразу (планируем серию/реакцию).
         author_name = await _author_name(author_id)
+        await _record_game_post(
+            "single", chat_id, message.message_id, author_id, message.date
+        )
         await _schedule_reaction(
             "single", chat_id, message.message_id, author_id, author_name
         )
@@ -418,6 +481,7 @@ async def _on_media_impl(message: Message) -> None:
             author_id=author_id,
             author_name=author_name,
             first_message_id=message.message_id,
+            posted_at=message.date,
         )
         _albums[mgid] = buf
         buf.task = asyncio.create_task(_finalize_album(mgid))
@@ -457,6 +521,10 @@ async def on_reaction(update: MessageReactionUpdated) -> None:
             "media_reactions.human_reaction",
             message_id=update.message_id,
             user_id=update.user.id,
+        )
+        # GHG10 Э7: реакция — отклик для мем-ачивок (окно реакции там же).
+        await _record_game_reaction(
+            update.chat.id, update.message_id, update.user.id, update.date
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("media_reactions.on_reaction_failed", error=str(exc))

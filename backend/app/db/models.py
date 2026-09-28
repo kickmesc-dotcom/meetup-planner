@@ -714,6 +714,57 @@ class GameHoliday(Base):
     )
 
 
+class GameMediaPost(Base):
+    """GHG10 Э7: телеметрия мем-постов (мемолог / успешный успех / опиум).
+
+    Живёт в БД, а не в памяти: HF Space перезапускается, а «скинул мем и 12
+    часов тишины» — факт, который должен быть помнит дольше процесса (ср.
+    `media_reactions`, где in-memory `_reacted` честно эфемерен).
+
+    Два списка откликов, потому что роли у них разные:
+    - `window_responders` — кто успел в окно реакции (`MEME_REACTION_WINDOW_MIN`);
+      только он решает «Мемолога» («отреагировали все живые»);
+    - `responders` — кто откликнулся вообще (реакция/reply в любое время);
+      он решает, был ли пост с реакциями, когда истекают 12 часов.
+
+    `memelog_done` — «вердикт по мемологу вынесен»: окно закрылось, состав
+    откликнувшихся больше не изменится. Без него job каждые 10 минут заново
+    спрашивал бы ачивку у 71 поста до наступления 12-часового рубежа.
+    """
+
+    __tablename__ = "game_media_posts"
+    __table_args__ = (
+        UniqueConstraint(
+            "chat_id", "tg_message_id", name="uq_game_media_post_msg"
+        ),
+        Index("ix_game_media_chat_posted", "chat_id", "posted_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tg_message_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # "single" (одиночный мем) | "collection" (подборка-альбом)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    posted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    responders: Mapped[list[int]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    window_responders: Mapped[list[int]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    memelog_done: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    # "alive" — пост собрал реакции; "dead" — 12 часов никто не откликнулся.
+    outcome: Mapped[str | None] = mapped_column(String(16))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event

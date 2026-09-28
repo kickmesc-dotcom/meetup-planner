@@ -132,3 +132,56 @@ class RankRowOut(BaseModel):
     hex: str
     bold: bool = False
     supreme: bool = False
+
+
+class HolidayOut(BaseModel):
+    """Праздник: ежегодная дата (месяц+день) + текст поздравления (Э10)."""
+
+    id: int
+    month: int
+    day: int
+    message: str
+    enabled: bool = True
+
+
+class HolidayCreate(BaseModel):
+    """Добавление праздника. Правку сообщения не даём: проще удалить и завести."""
+
+    month: int = Field(..., ge=1, le=12)
+    day: int = Field(..., ge=1, le=31)
+    message: str = Field(..., max_length=200)
+
+
+class HolidaysOut(BaseModel):
+    """Список праздников + можно ли текущему юзеру их править (с 6 ранга)."""
+
+    can_manage: bool = False
+    required_level: int | None = None
+    items: list[HolidayOut] = []
+
+
+class DonationIn(BaseModel):
+    """Подарок опыта имениннику (Э11).
+
+    Получателя можно задать и внутренним `user_id` (так зовёт мини-апп — он
+    оперирует участниками из `/api/users`), и `telegram_id` (удобно из админки
+    и отладки). Достаточно одного.
+    """
+
+    user_id: int | None = None
+    telegram_id: int | None = None
+
+
+class DonationOut(BaseModel):
+    """Итог доната: код + балансы, чтобы клиент сразу показал новое состояние.
+
+    `code` при успехе — `ok`, а отказы уезжают как HTTP-ошибки с тем же кодом
+    в `detail` (фронт переводит их своим `humanizeApiError`).
+    """
+
+    ok: bool = False
+    code: str = ""
+    amount: int = 0
+    donor_xp: int = 0
+    recipient_xp: int = 0
+    recipient_name: str = ""
