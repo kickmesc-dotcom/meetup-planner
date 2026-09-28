@@ -14,8 +14,10 @@ from fastapi import HTTPException
 from app.api import routes_game
 from app.bot import commands_catalog
 from app.db.models import GameHoliday
+from app.services.game import achievements_catalog as catalog
 from app.services.game import holidays, report
-from app.services.game.config import XP_PER_LEVEL, XP_RULES
+from app.services.game.achievements import COUNTER_WORM_TAMER
+from app.services.game.config import MAX_LEVEL, XP_PER_LEVEL, XP_RULES
 
 
 def _game(monkeypatch, enabled: bool) -> None:
@@ -116,7 +118,7 @@ async def test_ranks_chart_silent_when_game_disabled(monkeypatch):
 @pytest.mark.asyncio
 async def test_ranks_chart_lists_everyone_with_medals(monkeypatch):
     _game(monkeypatch, True)
-    rows = [(1, "Митян", 250), (2, "Никита", 0), (3, "Сомов", None)]
+    rows = [(1, "Митян", 250, None), (2, "Никита", 0, None), (3, "Сомов", None, None)]
 
     class _Rows:
         def all(self):
@@ -141,7 +143,145 @@ async def test_ranks_chart_lists_everyone_with_medals(monkeypatch):
 
 def test_game_commands_are_visible_in_group_help():
     visible = {c.cmd for c in commands_catalog.visible_for("group", is_admin=False)}
-    assert {"rank", "ranks", "xp"} <= visible
+    assert {"rank", "ranks", "xp", "levels", "ach"} <= visible
+
+
+# --- /ach: полный список ачивок с описаниями ---------------------------------
+
+def test_tier_marks_show_which_anniversaries_are_taken():
+    codes = catalog.tier_codes("chin_up")
+    marks = report.tier_marks("chin_up", {codes[0]})
+    assert "×10 ✅" in marks
+    assert "×20 ▫️" in marks
+    # У ачивки без юбилеев строки нет вообще — не рисуем пустое «юбилеи:».
+    assert report.tier_marks("self_shot", set()) == ""
+
+
+def test_is_collected_counts_a_tier_as_the_base():
+    assert report._is_collected("chin_up", (10, 20), set()) is False
+    assert report._is_collected("chin_up", (10, 20), {"chin_up:10"}) is True
+    assert report._is_collected("chin_up", (10,), {"chin_up"}) is True
+
+
+@pytest.mark.asyncio
+async def test_ach_lists_every_base_achievement_with_description(monkeypatch):
+    _game(monkeypatch, True)
+    text = await report.achievements_guide_text(None)
+    for base in catalog.base_achievements():
+        if base.secret:
+            continue
+        assert base.title in text
+        assert base.description in text
+    assert "юбилеи:" in text
+    # Секретную ачивку без личных отметок не спойлерим.
+    assert "Скрытых ачивок: 1" in text
+    assert "Верховный чухан" not in text
+
+
+@pytest.mark.asyncio
+async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
+    _game(monkeypatch, True)
+
+    async def _collected(_session, _user_id):
+        return {"chin_up:10", "supreme_chukhan"}
+
+    async def _progress(_session, _user_id):
+        return {"chin_up": 12, COUNTER_WORM_TAMER: 0}
+
+    monkeypatch.setattr(report.achievements, "collected_codes", _collected)
+    monkeypatch.setattr(report.achievements, "progress", _progress)
+    text = await report.achievements_guide_text(None, user_id=1)
+    assert f"У тебя: <b>2</b>/{catalog.catalog_size()}" in text
+    assert "×10 ✅" in text and "×20 ▫️" in text
+    assert "сейчас 12" in text
+    # Нулевой счётчик тоже показываем: это «трекер существует», а не “нет данных».
+    assert "сейчас 0" in text
+    # Полученную секретную ачивку показываем как обычную.
+    assert "Верховный чухан" in text
+    assert "Скрытых ачивок" not in text
+
+
+@pytest.mark.asyncio
+async def test_ach_is_silent_when_game_disabled(monkeypatch):
+    _game(monkeypatch, False)
+    assert await report.achievements_guide_text(None, user_id=1) is None
+
+
+# --- /levels: своя стата + левелы участников ---------------------------------
+
+@pytest.mark.asyncio
+async def test_levels_text_has_stats_place_and_the_whole_chart(monkeypatch):
+    _game(monkeypatch, True)
+    rows = [
+        (1, "Митян", 500, None),
+        (2, "Серж-NEO", 340, "Терпила средней руки"),
+        (3, "Сомов", 0, None),
+    ]
+
+    class _Session:
+        async def get(self, *_a, **_k):
+            return SimpleNamespace(xp=340, custom_rank_title=None)
+
+    async def _rows(_session):
+        return rows
+
+    async def _rank_name(*_a, **_k):
+        return "Терпила средней руки"
+
+    async def _supreme(*_a, **_k):
+        return set()
+
+    async def _ach_count(*_a, **_k):
+        return 7
+
+    async def _history(*_a, **_k):
+        return [SimpleNamespace(title="Сообщение в чате", points=12, count=12)]
+
+    monkeypatch.setattr(report, "chart_rows", _rows)
+    monkeypatch.setattr(report, "effective_rank_name", _rank_name)
+    monkeypatch.setattr(report.achievements, "supreme_holders", _supreme)
+    monkeypatch.setattr(report.achievements, "count_for_user", _ach_count)
+    monkeypatch.setattr(report.xp, "daily_history", _history)
+
+    text = await report.levels_text(_Session(), user_id=2, display_name="Серж-NEO")
+    assert "4-й ранг" in text and "Терпила средней руки" in text
+    assert "40/100" in text
+    assert "Всего <b>340</b> XP" in text
+    assert f"Уровень 4/{MAX_LEVEL}" in text
+    assert "место 2 из 3" in text
+    assert f"ачивок 7/{catalog.catalog_size()}" in text
+    # Сегодняшний опыт показываем с источниками, а не просто числом.
+    assert "+12</b> XP" in text
+    assert "сообщение в чате ×12" in text
+    assert "Левелы участников" in text and "🥇" in text and "Сомов" in text
+    # В чарте — то же имя ранга, что и в своей стате (иначе «я тут другой»).
+    assert text.count("Терпила средней руки") == 2
+
+
+@pytest.mark.asyncio
+async def test_levels_text_is_silent_when_game_disabled(monkeypatch):
+    _game(monkeypatch, False)
+    assert await report.levels_text(None, user_id=1, display_name="X") is None
+
+
+def test_chart_lines_mark_medals_and_supreme_title():
+    rows = [(1, "Митян", 950, None), (2, "Сомов", 0, None)]
+    lines = report.chart_lines(rows, {1})
+    assert "🥇" in lines[0] and "🥈" in lines[1]
+    # Спец-ранг перекрывает ранг за уровень — в чате и в мини-аппе одинаково.
+    assert "Верховный чухан" in lines[0]
+    assert "Сомов" in lines[1]
+    assert report.chart_lines([], set()) == ["⚠️ В чате пока никто не зарегистрирован."]
+
+
+def test_chart_lines_prefer_custom_title_over_level_name():
+    rows = [(1, "Митян", 950, "Король мемов"), (2, "Сомов", 950, None)]
+    lines = report.chart_lines(rows, set())
+    assert "Король мемов" in lines[0]
+    assert "Сигма икона" in lines[1]  # 950 XP — максимум, у кого нет своего ранга
+    # Спец-ранг всё равно главнее своего названия.
+    supreme = report.chart_lines(rows, {1})
+    assert "Верховный чухан" in supreme[0]
 
 
 # --- Э10.3: валидация праздников --------------------------------------------

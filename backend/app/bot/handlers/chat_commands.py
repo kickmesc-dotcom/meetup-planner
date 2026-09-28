@@ -118,6 +118,56 @@ async def on_xp(message: Message) -> None:
     await message.answer(report.xp_rules_text(), parse_mode="HTML")
 
 
+@router.message(Command(commands=["ach", "achievements"]))
+async def on_ach(message: Message) -> None:
+    """Список всех ачивок с описаниями (и отметками того, что уже взято)."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            ref = await _game_user_pk(session, message.from_user.id)
+            # Нет в базе — всё равно показываем список (без личных отметок):
+            # справочник полезен и тем, кто ещё не попал в профиль.
+            text = await report.achievements_guide_text(
+                session, user_id=ref[0] if ref else None
+            )
+    except Exception as exc:  # noqa: BLE001 — справочник не стоит падения хендлера
+        log.warning("chat.ach_failed", error=str(exc))
+        return
+    if text is None:  # игра выключена
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.message(Command("levels"))
+async def on_levels(message: Message) -> None:
+    """Своя подробная стата + левелы всех участников одним сообщением."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            ref = await _game_user_pk(session, message.from_user.id)
+            if ref is None:
+                # Незнакомого не выкидываем совсем: чарт всё равно осмыслен.
+                text = await report.ranks_chart_text(session)
+            else:
+                text = await report.levels_text(
+                    session, user_id=ref[0], display_name=ref[1]
+                )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("chat.levels_failed", error=str(exc))
+        return
+    if text is None:
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
 # ---------------------- C1: /phrase ----------------------
 
 @router.message(Command("phrase"))
