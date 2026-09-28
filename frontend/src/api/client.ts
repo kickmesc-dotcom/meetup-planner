@@ -15,6 +15,13 @@ export class ApiError extends Error {
 export function humanizeApiError(e: unknown): string {
   if (e instanceof ApiError) {
     const d = e.detail || "";
+    // GHG10 Э8: функция закрыта рангом (`rank_required:<N>`).
+    if (d.startsWith("rank_required:")) {
+      const lvl = Number(d.split(":")[1] ?? 0);
+      return lvl > 0
+        ? `🔒 Откроется с ${lvl} ранга — качай опыт в чате и календаре.`
+        : "🔒 Эта функция пока недоступна.";
+    }
     if (d.startsWith("cooldown:")) {
       const sec = Number(d.split(":")[1] ?? 0);
       const m = Math.ceil(sec / 60);

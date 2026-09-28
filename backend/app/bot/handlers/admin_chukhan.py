@@ -30,6 +30,16 @@ async def on_force_chukhan(message: Message) -> None:
     
     sm = get_sessionmaker()
     async with sm() as session:
+        # GHG10 Э8.4: реролл чухана — с 5 ранга (поверх админ-прав).
+        from app.services.game import gates
+
+        gate = await gates.check_feature(
+            session, "chukhan_reroll", telegram_id=message.from_user.id
+        )
+        if not gate.allowed:
+            await message.answer(gates.denial_message(gate), parse_mode="HTML")
+            return
+
         ws = current_week_start()
         existing = await session.scalar(
             select(WeeklyChukhan).where(WeeklyChukhan.week_start == ws)

@@ -6,6 +6,7 @@ import { fetchUsers } from "@/api/availability";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ApiError, humanizeApiError } from "@/api/client";
+import { useGameFeatures } from "@/features/game/useGameFeatures";
 import BottomSheet from "./BottomSheet";
 
 function fmtRemaining(seconds: number): string {
@@ -25,6 +26,9 @@ export default function LoserSheet() {
 
   const usersQ = useQuery({ queryKey: ["users"], queryFn: fetchUsers, staleTime: 60_000 });
   const statsQ = useQuery({ queryKey: ["loser-stats"], queryFn: fetchLoserStats });
+  // GHG10 Э8.1: ручная рулетка закрыта до 2 ранга (гейт молчит при выключенной игре).
+  const features = useGameFeatures();
+  const locked = !features.can("loser_roulette");
 
   useEffect(() => {
     const t = setInterval(() => setTick((x) => x + 1), 1000);
@@ -104,20 +108,29 @@ export default function LoserSheet() {
 
   return (
     <BottomSheet title="🤡 Автолох" onClose={close}>
-      <button
-        type="button"
-        onClick={() => mut.mutate()}
-        disabled={mut.isPending || remaining > 0}
-        className="w-full rounded-xl bg-tg-button py-4 text-base font-bold text-tg-button-text disabled:opacity-50"
-      >
-        {remaining > 0
-          ? `Кулдаун: ${fmtRemaining(remaining)}`
-          : mut.isPending
-            ? "Крутим…"
-            : "Крутить рулетку"}
-      </button>
+      {locked ? (
+        <div className="rounded-xl bg-tg-secondary-bg p-4 text-center text-sm text-tg-hint">
+          🔒 Ручная рулетка открывается со 2 ранга.
+          <div className="mt-1 text-xs">
+            Качай опыт в чате и календаре — ранг растёт сам.
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => mut.mutate()}
+          disabled={mut.isPending || remaining > 0}
+          className="w-full rounded-xl bg-tg-button py-4 text-base font-bold text-tg-button-text disabled:opacity-50"
+        >
+          {remaining > 0
+            ? `Кулдаун: ${fmtRemaining(remaining)}`
+            : mut.isPending
+              ? "Крутим…"
+              : "Крутить рулетку"}
+        </button>
+      )}
 
-      {(isSpinning || (mut.isSuccess && spinName == null)) && (
+      {!locked && (isSpinning || (mut.isSuccess && spinName == null)) && (
         <div className="mt-4 rounded-xl bg-tg-secondary-bg p-4 text-center overflow-hidden">
           <div className="text-xs text-tg-hint mb-1">
             {isSpinning ? "Барабан крутится…" : "🥁 Победитель"}

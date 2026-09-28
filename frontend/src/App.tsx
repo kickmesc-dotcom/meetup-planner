@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMe,
@@ -15,7 +16,7 @@ import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
 import { useUI } from "./store/ui";
-import { haptic } from "./tg/webapp";
+import { getStartParam, haptic } from "./tg/webapp";
 
 export default function App() {
   const qc = useQueryClient();
@@ -41,6 +42,12 @@ export default function App() {
   });
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
+
+  // GHG10 (Э4.2): анонс ачивки в чате ведёт по deep link на «свои ачивки».
+  // Открываем профиль — там живут ранг и лист ачивок (наполнение — Э5).
+  useEffect(() => {
+    if (getStartParam() === "achievements") setTab("profile");
+  }, [setTab]);
 
   if (me.isPending || users.isPending) {
     return (

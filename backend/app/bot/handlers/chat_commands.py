@@ -287,6 +287,20 @@ async def on_loser(message: Message) -> None:
             log.warning("chat.loser_caller_not_in_db", tg_id=message.from_user.id)
             return
 
+        # GHG10 Э8.1: ручная рулетка лоха — со 2 ранга (гейт молчит при
+        # выключенной игре и обходится «Серж нео»).
+        from app.services.game import gates
+
+        gate = await gates.check_feature(
+            session,
+            "loser_roulette",
+            user_id=caller.id,
+            telegram_id=caller.telegram_id,
+        )
+        if not gate.allowed:
+            await message.answer(gates.denial_message(gate), parse_mode="HTML")
+            return
+
         async def _announce(roll, loser, extras=None):
             target = chat_id if chat_id else message.chat.id
             # GHG8 P3: «мог бы стать %name%, но ДР» — перед основным постом.
@@ -445,6 +459,7 @@ _JOB_LABELS: dict[str, str] = {
     "random_phrases": "💬 Автопост рандомных фраз",
     "autoloser": "🤡 Автолох",
     "birthdays_daily": "🎂 Дни рождения",
+    "game_holidays_daily": "🎊 Праздники GHG10",
 }
 
 

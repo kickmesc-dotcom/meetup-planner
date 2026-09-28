@@ -86,6 +86,8 @@ JOB_LOSER_OUTBOX_RETRY = "loser_outbox_retry"  # GHG7 P0.2.b.4
 JOB_CHUKHAN_RETRY = "chukhan_retry"  # GHG7 P11 (инцидент 03.06 #1)
 JOB_DEAD_CHAT = "dead_chat_hourly"  # GHG8 P7
 JOB_SPACE_RESTART = "space_restart_tick"  # GHG8 P14
+JOB_GAME_HOLIDAYS = "game_holidays_daily"  # GHG10 Э10
+JOB_GAME_WEEK_ACTIVITY = "game_week_activity_weekly"  # GHG10 Э6
 
 
 def _env_int(name: str, default: int) -> int:
@@ -685,6 +687,56 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_MEETING_FEEDBACK)
         log.info("scheduler.meeting_feedback_disabled")
+
+    # --- GHG10 (Э10): праздники — ежедневный обход.
+    # Регистрируем ТОЛЬКО при включённом рубильнике: когда игра выключена, в
+    # простое не должно быть ни одного лишнего тика (требование Э12.2).
+    from app.services.game.flags import is_game_enabled
+
+    # Один запрос на обе игровые job'ы: reload и так редкий, но два одинаковых
+    # `SELECT` подряд — бессмысленные round-trip'ы (см. заметку про кэш флага).
+    game_on = await is_game_enabled(session)
+
+    if game_on:
+        from app.services.game.holidays import run_holidays_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_HOLIDAYS, run_holidays_job),
+            CronTrigger(hour=9, minute=17, timezone=settings.scheduler_tz),
+            kwargs={"bot": bot},
+            id=JOB_GAME_HOLIDAYS,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        log.info("scheduler.game_holidays_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_HOLIDAYS)
+        log.info("scheduler.game_holidays_disabled")
+
+    # --- GHG10 (Э6): недельный итог активности — «Рупор поколения» / «Read only».
+    # Понедельник 09:27 — после конца ISO-недели, рядом с утренними ДР/праздниками.
+    # Как и праздники, регистрируем ТОЛЬКО при включённом рубильнике.
+    if game_on:
+        from app.services.game.weekly import run_week_activity_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_WEEK_ACTIVITY, run_week_activity_job),
+            CronTrigger(
+                day_of_week="mon", hour=9, minute=27, timezone=settings.scheduler_tz
+            ),
+            kwargs={"bot": bot},
+            id=JOB_GAME_WEEK_ACTIVITY,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        log.info("scheduler.game_week_activity_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_WEEK_ACTIVITY)
+        log.info("scheduler.game_week_activity_disabled")
 
 
 def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:

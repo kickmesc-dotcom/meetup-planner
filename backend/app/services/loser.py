@@ -182,6 +182,28 @@ async def time_until_next_roll(
 AnnounceFn = Callable[..., Awaitable[None]]
 
 
+async def _award_game(
+    session: AsyncSession, row: LoserRoll, roller: User, loser: User
+) -> None:
+    """GHG10 (2.2): опыт и ачивки за ролл.
+
+    Единая точка для всех источников (auto/manual/duel), поэтому вызывается
+    здесь, а не в четырёх callers'ах — забыть её в новом месте станет
+    невозможно. Ошибки глотает `awards` (см. `_guarded`): сбой игры не должен
+    ломать рулетку.
+    """
+    from app.services.game import awards
+
+    await awards.loser(
+        session,
+        loser_id=loser.id,
+        roller_id=roller.id,
+        source=row.source,
+        roll_id=row.id,
+        at=row.rolled_at,
+    )
+
+
 async def roll_loser(
     session: AsyncSession,
     *,
@@ -318,6 +340,7 @@ async def roll_loser(
                         raise
                 await session.commit()
                 await session.refresh(row)
+                await _award_game(session, row, rolled_by, loser)
                 return row
             prev_worm.ended_at = datetime.now(timezone.utc)
             await session.flush()
@@ -352,6 +375,7 @@ async def roll_loser(
 
     await session.commit()
     await session.refresh(row)
+    await _award_game(session, row, rolled_by, loser)
     return row
 
 

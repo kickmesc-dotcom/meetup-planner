@@ -262,7 +262,40 @@ async def compose_random_phrase(
     recency_quarantine_hours: float = RECENCY_QUARANTINE_HOURS_DEFAULT,
     recency_quarantine_weight: float = RECENCY_QUARANTINE_WEIGHT_DEFAULT,
 ) -> str | None:
+    """Только текст цитаты (совместимая обёртка).
+
+    GHQ10 (2.6): опыт за цитату начисляется автору, поэтому основная функция
+    теперь возвращает ещё и `user_id` — `compose_random_phrase_attributed`.
+    Оставляем эту обёртку для вызовов, которым автор не нужен (поздравление
+    с ДР), чтобы не трогать их сигнатуры.
+    """
+    text, _author_id = await compose_random_phrase_attributed(
+        session,
+        n,
+        lookback_days=lookback_days,
+        collective_chance=collective_chance,
+        mode=mode,
+        recency_quarantine_hours=recency_quarantine_hours,
+        recency_quarantine_weight=recency_quarantine_weight,
+    )
+    return text
+
+
+async def compose_random_phrase_attributed(
+    session: AsyncSession,
+    n: int,
+    *,
+    lookback_days: int = 7,
+    collective_chance: float = 0.1,
+    mode: str = "mix",
+    recency_quarantine_hours: float = RECENCY_QUARANTINE_HOURS_DEFAULT,
+    recency_quarantine_weight: float = RECENCY_QUARANTINE_WEIGHT_DEFAULT,
+) -> tuple[str | None, int | None]:
     """Собрать случайную «шизо-цитату» по N единиц выбранного `mode`.
+
+    Возвращает `(текст, user_id автора)`. Автор — `None` в двух случаях:
+    «сводный хор» (цитата не от одного человека) и пустой/непригодный пул.
+    Это и есть источник опыта за цитату (GHG10 2.6).
 
     `mode` ∈ {'words','phrases','mix'} — единица сборки:
       - words: отдельные слова длиной ≥3 (см. _split_into_words). Склейка пробелом.
@@ -301,7 +334,7 @@ async def compose_random_phrase(
         rows = list((await session.execute(stmt)).all())
 
     if not rows:
-        return "<i>(В чате подозрительно тихо... Мне нечего цитировать)</i>"
+        return "<i>(В чате подозрительно тихо... Мне нечего цитировать)</i>", None
 
     # 3. Группируем единицы по mode. P13: каждая единица несёт возраст своего
     # сообщения (часы) — кортеж (text, age_hours) для взвешенного выбора.
@@ -332,7 +365,7 @@ async def compose_random_phrase(
     )
 
     if not all_units:
-        return "<i>(Сообщения есть, но они слишком короткие для цитат)</i>"
+        return "<i>(Сообщения есть, но они слишком короткие для цитат)</i>", None
 
     # 4. Решаем: Шизо-цитата юзера (1 - collective_chance) или Голос Шестерки.
     is_collective = (random.random() < collective_chance) or (len(by_user) < 2)
@@ -355,7 +388,8 @@ async def compose_random_phrase(
                 pool=len(all_units),
             )
         glued = _glue_words(picked) if mode == "words" else _glue_chunks(picked)
-        return f"🗣 <b>Сводный хор Шестёрки:</b>\n\n«<i>{glued}</i>»"
+        # «Сводный хор» — цитата не от одного человека, автор не начисляется.
+        return f"🗣 <b>Сводный хор Шестёрки:</b>\n\n«<i>{glued}</i>»", None
 
     # 5. Шизо-цитата конкретного автора
     target_uid = random.choice(list(by_user.keys()))
@@ -382,7 +416,7 @@ async def compose_random_phrase(
 
     user = await session.get(User, target_uid)
     author_name = user.display_name if user else "Кто-то из наших"
-    return f"👤 <b>{author_name} вещает:</b>\n\n«<i>{glued}</i>»"
+    return f"👤 <b>{author_name} вещает:</b>\n\n«<i>{glued}</i>»", target_uid
 
 def format_bot_reply(
     chunks: list[str],
@@ -520,6 +554,7 @@ async def run_random_phrases_job(bot: Bot) -> None:
 
         try:
             text = None
+            author_id: int | None = None
             if generator_version == "personas":
                 # P6.2: v2 «с типажами». None (нет пригодных персоналий) →
                 # фолбэк на legacy ниже — пост не срывается (GHG7.txt стр. 162).
@@ -531,7 +566,7 @@ async def run_random_phrases_job(bot: Bot) -> None:
                 if text is None:
                     log.info("random_phrases.personas_empty_fallback_legacy")
             if text is None:
-                text = await compose_random_phrase(
+                text, author_id = await compose_random_phrase_attributed(
                     session,
                     n,
                     lookback_days=lookback_days,
@@ -543,6 +578,14 @@ async def run_random_phrases_job(bot: Bot) -> None:
         except Exception:
             log.exception("random_phrases.compose_failed")
             text = "<i>(Ошибка при сборке цитаты, техник уже выехал)</i>"
+            author_id = None
+
+        # GHG10 (2.6): бот вкинул цитату ОТ ИМЕНИ конкретного юзера → ему +1 XP.
+        # «Сводный хор» (author_id=None) и v2-типажи опыта не дают: автора у них нет.
+        if author_id is not None:
+            from app.services.game import awards
+
+            await awards.quote(session, author_id)
 
     if not text:
         log.warning("random_phrases.empty_text_after_compose")

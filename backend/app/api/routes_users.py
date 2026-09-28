@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.config import get_settings
-from app.db.models import User
+from app.db.models import GameProfile, User
 from app.schemas.user import UserOut
 from app.services.admin_config import (
     get_ui_hide_greeting,
@@ -38,11 +38,19 @@ def _avatar_display_url(u: User) -> str | None:
     return None
 
 
-def _to_out(u: User, *, admin_ids: set[int]) -> UserOut:
+def _to_out(
+    u: User, *, admin_ids: set[int], custom_name: str | None = None
+) -> UserOut:
+    """`custom_name` (GHG10 Э8.7) перекрывает TG-имя ВНУТРИ мини-аппа.
+
+    Передаётся из `game_profiles.custom_name` вызывающим кодом (батчем для
+    списка, точечно для `/me`) — сам `_to_out` в БД не ходит, чтобы не появилось
+    N+1 на списке участников.
+    """
     return UserOut(
         id=u.id,
         telegram_id=u.telegram_id,
-        display_name=u.display_name,
+        display_name=custom_name or u.display_name,
         username=u.username,
         avatar_url=_avatar_display_url(u),
         color_hex=u.color_hex,
@@ -53,16 +61,33 @@ def _to_out(u: User, *, admin_ids: set[int]) -> UserOut:
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: CurrentUser) -> UserOut:
+async def me(session: SessionDep, user: CurrentUser) -> UserOut:
     admin_ids = get_settings().admin_tg_id_set
-    return _to_out(user, admin_ids=admin_ids)
+    custom_name = await session.scalar(
+        select(GameProfile.custom_name).where(GameProfile.user_id == user.id)
+    )
+    return _to_out(user, admin_ids=admin_ids, custom_name=custom_name)
 
 
 @router.get("/users", response_model=list[UserOut])
 async def list_users(session: SessionDep, _: CurrentUser) -> list[UserOut]:
     admin_ids = get_settings().admin_tg_id_set
     result = await session.scalars(select(User).order_by(User.id))
-    return [_to_out(u, admin_ids=admin_ids) for u in result.all()]
+    # Одно доп. чтение на весь список (не N+1): кастомные имена из игровых профилей.
+    custom_names = {
+        int(uid): name
+        for uid, name in (
+            await session.execute(
+                select(GameProfile.user_id, GameProfile.custom_name).where(
+                    GameProfile.custom_name.is_not(None)
+                )
+            )
+        ).all()
+    }
+    return [
+        _to_out(u, admin_ids=admin_ids, custom_name=custom_names.get(u.id))
+        for u in result.all()
+    ]
 
 
 # --- GHG8 (18.06 #2): прокси аватарок ---

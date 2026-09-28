@@ -136,6 +136,12 @@ async def create_poll_in_chat(
     await session.commit()
     await session.refresh(poll)
 
+    # GHG10: «Агент ВЦИОМ-а» — третий созданный опрос (count по таблице `polls`).
+    # Ошибки глотает `awards._guarded`: игра не может сломать создание опроса.
+    from app.services.game import awards
+
+    await awards.poll_created(session, created_by.id)
+
     # GHG6 G2: пин опционально, ошибки глотает помощник — опрос важнее закрепа.
     if pin:
         from app.bot.utils.pinning import pin_message_safely

@@ -91,6 +91,12 @@ async def _send_for(
         await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
         await session.commit()
         log.info("birthdays.sent", user_id=b.user_id, kind=kind)
+        # GHG10 (2.7): сам день ДР = +100 XP (раз в год — окно в `xp_grants`).
+        # Игровой сбой не роняет отправку поздравления (глотает `awards._guarded`).
+        if kind == "on_day":
+            from app.services.game import awards
+
+            await awards.birthday(session, user.id)
     except TelegramAPIError:
         await session.rollback()
         log.exception("birthdays.send_failed", user_id=b.user_id, kind=kind)

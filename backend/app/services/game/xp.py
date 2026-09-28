@@ -39,6 +39,18 @@ from app.services.game.config import (
 _MAX_KEY_LEN = 120
 
 
+async def _flush_or_commit(session: AsyncSession, commit: bool) -> None:
+    """Либо фиксируем, либо только flush — вызывающий код коммитит сам.
+
+    `flush` нужен, чтобы `get_xp()` после начисления видел уже записанное значение
+    внутри той же транзакции.
+    """
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
+
+
 def utc_day(at: datetime | None = None) -> date:
     """UTC-сутки. Везде в проекте используется aware UTC — не меняем обычай."""
     return (at or datetime.now(timezone.utc)).astimezone(timezone.utc).date()
@@ -127,12 +139,17 @@ async def award(
     at: datetime | None = None,
     discriminator: str | int | None = None,
     points: int | None = None,
+    commit: bool = True,
 ) -> AwardResult:
     """Начислить опыт за событие. Единственный путь появления опыта.
 
     `points` переопределяет значение из `config` — нужно для ачивок с разной
     ценой и для донатов (там переводится фиксированная сумма, а не «цена
     события»).
+
+    `commit=False` — только flush. Нужно самому горячему пути («сообщение»),
+    где рядом пишется ещё и дневная активность: два изменения должны уехать
+    ОДНИМ commit'ом, а не двумя round-trip'ами к Neon.
     """
     # 1. Лимит окна: повтор в том же окне — не начисляем.
     limit = limit_for(event)
@@ -157,7 +174,7 @@ async def award(
         # маркера окна/статистики — профиль не трогаем.
         if key is not None:
             session.add(XpGrant(user_id=user_id, idem_key=key))
-            await session.commit()
+            await _flush_or_commit(session, commit)
         xp_now = await get_xp(session, user_id)
         return AwardResult(
             awarded=True,
@@ -176,6 +193,16 @@ async def award(
     xp_after = xp_before + gain
     profile.xp = xp_after
 
+    # Э3: запоминаем подъём, чтобы профиль показал уведомление «был ранг → стал
+    # ранг → что открылось». Живёт здесь (а не во фронте), потому что это
+    # единственное игровое состояние, не выводимое из `xp`: «показано/нет».
+    gained = levels.levels_gained(xp_before, xp_after)
+    if gained:
+        # Если подъём не показан — from остаётся самым ранним уровнем диапазона.
+        if profile.pending_level_up_from is None:
+            profile.pending_level_up_from = levels.level_for_xp(xp_before)
+        profile.pending_level_up_to = levels.level_for_xp(xp_after)
+
     # 4. Дневная история (агрегат).
     day = utc_day(at)
     bucket = await session.get(XpDaily, (user_id, day, event))
@@ -191,14 +218,14 @@ async def award(
     if key is not None:
         session.add(XpGrant(user_id=user_id, idem_key=key))
 
-    await session.commit()
+    await _flush_or_commit(session, commit)
 
     return AwardResult(
         awarded=True,
         points=gain,
         xp_before=xp_before,
         xp_after=xp_after,
-        levels_gained=tuple(levels.levels_gained(xp_before, xp_after)),
+        levels_gained=tuple(gained),
     )
 
 

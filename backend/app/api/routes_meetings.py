@@ -147,6 +147,11 @@ async def create_meeting(
     await session.commit()
     await session.refresh(meeting)
     await schedule_meeting_reminders(session, meeting)
+    # GHG10 (2.9): «инициировал встречу = +50 XP». Дискриминатор — id встречи,
+    # поэтому лимит «раз в день» ограничивает награду за ОДНУ встречу, а не за день.
+    from app.services.game import awards
+
+    await awards.meeting(session, user.id, meeting.id)
     return meeting
 
 
@@ -277,6 +282,11 @@ async def loser_roll_endpoint(
     session: SessionDep,
     user: CurrentUser,
 ) -> LoserRollResponse:
+    # GHG10 Э8.1: ручная рулетка лоха — со 2 ранга. Гейт молчит при выключенной
+    # игре и обходится «Серж нео» (см. `services/game/gates.py`).
+    from app.services.game import gates
+
+    await gates.require_feature(session, user, "loser_roulette")
     settings = get_settings()
     target_chat = settings.group_chat_id
     sent_flag = {"ok": False}

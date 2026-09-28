@@ -98,6 +98,7 @@ async def add_nomination(
         await session.commit()
         await session.refresh(row)
         log.info("games.nomination_restored", id=row.id, name=row.name)
+        await _award_nomination(session, added_by_tg_id)
         return row
 
     row = GameNomination(
@@ -108,7 +109,19 @@ async def add_nomination(
     await session.commit()
     await session.refresh(row)
     log.info("games.nomination_added", id=row.id, name=row.name)
+    await _award_nomination(session, added_by_tg_id)
     return row
+
+
+async def _award_nomination(session: AsyncSession, added_by_tg_id: int) -> None:
+    """GHG10: «Номинальный номинал» (3 игры).
+
+    Номинация хранит TG-id (не PK), поэтому конвертация — в `awards`.
+    Ошибки глотает `awards._guarded`: игра не может ломать номинацию.
+    """
+    from app.services.game import awards
+
+    await awards.nomination_by_tg(session, added_by_tg_id)
 
 
 async def remove_nomination(

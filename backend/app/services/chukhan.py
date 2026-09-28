@@ -418,6 +418,14 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
         user=user.display_name,
     )
 
+    # GHG10 (2.3): «стал чуханом = 100 XP» + ачивка «Первоход».
+    # Строго ПОСЛЕ commit'а posted_at: опыт начисляется за доставленное звание,
+    # недоставленный пик (posted_at IS NULL) опыта не даёт — так же, как не
+    # показывается в календаре. Ошибки глотает `awards._guarded`.
+    from app.services.game import awards
+
+    await awards.chukhan(session, user.id, week_start=row.week_start)
+
     # Опрос-обжалование — best-effort, не критично для атомарности.
     # H.3: длительность настраивается (дефолт 6ч вместо прежнего часа).
     try:

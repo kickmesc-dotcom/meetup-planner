@@ -125,6 +125,28 @@ export function getInitData(): string {
   return WebApp.initData ?? "";
 }
 
+/**
+ * GHG10: параметр запуска мини-аппа.
+ *
+ * Анонс ачивки в чате даёт кнопку-ссылку `t.me/<бот>?startapp=achievements` →
+ * Telegram открывает мини-апп и кладёт «achievements» в `start_param`. Вторая
+ * ветка — прямой URL мини-аппа (когда username бота недоступен): там тот же
+ * параметр приезжает обычным `?startapp=`. Обе приводят к одному результату.
+ */
+export function getStartParam(): string {
+  try {
+    const fromTg = WebApp.initDataUnsafe?.start_param;
+    if (fromTg) return String(fromTg);
+  } catch {
+    // вне Telegram — читаем из адресной строки
+  }
+  try {
+    return new URLSearchParams(window.location.search).get("startapp") ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export type HapticKind =
   | "light"
   | "medium"

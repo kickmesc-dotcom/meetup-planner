@@ -171,6 +171,13 @@ async def create_game_choice_poll(
         follow_up=follow_up_when,
     )
 
+    # GHG10: «Агент ВЦИОМ-а» — третий опрос, созданный участником (считаем по
+    # `polls.created_by`). Follow-up `game_when` создаёт бот, поэтому он в счёт
+    # не идёт — считаем только осознанные «Во что сыграем».
+    from app.services.game import awards
+
+    await awards.poll_created(session, created_by.id)
+
     # GHG6 G2: пин опционально, ошибки глотает помощник.
     # `follow_up_when` префикс уже в question — флаг pin кодируем там же,
     # чтобы handle_game_choice_closed знал, нужно ли пинить follow-up-полл.
@@ -379,6 +386,15 @@ async def handle_game_choice_closed(
             await pin_message_safely(
                 bot, chat_id=chat_id, message_id=sent_announce.message_id
             )
+
+    # GHG10: «Номинатор» — победила игра, номинированная этим участником
+    # (выдаётся один раз за всё время). Номинация хранит TG-id, конвертация — в
+    # `awards`; ошибки глотает `_guarded`. Номинации может не быть (победивший
+    # лейбл не из наших игр) — тогда ачивку вручать некому.
+    if nomination is not None:
+        from app.services.game import awards
+
+        await awards.game_winner_by_tg(session, nomination.added_by_tg_id)
 
     # GHG6 G2: префиксы [+pin] и [+when] в question — флаги choice-полла.
     # Порядок: [+pin] идёт перед [+when], если оба есть.

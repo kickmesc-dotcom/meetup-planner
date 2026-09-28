@@ -138,6 +138,22 @@ async def _maybe_react(message: Message) -> None:
     async with sm() as session:
         cfg = await get_bot_reactions_settings(session)
 
+        # GHG10: «Укротитель паст» — юзер обратился к боту (реплаем на его
+        # сообщение или упоминанием). Считаем ДО гейта настроек реакций: это
+        # заслуга юзера, а не следствие включённого ответа. Ошибки глотает
+        # `awards._guarded`, рубильник game.enabled — внутри.
+        replied_is_bot = bool(
+            message.reply_to_message
+            and message.reply_to_message.from_user
+            and message.reply_to_message.from_user.id == bot_id
+        )
+        if bot_username and _mentions_bot(message, bot_username, bot_id):
+            replied_is_bot = True
+        if replied_is_bot:
+            from app.services.game import awards
+
+            await awards.bot_reply_by_tg(session, message.from_user.id)
+
     # T3.4 «магический шар». Два триггера совета, оба ДО обычной реакции:
     #  - хештег #совет/#advice — самостоятельный, не зависит от тоглов реакций;
     #  - @-mention бота + текст заканчивается на «?» — «однозначный триггер»

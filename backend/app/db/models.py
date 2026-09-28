@@ -549,6 +549,12 @@ class GameProfile(Base):
     # Ранг 8/10: своё имя и своё название ранга в приложении (гейтинг по уровню).
     custom_name: Mapped[str | None] = mapped_column(Text)
     custom_rank_title: Mapped[str | None] = mapped_column(Text)
+    # Э3: непоказанное уведомление о левел-апе. `from` = уровень до подъёма,
+    # `to` = уровень после. Обе None = уведомления нет. Если одно начисление
+    # закрыло несколько уровней — храним весь диапазон (from самый ранний).
+    # Сбрасывается, когда юзер посмотрел профиль (POST /me/game/level-up/ack).
+    pending_level_up_from: Mapped[int | None] = mapped_column(Integer)
+    pending_level_up_to: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -654,6 +660,33 @@ class ChatActivityDaily(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class AchievementCounter(Base):
+    """GHG10: накопители ачивок, которые НЕ выводятся из существующих таблиц.
+
+    Большинство трекеров считает по уже имеющимся данным (`loser_rolls`,
+    `weekly_chukhan`, `polls`, `availability_ranges`, `xp_grants`) — дублировать
+    их счётчиками нельзя. Здесь живут только те, для которых источника нет:
+    ответы боту (`worm_tamer`), посты с реакциями (`successful_success`),
+    мёртвые посты (`opium_for_nobody`). Строк мало и они не растут на каждое
+    сообщение (обновляем `count` одной строки).
+    """
+
+    __tablename__ = "achievement_counters"
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    # Код трекера (не обязательно код ачивки — см. `achievements.COUNTER_*`).
+    code: Mapped[str] = mapped_column(String(48), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 class GameHoliday(Base):

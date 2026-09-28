@@ -55,6 +55,7 @@ async def on_group_message(message: Message) -> None:
     if not message.text or not message.text.strip():
         return
 
+    user_pk: int | None = None
     try:
         sm = get_sessionmaker()
         async with sm() as session:
@@ -80,12 +81,24 @@ async def on_group_message(message: Message) -> None:
             # Сразу после записи чистим хвосты за прошлую неделю
             # Это держит базу в идеальном тонусе
             await cleanup_old_messages(session)
+            user_pk = user.id
 
         # GHG8 P7: текст от участника = чат жив. Внутри — троттлинг 15 мин
         # и best-effort, сюда исключения не долетают.
         from app.services.dead_chat import touch_chat_activity
 
         await touch_chat_activity(message.date)
+
+        # GHG10 (2.1): «сообщение = 1 XP» + durable счётчик активности.
+        # Через фасад `awards`: он сам проверяет рубильник `game.enabled`
+        # (при выключенной игре — один дешёвый SELECT и выход) и пишет оба
+        # изменения ОДНИМ commit'ом. Порядок важен: сообщение в `chat_messages`
+        # уже закоммичено, поэтому сбой игры не может стоить нам сообщения.
+        if user_pk is not None:
+            from app.services.game import awards
+
+            async with sm() as gsession:
+                await awards.message(gsession, user_pk, at=message.date)
 
     except Exception as exc:  # noqa: BLE001
         log.warning("chat_capture.failed", error=str(exc))

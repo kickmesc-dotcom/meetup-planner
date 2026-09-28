@@ -56,8 +56,11 @@ XP_RULES: dict[str, XpRule] = {
     for r in (
         XpRule("message", 1, "Сообщение в чате"),
         XpRule("quote", 1, "Бот процитировал твоё сообщение"),
-        XpRule("became_loser", 10, "Стал лохом дня"),
-        XpRule("became_chukhan", 100, "Стал чуханом недели"),
+        # Лимиты у этих двух нужны не для ограничения частоты, а для
+        # идемпотентности КОНКРЕТНОГО случая: дискриминатор — id ролла / недели,
+        # поэтому ретрай доставки не начислит второй раз за того же лоха/чухана.
+        XpRule("became_loser", 10, "Стал лохом дня", limit="day"),
+        XpRule("became_chukhan", 100, "Стал чуханом недели", limit="week"),
         XpRule("achievement", 50, "Получил ачивку"),
         # По заданию: «опыт даётся только раз в неделю, защита от абьюза».
         XpRule(
@@ -180,6 +183,23 @@ def unlocks_for_level(level: int) -> tuple[str, ...]:
         if lvl <= level:
             out.extend(LEVEL_UNLOCKS[lvl])
     return tuple(out)
+
+
+def unlocks_between(from_level: int, to_level: int) -> tuple[str, ...]:
+    """Что ОТКРЫЛОСЬ при подъёме с `from_level` до `to_level` (эти границы включительно").
+
+    Нужно для уведомления о левел-апе («какие возможности открылись»). Одно
+    начисление может закрыть несколько уровней — тогда возвращаем всё подряд.
+    """
+    out: list[str] = []
+    for lvl in range(from_level + 1, to_level + 1):
+        out.extend(LEVEL_UNLOCKS.get(lvl, ()))
+    return tuple(out)
+
+
+def feature_title(code: str) -> str:
+    """Человеческое название фичи для UI. Неизвестный код → сам код."""
+    return FEATURE_TITLES.get(code, code)
 
 
 # --------------------------------------------------------------------------

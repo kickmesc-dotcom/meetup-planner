@@ -59,6 +59,17 @@ def _ensure_admin(user: User) -> None:
     if user.telegram_id not in admin_ids:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "not_admin")
 
+
+async def _game_gate(session, user: User, feature: str) -> None:
+    """GHG10 Э8: ранг-гейт ПОВЕРХ админ-прав (не вместо них).
+
+    Вызывается после `_ensure_admin`. При выключенной игре проверки нет, а
+    отладочные TG-id («Серж нео») её обходят — это забота `gates`.
+    """
+    from app.services.game import gates
+
+    await gates.require_feature(session, user, feature)
+
 class WeightOut(BaseModel):
     user_id: int
     telegram_id: int
@@ -172,6 +183,8 @@ async def force_reroll(
     user: CurrentUser,
 ) -> WeeklyChukhan | None:
     _ensure_admin(user)
+    # GHG10 Э8.4: реролл чухана — с 5 ранга.
+    await _game_gate(session, user, "chukhan_reroll")
     from app.bot.dispatcher import get_bot
     ws = current_week_start()
     existing = await session.scalar(
@@ -183,6 +196,11 @@ async def force_reroll(
     row = await announce_chukhan(get_bot(), session)
     if row is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_group_chat_id")
+    # GHG10: «Переписал историю» — инициировал реролл чухана недели (разово).
+    # Ошибки глотает `awards._guarded`.
+    from app.services.game import awards
+
+    await awards.chukhan_reroll(session, user.id)
     return row
 
 @router.get("/admin/chukhan/history", response_model=list[ChukhanWeekOut])
@@ -205,6 +223,7 @@ _JOB_LABELS: dict[str, str] = {
     "birthdays_daily": "🎂 Дни рождения (ежедневная проверка)",
     "meeting_feedback_daily": "🌟 5★ опрос по встречам (N2)",
     "space_restart_tick": "🔄 Рестарт Space (тик расписания)",
+    "game_holidays_daily": "🎊 Праздники GHG10 (ежедневно)",
 }
 
 @router.get("/admin/jobs", response_model=list[ScheduledJobOut])
@@ -1093,6 +1112,8 @@ async def update_loser_reasons(
     body: LoserReasonsUpdate, session: SessionDep, user: CurrentUser
 ) -> LoserReasonsOut:
     _ensure_admin(user)
+    # GHG10 Э8.2: редактор фраз лоха — с 3 ранга.
+    await _game_gate(session, user, "loser_phrases_editor")
     await set_loser_reasons(session, body.reasons)
     saved = await get_loser_reasons(session)
     log.info("admin.loser_reasons_updated", count=len(saved), by=user.id)
@@ -1154,6 +1175,8 @@ async def admin_update_chukhan_reasons(
     body: ChukhanReasonsUpdate, session: SessionDep, user: CurrentUser
 ) -> ChukhanReasonsOut:
     _ensure_admin(user)
+    # GHG10 Э8.3: редактор фраз чухана — с 4 ранга.
+    await _game_gate(session, user, "chukhan_phrases_editor")
     await _set_chukhan_reasons(session, body.reasons)
     saved = await _get_chukhan_reasons(session)
     log.info("admin.chukhan_reasons_updated", count=len(saved), by=user.id)
@@ -1204,6 +1227,8 @@ async def admin_reset_chukhan_reasons(
     фраз, правки не применяются». Кнопка в админ-UI пишет валидный JSON через
     `set_chukhan_reasons`, гарантированно вытесняя битое значение."""
     _ensure_admin(user)
+    # GHG10 Э8.3: reset тоже правит фразы чухана — тот же гейт, что и PUT.
+    await _game_gate(session, user, "chukhan_phrases_editor")
     await _set_chukhan_reasons(session, list(_DEFAULT_CHUKHAN_REASONS))
     saved = await _get_chukhan_reasons(session)
     log.info("admin.chukhan_reasons_reset", count=len(saved), by=user.id)
@@ -1886,6 +1911,7 @@ async def admin_clear_loser_reason_use_counts(
     session: SessionDep, user: CurrentUser
 ) -> ReasonUseCountsCleared:
     _ensure_admin(user)
+    await _game_gate(session, user, "loser_phrases_editor")
     n = await clear_use_counts(session, LOSER_USE_COUNTS_KEY)
     await session.commit()
     log.info("admin.loser_reason_use_counts_cleared", removed=n, by=user.id)
@@ -1899,6 +1925,7 @@ async def admin_set_loser_reason_use_count(
     payload: ReasonUseCountSet, session: SessionDep, user: CurrentUser
 ) -> ReasonUseCountsOut:
     _ensure_admin(user)
+    await _game_gate(session, user, "loser_phrases_editor")
     await set_one_use_count(
         session, LOSER_USE_COUNTS_KEY, payload.phrase, payload.count
     )
@@ -1930,6 +1957,7 @@ async def admin_clear_chukhan_reason_use_counts(
     session: SessionDep, user: CurrentUser
 ) -> ReasonUseCountsCleared:
     _ensure_admin(user)
+    await _game_gate(session, user, "chukhan_phrases_editor")
     n = await clear_use_counts(session, CHUKHAN_USE_COUNTS_KEY)
     await session.commit()
     log.info("admin.chukhan_reason_use_counts_cleared", removed=n, by=user.id)
@@ -1943,6 +1971,7 @@ async def admin_set_chukhan_reason_use_count(
     payload: ReasonUseCountSet, session: SessionDep, user: CurrentUser
 ) -> ReasonUseCountsOut:
     _ensure_admin(user)
+    await _game_gate(session, user, "chukhan_phrases_editor")
     await set_one_use_count(
         session, CHUKHAN_USE_COUNTS_KEY, payload.phrase, payload.count
     )
@@ -2060,6 +2089,8 @@ async def admin_loser_roll_now(
     LoserSheet).
     """
     _ensure_admin(user)
+    # GHG10 Э8.6: принудительный реролл лоха — с 7 ранга.
+    await _game_gate(session, user, "forced_loser_reroll")
     from app.bot.dispatcher import get_bot
     from app.config import get_settings as _gs
     from app.services.loser import compose_loser_message, roll_loser

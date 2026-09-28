@@ -1491,9 +1491,12 @@ GAME_ENABLED_KEY = "game.enabled"
 # TG-id через запятую — кому гейтинг по рангам не указ («Серж нео»).
 GAME_DEBUG_TG_IDS_KEY = "game.debug_tg_ids"
 
-# Default False — поэтапная выкатка: код можно деплоить выключенным
-# (как `worm_master.enabled`), включение — кнопкой в админке.
-_GAME_ENABLED_DEFAULT = False
+# Default: включено. Изначально закладывалось `False` (поэтапная выкатка, как
+# `worm_master.enabled`), но UI-рубильника в админке пока НЕТ (Э5.5), а изменения
+# уже задеплоены — поэтому дефолт поднят в `True`, чтобы игровая система была
+# видна в мини-аппе. Выключается установкой ключа `game.enabled=false` в
+# `admin_config` (вернуть строгий дефолт — снова `False`, когда появится UI).
+_GAME_ENABLED_DEFAULT = True
 
 
 def _parse_tg_id_list(raw: str | None) -> list[int]:

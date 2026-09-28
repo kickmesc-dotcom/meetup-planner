@@ -15,22 +15,37 @@ import {
 import { fetchLoserHistory, fetchLoserStats } from "@/api/meetings";
 import { fetchChukhanHistory } from "@/api/birthdays";
 import { fetchChukhanLeaderboard } from "@/api/admin";
+import { fetchMyGame } from "@/api/game";
 import type { User } from "@/types";
-import { haptic } from "@/tg/webapp";
+import { getStartParam, haptic } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Switch } from "@/components/Checkbox";
 import LeaderboardScreen from "../leaderboard/LeaderboardScreen";
+import { AchievementsScreen, GameRankCard } from "./GameSection";
 
 interface Props {
   users: User[];
   me: User;
 }
 
-type Inner = "root" | "tops" | "history";
+type Inner = "root" | "tops" | "history" | "achievements";
 
 export default function ProfileScreen({ users, me }: Props) {
-  const [inner, setInner] = useState<Inner>("root");
+  // GHG10 Э5: deep link «свои ачивки» (`?startapp=achievements`) открывает
+  // лист ачивок сразу, а не корень профиля.
+  const [inner, setInner] = useState<Inner>(() =>
+    getStartParam() === "achievements" ? "achievements" : "root",
+  );
+  const game = useQuery({ queryKey: ["game", "me"], queryFn: fetchMyGame });
+  const gameOn = game.data?.enabled === true;
 
+  if (inner === "achievements") {
+    return (
+      <InnerScreen title="🏅 Ачивки и ранги" onBack={() => setInner("root")}>
+        <AchievementsScreen users={users} />
+      </InnerScreen>
+    );
+  }
   if (inner === "tops") {
     return (
       <InnerScreen title="🏆 Топы" onBack={() => setInner("root")}>
@@ -50,6 +65,21 @@ export default function ProfileScreen({ users, me }: Props) {
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
       {/* F1 (T1.5): крупная аватарка по центру → сводка → Топы → История. */}
       <ProfileHeader me={me} />
+
+      {/* GHG10 Э5: игровой блок появляется только при включённом рубильнике. */}
+      {gameOn && <GameRankCard />}
+
+      {gameOn && (
+        <NavCard
+          icon="🏅"
+          title="Ачивки и ранги"
+          subtitle="Свои ачивки + чарты участников"
+          onClick={() => {
+            haptic("selection");
+            setInner("achievements");
+          }}
+        />
+      )}
 
       <NavCard
         icon="🏆"

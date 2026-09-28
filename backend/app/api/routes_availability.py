@@ -18,6 +18,17 @@ from app.schemas.availability import (
 router = APIRouter(prefix="/availability", tags=["availability"])
 
 
+async def _award_calendar(session, user_id: int) -> None:
+    """GHG10 (2.5): разметка календаря = +10 XP раз в неделю + ачивки.
+
+    Ошибки глотает `awards._guarded`: игровой сбой не должен ломать сохранение
+    календаря. При выключенном рубильнике `awards` молча выходит.
+    """
+    from app.services.game import awards
+
+    await awards.availability(session, user_id)
+
+
 @router.get("", response_model=list[AvailabilityRangeOut])
 async def list_ranges(
     session: SessionDep,
@@ -58,6 +69,7 @@ async def create_range(
     session.add(row)
     await session.commit()
     await session.refresh(row)
+    await _award_calendar(session, user.id)
     return row
 
 
@@ -86,6 +98,7 @@ async def patch_range(
 
     await session.commit()
     await session.refresh(row)
+    await _award_calendar(session, user.id)
     return row
 
 
@@ -159,4 +172,5 @@ async def bulk_ops(
             deleted.append(op.id)
 
     await session.commit()
+    await _award_calendar(session, user.id)
     return BulkResult(created_ids=created, updated_ids=updated, deleted_ids=deleted)
