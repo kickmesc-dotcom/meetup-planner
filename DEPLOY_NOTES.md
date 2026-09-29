@@ -1,3 +1,56 @@
+# 🔑 Пуш монорепо в GitHub (2026-09-29): нужен новый PAT
+
+Старый PAT (в `leltokens2.txt`, «GIT PAT TOKEN NEW from 01.07.26 — till
+september 29th») **истёк 29.09.2026**: GitHub отвечает `Invalid username or
+token. Password authentication is not supported for Git operations.`
+
+Пока токен не заменён, в `kickmesc-dotcom/meetup-planner` не доехали **5
+коммитов GHG10** (этап 9, 5.4/5.5, 7, 10.3, 11, `/ach`, `/levels`). Следствия:
+
+- **Cloudflare Pages** (`meetup-planner1`) собирает старый фронт: в живом
+  бандле уже есть гейтинг (`rank_required`, «Откроется с N ранга»), но НЕТ
+  доната у тортика, `/api/game/holidays` и админского экрана игры;
+- если проект Amvera собран именно из GitHub (см. развилку в
+  `docs/AMVERA_BUILD_DIAGNOSTIC.md`), то и бэкенд Amvera обновляется только
+  пушем в GitHub — пуш в гит Amvera в этом случае ни на что не влияет.
+
+## Как выпустить токен
+
+- **Fine-grained** (предпочтительно): GitHub → Settings → Developer settings →
+  Personal access tokens → Fine-grained tokens → *Repository access*:
+  `kickmesc-dotcom/meetup-planner`; *Permissions*: **Contents → Read and write**.
+- **Classic**: scope `repo` (для публичного репозитория хватает `public_repo`).
+- Срок — с запасом, иначе история повторится ровно в дату истечения.
+
+## Как запушить (токен не попадает в файлы репозитория)
+
+```bash
+cd /c/Users/fa1nt/meetup-planner/meetup-planner-main
+export GH_PAT=...   # новый токен
+git -c credential.helper='!f() { echo username=x-access-token; echo password=$GH_PAT; }; f' \
+    push origin main
+unset GH_PAT
+```
+
+Пуш — **fast-forward**: `origin/main` отстаёт ровно на 5 коммитов, расхождений
+нет, переписывать историю не придётся. Перед пушем фронт проверен локально:
+`npm run typecheck` чист, `npm run build` проходит (остаются только
+предзаписанные warnings про минификацию CSS и размер чанка >500 kB).
+
+## Проверка, что фронт доехал (CF собирает ~1–2 мин)
+
+```bash
+JS=$(curl -s https://meetup-planner1.pages.dev/ | grep -oE '/assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+curl -s "https://meetup-planner1.pages.dev$JS" | grep -c 'Себе дарить опыт'   # было 0 → должно стать 1
+```
+
+После пуша в бандле также появятся `/api/game/holidays` и `game_disabled`.
+
+> Токен нужен только для github.com. HF Space ходит со своим `hf_`-токеном, а
+git Amvera — по логину Amvera; один и тот же PAT нигде больше не переиспользуется.
+
+---
+
 # ⚠️ Уточнение топологии фронта (2026-09-28): фронт — Cloudflare Pages, НЕ GitHub Pages
 
 В инструкциях ниже встречается «GitHub Pages соберёт» — это **устаревшая
