@@ -84,6 +84,7 @@ curl -s "https://meetup-planner1.pages.dev$JS" | grep -c 'Себе дарить 
 |---|---|
 | `tools/amvera-mcp.py` | CLI к MCP-серверу Amvera: `tools`, `call <tool> '<json>'`, `raw '<json>'`. 28 инструментов: сборка, логи, переменные, домены, файлы |
 | `tools/switch-db.py` | `status` / `check <dsn>` / `switch <dsn>` / `webhook amvera\|hf` — переключатель базы, который реально работает |
+| `tools/backup-db.py` | `dump` / `verify` / `restore` / `list` — логический бэкап боевой базы (пункт 0.4 задания) в `backups/<штамп>/` |
 
 Токен берётся из `secrets/Get-Secret.ps1 AMVERA_MCP_TOKEN` (или env
 `AMVERA_MCP_TOKEN`). Типовые команды:
