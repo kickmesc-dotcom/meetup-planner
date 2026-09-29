@@ -20,6 +20,41 @@ from __future__ import annotations
 from typing import Any
 
 
+class FakeResult:
+    """Мини-результат `execute`: коду нужны только `rowcount` и `first()`."""
+
+    def __init__(self, row: Any = None, *, rowcount: int = 0) -> None:
+        self._row = row
+        self.rowcount = rowcount
+
+    def first(self) -> Any:
+        return self._row
+
+
+def column_count(stmt: Any) -> int:
+    """Сколько колонок в SELECT (0 — если это не SELECT)."""
+    return len(getattr(stmt, "column_descriptions", None) or [])
+
+
+def scalar_answer(stmt: Any, row: Any) -> Any:
+    """Что вернул бы настоящий `session.scalar(stmt)` для такой очереди ответов.
+
+    Главное правило, ради которого это здесь: **`scalar` отдаёт первую КОЛОНКУ
+    первой строки, а не строку-кортеж**. На двухколоночном select
+    (`select(User.id, User.display_name)`) настоящая сессия возвращает `int`, и
+    код, читающий `row[0]`, падает в бою с «'int' object is not subscriptable».
+
+    Так уже случилось в `events.try_answer`: ни один ответ на случайное событие
+    не засчитался, а тест проходил, потому что фейк отдавал кортеж — добрее
+    реальности. Фейк обязан быть таким же строгим, как база.
+    """
+    if row is None:
+        return None
+    if column_count(stmt) > 1 and isinstance(row, tuple | list):
+        return row[0]
+    return row
+
+
 def grant_lookup(stmt: Any, store: dict[tuple, object]) -> tuple[bool, Any]:
     """Ответ на «есть ли маркер окна?» — по store, а не из очереди.
 

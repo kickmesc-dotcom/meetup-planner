@@ -225,12 +225,19 @@ async def try_answer(
     if matched is None:
         return False
 
-    user_row = await session.scalar(
-        select(User.id, User.display_name).where(User.telegram_id == telegram_id)
-    )
-    if user_row is None:
+    # ⚠️ Через `execute(...).first()`, а НЕ `scalar(...)`: `scalar` возвращает
+    # первую КОЛОНКУ первой строки, поэтому на двухколоночном select он отдаёт
+    # `int`, и `user_row[0]` падает с «'int' object is not subscriptable».
+    # С этой ошибкой соц-слой не засчитал ни одного ответа на событие в бою:
+    # исключение улетало в `game_social_failed` до `prompt.closed_at = moment`.
+    found = (
+        await session.execute(
+            select(User.id, User.display_name).where(User.telegram_id == telegram_id)
+        )
+    ).first()
+    if found is None:
         return False
-    user_id, name = int(user_row[0]), user_row[1]
+    user_id, name = int(found[0]), found[1]
 
     # Сначала закрываем промпт: он одноразовый, и даже сбой начисления не должен
     # дать второму участнику ту же награду.

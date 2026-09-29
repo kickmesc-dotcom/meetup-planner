@@ -18,6 +18,7 @@ import pytest
 
 from app.services.game import contraband, events, journal, memorial, report
 from app.services.game.events_catalog import PROMPTS, PROMPTS_BY_CODE
+from tests.game_fakes import FakeResult, scalar_answer
 
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
 
@@ -34,24 +35,37 @@ class _Rows:
 
 
 class _FakeSession:
-    """Сессия-заглушка: очередь ответов `scalar`, запись добавленного и коммитов."""
+    """Сессия-заглушка: очереди ответов `scalar`/`execute`, коммиты.
 
-    def __init__(self, *, scalars: list | None = None) -> None:
+    Поведение `scalar` намеренно повторяет настоящую сессию: на SELECT с двумя
+    колонками SQLAlchemy возвращает первую колонку первой строки, а не кортеж
+    (см. `tests/game_fakes.scalar_answer`). Раньше фейк отдавал кортеж — и
+    боевая ошибка «'int' object is not subscriptable» в ответе на событие
+    проходила все тесты.
+    """
+
+    def __init__(
+        self, *, scalars: list | None = None, rows: list | None = None
+    ) -> None:
         self._scalar = list(scalars or [])
+        self._rows = list(rows or [])
         self.added: list = []
         self.commits = 0
 
     async def get(self, *_a, **_k):
         return None  # «ключа в admin_config нет» → везде дефолты
 
-    async def scalar(self, *_a, **_k):
-        return self._scalar.pop(0) if self._scalar else None
+    async def scalar(self, stmt=None, *_a, **_k):
+        row = self._scalar.pop(0) if self._scalar else None
+        return scalar_answer(stmt, row)
 
     async def scalars(self, *_a, **_k):
         return _Rows(self._scalar.pop(0) if self._scalar else [])
 
     async def execute(self, *_a, **_k):
-        return SimpleNamespace(rowcount=0, first=lambda: None)
+        # Строки для `execute(...).first()` лежат в отдельной очереди `rows`.
+        row = self._rows.pop(0) if self._rows else None
+        return FakeResult(row)
 
     def add(self, obj) -> None:
         self.added.append(obj)
@@ -259,7 +273,9 @@ async def test_try_answer_closes_prompt_and_pays_once(monkeypatch):
         outcome=None,
         winner_user_id=None,
     )
-    session = _FakeSession(scalars=[prompt, (7, "Митян")])
+    # Победитель достаётся из `execute(...).first()`, а не из `scalar`: именно на
+    # этом падал бой (см. `_FakeSession`). Кортеж лежит в очереди `rows`.
+    session = _FakeSession(scalars=[prompt], rows=[(7, "Митян")])
     assert await events.try_answer(
         session, chat_id=-100, telegram_id=123, text="я", at=NOW
     )
@@ -322,12 +338,58 @@ def test_announcement_names_owner_and_author():
 
 
 def test_default_registry_covers_the_brief():
-    """Слова из задания: нейронка/Серж, пиздец/Митян, согласен/Никита, игра/Руслан."""
+    """Слова из задания на всех шестерых участников группы."""
     owners = {entry["owner"] for entry in contraband.DEFAULT_WORDS}
     words = {entry["word"] for entry in contraband.DEFAULT_WORDS}
-    assert {"Серж", "Митян", "Никита", "Руслан"} <= owners
+    assert {
+        "Серж-NEO",
+        "Митян",
+        "Сомов",
+        "Никита",
+        "Кравченко",
+        "Русланище",
+    } <= owners
     assert {"нейронка", "пиздец", "согласен"} <= words
     assert all(entry["variants"] for entry in contraband.DEFAULT_WORDS)
+
+
+def test_every_default_word_has_a_stable_owner_key():
+    """Регрессия: имя владельца — плохой ключ, поэтому у всех есть tg-id.
+
+    На боевой базе лежат «Серж-NEO» и «Русланище», а в дефолтах когда-то были
+    «Серж» и «Руслан»: два слова из четырёх молча не платили никому.
+    """
+    for entry in contraband.DEFAULT_WORDS:
+        assert isinstance(entry.get("owner_tg_id"), int), entry["word"]
+    ids = [entry["owner_tg_id"] for entry in contraband.DEFAULT_WORDS]
+    assert len(set(ids)) == len(ids)  # один владелец на слово, без дублей
+
+
+@pytest.mark.asyncio
+async def test_resolve_owner_prefers_telegram_id():
+    """Владельца ищем по tg-id, даже если имя в записи не совпадает с базой."""
+    entry = {"word": "нейронка", "owner": "Серж", "owner_tg_id": 306733739}
+    session = _FakeSession(rows=[(1, "Серж-NEO")])
+    assert await contraband.resolve_owner(session, entry) == (1, "Серж-NEO")
+
+
+@pytest.mark.asyncio
+async def test_resolve_owner_by_name_is_tolerant():
+    """Запасной путь по имени ищет «Серж» → «Серж-NEO», а не только точно."""
+    tried: list[str] = []
+
+    async def _scalar(stmt=None, *_a, **_k):
+        params = list((stmt.compile().params or {}).values()) if stmt is not None else []
+        pattern = next((v for v in params if isinstance(v, str)), "")
+        tried.append(pattern)
+        return 5 if pattern == "Серж%" else None
+
+    session = _FakeSession()
+    session.scalar = _scalar  # type: ignore[assignment]
+    entry = {"word": "нейронка", "owner": "Серж", "owner_tg_id": None}
+    assert await contraband.resolve_owner(session, entry) == (5, "Серж")
+    # Первый заход — точное имя, оно не нашлось; второй — префикс, он сработал.
+    assert tried[:2] == ["Серж", "Серж%"]
 
 
 @pytest.mark.asyncio
@@ -469,11 +531,23 @@ def test_journal_kind_labels_cover_all_kinds():
         assert kind in journal.KIND_LABELS
 
 
-def test_memorial_threshold_default_is_three_weeks():
+def test_memorial_threshold_default_matches_live_setting():
+    """Дефолт кода обязан совпадать с боевой настройкой (10 дней / повтор 5).
+
+    В задании было «ровно 3 недели» (21 день), но на боевом пороге выставлены
+    10/5 — если дефолт оставить прежним, то первый же сброс конфига вернул бы
+    значение, от которого отказались.
+    """
+    from app.services import admin_config
     from app.services.game import config
 
-    assert config.MEMORIAL_SILENCE_DAYS == 21
+    assert config.MEMORIAL_SILENCE_DAYS == 10
+    assert config.MEMORIAL_REPEAT_DAYS == 5
     assert config.MEMORIAL_REPEAT_DAYS < config.MEMORIAL_SILENCE_DAYS
+    # `_game_defaults()` — то, что админка подставляет, когда ключа нет в базе.
+    defaults = admin_config._game_defaults()
+    assert defaults["memorial_silence_days"] == config.MEMORIAL_SILENCE_DAYS
+    assert defaults["memorial_repeat_days"] == config.MEMORIAL_REPEAT_DAYS
 
 
 def test_digest_defaults_are_off_and_sane():

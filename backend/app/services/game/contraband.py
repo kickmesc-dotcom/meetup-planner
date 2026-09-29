@@ -42,13 +42,17 @@ log = structlog.get_logger()
 
 # Дефолтный реестр. `variants` — регэкспы (ловим любые формулировки), `labels` —
 # то же человеческим языком, потому что показывать человеку регулярку нельзя.
-# Владелец ищется по `owner_tg_id`, а если его нет — по имени среди участников
-# (`owner`); поэтому дефолты работают «из коробки» на привычных именах группы.
+#
+# ⚠️ Владельца ищем СНАЧАЛА по `owner_tg_id`, и только потом по имени. Имя —
+# плохой ключ: в базе живут «Серж-NEO» и «Русланище», а дефолты когда-то были
+# написаны как «Серж» и «Руслан», поэтому два слова из четырёх молча не платили
+# никому (в логах `game.contraband_owner_not_found`). Поэтому tg-id проставлены
+# всем шестерым участникам — это устойчивый ключ, а имя только для читаемости.
 DEFAULT_WORDS: tuple[dict, ...] = (
     {
         "word": "нейронка",
-        "owner": "Серж",
-        "owner_tg_id": None,
+        "owner": "Серж-NEO",
+        "owner_tg_id": 306733739,
         "variants": [r"нейронк\w*", r"\bнейро-?\w*", r"\bии\b", r"\bai\b", r"\bэйай\b"],
         "labels": ["нейро", "ИИ", "Ai", "Эйай", "нейро-"],
         "xp": 5,
@@ -57,7 +61,7 @@ DEFAULT_WORDS: tuple[dict, ...] = (
     {
         "word": "пиздец",
         "owner": "Митян",
-        "owner_tg_id": None,
+        "owner_tg_id": 52765607,
         "variants": [r"пизд\w*", r"\bпезд\w*"],
         "labels": ["пизда", "пизды", "пиздец"],
         "xp": 5,
@@ -66,7 +70,7 @@ DEFAULT_WORDS: tuple[dict, ...] = (
     {
         "word": "согласен",
         "owner": "Никита",
-        "owner_tg_id": None,
+        "owner_tg_id": 380170615,
         "variants": [r"\bсогласен\b", r"\bсогласна\b", r"\bсогласны\b"],
         "labels": ["согласен", "согласна"],
         "xp": 5,
@@ -74,12 +78,34 @@ DEFAULT_WORDS: tuple[dict, ...] = (
     },
     {
         "word": "игра",
-        "owner": "Руслан",
-        "owner_tg_id": None,
+        "owner": "Русланище",
+        "owner_tg_id": 137348534,
         "variants": [r"\bигр\w*", r"\bпоигра\w*", r"\bгамар\w*"],
         "labels": ["игра", "играть", "поиграть"],
         "xp": 5,
         "note": "лицензионный сбор",
+    },
+    {
+        # Сомов: «я считаю» — его формулировка, плюс его же «скрипт запущен».
+        "word": "я считаю",
+        "owner": "Сомов",
+        "owner_tg_id": 175773775,
+        "variants": [r"\bя\s+считаю\b", r"\bскрипт\s+запущен\w*\b"],
+        "labels": ["я считаю", "скрипт запущен"],
+        "xp": 5,
+        "note": "личное мнение",
+    },
+    {
+        # Кравченко: подпись вытащена из его же сообщений («Вся жизнь борьба»).
+        # История чата чистится через 7 дней, поэтому это лучшее, что есть в
+        # наличии; слово правится в админке, если найдётся более его.
+        "word": "вся жизнь борьба",
+        "owner": "Кравченко",
+        "owner_tg_id": 397594558,
+        "variants": [r"вся\s+жизнь\s*[-—]?\s*борьб\w*", r"\bборьб\w*"],
+        "labels": ["вся жизнь борьба", "борьба"],
+        "xp": 5,
+        "note": "жизненная позиция",
     },
 )
 
@@ -148,14 +174,18 @@ async def resolve_owner(session: AsyncSession, entry: dict) -> tuple[int | None,
         if found:
             return int(found[0]), found[1]
     if title:
-        found = await session.scalar(
-            select(User.id)
-            .where(User.display_name.ilike(str(title)))
-            .order_by(User.id.asc())
-            .limit(1)
-        )
-        if found is not None:
-            return int(found), str(title)
+        # Имя — запасной ключ, поэтому ищем терпимо: сначала точное совпадение
+        # без регистра, потом «начинается с», потом «содержит». Иначе «Серж» не
+        # находит «Серж-NEO» и слово молча не платит никому.
+        for pattern in (str(title), f"{title}%", f"%{title}%"):
+            found = await session.scalar(
+                select(User.id)
+                .where(User.display_name.ilike(pattern))
+                .order_by(User.id.asc())
+                .limit(1)
+            )
+            if found is not None:
+                return int(found), str(title)
     return None, (str(title) if title else None)
 
 
