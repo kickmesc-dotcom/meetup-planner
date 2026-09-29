@@ -1,40 +1,43 @@
-# 🔑 Пуш монорепо в GitHub (2026-09-29): нужен новый PAT
+# 🔑 Пуш монорепо в GitHub (2026-09-29): виноват был Git Credential Manager
 
-Старый PAT (в `leltokens2.txt`, «GIT PAT TOKEN NEW from 01.07.26 — till
-september 29th») **истёк 29.09.2026**: GitHub отвечает `Invalid username or
-token. Password authentication is not supported for Git operations.`
+**Пуш сделан** — `38e9c0c..05f72d0`, в `origin/main` уехали 6 коммитов GHG10
+(этап 9, 5.4/5.5, 7, 10.3, 11, `/ach`, `/levels` + диагностика Amvera). Но не с
+первого раза, и причина оказалась не в токене.
 
-Пока токен не заменён, в `kickmesc-dotcom/meetup-planner` не доехали **5
-коммитов GHG10** (этап 9, 5.4/5.5, 7, 10.3, 11, `/ach`, `/levels`). Следствия:
+Что происходило:
 
-- **Cloudflare Pages** (`meetup-planner1`) собирает старый фронт: в живом
-  бандле уже есть гейтинг (`rank_required`, «Откроется с N ранга»), но НЕТ
-  доната у тортика, `/api/game/holidays` и админского экрана игры;
-- если проект Amvera собран именно из GitHub (см. развилку в
-  `docs/AMVERA_BUILD_DIAGNOSTIC.md`), то и бэкенд Amvera обновляется только
-  пушем в GitHub — пуш в гит Amvera в этом случае ни на что не влияет.
+- обычный `git push` падал с
+  `remote: Permission to kickmesc-dotcom/meetup-planner.git denied to
+  youmakemefry-cmd` → **403**: аутентификация проходила, а прав на пуш у этого
+  аккаунта нет;
+- в хранилище Windows (GCM) при этом лежит **рабочий credential аккаунта
+  `kickmesc-dotcom`** с правами **admin** на репозиторий (`gho_…`, scopes
+  `repo, workflow`) — именно им репозиторий и пушится;
+- PAT из `leltokens2.txt` («till september 29th») к этому моменту **истёк**:
+  с ним GitHub отвечает `Invalid username or token`. Он больше не нужен —
+  пушить можно хранимым credential'ом.
 
-## Как выпустить токен
-
-- **Fine-grained** (предпочтительно): GitHub → Settings → Developer settings →
-  Personal access tokens → Fine-grained tokens → *Repository access*:
-  `kickmesc-dotcom/meetup-planner`; *Permissions*: **Contents → Read and write**.
-- **Classic**: scope `repo` (для публичного репозитория хватает `public_repo`).
-- Срок — с запасом, иначе история повторится ровно в дату истечения.
-
-## Как запушить (токен не попадает в файлы репозитория)
+## Как пушить (рабочая команда)
 
 ```bash
 cd /c/Users/fa1nt/meetup-planner/meetup-planner-main
-export GH_PAT=...   # новый токен
-git -c credential.helper='!f() { echo username=x-access-token; echo password=$GH_PAT; }; f' \
+creds=$(printf 'protocol=https\nhost=github.com\nusername=kickmesc-dotcom\n\n' \
+        | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null)
+export GH_U=$(echo "$creds" | sed -n 's/^username=//p')
+export GH_P=$(echo "$creds" | sed -n 's/^password=//p')
+GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
+    -c credential.helper='!f() { echo username=$GH_U; echo password=$GH_P; }; f' \
     push origin main
-unset GH_PAT
+unset GH_U GH_P
 ```
 
-Пуш — **fast-forward**: `origin/main` отстаёт ровно на 5 коммитов, расхождений
-нет, переписывать историю не придётся. Перед пушем фронт проверен локально:
-`npm run typecheck` чист, `npm run build` проходит (остаются только
+Ключевая деталь — **`-c credential.helper=`** (пустое значение сбрасывает
+список helper'ов). Без него GCM снова подставит `youmakemefry-cmd` и вернёт
+403. Убрать лишнюю запись из хранилища совсем:
+`git credential-manager github list` / `... erase`.
+
+Пуш — **fast-forward**, история не переписывается. Перед пушем фронт проверен
+локально: `npm run typecheck` чист, `npm run build` проходит (остаются только
 предзаписанные warnings про минификацию CSS и размер чанка >500 kB).
 
 ## Проверка, что фронт доехал (CF собирает ~1–2 мин)
@@ -44,10 +47,22 @@ JS=$(curl -s https://meetup-planner1.pages.dev/ | grep -oE '/assets/index-[A-Za-
 curl -s "https://meetup-planner1.pages.dev$JS" | grep -c 'Себе дарить опыт'   # было 0 → должно стать 1
 ```
 
-После пуша в бандле также появятся `/api/game/holidays` и `game_disabled`.
+Проверено 2026-09-29 после пуша: бандл сменился
+`index-BE5RzxWI.js` → **`index-AM8bZSEw.js`**, и в нём уже есть «Себе дарить
+опыт» (донат у тортика), `/api/game/holidays` и `game_disabled`.
 
-> Токен нужен только для github.com. HF Space ходит со своим `hf_`-токеном, а
-git Amvera — по логину Amvera; один и тот же PAT нигде больше не переиспользуется.
+⚠️ Важное следствие: фронт уехал вперёд бэкенда. Кнопка доната у тортика
+вызывает `/api/game/donate`, а на живом Amvera этой ручки пока нет (404).
+Пока Amvera не пересобрана, донат сработает только с бэкендом HF. Админский
+экран «Игра» аналогично отдаст 404. Ближайших дней рождения нет (проверено
+по БД 2026-09-29), так что это окно без риска — но его стоит закрыть.
+
+> Токен/PAT нужен только для github.com. HF Space ходит со своим `hf_`-токеном,
+а git Amvera — по логину Amvera; один и тот же секрет нигде не переиспользуется.
+
+После этого пуша **Amvera не отреагировала** (осталась на 123 путях) — то есть
+её конвейер не реагирует ни на пуш в свой git, ни на пуш в GitHub. Разбор —
+в `docs/AMVERA_BUILD_DIAGNOSTIC.md`, раздел про три сценария отказа.
 
 ---
 
