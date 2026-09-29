@@ -1,4 +1,13 @@
-FROM python:3.12-slim AS base
+# База — официальный образ Python из зеркала Docker Hub на AWS ECR Public,
+# а не `python:3.12-slim` с Docker Hub напрямую. Причина: сборщик Amvera
+# переписывает ссылки на Docker Hub в свой внутренний proxy-реестр
+# harbor.waw.amverum.com, и с 28.09.2026 тот отдаёт на blob'ах
+# `stream error: stream ID 1; INTERNAL_ERROR; received from peer` — каждая
+# сборка падала на «Retrieving image python:3.12-slim». Содержимое образа
+# идентично (ECR Public зеркалит Docker Official Images), отличается только
+# путь доставки. Если Amvera когда-нибудь начнёт проксировать и этот адрес —
+# вернуть прежнюю строку и завести тикет в их поддержку.
+FROM public.ecr.aws/docker/library/python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

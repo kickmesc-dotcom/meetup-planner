@@ -13,6 +13,12 @@ from app.api.deps import CurrentUser, SessionDep
 from app.bot.scheduler import get_scheduler, reload_dynamic_jobs
 from app.config import get_settings
 from app.db.models import Birthday, LoserRoll, Meeting, MeetingReminder, Poll, User, WeeklyChukhan
+from app.schemas.game import (
+    GameContrabandWord,
+    GameDigestFlushOut,
+    GameSocialIn,
+    GameSocialOut,
+)
 from app.services.admin_config import (
     get_autoloser_settings,
     get_chukhan_weights,
@@ -4037,3 +4043,152 @@ async def admin_game_set_xp(
     await session.commit()
     log.info("admin.game_xp_set", target=target.id, xp=body.xp_total, by=user.id)
     return await _game_player_out(session, target)
+
+
+# --------------------------------------------------------------------------
+# GHG10 Э13: четыре «социальные» фичи — сводка, поминовения, события, слова
+# --------------------------------------------------------------------------
+
+
+async def _game_social_state(session) -> GameSocialOut:
+    """Собрать состояние всех четырёх фич (одна ручка вместо четырёх запросов)."""
+    from app.db.models import GameJournalEntry, GamePrompt
+    from app.services.admin_config import (
+        get_game_contraband_chance_percent,
+        get_game_contraband_daily_cap,
+        get_game_contraband_enabled,
+        get_game_contraband_words,
+        get_game_digest_enabled,
+        get_game_digest_interval_hours,
+        get_game_events_chance_percent,
+        get_game_events_enabled,
+        get_game_events_max_per_day,
+        get_game_events_min_gap_hours,
+        get_game_memorial_enabled,
+        get_game_memorial_repeat_days,
+        get_game_memorial_silence_days,
+    )
+    from app.services.game import contraband as contraband_service
+
+    custom = await get_game_contraband_words(session)
+    words = await contraband_service.configured_words(session)
+    unresolved: list[str] = []
+    for entry in words:
+        if not entry.get("enabled", True):
+            continue
+        owner_id, _name = await contraband_service.resolve_owner(session, entry)
+        if owner_id is None:
+            unresolved.append(str(entry.get("owner") or entry.get("word")))
+
+    pending = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(GameJournalEntry)
+            .where(GameJournalEntry.sent_at.is_(None))
+        )
+        or 0
+    )
+    open_prompts = int(
+        await session.scalar(
+            select(func.count()).select_from(GamePrompt).where(GamePrompt.closed_at.is_(None))
+        )
+        or 0
+    )
+    return GameSocialOut(
+        digest_enabled=await get_game_digest_enabled(session),
+        digest_interval_hours=await get_game_digest_interval_hours(session),
+        digest_pending=pending,
+        memorial_enabled=await get_game_memorial_enabled(session),
+        memorial_silence_days=await get_game_memorial_silence_days(session),
+        memorial_repeat_days=await get_game_memorial_repeat_days(session),
+        events_enabled=await get_game_events_enabled(session),
+        events_chance_percent=await get_game_events_chance_percent(session),
+        events_max_per_day=await get_game_events_max_per_day(session),
+        events_min_gap_hours=await get_game_events_min_gap_hours(session),
+        events_open=open_prompts,
+        contraband_enabled=await get_game_contraband_enabled(session),
+        contraband_chance_percent=await get_game_contraband_chance_percent(session),
+        contraband_daily_cap=await get_game_contraband_daily_cap(session),
+        contraband_custom_registry=custom is not None,
+        contraband_words=[GameContrabandWord(**entry) for entry in words],
+        unresolved_owners=unresolved,
+    )
+
+
+@router.get("/admin/game/social", response_model=GameSocialOut)
+async def admin_game_social_get(session: SessionDep, user: CurrentUser) -> GameSocialOut:
+    """Сводка, поминовения, случайные события и контрабанда одним ответом."""
+    _ensure_admin(user)
+    return await _game_social_state(session)
+
+
+@router.put("/admin/game/social", response_model=GameSocialOut)
+async def admin_game_social_put(
+    body: GameSocialIn, session: SessionDep, user: CurrentUser
+) -> GameSocialOut:
+    """Частичная правка социальных фич. Что не передали — осталось как было.
+
+    Ключевое для задания: режим сводки включается/выключается здесь ОДНОЙ
+    переменной, а вероятность срабатывания контрабанды крутится процентом.
+    Ничего перезапускать не нужно — значения читаются на каждом событии.
+    """
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        set_game_contraband_chance_percent,
+        set_game_contraband_daily_cap,
+        set_game_contraband_enabled,
+        set_game_contraband_words,
+        set_game_digest_enabled,
+        set_game_digest_interval,
+        set_game_events_chance_percent,
+        set_game_events_enabled,
+        set_game_events_max_per_day,
+        set_game_events_min_gap_hours,
+        set_game_memorial_enabled,
+        set_game_memorial_repeat_days,
+        set_game_memorial_silence_days,
+    )
+
+    if body.digest_enabled is not None:
+        await set_game_digest_enabled(session, body.digest_enabled)
+    if body.digest_interval_hours is not None:
+        await set_game_digest_interval(session, body.digest_interval_hours)
+    if body.memorial_enabled is not None:
+        await set_game_memorial_enabled(session, body.memorial_enabled)
+    if body.memorial_silence_days is not None:
+        await set_game_memorial_silence_days(session, body.memorial_silence_days)
+    if body.memorial_repeat_days is not None:
+        await set_game_memorial_repeat_days(session, body.memorial_repeat_days)
+    if body.events_enabled is not None:
+        await set_game_events_enabled(session, body.events_enabled)
+    if body.events_chance_percent is not None:
+        await set_game_events_chance_percent(session, body.events_chance_percent)
+    if body.events_max_per_day is not None:
+        await set_game_events_max_per_day(session, body.events_max_per_day)
+    if body.events_min_gap_hours is not None:
+        await set_game_events_min_gap_hours(session, body.events_min_gap_hours)
+    if body.contraband_enabled is not None:
+        await set_game_contraband_enabled(session, body.contraband_enabled)
+    if body.contraband_chance_percent is not None:
+        await set_game_contraband_chance_percent(session, body.contraband_chance_percent)
+    if body.contraband_daily_cap is not None:
+        await set_game_contraband_daily_cap(session, body.contraband_daily_cap)
+    if body.contraband_words is not None:
+        await set_game_contraband_words(
+            session, [item.model_dump() for item in body.contraband_words]
+        )
+    log.info("admin.game_social_updated", by=user.id)
+    return await _game_social_state(session)
+
+
+@router.post("/admin/game/social/flush", response_model=GameDigestFlushOut)
+async def admin_game_social_flush(
+    session: SessionDep, user: CurrentUser
+) -> GameDigestFlushOut:
+    """«Вывали сводку сейчас» — не ждать окна (удобно проверить режим)."""
+    _ensure_admin(user)
+    from app.services.game import journal
+
+    sent = await journal.flush(session)
+    log.info("admin.game_digest_flushed", sent=sent, by=user.id)
+    return GameDigestFlushOut(sent=sent)

@@ -172,6 +172,81 @@ class DonationIn(BaseModel):
     telegram_id: int | None = None
 
 
+class GameContrabandWord(BaseModel):
+    """Слово-контрабанда: чьё, сколько платит и в каких формулировках ловится.
+
+    `owner_tg_id` — основной способ привязки (надёжен при смене имени), `owner`
+    — подпись для чата и запасной путь (поиск по display_name). `variants` —
+    регулярки, `labels` — те же формулировки человеческим языком: показывать
+    людям регулярку нельзя, а объяснить, что именно ловится, нужно.
+    """
+
+    word: str = Field(..., min_length=2, max_length=40)
+    owner: str | None = Field(None, max_length=60)
+    owner_tg_id: int | None = None
+    variants: list[str] = []
+    labels: list[str] = []
+    xp: int = Field(5, ge=0, le=1000)
+    note: str | None = Field(None, max_length=80)
+    enabled: bool = True
+    chance: int | None = Field(None, ge=0, le=100)
+
+
+class GameSocialOut(BaseModel):
+    """Э13: состояние четырёх «социальных» фич одним ответом.
+
+    `unresolved_owners` — владельцы слов, которых нет среди участников: без
+    этого списка «контрабанда не срабатывает» выглядело бы как поломка, хотя
+    на деле слово просто некому начислить.
+    """
+
+    digest_enabled: bool = False
+    digest_interval_hours: int = 6
+    digest_pending: int = 0
+    memorial_enabled: bool = True
+    memorial_silence_days: int = 21
+    memorial_repeat_days: int = 7
+    events_enabled: bool = True
+    events_chance_percent: int = 60
+    events_max_per_day: int = 2
+    events_min_gap_hours: int = 6
+    events_open: int = 0
+    contraband_enabled: bool = True
+    contraband_chance_percent: int = 100
+    contraband_daily_cap: int = 1
+    contraband_custom_registry: bool = False
+    contraband_words: list[GameContrabandWord] = []
+    unresolved_owners: list[str] = []
+
+
+class GameSocialIn(BaseModel):
+    """Частичная правка: что не передали — не трогаем.
+
+    `contraband_words` заменяет реестр целиком (пустой список — «правил нет», а
+    не «верни дефолты»: иначе вычистить реестр было бы невозможно).
+    """
+
+    digest_enabled: bool | None = None
+    digest_interval_hours: int | None = None
+    memorial_enabled: bool | None = None
+    memorial_silence_days: int | None = Field(None, ge=1, le=365)
+    memorial_repeat_days: int | None = Field(None, ge=1, le=365)
+    events_enabled: bool | None = None
+    events_chance_percent: int | None = Field(None, ge=0, le=100)
+    events_max_per_day: int | None = Field(None, ge=0, le=50)
+    events_min_gap_hours: int | None = Field(None, ge=0, le=168)
+    contraband_enabled: bool | None = None
+    contraband_chance_percent: int | None = Field(None, ge=0, le=100)
+    contraband_daily_cap: int | None = Field(None, ge=0, le=100)
+    contraband_words: list[GameContrabandWord] | None = None
+
+
+class GameDigestFlushOut(BaseModel):
+    """Сколько записей журнала уехало в чат по кнопке «отправить сейчас»."""
+
+    sent: int = 0
+
+
 class DonationOut(BaseModel):
     """Итог доната: код + балансы, чтобы клиент сразу показал новое состояние.
 

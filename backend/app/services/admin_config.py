@@ -1533,3 +1533,225 @@ async def set_game_debug_tg_ids(session: AsyncSession, ids: list[int]) -> None:
     await _set_value(
         session, GAME_DEBUG_TG_IDS_KEY, ",".join(str(i) for i in ids)
     )
+
+
+# --- GHG10 Э13: сводка, поминовения, случайные события, контрабанда ---
+# Четыре «социальные» фичи живут на одних и тех же дефолтах из
+# `services/game/config.py` — числа не дублируем, берём оттуда.
+GAME_DIGEST_ENABLED_KEY = "game.digest.enabled"
+GAME_DIGEST_INTERVAL_KEY = "game.digest.interval_hours"
+GAME_DIGEST_LAST_FLUSH_KEY = "game.digest.last_flush_at"
+
+GAME_MEMORIAL_ENABLED_KEY = "game.memorial.enabled"
+GAME_MEMORIAL_SILENCE_KEY = "game.memorial.silence_days"
+GAME_MEMORIAL_REPEAT_KEY = "game.memorial.repeat_days"
+
+GAME_EVENTS_ENABLED_KEY = "game.events.enabled"
+GAME_EVENTS_CHANCE_KEY = "game.events.chance_percent"
+GAME_EVENTS_MAX_PER_DAY_KEY = "game.events.max_per_day"
+GAME_EVENTS_MIN_GAP_KEY = "game.events.min_gap_hours"
+
+GAME_CONTRABAND_ENABLED_KEY = "game.contraband.enabled"
+GAME_CONTRABAND_CHANCE_KEY = "game.contraband.chance_percent"
+GAME_CONTRABAND_CAP_KEY = "game.contraband.daily_cap"
+GAME_CONTRABAND_WORDS_KEY = "game.contraband.words"
+
+# Как и у рубильника игры: фичи, которые пишут в чат, по умолчанию включены,
+# а режим сводки — ВЫКЛЮЧЕН (задание: «пока этот режим неактивен, я хочу
+# понаблюдать за поведением бота»). Переключается ключом.
+_GAME_DIGEST_ENABLED_DEFAULT = False
+_GAME_MEMORIAL_ENABLED_DEFAULT = True
+_GAME_EVENTS_ENABLED_DEFAULT = True
+_GAME_CONTRABAND_ENABLED_DEFAULT = True
+
+
+def _game_defaults() -> dict:
+    """Дефолты из единственной точки тюнинга (ленивый импорт — цикл модулей)."""
+    from app.services.game import config as game_config
+
+    return {
+        "digest_interval": game_config.DIGEST_DEFAULT_INTERVAL,
+        "memorial_silence_days": game_config.MEMORIAL_SILENCE_DAYS,
+        "memorial_repeat_days": game_config.MEMORIAL_REPEAT_DAYS,
+        "events_chance_percent": game_config.EVENTS_CHANCE_PERCENT,
+        "events_max_per_day": game_config.EVENTS_MAX_PER_DAY,
+        "events_min_gap_hours": game_config.EVENTS_MIN_GAP_HOURS,
+        "contraband_daily_cap": game_config.CONTRABAND_DAILY_CAP,
+    }
+
+
+async def _get_int(
+    session: AsyncSession, key: str, default: int, *, lo: int = 0, hi: int = 10000
+) -> int:
+    """Целое из конфига с зажимом в границы. Мусор → дефолт (не падаем)."""
+    raw = await _get_value(session, key)
+    if raw is None:
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (ValueError, TypeError):
+        log.warning("admin_config.bad_int", key=key, value=raw)
+        return default
+    return max(lo, min(hi, value))
+
+
+async def get_game_digest_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(session, GAME_DIGEST_ENABLED_KEY, _GAME_DIGEST_ENABLED_DEFAULT)
+
+
+async def get_game_digest_interval_hours(session: AsyncSession) -> int:
+    from app.services.game.config import DIGEST_INTERVALS
+
+    value = await _get_int(session, GAME_DIGEST_INTERVAL_KEY, _game_defaults()["digest_interval"])
+    return value if value in DIGEST_INTERVALS else _game_defaults()["digest_interval"]
+
+
+async def get_game_digest_last_flush(session: AsyncSession) -> str | None:
+    """ISO-таймстемп последней сводки — чтобы понимать, не пора ли снова."""
+    return await _get_value(session, GAME_DIGEST_LAST_FLUSH_KEY)
+
+
+async def set_game_digest_last_flush(session: AsyncSession, value: str) -> None:
+    await _set_value(session, GAME_DIGEST_LAST_FLUSH_KEY, value)
+
+
+async def get_game_memorial_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_MEMORIAL_ENABLED_KEY, _GAME_MEMORIAL_ENABLED_DEFAULT
+    )
+
+
+async def get_game_memorial_silence_days(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_MEMORIAL_SILENCE_KEY, _game_defaults()["memorial_silence_days"], lo=1
+    )
+
+
+async def get_game_memorial_repeat_days(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_MEMORIAL_REPEAT_KEY, _game_defaults()["memorial_repeat_days"], lo=1
+    )
+
+
+async def get_game_events_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(session, GAME_EVENTS_ENABLED_KEY, _GAME_EVENTS_ENABLED_DEFAULT)
+
+
+async def get_game_events_chance_percent(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_EVENTS_CHANCE_KEY, _game_defaults()["events_chance_percent"], hi=100
+    )
+
+
+async def get_game_events_max_per_day(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_EVENTS_MAX_PER_DAY_KEY, _game_defaults()["events_max_per_day"]
+    )
+
+
+async def get_game_events_min_gap_hours(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_EVENTS_MIN_GAP_KEY, _game_defaults()["events_min_gap_hours"]
+    )
+
+
+async def get_game_contraband_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_CONTRABAND_ENABLED_KEY, _GAME_CONTRABAND_ENABLED_DEFAULT
+    )
+
+
+async def get_game_contraband_chance_percent(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_CONTRABAND_CHANCE_KEY, 100, hi=100
+    )
+
+
+async def get_game_contraband_daily_cap(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_CONTRABAND_CAP_KEY, _game_defaults()["contraband_daily_cap"], hi=100
+    )
+
+
+async def get_game_contraband_words(session: AsyncSession) -> list[dict] | None:
+    """Пользовательский реестр слов. `None` = «не настроено, бери дефолтный».
+
+    Пустой список — это НЕ «не настроено», а осознанное «правил нет»: админ
+    мог вычистить реестр, и тогда контрабанда должна молчать, а не воскрешать
+    дефолты из кода.
+    """
+    raw = await _get_value(session, GAME_CONTRABAND_WORDS_KEY)
+    if raw is None:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (ValueError, TypeError):
+        log.warning("admin_config.bad_contraband_json")
+        return None
+    if not isinstance(parsed, list):
+        return None
+    return [item for item in parsed if isinstance(item, dict)]
+
+
+async def set_game_contraband_words(session: AsyncSession, words: list[dict]) -> None:
+    await _set_value(
+        session,
+        GAME_CONTRABAND_WORDS_KEY,
+        json.dumps(words, ensure_ascii=False),
+    )
+
+
+async def set_game_digest_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_DIGEST_ENABLED_KEY, "true" if value else "false")
+
+
+async def set_game_digest_interval(session: AsyncSession, hours: int) -> None:
+    """Интервал сводки. Чужие значения зажимаем к ближайшему допустимому."""
+    from app.services.game.config import DIGEST_INTERVALS
+
+    allowed = sorted(DIGEST_INTERVALS)
+    if hours in allowed:
+        chosen = hours
+    else:
+        chosen = min(allowed, key=lambda x: abs(x - hours))
+    await _set_value(session, GAME_DIGEST_INTERVAL_KEY, str(chosen))
+
+
+async def set_game_memorial_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_MEMORIAL_ENABLED_KEY, "true" if value else "false")
+
+
+async def set_game_memorial_silence_days(session: AsyncSession, days: int) -> None:
+    await _set_value(session, GAME_MEMORIAL_SILENCE_KEY, str(max(1, int(days))))
+
+
+async def set_game_memorial_repeat_days(session: AsyncSession, days: int) -> None:
+    await _set_value(session, GAME_MEMORIAL_REPEAT_KEY, str(max(1, int(days))))
+
+
+async def set_game_events_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_EVENTS_ENABLED_KEY, "true" if value else "false")
+
+
+async def set_game_events_chance_percent(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_EVENTS_CHANCE_KEY, str(max(0, min(100, int(value)))))
+
+
+async def set_game_events_max_per_day(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_EVENTS_MAX_PER_DAY_KEY, str(max(0, int(value))))
+
+
+async def set_game_events_min_gap_hours(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_EVENTS_MIN_GAP_KEY, str(max(0, int(value))))
+
+
+async def set_game_contraband_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_CONTRABAND_ENABLED_KEY, "true" if value else "false")
+
+
+async def set_game_contraband_chance_percent(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_CONTRABAND_CHANCE_KEY, str(max(0, min(100, int(value)))))
+
+
+async def set_game_contraband_daily_cap(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_CONTRABAND_CAP_KEY, str(max(0, int(value))))

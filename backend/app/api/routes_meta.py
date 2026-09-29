@@ -54,6 +54,7 @@ _FEATURE_ROUTES: dict[str, tuple[str, str]] = {
     "game.holidays": ("GET", "/api/game/holidays"),
     "game.donate": ("POST", "/api/game/donate"),
     "admin.game": ("GET", "/api/admin/game"),
+    "admin.game.social": ("GET", "/api/admin/game/social"),
 }
 
 # Ключи, которые считаем диагностически значимыми в отпечатке кода: служебные

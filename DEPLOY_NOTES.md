@@ -64,9 +64,53 @@ curl -s "https://meetup-planner1.pages.dev$JS" | grep -c 'Себе дарить 
 > Токен/PAT нужен только для github.com. HF Space ходит со своим `hf_`-токеном,
 а git Amvera — по логину Amvera; один и тот же секрет нигде не переиспользуется.
 
-После этого пуша **Amvera не отреагировала** (осталась на 123 путях) — то есть
-её конвейер не реагирует ни на пуш в свой git, ни на пуш в GitHub. Разбор —
-в `docs/AMVERA_BUILD_DIAGNOSTIC.md`, раздел про три сценария отказа.
+### Amvera: сборка падала на базовом образе (2026-09-29, закрыто)
+
+Гипотеза «конвейер не реагирует» была неверной: реагировал как часы, а падал
+первый шаг Docker. Внутренний proxy Amvera `harbor.waw.amverum.com` отдавал
+`stream error … INTERNAL_ERROR` на blob'ах `python:3.12-slim`. Лечение —
+`FROM public.ecr.aws/docker/library/python:3.12-slim`, после чего сборка прошла.
+Подробности и логи — в `docs/AMVERA_BUILD_DIAGNOSTIC.md` (шапка документа).
+
+Если это повторится с другой библиотекой — смотреть не код, а `getBuildLogs`
+через MCP: падение почти всегда видно в первых трёх строках.
+
+## 🛠 Управление хостами из терминала (2026-09-29)
+
+Всё лежит в `../tools/` (рядом с `meetup-planner-main`, не внутри монорепо —
+эти скрипты про инфраструктуру, а не про приложение):
+
+| Скрипт | Что делает |
+|---|---|
+| `tools/amvera-mcp.py` | CLI к MCP-серверу Amvera: `tools`, `call <tool> '<json>'`, `raw '<json>'`. 28 инструментов: сборка, логи, переменные, домены, файлы |
+| `tools/switch-db.py` | `status` / `check <dsn>` / `switch <dsn>` / `webhook amvera\|hf` — переключатель базы, который реально работает |
+
+Токен берётся из `secrets/Get-Secret.ps1 AMVERA_MCP_TOKEN` (или env
+`AMVERA_MCP_TOKEN`). Типовые команды:
+
+```bash
+python tools/amvera-mcp.py call listProjects '{}'
+python tools/amvera-mcp.py call getBuildLogs '{"serviceName":"meetup-planner","query":"*","start":"2026-09-29T00:00:00Z","end":"2026-09-29T23:59:59Z"}'
+python tools/amvera-mcp.py call rebuildProject '{"slug":"meetup-planner"}'
+```
+
+⚠ Мелочь, о которой стоит знать: сервер Amvera требует присутствия всех
+полей из схемы, даже объявленных необязательными (`isSecret`, `query`, `start`,
+`end`). Клиент сам дозаполняет недостающие `null` и повторяет вызов.
+
+`tools/switch-db.py` делает то, что не могли `meetup-switch/*.bat`: те меняли
+URL вебхука (какой бэкенд обслуживает бота), а база живёт в `DATABASE_URL`
+контейнера. Скрипт проверяет кандидата до переключения, меняет переменную
+**у обоих хостов** (Amvera — через MCP, HF — через API секретов), перезапускает
+их и подтверждает результат по `/api/meta`:
+
+```bash
+python tools/switch-db.py status          # что сейчас у обоих
+python tools/switch-db.py check --list    # какие DSN вообще известны
+python tools/switch-db.py check current   # проверка кандидата
+python tools/switch-db.py switch dsn2     # переключить и подтвердить
+python tools/switch-db.py webhook amvera  # то, что делали .bat
+```
 
 ---
 

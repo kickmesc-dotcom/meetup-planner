@@ -1287,3 +1287,57 @@ export const setGamePlayerXp = (telegramId: number, xpTotal: number) =>
     method: "POST",
     body: JSON.stringify({ telegram_id: telegramId, xp_total: xpTotal }),
   });
+
+// --- GHG10 Э13: сводка, поминовения, события, контрабанда ---
+
+/** Слово-контрабанда: чьё, сколько платит, в каких формулировках ловится. */
+export interface GameContrabandWord {
+  word: string;
+  owner: string | null;
+  owner_tg_id: number | null;
+  variants: string[];
+  labels: string[];
+  xp: number;
+  note: string | null;
+  enabled: boolean;
+  chance: number | null;
+}
+
+export interface GameSocialState {
+  digest_enabled: boolean;
+  digest_interval_hours: number;
+  /** Сколько событий уже лежит в журнале и ждёт отправки. */
+  digest_pending: number;
+  memorial_enabled: boolean;
+  memorial_silence_days: number;
+  memorial_repeat_days: number;
+  events_enabled: boolean;
+  events_chance_percent: number;
+  events_max_per_day: number;
+  events_min_gap_hours: number;
+  /** Сколько случайных событий сейчас ждут ответа. */
+  events_open: number;
+  contraband_enabled: boolean;
+  contraband_chance_percent: number;
+  contraband_daily_cap: number;
+  /** true — реестр слов отредактирован вручную (иначе действуют дефолты). */
+  contraband_custom_registry: boolean;
+  contraband_words: GameContrabandWord[];
+  /** Владельцы слов, которых нет среди участников — слово молчит. */
+  unresolved_owners: string[];
+}
+
+export const fetchGameSocial = () =>
+  api<GameSocialState>("/api/admin/game/social");
+
+export const updateGameSocial = (body: Partial<Omit<GameSocialState, "contraband_words">> & {
+  contraband_words?: GameContrabandWord[];
+}) =>
+  api<GameSocialState>("/api/admin/game/social", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+/** «Вывали сводку сейчас» — не ждать настроенного окна. */
+export const flushGameDigest = () =>
+  api<{ sent: number }>("/api/admin/game/social/flush", { method: "POST" });

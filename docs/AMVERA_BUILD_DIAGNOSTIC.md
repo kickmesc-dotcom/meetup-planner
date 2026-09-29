@@ -1,6 +1,36 @@
 # Диагностика: сборка Amvera не доезжает до живого контейнера
 
-Дата сбора: **2026-09-29** (утро). Предмет: боевой хост бота
+> ## ✅ РАЗГАДАНО (2026-09-29, вечер)
+>
+> Всё нижеописанное было догадками по внешним признакам. Причина оказалась в
+> другом месте, и она видна за минуту через **MCP Amvera** (см. `tools/amvera-mcp.py`):
+>
+> ```
+> listProjects         → meetup-planner | status=BUILD_FAILED
+> getBuildLogs         → HEAD is now at 5c7348f …        ← пуш и вебхук работают
+>                        INFO[0000] Retrieving image python:3.12-slim
+>                                   from mapped registry harbor.waw.amverum.com
+>                        error building image: stream error: stream ID 1;
+>                                   INTERNAL_ERROR; received from peer
+> ```
+>
+> **Автодеплой всё время работал.** Каждая сборка клонировала самый свежий коммит
+> и падала на первой же строке Dockerfile: Amvera переписывает ссылки на Docker
+> Hub в свой внутренний proxy-реестр `harbor.waw.amverum.com`, и с 28.09.2026
+> (~21:06 MSK — последняя успешная сборка была в 19:15) тот отдаёт `INTERNAL_ERROR`
+> на blob'ах образа `python:3.12-slim`. Ни один пуш ничего не мог изменить.
+>
+> Лечение (в коде, а не в консоли): база берётся из зеркала Docker Official
+> Images на **AWS ECR Public** — `public.ecr.aws/docker/library/python:3.12-slim`,
+> содержимое образа идентично, отличается только путь доставки. После пуша
+> `meetup-planner-backend` в `amvera master` проект стал `RUNNING`, живой хост
+> отвечает `fingerprint 5673be7eb499` и 7 возможностями — то есть догнал HF.
+>
+> Заодно MCP дал тот инструмент, которого не хватало: сборку, переменные
+> окружения и логи можно дёргать из терминала, без консоли и без SSH
+> (`tools/amvera-mcp.py`, `tools/switch-db.py`).
+
+Дата сбора первоначальной диагностики: **2026-09-29** (утро). Предмет: боевой хост бота
 `https://meetup-planner-youmakemefry.waw0.amvera.tech` работает на коде **этапа
 2–8 GHG10**, хотя в git-репозитории Amvera лежат коммиты до `2b46777`
 (этапы 9, 5.4/5.5, 7, 10.3, 11, `/ach`, `/levels`).

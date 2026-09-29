@@ -51,6 +51,7 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("ranks", "📊 Чарт рангов участников", scope="both"),
     CommandSpec("ach", "🏆 Все ачивки с описаниями", scope="both"),
     CommandSpec("xp", "⚡️ За что дают опыт", scope="both"),
+    CommandSpec("game", "📖 Как всё устроено: опыт, ранги, события", scope="both"),
     # --- Действия ---
     CommandSpec("loser", "Назначить лоха дня (ручная рулетка)", scope="both"),
     CommandSpec("phrase", "Прогнать рандомную фразу", scope="both"),

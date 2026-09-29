@@ -362,8 +362,157 @@ def xp_rules_text() -> str:
     for rule in XP_RULES.values():
         label = limit_label(rule.limit)
         tail = f" <i>({label})</i>" if label else ""
-        lines.append(f"• {rule.title} — <b>+{rule.points}</b> XP{tail}")
+        price = "по событию" if rule.variable else f"<b>+{rule.points}</b> XP"
+        lines.append(f"• {rule.title} — {price}{tail}")
     lines.append(
-        f"\n1 ранг = 100 XP, максимум — {MAX_LEVEL}. Дальше опыт идёт в престиж."
+        f"\n1 ранг = {XP_PER_LEVEL} XP, максимум — {MAX_LEVEL}. "
+        "Дальше опыт идёт в престиж."
     )
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Э13: мини-методичка — «как всё работает» одним сообщением
+# --------------------------------------------------------------------------
+
+
+def manual_xp_block() -> list[str]:
+    """Строки про опыт — из единственной точки тюнинга, чтобы не разъехались."""
+    out: list[str] = []
+    for rule in XP_RULES.values():
+        label = limit_label(rule.limit)
+        tail = f" ({label})" if label else ""
+        price = "по событию" if rule.variable else f"+{rule.points} XP"
+        out.append(f"• {rule.title} — {price}{tail}")
+    return out
+
+
+def manual_ranks_block() -> list[str]:
+    """Строки про ранги и что они открывают — из `LEVEL_UNLOCKS`."""
+    out: list[str] = []
+    for level in sorted(LEVEL_UNLOCKS):
+        titles = ", ".join(feature_title(code) for code in LEVEL_UNLOCKS[level])
+        out.append(f"• {level}-й ранг — {titles}")
+    return out
+
+
+async def game_manual_text(session: AsyncSession) -> str | None:
+    """Мини-методичка «что тут вообще происходит» — по команде /game.
+
+    Собирается из тех же структур, что и сама игра (`XP_RULES`, `LEVEL_UNLOCKS`,
+    каталоги событий и слов), поэтому не может «рассказать одно, а делать
+    другое». `None` — игра выключена, отвечать нечего.
+    """
+    if not await is_game_enabled(session):
+        return None
+
+    from app.services.admin_config import (
+        get_game_contraband_enabled,
+        get_game_digest_enabled,
+        get_game_digest_interval_hours,
+        get_game_events_enabled,
+        get_game_memorial_enabled,
+        get_game_memorial_silence_days,
+    )
+    from app.services.game import contraband
+    from app.services.game.events_catalog import PROMPTS
+
+    def _on(flag: bool) -> str:
+        return "включено" if flag else "выключено"
+
+    lines: list[str] = ["📖 <b>Игра: как всё работает</b>"]
+
+    lines.append("\n<b>Опыт</b>")
+    lines.extend(manual_xp_block())
+
+    lines.append(
+        f"\n<b>Уровни.</b> {MAX_LEVEL} уровней по {XP_PER_LEVEL} XP; "
+        f"уровень = ранг. С {MAX_LEVEL}-го опыт идёт в престиж, качаться больше некуда."
+    )
+    lines.append("<b>Что открывает ранг</b>")
+    lines.extend(manual_ranks_block())
+
+    lines.append(
+        f"\n<b>Ачивки</b> — {len(catalog.CATALOG)} шт., каждая берётся один раз. "
+        "У накопительных есть юбилеи (×10/20/30/50/100), у «С почином» за ×100 — "
+        f"титул «{SUPREME_CHUKHAN_TITLE}» поверх ранга. Список: /ach"
+    )
+
+    lines.append(
+        f"\n<b>Случайные события</b> — {_on(await get_game_events_enabled(session))}. "
+        "Бот иногда кидает призыв в чат; первый, кто ответит, забирает XP:"
+    )
+    for prompt in PROMPTS:
+        first = (prompt.text or "").split("\n")[0]
+        clean = _strip_tags(first)
+        lines.append(f"• {clean} ({prompt.ttl_minutes} мин)")
+
+    words = await contraband.configured_words(session)
+    lines.append(
+        f"\n<b>Контрабанда слов</b> — {_on(await get_game_contraband_enabled(session))}. "
+        "Опыт за кодовое слово уходит ВЛАДЕЛЬЦУ (не тому, кто написал):"
+    )
+    for entry in words:
+        if not entry.get("enabled", True):
+            continue
+        owner = entry.get("owner") or "—"
+        lines.append(f"• «{entry.get('word')}» → <b>{owner}</b> (+{entry.get('xp', 0)} XP)")
+
+    silence = await get_game_memorial_silence_days(session)
+    lines.append(
+        f"\n<b>Поминовения</b> — {_on(await get_game_memorial_enabled(session))}. "
+        f"Молчишь {silence} дней — бот торжественно поминает, вернёшься — «ОН ЗДЕСЬ»."
+    )
+
+    digest = await get_game_digest_enabled(session)
+    every = await get_game_digest_interval_hours(session)
+    lines.append(
+        f"\n<b>Сводка</b> — {_on(digest)} (сейчас раз в {every} ч). "
+        "Пока выключена, бот пишет про ачивки сразу; включённая — копит в журнал и "
+        "вываливает одним сообщением раз в 1/6/12/24 ч."
+    )
+
+    lines.append(
+        "\n<b>Команды</b>\n"
+        "• /rank — мой ранг и сколько до следующего\n"
+        "• /ranks — чарт рангов\n"
+        "• /levels — подробная стата и уровни всех\n"
+        "• /ach — все ачивки с описаниями\n"
+        "• /xp — за что дают опыт"
+    )
+    return "\n".join(lines)
+
+
+# Лимит Telegram — 4096 символов. Оставляем запас на HTML-теги/эмодзи.
+CHAT_MESSAGE_LIMIT = 4000
+
+
+def chunk_text(text: str, *, limit: int = CHAT_MESSAGE_LIMIT) -> list[str]:
+    """Порезать длинный текст на сообщения по границам строк. Чистая функция.
+
+    Нужна там, где справочник может перерасти одно сообщение: отдавать
+    «Bad Request: message is too long» вместо ответа — худший вариант.
+    """
+    if not text:
+        return []
+    if len(text) <= limit:
+        return [text]
+    chunks: list[str] = []
+    current = ""
+    for line in text.split("\n"):
+        candidate = f"{current}\n{line}" if current else line
+        if len(candidate) > limit and current:
+            chunks.append(current)
+            current = line
+        else:
+            current = candidate
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _strip_tags(text: str) -> str:
+    """Убрать HTML-теги из строки — для цитирования каталогов в методичке."""
+    import re
+
+    return re.sub(r"<[^>]+>", "", text).strip()

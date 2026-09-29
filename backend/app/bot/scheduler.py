@@ -89,6 +89,9 @@ JOB_SPACE_RESTART = "space_restart_tick"  # GHG8 P14
 JOB_GAME_HOLIDAYS = "game_holidays_daily"  # GHG10 Э10
 JOB_GAME_WEEK_ACTIVITY = "game_week_activity_weekly"  # GHG10 Э6
 JOB_GAME_MEMES = "game_memes_sweep"  # GHG10 Э7
+JOB_GAME_MEMORIAL = "game_memorial_daily"  # GHG10 Э13
+JOB_GAME_EVENTS = "game_events_hourly"  # GHG10 Э13
+JOB_GAME_DIGEST = "game_digest_flush"  # GHG10 Э13
 
 
 def _env_int(name: str, default: int) -> int:
@@ -759,6 +762,69 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_GAME_MEMES)
         log.info("scheduler.game_memes_disabled")
+
+    # --- GHG10 (Э13): «поминальные» — раз в сутки.
+    # 10:05 — после утренних ДР/праздников, чтобы поминовение не толкалось с
+    # ними в одном сообщении. Само решение «кого поминать» принимает job
+    # (порог и интервал повтора читаются из конфига и меняются без деплоя).
+    if game_on:
+        from app.services.game.memorial import run_memorial_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_MEMORIAL, run_memorial_job),
+            CronTrigger(hour=10, minute=5, timezone=settings.scheduler_tz),
+            id=JOB_GAME_MEMORIAL,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        log.info("scheduler.game_memorial_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_MEMORIAL)
+        log.info("scheduler.game_memorial_disabled")
+
+    # --- GHG10 (Э13): случайные события.
+    # Тик — часовой, а «выпадать/не выпадать» решает сам job: пауза между
+    # событиями (`min_gap_hours`), суточный потолок и вероятность. Поэтому
+    # правка настроек в админке работает без пересоздания job'а.
+    if game_on:
+        from app.services.game.events import run_events_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_EVENTS, run_events_job),
+            IntervalTrigger(hours=1),
+            id=JOB_GAME_EVENTS,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=1800,
+        )
+        log.info("scheduler.game_events_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_EVENTS)
+        log.info("scheduler.game_events_disabled")
+
+    # --- GHG10 (Э13): отправка сводки.
+    # Режим сводки ВЫКЛЮЧЕН по умолчанию (см. `game.digest.enabled`), но job
+    # регистрируем всегда при включённой игре: включение режима не должно
+    # требовать рестарта контейнера. Пустой журнал = ноль работы.
+    if game_on:
+        from app.services.game.journal import run_digest_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_DIGEST, run_digest_job),
+            IntervalTrigger(minutes=30),
+            id=JOB_GAME_DIGEST,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=900,
+        )
+        log.info("scheduler.game_digest_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_DIGEST)
+        log.info("scheduler.game_digest_disabled")
 
 
 def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:

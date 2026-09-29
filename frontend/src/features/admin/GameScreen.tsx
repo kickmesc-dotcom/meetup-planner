@@ -17,10 +17,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchGameAdmin,
   fetchGamePlayer,
+  fetchGameSocial,
+  flushGameDigest,
   grantGameAchievement,
   resetGameAchievements,
   setGamePlayerXp,
   updateGameAdmin,
+  updateGameSocial,
+  type GameContrabandWord,
   type GamePlayerState,
 } from "@/api/admin";
 import type { User } from "@/types";
@@ -35,14 +39,92 @@ interface Props {
 }
 
 const QUERY_KEY = ["admin", "game"] as const;
+const SOCIAL_KEY = ["admin", "game", "social"] as const;
+
+/** Ползунок-тумблер: одинаковый во всех четырёх блоках Э13. */
+function Toggle({
+  label,
+  hint,
+  on,
+  busy,
+  onClick,
+}: {
+  label: string;
+  hint: string;
+  on: boolean;
+  busy: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="min-w-0">
+        <div className="text-sm font-semibold">{label}</div>
+        <div className="text-[11px] text-tg-hint">{hint}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        className={[
+          "shrink-0 rounded-lg px-3 py-2 text-sm font-medium active:scale-[0.98] disabled:opacity-60",
+          on ? "bg-status-busy/20 text-status-busy" : "bg-tg-button text-tg-button-text",
+        ].join(" ")}
+      >
+        {busy ? "…" : on ? "Выключить" : "Включить"}
+      </button>
+    </div>
+  );
+}
+
+/** Числовое поле с черновиком: сохраняется кнопкой «Сохранить», а не на каждый символ. */
+function NumberRow({
+  label,
+  value,
+  onSave,
+  busy,
+}: {
+  label: string;
+  value: number;
+  onSave: (next: number) => void;
+  busy: boolean;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? String(value);
+  return (
+    <div className="flex gap-2">
+      <input
+        value={shown}
+        onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 4))}
+        inputMode="numeric"
+        placeholder={label}
+        className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+      />
+      <button
+        type="button"
+        onClick={() => {
+          onSave(Number(shown));
+          setDraft(null);
+        }}
+        disabled={draft === null || busy}
+        className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
+      >
+        Сохранить
+      </button>
+    </div>
+  );
+}
 
 export default function GameScreen({ users, onBack }: Props) {
   const queryClient = useQueryClient();
   const state = useQuery({ queryKey: QUERY_KEY, queryFn: fetchGameAdmin });
+  const social = useQuery({ queryKey: SOCIAL_KEY, queryFn: fetchGameSocial });
   const [selected, setSelected] = useState<number | null>(null);
   const [code, setCode] = useState("");
   const [xpDraft, setXpDraft] = useState("");
   const [debugDraft, setDebugDraft] = useState<string | null>(null);
+  // Реестр слов правим локально и отправляем целиком: он заменяется, а не мержится.
+  const [wordsDraft, setWordsDraft] = useState<GameContrabandWord[] | null>(null);
+  const words = wordsDraft ?? social.data?.contraband_words ?? [];
 
   const player = useQuery({
     queryKey: ["admin", "game", "player", selected],
@@ -116,6 +198,34 @@ export default function GameScreen({ users, onBack }: Props) {
       haptic("success");
       setXpDraft("");
       refreshPlayer(data);
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  const socialMut = useMutation({
+    mutationFn: updateGameSocial,
+    onSuccess: (data) => {
+      haptic("success");
+      queryClient.setQueryData(SOCIAL_KEY, data);
+      setWordsDraft(null);
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  const flushMut = useMutation({
+    mutationFn: flushGameDigest,
+    onSuccess: (data) => {
+      haptic("success");
+      void showAlert(
+        data.sent > 0 ? `Улетело в чат записей: ${data.sent}` : "В журнале пусто",
+      );
+      void queryClient.invalidateQueries({ queryKey: SOCIAL_KEY });
     },
     onError: (e) => {
       haptic("error");
@@ -326,6 +436,239 @@ export default function GameScreen({ users, onBack }: Props) {
             >
               🧹 Сбросить ачивки и накопители
             </button>
+          </>
+        )}
+      </section>
+
+      {/* GHG10 Э13: четыре социальные фичи. Задание просило выключаемость и
+          «процент срабатываний» — здесь и то, и другое, без похода в SQL. */}
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <div className="text-sm font-semibold">📣 Социальные фичи</div>
+        <div className="text-[11px] text-tg-hint">
+          Всё это пишет в чат само. Сводка — противоядие от спама: вместо
+          отдельных сообщений бот копит события в журнал и вываливает пачкой.
+        </div>
+
+        {social.isError && isEndpointMissing(social.error) && (
+          <div className="text-[12px] text-tg-hint">
+            Сервер ещё не знает ручку /api/admin/game/social — обновится сам после
+            пересборки бэкенда.
+          </div>
+        )}
+
+        {social.data && (
+          <>
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <Toggle
+                label="Режим сводки"
+                hint={
+                  social.data.digest_enabled
+                    ? `Копится в журнал: ${social.data.digest_pending} записей`
+                    : "Сейчас бот пишет про ачивки сразу"
+                }
+                on={social.data.digest_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ digest_enabled: !social.data?.digest_enabled });
+                }}
+              />
+              <div className="flex flex-wrap gap-1">
+                {[1, 6, 12, 24].map((hours) => (
+                  <button
+                    key={hours}
+                    type="button"
+                    onClick={() => {
+                      haptic("selection");
+                      socialMut.mutate({ digest_interval_hours: hours });
+                    }}
+                    disabled={socialMut.isPending}
+                    className={[
+                      "rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-60",
+                      social.data?.digest_interval_hours === hours
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-secondary-bg/80 text-tg-text",
+                    ].join(" ")}
+                  >
+                    раз в {hours} ч
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  flushMut.mutate();
+                }}
+                disabled={flushMut.isPending}
+                className="w-full rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
+              >
+                Отправить сводку сейчас
+              </button>
+            </div>
+
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <Toggle
+                label="Поминовения"
+                hint="Молчишь N дней — бот поминает; вернёшься — «ОН ЗДЕСЬ»"
+                on={social.data.memorial_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ memorial_enabled: !social.data?.memorial_enabled });
+                }}
+              />
+              <NumberRow
+                label="дней тишины"
+                value={social.data.memorial_silence_days}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ memorial_silence_days: n || 1 })}
+              />
+              <div className="text-[11px] text-tg-hint">
+                первое число — порог тишины в днях (21 = «3 недели»), второе —
+                как часто повторять поминовение
+              </div>
+              <NumberRow
+                label="дней между повторами"
+                value={social.data.memorial_repeat_days}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ memorial_repeat_days: n || 1 })}
+              />
+            </div>
+
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <Toggle
+                label="Случайные события"
+                hint={`Ждут ответа сейчас: ${social.data.events_open}. Первый ответивший забирает XP`}
+                on={social.data.events_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ events_enabled: !social.data?.events_enabled });
+                }}
+              />
+              <div className="text-[11px] text-tg-hint">
+                вероятность выпадения, потолок в сутки и пауза между событиями
+              </div>
+              <NumberRow
+                label="вероятность, %"
+                value={social.data.events_chance_percent}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ events_chance_percent: Math.min(100, n) })}
+              />
+              <NumberRow
+                label="событий в сутки"
+                value={social.data.events_max_per_day}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ events_max_per_day: n })}
+              />
+              <NumberRow
+                label="пауза, часов"
+                value={social.data.events_min_gap_hours}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ events_min_gap_hours: n })}
+              />
+            </div>
+
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <Toggle
+                label="Контрабанда слов"
+                hint="Опыт за кодовое слово уходит ВЛАДЕЛЬЦУ слова, не тому, кто написал"
+                on={social.data.contraband_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ contraband_enabled: !social.data?.contraband_enabled });
+                }}
+              />
+              <div className="text-[11px] text-tg-hint">
+                вероятность срабатывания и потолок срабатываний в сутки на слово
+              </div>
+              <NumberRow
+                label="вероятность, %"
+                value={social.data.contraband_chance_percent}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ contraband_chance_percent: Math.min(100, n) })}
+              />
+              <NumberRow
+                label="срабатываний в сутки"
+                value={social.data.contraband_daily_cap}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ contraband_daily_cap: n })}
+              />
+
+              {social.data.unresolved_owners.length > 0 && (
+                <div className="rounded bg-status-busy/15 p-2 text-[11px] text-status-busy">
+                  Некому начислять: {social.data.unresolved_owners.join(", ")} — выбери
+                  владельца из участников, иначе слово молчит
+                </div>
+              )}
+
+              <div className="space-y-1">
+                {words.map((w, idx) => (
+                  <div key={w.word} className="rounded bg-tg-bg/50 p-2 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                        «{w.word}»
+                      </span>
+                      <span className="text-[11px] text-tg-hint">+{w.xp} XP</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setWordsDraft(
+                            words.map((it, i) =>
+                              i === idx ? { ...it, enabled: !it.enabled } : it,
+                            ),
+                          )
+                        }
+                        className={[
+                          "rounded px-2 py-0.5 text-[11px] font-medium",
+                          w.enabled ? "bg-status-free/20" : "bg-tg-secondary-bg/80",
+                        ].join(" ")}
+                      >
+                        {w.enabled ? "в игре" : "выкл"}
+                      </button>
+                    </div>
+                    <select
+                      value={w.owner_tg_id ?? ""}
+                      onChange={(e) =>
+                        setWordsDraft(
+                          words.map((it, i) =>
+                            i === idx
+                              ? {
+                                  ...it,
+                                  owner_tg_id: e.target.value ? Number(e.target.value) : null,
+                                }
+                              : it,
+                          ),
+                        )
+                      }
+                      className="w-full rounded bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
+                    >
+                      <option value="">{w.owner ?? "— владелец не выбран —"}</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.telegram_id}>
+                          {u.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ contraband_words: words });
+                }}
+                disabled={wordsDraft === null || socialMut.isPending}
+                className="w-full rounded-lg bg-tg-button px-3 py-2 text-xs font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
+              >
+                Сохранить реестр слов
+                {social.data.contraband_custom_registry ? "" : " (сейчас действуют дефолты)"}
+              </button>
+            </div>
           </>
         )}
       </section>

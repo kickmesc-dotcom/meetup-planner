@@ -167,14 +167,13 @@ async def run_holidays_job(bot: Bot, *, today: date | None = None) -> int:
             if not settings.group_chat_id:
                 continue
             text = holiday_announcement(holiday, points=awards_points())
-            try:
-                await bot.send_message(
-                    chat_id=settings.group_chat_id,
-                    text=text,
-                    parse_mode="HTML",
-                )
-            except Exception as exc:  # noqa: BLE001 — праздник не стоит падения job'а
-                log.warning("game.holiday_announce_failed", error=str(exc))
+            # Э13: через журнал — при включённом режиме сводки праздник уедет
+            # ближайшим окном, а не посреди рабочего дня.
+            from app.services.game import journal
+
+            await journal.announce(
+                session, kind=journal.KIND_HOLIDAY, text=text
+            )
     if announced:
         log.info("game.holidays_processed", announced=announced)
     return announced

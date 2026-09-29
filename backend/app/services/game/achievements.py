@@ -383,19 +383,24 @@ async def announce_granted(
         markup = await _link_markup(url)
         if bot is None:
             return False
-        await bot.send_message(
-            chat_id=chat_id,
+        # Э13: анонс идёт через журнал — при включённом режиме сводки он не
+        # улетает в чат сразу, а ждёт ближайшего окна (см. `journal.announce`).
+        from app.services.game import journal
+
+        sent = await journal.announce(
+            session,
+            kind=journal.KIND_ACHIEVEMENT,
+            subject_user_id=user_id,
             text=text,
-            parse_mode="HTML",
             reply_markup=markup,
-            disable_notification=False,
         )
-        log.info(
-            "game.achievement_announced",
-            user_id=user_id,
-            codes=[a.code for a in achs],
-        )
-        return True
+        if sent:
+            log.info(
+                "game.achievement_announced",
+                user_id=user_id,
+                codes=[a.code for a in achs],
+            )
+        return sent
     except Exception as exc:  # noqa: BLE001
         log.warning("game.achievement_announce_failed", error=str(exc))
         return False

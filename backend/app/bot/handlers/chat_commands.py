@@ -142,6 +142,30 @@ async def on_ach(message: Message) -> None:
     await message.answer(text, parse_mode="HTML")
 
 
+@router.message(Command(commands=["game", "manual"]))
+async def on_game_manual(message: Message) -> None:
+    """Мини-методичка «как всё работает» (Э13).
+
+    Текст собирается из тех же структур, что и сама игра, поэтому не может
+    разойтись с поведением. Игра выключена — молчим.
+    """
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            text = await report.game_manual_text(session)
+    except Exception as exc:  # noqa: BLE001 — методичка не стоит падения хендлера
+        log.warning("chat.game_manual_failed", error=str(exc))
+        return
+    if text is None:  # игра выключена
+        return
+    for chunk in report.chunk_for_chat(text):
+        await message.answer(chunk, parse_mode="HTML")
+
+
 @router.message(Command("levels"))
 async def on_levels(message: Message) -> None:
     """Своя подробная стата + левелы всех участников одним сообщением."""

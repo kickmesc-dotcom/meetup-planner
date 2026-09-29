@@ -82,6 +82,9 @@ async def on_group_message(message: Message) -> None:
             # Это держит базу в идеальном тонусе
             await cleanup_old_messages(session)
             user_pk = user.id
+            # Запоминаем имя здесь: после commit'а атрибуты истекли, а сессия
+            # уже закрыта — снаружи `user.display_name` бросил бы исключение.
+            user_name = user.display_name
 
         # GHG8 P7: текст от участника = чат жив. Внутри — троттлинг 15 мин
         # и best-effort, сюда исключения не долетают.
@@ -123,5 +126,67 @@ async def on_group_message(message: Message) -> None:
             except Exception as exc:  # noqa: BLE001
                 log.warning("chat_capture.game_response_failed", error=str(exc))
 
+            # GHG10 Э13: «социальный» слой — возвращение из поминовения, ответ
+            # на случайное событие и контрабанда слов. Одна общая сессия и
+            # строго best-effort: ни одна из трёх фич не имеет права стоить нам
+            # самого сообщения или опыта за него.
+            from app.services.game import contraband, events, memorial
+
+            try:
+                async with sm() as ssession:
+                    await memorial.note_return(ssession, user_id=user_pk, at=message.date)
+                    await events.try_answer(
+                        ssession,
+                        chat_id=message.chat.id,
+                        telegram_id=message.from_user.id,
+                        text=message.text,
+                        has_media=False,
+                        at=message.date,
+                    )
+                    await contraband.scan(
+                        ssession,
+                        author_id=user_pk,
+                        author_name=user_name,
+                        text=message.text,
+                        at=message.date,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("chat_capture.game_social_failed", error=str(exc))
+
     except Exception as exc:  # noqa: BLE001
         log.warning("chat_capture.failed", error=str(exc))
+
+
+@router.message(F.photo | F.sticker | F.animation | F.video)
+async def on_group_media(message: Message) -> None:
+    """Медиа в общем чате — единственный вход для «скинь мем» (Э13).
+
+    Текст хендлера выше медиа не ловит, а призыв «скинь любимый мем» обязан
+    засчитываться по самому факту картинки. Ничего не сохраняем (в отличие от
+    текста): нам нужен только ответ на открытый промпт.
+    """
+    settings = get_settings()
+    if not settings.group_chat_id or message.chat.id != settings.group_chat_id:
+        return
+    if not message.from_user or message.from_user.is_bot:
+        return
+    from app.services.game import events
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            user_pk = await session.scalar(
+                select(User.id).where(User.telegram_id == message.from_user.id)
+            )
+            if user_pk is None:
+                return
+            await events.try_answer(
+                session,
+                chat_id=message.chat.id,
+                telegram_id=message.from_user.id,
+                text=None,
+                has_media=True,
+                at=message.date,
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("chat_capture.game_media_failed", error=str(exc))

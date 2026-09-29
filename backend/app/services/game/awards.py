@@ -28,10 +28,10 @@ import functools
 from datetime import datetime, time, timedelta, timezone
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import AvailabilityRange, ChatActivityDaily, User
+from app.db.models import AvailabilityRange, ChatActivityDaily, User, XpGrant
 from app.services.game import achievements, xp
 from app.services.game.achievements import STATUS_FREE
 from app.services.game.config import (
@@ -40,6 +40,8 @@ from app.services.game.config import (
     EV_BECAME_CHUKHAN,
     EV_BECAME_LOSER,
     EV_BIRTHDAY,
+    EV_CONTRABAND,
+    EV_EVENT,
     EV_HOLIDAY,
     EV_MEETING,
     EV_MESSAGE,
@@ -419,6 +421,70 @@ async def week_activity(
     )
 
 
+@_guarded(EV_EVENT)
+async def event(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    points: int,
+    prompt_id: int | None = None,
+    at: datetime | None = None,
+) -> None:
+    """Э13: выиграл случайное событие. Сколько именно — решает промпт.
+
+    Дискриминатор = id промпта: один промпт = одна награда, даже если сообщение
+    пришло дважды (TG умеет ретраить апдейты).
+    """
+    if not await _enabled(session):
+        return
+    await xp.award(
+        session, user_id, EV_EVENT, at=at, points=points, discriminator=prompt_id
+    )
+
+
+@_guarded(EV_CONTRABAND)
+async def contraband(
+    session: AsyncSession,
+    *,
+    owner_id: int,
+    word: str,
+    points: int,
+    daily_cap: int = 1,
+    at: datetime | None = None,
+) -> bool:
+    """Э13: сработало кодовое слово — награда его ВЛАДЕЛЬЦУ.
+
+    Возвращает `True`, только если начисление реально прошло: по этому признаку
+    вызывающий код решает, писать ли анонс в чат. Суточный кэп реализован через
+    дискриминатор (`слово:номер срабатывания за сутки`), поэтому живёт в БД и
+    переживает рестарт контейнера.
+    """
+    if not await _enabled(session):
+        return False
+    if daily_cap <= 0:
+        return False
+    day = xp.window_key("day", at)
+    prefix = f"{EV_CONTRABAND}:{day}:{word}"
+    used = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(XpGrant)
+            .where(
+                XpGrant.user_id == owner_id,
+                XpGrant.idem_key.startswith(prefix, autoescape=True),
+            )
+        )
+        or 0
+    )
+    if used >= daily_cap:
+        return False
+    discriminator = word if daily_cap == 1 else f"{word}:{used + 1}"
+    result = await xp.award(
+        session, owner_id, EV_CONTRABAND, at=at, points=points, discriminator=discriminator
+    )
+    return bool(result.awarded)
+
+
 @_guarded(EV_ACHIEVEMENT)
 async def achievement(session: AsyncSession, user_id: int, code: str) -> None:
     """Выдать конкретную ачивку (админка/отладка) — тоже за рубильником."""
@@ -438,4 +504,6 @@ ALL_EVENTS = (
     EV_BIRTHDAY,
     EV_HOLIDAY,
     EV_MEETING,
+    EV_EVENT,
+    EV_CONTRABAND,
 )

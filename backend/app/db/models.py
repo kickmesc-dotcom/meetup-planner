@@ -765,6 +765,83 @@ class GameMediaPost(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class GameJournalEntry(Base):
+    """Э13: игровой журнал — сводка вместо спама и «поминальные» сообщения.
+
+    Одна таблица решает две задачи, потому что у них общая механика: «событие
+    случилось → его надо (не)показать в чат».
+
+    * **Сводка.** Когда `game.digest.enabled=true`, анонсы не уходят в чат по
+      одному, а ложатся сюда (`sent_at IS NULL`) и вываливаются одним дайджестом
+      по расписанию. Пустая таблица = пусто в чате.
+    * **Поминовения.** Строка `kind='memorial'` с `subject_user_id` — открытое
+      поминовение: пока `resolved_at IS NULL`, человек «в розыске», и первое же
+      его сообщение закрывает строку и вызывает «⚠️ ОН ЗДЕСЬ».
+
+    `repeat_after` — когда поминовение можно повторить (одно и то же лицо может
+    молчать месяцами, а спамить каждый день нельзя).
+    """
+
+    __tablename__ = "game_journal"
+    __table_args__ = (
+        Index("ix_game_journal_pending", "sent_at", "created_at"),
+        Index("ix_game_journal_subject", "subject_user_id", "kind"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Кто автор события (для «своих ачивок» и вообще для контекста). None — «никто».
+    subject_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # None = ещё не показано (для сводки — «в очереди»).
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Когда поминовение можно повторить; None — только для не-поминовений.
+    repeat_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Поминовение закрыто возвращением человека.
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class GamePrompt(Base):
+    """Э13: случайное событие, требующее действия в чате.
+
+    Бот постит призыв («Первый, кто напишет "я", получает 50 XP») и ждёт
+    сообщение, подходящее под один из ответов каталога. Победитель — первый
+    подходящий ответ до `expires_at`; после этого строка закрывается.
+
+    `matcher` хранится строкой (регэксп), а не ссылкой на код: промпт живёт
+    дольше одного релиза, и старые открытые промпты должны доиграть по своим
+    правилам, даже если каталог уже переписали.
+    """
+
+    __tablename__ = "game_prompts"
+    __table_args__ = (
+        Index("ix_game_prompts_open", "chat_id", "closed_at", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    # JSONB-список ответов: [{"matcher": "^да$", "xp": 10, "reply": "..."}].
+    answers: Mapped[list[dict]] = mapped_column(JSONB, default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    winner_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # None = промпт ещё в игре. Закрывается победой или истечением срока.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str | None] = mapped_column(String(16))
+
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event
