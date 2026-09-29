@@ -25,11 +25,41 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
   const qc = useQueryClient();
 
+  // См. `ParticipantRow`: диапазон кладём в кэш сразу, иначе полоса появляется
+  // только после ответа сервера и рефетча.
   const createMut = useMutation({
     mutationFn: createRange,
+    onMutate: async (body) => {
+      await qc.cancelQueries({ queryKey: ["ranges"] });
+      const snapshot = qc.getQueriesData<AvailabilityRange[]>({ queryKey: ["ranges"] });
+      qc.setQueriesData<AvailabilityRange[] | undefined>({ queryKey: ["ranges"] }, (old) =>
+        old
+          ? [
+              ...old,
+              {
+                id: -Date.now(),
+                user_id: meId,
+                starts_at: body.starts_at,
+                ends_at: body.ends_at,
+                all_day: body.all_day ?? false,
+                status: body.status,
+                confidence: body.confidence ?? 3,
+                note: body.note ?? null,
+              } as AvailabilityRange,
+            ]
+          : old,
+      );
+      return { snapshot };
+    },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["ranges"] });
       setEditing(created.id);
+    },
+    onError: (_e, _body, ctx) => {
+      haptic("error");
+      if (ctx?.snapshot) {
+        for (const [key, data] of ctx.snapshot) qc.setQueryData(key, data);
+      }
     },
   });
 

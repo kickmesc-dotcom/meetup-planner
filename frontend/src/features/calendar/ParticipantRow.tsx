@@ -65,13 +65,47 @@ export default function ParticipantRow({
   const setShowWormHistory = useUI((s) => s.setShowWormHistory);
   const qc = useQueryClient();
 
+  // Тап по своему свободному дню. Раньше клетка закрашивалась только после
+  // ответа сервера и последующего рефетча: на медленной сети (и тем более при
+  // ошибке) выглядело как «тапнул — ничего не произошло, а через время позеленело».
+  // Теперь диапазон кладётся в кэш СРАЗУ (оптимистично), а ответ сервера лишь
+  // уточняет его — ровно тот же приём, что уже используется в редакторе диапазона.
   const createMut = useMutation({
     mutationFn: createRange,
+    onMutate: async (body) => {
+      await qc.cancelQueries({ queryKey: ["ranges"] });
+      const snapshot = qc.getQueriesData<AvailabilityRange[]>({ queryKey: ["ranges"] });
+      const pendingId = -Date.now();
+      qc.setQueriesData<AvailabilityRange[] | undefined>({ queryKey: ["ranges"] }, (old) =>
+        old
+          ? [
+              ...old,
+              {
+                id: pendingId,
+                user_id: user.id,
+                starts_at: body.starts_at,
+                ends_at: body.ends_at,
+                all_day: body.all_day ?? true,
+                status: body.status,
+                confidence: body.confidence ?? 3,
+                note: body.note ?? null,
+              } as AvailabilityRange,
+            ]
+          : old,
+      );
+      return { snapshot };
+    },
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["ranges"] });
       setEditing(created.id);
     },
-    onError: () => haptic("error"),
+    onError: (_e, _body, ctx) => {
+      haptic("error");
+      // Откат обязателен: иначе клетка осталась бы зелёной без строки в базе.
+      if (ctx?.snapshot) {
+        for (const [key, data] of ctx.snapshot) qc.setQueryData(key, data);
+      }
+    },
   });
 
   const onCellTap = (dayIndex: number) => {

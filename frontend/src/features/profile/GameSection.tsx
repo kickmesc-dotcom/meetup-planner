@@ -1,9 +1,10 @@
 /**
  * GHG10 Э5: игровые поверхности профиля.
  *
- * `GameRankCard` — ранг + шкала/престиж + уведомление о левел-апе + кнопка
- * «за что дают опыт» + история дня. `AchievementsScreen` — лист ачивок и чарты
- * (обладатели ачивок и ранги участников).
+ * `GameDetails` — уведомление о левел-апе + что открылось + история дня +
+ * кнопка «за что дают опыт» + кастомизация. Ранг, аватарка и шкала опыта
+ * переехали в карточку персонажа (`ProfileScreen`), чтобы опыт не жил «где-то
+ * ниже» отдельным блоком. `AchievementsScreen` — лист ачивок и чарты.
  *
  * Рубильник: при `enabled=false` сервер отвечает «пусто», а мы просто не
  * рисуем игровые блоки — остальной профиль работает как раньше.
@@ -19,11 +20,13 @@ import {
   fetchMyGame,
   fetchRanksChart,
   updateGameProfile,
+  type GameAchievement,
   type GameLevelUp,
   type GameProfile,
 } from "@/api/game";
 import type { User } from "@/types";
-import RankPlaque, { RankBar } from "@/components/RankPlaque";
+import RankPlaque from "@/components/RankPlaque";
+import ProgressBar from "@/components/ProgressBar";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
@@ -35,10 +38,9 @@ const LIMIT_LABELS: Record<string, string> = {
   once: "один раз",
 };
 
-export function GameRankCard() {
+export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
   const qc = useQueryClient();
   const [showRules, setShowRules] = useState(false);
-  const game = useQuery({ queryKey: ["game", "me"], queryFn: fetchMyGame });
   const ack = useMutation({
     mutationFn: ackLevelUp,
     onSuccess: () => {
@@ -48,15 +50,15 @@ export function GameRankCard() {
     onError: () => haptic("error"),
   });
 
-  if (game.isPending) {
+  if (!profile) {
     return (
       <section className="rounded-xl bg-tg-secondary-bg/60 p-4">
         <ListSkeleton rows={2} />
       </section>
     );
   }
-  const g = game.data;
-  if (!g || !g.enabled || !g.rank) return null;
+  const g = profile;
+  if (!g.enabled || !g.rank) return null;
 
   return (
     <section className="rounded-xl bg-tg-secondary-bg/60 p-4 space-y-3">
@@ -65,32 +67,6 @@ export function GameRankCard() {
           levelUp={g.level_up}
           onAck={() => ack.mutate()}
           pending={ack.isPending}
-        />
-      )}
-
-      <header className="flex items-center justify-between gap-2">
-        <RankPlaque hex={g.rank.hex} bold={g.rank.bold || g.supreme}>
-          {g.supreme ? "🏅 " : ""}
-          {g.rank_name}
-        </RankPlaque>
-        <span className="text-xs text-tg-hint tabular-nums">
-          Ур. {g.level}/{g.max_level} · {g.xp} XP
-        </span>
-      </header>
-
-      {g.at_max ? (
-        // Э3.3: на максимуме шкала заменяется счётчиком престижа.
-        <div className="flex items-center justify-between rounded-lg bg-tg-bg/50 px-3 py-2">
-          <span className="text-sm text-tg-text">✦ Престиж</span>
-          <span className="text-lg font-bold tabular-nums text-tg-text">
-            {g.prestige}
-          </span>
-        </div>
-      ) : (
-        <RankBar
-          value={g.xp_into_level}
-          total={g.xp_into_level + (g.xp_to_next ?? 0)}
-          label={`До ур. ${g.level + 1}`}
         />
       )}
 
@@ -336,9 +312,19 @@ export function AchievementsScreen({ users }: { users: User[] }) {
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-semibold">🏅 Мои ачивки</h2>
           <span className="text-xs text-tg-hint tabular-nums">
-            {collected}/{achievements.length}
+            собрано {collected}/{achievements.length}
           </span>
         </div>
+        {/* Тот же `10/25`, что раньше висел голым числом — теперь с полосой,
+            чтобы было ясно: это прогресс коллекции, а не что-то ещё. */}
+        {achievements.length > 0 && (
+          <ProgressBar
+            className="mt-2"
+            size="sm"
+            value={collected}
+            total={achievements.length}
+          />
+        )}
         {game.isPending ? (
           <div className="mt-2">
             <ListSkeleton rows={5} />
@@ -359,15 +345,25 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                     <span className="text-sm font-medium text-tg-text truncate">
                       {a.title}
                     </span>
-                    <span className="shrink-0 text-[11px] text-tg-hint tabular-nums">
-                      {a.collected
-                        ? `+${a.points} XP`
-                        : progressLabel(a.progress, a.threshold, a.tiers)}
-                    </span>
+                    {a.collected && (
+                      <span className="shrink-0 text-[11px] font-medium text-status-free tabular-nums">
+                        ✅ +{a.points} XP
+                      </span>
+                    )}
                   </div>
                   <div className="text-[11px] text-tg-hint line-clamp-2">
                     {a.description}
                   </div>
+                  {/* Прогресс — полосой с подписью `X/Y`, а не парой чисел
+                      со стрелкой: продакшн-фидбек 29.09. */}
+                  {!a.collected && achievementProgress(a) && (
+                    <ProgressBar
+                      className="mt-1.5"
+                      size="sm"
+                      tone="muted"
+                      {...achievementProgress(a)!}
+                    />
+                  )}
                 </div>
               </li>
             ))}
@@ -560,18 +556,35 @@ function HolidaysSection() {
   );
 }
 
-function progressLabel(
-  progress: number | null,
-  threshold: number | null,
-  tiers: number[],
-): string {
-  if (threshold !== null) return `${progress ?? 0}/${threshold}`;
-  if (tiers.length > 0) {
-    const next = tiers.find((t) => t > (progress ?? 0));
-    const cur = progress ?? 0;
-    return next ? `${cur} → ${next}` : `${cur} раз`;
+/** Ближайший непройденный юбилей (10/20/30/50/100). */
+function nextTier(progress: number, tiers: number[]): number | null {
+  return tiers.find((t) => t > progress) ?? null;
+}
+
+/**
+ * Прогресс ачивки в виде отношения, а не текста.
+ *
+ * Раньше тут жила строка «12 → 25», где левое число — счётчик, правое — юбилей:
+ * по виду не отличить от дроби и совсем не понятно, что это прогресс. Теперь
+ * всегда отношение `X/Y` с полосой, а смысл `Y` вынесен в подпись.
+ *
+ * `null` — у ачивки нет измеримого прогресса (разовые: «самострел», «кэшбэк»).
+ */
+function achievementProgress(a: GameAchievement): {
+  value: number;
+  total: number;
+  label: string;
+} | null {
+  const progress = a.progress ?? 0;
+  if (a.threshold !== null && a.threshold > 0) {
+    return { value: progress, total: a.threshold, label: "прогресс" };
   }
-  return "";
+  if (a.tiers.length > 0) {
+    const tier = nextTier(progress, a.tiers);
+    if (tier === null) return null;
+    return { value: progress, total: tier, label: `до юбилея ×${tier}` };
+  }
+  return null;
 }
 
 function Avatar({ user, fallback }: { user?: User; fallback: number }) {

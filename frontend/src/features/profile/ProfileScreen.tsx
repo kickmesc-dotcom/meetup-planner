@@ -15,13 +15,15 @@ import {
 import { fetchLoserHistory, fetchLoserStats } from "@/api/meetings";
 import { fetchChukhanHistory } from "@/api/birthdays";
 import { fetchChukhanLeaderboard } from "@/api/admin";
-import { fetchMyGame } from "@/api/game";
+import { fetchMyGame, type GameProfile } from "@/api/game";
 import type { User } from "@/types";
 import { getStartParam, haptic } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Switch } from "@/components/Checkbox";
+import RankPlaque from "@/components/RankPlaque";
+import ProgressBar from "@/components/ProgressBar";
 import LeaderboardScreen from "../leaderboard/LeaderboardScreen";
-import { AchievementsScreen, GameRankCard } from "./GameSection";
+import { AchievementsScreen, GameDetails } from "./GameSection";
 
 interface Props {
   users: User[];
@@ -63,11 +65,14 @@ export default function ProfileScreen({ users, me }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      {/* F1 (T1.5): крупная аватарка по центру → сводка → Топы → История. */}
-      <ProfileHeader me={me} />
+      {/* GHG10 Э5 (правка 29.09): профиль — «карточка персонажа». Аватарка,
+          ранг и опыт живут в ОДНОЙ карточке (опыт не «где-то ниже»), а счётчики
+          лоха/чухана уехали в приглушённую строку внизу: они забавные, но не
+          центр внимания. */}
+      <CharacterCard me={me} game={game.data} loading={game.isPending} />
 
       {/* GHG10 Э5: игровой блок появляется только при включённом рубильнике. */}
-      {gameOn && <GameRankCard />}
+      {gameOn && <GameDetails profile={game.data} />}
 
       {gameOn && (
         <NavCard
@@ -106,12 +111,25 @@ export default function ProfileScreen({ users, me }: Props) {
 }
 
 /**
- * F1 (T1.5): шапка профиля — крупная аватарка по центру, имя/@username, ниже
- * сводка «сколько раз был лохом / чуханом». Счётчики берём из тех же публичных
- * эндпоинтов, что и Топы (loser/stats + chukhan/leaderboard) — отдельного API
- * не заводим.
+ * Карточка персонажа: аватарка + ранг + опыт ОДНИМ блоком, как в игре.
+ *
+ * Продакшн-фидбек: раньше аватарка была сверху, а опыт/левел — отдельным
+ * блоком ниже, из-за чего профиль читался как «фотка, потом непонятно что».
+ * Теперь прогресс встроен в карточку: под именем всегда видно «Ур. N из 10»
+ * и полосу опыта `X/Y` (на максимуме — счётчик престижа).
+ *
+ * Счётчики лоха/чухана остались, но ушли в приглушённую строку-чипсы внизу:
+ * данные берём из тех же публичных эндпоинтов, что и Топы (отдельного API нет).
  */
-function ProfileHeader({ me }: { me: User }) {
+function CharacterCard({
+  me,
+  game,
+  loading,
+}: {
+  me: User;
+  game: GameProfile | undefined;
+  loading: boolean;
+}) {
   const loserStats = useQuery({
     queryKey: ["loser", "stats"],
     queryFn: fetchLoserStats,
@@ -124,54 +142,87 @@ function ProfileHeader({ me }: { me: User }) {
   const loserCount = loserStats.data?.counts?.[me.id] ?? 0;
   const chukhanCount =
     chukhanLeaders.data?.find((r) => r.user_id === me.id)?.count ?? 0;
-  const loading = loserStats.isPending || chukhanLeaders.isPending;
+  const countersLoading = loserStats.isPending || chukhanLeaders.isPending;
+
+  const g = game?.enabled ? game : undefined;
+  const avatarUrl = g?.avatar_manual_url ?? me.avatar_url;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-4 flex flex-col items-center text-center">
-      <div
-        className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center text-white text-3xl font-semibold shrink-0"
-        style={{ background: me.color_hex ?? "#888" }}
-      >
-        {me.avatar_url ? (
-          <img src={me.avatar_url} alt="" className="w-full h-full object-cover" />
-        ) : (
-          me.display_name[0]
-        )}
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-4">
+      <div className="flex items-center gap-3">
+        <div
+          className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-white text-2xl font-semibold shrink-0 ring-2"
+          style={{
+            background: me.color_hex ?? "#888",
+            // Кольцо вокруг аватарки — цвет ранга: карточка сразу «считывается»
+            // как персонаж, а не как фотография.
+            boxShadow: g?.rank ? `0 0 0 3px ${g.rank.hex}44` : undefined,
+          }}
+        >
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+          ) : (
+            me.display_name[0]
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-semibold truncate">
+            {g?.custom_name || me.display_name}
+          </div>
+          {me.username && (
+            <div className="text-xs text-tg-hint truncate">@{me.username}</div>
+          )}
+          {g?.rank && (
+            <div className="mt-1.5">
+              <RankPlaque hex={g.rank.hex} bold={g.rank.bold || g.supreme}>
+                {g.supreme ? "🏅 " : ""}
+                {g.rank_name}
+              </RankPlaque>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="mt-3 text-lg font-semibold">{me.display_name}</div>
-      {me.username && (
-        <div className="text-xs text-tg-hint">@{me.username}</div>
+
+      {/* Опыт — внутри карточки персонажа, а не отдельным блоком ниже. */}
+      {g && (
+        <div className="mt-3">
+          {g.at_max ? (
+            <div className="flex items-center justify-between rounded-lg bg-tg-bg/50 px-3 py-2">
+              <span className="text-xs text-tg-hint">Максимальный ранг</span>
+              <span className="text-sm text-tg-text">
+                ✦ Престиж{" "}
+                <span className="font-bold tabular-nums">{g.prestige}</span>
+              </span>
+            </div>
+          ) : (
+            <ProgressBar
+              value={g.xp_into_level}
+              total={g.xp_into_level + (g.xp_to_next ?? 0)}
+              label={`Ур. ${g.level} из ${g.max_level} · всего ${g.xp} XP`}
+              hint="до след. ранга"
+            />
+          )}
+        </div>
+      )}
+      {!g && loading && (
+        <div className="mt-3">
+          <ListSkeleton rows={1} />
+        </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-2 w-full">
-        <StatCell icon="🤡" label="Был лохом" value={loserCount} loading={loading} />
-        <StatCell icon="💩" label="Был чуханом" value={chukhanCount} loading={loading} />
+      {/* Второстепенное: сколько раз был лохом/чуханом. Приглушённые чипсы. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-tg-bg/40 pt-2.5 text-[11px] text-tg-hint">
+        <span className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5">
+          🤡 <span className="tabular-nums">{countersLoading ? "…" : loserCount}</span>
+          <span className="truncate">раз лохом</span>
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5">
+          💩 <span className="tabular-nums">{countersLoading ? "…" : chukhanCount}</span>
+          <span className="truncate">раз чуханом</span>
+        </span>
       </div>
     </section>
-  );
-}
-
-function StatCell({
-  icon,
-  label,
-  value,
-  loading,
-}: {
-  icon: string;
-  label: string;
-  value: number;
-  loading: boolean;
-}) {
-  return (
-    <div className="rounded-lg bg-tg-bg/50 px-3 py-2 flex items-center gap-2">
-      <span className="text-xl shrink-0">{icon}</span>
-      <div className="min-w-0 text-left">
-        <div className="text-lg font-semibold tabular-nums leading-tight">
-          {loading ? "…" : value}
-        </div>
-        <div className="text-[11px] text-tg-hint truncate">{label}</div>
-      </div>
-    </div>
   );
 }
 

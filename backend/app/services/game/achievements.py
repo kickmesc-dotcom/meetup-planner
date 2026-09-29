@@ -673,7 +673,11 @@ async def _claim_week_marker(
     ровно «маркеры идемпотентности». Повторный прогон job'а за ту же неделю
     не должен ни второй раз поднимать счётчик, ни выдавать тир.
     """
-    existing = await session.get(XpGrant, (user_id, key))
+    # Через `xp.grant_exists`, а не `session.get(XpGrant, (user_id, key))`: у
+    # `XpGrant` суррогатный PK `id`, и `get` по паре падает на сборке PK —
+    # ошибка уходила бы в `awards._guarded`, который делает rollback и экспайрит
+    # объекты вызывающего (отсюда 500 при сохранении календаря).
+    existing = await xp.grant_exists(session, user_id, key)
     if existing is not None:
         return False
     session.add(XpGrant(user_id=user_id, idem_key=key))

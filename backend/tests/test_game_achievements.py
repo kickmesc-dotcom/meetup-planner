@@ -32,7 +32,7 @@ from app.services.game.achievements_catalog import (
     tiers_reached,
 )
 from app.services.game.holidays import holiday_announcement
-
+from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
 # --------------------------------------------------------------------------
 # Расширенный фейк сессии
@@ -75,6 +75,7 @@ class _FakeSession:
         self.execute_queue: list[list] = []
 
     async def get(self, model, key):  # noqa: ANN001
+        assert_single_column_pk_get(model, key)
         return self.store.get((model.__name__, key))
 
     def add(self, row) -> None:  # noqa: ANN001
@@ -90,7 +91,11 @@ class _FakeSession:
     async def rollback(self) -> None:
         self.rollbacks += 1
 
-    async def scalar(self, *_a, **_k):  # noqa: ANN002
+    async def scalar(self, stmt=None, *_a, **_k):  # noqa: ANN001, ANN002
+        # См. `tests/game_fakes.py`: маркер окна ищем по store, как база.
+        handled, value = grant_lookup(stmt, self.store)
+        if handled:
+            return value
         return self.scalar_queue.pop(0) if self.scalar_queue else None
 
     async def scalars(self, *_a, **_k):  # noqa: ANN002

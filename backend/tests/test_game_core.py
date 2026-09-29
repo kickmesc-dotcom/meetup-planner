@@ -13,11 +13,11 @@ import pytest
 
 from app.services.game import levels
 from app.services.game.config import (
+    ANNIVERSARY_TIERS,
     LEVEL_UNLOCKS,
     MAX_LEVEL,
     RANKS,
     XP_PER_LEVEL,
-    ANNIVERSARY_TIERS,
     points_for,
     tier_title,
     unlocks_for_level,
@@ -31,6 +31,7 @@ from app.services.game.xp import (
     utc_day,
     window_key,
 )
+from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
 # --------------------------------------------------------------------------
 # Фейк сессии
@@ -45,7 +46,17 @@ class _FakeSession:
         self.commits = 0
 
     async def get(self, model, key):  # noqa: ANN001
+        # Ведём себя как настоящая сессия: она собирает PK по метаданным модели
+        # и падает, если значений не столько, сколько колонок.
+        assert_single_column_pk_get(model, key)
         return self.store.get((model.__name__, key))
+
+    async def scalar(self, stmt, *_a, **_k):  # noqa: ANN001, ANN002
+        # Поиск маркера окна в `xp_grants` отвечаем из store — как база по
+        # уникальному индексу. Иначе тест молча соглашается с любой формой
+        # запроса (этим и прощался `session.get(XpGrant, (user_id, key))`).
+        handled, value = grant_lookup(stmt, self.store)
+        return value if handled else None
 
     def add(self, row) -> None:  # noqa: ANN001
         # Повторяем поведение session.add: объект попадает «в БД» по своему PK.

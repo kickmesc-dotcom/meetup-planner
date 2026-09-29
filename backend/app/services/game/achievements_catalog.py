@@ -228,6 +228,61 @@ SUPREME_CHUKHAN_TIER_BASE = "chin_up"
 SUPREME_CHUKHAN_TIER = ANNIVERSARY_TIERS[-1]
 
 
+# --------------------------------------------------------------------------
+# Разделы листа ачивок
+# --------------------------------------------------------------------------
+# Зачем разделы в каталоге, а не в отчёте бота. Лист ачивок — длинный, и без
+# группировки он читается как одна стена текста (прод-фидбек 29.09). Но
+# группировка — факт про НАБОР ачивок, поэтому живёт рядом с ним: если список
+# группировать в `report.py`, то новая ачивка молча окажется в чужом разделе.
+# Полнота проверяется тестом (`tests/test_game_surfaces.py`), а не глазами.
+#
+# Формат: (код раздела, заголовок, коды ачивок). Порядок разделов = порядок
+# вывода, поэтому он задан здесь же.
+GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "deeds",
+        "🎲 Звания и рулетка",
+        (
+            "chin_up",
+            "first_worm",
+            "truth_seeker",
+            "self_shot",
+            "rewrote_history",
+            SUPREME_CHUKHAN_CODE,
+        ),
+    ),
+    ("chat", "📣 Активность в чате", ("generation_mouthpiece", "read_only")),
+    (
+        "content",
+        "🎨 Контент и мемы",
+        ("memelog", "forever_alone", "opium_for_nobody", "successful_success"),
+    ),
+    ("calendar", "📅 Календарь и явка", ("informant", "unemployed")),
+    (
+        "games",
+        "🗳 Опросы, игры и встречи",
+        ("vciom_agent", "nominator", "nominal_nominal"),
+    ),
+    ("social", "🤝 Бот и подарки", ("worm_tamer", "cashback", "don_corleone")),
+)
+
+GROUP_FALLBACK = ("other", "🎁 Разное")
+
+
+def group_of(code: str) -> tuple[str, str]:
+    """Раздел базовой ачивки. У тира — раздел его базовой ачивки.
+
+    Неизвестный код отдаёт «Разное», а не пропадает: новая ачивка, которую
+    забыли разнести по разделам, всё равно попадёт в лист (и это заметно).
+    """
+    base = code.split(":", 1)[0]
+    for key, title, codes in GROUPS:
+        if base in codes:
+            return key, title
+    return GROUP_FALLBACK
+
+
 def _expand(base: Achievement) -> list[Achievement]:
     """Развернуть базовую ачивку с юбилеями в неё саму + тир-записи."""
     out = [base]

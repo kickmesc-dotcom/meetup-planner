@@ -128,6 +128,23 @@ class DailyBucket:
     count: int
 
 
+async def grant_exists(session: AsyncSession, user_id: int, key: str) -> int | None:
+    """Есть ли уже маркер окна — по уникальному индексу `(user_id, idem_key)`.
+
+    Именно `select`, а не `session.get`: у `XpGrant` суррогатный PK `id`, и
+    `session.get(XpGrant, (user_id, key))` собирает PK по метаданным модели — то
+    есть падает с «Incorrect number of values in identifier to formulate primary
+    key». Падение здесь — не «просто ошибка начисления»: `awards._guarded` ловит
+    его и делает `rollback()`, а rollback экспайрит ВСЕ объекты сессии, включая
+    те, что вызывающий код возвращает в HTTP-ответ. Так сбой игрового начисления
+    ломал сохранение календаря: тап по дню создавал диапазон (строка в базе
+    оставалась!), но ответ падал с 500 на сериализации — `MissingGreenlet`.
+    """
+    return await session.scalar(
+        select(XpGrant.id).where(XpGrant.user_id == user_id, XpGrant.idem_key == key)
+    )
+
+
 async def get_xp(session: AsyncSession, user_id: int) -> int:
     """Опыт юзера (0, если профиля ещё нет — ленивое создание в `award`)."""
     profile = await session.get(GameProfile, user_id)
@@ -158,7 +175,7 @@ async def award(
     limit = limit_for(event)
     key = idem_key(event, limit, at=at, discriminator=discriminator)
     if key is not None:
-        existing = await session.get(XpGrant, (user_id, key))
+        existing = await grant_exists(session, user_id, key)
         if existing is not None:
             xp_now = await get_xp(session, user_id)
             return AwardResult(

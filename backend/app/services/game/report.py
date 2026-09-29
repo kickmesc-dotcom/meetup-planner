@@ -304,7 +304,13 @@ async def achievements_guide_text(
         head += f" У тебя: <b>{len(collected)}</b>/{total}."
     lines = [head]
 
+    # Группируем по разделам каталога. Одним списком это была стена текста:
+    # 20 строк по 150 символов, без воздуха и без опознаваемых границ (прод-
+    # фидбек 29.09: «вообще нечитаемая стена»). Теперь каждый раздел — свой
+    # блок: заголовок, пустая строка, и внутри ачивки разделены пустыми
+    # строками, а описание ушло на отдельную строку с отбивкой.
     hidden = 0
+    rendered: dict[str, list[str]] = {}
     for base in bases:
         taken = _is_collected(base.code, base.tiers, collected)
         if base.secret and not taken:
@@ -312,23 +318,48 @@ async def achievements_guide_text(
             # перестал бы быть сюрпризом для того, кто только начал качаться.
             hidden += 1
             continue
-        mark = " ✅" if taken else ""
+        # ✅/▫️ — получена или нет; блок внутри раздела отделён пустой строкой.
+        mark = "✅" if taken else "▫️"
+        block = [f"{mark} {base.icon} <b>{base.title}</b>"]
+        block.append(f"    <i>{base.description}</i>")
         count = counters.get(base.code)
-        extra = f" <i>· сейчас {count}</i>" if count is not None else ""
-        lines.append(
-            f"{base.icon} <b>{base.title}</b>{mark} — {base.description}{extra}"
-        )
+        if count is not None:
+            block.append(f"    ┗ сейчас: <b>{count}</b>")
         tiers = tier_marks(base.code, collected)
         if tiers:
-            lines.append(f"   юбилеи: {tiers}")
+            block.append(f"    ┗ юбилеи: {tiers}")
+        key, _ = catalog.group_of(base.code)
+        rendered.setdefault(key, []).append("\n".join(block))
 
+    for key, title, codes in catalog.GROUPS:
+        blocks = rendered.get(key)
+        if not blocks:
+            continue
+        taken_here = 0
+        for code in codes:
+            ach = catalog.get(code)
+            if ach is not None and _is_collected(code, ach.tiers, collected):
+                taken_here += 1
+        lines.append("")
+        lines.append(f"<b>{title}</b>  <i>собрано {taken_here}/{len(codes)}</i>")
+        lines.append("")
+        lines.append("\n\n".join(blocks))
+
+    leftovers = rendered.get(catalog.GROUP_FALLBACK[0])
+    if leftovers:
+        lines.append("")
+        lines.append(f"<b>{catalog.GROUP_FALLBACK[1]}</b>")
+        lines.append("")
+        lines.append("\n\n".join(leftovers))
+
+    lines.append("")
     if hidden:
         lines.append(f"🔒 Скрытых ачивок: {hidden} — узнаешь, когда получишь.")
     points = sorted({base.points for base in bases})
     reward = f"+{points[0]} XP"
     if len(points) > 1:
         reward += f", самая редкая — +{points[-1]}"
-    lines.append(f"\nЗа ачивку дают {reward} — опыт идёт в тот же счёт, что ранги.")
+    lines.append(f"За ачивку дают {reward} — опыт идёт в тот же счёт, что ранги.")
     lines.append("Свои ачивки и прогресс — в мини-аппе, раздел «🏅 Ачивки и ранги».")
     return "\n".join(lines)
 

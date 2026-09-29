@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, resync_if_expired
 from app.bot.scheduler import get_scheduler, reload_dynamic_jobs
 from app.config import get_settings
 from app.db.models import Birthday, LoserRoll, Meeting, MeetingReminder, Poll, User, WeeklyChukhan
@@ -207,6 +207,9 @@ async def force_reroll(
     from app.services.game import awards
 
     await awards.chukhan_reroll(session, user.id)
+    # См. `resync_if_expired`: иначе сбой награды превращает уже выданного
+    # чухана в 500.
+    await resync_if_expired(session, row)
     return row
 
 @router.get("/admin/chukhan/history", response_model=list[ChukhanWeekOut])
@@ -3883,6 +3886,9 @@ async def _game_player_out(session, user: User) -> GamePlayerOut:
     from app.services.game import levels, xp
     from app.services.game.achievements import collected_codes, progress
 
+    # Юзера могли экспайрить награды выше по стеку (`awards._guarded` делает
+    # rollback). Перечитываем здесь, чтобы карточку можно было собрать всегда.
+    await resync_if_expired(session, user)
     total = await xp.get_xp(session, user.id)
     prog = levels.progress_for_xp(total)
     return GamePlayerOut(

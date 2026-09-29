@@ -5,7 +5,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import and_, delete, select
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, resync_if_expired
 from app.db.models import AvailabilityRange
 from app.schemas.availability import (
     AvailabilityRangeCreate,
@@ -18,15 +18,23 @@ from app.schemas.availability import (
 router = APIRouter(prefix="/availability", tags=["availability"])
 
 
-async def _award_calendar(session, user_id: int) -> None:
+async def _award_calendar(
+    session, user_id: int, row: AvailabilityRange | None = None
+) -> None:
     """GHG10 (2.5): разметка календаря = +10 XP раз в неделю + ачивки.
 
     Ошибки глотает `awards._guarded`: игровой сбой не должен ломать сохранение
     календаря. При выключенном рубильнике `awards` молча выходит.
+
+    Но «не упасть» недостаточно: сбой внутри награды делает `rollback()`, который
+    экспайрит возвращаемый объект, и ответ превращается в 500 на успешно
+    сохранённом диапазоне. Поэтому `resync_if_expired` после наград — часть
+    контракта, а не оптимизация.
     """
     from app.services.game import awards
 
     await awards.availability(session, user_id)
+    await resync_if_expired(session, row)
 
 
 @router.get("", response_model=list[AvailabilityRangeOut])
@@ -69,7 +77,7 @@ async def create_range(
     session.add(row)
     await session.commit()
     await session.refresh(row)
-    await _award_calendar(session, user.id)
+    await _award_calendar(session, user.id, row)
     return row
 
 
@@ -98,7 +106,7 @@ async def patch_range(
 
     await session.commit()
     await session.refresh(row)
-    await _award_calendar(session, user.id)
+    await _award_calendar(session, user.id, row)
     return row
 
 
@@ -172,5 +180,6 @@ async def bulk_ops(
             deleted.append(op.id)
 
     await session.commit()
+    # Возвращаем id, а не ORM-объекты — экспайр после наград здесь безопасен.
     await _award_calendar(session, user.id)
     return BulkResult(created_ids=created, updated_ids=updated, deleted_ids=deleted)

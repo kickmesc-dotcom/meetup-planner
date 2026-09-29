@@ -51,37 +51,10 @@ export default function RankPlaque({ hex, bold, children, title }: Props) {
   );
 }
 
-/** Шкала прогресса уровня. На максимуме заменяется счётчиком престижа (Э3.3). */
-export function RankBar({
-  value,
-  total,
-  label,
-}: {
-  value: number;
-  total: number;
-  label: string;
-}) {
-  const pct = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 100;
-  return (
-    <div className="space-y-1">
-      <div className="flex items-baseline justify-between text-[11px] text-tg-hint">
-        <span>{label}</span>
-        <span className="tabular-nums">
-          {value}/{total}
-        </span>
-      </div>
-      <div
-        className="h-2 w-full overflow-hidden rounded-full bg-tg-bg/60"
-        role="progressbar"
-        aria-valuenow={value}
-        aria-valuemin={0}
-        aria-valuemax={total}
-      >
-        <div
-          className="h-full rounded-full bg-tg-button transition-[width] duration-300"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+/**
+ * Шкала прогресса уровня живёт в `components/ProgressBar.tsx`.
+ *
+ * Раньше она была отдельным экспортом здесь, а в списке ачивок прогресс рисовался
+ * текстом — из-за этого одно и то же отношение выглядело по-разному в двух
+ * местах одного экрана. Теперь полоса одна на весь фронт.
+ */

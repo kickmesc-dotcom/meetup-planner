@@ -20,7 +20,7 @@ from app.api import routes_game
 from app.db.models import GameProfile, UserAchievement
 from app.services.game import achievements, awards, weekly, xp
 from app.services.game.config import SUPREME_CHUKHAN_TITLE, unlocks_between
-
+from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
 # --------------------------------------------------------------------------
 # Фейк сессии (dict + очереди ответов)
@@ -62,6 +62,7 @@ class _FakeSession:
         self.execute_queue: list[list] = []
 
     async def get(self, model, key):  # noqa: ANN001
+        assert_single_column_pk_get(model, key)
         return self.store.get((model.__name__, key))
 
     def add(self, row) -> None:  # noqa: ANN001
@@ -77,7 +78,12 @@ class _FakeSession:
     async def rollback(self) -> None:
         return None
 
-    async def scalar(self, *_a, **_k):  # noqa: ANN002
+    async def scalar(self, stmt=None, *_a, **_k):  # noqa: ANN001, ANN002
+        # Поиск маркера окна в `xp_grants` — из store (как в базе по уникальному
+        # индексу), чтобы форма запроса в коде была под тестом, а не «мимо».
+        handled, value = grant_lookup(stmt, self.store)
+        if handled:
+            return value
         return self.scalar_queue.pop(0) if self.scalar_queue else None
 
     async def scalars(self, *_a, **_k):  # noqa: ANN002

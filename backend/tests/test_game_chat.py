@@ -193,9 +193,9 @@ async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
     text = await report.achievements_guide_text(None, user_id=1)
     assert f"У тебя: <b>2</b>/{catalog.catalog_size()}" in text
     assert "×10 ✅" in text and "×20 ▫️" in text
-    assert "сейчас 12" in text
+    assert "сейчас: <b>12</b>" in text
     # Нулевой счётчик тоже показываем: это «трекер существует», а не “нет данных».
-    assert "сейчас 0" in text
+    assert "сейчас: <b>0</b>" in text
     # Полученную секретную ачивку показываем как обычную.
     assert "Верховный чухан" in text
     assert "Скрытых ачивок" not in text
@@ -205,6 +205,45 @@ async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
 async def test_ach_is_silent_when_game_disabled(monkeypatch):
     _game(monkeypatch, False)
     assert await report.achievements_guide_text(None, user_id=1) is None
+
+
+def test_every_achievement_sits_in_exactly_one_group():
+    """Разделы листа ачивок — часть каталога, а не отчёта.
+
+    Без этой проверки новая ачивка молча уезжает в «Разное» (или, хуже,
+    пропадает из листа) — а заметить это можно только глазами в живом чате.
+    """
+    codes = [code for _key, _title, group in catalog.GROUPS for code in group]
+    assert len(codes) == len(set(codes)), "один код в двух разделах"
+    base_codes = {a.code for a in catalog.base_achievements()}
+    assert set(codes) == base_codes, (
+        f"в каталоге без раздела: {sorted(base_codes - set(codes))}; "
+        f"в разделах лишнее: {sorted(set(codes) - base_codes)}"
+    )
+    # Тиры наследуют раздел базовой ачивки, а неизвестный код не проваливается.
+    assert catalog.group_of("chin_up:10") == catalog.group_of("chin_up")
+    assert catalog.group_of("nope") == catalog.GROUP_FALLBACK
+
+
+@pytest.mark.asyncio
+async def test_ach_report_is_devided_into_labelled_blocks(monkeypatch):
+    """Стена текста → разделы с воздухом (прод-фидбек 29.09)."""
+    _game(monkeypatch, True)
+
+    async def _empty(_session, _user_id):
+        return {}
+
+    monkeypatch.setattr(report.achievements, "progress", _empty)
+    monkeypatch.setattr(report.achievements, "collected_codes", _empty)
+    text = await report.achievements_guide_text(None, user_id=1)
+    for _key, title, _codes in catalog.GROUPS:
+        assert title in text, f"нет раздела «{title}»"
+    # Каждый раздел отделён пустой строкой — иначе блоки слипаются в стену.
+    assert "\n\n" in text
+    # Ачивки одного раздела тоже разделены пустой строкой.
+    assert "\n\n▫️" in text or "\n\n✅" in text
+    # И всё это влезает в ОДНО сообщение Telegram.
+    assert len(text) <= 4096
 
 
 # --- /levels: своя стата + левелы участников ---------------------------------

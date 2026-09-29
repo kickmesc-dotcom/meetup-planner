@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep, resync_if_expired
 from app.config import get_settings
 from app.db.models import LoserRoll, Meeting, MeetingAttendance, User
 from app.schemas.meetings import (
@@ -152,6 +152,8 @@ async def create_meeting(
     from app.services.game import awards
 
     await awards.meeting(session, user.id, meeting.id)
+    # Игра не имеет права ломать ответ API — только сама не начислиться.
+    await resync_if_expired(session, meeting)
     return meeting
 
 
