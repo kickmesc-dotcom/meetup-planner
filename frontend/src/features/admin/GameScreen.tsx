@@ -25,7 +25,7 @@ import {
 } from "@/api/admin";
 import type { User } from "@/types";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-import { humanizeApiError } from "@/api/client";
+import { humanizeApiError, isEndpointMissing } from "@/api/client";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
@@ -146,6 +146,23 @@ export default function GameScreen({ users, onBack }: Props) {
   };
 
   const debugIds = state.data?.debug_tg_ids ?? [];
+
+  // GHG10-ops: экран приехал во фронте раньше, чем ручка на живом бэкенде.
+  // Без этой ветки UI показывал бы «игра выключена, 0 профилей» — то есть
+  // выглядел бы как работоспособный, но врал бы.
+  if (state.isError && isEndpointMissing(state.error)) {
+    return (
+      <SubScreen title="🎮 Игровая система" subtitle="Рубильник, ачивки, отладка" onBack={onBack}>
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+          <div className="text-sm font-semibold">Сервер ещё не обновился</div>
+          <div className="text-[12px] text-tg-hint">
+            Живая сборка бэкенда пока не знает ручку /api/admin/game — этот экран
+            включится сам, как только сервер пересоберётся. Чинить вручную нечего.
+          </div>
+        </section>
+      </SubScreen>
+    );
+  }
 
   return (
     <SubScreen title="🎮 Игровая система" subtitle="Рубильник, ачивки, отладка" onBack={onBack}>

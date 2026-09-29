@@ -18,6 +18,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchBirthdayGreeting, postBirthdayGreeting } from "@/api/birthdays";
 import { donateXp } from "@/api/game";
 import { useGameFeatures } from "@/features/game/useGameFeatures";
+import { useServerCapabilities } from "@/features/game/useServerCapabilities";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
@@ -33,6 +34,10 @@ export default function BirthdayPopover() {
   // GHG10 Э11: донат опыта — только когда игра включена (иначе сервер отдаст
   // `game_disabled`, а кнопка была бы обещанием, которого нет).
   const game = useGameFeatures();
+  // GHG10-ops: донат — новая ручка, и живой бэкенд может её ещё не знать.
+  // Тогда показываем понятное состояние вместо 404 по нажатию.
+  const caps = useServerCapabilities();
+  const canDonate = caps.has("game.donate");
   const queryClient = useQueryClient();
 
   const greetingMut = useMutation({
@@ -223,7 +228,7 @@ export default function BirthdayPopover() {
             </div>
           )}
 
-          {game.enabled && (
+          {game.enabled && canDonate && (
             <button
               type="button"
               onClick={() => void onDonate()}
@@ -233,6 +238,13 @@ export default function BirthdayPopover() {
               {donateMut.isPending && <Spinner size={14} />}
               🎁 Задонатить 100 XP
             </button>
+          )}
+
+          {game.enabled && !canDonate && (
+            <div className="mt-1 rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-[11px] text-tg-hint">
+              🎁 Донат опыта включится сам, когда бэкенд пересоберётся — эта сборка
+              сервера ещё не умеет дарить опыт.
+            </div>
           )}
 
           <button

@@ -25,6 +25,7 @@ from app.api import (
     routes_calendar,
     routes_game,
     routes_meetings,
+    routes_meta,
     routes_polls,
     routes_users,
 )
@@ -243,6 +244,10 @@ def create_app() -> FastAPI:
     app.include_router(routes_calendar.router, prefix="/api")
     app.include_router(routes_game.router, prefix="/api")
     app.include_router(routes_admin.router, prefix="/api")
+    # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие
+    # возможности есть). Регистрируется последним, поэтому его собственный
+    # роут уже попал в отпечаток — хеш получается устойчивым.
+    app.include_router(routes_meta.router, prefix="/api")
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import os
 import ssl
 from collections.abc import AsyncIterator
 from typing import Any
+
+import structlog
 
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -29,6 +32,25 @@ def _normalize_url(url: str) -> str:
         url = "postgresql+asyncpg://" + url[len("postgresql://") :]
     return url
 
+def _ssl_enabled_for(url: str) -> bool:
+    """Нужен ли SSL для этого DSN.
+
+    GHG10-ops: раньше SSL включался безусловно для любого asyncpg-URL — это
+    следствие жизни на Neon. Российские managed-PostgreSQL (например, БД
+    Amvera) могут отдавать соединение без SSL, и тогда переключение базы
+    «молча не работало»: контейнер падал на подключении. Теперь это явный
+    переключатель: `DB_SSL=require|disable|auto` (по умолчанию `auto` — SSL
+    включён везде, кроме локальных хостов).
+    """
+    mode = os.getenv("DB_SSL", "auto").strip().lower()
+    if mode == "disable":
+        return False
+    if mode == "require":
+        return True
+    host = url.split("@")[-1].split("/")[0].lower()
+    return not ("localhost" in host or "127.0.0.1" in host or "::1" in host)
+
+
 def get_engine() -> AsyncEngine:
     global _engine, _sessionmaker
     if _engine is None:
@@ -38,11 +60,13 @@ def get_engine() -> AsyncEngine:
         connect_args: dict[str, Any] = {}
         
         if "asyncpg" in url:
-            # Создаем SSL-контекст, который разрешает соединения с Neon
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            connect_args["ssl"] = ctx
+            if _ssl_enabled_for(url):
+                # Создаем SSL-контекст: Neon требует SSL, а сам сертификат
+                # (managed-база) не всегда в системных корнях.
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                connect_args["ssl"] = ctx
             # Небольшой таймаут на выполнение команд, чтобы не висеть вечно
             connect_args["command_timeout"] = 60
 
@@ -55,6 +79,13 @@ def get_engine() -> AsyncEngine:
             connect_args=connect_args,
         )
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
+        # Диагностика «куда мы на самом деле подключились» — без пароля и DSN:
+        # по этой строке видно, Neon это, Amvera или локальная база.
+        structlog.get_logger().info(
+            "db.engine_created",
+            host=url.split("@")[-1].split("/")[0],
+            ssl="ssl" in connect_args,
+        )
     return _engine
 
 def get_sessionmaker() -> async_sessionmaker[AsyncSession]:

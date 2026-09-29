@@ -9,6 +9,18 @@ export class ApiError extends Error {
 }
 
 /**
+ * GHG10-ops: ручки на сервере нет вовсе — фронт уехал впереди бэкенда.
+ *
+ * FastAPI на неизвестный путь отдаёт 404 с голым `detail="Not Found"` (у наших
+ * осмысленных отказов всегда свой код в detail). Признак важен, потому что
+ * бэкенд на Amvera пересобирается вручную и может отставать на несколько
+ * сборок — именно так кнопка, которой ещё нет на сервере, отвечала 404.
+ */
+export function isEndpointMissing(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 404 && (!e.detail || e.detail === "Not Found");
+}
+
+/**
  * Превращает технический detail/status в человечный русский текст.
  * Возвращает короткую строку, которую можно показать через showAlert или inline.
  */
@@ -82,6 +94,9 @@ export function humanizeApiError(e: unknown): string {
       return "Нет доступа.";
     }
     if (e.status === 404) {
+      if (isEndpointMissing(e)) {
+        return "Сервер ещё не обновился: функция появится после пересборки бэкенда.";
+      }
       return "Не найдено.";
     }
     return d || `Ошибка ${e.status}`;
