@@ -1,26 +1,31 @@
-# 🔑 Пуш монорепо в GitHub (2026-09-29): виноват был Git Credential Manager
+# 🔑 Пуш монорепо в GitHub (обновлено 2026-09-29)
 
-**Пуш сделан** — `38e9c0c..05f72d0`, в `origin/main` уехали 6 коммитов GHG10
-(этап 9, 5.4/5.5, 7, 10.3, 11, `/ach`, `/levels` + диагностика Amvera). Но не с
-первого раза, и причина оказалась не в токене.
+**Статус: работает.** Свежий PAT со scope `repo` действует **до 2026-12-28**
+(лежит в `leltokens2.txt` и в DPAPI-хранилище `secrets/` как `GITHUB_PAT`).
 
-Что происходило:
-
-- обычный `git push` падал с
-  `remote: Permission to kickmesc-dotcom/meetup-planner.git denied to
-  youmakemefry-cmd` → **403**: аутентификация проходила, а прав на пуш у этого
-  аккаунта нет;
-- в хранилище Windows (GCM) при этом лежит **рабочий credential аккаунта
-  `kickmesc-dotcom`** с правами **admin** на репозиторий (`gho_…`, scopes
-  `repo, workflow`) — именно им репозиторий и пушится;
-- PAT из `leltokens2.txt` («till september 29th») к этому моменту **истёк**:
-  с ним GitHub отвечает `Invalid username or token`. Он больше не нужен —
-  пушить можно хранимым credential'ом.
-
-## Как пушить (рабочая команда)
+## Как пушить (основной путь)
 
 ```bash
 cd /c/Users/fa1nt/meetup-planner/meetup-planner-main
+export GITHUB_PAT=$(powershell -File ../secrets/Get-Secret.ps1 GITHUB_PAT)
+GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
+    -c credential.helper='!f() { echo username=x-access-token; echo password=$GITHUB_PAT; }; f' \
+    push origin main
+unset GITHUB_PAT
+```
+
+Ключевая деталь — **`-c credential.helper=`** (пустое значение сбрасывает
+список helper'ов). Без него Git Credential Manager подставит свой сохранённый
+аккаунт — и если это `youmakemefry-cmd` (без прав на репозиторий), пуш упадёт
+с `403 Permission denied`, хотя аутентификация пройдёт. Проверить, кто там
+лежит: `git credential-manager github list`.
+
+## Запасной путь — без токена
+
+В хранилище GCM лежит рабочий OAuth-credential аккаунта `kickmesc-dotcom`
+с правами **admin** на репозиторий. Им можно пушить так:
+
+```bash
 creds=$(printf 'protocol=https\nhost=github.com\nusername=kickmesc-dotcom\n\n' \
         | GIT_TERMINAL_PROMPT=0 git credential fill 2>/dev/null)
 export GH_U=$(echo "$creds" | sed -n 's/^username=//p')
@@ -31,14 +36,13 @@ GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
 unset GH_U GH_P
 ```
 
-Ключевая деталь — **`-c credential.helper=`** (пустое значение сбрасывает
-список helper'ов). Без него GCM снова подставит `youmakemefry-cmd` и вернёт
-403. Убрать лишнюю запись из хранилища совсем:
-`git credential-manager github list` / `... erase`.
-
 Пуш — **fast-forward**, история не переписывается. Перед пушем фронт проверен
 локально: `npm run typecheck` чист, `npm run build` проходит (остаются только
 предзаписанные warnings про минификацию CSS и размер чанка >500 kB).
+
+Предыстория: 29.09.2026 пуш сначала падал с 403 (GCM отдавал аккаунт без прав),
+а PAT от 01.07.26 к тому моменту истёк и отвечал `Invalid username or token`.
+Оба фактора устранены: новый PAT выпущен, рецепт с обходом GCM — выше.
 
 ## Проверка, что фронт доехал (CF собирает ~1–2 мин)
 
@@ -47,15 +51,15 @@ JS=$(curl -s https://meetup-planner1.pages.dev/ | grep -oE '/assets/index-[A-Za-
 curl -s "https://meetup-planner1.pages.dev$JS" | grep -c 'Себе дарить опыт'   # было 0 → должно стать 1
 ```
 
-Проверено 2026-09-29 после пуша: бандл сменился
-`index-BE5RzxWI.js` → **`index-AM8bZSEw.js`**, и в нём уже есть «Себе дарить
-опыт» (донат у тортика), `/api/game/holidays` и `game_disabled`.
+Актуальный маркер последней сборки (2026-09-29): бандл **`index-CeiO31Yj.js`**,
+в нём есть `game.donate` (проверка возможностей сервера), «Сервер ещё не
+обновился» и `/api/meta`.
 
-⚠️ Важное следствие: фронт уехал вперёд бэкенда. Кнопка доната у тортика
-вызывает `/api/game/donate`, а на живом Amvera этой ручки пока нет (404).
-Пока Amvera не пересобрана, донат сработает только с бэкендом HF. Админский
-экран «Игра» аналогично отдаст 404. Ближайших дней рождения нет (проверено
-по БД 2026-09-29), так что это окно без риска — но его стоит закрыть.
+Было закрыто в тот же день: фронт уехал вперёд бэкенда, и кнопка доната у
+тортика получала 404. Теперь мини-апп сам спрашивает у бэкенда `/api/meta`,
+какие ручки тот умеет, и вместо кнопки показывает строку «донат включится,
+когда бэкенд пересоберётся»; админский экран игры на 404 отвечает «Сервер ещё
+не обновился». То есть рассинхрон фронта и бэкенда больше не выглядит поломкой.
 
 > Токен/PAT нужен только для github.com. HF Space ходит со своим `hf_`-токеном,
 а git Amvera — по логину Amvera; один и тот же секрет нигде не переиспользуется.
