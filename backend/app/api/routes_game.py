@@ -5,13 +5,13 @@
 `{enabled: false}` (мини-апп просто прячет игровые блоки), а чарты — пустой
 список. Ошибки НЕ бросаем: выключенная игра — не ошибка.
 
-Тяжёлые агрегаты — по одному SELECT (`achievements.leaderboard`,
+Тяжёлые агрегаты — по одному SELECT (`achievements.rarity_stats`,
 `supreme_holders`, `GameProfile.xp desc`), без N+1 (требование Э12.1).
 """
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, HTTPException, Response, status
@@ -22,8 +22,8 @@ from app.api.deps import CurrentUser, SessionDep
 from app.config import get_settings
 from app.db.models import GameProfile, User, UserAchievement
 from app.schemas.game import (
-    AchievementHolderOut,
     AchievementItemOut,
+    AchievementStatOut,
     DailyEventOut,
     DonationIn,
     DonationOut,
@@ -34,6 +34,9 @@ from app.schemas.game import (
     HolidayOut,
     HolidaysOut,
     LevelUpOut,
+    MusicMineOut,
+    MusicMineTrackOut,
+    MusicSelectionOut,
     RankOut,
     RankRowOut,
     XpRuleOut,
@@ -301,20 +304,48 @@ async def donate_xp(
     )
 
 
-@router.get("/game/achievements", response_model=list[AchievementHolderOut])
-async def achievements_chart(
+@router.get("/game/achievements", response_model=list[AchievementStatOut])
+async def achievements_stats(
     session: SessionDep, _: CurrentUser
-) -> list[AchievementHolderOut]:
-    """Чарт обладателей ачивок: кто сколько собрал (Э5.3)."""
+) -> list[AchievementStatOut]:
+    """Насколько редка каждая ачивка — «её имеют N% участников» (Э5.3).
+
+    Было «кто сколько собрал» списком имён; по заданию это заменено крохотной
+    сводкой: две агрегации (всего участников + обладатели по кодам), без N+1.
+    """
     if not await is_game_enabled(session):
         return []
-    rows = await achievements.leaderboard(session)
-    return [AchievementHolderOut(user_id=uid, count=cnt) for uid, cnt in rows]
+    from app.services.game import achievements_catalog as catalog
+
+    out: list[AchievementStatOut] = []
+    for stat in await achievements.rarity_stats(session):
+        ach = catalog.get(stat.code)
+        out.append(
+            AchievementStatOut(
+                code=stat.code,
+                title=ach.title if ach else stat.code,
+                icon=ach.icon if ach else "🏆",
+                holders=stat.holders,
+                total=stat.total,
+                percent=stat.percent,
+            )
+        )
+    return out
 
 
 # --------------------------------------------------------------------------
 # Э10.3: пул праздников — «дата + сообщение»
 # --------------------------------------------------------------------------
+
+
+def _is_admin(user) -> bool:
+    """Админ (ADMIN_TG_IDS) — правит праздники независимо от ранга.
+
+    Так это и было задумано в справке («с 6 ранга ИЛИ админу»), но гейт про
+    админов не знал: `gates` видит только «Серж нео» (отладочные TG-id). Оператор
+    без 6 ранга не мог завести праздник в том самом блоке, который сам просил.
+    """
+    return user.telegram_id in get_settings().admin_tg_id_set
 
 
 def _holiday_out(row) -> HolidayOut:
@@ -341,7 +372,7 @@ async def holidays_list(session: SessionDep, user: CurrentUser) -> HolidaysOut:
     )
     rows = await holidays.list_holidays(session)
     return HolidaysOut(
-        can_manage=gate.allowed,
+        can_manage=gate.allowed or _is_admin(user),
         required_level=gate.required_level,
         items=[_holiday_out(row) for row in rows],
     )
@@ -360,7 +391,8 @@ async def holiday_add(
         # У выключенной игры нет и её функций: иначе праздник завели бы в пустоту
         # (job не работает, опыт не начисляется) и он бы «выстрелил» потом.
         raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
-    await gates.require_feature(session, user, FEATURE_HOLIDAYS)
+    if not _is_admin(user):
+        await gates.require_feature(session, user, FEATURE_HOLIDAYS)
     try:
         row = await holidays.add_holiday(
             session,
@@ -388,7 +420,8 @@ async def holiday_delete(
     """Убрать праздник. Гейт тот же, что на добавление (одно право — обе ручки)."""
     if not await is_game_enabled(session):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
-    await gates.require_feature(session, user, FEATURE_HOLIDAYS)
+    if not _is_admin(user):
+        await gates.require_feature(session, user, FEATURE_HOLIDAYS)
     if not await holidays.remove_holiday(session, holiday_id=holiday_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "holiday_not_found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -424,3 +457,59 @@ async def ranks_chart(session: SessionDep, _: CurrentUser) -> list[RankRowOut]:
             )
         )
     return out
+
+
+# --------------------------------------------------------------------------
+# Э15/Э16: «Предложка недели» в мини-аппе
+# --------------------------------------------------------------------------
+
+
+@router.get("/game/music/mine", response_model=MusicMineOut)
+async def my_music(session: SessionDep, user: CurrentUser) -> MusicMineOut:
+    """Свои сданные треки, остаток недельного лимита и история подборок.
+
+    Только для участника: чужие треки до публикации не показываем (интрига).
+    Фича появляется вместе с игрой: при `game.enabled=false` экран прячется,
+    как и остальные игровые блоки.
+    """
+    from app.services.admin_config import get_game_music_enabled
+    from app.services.game import music
+    from app.services.game.config import MUSIC_PER_USER_WEEKLY
+
+    if not await is_game_enabled(session):
+        return MusicMineOut(enabled=False, per_user_weekly=MUSIC_PER_USER_WEEKLY)
+    enabled = await get_game_music_enabled(session)
+    if not enabled:
+        return MusicMineOut(enabled=False, per_user_weekly=MUSIC_PER_USER_WEEKLY)
+
+    now = datetime.now(timezone.utc)
+    tracks = await music.my_week_tracks(session, user.id, at=now)
+    count = await music.weekly_count(session, user.id, at=now)
+    history = await music.published_selections(session, limit=10)
+    return MusicMineOut(
+        enabled=True,
+        per_user_weekly=MUSIC_PER_USER_WEEKLY,
+        week_count=count,
+        tracks=[
+            MusicMineTrackOut(
+                id=t.id,
+                kind=t.kind,
+                title=t.title,
+                performer=t.performer,
+                url=t.url,
+                status=t.status,
+                added_at=t.added_at,
+            )
+            for t in tracks
+        ],
+        history=[
+            MusicSelectionOut(
+                id=s.id,
+                tg_message_id=s.tg_message_id,
+                track_count=s.track_count,
+                note=s.note,
+                created_at=s.created_at,
+            )
+            for s in history
+        ],
+    )

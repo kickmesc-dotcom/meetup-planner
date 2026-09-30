@@ -14,6 +14,7 @@
 """
 from __future__ import annotations
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,13 +25,15 @@ from app.services.game.config import (
     LEVEL_UNLOCKS,
     MAX_LEVEL,
     SUPREME_CHUKHAN_TITLE,
-    XP_PER_LEVEL,
+    XP_CURVE_STEP,
     XP_RULES,
     feature_title,
     next_unlock_level,
     unlocks_for_level,
 )
 from app.services.game.flags import is_game_enabled
+
+log = structlog.get_logger()
 
 # Ширина прогресс-бара в чате (квадраты «█»/«░»).
 BAR_WIDTH = 10
@@ -70,6 +73,16 @@ def progress_bar(filled: int, total: int, *, width: int = BAR_WIDTH) -> str:
 def ordinal(level: int) -> str:
     """«3-й» — для фраз про ранги. Чистая."""
     return f"{level}-й"
+
+
+def level_bar_total(level: int) -> int:
+    """Знаменатель шкалы прогресса для уровня — цена именно ЭТОГО перехода.
+
+    Шкала прогрессивная, поэтому «сколько осталось до следующего ранга» зависит от
+    текущего уровня: 100 XP на первом, 900 на девятом. Знаменатель берём из шкалы,
+    а не из константы, иначе бар на поздних рангах всегда выглядел бы полным.
+    """
+    return levels.xp_span_for_level(level)
 
 
 async def effective_rank_name(
@@ -112,9 +125,10 @@ async def my_rank_text(
             f"(всего {total})."
         )
     else:
-        bar = progress_bar(progress.xp_into_level, XP_PER_LEVEL)
+        span = level_bar_total(progress.level)
+        bar = progress_bar(progress.xp_into_level, span)
         lines.append(
-            f"{bar} {progress.xp_into_level}/{XP_PER_LEVEL} XP "
+            f"{bar} {progress.xp_into_level}/{span} XP "
             f"до {ordinal(progress.level + 1)} ранга — ещё <b>{progress.xp_to_next}</b>"
         )
 
@@ -226,9 +240,10 @@ async def levels_text(
             f"(всего {total})."
         )
     else:
-        bar = progress_bar(progress.xp_into_level, XP_PER_LEVEL)
+        span = level_bar_total(progress.level)
+        bar = progress_bar(progress.xp_into_level, span)
         lines.append(
-            f"{bar} {progress.xp_into_level}/{XP_PER_LEVEL} XP "
+            f"{bar} {progress.xp_into_level}/{span} XP "
             f"до {ordinal(progress.level + 1)} ранга — ещё <b>{progress.xp_to_next}</b>"
         )
 
@@ -296,6 +311,15 @@ async def achievements_guide_text(
         if user_id is not None
         else {}
     )
+    # Сводка редкости — «сколько % участников имеют такую». Best-effort: подсказка
+    # обязана работать и там, где сессии нет/БД отвалилась (тот же инвариант, что
+    # у `xp_rules_text` — статический список без БД).
+    rarity: dict[str, object] = {}
+    if session is not None:
+        try:
+            rarity = {s.code: s for s in await achievements.rarity_stats(session)}
+        except Exception as exc:  # noqa: BLE001
+            log.warning("game.ach_rarity_failed", error=str(exc))
     bases = catalog.base_achievements()
     total = catalog.catalog_size()
 
@@ -303,6 +327,13 @@ async def achievements_guide_text(
     if user_id is not None:
         head += f" У тебя: <b>{len(collected)}</b>/{total}."
     lines = [head]
+    # Главная путаница, которую жаловались в чате: «С почином» берётся ОДИН раз
+    # (первый лох), а «×10/×20/…» — это ОТДЕЛЬНЫЕ ачивки за юбилеи, а не
+    # прогресс первой. Строка ниже говорит это прямым текстом.
+    lines.append(
+        "ℹ️ У накопительных ачивок две разные сущности: <b>разовая</b> берётся за "
+        "первый случай, а каждый <b>юбилей</b> (×10/×20/…) — своя отдельная ачивка."
+    )
 
     # Группируем по разделам каталога. Одним списком это была стена текста:
     # 20 строк по 150 символов, без воздуха и без опознаваемых границ (прод-
@@ -323,11 +354,24 @@ async def achievements_guide_text(
         block = [f"{mark} {base.icon} <b>{base.title}</b>"]
         block.append(f"    <i>{base.description}</i>")
         count = counters.get(base.code)
-        if count is not None:
+        if base.tiers:
+            # Накопитель: разовая запись и юбилеи — разное, поэтому и подписи
+            # разные. Прогресс показываем только там, где он есть (счётчик).
+            one_time = "✅ взята" if base.code in collected else "▫️ пока нет"
+            block.append(f"    ┗ разовая: {one_time}")
+            if count is not None:
+                block.append(f"    ┗ случаев: <b>{count}</b>")
+            tiers = tier_marks(base.code, collected)
+            if tiers:
+                block.append(f"    ┗ юбилейные ачивки: {tiers}")
+        elif count is not None:
             block.append(f"    ┗ сейчас: <b>{count}</b>")
-        tiers = tier_marks(base.code, collected)
-        if tiers:
-            block.append(f"    ┗ юбилеи: {tiers}")
+        stat = rarity.get(base.code)
+        if stat is not None and getattr(stat, "total", 0):
+            block.append(
+                f"    ┗ имеют: <b>{stat.percent}%</b> "
+                f"({stat.holders}/{stat.total})"
+            )
         key, _ = catalog.group_of(base.code)
         rendered.setdefault(key, []).append("\n".join(block))
 
@@ -359,7 +403,10 @@ async def achievements_guide_text(
     reward = f"+{points[0]} XP"
     if len(points) > 1:
         reward += f", самая редкая — +{points[-1]}"
-    lines.append(f"За ачивку дают {reward} — опыт идёт в тот же счёт, что ранги.")
+    lines.append(
+        f"За ачивку дают {reward} — опыт идёт в тот же счёт, что ранги. "
+        "«Имеют» — доля участников, у которых она уже есть."
+    )
     lines.append("Свои ачивки и прогресс — в мини-аппе, раздел «🏅 Ачивки и ранги».")
     return "\n".join(lines)
 
@@ -396,8 +443,9 @@ def xp_rules_text() -> str:
         price = "по событию" if rule.variable else f"<b>+{rule.points}</b> XP"
         lines.append(f"• {rule.title} — {price}{tail}")
     lines.append(
-        f"\n1 ранг = {XP_PER_LEVEL} XP, максимум — {MAX_LEVEL}. "
-        "Дальше опыт идёт в престиж."
+        f"\nШкала прогрессивная: 1→2 ранг стоит {XP_CURVE_STEP} XP, каждый следующий "
+        f"дороже на {XP_CURVE_STEP} (100 / 200 / 300 / …), а на {MAX_LEVEL}-й ранг — "
+        "около 1000 XP. Дальше опыт идёт в престиж."
     )
     return "\n".join(lines)
 
@@ -457,8 +505,9 @@ async def game_manual_text(session: AsyncSession) -> str | None:
     lines.extend(manual_xp_block())
 
     lines.append(
-        f"\n<b>Уровни.</b> {MAX_LEVEL} уровней по {XP_PER_LEVEL} XP; "
-        f"уровень = ранг. С {MAX_LEVEL}-го опыт идёт в престиж, качаться больше некуда."
+        f"\n<b>Уровни.</b> {MAX_LEVEL} уровней, шкала прогрессивная: первые шаги по "
+        f"{XP_CURVE_STEP} XP, переход на {MAX_LEVEL}-й ранг — ≈1000 XP. Уровень = "
+        f"ранг. С {MAX_LEVEL}-го опыт идёт в престиж, качаться больше некуда."
     )
     lines.append("<b>Что открывает ранг</b>")
     lines.extend(manual_ranks_block())

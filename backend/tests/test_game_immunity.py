@@ -60,11 +60,15 @@ def test_levels_come_from_config_unlocks():
     assert immunity_level("chukhan") == 10
 
 
+# Пороги 9/10 уровней берём из шкалы (прогрессивная: 3600 / 4500 при шаге 100).
+L9 = levels.xp_for_level(9)
+L10 = levels.xp_for_level(10)
+
+
 def test_threshold_matches_calculated_level():
-    # 9 уровень начинается на 800 XP, 10 — на 900 (см. levels.xp_cap).
-    assert immunity_threshold_xp("loser") == 800
-    assert immunity_threshold_xp("chukhan") == 900
-    for kind, threshold in (("loser", 800), ("chukhan", 900)):
+    assert immunity_threshold_xp("loser") == L9
+    assert immunity_threshold_xp("chukhan") == L10
+    for kind, threshold in (("loser", L9), ("chukhan", L10)):
         assert levels.level_for_xp(threshold) == immunity_level(kind)
         # На один XP меньше — уровень уже ниже порога (граница ровно на пороге).
         assert levels.level_for_xp(threshold - 1) < immunity_level(kind)
@@ -140,9 +144,9 @@ async def test_rank_immunity_empty_when_game_disabled(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_loser_immunity_starts_at_level_nine(game_on):
-    session = _FakeSession([(1, 800), (2, 799), (3, 900)])
+    session = _FakeSession([(1, L9), (2, L9 - 1), (3, L10)])
     reasons = await rank_immune_reasons(session, kind="loser")
-    # 800 → 9 уровень (иммунен), 799 → 8 (нет), 900 → 10 (иммунен тоже).
+    # Порог 9 уровня → иммунен, на 1 XP меньше → 8 (нет), 10 уровень → тоже иммунен.
     assert set(reasons) == {1, 3}
     assert reasons[1].code == LOSER_IMMUNITY
     assert "9-й ранг" in reasons[1].template
@@ -151,7 +155,7 @@ async def test_loser_immunity_starts_at_level_nine(game_on):
 
 @pytest.mark.asyncio
 async def test_chukhan_immunity_needs_level_ten(game_on):
-    session = _FakeSession([(1, 800), (3, 900)])
+    session = _FakeSession([(1, L9), (3, L10)])
     reasons = await rank_immune_reasons(session, kind="chukhan")
     # Девятого ранга для иммунитета к чухану мало.
     assert set(reasons) == {3}
@@ -160,7 +164,7 @@ async def test_chukhan_immunity_needs_level_ten(game_on):
 
 @pytest.mark.asyncio
 async def test_immune_reason_is_per_user(game_on):
-    session = _FakeSession([(1, 800), (3, 900)])
+    session = _FakeSession([(1, L9), (3, L10)])
     reasons = await rank_immune_reasons(session, kind="chukhan")
     text = reasons[3].text("Серёга")
     assert "Серёга" in text

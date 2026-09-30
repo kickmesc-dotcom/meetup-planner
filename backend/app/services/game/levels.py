@@ -15,7 +15,7 @@ from app.services.game.config import (
     MIN_LEVEL,
     RANK_BY_LEVEL,
     SUPREME_CHUKHAN_TITLE,
-    XP_PER_LEVEL,
+    XP_CURVE_STEP,
     Rank,
 )
 
@@ -24,40 +24,69 @@ def clamp_level(level: int) -> int:
     return max(MIN_LEVEL, min(MAX_LEVEL, level))
 
 
-def level_for_xp(xp: int) -> int:
-    """Уровень по накопленному опыту.
+def xp_for_level(level: int) -> int:
+    """Сколько ВСЕГО опыта нужно, чтобы начать этот уровень.
 
-    1 уровень — от 0 XP. Каждый следующий — ещё `XP_PER_LEVEL`.
+    1 уровень — 0 XP. Каждый следующий переход дороже: переход «N → N+1» стоит
+    `XP_CURVE_STEP * N` (100 / 200 / 300 / …), поэтому пороги — треугольные
+    числа, умноженные на шаг:
+
+        0, 100, 300, 600, 1000, 1500, 2100, 2800, 3600, 4500
+
+    Чистая функция (тесты без БД). Уровень ниже первого трактуем как первый.
+    """
+    lvl = max(0, level)
+    return XP_CURVE_STEP * (lvl - 1) * lvl // 2
+
+
+def xp_span_for_level(level: int) -> int:
+    """Сколько XP стоит переход С этого уровня на следующий.
+
+    Нужно шкале прогресса: её знаменатель — не «цена любого уровня», а цена
+    именно текущего перехода (иначе шкала на 8 уровне заполнялась бы за 100 XP).
+    """
+    return XP_CURVE_STEP * clamp_level(level)
+
+
+def level_for_xp(xp: int) -> int:
+    """Уровень по накопленному опыту (прогрессивная шкала).
+
     На `MAX_LEVEL` останавливаемся: дальше опыт идёт в престиж (см.
-    `prestige_for_xp`), а не в уровень.
+    `prestige_for_xp`), а не в уровень. Порогов всего 10, поэтому простой
+    подъём по ним — и честнее, и быстрее любой «магии» с формулой.
     """
     if xp <= 0:
         return MIN_LEVEL
-    return clamp_level(xp // XP_PER_LEVEL + 1)
+    level = MIN_LEVEL
+    while level < MAX_LEVEL and xp >= xp_for_level(level + 1):
+        level += 1
+    return level
 
 
 def xp_into_level(xp: int) -> int:
     """Сколько опыта набрано внутри текущего уровня (для шкалы прогресса)."""
-    if level_for_xp(xp) >= MAX_LEVEL:
-        return XP_PER_LEVEL
-    return max(0, xp - (level_for_xp(xp) - 1) * XP_PER_LEVEL)
+    level = level_for_xp(xp)
+    if level >= MAX_LEVEL:
+        return xp_span_for_level(MAX_LEVEL)
+    return max(0, xp - xp_for_level(level))
 
 
 def xp_to_next_level(xp: int) -> int | None:
     """Сколько опыта осталось до следующего уровня. `None` — уже максимум."""
-    if level_for_xp(xp) >= MAX_LEVEL:
+    level = level_for_xp(xp)
+    if level >= MAX_LEVEL:
         return None
-    return XP_PER_LEVEL - xp_into_level(xp)
+    return xp_for_level(level + 1) - xp
 
 
 def xp_cap() -> int:
     """Опыт, при котором достигается максимальный уровень.
 
-    ⚠️ Именно `(MAX_LEVEL - 1) * XP_PER_LEVEL`, а не `MAX_LEVEL * XP_PER_LEVEL`:
-    1 уровень — от 0 XP, поэтому 10 уровень начинается на 9 порогах (900), а не
-    на 10 (1000). Иначе престиж стартовал бы, когда шкала ещё не заполнена.
+    Это порог 10 уровня (4500 при шаге 100), а не сумма «цена × уровни»:
+    1 уровень начинается с 0 XP, поэтому порог уровня L — сумма L-1 переходов.
+    Иначе престиж стартовал бы, когда шкала ещё не заполнена.
     """
-    return (MAX_LEVEL - 1) * XP_PER_LEVEL
+    return xp_for_level(MAX_LEVEL)
 
 
 def prestige_for_xp(xp: int) -> int:

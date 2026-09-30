@@ -1556,6 +1556,22 @@ GAME_CONTRABAND_CHANCE_KEY = "game.contraband.chance_percent"
 GAME_CONTRABAND_CAP_KEY = "game.contraband.daily_cap"
 GAME_CONTRABAND_WORDS_KEY = "game.contraband.words"
 
+# Э14: голосовые задания.
+GAME_VOICE_ENABLED_KEY = "game.voice.enabled"
+GAME_VOICE_POLL_KEY = "game.voice.poll_enabled"
+GAME_VOICE_MIN_GAP_KEY = "game.voice.min_gap_hours"
+
+# Э15: музыкальная предложка (GHG8 H.7).
+GAME_MUSIC_ENABLED_KEY = "game.music.enabled"
+GAME_MUSIC_WEEKDAY_KEY = "game.music.weekday"
+GAME_MUSIC_HOUR_KEY = "game.music.hour"
+GAME_MUSIC_ATTRIBUTE_KEY = "game.music.attribute"
+
+# Э16 (H.8): мьюзик-гейм «угадай, кто предложил трек» — авто-вызов (опция).
+GAME_MUSIC_GAME_ENABLED_KEY = "game.music.game_enabled"
+GAME_MUSIC_GAME_WEEKDAY_KEY = "game.music.game_weekday"
+GAME_MUSIC_GAME_HOUR_KEY = "game.music.game_hour"
+
 # Как и у рубильника игры: фичи, которые пишут в чат, по умолчанию включены,
 # а режим сводки — ВЫКЛЮЧЕН (задание: «пока этот режим неактивен, я хочу
 # понаблюдать за поведением бота»). Переключается ключом.
@@ -1563,6 +1579,16 @@ _GAME_DIGEST_ENABLED_DEFAULT = False
 _GAME_MEMORIAL_ENABLED_DEFAULT = True
 _GAME_EVENTS_ENABLED_DEFAULT = True
 _GAME_CONTRABAND_ENABLED_DEFAULT = True
+# Задания выходят в чат сами — как и события, по умолчанию включены; голосование
+# за лучший вариант — ВЫКЛЮЧЕНО (по заданию «по умолчанию голосование выкл»).
+_GAME_VOICE_ENABLED_DEFAULT = True
+_GAME_VOICE_POLL_DEFAULT = False
+# Музыкальная предложка — фича из старого backlog (P3, «дизайн не согласован»),
+# поэтому по умолчанию ВЫКЛЮЧЕНА: включит оператор, когда решит запустить.
+_GAME_MUSIC_ENABLED_DEFAULT = False
+_GAME_MUSIC_ATTRIBUTE_DEFAULT = True
+# Мьюзик-гейм — тоже опция: авто-вызов по умолчанию ВЫКЛ (задание H.8).
+_GAME_MUSIC_GAME_ENABLED_DEFAULT = False
 
 
 def _game_defaults() -> dict:
@@ -1577,6 +1603,11 @@ def _game_defaults() -> dict:
         "events_max_per_day": game_config.EVENTS_MAX_PER_DAY,
         "events_min_gap_hours": game_config.EVENTS_MIN_GAP_HOURS,
         "contraband_daily_cap": game_config.CONTRABAND_DAILY_CAP,
+        "voice_min_gap_hours": game_config.VOICE_TASK_MIN_GAP_HOURS,
+        "music_weekday": game_config.MUSIC_DEFAULT_WEEKDAY,
+        "music_hour": game_config.MUSIC_DEFAULT_HOUR,
+        "music_game_weekday": game_config.MUSIC_GAME_DEFAULT_WEEKDAY,
+        "music_game_hour": game_config.MUSIC_GAME_DEFAULT_HOUR,
     }
 
 
@@ -1698,6 +1729,123 @@ async def set_game_contraband_words(session: AsyncSession, words: list[dict]) ->
         session,
         GAME_CONTRABAND_WORDS_KEY,
         json.dumps(words, ensure_ascii=False),
+    )
+
+
+async def get_game_voice_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_VOICE_ENABLED_KEY, _GAME_VOICE_ENABLED_DEFAULT
+    )
+
+
+async def get_game_voice_poll_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(session, GAME_VOICE_POLL_KEY, _GAME_VOICE_POLL_DEFAULT)
+
+
+async def get_game_voice_min_gap_hours(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_VOICE_MIN_GAP_KEY, _game_defaults()["voice_min_gap_hours"], lo=1
+    )
+
+
+async def set_game_voice_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_VOICE_ENABLED_KEY, "true" if value else "false")
+
+
+async def set_game_voice_poll_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_VOICE_POLL_KEY, "true" if value else "false")
+
+
+async def set_game_voice_min_gap_hours(session: AsyncSession, hours: int) -> None:
+    await _set_value(session, GAME_VOICE_MIN_GAP_KEY, str(max(1, int(hours))))
+
+
+async def get_game_music_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_MUSIC_ENABLED_KEY, _GAME_MUSIC_ENABLED_DEFAULT
+    )
+
+
+async def get_game_music_weekday(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_MUSIC_WEEKDAY_KEY, _game_defaults()["music_weekday"], hi=6
+    )
+
+
+async def get_game_music_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_MUSIC_HOUR_KEY, _game_defaults()["music_hour"], hi=23
+    )
+
+
+async def get_game_music_attribute(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_MUSIC_ATTRIBUTE_KEY, _GAME_MUSIC_ATTRIBUTE_DEFAULT
+    )
+
+
+async def set_game_music_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_MUSIC_ENABLED_KEY, "true" if value else "false")
+
+
+async def set_game_music_attribute(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_MUSIC_ATTRIBUTE_KEY, "true" if value else "false")
+
+
+def _clamp(value: int, *, lo: int, hi: int) -> int:
+    return max(lo, min(hi, int(value)))
+
+
+async def set_game_music_weekday(session: AsyncSession, weekday: int) -> None:
+    """День недели публикации (0=Пн). Чужие значения зажимаем в границы."""
+    await _set_value(
+        session, GAME_MUSIC_WEEKDAY_KEY, str(_clamp(weekday, lo=0, hi=6))
+    )
+
+
+async def set_game_music_hour(session: AsyncSession, hour: int) -> None:
+    await _set_value(session, GAME_MUSIC_HOUR_KEY, str(_clamp(hour, lo=0, hi=23)))
+
+
+async def get_game_music_game_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_MUSIC_GAME_ENABLED_KEY, _GAME_MUSIC_GAME_ENABLED_DEFAULT
+    )
+
+
+async def get_game_music_game_weekday(session: AsyncSession) -> int:
+    return await _get_int(
+        session,
+        GAME_MUSIC_GAME_WEEKDAY_KEY,
+        _game_defaults()["music_game_weekday"],
+        hi=6,
+    )
+
+
+async def get_game_music_game_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session,
+        GAME_MUSIC_GAME_HOUR_KEY,
+        _game_defaults()["music_game_hour"],
+        hi=23,
+    )
+
+
+async def set_game_music_game_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(
+        session, GAME_MUSIC_GAME_ENABLED_KEY, "true" if value else "false"
+    )
+
+
+async def set_game_music_game_weekday(session: AsyncSession, weekday: int) -> None:
+    await _set_value(
+        session, GAME_MUSIC_GAME_WEEKDAY_KEY, str(_clamp(weekday, lo=0, hi=6))
+    )
+
+
+async def set_game_music_game_hour(session: AsyncSession, hour: int) -> None:
+    await _set_value(
+        session, GAME_MUSIC_GAME_HOUR_KEY, str(_clamp(hour, lo=0, hi=23))
     )
 
 

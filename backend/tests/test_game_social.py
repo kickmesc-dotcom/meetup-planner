@@ -484,7 +484,9 @@ def test_xp_rules_text_does_not_promise_zero_xp():
     assert "Случайное событие в чате — по событию" in text
     assert "Кодовое слово сработало" in text
     assert "+0 XP" not in text
-    assert f"1 ранг = {report.XP_PER_LEVEL} XP" in text
+    # Шкала прогрессивная — в подсказке про неё, а не про «1 ранг = 100 XP».
+    assert "1→2 ранг стоит" in text
+    assert str(report.XP_CURVE_STEP) in text
 
 
 def test_manual_blocks_come_from_config():

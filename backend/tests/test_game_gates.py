@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from app.api import routes_game
 from app.db.models import GameProfile
 from app.schemas.game import GameCustomizePatch, GameProfileOut
-from app.services.game import gates
+from app.services.game import gates, levels
 
 
 class _Rows:
@@ -120,7 +120,7 @@ async def test_ungated_feature_is_allowed(monkeypatch, session):
 async def test_telegram_id_is_resolved_to_user(monkeypatch, session):
     _flag(monkeypatch)
     session.scalar_queue = [7]  # select(User.id) по telegram_id
-    session.store[("GameProfile", 7)] = GameProfile(user_id=7, xp=900)  # 10 уровень
+    session.store[("GameProfile", 7)] = GameProfile(user_id=7, xp=levels.xp_cap())  # 10 уровень
     res = await gates.check_feature(session, "chukhan_immunity", telegram_id=555)
     assert res.allowed is True and res.level == 10
 
@@ -181,7 +181,7 @@ async def test_customize_is_a_403_when_rank_is_too_low(monkeypatch, session):
 @pytest.mark.asyncio
 async def test_customize_saves_each_field(monkeypatch, session):
     _flag(monkeypatch)
-    profile = GameProfile(user_id=1, xp=900)  # 10 уровень: всё открыто
+    profile = GameProfile(user_id=1, xp=levels.xp_cap())  # 10 уровень: всё открыто
     session.store[("GameProfile", 1)] = profile
     user = _User()
 
@@ -207,7 +207,7 @@ async def test_customize_saves_each_field(monkeypatch, session):
 @pytest.mark.asyncio
 async def test_customize_empty_string_clears_the_field(monkeypatch, session):
     _flag(monkeypatch)
-    profile = GameProfile(user_id=1, xp=900)
+    profile = GameProfile(user_id=1, xp=levels.xp_cap())
     profile.custom_name = "Старое"
     session.store[("GameProfile", 1)] = profile
 

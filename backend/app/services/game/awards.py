@@ -45,7 +45,11 @@ from app.services.game.config import (
     EV_HOLIDAY,
     EV_MEETING,
     EV_MESSAGE,
+    EV_MUSIC_AUTHOR,
+    EV_MUSIC_GUESS,
     EV_QUOTE,
+    EV_VOICE,
+    EV_VOICE_BEST,
 )
 from app.services.game.flags import is_game_enabled
 
@@ -485,6 +489,71 @@ async def contraband(
     return bool(result.awarded)
 
 
+@_guarded(EV_VOICE)
+async def voice(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    points: int,
+    task_id: int | None = None,
+    at: datetime | None = None,
+) -> None:
+    """Э14: сдал голосовой вариант. Повтор защищён уникальностью сдачи
+    (`game_voice_submissions(task_id, user_id)`), а не окном: без своей записи
+    опыт не начислить дважды за одно задание."""
+    if not await _enabled(session):
+        return
+    await xp.award(session, user_id, EV_VOICE, at=at, points=points)
+
+
+@_guarded(EV_VOICE_BEST)
+async def voice_best(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    points: int,
+    task_id: int | None = None,
+    at: datetime | None = None,
+) -> None:
+    """Э14: вариант победил в голосовании. Идемпотентность — на стороне
+    вызывающего (task.winner_user_id выставляется один раз до начисления)."""
+    if not await _enabled(session):
+        return
+    await xp.award(session, user_id, EV_VOICE_BEST, at=at, points=points)
+
+
+@_guarded(EV_MUSIC_AUTHOR)
+async def music_author(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    points: int,
+    round_id: int | None = None,
+    at: datetime | None = None,
+) -> None:
+    """Э16: трек участника выпал в мьюзик-гейме. Повтор защищён состоянием
+    раунда (`closed_at` выставляется один раз до начисления)."""
+    if not await _enabled(session):
+        return
+    await xp.award(session, user_id, EV_MUSIC_AUTHOR, at=at, points=points)
+
+
+@_guarded(EV_MUSIC_GUESS)
+async def music_guess(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    points: int,
+    round_id: int | None = None,
+    at: datetime | None = None,
+) -> None:
+    """Э16: угадал автора трека. Идемпотентность — на стороне вызывающего
+    (`finalize_round` проходит один раз)."""
+    if not await _enabled(session):
+        return
+    await xp.award(session, user_id, EV_MUSIC_GUESS, at=at, points=points)
+
+
 @_guarded(EV_ACHIEVEMENT)
 async def achievement(session: AsyncSession, user_id: int, code: str) -> None:
     """Выдать конкретную ачивку (админка/отладка) — тоже за рубильником."""
@@ -506,4 +575,8 @@ ALL_EVENTS = (
     EV_MEETING,
     EV_EVENT,
     EV_CONTRABAND,
+    EV_VOICE,
+    EV_VOICE_BEST,
+    EV_MUSIC_AUTHOR,
+    EV_MUSIC_GUESS,
 )

@@ -20,9 +20,12 @@ from app.bot.handlers import (
     chat_commands,
     help as help_handler,
     media_reactions,
+    music,
+    music_game,
     next_meeting,
     poll_answer,
     start,
+    voice_tasks,
     whoami,
     zaebal,
 )
@@ -382,5 +385,13 @@ def get_dispatcher() -> Dispatcher:
         # всё равно завершается raise SkipHandler (пропагация). Содержит и
         # @message_reaction-роутер (приём живых реакций для wait_then_chance).
         _dispatcher.include_router(media_reactions.router)
+        # Э14: голосовые задания — ПОСЛЕ media_reactions (тот матчит `F.voice`
+        # как медиа и заканчивается `raise SkipHandler`, поэтому апдейт доедет
+        # и сюда, а телеметрия мемов не сломается).
+        _dispatcher.include_router(voice_tasks.router)
+        # Э15: музыкальная предложка — только личка (аудио/ссылки от участников).
+        _dispatcher.include_router(music.router)
+        # Э16: ручной запуск мьюзик-гейма (команда в группе, только админ).
+        _dispatcher.include_router(music_game.router)
         _dispatcher.include_router(chat_capture.router)
     return _dispatcher

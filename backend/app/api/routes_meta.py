@@ -51,9 +51,11 @@ _FEATURE_ROUTES: dict[str, tuple[str, str]] = {
     "me.game.profile": ("PATCH", "/api/me/game/profile"),
     "game.achievements": ("GET", "/api/game/achievements"),
     "game.ranks": ("GET", "/api/game/ranks"),
+    "game.music": ("GET", "/api/game/music/mine"),
     "game.holidays": ("GET", "/api/game/holidays"),
     "game.donate": ("POST", "/api/game/donate"),
     "admin.game": ("GET", "/api/admin/game"),
+    "admin.game.music": ("GET", "/api/admin/game/music"),
     "admin.game.social": ("GET", "/api/admin/game/social"),
 }
 

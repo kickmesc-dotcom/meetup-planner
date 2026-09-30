@@ -90,9 +90,18 @@ def test_level_from_zero_is_first():
 
 
 def test_level_thresholds():
+    """Прогрессивная шкала: переход N→N+1 стоит `XP_PER_LEVEL * N`.
+
+    Отсюда пороги 100 / 300 / 600 / 1000 / … — первые уровни берутся легко.
+    """
+    assert levels.xp_for_level(1) == 0
+    assert levels.xp_for_level(2) == XP_PER_LEVEL
+    assert levels.xp_for_level(3) == XP_PER_LEVEL * 3
+    assert levels.xp_for_level(4) == XP_PER_LEVEL * 6
     assert levels.level_for_xp(XP_PER_LEVEL - 1) == 1
     assert levels.level_for_xp(XP_PER_LEVEL) == 2
-    assert levels.level_for_xp(XP_PER_LEVEL * 8) == 9
+    assert levels.level_for_xp(levels.xp_for_level(9) - 1) == 8
+    assert levels.level_for_xp(levels.xp_for_level(9)) == 9
 
 
 def test_level_is_capped_at_max():
@@ -100,19 +109,23 @@ def test_level_is_capped_at_max():
 
 
 def test_prestige_starts_when_bar_is_full_not_after():
-    """Регресс: престиж должен начинаться ровно на полной шкале (900), не на 1000."""
-    assert levels.xp_cap() == (MAX_LEVEL - 1) * XP_PER_LEVEL
+    """Регресс: престиж должен начинаться ровно на полной шкале, не за ней."""
+    assert levels.xp_cap() == levels.xp_for_level(MAX_LEVEL)
     assert levels.level_for_xp(levels.xp_cap()) == MAX_LEVEL
     assert levels.prestige_for_xp(levels.xp_cap()) == 0
     assert levels.prestige_for_xp(levels.xp_cap() + 250) == 250
 
 
 def test_progress_shape():
+    # 150 XP — второй уровень (пороги 0 / 100 / 300), до третьего ещё 150.
     p = levels.progress_for_xp(150)
     assert p.level == 2
     assert p.xp_into_level == 50
-    assert p.xp_to_next == 50
+    assert p.xp_to_next == 150
     assert not p.at_max
+    # Знаменатель шкалы — цена ИМЕННО этого перехода, а не 100 для всех уровней.
+    assert levels.xp_span_for_level(2) == 200
+    assert levels.xp_span_for_level(9) == 900
 
 
 def test_progress_at_max_has_no_next():
@@ -125,8 +138,8 @@ def test_progress_at_max_has_no_next():
 
 def test_levels_gained_lists_every_crossed_level():
     assert levels.levels_gained(0, 100) == [2]
-    # одно начисление может закрыть сразу два уровня
-    assert levels.levels_gained(90, 310) == [2, 3, 4]
+    # одно начисление может закрыть сразу несколько уровней (0 → 600 = 4-й)
+    assert levels.levels_gained(90, 600) == [2, 3, 4]
     assert levels.levels_gained(100, 100) == []
     assert levels.levels_gained(200, 100) == []
 

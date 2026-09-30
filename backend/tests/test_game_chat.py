@@ -26,6 +26,11 @@ def _game(monkeypatch, enabled: bool) -> None:
 
     monkeypatch.setattr(report, "is_game_enabled", _flag)
     monkeypatch.setattr(routes_game, "is_game_enabled", _flag)
+    # Праздники проверяют админство (ADMIN_TG_IDS). Тесты не поднимают настоящее
+    # окружение, поэтому подменяем настройки: пусто = пользователь не админ.
+    monkeypatch.setattr(
+        routes_game, "get_settings", lambda: SimpleNamespace(admin_tg_id_set=set())
+    )
 
 
 # --- Э5.4: отчёты ------------------------------------------------------------
@@ -82,10 +87,11 @@ async def test_my_rank_shows_rank_and_bar(monkeypatch):
     monkeypatch.setattr(report.xp, "daily_history", _history)
     text = await report.my_rank_text(_Session(), user_id=1, display_name="Митян")
     assert "Митян" in text
-    # 340 XP — это уже 4 ранг (3-й начинался на 200), внутри уровня 40/100.
-    assert "4-й ранг" in text and "Терпила средней руки" in text
-    assert "до 5-й ранга" in text
-    assert "40/100" in text
+    # 340 XP — это 3-й ранг (пороги 0/100/300), внутри уровня 40/300: знаменатель
+    # шкалы — цена текущего перехода, а не «100 для всех».
+    assert "3-й ранг" in text and "Терпила средней руки" in text
+    assert "до 4-й ранга" in text
+    assert "40/300" in text
 
 
 @pytest.mark.asyncio
@@ -94,7 +100,8 @@ async def test_my_rank_marks_maximum(monkeypatch):
 
     class _Session:
         async def get(self, *_a, **_k):
-            return SimpleNamespace(xp=1200, custom_rank_title=None)
+            # Кап прогрессивной шкалы — 4500 (порог 10 уровня).
+            return SimpleNamespace(xp=4800, custom_rank_title=None)
 
     async def _rank_name(*_a, **_k):
         return "Сигма икона"
@@ -106,7 +113,7 @@ async def test_my_rank_marks_maximum(monkeypatch):
     monkeypatch.setattr(report.xp, "daily_history", _history)
     text = await report.my_rank_text(_Session(), user_id=1, display_name="X")
     assert "Максимум взят" in text
-    assert "300" in text  # престиж = 1200 − 900
+    assert "300" in text  # престиж = 4800 − 4500
 
 
 @pytest.mark.asyncio
@@ -172,7 +179,7 @@ async def test_ach_lists_every_base_achievement_with_description(monkeypatch):
             continue
         assert base.title in text
         assert base.description in text
-    assert "юбилеи:" in text
+    assert "юбилейные ачивки:" in text
     # Секретную ачивку без личных отметок не спойлерим.
     assert "Скрытых ачивок: 1" in text
     assert "Верховный чухан" not in text
@@ -193,12 +200,54 @@ async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
     text = await report.achievements_guide_text(None, user_id=1)
     assert f"У тебя: <b>2</b>/{catalog.catalog_size()}" in text
     assert "×10 ✅" in text and "×20 ▫️" in text
-    assert "сейчас: <b>12</b>" in text
+    # Накопитель: «разовая» и «случаев» — разные строки (первый раз vs счётчик).
+    assert "случаев: <b>12</b>" in text
+    assert "разовая:" in text
     # Нулевой счётчик тоже показываем: это «трекер существует», а не “нет данных».
     assert "сейчас: <b>0</b>" in text
     # Полученную секретную ачивку показываем как обычную.
     assert "Верховный чухан" in text
     assert "Скрытых ачивок" not in text
+
+
+@pytest.mark.asyncio
+async def test_ach_shows_rarity_percent(monkeypatch):
+    """Вместо списка обладателей в /ach — «имеют: N% (holders/total)»."""
+    _game(monkeypatch, True)
+
+    async def _empty(*_a, **_k):
+        return {}
+
+    async def _rarity(*_a, **_k):
+        from app.services.game.achievements import AchievementStat
+
+        return [AchievementStat("chin_up", 3, 6), AchievementStat("first_worm", 0, 6)]
+
+    monkeypatch.setattr(report.achievements, "progress", _empty)
+    monkeypatch.setattr(report.achievements, "collected_codes", _empty)
+    monkeypatch.setattr(report.achievements, "rarity_stats", _rarity)
+    text = await report.achievements_guide_text(object(), user_id=1)
+    assert "имеют: <b>50%</b> (3/6)" in text
+    # Ноль тоже показываем — это «ачивку пока никто не взял», а не пропуск.
+    assert "имеют: <b>0%</b> (0/6)" in text
+
+
+@pytest.mark.asyncio
+async def test_ach_survives_rarity_failure(monkeypatch):
+    """Сбой редкости не должен ронять подсказку (best-effort, как и всё остальное)."""
+    _game(monkeypatch, True)
+
+    async def _empty(*_a, **_k):
+        return {}
+
+    async def _boom(*_a, **_k):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(report.achievements, "progress", _empty)
+    monkeypatch.setattr(report.achievements, "collected_codes", _empty)
+    monkeypatch.setattr(report.achievements, "rarity_stats", _boom)
+    text = await report.achievements_guide_text(object(), user_id=1)
+    assert "Ачивки" in text
 
 
 @pytest.mark.asyncio
@@ -251,8 +300,10 @@ async def test_ach_report_is_devided_into_labelled_blocks(monkeypatch):
 @pytest.mark.asyncio
 async def test_levels_text_has_stats_place_and_the_whole_chart(monkeypatch):
     _game(monkeypatch, True)
+    # Митян — 0 XP (1-й ранг), чтобы имя ранга «Терпила» в тексте встречалось
+    # ровно дважды: своя стата + своя строка чарта.
     rows = [
-        (1, "Митян", 500, None),
+        (1, "Митян", 0, None),
         (2, "Серж-NEO", 340, "Терпила средней руки"),
         (3, "Сомов", 0, None),
     ]
@@ -283,10 +334,10 @@ async def test_levels_text_has_stats_place_and_the_whole_chart(monkeypatch):
     monkeypatch.setattr(report.xp, "daily_history", _history)
 
     text = await report.levels_text(_Session(), user_id=2, display_name="Серж-NEO")
-    assert "4-й ранг" in text and "Терпила средней руки" in text
-    assert "40/100" in text
+    assert "3-й ранг" in text and "Терпила средней руки" in text
+    assert "40/300" in text
     assert "Всего <b>340</b> XP" in text
-    assert f"Уровень 4/{MAX_LEVEL}" in text
+    assert f"Уровень 3/{MAX_LEVEL}" in text
     assert "место 2 из 3" in text
     assert f"ачивок 7/{catalog.catalog_size()}" in text
     # Сегодняшний опыт показываем с источниками, а не просто числом.
@@ -314,10 +365,11 @@ def test_chart_lines_mark_medals_and_supreme_title():
 
 
 def test_chart_lines_prefer_custom_title_over_level_name():
-    rows = [(1, "Митян", 950, "Король мемов"), (2, "Сомов", 950, None)]
+    # 4500 XP — кап прогрессивной шкалы (10-й ранг).
+    rows = [(1, "Митян", 4500, "Король мемов"), (2, "Сомов", 4500, None)]
     lines = report.chart_lines(rows, set())
     assert "Король мемов" in lines[0]
-    assert "Сигма икона" in lines[1]  # 950 XP — максимум, у кого нет своего ранга
+    assert "Сигма икона" in lines[1]  # максимум, у кого нет своего ранга
     # Спец-ранг всё равно главнее своего названия.
     supreme = report.chart_lines(rows, {1})
     assert "Верховный чухан" in supreme[0]
@@ -400,6 +452,46 @@ async def test_holidays_list_reports_manage_rights(monkeypatch):
     assert out.can_manage is True
     assert out.required_level == 6
     assert [h.message for h in out.items] == ["Новый год"]
+
+
+@pytest.mark.asyncio
+async def test_admin_manages_holidays_without_the_rank(monkeypatch):
+    """Админ из ADMIN_TG_IDS правит праздники даже без 6 ранга (иначе блок не открыть)."""
+    _game(monkeypatch, True)
+
+    async def _deny(*_a, **_k):
+        return SimpleNamespace(allowed=False, required_level=6)
+
+    async def _list(*_a, **_k):
+        return [_holiday_row()]
+
+    monkeypatch.setattr(
+        routes_game, "get_settings", lambda: SimpleNamespace(admin_tg_id_set={777})
+    )
+    monkeypatch.setattr(routes_game.gates, "check_feature", _deny)
+    monkeypatch.setattr(routes_game.holidays, "list_holidays", _list)
+    out = await routes_game.holidays_list(None, _user())
+    assert out.can_manage is True
+
+
+@pytest.mark.asyncio
+async def test_admin_holiday_add_skips_the_rank_gate(monkeypatch):
+    _game(monkeypatch, True)
+
+    async def _forbidden(*_a, **_k):
+        raise AssertionError("гейт не должен вызываться для админа")
+
+    async def _add(*_a, **_k):
+        return _holiday_row()
+
+    monkeypatch.setattr(
+        routes_game, "get_settings", lambda: SimpleNamespace(admin_tg_id_set={777})
+    )
+    monkeypatch.setattr(routes_game.gates, "require_feature", _forbidden)
+    monkeypatch.setattr(routes_game.holidays, "add_holiday", _add)
+    body = routes_game.HolidayCreate(month=1, day=1, message="Новый год")
+    out = await routes_game.holiday_add(body, None, _user())
+    assert out.message == "Новый год"
 
 
 @pytest.mark.asyncio

@@ -40,6 +40,11 @@ class Achievement:
     разворачиваются в отдельные `Achievement` с кодом `"<base>:<tier>"` (см.
     `_expand`). `base` у тира указывает на родителя — по нему считается
     «внутренний ранг» ачивки.
+
+    Разделение «впервые vs юбилей» держим именно так: базовая запись выдаётся на
+    первый случай (`count >= 1`) и берётся ОДИН раз, а каждый юбилей — отдельная
+    запись каталога со своим кодом. Так «С почином» никогда не показывает
+    прогресс «18/20»: 18 — это счётчик случаев, 20 — отдельная ачивка «×20».
     """
 
     code: str
@@ -92,7 +97,7 @@ _BASE: tuple[Achievement, ...] = (
     Achievement(
         "generation_mouthpiece",
         "Рупор поколения",
-        "Стать самым активным участником чата за неделю",
+        "Стать самым активным участником чата за неделю впервые",
         "📣",
         KIND_COUNTER,
         tiers=ANNIVERSARY_TIERS,
@@ -100,7 +105,7 @@ _BASE: tuple[Achievement, ...] = (
     Achievement(
         "read_only",
         "Read only",
-        "Стать самым НЕактивным участником чата за неделю",
+        "Стать самым НЕактивным участником чата за неделю впервые",
         "🔇",
         KIND_COUNTER,
         tiers=ANNIVERSARY_TIERS,
@@ -284,15 +289,21 @@ def group_of(code: str) -> tuple[str, str]:
 
 
 def _expand(base: Achievement) -> list[Achievement]:
-    """Развернуть базовую ачивку с юбилеями в неё саму + тир-записи."""
+    """Развернуть базовую ачивку с юбилеями в неё саму + тир-записи.
+
+    Важно для читаемости: базовая запись — это ПРО ПЕРВЫЙ раз («впервые»), а
+    каждая тир-запись — отдельная ачивка про юбилей. Поэтому у тира из описания
+    вырезается «впервые»: иначе вышло бы противоречие «впервые — 10-й раз».
+    """
     out = [base]
+    narrative = base.description.replace(" впервые", "")
     for tier in base.tiers:
         out.append(
             replace(
                 base,
                 code=f"{base.code}:{tier}",
                 title=tier_title(base.title, tier),
-                description=f"{base.description} — {'юбилей' if tier else ''} {tier} раз",
+                description=f"{narrative} — {tier}-й раз (юбилейная ачивка)",
                 tier=tier,
                 base=base.code,
             )

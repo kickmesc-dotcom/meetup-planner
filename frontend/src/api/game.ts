@@ -79,9 +79,13 @@ export interface GameProfile {
   xp_rules: GameXpRule[];
 }
 
-export interface AchievementHolder {
-  user_id: number;
-  count: number;
+export interface AchievementStat {
+  code: string;
+  title: string;
+  icon: string;
+  holders: number;
+  total: number;
+  percent: number;
 }
 
 export interface RankRow {
@@ -112,10 +116,39 @@ export const updateGameProfile = (patch: GameCustomizePatch) =>
 export const ackLevelUp = () =>
   api<void>("/api/me/game/level-up/ack", { method: "POST" });
 
-export const fetchAchievementsChart = () =>
-  api<AchievementHolder[]>("/api/game/achievements");
+export const fetchAchievementStats = () =>
+  api<AchievementStat[]>("/api/game/achievements");
 
 export const fetchRanksChart = () => api<RankRow[]>("/api/game/ranks");
+
+/** Э15/Э16: «Предложка недели» — свои треки, лимит и история подборок. */
+export interface MusicMineTrack {
+  id: number;
+  kind: string;
+  title: string | null;
+  performer: string | null;
+  url: string | null;
+  status: string;
+  added_at: string | null;
+}
+
+export interface MusicSelection {
+  id: number;
+  tg_message_id: number | null;
+  track_count: number;
+  note: string | null;
+  created_at: string | null;
+}
+
+export interface MusicMine {
+  enabled: boolean;
+  per_user_weekly: number;
+  week_count: number;
+  tracks: MusicMineTrack[];
+  history: MusicSelection[];
+}
+
+export const fetchMyMusic = () => api<MusicMine>("/api/game/music/mine");
 
 /** Э10.3: праздник — ежегодная дата + текст поздравления. */
 export interface GameHoliday {

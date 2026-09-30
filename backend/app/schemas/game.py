@@ -115,11 +115,20 @@ class GameCustomizePatch(BaseModel):
     avatar_manual_url: str | None = Field(None, max_length=512)
 
 
-class AchievementHolderOut(BaseModel):
-    """Строка чарта обладателей ачивок (Э5.3)."""
+class AchievementStatOut(BaseModel):
+    """Сводка по одной ачивке: сколько участников её имеют.
 
-    user_id: int
-    count: int
+    Задание: «вместо обладателей ачивок — крохотная сводка, сколько % участников
+    имеют такую». Поэтому вместо списка имён отдаём число/процент: держать в
+    ответе персональные данные для «у кого что» больше не нужно.
+    """
+
+    code: str
+    title: str
+    icon: str
+    holders: int
+    total: int
+    percent: int
 
 
 class RankRowOut(BaseModel):
@@ -217,6 +226,11 @@ class GameSocialOut(BaseModel):
     contraband_custom_registry: bool = False
     contraband_words: list[GameContrabandWord] = []
     unresolved_owners: list[str] = []
+    # Э14: голосовые задания.
+    voice_enabled: bool = True
+    voice_poll_enabled: bool = False
+    voice_min_gap_hours: int = 48
+    voice_open: int = 0
 
 
 class GameSocialIn(BaseModel):
@@ -239,12 +253,96 @@ class GameSocialIn(BaseModel):
     contraband_chance_percent: int | None = Field(None, ge=0, le=100)
     contraband_daily_cap: int | None = Field(None, ge=0, le=100)
     contraband_words: list[GameContrabandWord] | None = None
+    voice_enabled: bool | None = None
+    voice_poll_enabled: bool | None = None
+    voice_min_gap_hours: int | None = Field(None, ge=1, le=720)
 
 
 class GameDigestFlushOut(BaseModel):
     """Сколько записей журнала уехало в чат по кнопке «отправить сейчас»."""
 
     sent: int = 0
+
+
+class MusicTrackOut(BaseModel):
+    """Трек в пуле предложки (Э15). Ссылка или `file_id`, не файл."""
+
+    id: int
+    user_id: int
+    kind: str
+    title: str | None = None
+    performer: str | None = None
+    url: str | None = None
+    duration: int | None = None
+    status: str = "pool"
+    selection_id: int | None = None
+
+
+class MusicSelectionOut(BaseModel):
+    """Выпущенная подборка или неудачная попытка (Э15)."""
+
+    id: int
+    tg_message_id: int | None = None
+    track_count: int = 0
+    note: str | None = None
+    created_at: datetime | None = None
+
+
+class MusicStateOut(BaseModel):
+    """Состояние музыкальной предложки: настройки + пул + история."""
+
+    enabled: bool = False
+    weekday: int = 1
+    hour: int = 12
+    attribute: bool = True
+    min_tracks: int = 4
+    max_tracks: int = 10
+    per_user_weekly: int = 5
+    # Э16: мьюзик-гейм «угадай, кто предложил трек» — авто-вызов.
+    game_enabled: bool = False
+    game_weekday: int = 6
+    game_hour: int = 12
+    pool: list[MusicTrackOut] = []
+    history: list[MusicSelectionOut] = []
+
+
+class MusicSettingsIn(BaseModel):
+    """Частичная правка настроек предложки: что не передали — не трогаем."""
+
+    enabled: bool | None = None
+    weekday: int | None = Field(None, ge=0, le=6)
+    hour: int | None = Field(None, ge=0, le=23)
+    attribute: bool | None = None
+    game_enabled: bool | None = None
+    game_weekday: int | None = Field(None, ge=0, le=6)
+    game_hour: int | None = Field(None, ge=0, le=23)
+
+
+class MusicMineTrackOut(BaseModel):
+    """Трек, сданный самим участником на текущей неделе (Э16, мини-апп)."""
+
+    id: int
+    kind: str
+    title: str | None = None
+    performer: str | None = None
+    url: str | None = None
+    status: str = "pool"
+    added_at: datetime | None = None
+
+
+class MusicMineOut(BaseModel):
+    """Экран «Предложка недели» в мини-аппе.
+
+    Участник видит свои сданные треки, остаток недельного лимита и историю уже
+    выпущенных подборок — без админских ручек.
+    """
+
+    enabled: bool = False
+    per_user_weekly: int = 5
+    week_count: int = 0
+    # «audio» или «link» — как присылать треки (подсказка в шапке).
+    tracks: list[MusicMineTrackOut] = []
+    history: list[MusicSelectionOut] = []
 
 
 class DonationOut(BaseModel):

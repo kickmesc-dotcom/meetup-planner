@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import GameProfile, User
 from app.services.game import levels
-from app.services.game.config import XP_PER_LEVEL, feature_title
+from app.services.game.config import feature_title
 from app.services.game.flags import is_game_enabled, required_level
 from app.services.immunity import (
     CHUKHAN_IMMUNITY,
@@ -53,14 +53,14 @@ def immunity_level(kind: str) -> int | None:
 def immunity_threshold_xp(kind: str) -> int | None:
     """Минимум опыта, с которого иммунитет вообще возможен (для WHERE в SQL).
 
-    Считается из порога уровня и `XP_PER_LEVEL`, а не пишется числом: иначе при
-    смене цены уровня (или переезде иммунитета на другой ранг) запрос начал бы
-    тянуть не тех.
+    Берём порог уровня из шкалы (`levels.xp_for_level`), а не считаем его числом:
+    при смене шага шкалы (или переезде иммунитета на другой ранг) запрос иначе
+    начал бы тянуть не тех.
     """
     level = immunity_level(kind)
     if level is None:
         return None
-    return (level - 1) * XP_PER_LEVEL
+    return levels.xp_for_level(level)
 
 
 def immunity_reason(level: int, kind: str) -> ImmuneReason:
@@ -81,7 +81,7 @@ async def rank_immune_reasons(
 
     Один SELECT и только по тем, у кого опыта уже хватает на пороговый уровень:
     точный уровень считает `levels.level_for_xp` (арифметику опыта SQL не
-    дублирует — иначе при смене `XP_PER_LEVEL` они разъедутся).
+    дублирует — иначе при смене шкалы они разъедутся).
     """
     level_needed = immunity_level(kind)
     threshold = immunity_threshold_xp(kind)

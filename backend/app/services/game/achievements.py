@@ -46,10 +46,11 @@ from app.services.game.achievements_catalog import (
     SUPREME_CHUKHAN_TIER,
     SUPREME_CHUKHAN_TIER_BASE,
     Achievement,
+    base_achievements,
     get,
     tiers_reached,
 )
-from app.services.game.config import EV_ACHIEVEMENT
+from app.services.game.config import ACHIEVEMENTS_ERA_START, EV_ACHIEVEMENT
 
 log = structlog.get_logger()
 
@@ -130,19 +131,50 @@ async def count_for_user(session: AsyncSession, user_id: int) -> int:
     return int(total or 0)
 
 
-async def leaderboard(session: AsyncSession) -> list[tuple[int, int]]:
-    """Чарт обладателей ачивок: [(user_id, count)] по убыванию, без нулей.
+@dataclass(frozen=True)
+class AchievementStat:
+    """Насколько редка ачивка: сколько участников её имеют (для сводки в профиле).
 
-    Один агрегатный SELECT — без N+1 (требование Э12.1).
+    Задание: «вместо обладателей ачивок — крохотная сводка, сколько % участников
+    имеют такую». Поэтому отдаём не список имён, а процент от всех участников.
     """
+
+    code: str
+    holders: int
+    total: int
+
+    @property
+    def percent(self) -> int:
+        """Округлённый процент (0 — если участников нет)."""
+        if self.total <= 0:
+            return 0
+        return round(self.holders * 100 / self.total)
+
+
+async def rarity_stats(session: AsyncSession) -> list[AchievementStat]:
+    """Сколько участников имеют каждую (базовую) ачивку — два SELECT, без N+1.
+
+    Тир-коды объединяем с базовым: «С почином ×10» — это та же ачивка «С почином»
+    в сводке редкости, иначе она бы считалась дважды и разнесла строки. Знаменатель
+    — число зарегистрированных участников.
+    """
+    total = int(await session.scalar(select(func.count()).select_from(User)) or 0)
     rows = (
         await session.execute(
-            select(UserAchievement.user_id, func.count())
-            .group_by(UserAchievement.user_id)
-            .order_by(func.count().desc())
+            select(UserAchievement.code, func.count(func.distinct(UserAchievement.user_id)))
+            .group_by(UserAchievement.code)
         )
     ).all()
-    return [(int(uid), int(cnt)) for uid, cnt in rows]
+    holders: dict[str, int] = {}
+    for code, count in rows:
+        base = code.split(":", 1)[0]
+        # Если тир появился у человека, у которого нет базовой записи (старые
+        # данные/ручная выдача), считаем его по максимуму, а не складываем.
+        holders[base] = max(holders.get(base, 0), int(count))
+    return [
+        AchievementStat(code=ach.code, holders=holders.get(ach.code, 0), total=total)
+        for ach in base_achievements()
+    ]
 
 
 async def is_supreme_chukhan(session: AsyncSession, user_id: int) -> bool:
@@ -412,52 +444,73 @@ async def announce_granted(
 
 _OFFICIAL_SOURCE = LoserRoll.source != "duel"
 
+# Эра геймификации: записи ДО неё были «просто жизнью чата», а не игрой, поэтому
+# в счётчиках ачивок они не участвуют (задание: отсчёт с чистого листа, но
+# старые топы и опыт не обнуляем). Дату можно менять в `config.py`.
+_ERA = ACHIEVEMENTS_ERA_START
+
 
 async def count_losers(session: AsyncSession, user_id: int) -> int:
-    """Сколько раз юзер был «лохом дня». Дубли (`source='duel'`) не считаем:
-    это развлекательный прокрут, он не идёт даже в `loser_stats`."""
+    """Сколько раз юзер был «лохом дня» С НАЧАЛА геймификации. Дубли
+    (`source='duel'`) не считаем: это развлекательный прокрут, он не идёт даже в
+    `loser_stats`."""
     total = await session.scalar(
         select(func.count())
         .select_from(LoserRoll)
-        .where(LoserRoll.loser_user_id == user_id, _OFFICIAL_SOURCE)
+        .where(
+            LoserRoll.loser_user_id == user_id,
+            _OFFICIAL_SOURCE,
+            LoserRoll.rolled_at >= _ERA,
+        )
     )
     return int(total or 0)
 
 
 async def count_started_rolls(session: AsyncSession, user_id: int) -> int:
-    """Сколько рулеток юзер закрутил сам (автолох не в счёт)."""
+    """Сколько рулеток юзер закрутил сам (автолох не в счёт), с начала игры."""
     total = await session.scalar(
         select(func.count())
         .select_from(LoserRoll)
-        .where(LoserRoll.rolled_by == user_id, LoserRoll.source != "auto")
+        .where(
+            LoserRoll.rolled_by == user_id,
+            LoserRoll.source != "auto",
+            LoserRoll.rolled_at >= _ERA,
+        )
     )
     return int(total or 0)
 
 
 async def count_chukhan(session: AsyncSession, user_id: int) -> int:
-    """Сколько раз юзер был чуханом недели (только доставленные недели)."""
+    """Сколько раз юзер был чуханом недели (только доставленные недели, с начала игры)."""
     total = await session.scalar(
         select(func.count())
         .select_from(WeeklyChukhan)
-        .where(WeeklyChukhan.user_id == user_id, WeeklyChukhan.posted_at.is_not(None))
+        .where(
+            WeeklyChukhan.user_id == user_id,
+            WeeklyChukhan.posted_at.is_not(None),
+            WeeklyChukhan.week_start >= _ERA,
+        )
     )
     return int(total or 0)
 
 
 async def count_polls(session: AsyncSession, user_id: int) -> int:
+    """Опросы юзера с начала игры (у `polls` есть `created_at` с `now()`)."""
     total = await session.scalar(
-        select(func.count()).select_from(Poll).where(Poll.created_by == user_id)
+        select(func.count())
+        .select_from(Poll)
+        .where(Poll.created_by == user_id, Poll.created_at >= _ERA)
     )
     return int(total or 0)
 
 
 async def count_nominations(session: AsyncSession, user_id: int) -> int:
-    """Номинации игр. `added_by_tg_id` — TG-id, поэтому сверяем через users."""
+    """Номинации игр с начала игры. `added_by_tg_id` — TG-id, сверяем через users."""
     total = await session.scalar(
         select(func.count())
         .select_from(GameNomination)
         .join(User, User.telegram_id == GameNomination.added_by_tg_id)
-        .where(User.id == user_id)
+        .where(User.id == user_id, GameNomination.added_at >= _ERA)
     )
     return int(total or 0)
 

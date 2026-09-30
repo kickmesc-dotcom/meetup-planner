@@ -176,6 +176,9 @@ JOB_GAME_MEMES = "game_memes_sweep"  # GHG10 Э7
 JOB_GAME_MEMORIAL = "game_memorial_daily"  # GHG10 Э13
 JOB_GAME_EVENTS = "game_events_hourly"  # GHG10 Э13
 JOB_GAME_DIGEST = "game_digest_flush"  # GHG10 Э13
+JOB_GAME_VOICE = "game_voice_tick"  # GHG10 Э14
+JOB_GAME_MUSIC = "game_music_weekly"  # GHG10 Э15
+JOB_GAME_MUSIC_GAME = "game_music_game_weekly"  # GHG10 Э16
 
 
 def _env_int(name: str, default: int) -> int:
@@ -931,6 +934,71 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_GAME_DIGEST)
         log.info("scheduler.game_digest_disabled")
+
+    # --- GHG10 (Э14): голосовые задания. ---
+    # Job тикает часто, а решение «ставить ли задание» принимает сам: дневное
+    # окно, пауза ``game.voice.min_gap_hours`` и «нет открытого задания». Поэтому
+    # правка настроек в админке работает без пересоздания job'а.
+    if game_on:
+        from app.services.game.voice import run_voice_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_VOICE, run_voice_job),
+            IntervalTrigger(minutes=30),
+            kwargs={"bot": bot},
+            id=JOB_GAME_VOICE,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=900,
+        )
+        log.info("scheduler.game_voice_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_VOICE)
+        log.info("scheduler.game_voice_disabled")
+
+    # --- GHG10 (Э15): музыкальная предложка. ---
+    # Job тикает часто, а «пора ли публиковать» решает сам по расписанию из
+    # админки и последней попытке (в т.ч. повтор при недоборе через 3–6 ч).
+    if game_on:
+        from app.services.game.music import run_music_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_MUSIC, run_music_job),
+            IntervalTrigger(minutes=30),
+            kwargs={"bot": bot},
+            id=JOB_GAME_MUSIC,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=900,
+        )
+        log.info("scheduler.game_music_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_MUSIC)
+        log.info("scheduler.game_music_disabled")
+
+    # --- GHG10 (Э16): мьюзик-гейм «угадай, кто предложил трек». ---
+    # Авто-вызов — опция (по умолчанию выкл). Job тикает часто, а «пора ли» решает
+    # сам: расписание из админки, отсутствие открытого раунда и память о прошлых.
+    # Зависшие раунды (опрос не долетел) он же и закрывает.
+    if game_on:
+        from app.services.game.music_game import run_music_game_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_MUSIC_GAME, run_music_game_job),
+            IntervalTrigger(minutes=30),
+            kwargs={"bot": bot},
+            id=JOB_GAME_MUSIC_GAME,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=900,
+        )
+        log.info("scheduler.game_music_game_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_MUSIC_GAME)
+        log.info("scheduler.game_music_game_disabled")
 
 
 def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:

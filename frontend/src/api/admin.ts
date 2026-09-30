@@ -1325,6 +1325,12 @@ export interface GameSocialState {
   contraband_words: GameContrabandWord[];
   /** Владельцы слов, которых нет среди участников — слово молчит. */
   unresolved_owners: string[];
+  /** Э14: голосовые задания. */
+  voice_enabled: boolean;
+  voice_poll_enabled: boolean;
+  voice_min_gap_hours: number;
+  /** Сколько заданий сейчас открыто (обычно 0 или 1). */
+  voice_open: number;
 }
 
 export const fetchGameSocial = () =>
@@ -1341,3 +1347,65 @@ export const updateGameSocial = (body: Partial<Omit<GameSocialState, "contraband
 /** «Вывали сводку сейчас» — не ждать настроенного окна. */
 export const flushGameDigest = () =>
   api<{ sent: number }>("/api/admin/game/social/flush", { method: "POST" });
+
+// --- GHG10 Э15: музыкальная предложка (GHG8 H.7) ---
+
+export interface MusicTrack {
+  id: number;
+  user_id: number;
+  kind: string;
+  title: string | null;
+  performer: string | null;
+  url: string | null;
+  duration: number | null;
+  status: string;
+  selection_id: number | null;
+}
+
+export interface MusicSelection {
+  id: number;
+  tg_message_id: number | null;
+  track_count: number;
+  note: string | null;
+  created_at: string | null;
+}
+
+export interface MusicState {
+  enabled: boolean;
+  weekday: number;
+  hour: number;
+  attribute: boolean;
+  min_tracks: number;
+  max_tracks: number;
+  per_user_weekly: number;
+  /** Э16: авто-вызов мьюзик-гейма «угадай, кто предложил трек». */
+  game_enabled: boolean;
+  game_weekday: number;
+  game_hour: number;
+  pool: MusicTrack[];
+  history: MusicSelection[];
+}
+
+export const fetchGameMusic = () => api<MusicState>("/api/admin/game/music");
+
+export const updateGameMusic = (
+  body: Partial<
+    Pick<
+      MusicState,
+      | "enabled"
+      | "weekday"
+      | "hour"
+      | "attribute"
+      | "game_enabled"
+      | "game_weekday"
+      | "game_hour"
+    >
+  >,
+) =>
+  api<MusicState>("/api/admin/game/music", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+export const removeMusicTrack = (trackId: number) =>
+  api<MusicState>(`/api/admin/game/music/tracks/${trackId}`, { method: "DELETE" });

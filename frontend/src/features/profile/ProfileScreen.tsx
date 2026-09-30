@@ -15,7 +15,7 @@ import {
 import { fetchLoserHistory, fetchLoserStats } from "@/api/meetings";
 import { fetchChukhanHistory } from "@/api/birthdays";
 import { fetchChukhanLeaderboard } from "@/api/admin";
-import { fetchMyGame, type GameProfile } from "@/api/game";
+import { fetchMyGame, fetchMyMusic, type GameProfile } from "@/api/game";
 import type { User } from "@/types";
 import { getStartParam, haptic } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
@@ -24,13 +24,14 @@ import RankPlaque from "@/components/RankPlaque";
 import ProgressBar from "@/components/ProgressBar";
 import LeaderboardScreen from "../leaderboard/LeaderboardScreen";
 import { AchievementsScreen, GameDetails } from "./GameSection";
+import { MusicScreen } from "./MusicSection";
 
 interface Props {
   users: User[];
   me: User;
 }
 
-type Inner = "root" | "tops" | "history" | "achievements";
+type Inner = "root" | "tops" | "history" | "achievements" | "music";
 
 export default function ProfileScreen({ users, me }: Props) {
   // GHG10 Э5: deep link «свои ачивки» (`?startapp=achievements`) открывает
@@ -40,7 +41,18 @@ export default function ProfileScreen({ users, me }: Props) {
   );
   const game = useQuery({ queryKey: ["game", "me"], queryFn: fetchMyGame });
   const gameOn = game.data?.enabled === true;
+  // Э15/Э16: «Предложка недели» — показываем, только когда фича включена
+  // (сервер сам скажет `enabled=false`, если игра или предложка выключены).
+  const music = useQuery({ queryKey: ["music", "mine"], queryFn: fetchMyMusic });
+  const musicOn = music.data?.enabled === true;
 
+  if (inner === "music") {
+    return (
+      <InnerScreen title="🎧 Предложка недели" onBack={() => setInner("root")}>
+        <MusicScreen />
+      </InnerScreen>
+    );
+  }
   if (inner === "achievements") {
     return (
       <InnerScreen title="🏅 Ачивки и ранги" onBack={() => setInner("root")}>
@@ -82,6 +94,18 @@ export default function ProfileScreen({ users, me }: Props) {
           onClick={() => {
             haptic("selection");
             setInner("achievements");
+          }}
+        />
+      )}
+
+      {musicOn && (
+        <NavCard
+          icon="🎧"
+          title="Предложка недели"
+          subtitle="Свои треки, лимит и прошлые подборки"
+          onClick={() => {
+            haptic("selection");
+            setInner("music");
           }}
         />
       )}

@@ -18,7 +18,7 @@ import pytest
 
 from app.api import routes_game
 from app.db.models import GameProfile, UserAchievement
-from app.services.game import achievements, awards, weekly, xp
+from app.services.game import achievements, awards, levels, weekly, xp
 from app.services.game.config import SUPREME_CHUKHAN_TITLE, unlocks_between
 from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
@@ -138,7 +138,7 @@ async def test_award_records_pending_level_up(session: _FakeSession):
 async def test_pending_level_up_keeps_the_earliest_from(session: _FakeSession):
     """Одно начисление закрыло несколько уровней, потом ещё — «from» не едет вверх."""
     await xp.award(session, 1, "message", at=_at(2026, 9, 28), points=150)  # 1→2
-    await xp.award(session, 1, "message", at=_at(2026, 9, 28), points=200)  # 2→4
+    await xp.award(session, 1, "message", at=_at(2026, 9, 28), points=450)  # 600 → 4
     profile = session.store[("GameProfile", 1)]
     assert profile.pending_level_up_from == 1  # самое раннее
     assert profile.pending_level_up_to == 4  # самое позднее
@@ -155,7 +155,7 @@ async def test_no_level_up_notification_below_threshold(session: _FakeSession):
 @pytest.mark.asyncio
 async def test_prestige_at_max_does_not_create_notification(session: _FakeSession):
     """9→10 даёт уведомление, дальше опыт уходит в престиж и больше не уведомляет."""
-    await xp.award(session, 1, "message", at=_at(2026, 9, 28), points=950)  # 1→10
+    await xp.award(session, 1, "message", at=_at(2026, 9, 28), points=levels.xp_cap())  # 1→10
     profile = session.store[("GameProfile", 1)]
     assert profile.pending_level_up_to == 10
     await xp.award(session, 1, "message", at=_at(2026, 9, 28), points=100)  # престиж
@@ -277,7 +277,7 @@ async def test_profile_is_silent_when_game_disabled(monkeypatch, session):
 @pytest.mark.asyncio
 async def test_charts_are_empty_when_game_disabled(monkeypatch, session):
     _disable(monkeypatch)
-    assert await routes_game.achievements_chart(session, _User()) == []
+    assert await routes_game.achievements_stats(session, _User()) == []
     assert await routes_game.ranks_chart(session, _User()) == []
 
 
@@ -300,7 +300,8 @@ async def test_profile_payload_has_rank_progress_and_level_up(monkeypatch, sessi
     assert out.enabled is True
     assert out.level == 2 and out.rank is not None
     assert out.rank_name == "Воин кринжа"
-    assert out.xp_to_next == 50
+    # 150 XP — второй уровень, до третьего (300) ещё 150.
+    assert out.xp_to_next == 150
     assert out.level_up is not None
     assert out.level_up.from_level == 1 and out.level_up.to_level == 2
     assert [f.code for f in out.level_up.unlocked] == ["loser_roulette"]
@@ -341,7 +342,10 @@ async def test_ranks_chart_builds_rows_with_ranks(monkeypatch, session):
         return True
 
     monkeypatch.setattr(routes_game, "is_game_enabled", _enabled)
-    profiles = [GameProfile(user_id=1, xp=950), GameProfile(user_id=2, xp=0)]
+    profiles = [
+        GameProfile(user_id=1, xp=levels.xp_cap()),
+        GameProfile(user_id=2, xp=0),
+    ]
     profiles[0].custom_rank_title = None
     session.scalars_queue = [profiles, [1]]  # профили + supreme_holders([1])
 
@@ -353,14 +357,22 @@ async def test_ranks_chart_builds_rows_with_ranks(monkeypatch, session):
 
 
 @pytest.mark.asyncio
-async def test_achievements_chart_passes_through(session, monkeypatch):
+async def test_achievements_stats_aggregates_holders_and_percent(session, monkeypatch):
+    """Сводка редкости: тиры складываются с базовым кодом, процент — от участников."""
     async def _enabled(_session):  # noqa: ANN001
         return True
 
     monkeypatch.setattr(routes_game, "is_game_enabled", _enabled)
-    session.execute_queue = [[(3, 7), (1, 2)]]
-    out = await routes_game.achievements_chart(session, _User())
-    assert [(r.user_id, r.count) for r in out] == [(3, 7), (1, 2)]
+    session.scalar_queue = [6]  # всего участников
+    session.execute_queue = [[("chin_up", 3), ("chin_up:10", 3), ("first_worm", 1)]]
+
+    out = await routes_game.achievements_stats(session, _User())
+    by_code = {r.code: r for r in out}
+    assert by_code["chin_up"].holders == 3
+    assert by_code["chin_up"].percent == 50  # 3 из 6
+    assert by_code["chin_up"].title == "С почином"
+    assert by_code["first_worm"].holders == 1
+    assert by_code["self_shot"].holders == 0  # у кого нет — 0, а не пропуск
 
 
 # Фасад: недельный вызов проходит через рубильник и week_key (Э6).

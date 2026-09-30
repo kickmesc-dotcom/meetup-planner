@@ -18,6 +18,10 @@ from app.schemas.game import (
     GameDigestFlushOut,
     GameSocialIn,
     GameSocialOut,
+    MusicSelectionOut,
+    MusicSettingsIn,
+    MusicStateOut,
+    MusicTrackOut,
 )
 from app.services.admin_config import (
     get_autoloser_settings,
@@ -4058,7 +4062,7 @@ async def admin_game_set_xp(
 
 async def _game_social_state(session) -> GameSocialOut:
     """Собрать состояние всех четырёх фич (одна ручка вместо четырёх запросов)."""
-    from app.db.models import GameJournalEntry, GamePrompt
+    from app.db.models import GameJournalEntry, GamePrompt, GameVoiceTask
     from app.services.admin_config import (
         get_game_contraband_chance_percent,
         get_game_contraband_daily_cap,
@@ -4073,6 +4077,9 @@ async def _game_social_state(session) -> GameSocialOut:
         get_game_memorial_enabled,
         get_game_memorial_repeat_days,
         get_game_memorial_silence_days,
+        get_game_voice_enabled,
+        get_game_voice_min_gap_hours,
+        get_game_voice_poll_enabled,
     )
     from app.services.game import contraband as contraband_service
 
@@ -4100,6 +4107,14 @@ async def _game_social_state(session) -> GameSocialOut:
         )
         or 0
     )
+    voice_open = int(
+        await session.scalar(
+            select(func.count())
+            .select_from(GameVoiceTask)
+            .where(GameVoiceTask.closed_at.is_(None))
+        )
+        or 0
+    )
     return GameSocialOut(
         digest_enabled=await get_game_digest_enabled(session),
         digest_interval_hours=await get_game_digest_interval_hours(session),
@@ -4118,6 +4133,10 @@ async def _game_social_state(session) -> GameSocialOut:
         contraband_custom_registry=custom is not None,
         contraband_words=[GameContrabandWord(**entry) for entry in words],
         unresolved_owners=unresolved,
+        voice_enabled=await get_game_voice_enabled(session),
+        voice_poll_enabled=await get_game_voice_poll_enabled(session),
+        voice_min_gap_hours=await get_game_voice_min_gap_hours(session),
+        voice_open=voice_open,
     )
 
 
@@ -4153,6 +4172,9 @@ async def admin_game_social_put(
         set_game_memorial_enabled,
         set_game_memorial_repeat_days,
         set_game_memorial_silence_days,
+        set_game_voice_enabled,
+        set_game_voice_min_gap_hours,
+        set_game_voice_poll_enabled,
     )
 
     if body.digest_enabled is not None:
@@ -4183,6 +4205,12 @@ async def admin_game_social_put(
         await set_game_contraband_words(
             session, [item.model_dump() for item in body.contraband_words]
         )
+    if body.voice_enabled is not None:
+        await set_game_voice_enabled(session, body.voice_enabled)
+    if body.voice_poll_enabled is not None:
+        await set_game_voice_poll_enabled(session, body.voice_poll_enabled)
+    if body.voice_min_gap_hours is not None:
+        await set_game_voice_min_gap_hours(session, body.voice_min_gap_hours)
     log.info("admin.game_social_updated", by=user.id)
     return await _game_social_state(session)
 
@@ -4198,3 +4226,115 @@ async def admin_game_social_flush(
     sent = await journal.flush(session)
     log.info("admin.game_digest_flushed", sent=sent, by=user.id)
     return GameDigestFlushOut(sent=sent)
+
+
+# --------------------------------------------------------------------------
+# GHG10 Э15: музыкальная предложка (GHG8 H.7)
+# --------------------------------------------------------------------------
+
+
+def _music_track_out(track) -> MusicTrackOut:  # noqa: ANN001
+    return MusicTrackOut(
+        id=track.id,
+        user_id=track.user_id,
+        kind=track.kind,
+        title=track.title,
+        performer=track.performer,
+        url=track.url,
+        duration=track.duration,
+        status=track.status,
+        selection_id=track.selection_id,
+    )
+
+
+async def _music_state(session) -> MusicStateOut:  # noqa: ANN001
+    from app.services.admin_config import (
+        get_game_music_attribute,
+        get_game_music_enabled,
+        get_game_music_game_enabled,
+        get_game_music_game_hour,
+        get_game_music_game_weekday,
+        get_game_music_hour,
+        get_game_music_weekday,
+    )
+    from app.services.game import music
+
+    pool = await music.pool_tracks(session)
+    history = await music.selections_history(session)
+    return MusicStateOut(
+        enabled=await get_game_music_enabled(session),
+        weekday=await get_game_music_weekday(session),
+        hour=await get_game_music_hour(session),
+        attribute=await get_game_music_attribute(session),
+        game_enabled=await get_game_music_game_enabled(session),
+        game_weekday=await get_game_music_game_weekday(session),
+        game_hour=await get_game_music_game_hour(session),
+        pool=[_music_track_out(t) for t in pool],
+        history=[
+            MusicSelectionOut(
+                id=s.id,
+                tg_message_id=s.tg_message_id,
+                track_count=s.track_count,
+                note=s.note,
+                created_at=s.created_at,
+            )
+            for s in history
+        ],
+    )
+
+
+@router.get("/admin/game/music", response_model=MusicStateOut)
+async def admin_game_music_get(session: SessionDep, user: CurrentUser) -> MusicStateOut:
+    """Настройки предложки + пул ближайшей подборки + история (превью)."""
+    _ensure_admin(user)
+    return await _music_state(session)
+
+
+@router.put("/admin/game/music", response_model=MusicStateOut)
+async def admin_game_music_put(
+    body: MusicSettingsIn, session: SessionDep, user: CurrentUser
+) -> MusicStateOut:
+    """Частичная правка: день/час публикации, вкл/выкл, подписывать автора."""
+    _ensure_admin(user)
+    from app.services.admin_config import (
+        set_game_music_attribute,
+        set_game_music_enabled,
+        set_game_music_game_enabled,
+        set_game_music_game_hour,
+        set_game_music_game_weekday,
+        set_game_music_hour,
+        set_game_music_weekday,
+    )
+
+    if body.enabled is not None:
+        await set_game_music_enabled(session, body.enabled)
+    if body.weekday is not None:
+        await set_game_music_weekday(session, body.weekday)
+    if body.hour is not None:
+        await set_game_music_hour(session, body.hour)
+    if body.attribute is not None:
+        await set_game_music_attribute(session, body.attribute)
+    if body.game_enabled is not None:
+        await set_game_music_game_enabled(session, body.game_enabled)
+    if body.game_weekday is not None:
+        await set_game_music_game_weekday(session, body.game_weekday)
+    if body.game_hour is not None:
+        await set_game_music_game_hour(session, body.game_hour)
+    log.info("admin.game_music_updated", by=user.id)
+    return await _music_state(session)
+
+
+@router.delete("/admin/game/music/tracks/{track_id}", response_model=MusicStateOut)
+async def admin_game_music_remove_track(
+    track_id: int, session: SessionDep, user: CurrentUser
+) -> MusicStateOut:
+    """Убрать трек из пула (статус `removed`, а не удаление строки — история)."""
+    _ensure_admin(user)
+    from app.db.models import MusicTrack
+
+    track = await session.get(MusicTrack, track_id)
+    if track is not None:
+        track.status = "removed"
+        await session.commit()
+        log.info("admin.game_music_track_removed", track_id=track_id, by=user.id)
+    return await _music_state(session)

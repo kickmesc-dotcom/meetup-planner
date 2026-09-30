@@ -16,13 +16,16 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchGameAdmin,
+  fetchGameMusic,
   fetchGamePlayer,
   fetchGameSocial,
   flushGameDigest,
   grantGameAchievement,
+  removeMusicTrack,
   resetGameAchievements,
   setGamePlayerXp,
   updateGameAdmin,
+  updateGameMusic,
   updateGameSocial,
   type GameContrabandWord,
   type GamePlayerState,
@@ -114,6 +117,19 @@ function NumberRow({
   );
 }
 
+/**
+ * Фраза → регэксп-вариант для «ловим любые формулировки».
+ *
+ * Спецсимволы экранируем, а пробелы делаем гибкими (`\s+`), чтобы «я ебал»
+ * ловилось и как «я   ебал». Хвост `\w*` — «я ебала/ебал-то» тоже попадают.
+ */
+function phraseToVariant(phrase: string): string {
+  const escaped = phrase
+    .trim()
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return `\\b${escaped.replace(/\s+/g, "\\s+")}\\w*`;
+}
+
 export default function GameScreen({ users, onBack }: Props) {
   const queryClient = useQueryClient();
   const state = useQuery({ queryKey: QUERY_KEY, queryFn: fetchGameAdmin });
@@ -124,7 +140,51 @@ export default function GameScreen({ users, onBack }: Props) {
   const [debugDraft, setDebugDraft] = useState<string | null>(null);
   // Реестр слов правим локально и отправляем целиком: он заменяется, а не мержится.
   const [wordsDraft, setWordsDraft] = useState<GameContrabandWord[] | null>(null);
+  // Черновики «добавить фразу», по одному на участника (ключ — tg-id).
+  const [phraseDraft, setPhraseDraft] = useState<Record<string, string>>({});
   const words = wordsDraft ?? social.data?.contraband_words ?? [];
+
+  // Группируем реестр ПО УЧАСТНИКАМ: править фразы удобнее рядом с их владельцем,
+  // а не в общем списке, где непонятно, чьи они.
+  const wordGroups = (() => {
+    const groups = new Map<
+      string,
+      { key: string; telegramId: number | null; items: { word: GameContrabandWord; idx: number }[] }
+    >();
+    words.forEach((w, idx) => {
+      const key = w.owner_tg_id != null ? String(w.owner_tg_id) : "__none__";
+      const group =
+        groups.get(key) ?? { key, telegramId: w.owner_tg_id ?? null, items: [] };
+      group.items.push({ word: w, idx });
+      groups.set(key, group);
+    });
+    return [...groups.values()];
+  })();
+
+  const ownerName = (telegramId: number | null) =>
+    users.find((u) => u.telegram_id === telegramId)?.display_name ??
+    (telegramId == null ? "— без владельца —" : `tg=${telegramId}`);
+
+  const addPhrase = (telegramId: number | null, key: string) => {
+    const text = (phraseDraft[key] ?? "").trim();
+    if (!text) return;
+    haptic("selection");
+    setWordsDraft([
+      ...words,
+      {
+        word: text,
+        owner: telegramId != null ? ownerName(telegramId) : null,
+        owner_tg_id: telegramId,
+        variants: [phraseToVariant(text)],
+        labels: [text],
+        xp: 5,
+        note: null,
+        enabled: true,
+        chance: null,
+      },
+    ]);
+    setPhraseDraft((draft) => ({ ...draft, [key]: "" }));
+  };
 
   const player = useQuery({
     queryKey: ["admin", "game", "player", selected],
@@ -604,54 +664,116 @@ export default function GameScreen({ users, onBack }: Props) {
                 </div>
               )}
 
-              <div className="space-y-1">
-                {words.map((w, idx) => (
-                  <div key={w.word} className="rounded bg-tg-bg/50 p-2 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                        «{w.word}»
+              <div className="space-y-2">
+                {wordGroups.map((group) => (
+                  <div key={group.key} className="rounded bg-tg-bg/50 p-2 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate text-xs font-semibold">
+                        {ownerName(group.telegramId)}
                       </span>
-                      <span className="text-[11px] text-tg-hint">+{w.xp} XP</span>
+                      <span className="shrink-0 text-[11px] text-tg-hint tabular-nums">
+                        фраз: {group.items.length}
+                      </span>
+                    </div>
+                    {group.items.map(({ word: w, idx }) => (
+                      <div key={`${w.word}-${idx}`} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="min-w-0 flex-1 truncate text-xs">
+                            «{w.word}»
+                          </span>
+                          <input
+                            type="number"
+                            value={w.xp}
+                            onChange={(e) =>
+                              setWordsDraft(
+                                words.map((it, i) =>
+                                  i === idx
+                                    ? { ...it, xp: Math.max(0, Number(e.target.value) || 0) }
+                                    : it,
+                                ),
+                              )
+                            }
+                            className="w-12 rounded bg-tg-bg/60 px-1 py-0.5 text-right text-[11px] tabular-nums text-tg-text"
+                            aria-label="XP за фразу"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setWordsDraft(
+                                words.map((it, i) =>
+                                  i === idx ? { ...it, enabled: !it.enabled } : it,
+                                ),
+                              )
+                            }
+                            className={[
+                              "rounded px-2 py-0.5 text-[11px] font-medium",
+                              w.enabled ? "bg-status-free/20" : "bg-tg-secondary-bg/80",
+                            ].join(" ")}
+                          >
+                            {w.enabled ? "в игре" : "выкл"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setWordsDraft(words.filter((_, i) => i !== idx))
+                            }
+                            className="rounded bg-status-busy/15 px-2 py-0.5 text-[11px] text-status-busy"
+                            aria-label="Удалить фразу"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <select
+                          value={w.owner_tg_id ?? ""}
+                          onChange={(e) =>
+                            setWordsDraft(
+                              words.map((it, i) =>
+                                i === idx
+                                  ? {
+                                      ...it,
+                                      owner_tg_id: e.target.value
+                                        ? Number(e.target.value)
+                                        : null,
+                                      owner: e.target.value
+                                        ? ownerName(Number(e.target.value))
+                                        : null,
+                                    }
+                                  : it,
+                              ),
+                            )
+                          }
+                          className="w-full rounded bg-tg-bg/60 px-2 py-1 text-[11px] text-tg-text"
+                        >
+                          <option value="">— без владельца —</option>
+                          {users.map((u) => (
+                            <option key={u.id} value={u.telegram_id}>
+                              {u.display_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                    <div className="flex gap-1 pt-1">
+                      <input
+                        value={phraseDraft[group.key] ?? ""}
+                        onChange={(e) =>
+                          setPhraseDraft((draft) => ({
+                            ...draft,
+                            [group.key]: e.target.value,
+                          }))
+                        }
+                        placeholder="новая фраза"
+                        className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
+                      />
                       <button
                         type="button"
-                        onClick={() =>
-                          setWordsDraft(
-                            words.map((it, i) =>
-                              i === idx ? { ...it, enabled: !it.enabled } : it,
-                            ),
-                          )
-                        }
-                        className={[
-                          "rounded px-2 py-0.5 text-[11px] font-medium",
-                          w.enabled ? "bg-status-free/20" : "bg-tg-secondary-bg/80",
-                        ].join(" ")}
+                        onClick={() => addPhrase(group.telegramId, group.key)}
+                        disabled={!(phraseDraft[group.key] ?? "").trim()}
+                        className="rounded-lg bg-tg-secondary-bg px-3 py-1 text-xs font-medium text-tg-text active:scale-[0.98] disabled:opacity-60"
                       >
-                        {w.enabled ? "в игре" : "выкл"}
+                        + фраза
                       </button>
                     </div>
-                    <select
-                      value={w.owner_tg_id ?? ""}
-                      onChange={(e) =>
-                        setWordsDraft(
-                          words.map((it, i) =>
-                            i === idx
-                              ? {
-                                  ...it,
-                                  owner_tg_id: e.target.value ? Number(e.target.value) : null,
-                                }
-                              : it,
-                          ),
-                        )
-                      }
-                      className="w-full rounded bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
-                    >
-                      <option value="">{w.owner ?? "— владелец не выбран —"}</option>
-                      {users.map((u) => (
-                        <option key={u.id} value={u.telegram_id}>
-                          {u.display_name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 ))}
               </div>
@@ -669,9 +791,204 @@ export default function GameScreen({ users, onBack }: Props) {
                 {social.data.contraband_custom_registry ? "" : " (сейчас действуют дефолты)"}
               </button>
             </div>
+
+            {/* Э14: голосовые задания. Опрос по умолчанию выключен (по заданию). */}
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <Toggle
+                label="Голосовые задания"
+                hint="Бот ставит творческую задачу; ответ — голосовым реплаем или боту в личку"
+                on={social.data.voice_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ voice_enabled: !social.data?.voice_enabled });
+                }}
+              />
+              <Toggle
+                label="Опрос «чей вариант лучше»"
+                hint="После сводки бот ставит опрос, победитель забирает бонусный XP"
+                on={social.data.voice_poll_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ voice_poll_enabled: !social.data?.voice_poll_enabled });
+                }}
+              />
+              <NumberRow
+                label="пауза между заданиями, ч"
+                value={social.data.voice_min_gap_hours}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ voice_min_gap_hours: Math.max(1, n) })}
+              />
+              <div className="text-[11px] text-tg-hint">
+                Открытых заданий сейчас: {social.data.voice_open}. Задания ставятся
+                только днём (10:00–20:00 по времени чата), окно сбора — часы.
+              </div>
+            </div>
           </>
         )}
       </section>
+
+      <MusicSection users={users} />
     </SubScreen>
+  );
+}
+
+const MUSIC_WEEKDAYS = [
+  "Пн",
+  "Вт",
+  "Ср",
+  "Чт",
+  "Пт",
+  "Сб",
+  "Вс",
+];
+
+/**
+ * Э15: музыкальная предложка. Настройки (день/час публикации, вкл, подпись
+ * автора), превью пула с удалением и история подборок — то, что просил H.7.
+ */
+function MusicSection({ users }: { users: User[] }) {
+  const queryClient = useQueryClient();
+  const key = ["admin", "game", "music"] as const;
+  const state = useQuery({ queryKey: key, queryFn: fetchGameMusic });
+  const save = useMutation({
+    mutationFn: updateGameMusic,
+    onSuccess: (data) => queryClient.setQueryData(key, data),
+  });
+  const drop = useMutation({
+    mutationFn: removeMusicTrack,
+    onSuccess: (data) => queryClient.setQueryData(key, data),
+  });
+  const byId = Object.fromEntries(users.map((u) => [u.id, u] as const));
+  const data = state.data;
+  if (!data) return null;
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-base font-semibold">🎧 Музыкальная предложка</h2>
+        <span className="text-xs text-tg-hint tabular-nums">
+          в пуле: {data.pool.length}
+        </span>
+      </div>
+      <Toggle
+        label="Включена"
+        hint="Раз в неделю бот выкладывает подборку из присланного в личку"
+        on={data.enabled}
+        busy={save.isPending}
+        onClick={() => {
+          haptic("selection");
+          save.mutate({ enabled: !data.enabled });
+        }}
+      />
+      <Toggle
+        label="Подписывать автора"
+        hint="В подборке будет «(от Митяна)»"
+        on={data.attribute}
+        busy={save.isPending}
+        onClick={() => {
+          haptic("selection");
+          save.mutate({ attribute: !data.attribute });
+        }}
+      />
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-tg-hint">день публикации</span>
+        <select
+          value={data.weekday}
+          onChange={(e) => save.mutate({ weekday: Number(e.target.value) })}
+          className="rounded bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
+        >
+          {MUSIC_WEEKDAYS.map((label, index) => (
+            <option key={label} value={index}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <NumberRow
+        label="час публикации"
+        value={data.hour}
+        busy={save.isPending}
+        onSave={(n) => save.mutate({ hour: Math.min(23, Math.max(0, n)) })}
+      />
+      <div className="text-[11px] text-tg-hint">
+        В подборке {data.min_tracks}–{data.max_tracks} треков, лимит
+        {` ${data.per_user_weekly} `}на участника в неделю.
+      </div>
+
+      {/* Э16: мьюзик-гейм «угадай, кто предложил трек». */}
+      <div className="mt-2 space-y-2 border-t border-tg-bg/40 pt-2">
+        <div className="flex items-baseline justify-between">
+          <span className="text-xs font-semibold text-tg-text">
+            🎵 Мьюзик-гейм
+          </span>
+          <span className="text-[11px] text-tg-hint">«кто предложил трек»</span>
+        </div>
+        <Toggle
+          label="Авто-вызов"
+          hint="Раз в неделю бот берёт случайный трек и запускает опрос. По умолчанию выкл; вручную — /musicgame"
+          on={data.game_enabled}
+          busy={save.isPending}
+          onClick={() => {
+            haptic("selection");
+            save.mutate({ game_enabled: !data.game_enabled });
+          }}
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-tg-hint">день игры</span>
+          <select
+            value={data.game_weekday}
+            onChange={(e) =>
+              save.mutate({ game_weekday: Number(e.target.value) })
+            }
+            className="rounded bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
+          >
+            {MUSIC_WEEKDAYS.map((label, index) => (
+              <option key={label} value={index}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <NumberRow
+          label="час игры"
+          value={data.game_hour}
+          busy={save.isPending}
+          onSave={(n) => save.mutate({ game_hour: Math.min(23, Math.max(0, n)) })}
+        />
+      </div>
+      {data.pool.length > 0 && (
+        <ul className="space-y-1">
+          {data.pool.map((track) => (
+            <li
+              key={track.id}
+              className="flex items-center gap-2 rounded bg-tg-bg/50 px-2 py-1"
+            >
+              <span className="min-w-0 flex-1 truncate text-xs">
+                {track.title || track.performer || track.url || "трек"}
+              </span>
+              <span className="shrink-0 text-[11px] text-tg-hint">
+                {byId[track.user_id]?.display_name ?? track.user_id}
+              </span>
+              <button
+                type="button"
+                onClick={() => drop.mutate(track.id)}
+                className="rounded bg-status-busy/15 px-2 py-0.5 text-[11px] text-status-busy"
+                aria-label="Убрать трек"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {data.history.length > 0 && (
+        <div className="text-[11px] text-tg-hint">
+          Последнее: {data.history[0].note === "shortfall"
+            ? "недобор"
+            : `подборка из ${data.history[0].track_count}`}
+        </div>
+      )}
+    </section>
   );
 }

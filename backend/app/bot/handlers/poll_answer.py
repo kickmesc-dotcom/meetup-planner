@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import structlog
 from aiogram import Router
 from aiogram.types import Poll, PollAnswer
@@ -25,6 +27,36 @@ async def on_poll_answer(answer: PollAnswer) -> None:
             from sqlalchemy import select as _select
 
             from app.db.models import Poll as DbPoll, User as DbUser
+
+            # Э16: опрос мьюзик-гейма «кто предложил трек». Опознаём по
+            # `tg_poll_id` раунда ДО DbPoll: этого опроса нет в таблице polls,
+            # а верный выбор надо запомнить, потому что к закрытию опроса TG
+            # отдаёт только счётчики голосов, а не список проголосовавших.
+            from app.services.game import music_game as _music_game
+
+            game_round = await _music_game.find_round_by_poll(
+                session, answer.poll_id
+            )
+            if game_round is not None:
+                if not answer.option_ids:
+                    return
+                guesser = (
+                    await session.scalars(
+                        _select(DbUser).where(
+                            DbUser.telegram_id == answer.user.id
+                        )
+                    )
+                ).first()
+                if guesser is None:
+                    return
+                await _music_game.register_guess(
+                    session,
+                    round=game_round,
+                    user_id=guesser.id,
+                    option_index=int(answer.option_ids[0]),
+                )
+                return
+
             from app.services.meeting_feedback import (
                 POLL_KIND_MEETING_FEEDBACK,
                 feedback_index_to_payload,
@@ -134,6 +166,35 @@ async def on_poll_update(poll: Poll) -> None:
                     await handle_game_when_closed(
                         session, bot, poll=db_poll, chat_id=settings.group_chat_id
                     )
+                return
+
+            # Э14: опрос «чей вариант лучше» из голосового задания — победитель
+            # забирает бонусный XP. Опознаём по `tg_poll_id` на задании.
+            from app.services.game import voice
+
+            voice_task = await voice.find_task_by_poll(session, poll.id)
+            if voice_task is not None:
+                from app.bot.dispatcher import get_bot
+
+                await voice.handle_poll_closed(
+                    session, get_bot(), poll=poll, task=voice_task
+                )
+                return
+
+            # Э16: опрос мьюзик-гейма. Раунд оглашает автора и платит угадавшим.
+            from app.services.game import music_game
+
+            game_round = await music_game.find_round_by_poll(session, poll.id)
+            if game_round is not None:
+                from app.bot.dispatcher import get_bot
+
+                await music_game.finalize_round(
+                    session,
+                    get_bot(),
+                    game_round,
+                    now=datetime.now(timezone.utc),
+                    poll=poll,
+                )
                 return
 
             # zaebal-полл — 2 опции, индекс 0 = «за».

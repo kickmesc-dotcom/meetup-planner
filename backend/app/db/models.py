@@ -842,6 +842,189 @@ class GamePrompt(Base):
     outcome: Mapped[str | None] = mapped_column(String(16))
 
 
+class GameVoiceTask(Base):
+    """Э14: голосовое задание — бот ставит творческую задачу и собирает голосовые.
+
+    Отличие от `GamePrompt` (случайное событие): там побеждает ПЕРВЫЙ, здесь
+    собираются ВСЕ варианты до дедлайна, а потом бот вывешивает сводку с
+    подкреплением (кто какой вариант прислал) и, по настройке, опрос «чей
+    лучше». Поэтому нужны и сообщение-якорь (`tg_message_id` — ответ должен быть
+    реплаем на него), и дедлайн (`expires_at`), и пометка о сводке.
+    """
+
+    __tablename__ = "game_voice_tasks"
+    __table_args__ = (
+        Index("ix_game_voice_tasks_open", "chat_id", "closed_at", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    reward: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Сообщение-задание в чате: ответ засчитывается реплаем на него (или в личку).
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # None = задание ещё идёт. Закрывается сводкой.
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    summary_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    poll_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    tg_poll_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    # user_id в порядке вариантов опроса: по нему победитель превращается в юзера.
+    poll_user_ids: Mapped[list[int]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    winner_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    # "summary" — сводка без голосования; "poll" — была голосовалка.
+    outcome: Mapped[str | None] = mapped_column(String(16))
+
+
+class GameVoiceSubmission(Base):
+    """Э14: одна сдача голосового. Храним ТОЛЬКО `file_id` (и метаданные),
+
+    а не файл: хост слабый, качать и держать аудио нам нельзя. `file_id`
+    Telegram переиспользуется для отправки/`send_voice`, этого достаточно и для
+    сводки, и для голосования.
+
+    `UniqueConstraint(task_id, user_id)` — один вариант на участника на задание:
+    перезапись открыла бы второй опыт за то же задание.
+    """
+
+    __tablename__ = "game_voice_submissions"
+    __table_args__ = (
+        UniqueConstraint("task_id", "user_id", name="uq_game_voice_submission"),
+        Index("ix_game_voice_submissions_task", "task_id", "submitted_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("game_voice_tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    file_id: Mapped[str] = mapped_column(Text, nullable=False)
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    duration: Mapped[int | None] = mapped_column(Integer)
+    submitted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MusicSelection(Base):
+    """Э15: выпущенная подборка треков (история публикаций для админки).
+
+    `tg_message_id IS NULL` + `note='shortfall'` — попытка публикации не
+    состоялась (недобор треков): она нужна только чтобы планировщик знал, что
+    повтор надо делать через `MUSIC_RETRY_HOURS`, а не прямо сейчас.
+    """
+
+    __tablename__ = "music_selections"
+    __table_args__ = (Index("ix_music_selections_created", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    track_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 'published' | 'shortfall'
+    note: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MusicTrack(Base):
+    """Э15: предложенный трек. Храним только ССЫЛКУ или `file_id` — не файл.
+
+    `status`: 'pool' — ждёт подборки, 'published' — уже ушёл в подборку,
+    'removed' — админ убрал. Память об использованных — это и есть 'published'
+    (повторно в подборку не попадёт).
+    """
+
+    __tablename__ = "music_tracks"
+    __table_args__ = (
+        Index("ix_music_tracks_pool", "status", "added_at"),
+        Index("ix_music_tracks_user", "user_id", "added_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 'audio' (файл/войс-документ в TG) | 'link'
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    file_id: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    performer: Mapped[str | None] = mapped_column(Text)
+    duration: Mapped[int | None] = mapped_column(Integer)
+    added_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(12), nullable=False, default="pool", server_default="pool"
+    )
+    selection_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("music_selections.id", ondelete="SET NULL")
+    )
+
+
+class MusicGameRound(Base):
+    """Э16 (GHG8 H.8): мьюзик-гейм — «угадай, кто предложил трек».
+
+    Бот выдёргивает случайный трек из предложки и вывешивает опрос «кто его
+    предложил». Верный автор — `correct_user_id`; за опциями стоят user_id
+    (`option_user_ids`, индекс = индекс варианта).
+
+    `track_id` — использованный трек: по нему игра не повторяет один и тот же
+    трек (память об использованных). `ON DELETE SET NULL`, чтобы удаление трека
+    не рвало историю раундов.
+
+    `correct_voter_ids` — кто из голосовавших выбрал верную опцию (для награды);
+    заполняется по `poll_answer`, потому что Telegram о закрытии опроса отдаёт
+    только `voter_count` по опциям, а не список проголосовавших.
+    """
+
+    __tablename__ = "music_game_rounds"
+    __table_args__ = (
+        Index("ix_music_game_rounds_open", "chat_id", "closed_at"),
+        Index("ix_music_game_rounds_track", "track_id"),
+        Index("ix_music_game_rounds_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    chat_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    track_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("music_tracks.id", ondelete="SET NULL")
+    )
+    correct_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    tg_message_id: Mapped[int | None] = mapped_column(BigInteger)
+    tg_poll_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    option_user_ids: Mapped[list[int]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    # Кто угадал (правильно ответил на опрос) — заполняется на poll_answer.
+    correct_voter_ids: Mapped[list[int]] = mapped_column(
+        JSONB, default=list, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 'poll' — раунд разыгран опросом; 'stale' — опрос не долетел, закрыли сами.
+    outcome: Mapped[str | None] = mapped_column(String(16))
+
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event

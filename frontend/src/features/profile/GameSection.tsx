@@ -15,7 +15,7 @@ import {
   ackLevelUp,
   createHoliday,
   deleteHoliday,
-  fetchAchievementsChart,
+  fetchAchievementStats,
   fetchHolidays,
   fetchMyGame,
   fetchRanksChart,
@@ -286,9 +286,9 @@ function TodayHistory({ profile }: { profile: GameProfile }) {
 /** Э5.2/5.3: лист ачивок + чарты обладателей ачивок и рангов. */
 export function AchievementsScreen({ users }: { users: User[] }) {
   const game = useQuery({ queryKey: ["game", "me"], queryFn: fetchMyGame });
-  const holders = useQuery({
+  const stats = useQuery({
     queryKey: ["game", "achievements"],
-    queryFn: fetchAchievementsChart,
+    queryFn: fetchAchievementStats,
   });
   const ranks = useQuery({ queryKey: ["game", "ranks"], queryFn: fetchRanksChart });
   const byId = Object.fromEntries(users.map((u) => [u.id, u] as const));
@@ -342,8 +342,13 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                 <span className="mt-0.5 text-lg shrink-0">{a.icon}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-medium text-tg-text truncate">
+                    <span className="min-w-0 truncate text-sm font-medium text-tg-text">
                       {a.title}
+                      {a.kind === "counter" && (
+                        <span className="ml-1.5 rounded bg-tg-hint/15 px-1 py-0.5 align-middle text-[10px] font-normal text-tg-hint">
+                          разово
+                        </span>
+                      )}
                     </span>
                     {a.collected && (
                       <span className="shrink-0 text-[11px] font-medium text-status-free tabular-nums">
@@ -354,9 +359,9 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <div className="text-[11px] text-tg-hint line-clamp-2">
                     {a.description}
                   </div>
-                  {/* Прогресс — полосой с подписью `X/Y`, а не парой чисел
-                      со стрелкой: продакшн-фидбек 29.09. */}
-                  {!a.collected && achievementProgress(a) && (
+                  {/* Прогресс — полосой с подписью `X/Y`. Показываем и когда
+                      базовая ачивка уже взята: тогда полоса — про юбилей ×N. */}
+                  {achievementProgress(a) && (
                     <ProgressBar
                       className="mt-1.5"
                       size="sm"
@@ -371,23 +376,37 @@ export function AchievementsScreen({ users }: { users: User[] }) {
         )}
       </section>
 
+      {/* Вместо списка имён «кто сколько собрал» — сводка «сколько % участников
+          имеют такую»: имена для этой задачи не нужны, а сравнимость лучше. */}
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <h2 className="text-base font-semibold">🏆 Обладатели ачивок</h2>
-        <div className="text-xs text-tg-hint mb-2">Кто сколько собрал за всё время</div>
-        {holders.isPending ? (
+        <h2 className="text-base font-semibold">🏆 Редкость ачивок</h2>
+        <div className="text-xs text-tg-hint mb-2">Сколько % участников её имеют</div>
+        {stats.isPending ? (
           <ListSkeleton rows={4} />
-        ) : !holders.data?.length ? (
-          <div className="text-xs text-tg-hint py-2">Ачивок пока ни у кого.</div>
+        ) : !stats.data?.length ? (
+          <div className="text-xs text-tg-hint py-2">Игровая система сейчас выключена.</div>
         ) : (
-          <Chart
-            rows={holders.data.map((r) => ({
-              user_id: r.user_id,
-              value: r.count,
-              right: String(r.count),
-            }))}
-            byId={byId}
-            unit="ачивок"
-          />
+          <ul className="space-y-1.5">
+            {[...stats.data]
+              .sort(
+                (a, b) =>
+                  b.percent - a.percent || a.title.localeCompare(b.title),
+              )
+              .map((s) => (
+                <li key={s.code} className="flex items-center gap-2">
+                  <span className="shrink-0 text-base">{s.icon}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {s.title}
+                  </span>
+                  <span className="shrink-0 text-xs font-medium tabular-nums text-tg-text">
+                    {s.percent}%
+                  </span>
+                  <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-tg-hint">
+                    {s.holders}/{s.total}
+                  </span>
+                </li>
+              ))}
+          </ul>
         )}
       </section>
 
@@ -577,12 +596,23 @@ function achievementProgress(a: GameAchievement): {
 } | null {
   const progress = a.progress ?? 0;
   if (a.threshold !== null && a.threshold > 0) {
-    return { value: progress, total: a.threshold, label: "прогресс" };
+    return {
+      value: Math.min(progress, a.threshold),
+      total: a.threshold,
+      label: "прогресс",
+    };
   }
   if (a.tiers.length > 0) {
+    // Вторая сущность той же ачивки: базовая берётся за первый раз, а каждая
+    // строка ниже — ОТДЕЛЬНАЯ ачивка-юбилей. Подпись говорит это прямым
+    // текстом, иначе «С почином 18/20» читается как «нужно 20 раз».
     const tier = nextTier(progress, a.tiers);
     if (tier === null) return null;
-    return { value: progress, total: tier, label: `до юбилея ×${tier}` };
+    return {
+      value: Math.min(progress, tier),
+      total: tier,
+      label: `юбилей ×${tier}`,
+    };
   }
   return null;
 }
@@ -602,42 +632,3 @@ function Avatar({ user, fallback }: { user?: User; fallback: number }) {
   );
 }
 
-/** Простой чарт-бар: заливка строки пропорциональна величине. */
-function Chart({
-  rows,
-  byId,
-  unit,
-}: {
-  rows: { user_id: number; value: number; right: string }[];
-  byId: Record<number, User>;
-  unit: string;
-}) {
-  const max = Math.max(1, ...rows.map((r) => r.value));
-  return (
-    <ol className="space-y-1.5">
-      {rows.map((r) => {
-        const u = byId[r.user_id];
-        return (
-          <li
-            key={r.user_id}
-            className="relative flex items-center gap-2 overflow-hidden rounded-md px-1.5 py-1"
-            title={`${u?.display_name ?? r.user_id}: ${r.value} ${unit}`}
-          >
-            <span
-              aria-hidden
-              className="absolute inset-y-0 left-0 bg-tg-hint/10"
-              style={{ width: `${(r.value / max) * 100}%` }}
-            />
-            <Avatar user={u} fallback={r.user_id} />
-            <span className="relative min-w-0 flex-1 truncate text-sm">
-              {u?.display_name ?? `id=${r.user_id}`}
-            </span>
-            <span className="relative shrink-0 font-semibold tabular-nums text-tg-text">
-              {r.right}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
