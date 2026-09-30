@@ -32,6 +32,62 @@ from app.services.reminders import run_due_reminders
 
 log = structlog.get_logger()
 
+# --- H2 (30.09): классификация «транзиентных» сбоев БД ---------------------
+# Прод-инцидент: один прогон `run_memes_job` упал на `socket.gaierror:
+# Temporary failure in name resolution` — контейнер Amvera на секунду не смог
+# разрешить DNS до Neon. Это НЕ баг кода: следующий прогон той же job'ы
+# отработал штатно. Но APScheduler трактует любое исключение как провал
+# запуска, а `_logged_job` до этого просто пробрасывал его наверх — то есть
+# секундный сетевой блип убивал весь прогон целиком (а, например, у
+# `run_memes_job` внутри две фазы, и вторая тоже не выполнялась).
+#
+# Лечение: распознаём транзиентные сбои подключения (DNS, сокет, обрыв
+# соединения, таймаут, «база недоступна») и повторяем прогон с экспоненциальной
+# задержкой. Логика БД (constraint violation, UndefinedColumn, неверный SQL) —
+# НЕ транзиентна: её ретраить бессмысленно и опасно (можно замаскировать
+# настоящую ошибку), поэтому такие исключения по-прежнему валят прогон сразу.
+_TRANSIENT_DB_EXC_NAMES = frozenset(
+    {
+        # sqlalchemy.exc — ошибки уровня соединения/движка
+        "OperationalError",
+        "InterfaceError",
+        "DisconnectionError",
+        "DBAPIError",
+        # asyncpg — соединение/postgres-сервер недоступен
+        "ConnectionDoesNotExistError",
+        "PostgresConnectionError",
+        "CannotConnectNowError",
+        "TooManyConnectionsError",
+        "ConnectionResetError",
+        "ConnectionRefusedError",
+        "ConnectionAbortedError",
+        "IncompleteReadError",
+        "TimeoutError",
+    }
+)
+
+
+def _is_transient_db_error(exc: BaseException | None) -> bool:
+    """True, если исключение (или его причина) — транзиентный сбой доступа к БД.
+
+    Проходим цепочку `__cause__`/`__context__`: SQLAlchemy заворачивает
+    низкоуровневые `asyncpg`/`socket`-ошибки, поэтому тип верхнего исключения
+    малоинформативен. Смотрим и по имени класса (sqlalchemy/asyncpg тянуть в
+    импорт ради isinstance здесь не хочется — это опциональные зависимости в
+    тестах), и по `isinstance(OSError/TimeoutError)` — `socket.gaierror` из
+    прод-инцидента наследуется именно от `OSError`.
+    """
+    seen: set[int] = set()
+    cur = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, OSError | TimeoutError):
+            return True
+        if type(cur).__name__ in _TRANSIENT_DB_EXC_NAMES:
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
 
 def _logged_job(
     job_id: str,
@@ -46,18 +102,46 @@ def _logged_job(
     «сработал и упал» — пользователь GHG6 п.16 как раз жаловался, что бот
     «забивает на job в назначенное время». Логи дают возможность увидеть,
     был ли вообще вход в функцию.
+
+    H2 (30.09): транзиентный сбой БД (DNS/сокет/таймаут) не роняет прогон —
+    повторяем до `_SCHEDULER_DB_RETRY_ATTEMPTS` раз с экспоненциальной паузой
+    (base × 2^n). Каждая повторная попытка пишет `scheduler.job_retry`, а
+    итоговая неудача после исчерпания попыток — `scheduler.job_failed` с
+    флагом `transient=True`. Нетранзиентные ошибки ретраить не пытаемся.
     """
 
     @functools.wraps(func)
     async def _wrapped(*args: Any, **kwargs: Any) -> None:
         log.info("scheduler.job_fired", job_id=job_id)
-        try:
-            await func(*args, **kwargs)
-        except Exception:
-            log.exception("scheduler.job_failed", job_id=job_id)
-            raise
-        else:
-            log.info("scheduler.job_done", job_id=job_id)
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                await func(*args, **kwargs)
+            except Exception as exc:
+                transient = _is_transient_db_error(exc)
+                if transient and attempt < _SCHEDULER_DB_RETRY_ATTEMPTS:
+                    delay = _SCHEDULER_DB_RETRY_BASE_DELAY_SEC * (2 ** (attempt - 1))
+                    log.warning(
+                        "scheduler.job_retry",
+                        job_id=job_id,
+                        attempt=attempt,
+                        max_attempts=_SCHEDULER_DB_RETRY_ATTEMPTS,
+                        delay_sec=delay,
+                        error=f"{type(exc).__name__}: {exc}",
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                log.exception(
+                    "scheduler.job_failed",
+                    job_id=job_id,
+                    attempt=attempt,
+                    transient=transient,
+                )
+                raise
+            else:
+                log.info("scheduler.job_done", job_id=job_id, attempts=attempt)
+                return
 
     return _wrapped
 
@@ -103,6 +187,28 @@ def _env_int(name: str, default: int) -> int:
         return int(raw)
     except ValueError:
         return default
+
+
+def _env_float(name: str, default: float) -> float:
+    import os
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+# H2 (30.09): сколько раз повторять прогон при транзиентном сбое БД и базовая
+# пауза (экспоненциально растёт: base, base×2, base×4…). Всего попыток, включая
+# первую. Дефолт: 3 попытки с паузами 2с/4с — суммарно ~6с ожидания, этого
+# хватает на типичный DNS-блип, но не растягивает тик до неприличия (у части
+# job'ов misfire_grace_time всего 10 минут, а в одной БД-сессии интервал 10 мин).
+_SCHEDULER_DB_RETRY_ATTEMPTS = max(1, _env_int("SCHEDULER_DB_RETRY_ATTEMPTS", 3))
+_SCHEDULER_DB_RETRY_BASE_DELAY_SEC = max(
+    0.0, _env_float("SCHEDULER_DB_RETRY_BASE_DELAY_SEC", 2.0)
+)
 
 
 # GHG6 PX6 / GHG7 P8.4: онлайн-статус раз в час (было 10 мин). Каждый тик —

@@ -764,3 +764,15 @@ Push бэка: ПАРАЛЛЕЛЬНО `git push origin main` (HF) + `git push am
   счётчике «собрано 10/25»). `/ach` разбит на разделы каталога с воздухом между
   блоками — разделы живут в `achievements_catalog.GROUPS`, полнота покрытия
   проверяется тестом.
+- 2026-09-30 (стойчивость фоновых job'ов, H2): транзиентный сбой БД больше не
+  роняет фоновый прогон целиком. Обёртка `app/bot/scheduler._logged_job`
+  распознаёт транзиентные сбои подключения (`socket.gaierror`, таймауты, обрыв
+  соединения, `OperationalError`/`InterfaceError` и их причины в цепочке
+  `__cause__`/`__context__`) и повторяет прогон до `SCHEDULER_DB_RETRY_ATTEMPTS`
+  раз (дефолт 3) с экспоненциальной паузой `SCHEDULER_DB_RETRY_BASE_DELAY_SEC`
+  (дефолт 2с → 2/4с). Каждая повторная попытка пишет `scheduler.job_retry`, а
+  итоговая неудача — `scheduler.job_failed` с флагом `transient`. Логические
+  ошибки БД (bad SQL, constraint) как и раньше валят прогон сразу — их ретраить
+  бессмысленно и опасно. Повод — прод-инцидент 29.09 22:35 UTC: `run_memes_job`
+  упал на DNS-блипе Amvera→Neon, и вторая фаза job'а тоже не выполнилась.
+  Тесты — `tests/test_scheduler_job_resilience.py` (14 шт.), всего 806 passed.
