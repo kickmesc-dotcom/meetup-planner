@@ -147,6 +147,15 @@ def build_followup_text(*, ttl_minutes: int) -> str:
     )
 
 
+def build_prompt_posts(prompt: Prompt) -> list[str]:
+    """Тексты поста призыва: сам вопрос + ОБЯЗАТЕЛЬНЫЙ поясняющий пост.
+
+    Чистая функция, чтобы гарантию «вопрос всегда с фоллоу-постом» можно было
+    проверить без БД и без Telegram (и чтобы job не мог случайно опубликовать
+    первое без второго)."""
+    return [prompt.text, build_followup_text(ttl_minutes=prompt.ttl_minutes)]
+
+
 def pick_prompt(*, used_codes: set[str], rng: random.Random) -> Prompt | None:
     """Выбрать промпт вне кулдауна. Чистая функция (тесты)."""
     free = [p for p in PROMPTS if p.code not in used_codes]
@@ -257,15 +266,11 @@ async def run_events_job(
         await session.commit()
 
         # Призыв ждёт ответа — значит идёт через журнал: в режиме сводки он
-        # «выпадет» в чат ближайшим окном, а не посреди тишины.
-        await journal.announce(session, kind=journal.KIND_EVENT, text=chosen.text)
-        # Обязательный поясняющий пост: сколько принимается ответ, куда писать и
-        # кому достаётся опыт (правило оператора: вопрос ВСЕГДА с фоллоу-постом).
-        await journal.announce(
-            session,
-            kind=journal.KIND_EVENT,
-            text=build_followup_text(ttl_minutes=chosen.ttl_minutes),
-        )
+        # «выпадет» в чат ближайшим окном, а не посреди тишины. Второй текст —
+        # обязательный поясняющий пост (правило оператора: вопрос ВСЕГДА с
+        # фоллоу-постом), он формируется вместе с первым и не может отстать.
+        for body in build_prompt_posts(chosen):
+            await journal.announce(session, kind=journal.KIND_EVENT, text=body)
     log.info("game.event_posted", code=chosen.code)
     return 1
 

@@ -912,5 +912,11 @@ Push бэка: ПАРАЛЛЕЛЬНО `git push origin main` (HF) + `git push am
   Сторож-тест `test_first_time_and_anniversary_are_always_separate`. `/ach`
   режется на куски — каталог (26 базовых / **109** с юбилеями) перерос лимит
   TG. Админка/CLI: поля окна и минимума в «Случайных событиях»,
-  `tools/set-admin-config.py game.events.*`. Тестов: **894 passed**. Миграций
-  нет (head `0026_music_track_likes`). **НЕ выложено** (ждёт деплоя).
+  `tools/set-admin-config.py game.events.*`. Фоллоу-пост формируется общим чистым
+  хелпером `events.build_prompt_posts` — вопрос не может уйти без пары.
+  `tools/social-dryrun.py` дополнен блоками живых часов, потолка-диапазона,
+  фоллоу-поста и разведения «впервые/юбилей» — зелёный.
+  Тестов: **895 passed**. Миграций нет (head `0026_music_track_likes`).
+  **✅ Выложено 2026-10-01**: монорепо `6d4bd89`, зеркало `320b254` (HF origin +
+  Amvera `main:master`). `/api/meta` обоих хостов: `alembic_head=0026_music_track_likes`,
+  routes=186, api_routes=184, fingerprint=`acf4df94de67`, есть `game.music.like`.

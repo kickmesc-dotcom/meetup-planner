@@ -1,5 +1,13 @@
 # 🌙 GHG10 Э18: живые часы событий, лимиты, фоллоу-посты и правило «впервые ≠ юбилей» (ГОТОВО К ВЫКЛАДКЕ)
 
+> ✅ **Выложено 2026-10-01.** Монорепо `6d4bd89` (Э17+Э18 одним коммитом); зеркало
+> `meetup-planner-backend` — `320b254`, запушено в HF origin и Amvera
+> (`main:master`). `/api/meta` **обоих хостов**: `alembic_head=0026_music_track_likes`,
+> `db.alembic_version=0026_music_track_likes`, routes=186, api_routes=184,
+> fingerprint=`acf4df94de67`, фичи включают `game.music.like`. Живой прогон
+> `tools/social-dryrun.py` зелёный (живые часы, потолок-диапазон, фоллоу-пост,
+> «впервые ≠ юбилей»).
+
 Партия правок по фидбеку оператора 30.09. Идёт ПОВЕРХ Э17 (тем же коммитом/пушем).
 Миграций НЕТ — только код и настройки; alembic head остаётся `0026_music_track_likes`.
 
@@ -37,9 +45,16 @@
 ## Проверка
 
 ```bash
-./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q   # 894 passed
-cd meetup-planner-main/frontend && npm run typecheck                 # чисто
+./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q          # 895 passed
+cd meetup-planner-main/frontend && npm run typecheck                         # чисто
+./meetup-planner-main/backend/.venv/Scripts/python.exe tools/social-dryrun.py # зелёный
 ```
+
+`social-dryrun.py` дополнен блоками: живые часы (03:17 → запрет, 12:00 → можно),
+потолок-диапазон за 28 дней, «вопрос → обязательный фоллоу-пост» для всего
+каталога и разведение «впервые/юбилей» у бывших порогов (база на 1, ×3 на 3).
+Фоллоу-пост сформирован общим чистым хелпером `events.build_prompt_posts`, поэтому
+вопрос не может уйти в чат без пары.
 
 Админка: поля «минимум в сутки», «окно: с/по, час» и тумблер событий в
 «Случайных событиях». CLI: `tools/set-admin-config.py game.events.day_start_hour=10 …`.

@@ -278,6 +278,16 @@ def test_event_followup_always_explains_the_rules():
     assert "30 мин" in events.build_followup_text(ttl_minutes=30)
 
 
+def test_every_prompt_posts_question_then_followup():
+    """Вопрос ВСЕГДА идёт парой с поясняющим постом, и её не разорвать."""
+    for prompt in PROMPTS:
+        posts = events.build_prompt_posts(prompt)
+        assert len(posts) == 2, prompt.code
+        assert posts[0] == prompt.text
+        assert "общий чат" in posts[1]
+        assert "первый" in posts[1].lower()
+
+
 def test_every_catalog_prompt_has_a_way_to_win():
     for prompt in PROMPTS:
         assert prompt.answers, prompt.code
