@@ -155,6 +155,9 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
                 progress=counters.get(ach.code),
                 threshold=ach.threshold,
                 tiers=list(ach.tiers),
+                collected_tiers=[
+                    tier for tier in ach.tiers if f"{ach.code}:{tier}" in collected
+                ],
             )
         )
 

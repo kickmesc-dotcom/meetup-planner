@@ -47,6 +47,8 @@ export interface GameAchievement {
   progress: number | null;
   threshold: number | null;
   tiers: number[];
+  /** Взятые юбилейные тиры (×10/×20/…). База «разовая» и тиры — разные ачивки. */
+  collected_tiers: number[];
 }
 
 export interface GameXpRule {

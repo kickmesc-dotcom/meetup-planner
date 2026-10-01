@@ -64,6 +64,9 @@ class AchievementItemOut(BaseModel):
     progress: int | None = None
     threshold: int | None = None
     tiers: list[int] = []
+    # Какие юбилейные тиры уже взяты. База («разовая») и каждый юбилей ×N —
+    # РАЗНЫЕ ачивки, поэтому UI показывает их отдельно.
+    collected_tiers: list[int] = []
 
 
 class XpRuleOut(BaseModel):

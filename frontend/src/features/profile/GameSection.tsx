@@ -344,11 +344,13 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-medium text-tg-text">
                       {a.title}
-                      {a.kind === "counter" && (
-                        <span className="ml-1.5 rounded bg-tg-hint/15 px-1 py-0.5 align-middle text-[10px] font-normal text-tg-hint">
-                          разово
-                        </span>
-                      )}
+                      <span className="ml-1.5 rounded bg-tg-hint/15 px-1 py-0.5 align-middle text-[10px] font-normal text-tg-hint">
+                        {a.tiers.length > 0
+                          ? "разовая + юбилеи"
+                          : a.kind === "threshold"
+                            ? "порог"
+                            : "разово"}
+                      </span>
                     </span>
                     {a.collected && (
                       <span className="shrink-0 text-[11px] font-medium text-status-free tabular-nums">
@@ -359,16 +361,50 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <div className="text-[11px] text-tg-hint line-clamp-2">
                     {a.description}
                   </div>
-                  {/* Прогресс — полосой с подписью `X/Y`. Показываем и когда
-                      базовая ачивка уже взята: тогда полоса — про юбилей ×N. */}
-                  {achievementProgress(a) && (
+                  {/* Разделение «разовая» vs «юбилейные ×N» прямым текстом:
+                      для накопителей это ДВЕ разные ачивки, а не «прогресс до 20».
+                      Иначе «С почином 18/20» читается как «нужно стать лохом 20 раз». */}
+                  {a.tiers.length > 0 ? (
+                    <div className="mt-1.5 space-y-1">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-tg-hint">
+                        <span className="rounded bg-tg-hint/15 px-1 py-0.5">разовая</span>
+                        <span className={a.collected ? "text-status-free" : ""}>
+                          {a.collected ? "✅ взята" : "▫️ пока нет"}
+                        </span>
+                        <span>
+                          · случаев:{" "}
+                          <span className="tabular-nums text-tg-text">
+                            {a.progress ?? 0}
+                          </span>
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-tg-hint">
+                        <span>юбилейные:</span>
+                        {a.tiers.map((t) => {
+                          const got = (a.collected_tiers ?? []).includes(t);
+                          return (
+                            <span key={t} className={got ? "text-status-free" : ""}>
+                              ×{t} {got ? "✅" : "▫️"}
+                            </span>
+                          );
+                        })}
+                      </div>
+                      {achievementProgress(a) && (
+                        <ProgressBar
+                          size="sm"
+                          tone="muted"
+                          {...achievementProgress(a)!}
+                        />
+                      )}
+                    </div>
+                  ) : achievementProgress(a) ? (
                     <ProgressBar
                       className="mt-1.5"
                       size="sm"
                       tone="muted"
                       {...achievementProgress(a)!}
                     />
-                  )}
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -611,7 +647,7 @@ function achievementProgress(a: GameAchievement): {
     return {
       value: Math.min(progress, tier),
       total: tier,
-      label: `юбилей ×${tier}`,
+      label: `до юбилея ×${tier}`,
     };
   }
   return null;
