@@ -218,7 +218,11 @@ class GameSocialOut(BaseModel):
     events_enabled: bool = True
     events_chance_percent: int = 60
     events_max_per_day: int = 2
+    events_min_per_day: int = 1
     events_min_gap_hours: int = 6
+    # Дневное окно публикации событий (локальное время чата, UTC+3).
+    events_day_start_hour: int = 10
+    events_day_end_hour: int = 22
     events_open: int = 0
     contraband_enabled: bool = True
     contraband_chance_percent: int = 100
@@ -248,7 +252,10 @@ class GameSocialIn(BaseModel):
     events_enabled: bool | None = None
     events_chance_percent: int | None = Field(None, ge=0, le=100)
     events_max_per_day: int | None = Field(None, ge=0, le=50)
+    events_min_per_day: int | None = Field(None, ge=0, le=50)
     events_min_gap_hours: int | None = Field(None, ge=0, le=168)
+    events_day_start_hour: int | None = Field(None, ge=0, le=23)
+    events_day_end_hour: int | None = Field(None, ge=0, le=24)
     contraband_enabled: bool | None = None
     contraband_chance_percent: int | None = Field(None, ge=0, le=100)
     contraband_daily_cap: int | None = Field(None, ge=0, le=100)
@@ -330,11 +337,55 @@ class MusicMineTrackOut(BaseModel):
     added_at: datetime | None = None
 
 
+class MusicWeekTrackOut(BaseModel):
+    """Трек выпущенной подборки с лайками (Э17).
+
+    `liked` — лайкнул ли его СМОТРЯЩИЙ, чтобы фронт сразу рисовал состояние
+    кнопки; `likes` — общее число. Показываем только опубликованные треки.
+    """
+
+    id: int
+    kind: str
+    title: str | None = None
+    performer: str | None = None
+    url: str | None = None
+    likes: int = 0
+    liked: bool = False
+
+
+class MusicWeekOut(BaseModel):
+    """Свежая выпущенная подборка недели (Э17) — с треками и лайками."""
+
+    id: int
+    created_at: datetime | None = None
+    track_count: int = 0
+    tracks: list[MusicWeekTrackOut] = []
+
+
+class MusicTopTrackOut(BaseModel):
+    """Строка «топа треков недели»: трек + его лайки за окно (Э17)."""
+
+    id: int
+    title: str | None = None
+    performer: str | None = None
+    url: str | None = None
+    likes: int = 0
+
+
+class MusicLikeOut(BaseModel):
+    """Результат тапа по лайку: новое состояние + счётчик (Э17)."""
+
+    ok: bool = True
+    liked: bool = False
+    likes: int = 0
+
+
 class MusicMineOut(BaseModel):
     """Экран «Предложка недели» в мини-аппе.
 
-    Участник видит свои сданные треки, остаток недельного лимита и историю уже
-    выпущенных подборок — без админских ручек.
+    Участник видит свои сданные треки, остаток недельного лимита, историю уже
+    выпущенных подборок, свежую подборку с лайками и топ треков недели — без
+    админских ручек.
     """
 
     enabled: bool = False
@@ -343,6 +394,9 @@ class MusicMineOut(BaseModel):
     # «audio» или «link» — как присылать треки (подсказка в шапке).
     tracks: list[MusicMineTrackOut] = []
     history: list[MusicSelectionOut] = []
+    # Э17: свежая подборка с лайками + топ недели (задел H.8).
+    week: MusicWeekOut | None = None
+    top: list[MusicTopTrackOut] = []
 
 
 class DonationOut(BaseModel):

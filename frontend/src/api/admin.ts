@@ -1314,7 +1314,12 @@ export interface GameSocialState {
   events_enabled: boolean;
   events_chance_percent: number;
   events_max_per_day: number;
+  /** Нижняя граница суточного потолка: потолок дня — рандом в [min, max]. */
+  events_min_per_day: number;
   events_min_gap_hours: number;
+  /** Дневное окно публикации событий (локальное время чата, UTC+3). */
+  events_day_start_hour: number;
+  events_day_end_hour: number;
   /** Сколько случайных событий сейчас ждут ответа. */
   events_open: number;
   contraband_enabled: boolean;

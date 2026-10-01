@@ -139,7 +139,10 @@ async def on_ach(message: Message) -> None:
         return
     if text is None:  # игра выключена
         return
-    await message.answer(text, parse_mode="HTML")
+    # Каталог растёт (юбилейные тиры + соц-механики), и одним сообщением лист
+    # уже не влезает в лимит Telegram — режем по границам разделов.
+    for chunk in report.chunk_text(text):
+        await message.answer(chunk, parse_mode="HTML")
 
 
 @router.message(Command(commands=["game", "manual"]))
@@ -162,7 +165,7 @@ async def on_game_manual(message: Message) -> None:
         return
     if text is None:  # игра выключена
         return
-    for chunk in report.chunk_for_chat(text):
+    for chunk in report.chunk_text(text):
         await message.answer(chunk, parse_mode="HTML")
 
 
@@ -348,7 +351,11 @@ async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) 
             return False
         await increment_use_count(session, WORM_PUNISH_USE_COUNTS_KEY, raw)
         await session.commit()
-    text = render(raw, target=target)
+    # `username=target`: старые/кастомные пулы кары писали жертву как `{username}`
+    # (исторически фразы кары переиспользовали master-плейсхолдер). Раньше подста-
+    # новка шла только по `{target}`, поэтому в бою выходило буквальное «{username}».
+    # Отдаём оба имени, чтобы любой из плейсхолдеров подставил ЖЕРТВУ.
+    text = render(raw, target=target, username=target)
     try:
         await message.answer(f"⚔️ {text}", parse_mode="HTML")
     except Exception:

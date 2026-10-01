@@ -233,6 +233,51 @@ def test_render_reply_substitutes_name_and_xp():
     assert events.render_reply("{oops", name="Аня", xp=1) == "{oops"
 
 
+def test_events_is_daytime_window():
+    """Живые часы: 10–22 локального (UTC+3) — ночью событий нет."""
+    from datetime import datetime, timezone
+
+    def at(utc_hour: int) -> datetime:
+        return datetime(2026, 9, 29, utc_hour, 0, tzinfo=timezone.utc)
+
+    # local = utc + 3
+    assert events.is_daytime(at(7), start_hour=10, end_hour=22) is True  # 10:00
+    assert events.is_daytime(at(6), start_hour=10, end_hour=22) is False  # 09:00
+    assert events.is_daytime(at(18), start_hour=10, end_hour=22) is True  # 21:00
+    assert events.is_daytime(at(19), start_hour=10, end_hour=22) is False  # 22:00 (искл.)
+    # Ночь в 3:17 — главный репорт оператора.
+    assert events.is_daytime(at(0), start_hour=10, end_hour=22) is False
+    # start == end — окно «на весь день» (не «никогда»).
+    assert events.is_daytime(at(0), start_hour=0, end_hour=0) is True
+    # Окно через полночь.
+    assert events.is_daytime(at(22), start_hour=22, end_hour=6) is True  # local 01
+
+
+def test_daily_cap_is_stable_per_day_and_within_range():
+    """Потолок дня: точное значение при min == max, иначе рандом в [min, max]."""
+    assert events.daily_cap(1, 1, date(2026, 9, 29)) == 1
+    assert events.daily_cap(3, 3, date(2026, 9, 29)) == 3
+    caps = [events.daily_cap(1, 3, date(2026, 9, day)) for day in range(1, 29)]
+    assert all(1 <= c <= 3 for c in caps)
+    assert set(caps) == {1, 2, 3}  # диапазон реально «дышит»
+    # В течение одного дня — одно и то же значение.
+    assert events.daily_cap(1, 3, date(2026, 9, 29)) == events.daily_cap(
+        1, 3, date(2026, 9, 29)
+    )
+    # Выключение (max=0) закрывает день.
+    assert events.daily_cap(1, 0, date(2026, 9, 29)) == 0
+
+
+def test_event_followup_always_explains_the_rules():
+    text = events.build_followup_text(ttl_minutes=120)
+    assert "общий чат" in text
+    assert "2 ч" in text
+    assert "первый" in text.lower()
+    # Час — человеческое «1 ч», а не «60 мин».
+    assert "1 ч" in events.build_followup_text(ttl_minutes=60)
+    assert "30 мин" in events.build_followup_text(ttl_minutes=30)
+
+
 def test_every_catalog_prompt_has_a_way_to_win():
     for prompt in PROMPTS:
         assert prompt.answers, prompt.code

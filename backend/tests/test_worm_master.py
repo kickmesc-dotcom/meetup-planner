@@ -169,6 +169,14 @@ def test_render_punish_substitutes_target():
     assert render(raw, target="@kos") == "бью @kos с ноги"
 
 
+def test_render_punish_accepts_username_as_target_alias():
+    """Регрессия: кастомный пул писал жертву как `{username}`, и в бою выходило
+    буквальное «{username}». Хендлер кары отдаёт `username=target`, поэтому
+    оба плейсхолдера обязаны подставлять ЖЕРТВУ."""
+    raw = "вогнал {username} в очко"
+    assert render(raw, target="@MenarYR", username="@MenarYR") == "вогнал @MenarYR в очко"
+
+
 # --- T3.6.8 (б): решение о поддакивании ---
 
 def test_decide_agree_disabled_never():

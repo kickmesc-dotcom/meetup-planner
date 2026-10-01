@@ -861,3 +861,56 @@ Push бэка: ПАРАЛЛЕЛЬНО `git push origin main` (HF) + `git push am
   гейм платит автору и угадавшим.
   Тестов: **869 passed** (+11 `tests/test_game_music_game.py`). Alembic head —
   `0025_music_game_rounds`.
+  **Выкладка:** зеркало `meetup-planner-backend` синхронизировано и запушено
+  (`e26a01b` в HF origin и Amvera `main:master`). Оба хоста подтвердили по
+  `/api/meta`: `alembic_head=0025_music_game_rounds`, routes=185,
+  fingerprint=`b417a5c31bf1`; боевая Neon — `alembic_version=0025`.
+  **Admin-конфиг (боевая база):** включены `game.music.enabled=true` и
+  `game.music.game_enabled=true`; публикация подборки — Вт 12:00
+  (`weekday=1`,`hour=12`), авто-вызов гейма разведён на Чт 19:00
+  (`weekday=3`,`hour=19`), чтобы не пересекаться. Ключи правит
+  `tools/set-admin-config.py` (`--show` / `--yes`).
+
+- 2026-09-30 (Э17 лайки подборки + топ недели + ачивки соц-механик):
+  **Лайки/реакции под подборками (задел H.8)** (`music_track_likes`, миграция
+  **0026**). Тап из мини-аппа — `POST /api/game/music/tracks/{id}/like`
+  (toggle): ставит/снимает лайк треку ВЫПУЩЕННОЙ подборки, возвращает новое
+  состояние и счётчик. Лайк только опубликованного трека; идемпотентность —
+  `UniqueConstraint(user_id, track_id)`.
+  **Топ треков недели:** `GET /api/game/music/mine` теперь отдаёт `week`
+  (свежая подборка с `likes`/`liked` по каждому треку) и `top` (топ-5 по
+  лайкам за скользящие 7 дней). Мини-апп `MusicSection.tsx` получил разделы
+  «📻 Подборка недели» (кнопки лайка) и «🏆 Топ недели».
+  **Ачивки Э14/Э15/Э16** (каталог + трекеры, эра `ACHIEVEMENTS_ERA_START`):
+  `voice_debut` / `voice_winner` (голосовые), `music_dj` (трек в подборке),
+  `music_guess` / `music_streak` (угадывания и серия из 5 подряд),
+  `music_spotlight` (трек в мьюзик-гейме). Все — в новом разделе листа
+  «🎧 Голос и музыка». Серия живёт в счётчиках: верная догадка растит текущую
+  серию и рекорд, неверная — обнуляет текущую (рекорд не трогает).
+  **Живой прогон** `tools/music-voice-dryrun.py --scratch` дополнен шагом
+  лайков/топа — зелёный (лайк, второй лайк, снятие, топ; 0001→0026 на
+  scratch-базе). Тестов: **888 passed** (+19). Alembic head —
+  `0026_music_track_likes`. **НЕ выложено** (ждёт деплоя).
+
+- 2026-10-01 (Э18 живые часы + лимиты + фоллоу + правило ачивок):
+  **`/punish {username}`** — кастомные пулы кары писали жертву как `{username}`,
+  а рендер подставлял только `{target}`; хендлер теперь отдаёт `username=target`
+  (`worm_master.render`), оба плейсхолдера дают ЖЕРТВУ.
+  **Живые часы событий** — дефолт 10:00–22:00 локального (UTC+3), настраивается
+  (`game.events.day_start_hour`/`day_end_hour`); чистые `events.local_hour`,
+  `events.is_daytime`. Ночью призывов нет.
+  **Лимиты активностей** — суточный потолок = рандом в
+  `[game.events.min_per_day, game.events.max_per_day]`, фиксируется на день
+  (`events.daily_cap`); `min==max` — точное значение, `max=0` — выкл.
+  **Обязательный фоллоу-пост** — `events.build_followup_text`: ответ в общий
+  чат, окно = TTL промпта, опыт — только первому (`try_answer` закрывает промпт).
+  **Правило «впервые ≠ юбилей»** — `_expand` срезает «впервые» в любом регистре;
+  `cashback` переведён из `instant` в `counter`+`tiers` (счётчик `donations_sent`);
+  бывшие «пороги» разведены так же (`vciom_agent`/`nominal_nominal`/
+  `opium_for_nobody` — порог ×3 в их `tiers`; `worm_tamer`/`successful_success` —
+  ×10 как стандартный тир); остался один `threshold` — `music_streak` (серия).
+  Сторож-тест `test_first_time_and_anniversary_are_always_separate`. `/ach`
+  режется на куски — каталог (26 базовых / **109** с юбилеями) перерос лимит
+  TG. Админка/CLI: поля окна и минимума в «Случайных событиях»,
+  `tools/set-admin-config.py game.events.*`. Тестов: **894 passed**. Миграций
+  нет (head `0026_music_track_likes`). **НЕ выложено** (ждёт деплоя).

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import random
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import structlog
 from sqlalchemy import func, select, update
@@ -30,11 +30,15 @@ from app.config import get_settings
 from app.db.models import GamePrompt, User
 from app.services.admin_config import (
     get_game_events_chance_percent,
+    get_game_events_day_end_hour,
+    get_game_events_day_start_hour,
     get_game_events_enabled,
     get_game_events_max_per_day,
     get_game_events_min_gap_hours,
+    get_game_events_min_per_day,
 )
 from app.services.game import awards, journal
+from app.services.game.config import EVENTS_TZ_OFFSET_HOURS
 from app.services.game.events_catalog import (
     PROMPTS,
     PROMPTS_BY_CODE,
@@ -83,6 +87,66 @@ def render_reply(template: str, *, name: str, xp: int) -> str:
         return template
 
 
+def local_hour(now: datetime, *, offset_hours: int = EVENTS_TZ_OFFSET_HOURS) -> int:
+    """Час в ЛОКАЛЬНОМ времени чата (UTC + смещение). Чистая функция."""
+    return (now.astimezone(timezone.utc).hour + offset_hours) % 24
+
+
+def is_daytime(
+    now: datetime, *, start_hour: int, end_hour: int
+) -> bool:
+    """Живое ли сейчас окно для публикации события. Чистая функция.
+
+    Границы задаст оператор (дефолт 10–22). Верхняя граница исключающая: в 22:00
+    новое событие уже не уходит. `start == end` — окно «на весь день» (не
+    «никогда»): так выключение окна не путается с «событий нет».
+    """
+    hour = local_hour(now)
+    if start_hour == end_hour:
+        return True
+    if start_hour < end_hour:
+        return start_hour <= hour < end_hour
+    # Окно через полночь (напр. 22–06) — тоже допустимо.
+    return hour >= start_hour or hour < end_hour
+
+
+def daily_cap(min_per_day: int, max_per_day: int, day: date) -> int:
+    """Суточный потолок событий на конкретный день. Чистая функция.
+
+    Потолок выбран СЛУЧАЙНО в [min, max] и зафиксирован на весь день (сеем по
+    номеру дня), поэтому в течение суток поведение стабильно и воспроизводимо,
+    а между днями — «рандом от 1 до 3». `min == max` — точное значение.
+    """
+    hi = max(0, int(max_per_day))
+    lo = max(0, min(int(min_per_day), hi))
+    if lo >= hi:
+        return hi
+    return random.Random(day.toordinal()).randint(lo, hi)
+
+
+def build_followup_text(*, ttl_minutes: int) -> str:
+    """Обязательный поясняющий пост ПОСЛЕ призыва. Чистая функция.
+
+    Оператор: вопросы вида «маму любишь?» ДОЛЖНЫ всегда сопровождаться постом,
+    который объясняет правила — сколько принимается ответ, куда писать и кому
+    достаётся опыт. Текст собирается из TTL самого промпта, поэтому не может
+    разойтись с фактическим окном.
+    """
+    minutes = max(1, int(ttl_minutes))
+    if minutes % 60 == 0:
+        window = f"{minutes // 60} ч"
+    elif minutes > 60:
+        window = f"{minutes // 60} ч {minutes % 60} мин"
+    else:
+        window = f"{minutes} мин"
+    return (
+        "ℹ️ <b>Как отвечать:</b> напиши ответ <b>в общий чат</b> — можно обычным "
+        f"сообщением или ответом на пост выше. Ответы принимаются <b>{window}</b>. "
+        "Опыт получает <b>только первый</b>, чей ответ подойдёт: призыв "
+        "одноразовый. Остальным XP не начисляется — следующий призыв не за горами."
+    )
+
+
 def pick_prompt(*, used_codes: set[str], rng: random.Random) -> Prompt | None:
     """Выбрать промпт вне кулдауна. Чистая функция (тесты)."""
     free = [p for p in PROMPTS if p.code not in used_codes]
@@ -127,6 +191,14 @@ async def run_events_job(
         if not chat_id:
             return 0
 
+        # 0. Дневное окно: ночью событий не публикуем (фидбек «в 3:17 ночи»).
+        if not is_daytime(
+            moment,
+            start_hour=await get_game_events_day_start_hour(session),
+            end_hour=await get_game_events_day_end_hour(session),
+        ):
+            return 0
+
         # 1. Пауза между событиями.
         last_at = await session.scalar(select(func.max(GamePrompt.created_at)))
         gap_hours = await get_game_events_min_gap_hours(session)
@@ -146,7 +218,11 @@ async def run_events_job(
             )
             or 0
         )
-        if today >= await get_game_events_max_per_day(session):
+        if today >= daily_cap(
+            await get_game_events_min_per_day(session),
+            await get_game_events_max_per_day(session),
+            moment.date(),
+        ):
             return 0
 
         # 3. Везение.
@@ -183,6 +259,13 @@ async def run_events_job(
         # Призыв ждёт ответа — значит идёт через журнал: в режиме сводки он
         # «выпадет» в чат ближайшим окном, а не посреди тишины.
         await journal.announce(session, kind=journal.KIND_EVENT, text=chosen.text)
+        # Обязательный поясняющий пост: сколько принимается ответ, куда писать и
+        # кому достаётся опыт (правило оператора: вопрос ВСЕГДА с фоллоу-постом).
+        await journal.announce(
+            session,
+            kind=journal.KIND_EVENT,
+            text=build_followup_text(ttl_minutes=chosen.ttl_minutes),
+        )
     log.info("game.event_posted", code=chosen.code)
     return 1
 

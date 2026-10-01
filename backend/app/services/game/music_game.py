@@ -307,6 +307,11 @@ async def register_guess(
         return False
     index = correct_index(list(round.option_user_ids or []), int(round.correct_user_id or -1))
     if index is None or index != option_index:
+        # Э17: неверная догадка обнуляет ТЕКУЩУЮ серию угадываний. Но только если
+        # человек ещё не угадал этот раунд: смена верного голоса на неверный —
+        # это любопытство, а не промах, и серию рвать не должна.
+        if user_id not in list(round.correct_voter_ids or []):
+            await awards.music_miss(session, user_id)
         return False
     voters = list(round.correct_voter_ids or [])
     if user_id in voters:

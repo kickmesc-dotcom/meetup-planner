@@ -1549,7 +1549,11 @@ GAME_MEMORIAL_REPEAT_KEY = "game.memorial.repeat_days"
 GAME_EVENTS_ENABLED_KEY = "game.events.enabled"
 GAME_EVENTS_CHANCE_KEY = "game.events.chance_percent"
 GAME_EVENTS_MAX_PER_DAY_KEY = "game.events.max_per_day"
+GAME_EVENTS_MIN_PER_DAY_KEY = "game.events.min_per_day"
 GAME_EVENTS_MIN_GAP_KEY = "game.events.min_gap_hours"
+# Дневное окно публикации событий (локальное время чата, UTC+3).
+GAME_EVENTS_DAY_START_KEY = "game.events.day_start_hour"
+GAME_EVENTS_DAY_END_KEY = "game.events.day_end_hour"
 
 GAME_CONTRABAND_ENABLED_KEY = "game.contraband.enabled"
 GAME_CONTRABAND_CHANCE_KEY = "game.contraband.chance_percent"
@@ -1601,7 +1605,10 @@ def _game_defaults() -> dict:
         "memorial_repeat_days": game_config.MEMORIAL_REPEAT_DAYS,
         "events_chance_percent": game_config.EVENTS_CHANCE_PERCENT,
         "events_max_per_day": game_config.EVENTS_MAX_PER_DAY,
+        "events_min_per_day": game_config.EVENTS_MIN_PER_DAY,
         "events_min_gap_hours": game_config.EVENTS_MIN_GAP_HOURS,
+        "events_day_start_hour": game_config.EVENTS_DAY_START_HOUR,
+        "events_day_end_hour": game_config.EVENTS_DAY_END_HOUR,
         "contraband_daily_cap": game_config.CONTRABAND_DAILY_CAP,
         "voice_min_gap_hours": game_config.VOICE_TASK_MIN_GAP_HOURS,
         "music_weekday": game_config.MUSIC_DEFAULT_WEEKDAY,
@@ -1676,7 +1683,29 @@ async def get_game_events_chance_percent(session: AsyncSession) -> int:
 
 async def get_game_events_max_per_day(session: AsyncSession) -> int:
     return await _get_int(
-        session, GAME_EVENTS_MAX_PER_DAY_KEY, _game_defaults()["events_max_per_day"]
+        session, GAME_EVENTS_MAX_PER_DAY_KEY, _game_defaults()["events_max_per_day"],
+        hi=50,
+    )
+
+
+async def get_game_events_min_per_day(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_EVENTS_MIN_PER_DAY_KEY, _game_defaults()["events_min_per_day"],
+        hi=50,
+    )
+
+
+async def get_game_events_day_start_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_EVENTS_DAY_START_KEY, _game_defaults()["events_day_start_hour"],
+        hi=23,
+    )
+
+
+async def get_game_events_day_end_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_EVENTS_DAY_END_KEY, _game_defaults()["events_day_end_hour"],
+        hi=24,
     )
 
 
@@ -1887,6 +1916,18 @@ async def set_game_events_chance_percent(session: AsyncSession, value: int) -> N
 
 async def set_game_events_max_per_day(session: AsyncSession, value: int) -> None:
     await _set_value(session, GAME_EVENTS_MAX_PER_DAY_KEY, str(max(0, int(value))))
+
+
+async def set_game_events_min_per_day(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_EVENTS_MIN_PER_DAY_KEY, str(max(0, int(value))))
+
+
+async def set_game_events_day_start_hour(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_EVENTS_DAY_START_KEY, str(max(0, min(23, int(value)))))
+
+
+async def set_game_events_day_end_hour(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_EVENTS_DAY_END_KEY, str(max(0, min(24, int(value)))))
 
 
 async def set_game_events_min_gap_hours(session: AsyncSession, value: int) -> None:

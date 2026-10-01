@@ -34,9 +34,13 @@ from app.schemas.game import (
     HolidayOut,
     HolidaysOut,
     LevelUpOut,
+    MusicLikeOut,
     MusicMineOut,
     MusicMineTrackOut,
     MusicSelectionOut,
+    MusicTopTrackOut,
+    MusicWeekOut,
+    MusicWeekTrackOut,
     RankOut,
     RankRowOut,
     XpRuleOut,
@@ -486,6 +490,35 @@ async def my_music(session: SessionDep, user: CurrentUser) -> MusicMineOut:
     tracks = await music.my_week_tracks(session, user.id, at=now)
     count = await music.weekly_count(session, user.id, at=now)
     history = await music.published_selections(session, limit=10)
+
+    # Э17: свежая подборка с лайками — то, под чем участник и ставит реакции.
+    week: MusicWeekOut | None = None
+    latest = await music.latest_published_selection(session)
+    if latest is not None:
+        sel_tracks = await music.selection_tracks(session, latest.id)
+        ids = [t.id for t in sel_tracks]
+        likes = await music.like_counts(session, ids)
+        mine = await music.liked_track_ids(session, user.id, ids)
+        week = MusicWeekOut(
+            id=latest.id,
+            created_at=latest.created_at,
+            track_count=latest.track_count,
+            tracks=[
+                MusicWeekTrackOut(
+                    id=t.id,
+                    kind=t.kind,
+                    title=t.title,
+                    performer=t.performer,
+                    url=t.url,
+                    likes=likes.get(t.id, 0),
+                    liked=t.id in mine,
+                )
+                for t in sel_tracks
+            ],
+        )
+
+    top_rows = await music.top_tracks(session, since=music.top_window_start(now))
+
     return MusicMineOut(
         enabled=True,
         per_user_weekly=MUSIC_PER_USER_WEEKLY,
@@ -512,4 +545,41 @@ async def my_music(session: SessionDep, user: CurrentUser) -> MusicMineOut:
             )
             for s in history
         ],
+        week=week,
+        top=[
+            MusicTopTrackOut(
+                id=t.id,
+                title=t.title,
+                performer=t.performer,
+                url=t.url,
+                likes=likes,
+            )
+            for t, likes in top_rows
+        ],
     )
+
+
+@router.post("/game/music/tracks/{track_id}/like", response_model=MusicLikeOut)
+async def like_music_track(
+    track_id: int, session: SessionDep, user: CurrentUser
+) -> MusicLikeOut:
+    """Поставить или снять лайк треку выпущенной подборки (Э17, задел H.8).
+
+    Один роут на оба действия (toggle): мини-апп тапает по текущему состоянию и
+    просто отображает ответ. Лайкнуть трек из пула нельзя — он ещё не в подборке,
+    поэтому такой запрос под фичей-рубильником отдаём как 404.
+    """
+    from app.services.admin_config import get_game_music_enabled
+    from app.services.game import music
+
+    if not await is_game_enabled(session) or not await get_game_music_enabled(
+        session
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="music off")
+
+    result = await music.toggle_like(session, user_id=user.id, track_id=track_id)
+    if result.status != music.LIKE_OK:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="track not published"
+        )
+    return MusicLikeOut(ok=True, liked=result.liked, likes=result.likes)

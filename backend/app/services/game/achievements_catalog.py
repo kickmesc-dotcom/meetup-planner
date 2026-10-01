@@ -9,9 +9,13 @@
 
 Три вида ачивок (`kind`):
 
-* `counter`   — накопительная: базовый тир за первую единицу (`count >= 1`) и
-  отдельные юбилейные тиры 10/20/30/50/100 как самостоятельные записи.
-* `threshold` — накопительная до порога: одна запись, выдаётся на `threshold`.
+* `counter`   — накопительная: база за ПЕРВЫЙ случай («впервые») и отдельные
+  юбилейные тиры как самостоятельные записи. Набор тиров у каждой ачивки свой
+  (`tiers`): стандартные 10/20/30/50/100 плюс, при необходимости, свой порог
+  (напр. ×3 у «Агента ВЦИОМ-а»).
+* `threshold` — разовый ГЕТ за накопленный порог (серия/счётчик), без «первой»
+  ачивки. Оставлен только там, где «первый раз» уже покрыт своим counter'ом
+  (`music_streak` — см. `music_guess`) или где порог и есть суть механики.
 * `instant`   — разовая: выдаётся ровно в момент события, накопителя нет.
 
 Ачивки с `needs_telemetry=True` описаны здесь (чтобы лист ачивок был полным), но
@@ -21,6 +25,7 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, replace
 
 from app.services.game.config import ANNIVERSARY_TIERS, tier_title
@@ -159,9 +164,10 @@ _BASE: tuple[Achievement, ...] = (
     Achievement(
         "cashback",
         "Кэшбэк",
-        "Впервые задонатить кому-то экспу",
+        "Задонатить экспу кому-то впервые",
         "🎁",
-        KIND_INSTANT,
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
         needs_telemetry=True,
     ),
     Achievement(
@@ -172,48 +178,105 @@ _BASE: tuple[Achievement, ...] = (
         KIND_INSTANT,
         needs_telemetry=True,
     ),
-    # --- накопители-пороги (Э4.3) ---
+    # --- накопители с юбилеями (Э4.3) ---
+    # Раньше это были «пороги» (одна запись на N-й раз), но оператор потребовал
+    # жёстко развести «первый раз» и «юбилей»: теперь база — «впервые», а старый
+    # порог — один из юбилейных тиров (у опросов/номинаций/опиума это ×3, у
+    # успешного успеха/укротителя — стандартный ×10). Порог «3» добавлен в
+    # НАБОР ТИРОВ конкретной ачивки, а не в глобальный ANNIVERSARY_TIERS.
     Achievement(
         "opium_for_nobody",
         "Опиум для никого",
-        "Три поста подряд без единой реакции в течение 12 часов",
+        "Постить в пустоту впервые (пост без реакции 12 ч)",
         "💀",
-        KIND_THRESHOLD,
-        threshold=3,
+        KIND_COUNTER,
+        tiers=(3, *ANNIVERSARY_TIERS),
         needs_telemetry=True,
     ),
     Achievement(
         "vciom_agent",
         "Агент ВЦИОМ-а",
-        "Создать 3 опроса",
+        "Создать опрос впервые",
         "📊",
-        KIND_THRESHOLD,
-        threshold=3,
+        KIND_COUNTER,
+        tiers=(3, *ANNIVERSARY_TIERS),
     ),
     Achievement(
         "successful_success",
         "Успешный успех",
-        "Накопить 10 постов, на которые были реакции",
+        "Опубликовать пост с реакциями впервые",
         "📈",
-        KIND_THRESHOLD,
-        threshold=10,
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
         needs_telemetry=True,
     ),
     Achievement(
         "nominal_nominal",
         "Номинальный номинал",
-        "Номинировать 3 игры",
+        "Номинировать игру впервые",
         "🎮",
-        KIND_THRESHOLD,
-        threshold=3,
+        KIND_COUNTER,
+        tiers=(3, *ANNIVERSARY_TIERS),
     ),
     Achievement(
         "worm_tamer",
         "Укротитель паст",
-        "Ответить боту или отметить его в сообщении 10 раз",
+        "Ответить боту или отметить его в сообщении впервые",
         "🪱",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    # --- Э14/Э15/Э16: голосовые задания, предложка и мьюзик-гейм ---
+    # Задание: ачивки под новые соц-механики — голосовые, предложку и игру.
+    Achievement(
+        "voice_debut",
+        "Голос из народа",
+        "Подать голосовой вариант на задание впервые",
+        "🎙️",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    Achievement(
+        "voice_winner",
+        "Лучший голос",
+        "Победить в голосовании за лучший голосовой вариант впервые",
+        "🥇",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    Achievement(
+        "music_dj",
+        "Диджей недели",
+        "Твой трек попал в подборку впервые",
+        "🎧",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    Achievement(
+        "music_guess",
+        "Меломан",
+        "Угадать автора трека в мьюзик-гейме впервые",
+        "🎵",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    Achievement(
+        "music_spotlight",
+        "На виду",
+        "Твой трек засветился в мьюзик-гейме впервые",
+        "🔦",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    # Серия — не «впервые/юбилей»: первый раз даёт `music_guess` (выше), а эта
+    # ачивка — отдельный ГЕТ за серию, поэтому остаётся пороговой.
+    Achievement(
+        "music_streak",
+        "На слуху",
+        "Угадать автора трека пять раз подряд",
+        "🔥",
         KIND_THRESHOLD,
-        threshold=10,
+        threshold=5,
     ),
     # --- капстоун: единственный ранг приоритетнее ранга за уровень (Э3.4) ---
     Achievement(
@@ -270,6 +333,18 @@ GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ("vciom_agent", "nominator", "nominal_nominal"),
     ),
     ("social", "🤝 Бот и подарки", ("worm_tamer", "cashback", "don_corleone")),
+    (
+        "voice_music",
+        "🎧 Голос и музыка",
+        (
+            "voice_debut",
+            "voice_winner",
+            "music_dj",
+            "music_guess",
+            "music_spotlight",
+            "music_streak",
+        ),
+    ),
 )
 
 GROUP_FALLBACK = ("other", "🎁 Разное")
@@ -296,7 +371,11 @@ def _expand(base: Achievement) -> list[Achievement]:
     вырезается «впервые»: иначе вышло бы противоречие «впервые — 10-й раз».
     """
     out = [base]
-    narrative = base.description.replace(" впервые", "")
+    # Срезаем «впервые» в ЛЮБОМ регистре и позиции — иначе юбилейный тир
+    # противоречил бы сам себе («впервые … 10-й раз»). Именно эта путаница и
+    # есть правило оператора: «впервые» и «юбилей» — две РАЗНЫЕ ачивки.
+    narrative = re.sub(r"\s*впервые\s*", " ", base.description, flags=re.IGNORECASE)
+    narrative = re.sub(r"\s{2,}", " ", narrative).strip()
     for tier in base.tiers:
         out.append(
             replace(

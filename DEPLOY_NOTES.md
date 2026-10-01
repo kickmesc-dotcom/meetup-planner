@@ -1,4 +1,99 @@
+# 🌙 GHG10 Э18: живые часы событий, лимиты, фоллоу-посты и правило «впервые ≠ юбилей» (ГОТОВО К ВЫКЛАДКЕ)
+
+Партия правок по фидбеку оператора 30.09. Идёт ПОВЕРХ Э17 (тем же коммитом/пушем).
+Миграций НЕТ — только код и настройки; alembic head остаётся `0026_music_track_likes`.
+
+## Что починили/добавили
+
+- **`/punish` и `{username}`.** Кастомные пулы кары писали жертву как `{username}`,
+  а рендер подставлял только `{target}` → в бою выходило буквальное `{username}`.
+  Теперь хендлер кары отдаёт `target=target, username=target` — оба плейсхолдера
+  подставляют ЖЕРТВУ (`worm_master.render`).
+- **Живые часы случайных событий.** Дефолт 10:00–22:00 локального (UTC+3),
+  настраивается (`game.events.day_start_hour` / `day_end_hour`). Ночью job
+  молчит — «мем-задание в 3:17» больше не выпадет. Чистые `events.local_hour` /
+  `events.is_daytime`.
+- **Лимиты активностей.** Суточный потолок событий теперь выбирается СЛУЧАЙНО
+  в `[game.events.min_per_day, game.events.max_per_day]` и фиксируется на день
+  (`events.daily_cap`, сеется по дате). `min == max` — точное значение (1, 3, …);
+  `max = 0` — выключено.
+- **Обязательный фоллоу-пост.** После каждого призыва бот ВСЕГДА публикует
+  пояснение: ответ в общий чат, окно приёма (= TTL промпта), опыт — только
+  первому подходящему ответу (`events.build_followup_text`).
+- **Правило «впервые ≠ юбилей».** Строго: где в описании базы есть «впервые» —
+  это `counter` со своими `tiers` (база = первый раз, каждый ×10/×20/… —
+  ОТДЕЛЬНАЯ ачивка). `_expand` срезает «впервые» в любом регистре. Тест
+  `test_first_time_and_anniversary_are_always_separate` стережёт правило.
+  - `cashback` («Впервые задонатить…», был `instant`) → `counter`+`tiers`
+    (счётчик `donations_sent`).
+  - **Бывшие «пороги» тоже разведены:** `vciom_agent`, `nominal_nominal`,
+    `opium_for_nobody` (порог ×3 добавлен в их `tiers`), `worm_tamer`,
+    `successful_success` (×10 = стандартный тир) стали `counter`+`tiers`:
+    база — «впервые», старый порог — один из юбилеев. Остался единственный
+    `threshold` — `music_streak` (серия; «первый раз» покрывает `music_guess`).
+  - `/ach` теперь режется на куски: каталог (26 базовых / **109** с юбилеями)
+    перерос лимит одного сообщения Telegram.
+
+## Проверка
+
+```bash
+./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q   # 894 passed
+cd meetup-planner-main/frontend && npm run typecheck                 # чисто
+```
+
+Админка: поля «минимум в сутки», «окно: с/по, час» и тумблер событий в
+«Случайных событиях». CLI: `tools/set-admin-config.py game.events.day_start_hour=10 …`.
+
+---
+
+# 🎧 GHG10 Э17: лайки подборки, топ недели и ачивки соц-механик (ГОТОВО К ВЫКЛАДКЕ)
+
+Партия поверх Э14–Э16 (уже в бою, alembic `0025`). Добавляет задел H.8 и ачивки
+под голосовые/предложку/мьюзик-гейм.
+
+## Миграция
+
+- **0026_music_track_likes** (Э17) — `music_track_likes`: лайки трекам выпущенной
+  подборки, `UniqueConstraint(user_id, track_id)`, обе ссылки `ON DELETE CASCADE`.
+  Только `op.create_table`, без backfill.
+
+## Что нового
+
+- **Лайки подборки.** `POST /api/game/music/tracks/{id}/like` (toggle) — ставит/
+  снимает лайк треку со статусом `published`, отвечает `{ok, liked, likes}`.
+  Лайки под пулом и снятыми треками отклоняются (404 при выключенной фиче).
+- **Топ треков недели.** `GET /api/game/music/mine` отдаёт `week` (свежая
+  подборка с `likes`/`liked` по каждому треку) и `top` (топ-5 по лайкам за
+  скользящие 7 дней — `MUSIC_TOP_TRACKS_LIMIT`/`MUSIC_TOP_WINDOW_DAYS`).
+- **Ачивки Э14/Э15/Э16** — новый раздел листа «🎧 Голос и музыка»:
+  `voice_debut`, `voice_winner`, `music_dj`, `music_guess`, `music_spotlight`
+  (накопители с юбилеями), `music_streak` (5 угадываний подряд).
+
+## Живой прогон
+
+```bash
+export PYTHONIOENCODING=utf-8
+./meetup-planner-main/backend/.venv/Scripts/python.exe tools/music-voice-dryrun.py --scratch
+```
+
+Прогон дополнен шагом лайков/топа и поднимает scratch-базу до `0026`. Зелёный.
+Тестов — **888** (+19). Alembic head — `0026_music_track_likes`.
+
+## Выкладка
+
+Как у Э14–Э16: синк `backend/` в `meetup-planner-backend`, коммит, пуш в HF
+origin и Amvera (`main:master`). `alembic upgrade head` прокатит 0026 при старте.
+Откат — `git revert`; схему снимать `alembic downgrade 0025_music_game_rounds`.
+
+---
+
 # 🚀 GHG10 Э14–Э16: выкладка 2026-09-30 (голосовые задания, предложка, мьюзик-гейм)
+
+> ✅ **Выложено 2026-09-30.** Зеркало `meetup-planner-backend` = `e26a01b`;
+> HF origin и Amvera `main:master` запушены. `/api/meta` обоих хостов:
+> `alembic_head=0025_music_game_rounds`, routes=185, fingerprint=`b417a5c31bf1`,
+> боевая Neon `alembic_version=0025`. Admin-конфиг: `game.music.enabled` и
+> `game.music.game_enabled` = `true` (подборка Вт 12:00, гейм Чт 19:00).
 
 Одна партия: прогрессивная XP-шкала и эра ачивок, редкость в `/ach`, голосовые
 задания (Э14), музыкальная предложка (Э15), мьюзик-гейм (Э16) и экран мини-аппа

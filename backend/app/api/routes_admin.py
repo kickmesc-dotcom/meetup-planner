@@ -4071,9 +4071,12 @@ async def _game_social_state(session) -> GameSocialOut:
         get_game_digest_enabled,
         get_game_digest_interval_hours,
         get_game_events_chance_percent,
+        get_game_events_day_end_hour,
+        get_game_events_day_start_hour,
         get_game_events_enabled,
         get_game_events_max_per_day,
         get_game_events_min_gap_hours,
+        get_game_events_min_per_day,
         get_game_memorial_enabled,
         get_game_memorial_repeat_days,
         get_game_memorial_silence_days,
@@ -4125,7 +4128,10 @@ async def _game_social_state(session) -> GameSocialOut:
         events_enabled=await get_game_events_enabled(session),
         events_chance_percent=await get_game_events_chance_percent(session),
         events_max_per_day=await get_game_events_max_per_day(session),
+        events_min_per_day=await get_game_events_min_per_day(session),
         events_min_gap_hours=await get_game_events_min_gap_hours(session),
+        events_day_start_hour=await get_game_events_day_start_hour(session),
+        events_day_end_hour=await get_game_events_day_end_hour(session),
         events_open=open_prompts,
         contraband_enabled=await get_game_contraband_enabled(session),
         contraband_chance_percent=await get_game_contraband_chance_percent(session),
@@ -4166,9 +4172,12 @@ async def admin_game_social_put(
         set_game_digest_enabled,
         set_game_digest_interval,
         set_game_events_chance_percent,
+        set_game_events_day_end_hour,
+        set_game_events_day_start_hour,
         set_game_events_enabled,
         set_game_events_max_per_day,
         set_game_events_min_gap_hours,
+        set_game_events_min_per_day,
         set_game_memorial_enabled,
         set_game_memorial_repeat_days,
         set_game_memorial_silence_days,
@@ -4193,8 +4202,14 @@ async def admin_game_social_put(
         await set_game_events_chance_percent(session, body.events_chance_percent)
     if body.events_max_per_day is not None:
         await set_game_events_max_per_day(session, body.events_max_per_day)
+    if body.events_min_per_day is not None:
+        await set_game_events_min_per_day(session, body.events_min_per_day)
     if body.events_min_gap_hours is not None:
         await set_game_events_min_gap_hours(session, body.events_min_gap_hours)
+    if body.events_day_start_hour is not None:
+        await set_game_events_day_start_hour(session, body.events_day_start_hour)
+    if body.events_day_end_hour is not None:
+        await set_game_events_day_end_hour(session, body.events_day_end_hour)
     if body.contraband_enabled is not None:
         await set_game_contraband_enabled(session, body.contraband_enabled)
     if body.contraband_chance_percent is not None:

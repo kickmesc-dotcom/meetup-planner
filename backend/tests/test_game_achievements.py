@@ -133,11 +133,15 @@ def _now() -> datetime:
 # --------------------------------------------------------------------------
 
 
-def test_catalog_has_exactly_20_base_achievements():
-    """Задание: 20 ачивок. Тиры — отдельные записи, но база должна быть 20."""
-    assert len(base_achievements()) == 20
-    # 20 базовых + 5 накопительных × 5 юбилеев
-    assert catalog_size() == 20 + 5 * len(ANNIVERSARY_TIERS)
+def test_catalog_has_expected_number_of_base_achievements():
+    """Исходное задание — 20 ачивок; Э14/Э15/Э16 добавили 6 под соц-механики.
+
+    Тиры — отдельные записи, но база считается по ним ровно один раз.
+    """
+    bases = base_achievements()
+    assert len(bases) == 26
+    # 26 базовых + все юбилейные тиры.
+    assert catalog_size() == len(bases) + sum(len(a.tiers) for a in bases)
 
 
 def test_all_codes_unique_and_kinds_valid():
@@ -149,9 +153,41 @@ def test_all_codes_unique_and_kinds_valid():
         assert ach.points > 0
 
 
+def test_first_time_and_anniversary_are_always_separate():
+    """Жёсткое правило оператора: «впервые» и «юбилей» — ДВЕ разные ачивки.
+
+    Всякий раз, где в описании базовой ачивки есть «впервые», она обязана быть
+    накопительной (`counter`) с юбилеями, а сами юбилейные тиры — не повторять
+    слово «впервые» (иначе «впервые — 10-й раз»).
+    """
+    import re
+
+    seen = 0
+    for base in base_achievements():
+        if not re.search(r"впервые", base.description, re.IGNORECASE):
+            continue
+        seen += 1
+        assert base.kind == KIND_COUNTER, base.code
+        # Стандартные юбилеи обязаны присутствовать; у части ачивок есть свой
+        # дополнительный порог (напр. ×3 у «Агента ВЦИОМ-а»).
+        assert set(ANNIVERSARY_TIERS) <= set(base.tiers), base.code
+        for code in tier_codes(base.code):
+            tier = get(code)
+            assert not re.search(r"впервые", tier.description, re.IGNORECASE), code
+            assert tier.tier is not None and tier.base == base.code
+    assert seen >= 10  # голос/музыка/лох/чухан/рулетка/активность/донаты
+
+
 def test_anniversary_tiers_expand_to_separate_entries():
     """«Отдельный поздравительный статус и уровень ачивки для каждого юбилея»."""
-    for base in ("chin_up", "first_worm", "truth_seeker", "generation_mouthpiece", "read_only"):
+    for base in (
+        "chin_up",
+        "first_worm",
+        "truth_seeker",
+        "generation_mouthpiece",
+        "read_only",
+        "cashback",
+    ):
         assert get(base) is not None
         assert get(base).tiers == ANNIVERSARY_TIERS
         codes = tier_codes(base)
@@ -164,12 +200,22 @@ def test_anniversary_tiers_expand_to_separate_entries():
     assert tier_codes("self_shot") == []
 
 
-def test_thresholds_and_telemetry_flags():
-    assert get("vciom_agent").threshold == 3
-    assert get("nominal_nominal").threshold == 3
-    assert get("worm_tamer").threshold == 10
-    assert get("successful_success").threshold == 10
-    assert get("opium_for_nobody").threshold == 3
+def test_thresholds_expanded_to_first_plus_tiers():
+    """Бывшие пороги разведены на «впервые» + юбилеи (правило оператора).
+
+    Где старый порог не совпадал со стандартным юбилеем (3), он добавлен в НАБОР
+    тиров конкретной ачивки, поэтому ничего не потеряно.
+    """
+    for code in ("vciom_agent", "nominal_nominal", "opium_for_nobody"):
+        assert get(code).kind == KIND_COUNTER, code
+        assert get(code).threshold is None, code
+        assert 3 in get(code).tiers, code
+    for code in ("worm_tamer", "successful_success"):
+        assert get(code).kind == KIND_COUNTER, code
+        assert get(code).tiers == ANNIVERSARY_TIERS, code
+    # Серия остаётся пороговой — «первый раз» покрывает `music_guess`.
+    assert get("music_streak").kind == KIND_THRESHOLD
+    assert get("music_streak").threshold == 5
     # Мем-ачивки и донаты ждут своей телеметрии (Э7/Э11) — это зафиксировано в каталоге.
     for code in ("memelog", "forever_alone", "successful_success", "cashback", "don_corleone"):
         assert get(code).needs_telemetry is True, code
@@ -178,9 +224,11 @@ def test_thresholds_and_telemetry_flags():
 
 def test_kind_distribution_matches_spec():
     kinds = [a.kind for a in base_achievements()]
-    assert kinds.count(KIND_COUNTER) == 5
-    assert kinds.count(KIND_THRESHOLD) == 5
-    assert kinds.count(KIND_INSTANT) == 10
+    # 11 счётчиков (базовые + Э14–Э17) + 5 бывших порогов, ставших счётчиками;
+    # 1 порог — music_streak (серия); 9 разовых.
+    assert kinds.count(KIND_COUNTER) == 16
+    assert kinds.count(KIND_THRESHOLD) == 1  # music_streak
+    assert kinds.count(KIND_INSTANT) == 9
 
 
 def test_tiers_reached_is_pure_and_monotonic():
@@ -313,9 +361,19 @@ async def test_last_tier_grants_supreme_chukhan_rank(session: _FakeSession):
 
 @pytest.mark.asyncio
 async def test_grant_threshold_needs_enough_count(session: _FakeSession):
-    assert await achievements._grant_threshold(session, 1, "vciom_agent", 2, 3, announce=False) == []
-    got = await achievements._grant_threshold(session, 1, "vciom_agent", 3, 3, announce=False)
-    assert [a.code for a in got] == ["vciom_agent"]
+    assert await achievements._grant_threshold(session, 1, "music_streak", 4, 5, announce=False) == []
+    got = await achievements._grant_threshold(session, 1, "music_streak", 5, 5, announce=False)
+    assert [a.code for a in got] == ["music_streak"]
+
+
+@pytest.mark.asyncio
+async def test_grant_counter_custom_tier_at_three(session: _FakeSession):
+    """«Агент ВЦИОМ-а»: база за первый опрос + свой юбилей ×3 (из tiers)."""
+    granted = await achievements._grant_counter(
+        session, 1, "vciom_agent", 3, announce=False
+    )
+    assert {a.code for a in granted} == {"vciom_agent", "vciom_agent:3"}
+    assert session.codes_of(1) == {"vciom_agent", "vciom_agent:3"}
 
 
 # --------------------------------------------------------------------------
@@ -354,11 +412,14 @@ async def test_on_chukhan_grants_first_worm(session: _FakeSession):
 
 
 @pytest.mark.asyncio
-async def test_on_bot_reply_bumps_counter_and_grants_on_tenth(session: _FakeSession):
-    for _ in range(9):
-        assert await achievements.on_bot_reply(session, 3, announce=False) == []
-    granted = await achievements.on_bot_reply(session, 3, announce=False)
-    assert [a.code for a in granted] == ["worm_tamer"]
+async def test_on_bot_reply_grants_base_then_anniversary_at_ten(session: _FakeSession):
+    """Первый ответ — база «впервые», 10-й — отдельный юбилей ×10."""
+    first = await achievements.on_bot_reply(session, 3, announce=False)
+    assert [a.code for a in first] == ["worm_tamer"]
+    for _ in range(8):
+        await achievements.on_bot_reply(session, 3, announce=False)
+    granted = await achievements.on_bot_reply(session, 3, announce=False)  # 10-й
+    assert "worm_tamer:10" in {a.code for a in granted}
     assert await achievements.get_counter(session, 3, achievements.COUNTER_WORM_TAMER) == 10
 
 
@@ -389,6 +450,70 @@ async def test_on_week_activity_uses_counter_for_tiers(session: _FakeSession):
     assert "generation_mouthpiece" in codes and "read_only" in codes
     assert await achievements.get_counter(session, 1, achievements.COUNTER_MOUTHPIECE) == 2
     assert await achievements.get_counter(session, 2, achievements.COUNTER_READ_ONLY) == 2
+
+
+@pytest.mark.asyncio
+async def test_on_voice_submitted_grants_debut(session: _FakeSession):
+    session.scalar_queue = [1, None]  # count_voice_submissions, has
+    granted = await achievements.on_voice_submitted(session, 4, announce=False)
+    assert [a.code for a in granted] == ["voice_debut"]
+
+
+@pytest.mark.asyncio
+async def test_on_voice_winner_grants_best_voice(session: _FakeSession):
+    session.scalar_queue = [2, None]  # count_voice_wins, has
+    granted = await achievements.on_voice_winner(session, 4, announce=False)
+    assert [a.code for a in granted] == ["voice_winner"]
+
+
+@pytest.mark.asyncio
+async def test_on_music_published_grants_dj(session: _FakeSession):
+    session.scalar_queue = [1, None]  # count_music_published, has
+    granted = await achievements.on_music_published(session, 4, announce=False)
+    assert [a.code for a in granted] == ["music_dj"]
+
+
+@pytest.mark.asyncio
+async def test_on_music_spotlight_grants(session: _FakeSession):
+    session.scalar_queue = [1, None]  # count_music_spotlights, has
+    granted = await achievements.on_music_spotlight(session, 4, announce=False)
+    assert [a.code for a in granted] == ["music_spotlight"]
+
+
+@pytest.mark.asyncio
+async def test_music_streak_grants_after_five_in_a_row(session: _FakeSession):
+    # На каждой догадке `grant` проверяет «уже есть?» — queue с запасом.
+    session.scalar_queue = [None] * 20
+    got: list[str] = []
+    for _ in range(5):
+        got += [
+            a.code
+            for a in await achievements.on_music_guess(session, 4, announce=False)
+        ]
+    assert "music_streak" in got
+    assert await achievements.get_counter(session, 4, achievements.COUNTER_MUSIC_STREAK) == 5
+
+
+@pytest.mark.asyncio
+async def test_music_miss_resets_current_streak_but_keeps_best(session: _FakeSession):
+    session.scalar_queue = [None] * 20
+    for _ in range(3):
+        await achievements.on_music_guess(session, 4, announce=False)
+    assert (
+        await achievements.get_counter(
+            session, 4, achievements.COUNTER_MUSIC_STREAK_CURRENT
+        )
+        == 3
+    )
+    await achievements.on_music_miss(session, 4)
+    assert (
+        await achievements.get_counter(
+            session, 4, achievements.COUNTER_MUSIC_STREAK_CURRENT
+        )
+        == 0
+    )
+    # Рекорд не сбрасывается — ачивка смотрится по нему.
+    assert await achievements.get_counter(session, 4, achievements.COUNTER_MUSIC_STREAK) == 3
 
 
 @pytest.mark.asyncio
@@ -464,6 +589,13 @@ async def test_all_event_entrypoints_respect_the_flag(monkeypatch, session: _Fak
     await awards.donation_sent(session, 1, recipients_this_year=6, live_participants=6)
     await awards.week_activity(session, most_active_id=1, least_active_id=2)
     await awards.achievement(session, 1, "self_shot")
+    # Э14/Э15/Э16: новые точки входа тоже уважают рубильник.
+    await awards.voice(session, 1, points=50, task_id=7)
+    await awards.voice_best(session, 1, points=50, task_id=7)
+    await awards.music_author(session, 1, points=30, round_id=3)
+    await awards.music_guess(session, 1, points=20, round_id=3)
+    await awards.music_published(session, 1, track_id=5)
+    await awards.music_miss(session, 1)
     assert session.added == [] and session.commits == 0
 
 

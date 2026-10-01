@@ -140,15 +140,58 @@ export interface MusicSelection {
   created_at: string | null;
 }
 
+/** Э17: трек выпущенной подборки с лайками. */
+export interface MusicWeekTrack {
+  id: number;
+  kind: string;
+  title: string | null;
+  performer: string | null;
+  url: string | null;
+  likes: number;
+  liked: boolean;
+}
+
+/** Э17: свежая подборка недели с треками и лайками. */
+export interface MusicWeek {
+  id: number;
+  created_at: string | null;
+  track_count: number;
+  tracks: MusicWeekTrack[];
+}
+
+/** Э17: строка топа недели — трек и его лайки. */
+export interface MusicTopTrack {
+  id: number;
+  title: string | null;
+  performer: string | null;
+  url: string | null;
+  likes: number;
+}
+
+export interface MusicLikeResult {
+  ok: boolean;
+  liked: boolean;
+  likes: number;
+}
+
 export interface MusicMine {
   enabled: boolean;
   per_user_weekly: number;
   week_count: number;
   tracks: MusicMineTrack[];
   history: MusicSelection[];
+  /** Э17: свежая подборка с лайками + топ недели. */
+  week: MusicWeek | null;
+  top: MusicTopTrack[];
 }
 
 export const fetchMyMusic = () => api<MusicMine>("/api/game/music/mine");
+
+/** Э17: поставить/снять лайк треку подборки (toggle на сервере). */
+export const likeMusicTrack = (trackId: number) =>
+  api<MusicLikeResult>(`/api/game/music/tracks/${trackId}/like`, {
+    method: "POST",
+  });
 
 /** Э10.3: праздник — ежегодная дата + текст поздравления. */
 export interface GameHoliday {

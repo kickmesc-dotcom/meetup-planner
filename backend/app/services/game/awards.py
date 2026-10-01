@@ -504,6 +504,7 @@ async def voice(
     if not await _enabled(session):
         return
     await xp.award(session, user_id, EV_VOICE, at=at, points=points)
+    await achievements.on_voice_submitted(session, user_id)
 
 
 @_guarded(EV_VOICE_BEST)
@@ -520,6 +521,7 @@ async def voice_best(
     if not await _enabled(session):
         return
     await xp.award(session, user_id, EV_VOICE_BEST, at=at, points=points)
+    await achievements.on_voice_winner(session, user_id)
 
 
 @_guarded(EV_MUSIC_AUTHOR)
@@ -536,6 +538,7 @@ async def music_author(
     if not await _enabled(session):
         return
     await xp.award(session, user_id, EV_MUSIC_AUTHOR, at=at, points=points)
+    await achievements.on_music_spotlight(session, user_id)
 
 
 @_guarded(EV_MUSIC_GUESS)
@@ -548,10 +551,37 @@ async def music_guess(
     at: datetime | None = None,
 ) -> None:
     """Э16: угадал автора трека. Идемпотентность — на стороне вызывающего
-    (`finalize_round` проходит один раз)."""
+    (`finalize_round` проходит один раз).
+
+    Кроме опыта двигает «Меломан» и серию «На слуху»: верная догадка — это
+    событие с собственным набором ачивок, а не только начисление."""
     if not await _enabled(session):
         return
     await xp.award(session, user_id, EV_MUSIC_GUESS, at=at, points=points)
+    await achievements.on_music_guess(session, user_id)
+
+
+@_guarded("music_published")
+async def music_published(
+    session: AsyncSession, user_id: int, *, track_id: int | None = None
+) -> None:
+    """Э15/Э17: трек ушёл в выпущенную подборку → «Диджей недели».
+
+    Опыта не даём (как у `poll_created`): это ачивка-событие, а не начисление.
+    Идемпотентность — на стороне вызывающего: `publish` зовёт это только по
+    только что ушедшим трекам.
+    """
+    if not await _enabled(session):
+        return
+    await achievements.on_music_published(session, user_id)
+
+
+@_guarded("music_miss")
+async def music_miss(session: AsyncSession, user_id: int) -> None:
+    """Э16: неверная догадка в мьюзик-гейме — обнуляет текущую серию."""
+    if not await _enabled(session):
+        return
+    await achievements.on_music_miss(session, user_id)
 
 
 @_guarded(EV_ACHIEVEMENT)

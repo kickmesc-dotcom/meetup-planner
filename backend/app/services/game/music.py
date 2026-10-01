@@ -30,7 +30,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.db.models import MusicSelection, MusicTrack, User
+from app.db.models import MusicSelection, MusicTrack, MusicTrackLike, User
 from app.services.admin_config import (
     get_game_music_attribute,
     get_game_music_enabled,
@@ -44,6 +44,8 @@ from app.services.game.config import (
     MUSIC_MIN_TRACKS,
     MUSIC_PER_USER_WEEKLY,
     MUSIC_RETRY_HOURS,
+    MUSIC_TOP_TRACKS_LIMIT,
+    MUSIC_TOP_WINDOW_DAYS,
     VOICE_TZ_OFFSET_HOURS,
 )
 
@@ -202,6 +204,147 @@ async def published_selections(
         .limit(limit)
     )
     return list(rows)
+
+
+# --------------------------------------------------------------------------
+# Э17: лайки трекам подборки и топ недели (задел H.8)
+# --------------------------------------------------------------------------
+
+# Коды результата лайка (как у приёма треков — сервис не бросает, а возвращает).
+LIKE_OK = "ok"
+LIKE_NOT_PUBLISHED = "not_published"
+
+
+@dataclass(frozen=True)
+class LikeResult:
+    """Итог переключения лайка: состояние + сколько лайков у трека сейчас."""
+
+    status: str
+    liked: bool = False
+    likes: int = 0
+
+
+async def latest_published_selection(
+    session: AsyncSession,
+) -> MusicSelection | None:
+    """Свежая выпущенная подборка — то, что показывает мини-апп."""
+    return await session.scalar(
+        select(MusicSelection)
+        .where(MusicSelection.note == NOTE_PUBLISHED)
+        .order_by(MusicSelection.created_at.desc(), MusicSelection.id.desc())
+        .limit(1)
+    )
+
+
+async def selection_tracks(
+    session: AsyncSession, selection_id: int
+) -> list[MusicTrack]:
+    """Треки одной подборки. Порядок — по id: внутри подборки он и есть порядок
+    показа (строки подборки были отсортированы по `added_at`)."""
+    rows = await session.scalars(
+        select(MusicTrack)
+        .where(MusicTrack.selection_id == selection_id)
+        .order_by(MusicTrack.id.asc())
+    )
+    return list(rows)
+
+
+async def like_counts(
+    session: AsyncSession, track_ids: list[int]
+) -> dict[int, int]:
+    """Сколько лайков у каждого из треков — один SELECT (без N+1)."""
+    if not track_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(MusicTrackLike.track_id, func.count())
+            .where(MusicTrackLike.track_id.in_(track_ids))
+            .group_by(MusicTrackLike.track_id)
+        )
+    ).all()
+    return {int(tid): int(count) for tid, count in rows}
+
+
+async def liked_track_ids(
+    session: AsyncSession, user_id: int, track_ids: list[int]
+) -> set[int]:
+    """Какие из треков уже лайкнул этот участник — один SELECT."""
+    if not track_ids:
+        return set()
+    rows = await session.scalars(
+        select(MusicTrackLike.track_id).where(
+            MusicTrackLike.user_id == user_id,
+            MusicTrackLike.track_id.in_(track_ids),
+        )
+    )
+    return {int(tid) for tid in rows.all()}
+
+
+async def toggle_like(
+    session: AsyncSession, *, user_id: int, track_id: int
+) -> LikeResult:
+    """Поставить/снять лайк треку из ВЫПУЩЕННОЙ подборки.
+
+    Идемпотентность держится на `UniqueConstraint`: повторный тап «поставить»
+    создаёт вторую строку с ошибкой целостности, поэтому сначала ищем уже
+    имеющуюся запись. Лайкнуть можно только трек со статусом `published` —
+    треки из пула до подборки не показываем и не оцениваем.
+    """
+    track = await session.get(MusicTrack, track_id)
+    if track is None or track.status != STATUS_PUBLISHED:
+        return LikeResult(LIKE_NOT_PUBLISHED)
+
+    existing = await session.scalar(
+        select(MusicTrackLike).where(
+            MusicTrackLike.user_id == user_id,
+            MusicTrackLike.track_id == track_id,
+        )
+    )
+    liked: bool
+    if existing is not None:
+        await session.delete(existing)
+        liked = False
+    else:
+        session.add(MusicTrackLike(user_id=user_id, track_id=track_id))
+        liked = True
+    await session.commit()
+    likes = await session.scalar(
+        select(func.count())
+        .select_from(MusicTrackLike)
+        .where(MusicTrackLike.track_id == track_id)
+    )
+    return LikeResult(LIKE_OK, liked=liked, likes=int(likes or 0))
+
+
+async def top_tracks(
+    session: AsyncSession,
+    *,
+    since: datetime,
+    limit: int = MUSIC_TOP_TRACKS_LIMIT,
+) -> list[tuple[MusicTrack, int]]:
+    """Топ треков недели по лайкам (только выпущенные, свежие окном `since`)."""
+    rows = (
+        await session.execute(
+            select(MusicTrack, func.count(MusicTrackLike.id))
+            .join(MusicTrackLike, MusicTrackLike.track_id == MusicTrack.id)
+            .where(
+                MusicTrack.status == STATUS_PUBLISHED,
+                MusicTrackLike.created_at >= since,
+            )
+            .group_by(MusicTrack.id)
+            .order_by(
+                func.count(MusicTrackLike.id).desc(),
+                MusicTrack.id.asc(),
+            )
+            .limit(limit)
+        )
+    ).all()
+    return [(track, int(count)) for track, count in rows]
+
+
+def top_window_start(at: datetime) -> datetime:
+    """Начало окна «недели» топа: `MUSIC_TOP_WINDOW_DAYS` дней назад. Чистая."""
+    return at.astimezone(timezone.utc) - timedelta(days=MUSIC_TOP_WINDOW_DAYS)
 
 
 async def add_track(
@@ -364,6 +507,13 @@ async def publish(
         track.selection_id = selection.id
     await session.commit()
     log.info("game.music_published", tracks=len(chosen), selection_id=selection.id)
+
+    # Э17: трек ушёл в подборку — автору идёт «Диджей недели». Зовём ПОСЛЕ
+    # commit'а (правило awards): только теперь трек реально числится выпущенным.
+    from app.services.game import awards  # ленивый импорт: цикл модулей
+
+    for track in chosen:
+        await awards.music_published(session, track.user_id, track_id=track.id)
     return selection
 
 

@@ -1025,6 +1025,38 @@ class MusicGameRound(Base):
     outcome: Mapped[str | None] = mapped_column(String(16))
 
 
+class MusicTrackLike(Base):
+    """Э17 (задел H.8): лайк треку из выпущенной подборки.
+
+    Ставится из мини-аппа под подборкой недели (в чате — только текст). Лайк
+    идемпотентен: `UniqueConstraint(user_id, track_id)` делает повторный тап
+    no-op, а `DELETE` снимает. По этим строкам считается «топ треков недели».
+
+    Ставим лайк только трекам, реально ушедшим в подборку (`status='published'`)
+    — это проверяет сервис, а не БД: трек может стать неподборным позже.
+    """
+
+    __tablename__ = "music_track_likes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "track_id", name="uq_music_track_like"),
+        Index("ix_music_track_likes_track", "track_id"),
+        Index("ix_music_track_likes_user", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    track_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("music_tracks.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event

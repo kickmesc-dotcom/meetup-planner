@@ -193,7 +193,8 @@ async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
         return {"chin_up:10", "supreme_chukhan"}
 
     async def _progress(_session, _user_id):
-        return {"chin_up": 12, COUNTER_WORM_TAMER: 0}
+        # Серия — единственный оставшийся порог; у неё прогресс «сейчас: N».
+        return {"chin_up": 12, "music_streak": 0}
 
     monkeypatch.setattr(report.achievements, "collected_codes", _collected)
     monkeypatch.setattr(report.achievements, "progress", _progress)
@@ -291,8 +292,11 @@ async def test_ach_report_is_devided_into_labelled_blocks(monkeypatch):
     assert "\n\n" in text
     # Ачивки одного раздела тоже разделены пустой строкой.
     assert "\n\n▫️" in text or "\n\n✅" in text
-    # И всё это влезает в ОДНО сообщение Telegram.
-    assert len(text) <= 4096
+    # Каталог перерос лимит одного сообщения — текст режется на куски, и каждый
+    # кусок обязан влезать в сообщение Telegram (шлём их по очереди).
+    chunks = report.chunk_text(text)
+    assert len(chunks) >= 1
+    assert all(len(chunk) <= 4096 for chunk in chunks)
 
 
 # --- /levels: своя стата + левелы участников ---------------------------------

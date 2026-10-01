@@ -53,6 +53,11 @@ _COUNTERS = (
     ("chukhan", achievements.count_chukhan, "weekly_chukhan"),
     ("polls", achievements.count_polls, "polls"),
     ("nominations", achievements.count_nominations, "game_nominations"),
+    # Э14/Э15/Э16: голосовые, предложка и мьюзик-гейм тоже считаются от эры.
+    ("voice_submissions", achievements.count_voice_submissions, "game_voice_submissions"),
+    ("voice_wins", achievements.count_voice_wins, "game_voice_tasks"),
+    ("music_published", achievements.count_music_published, "music_tracks"),
+    ("music_spotlights", achievements.count_music_spotlights, "music_game_rounds"),
 )
 
 

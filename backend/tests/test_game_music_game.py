@@ -111,7 +111,16 @@ async def test_register_guess_records_correct_vote():
 
 
 @pytest.mark.asyncio
-async def test_register_guess_ignores_wrong_option_and_closed():
+async def test_register_guess_ignores_wrong_option_and_closed(monkeypatch):
+    # Неверная догадка обнуляет ТЕКУЩУЮ серию через фасад начислений (Э17).
+    # Подменяем его: настоящий полез бы в БД за рубильником.
+    missed: list[int] = []
+
+    async def _miss(_session, user_id):
+        missed.append(user_id)
+
+    monkeypatch.setattr(music_game.awards, "music_miss", _miss)
+
     row = _round()
     session = _Session()
     assert (
@@ -121,6 +130,18 @@ async def test_register_guess_ignores_wrong_option_and_closed():
         is False
     )
     assert row.correct_voter_ids == []
+    assert missed == [99]
+
+    # Смена ВЕРНОГО голоса на неверный — не промах, серию не рвёт.
+    row2 = _round(voters=[99])
+    missed.clear()
+    assert (
+        await music_game.register_guess(
+            session, round=row2, user_id=99, option_index=0
+        )
+        is False
+    )
+    assert missed == []
 
     closed = _round(closed=NOW)
     assert (

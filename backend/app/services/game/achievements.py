@@ -33,7 +33,11 @@ from app.db.models import (
     AvailabilityRange,
     ChatActivityDaily,
     GameNomination,
+    GameVoiceSubmission,
+    GameVoiceTask,
     LoserRoll,
+    MusicGameRound,
+    MusicTrack,
     Poll,
     User,
     UserAchievement,
@@ -63,6 +67,15 @@ COUNTER_OPIUM = "opium_for_nobody"
 # не пишет отдельной таблицы), поэтому тоже собственный счётчик.
 COUNTER_MOUTHPIECE = "generation_mouthpiece"
 COUNTER_READ_ONLY = "read_only"
+# Э16: серия угадываний в мьюзик-гейме. Текущая серия сбрасывается неверной
+# догадкой, рекорд — нет: ачивка «На слуху» смотрится по рекорду. Счётчик
+# верных догадок совпадает с кодом ачивки (как у «Укротителя паст»).
+COUNTER_MUSIC_GUESS = "music_guess"
+COUNTER_MUSIC_STREAK = "music_streak_best"
+COUNTER_MUSIC_STREAK_CURRENT = "music_streak_current"
+# Э11: задоначенный опыт. «Кэшбэк» — база «впервые», а юбилеи ×10/×20/… —
+# отдельные ачивки (правило «впервые ≠ юбилей»), поэтому ведём накопитель.
+COUNTER_DONATIONS = "donations_sent"
 
 # `availability_ranges.status`: 1 — свободен (см. `services/auto_pick.py`).
 STATUS_FREE = 1
@@ -199,6 +212,16 @@ async def progress(session: AsyncSession, user_id: int) -> dict[str, int]:
         COUNTER_OPIUM: await get_counter(session, user_id, COUNTER_OPIUM),
         COUNTER_MOUTHPIECE: await get_counter(session, user_id, COUNTER_MOUTHPIECE),
         COUNTER_READ_ONLY: await get_counter(session, user_id, COUNTER_READ_ONLY),
+        # Э14/Э15/Э16: голосовые, предложка и мьюзик-гейм.
+        "voice_debut": await count_voice_submissions(session, user_id),
+        "voice_winner": await count_voice_wins(session, user_id),
+        "music_dj": await count_music_published(session, user_id),
+        "music_spotlight": await count_music_spotlights(session, user_id),
+        COUNTER_MUSIC_GUESS: await get_counter(
+            session, user_id, COUNTER_MUSIC_GUESS
+        ),
+        "music_streak": await get_counter(session, user_id, COUNTER_MUSIC_STREAK),
+        "cashback": await get_counter(session, user_id, COUNTER_DONATIONS),
     }
 
 
@@ -515,6 +538,59 @@ async def count_nominations(session: AsyncSession, user_id: int) -> int:
     return int(total or 0)
 
 
+async def count_voice_submissions(session: AsyncSession, user_id: int) -> int:
+    """Э14: сколько голосовых вариантов юзер сдал с начала игры."""
+    total = await session.scalar(
+        select(func.count())
+        .select_from(GameVoiceSubmission)
+        .where(
+            GameVoiceSubmission.user_id == user_id,
+            GameVoiceSubmission.submitted_at >= _ERA,
+        )
+    )
+    return int(total or 0)
+
+
+async def count_voice_wins(session: AsyncSession, user_id: int) -> int:
+    """Э14: сколько голосований за лучший вариант юзер выиграл с начала игры."""
+    total = await session.scalar(
+        select(func.count())
+        .select_from(GameVoiceTask)
+        .where(
+            GameVoiceTask.winner_user_id == user_id,
+            GameVoiceTask.created_at >= _ERA,
+        )
+    )
+    return int(total or 0)
+
+
+async def count_music_published(session: AsyncSession, user_id: int) -> int:
+    """Э15: сколько треков юзера ушло в выпущенные подборки с начала игры."""
+    total = await session.scalar(
+        select(func.count())
+        .select_from(MusicTrack)
+        .where(
+            MusicTrack.user_id == user_id,
+            MusicTrack.status == "published",
+            MusicTrack.added_at >= _ERA,
+        )
+    )
+    return int(total or 0)
+
+
+async def count_music_spotlights(session: AsyncSession, user_id: int) -> int:
+    """Э16: сколько раз трек юзера выпал в мьюзик-гейме с начала игры."""
+    total = await session.scalar(
+        select(func.count())
+        .select_from(MusicGameRound)
+        .where(
+            MusicGameRound.correct_user_id == user_id,
+            MusicGameRound.created_at >= _ERA,
+        )
+    )
+    return int(total or 0)
+
+
 # ==========================================================================
 # Трекеры: события
 # ==========================================================================
@@ -588,14 +664,12 @@ async def on_availability(
 async def on_poll_created(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
-    ach = get("vciom_agent")
-    assert ach is not None and ach.threshold is not None
-    return await _grant_threshold(
+    """Создал опрос → «Агент ВЦИОМ-а» (первый) и его юбилеи (×3, ×10, …)."""
+    return await _grant_counter(
         session,
         user_id,
         "vciom_agent",
         await count_polls(session, user_id),
-        ach.threshold,
         announce=announce,
     )
 
@@ -603,16 +677,120 @@ async def on_poll_created(
 async def on_nomination(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
-    ach = get("nominal_nominal")
-    assert ach is not None and ach.threshold is not None
-    return await _grant_threshold(
+    """Номинировал игру → «Номинальный номинал» (первый) и юбилеи (×3, ×10, …)."""
+    return await _grant_counter(
         session,
         user_id,
         "nominal_nominal",
         await count_nominations(session, user_id),
-        ach.threshold,
         announce=announce,
     )
+
+
+async def _set_counter(
+    session: AsyncSession, user_id: int, code: str, value: int
+) -> None:
+    """Присвоить счётчику точное значение (для серий: сброс/рекорд)."""
+    row = await session.get(AchievementCounter, (user_id, code))
+    if row is None:
+        session.add(AchievementCounter(user_id=user_id, code=code, count=value))
+    else:
+        row.count = value
+    await session.flush()
+
+
+async def on_voice_submitted(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э14: сдал голосовой вариант → «Голос из народа» и его юбилеи."""
+    return await _grant_counter(
+        session,
+        user_id,
+        "voice_debut",
+        await count_voice_submissions(session, user_id),
+        announce=announce,
+    )
+
+
+async def on_voice_winner(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э14: вариант победил в голосовании → «Лучший голос» и его юбилеи."""
+    return await _grant_counter(
+        session,
+        user_id,
+        "voice_winner",
+        await count_voice_wins(session, user_id),
+        announce=announce,
+    )
+
+
+async def on_music_published(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э15: трек ушёл в подборку → «Диджей недели» и его юбилеи."""
+    return await _grant_counter(
+        session,
+        user_id,
+        "music_dj",
+        await count_music_published(session, user_id),
+        announce=announce,
+    )
+
+
+async def on_music_spotlight(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э16: трек автора выпал в мьюзик-гейме → «На виду»."""
+    return await _grant_counter(
+        session,
+        user_id,
+        "music_spotlight",
+        await count_music_spotlights(session, user_id),
+        announce=announce,
+    )
+
+
+async def on_music_guess(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э16: верная догадка → «Меломан» + рост серии («На слуху»).
+
+    Серия живёт в счётчиках, а не в таблице раундов: неверные догадки нигде не
+    хранятся, поэтому «сколько подряд» из данных не вывести. Своя пара
+    счётчиков (текущая серия + рекорд) закрывает это точно.
+    """
+    count = await bump_counter(session, user_id, COUNTER_MUSIC_GUESS)
+    out = await _grant_counter(
+        session, user_id, "music_guess", count, announce=announce
+    )
+
+    current = await get_counter(session, user_id, COUNTER_MUSIC_STREAK_CURRENT) + 1
+    await _set_counter(session, user_id, COUNTER_MUSIC_STREAK_CURRENT, current)
+    best = await get_counter(session, user_id, COUNTER_MUSIC_STREAK)
+    if current > best:
+        await _set_counter(session, user_id, COUNTER_MUSIC_STREAK, current)
+        best = current
+
+    ach = get("music_streak")
+    if ach is not None and ach.threshold is not None:
+        out += await _grant_threshold(
+            session,
+            user_id,
+            "music_streak",
+            best,
+            ach.threshold,
+            announce=announce,
+        )
+    await session.commit()
+    return out
+
+
+async def on_music_miss(session: AsyncSession, user_id: int) -> None:
+    """Э16: неверная догадка обнуляет ТЕКУЩУЮ серию (рекорд не трогаем)."""
+    if await get_counter(session, user_id, COUNTER_MUSIC_STREAK_CURRENT) != 0:
+        await _set_counter(session, user_id, COUNTER_MUSIC_STREAK_CURRENT, 0)
+        await session.commit()
 
 
 async def on_game_winner(
@@ -633,12 +811,10 @@ async def on_chukhan_reroll(
 async def on_bot_reply(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
-    """Ответ боту реплаем/упоминанием: счётчик «Укротителя паст»."""
-    ach = get("worm_tamer")
-    assert ach is not None and ach.threshold is not None
+    """Ответ боту реплаем/упоминанием: «Укротитель паст» (первый) и юбилеи."""
     count = await bump_counter(session, user_id, COUNTER_WORM_TAMER)
-    return await _grant_threshold(
-        session, user_id, "worm_tamer", count, ach.threshold, announce=announce
+    return await _grant_counter(
+        session, user_id, "worm_tamer", count, announce=announce
     )
 
 
@@ -658,15 +834,11 @@ async def on_meme_all_reacted(
 async def on_meme_reactions(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
-    """Э7: пост с мемом закрылся С реакциями → счётчик «Успешного успеха»."""
-    out: list[Achievement] = []
-    succ = get("successful_success")
-    assert succ is not None and succ.threshold is not None
+    """Э7: пост закрылся С реакциями → «Успешный успех» (первый) и юбилеи."""
     count = await bump_counter(session, user_id, COUNTER_SUCCESS)
-    out += await _grant_threshold(
-        session, user_id, "successful_success", count, succ.threshold, announce=announce
+    return await _grant_counter(
+        session, user_id, "successful_success", count, announce=announce
     )
-    return out
 
 
 async def on_dead_post(
@@ -688,11 +860,9 @@ async def on_dead_post(
         ach = await grant(session, user_id, "forever_alone", announce=announce)
         if ach:
             out.append(ach)
-    opium = get("opium_for_nobody")
-    assert opium is not None and opium.threshold is not None
     count = await bump_counter(session, user_id, COUNTER_OPIUM)
-    out += await _grant_threshold(
-        session, user_id, "opium_for_nobody", count, opium.threshold, announce=announce
+    out += await _grant_counter(
+        session, user_id, "opium_for_nobody", count, announce=announce
     )
     return out
 
@@ -705,11 +875,14 @@ async def on_donation_sent(
     live_participants: int,
     announce: bool = True,
 ) -> list[Achievement]:
-    """Э11: «Кэшбэк» (первый донат) и «Дон Корлеоне» (одарил всех живых за год)."""
+    """Э11: «Кэшбэк» (первый донат + юбилеи) и «Дон Корлеоне» (одарил всех живых).
+
+    «Кэшбэк» — накопитель: база берётся за ПЕРВЫЙ донат, а ×10/×20/… — отдельные
+    ачивки за юбилеи (одно жёсткое правило проекта «впервые ≠ юбилей»).
+    """
     out: list[Achievement] = []
-    ach = await grant(session, donor_id, "cashback", announce=announce)
-    if ach:
-        out.append(ach)
+    count = await bump_counter(session, donor_id, COUNTER_DONATIONS)
+    out += await _grant_counter(session, donor_id, "cashback", count, announce=announce)
     if live_participants > 0 and recipients_this_year >= live_participants:
         ach = await grant(session, donor_id, "don_corleone", announce=announce)
         if ach:

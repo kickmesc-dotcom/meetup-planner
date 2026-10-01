@@ -608,7 +608,9 @@ export default function GameScreen({ users, onBack }: Props) {
                 }}
               />
               <div className="text-[11px] text-tg-hint">
-                вероятность выпадения, потолок в сутки и пауза между событиями
+                вероятность выпадения, потолок в сутки и пауза между событиями.
+                Потолок дня выбирается случайно между «минимум» и «максимум»
+                (поставь равными — будет точное значение)
               </div>
               <NumberRow
                 label="вероятность, %"
@@ -617,10 +619,31 @@ export default function GameScreen({ users, onBack }: Props) {
                 onSave={(n) => socialMut.mutate({ events_chance_percent: Math.min(100, n) })}
               />
               <NumberRow
-                label="событий в сутки"
+                label="минимум в сутки"
+                value={social.data.events_min_per_day}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ events_min_per_day: n })}
+              />
+              <NumberRow
+                label="максимум в сутки"
                 value={social.data.events_max_per_day}
                 busy={socialMut.isPending}
                 onSave={(n) => socialMut.mutate({ events_max_per_day: n })}
+              />
+              <div className="text-[11px] text-tg-hint">
+                живые часы: ночью события не публикуются (локальное время, UTC+3)
+              </div>
+              <NumberRow
+                label="окно: с, час"
+                value={social.data.events_day_start_hour}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ events_day_start_hour: Math.min(23, n) })}
+              />
+              <NumberRow
+                label="окно: по, час"
+                value={social.data.events_day_end_hour}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ events_day_end_hour: Math.min(24, n) })}
               />
               <NumberRow
                 label="пауза, часов"
