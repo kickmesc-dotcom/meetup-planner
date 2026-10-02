@@ -990,3 +990,72 @@ async def test_observability_summary_shape():
     assert data["xp_total"] == 80
     assert data["by_event"][0]["event"] == "message"
     assert data["by_event"][0]["title"] == "Сообщение в чате"
+
+
+@pytest.mark.asyncio
+async def test_post_mode_hybrid_day_instant_night_pool(monkeypatch):
+    """Гибрид: днём (в живые часы) — сразу, ночью — в буфер на утреннюю сводку."""
+    from app.services import admin_config
+    from app.services.game import achievements as ach_mod
+    from app.services.game import activity, journal
+
+    async def _mode(_s):
+        return "hybrid"
+
+    async def _url(_bot=None):
+        return "https://t.me/x?startapp=achievements"
+
+    async def _markup(_url=None):
+        return None
+
+    monkeypatch.setattr(admin_config, "get_achievements_post_mode", _mode)
+    monkeypatch.setattr(
+        ach_mod, "get_settings", lambda: SimpleNamespace(group_chat_id=-100)
+    )
+    monkeypatch.setattr(ach_mod, "achievements_url", _url)
+    monkeypatch.setattr(ach_mod, "_link_markup", _markup)
+    monkeypatch.setattr(ach_mod, "_get_bot", lambda: object())
+
+    posted: dict = {}
+    queued: dict = {}
+
+    async def _announce(_s, **kw):
+        posted.update(kw)
+        return True
+
+    async def _queue(_s, *, user_id, lines, chat_id=None):
+        queued.update(user_id=user_id, lines=lines, chat_id=chat_id)
+        return True
+
+    monkeypatch.setattr(journal, "announce", _announce)
+    monkeypatch.setattr(journal, "queue_achievements", _queue)
+
+    ach = SimpleNamespace(
+        icon="📈", title="Успешный успех", points=50, description="d", code="x"
+    )
+
+    # Ночь → буфер, мгновенного поста нет.
+    async def _night(_s, **_k):
+        return activity.NIGHT
+
+    monkeypatch.setattr(activity, "check_window", _night)
+    assert await ach_mod.announce_granted(_FakeSession(), user_id=7, achs=[ach]) is True
+    assert queued["lines"] == ["📈 «Успешный успех» (+50 XP)"]
+    assert posted == {}
+
+    # День → мгновенный пост через журнал.
+    queued.clear()
+
+    async def _ok(_s, **_k):
+        return activity.OK
+
+    monkeypatch.setattr(activity, "check_window", _ok)
+    assert await ach_mod.announce_granted(_FakeSession(), user_id=7, achs=[ach]) is True
+    assert posted.get("subject_user_id") == 7
+    assert queued == {}
+
+
+def test_post_modes_include_hybrid():
+    from app.services.game import config
+
+    assert set(config.ACHIEVEMENT_POST_MODES) == {"instant", "pool", "hybrid"}

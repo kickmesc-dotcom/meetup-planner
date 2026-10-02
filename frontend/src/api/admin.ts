@@ -1318,6 +1318,9 @@ export interface GameSocialState {
   achievements_pool_pending: number;
   /** Э19: единый бюджет дня — максимум авто-постов за сутки (0 — без лимита). */
   activity_max_posts_per_day: number;
+  /** Э19: живые часы чата (локальные) — днём hybrid выдаёт ачивки сразу. */
+  activity_day_start_hour: number;
+  activity_day_end_hour: number;
   memorial_enabled: boolean;
   memorial_silence_days: number;
   memorial_repeat_days: number;

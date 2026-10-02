@@ -645,6 +645,7 @@ export default function GameScreen({ users, onBack }: Props) {
                   [
                     ["instant", "По одной (как раньше)"],
                     ["pool", "Пулом (сводкой)"],
+                    ["hybrid", "Гибрид (день — сразу, ночь — сводкой)"],
                   ] as const
                 ).map(([mode, label]) => (
                   <button
@@ -667,11 +668,31 @@ export default function GameScreen({ users, onBack }: Props) {
                 ))}
               </div>
               <div className="text-[11px] text-tg-hint">
-                {social.data.achievements_post_mode === "pool"
-                  ? `В буфере: ${social.data.achievements_pool_pending} ачивок. Ночью — только сбор, утром одна сводка, днём не чаще шага.`
-                  : "Каждая ачивка уходит отдельным сообщением сразу."}
+                {social.data.achievements_post_mode === "instant" &&
+                  "Каждая ачивка уходит отдельным сообщением сразу."}
+                {social.data.achievements_post_mode === "pool" &&
+                  `В буфере: ${social.data.achievements_pool_pending} ачивок. Ночью — только сбор, утром одна сводка, днём не чаще шага.`}
+                {social.data.achievements_post_mode === "hybrid" &&
+                  `Днём ${social.data.activity_day_start_hour}:00–${social.data.activity_day_end_hour}:00 выдаём сразу (в рамках бюджета дня), ночью копим: сейчас в буфере ${social.data.achievements_pool_pending}.`}
               </div>
-              {social.data.achievements_post_mode === "pool" && (
+              {social.data.achievements_post_mode === "hybrid" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <NumberRow
+                    label="живые часы: с"
+                    value={social.data.activity_day_start_hour}
+                    busy={socialMut.isPending}
+                    onSave={(n) => socialMut.mutate({ activity_day_start_hour: n })}
+                  />
+                  <NumberRow
+                    label="живые часы: до"
+                    value={social.data.activity_day_end_hour}
+                    busy={socialMut.isPending}
+                    onSave={(n) => socialMut.mutate({ activity_day_end_hour: n })}
+                  />
+                </div>
+              )}
+              {(social.data.achievements_post_mode === "pool" ||
+                social.data.achievements_post_mode === "hybrid") && (
                 <>
                   <div className="flex flex-wrap gap-1">
                     {[1, 2, 3, 4, 6, 8, 12].map((hours) => (

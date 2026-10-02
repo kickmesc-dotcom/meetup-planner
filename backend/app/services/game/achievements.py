@@ -469,13 +469,28 @@ async def announce_granted(
         return False
     user = await session.get(User, user_id)
     name = user.display_name if user else "Участник"
-    # Э19: режим буфера — не постим сразу, а тихо копим. Сводка выплеснется
-    # расписанием (`journal.run_achievements_digest_job`): ночью только сбор,
-    # утром одна компактная сводка, днём — не чаще настроенного шага.
+    # Э19: режим публикации ачивок.
+    #   instant — всегда сразу (как было);
+    #   pool    — всегда в буфер, выплеснется расписанием;
+    #   hybrid  — днём в живые часы и в рамках бюджета дня — сразу, а ночью /
+    #             в разгар флуда / после исчерпания бюджета — в буфер, и уже
+    #             утренняя сводка (`run_achievements_digest_job`) его выплеснет.
     from app.services.admin_config import get_achievements_post_mode
-    from app.services.game import journal
+    from app.services.game import activity, journal
 
-    if await get_achievements_post_mode(session) == "pool":
+    mode = await get_achievements_post_mode(session)
+    queue = mode == "pool"
+    if mode == "hybrid":
+        try:
+            window = await activity.check_window(
+                session, now=datetime.now(timezone.utc)
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("game.achievement_window_failed", error=str(exc))
+            # Не смогли проверить окно — безопаснее собрать, чем разбудить чат.
+            window = activity.BUSY
+        queue = window != activity.OK
+    if queue:
         lines = [f"{ach.icon} «{ach.title}» (+{ach.points} XP)" for ach in achs]
         return await journal.queue_achievements(
             session, user_id=user_id, lines=lines, chat_id=chat_id

@@ -4071,6 +4071,8 @@ async def _game_social_state(session) -> GameSocialOut:
         get_achievements_pool_min_items,
         get_achievements_pool_morning_hour,
         get_achievements_post_mode,
+        get_activity_day_end_hour,
+        get_activity_day_start_hour,
         get_activity_max_posts_per_day,
         get_game_contraband_chance_percent,
         get_game_contraband_daily_cap,
@@ -4140,6 +4142,8 @@ async def _game_social_state(session) -> GameSocialOut:
         achievements_pool_gap_minutes=await get_achievements_pool_gap_minutes(session),
         achievements_pool_pending=achievements_pending,
         activity_max_posts_per_day=await get_activity_max_posts_per_day(session),
+        activity_day_start_hour=await get_activity_day_start_hour(session),
+        activity_day_end_hour=await get_activity_day_end_hour(session),
         memorial_enabled=await get_game_memorial_enabled(session),
         memorial_silence_days=await get_game_memorial_silence_days(session),
         memorial_repeat_days=await get_game_memorial_repeat_days(session),
@@ -4188,6 +4192,8 @@ async def admin_game_social_put(
         set_achievements_pool_min_items,
         set_achievements_pool_morning_hour,
         set_achievements_post_mode,
+        set_activity_day_end_hour,
+        set_activity_day_start_hour,
         set_activity_max_posts_per_day,
         set_game_contraband_chance_percent,
         set_game_contraband_daily_cap,
@@ -4226,6 +4232,10 @@ async def admin_game_social_put(
         await set_achievements_pool_gap_minutes(session, body.achievements_pool_gap_minutes)
     if body.activity_max_posts_per_day is not None:
         await set_activity_max_posts_per_day(session, body.activity_max_posts_per_day)
+    if body.activity_day_start_hour is not None:
+        await set_activity_day_start_hour(session, body.activity_day_start_hour)
+    if body.activity_day_end_hour is not None:
+        await set_activity_day_end_hour(session, body.activity_day_end_hour)
     if body.memorial_enabled is not None:
         await set_game_memorial_enabled(session, body.memorial_enabled)
     if body.memorial_silence_days is not None:

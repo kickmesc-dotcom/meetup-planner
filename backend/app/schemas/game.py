@@ -250,6 +250,10 @@ class GameSocialOut(BaseModel):
     unresolved_owners: list[str] = []
     # Э19: единый бюджет дня — максимум авто-постов бота за сутки (0 — без лимита).
     activity_max_posts_per_day: int = 8
+    # Э19: живые часы (локальное время чата) — днём ачивки в hybrid-режиме
+    # выдаются сразу, ночью копятся в буфер.
+    activity_day_start_hour: int = 10
+    activity_day_end_hour: int = 22
     # Э14: голосовые задания.
     voice_enabled: bool = True
     voice_poll_enabled: bool = False
@@ -286,6 +290,8 @@ class GameSocialIn(BaseModel):
     contraband_daily_cap: int | None = Field(None, ge=0, le=100)
     contraband_words: list[GameContrabandWord] | None = None
     activity_max_posts_per_day: int | None = Field(None, ge=0, le=200)
+    activity_day_start_hour: int | None = Field(None, ge=0, le=23)
+    activity_day_end_hour: int | None = Field(None, ge=0, le=24)
     voice_enabled: bool | None = None
     voice_poll_enabled: bool | None = None
     voice_min_gap_hours: int | None = Field(None, ge=1, le=720)
