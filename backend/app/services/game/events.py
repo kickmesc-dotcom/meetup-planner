@@ -281,24 +281,26 @@ async def try_answer(
     text: str | None,
     has_media: bool = False,
     at: datetime | None = None,
+    prompt_id: int | None = None,
 ) -> bool:
     """Сообщение может быть ответом на открытый промпт. True — кто-то выиграл.
 
     Вызывается из обработчика КАЖДОГО сообщения, поэтому начинается с одного
     индексного SELECT'а по (chat_id, closed_at, expires_at) — нет открытых
     промптов, нет и работы.
+
+    Э21: `prompt_id` — ответ из мини-аппа, привязанный к конкретной карточке
+    (в чате остаётся выбор «первого открытого»).
     """
     moment = at or datetime.now(timezone.utc)
-    prompt = await session.scalar(
-        select(GamePrompt)
-        .where(
-            GamePrompt.chat_id == chat_id,
-            GamePrompt.closed_at.is_(None),
-            GamePrompt.expires_at > moment,
-        )
-        .order_by(GamePrompt.id.asc())
-        .limit(1)
+    stmt = select(GamePrompt).where(
+        GamePrompt.chat_id == chat_id,
+        GamePrompt.closed_at.is_(None),
+        GamePrompt.expires_at > moment,
     )
+    if prompt_id is not None:
+        stmt = stmt.where(GamePrompt.id == int(prompt_id))
+    prompt = await session.scalar(stmt.order_by(GamePrompt.id.asc()).limit(1))
     if prompt is None:
         return False
 

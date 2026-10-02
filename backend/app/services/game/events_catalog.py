@@ -29,6 +29,10 @@ class Answer:
     xp: int
     reply: str
     media: bool = False
+    # Э21: человеческая подпись варианта для мини-аппа. Когда она есть — вопрос
+    # можно ответить КНОПКОЙ в ленте («да»/«нет»), а не только текстом в чате.
+    # `None` означает «вариант без кнопки» (свободный ответ).
+    label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,11 +77,13 @@ PROMPTS: tuple[Prompt, ...] = (
                 matcher=r"^да\s*[!?.…]*$",
                 xp=10,
                 reply="🫶 <b>{name}</b>: +{xp} XP. Хоть не соврал.",
+                label="да",
             ),
             Answer(
                 matcher=r"^нет\s*[!?.…]*$",
                 xp=50,
                 reply="🫶 <b>{name}</b>: +{xp} XP и пожизненный кринж.",
+                label="нет",
             ),
         ),
         ttl_minutes=120,
@@ -147,6 +153,13 @@ def prompt_codes() -> tuple[str, ...]:
 def serialize_answers(prompt: Prompt) -> list[dict]:
     """Ответы промпта в JSONB-форму для `game_prompts.answers`."""
     return [
-        {"matcher": a.matcher, "xp": a.xp, "reply": a.reply, "media": a.media}
+        {
+            "matcher": a.matcher,
+            "xp": a.xp,
+            "reply": a.reply,
+            "media": a.media,
+            # Э21: подпись для кнопки в мини-аппе (None — свободный ответ).
+            "label": a.label,
+        }
         for a in prompt.answers
     ]

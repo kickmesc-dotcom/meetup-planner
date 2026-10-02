@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { fetchFeed, FEED_KIND_LABELS, type FeedItem } from "@/api/game";
+import ActivitiesPanel from "./ActivitiesPanel";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
@@ -123,6 +124,8 @@ export default function FeedScreen({ meId }: { meId: number }) {
       )}
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+        {/* Э21: активности прямо в приложении — вопросы и голосовое задание. */}
+        {scope === "all" && <ActivitiesPanel />}
         {items.map((it) => (
           <FeedRow
             key={it.id}

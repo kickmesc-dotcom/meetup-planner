@@ -540,3 +540,100 @@ class DonationOut(BaseModel):
     donor_xp: int = 0
     recipient_xp: int = 0
     recipient_name: str = ""
+
+
+# --------------------------------------------------------------------------
+# Э21: активности в мини-аппе (вопросы и голосовые) — когда бот молчит в чате
+# --------------------------------------------------------------------------
+
+
+class ActivityOptionOut(BaseModel):
+    """Вариант ответа на вопрос — кнопкой в ленте. `label` — что напишется."""
+
+    label: str
+    xp: int = 0
+
+
+class ActivityOut(BaseModel):
+    """Открытый вопрос (случайное событие), ждущий ответа.
+
+    `options` — варианты для кнопок; `needs_text` — нужен свободный ответ
+    (или вариант без кнопки). Одно из двух обычно непустое.
+    """
+
+    id: int
+    code: str = ""
+    text: str = ""
+    options: list[ActivityOptionOut] = []
+    needs_text: bool = False
+    expires_at: datetime | None = None
+    answered_by_me: bool = False
+
+
+class ActivitiesOut(BaseModel):
+    """Список активных вопросов + признак включённой игры."""
+
+    enabled: bool = True
+    items: list[ActivityOut] = []
+
+
+class ActivityAnswerIn(BaseModel):
+    """Ответ в мини-аппе: либо выбранный вариант, либо свободный текст."""
+
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class ActivityAnswerOut(BaseModel):
+    """Итог ответа: ок/нет и сколько выпало (текст ошибки — на клиенте)."""
+
+    ok: bool = False
+    status: str = ""
+    xp: int = 0
+
+
+class VoiceSubmissionOut(BaseModel):
+    """Одна сдача голосового в списке текущего задания."""
+
+    id: int
+    user_id: int
+    user_name: str | None = None
+    duration: int | None = None
+    submitted_at: datetime | None = None
+    is_mine: bool = False
+
+
+class VoiceCurrentOut(BaseModel):
+    """Текущее голосовое задание и сдачи по нему (для ленты)."""
+
+    enabled: bool = True
+    task_id: int | None = None
+    title: str = ""
+    text: str = ""
+    reward: int = 0
+    expires_at: datetime | None = None
+    my_submission_id: int | None = None
+    submissions: list[VoiceSubmissionOut] = []
+
+
+class VoiceSubmitOut(BaseModel):
+    """Итог сдачи голосового из мини-аппа."""
+
+    ok: bool = False
+    status: str = ""
+    reward: int = 0
+
+
+class MusicAddIn(BaseModel):
+    """Э21: трек ссылкой из мини-аппа (аудиофайлом по-прежнему в личку боту)."""
+
+    url: str = Field(min_length=1, max_length=2048)
+    title: str | None = Field(default=None, max_length=200)
+    performer: str | None = Field(default=None, max_length=200)
+
+
+class MusicAddOut(BaseModel):
+    """Итог приёма трека: статус сервиса + остаток недельного лимита."""
+
+    ok: bool = False
+    status: str = ""
+    week_count: int = 0

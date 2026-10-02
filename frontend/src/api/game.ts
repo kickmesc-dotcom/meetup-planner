@@ -1,4 +1,9 @@
 import { api } from "./client";
+import { getInitData } from "@/tg/webapp";
+
+// Э21: загрузка голосового и прослушивание — не через `api()`: там всегда
+// ставится JSON-заголовок, а для `FormData` браузер сам выставляет boundary.
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
 /**
  * GHG10 Э5: поверхности игровой системы (ранги, опыт, ачивки).
@@ -216,6 +221,126 @@ export const FEED_KIND_LABELS: Record<string, { icon: string; title: string }> =
   contraband: { icon: "💰", title: "Контрабанда" },
   memorial: { icon: "🕯", title: "Поминовения" },
 };
+
+/**
+ * Э21: активности в мини-аппе, когда бот молчит в чате.
+ *
+ * Вопросы (случайные события) можно закрыть кнопкой/текстом прямо в ленте, а
+ * голосовое задание — сдать, убрать и прослушать, не покидая приложение.
+ */
+export interface ActivityOption {
+  label: string;
+  xp: number;
+}
+
+export interface GameActivity {
+  id: number;
+  code: string;
+  text: string;
+  options: ActivityOption[];
+  needs_text: boolean;
+  expires_at: string | null;
+  answered_by_me: boolean;
+}
+
+export interface ActivitiesOut {
+  enabled: boolean;
+  items: GameActivity[];
+}
+
+export const fetchActivities = () =>
+  api<ActivitiesOut>("/api/game/activities");
+
+export interface ActivityAnswerResult {
+  ok: boolean;
+  status: string;
+  xp: number;
+}
+
+/** Ответ на вопрос: либо подпись варианта, либо свободный текст. */
+export const answerActivity = (id: number, text: string) =>
+  api<ActivityAnswerResult>(`/api/game/activities/${id}/answer`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+
+export interface VoiceSubmission {
+  id: number;
+  user_id: number;
+  user_name: string | null;
+  duration: number | null;
+  submitted_at: string | null;
+  is_mine: boolean;
+}
+
+export interface VoiceCurrent {
+  enabled: boolean;
+  task_id: number | null;
+  title: string;
+  text: string;
+  reward: number;
+  expires_at: string | null;
+  my_submission_id: number | null;
+  submissions: VoiceSubmission[];
+}
+
+export const fetchVoiceCurrent = () =>
+  api<VoiceCurrent>("/api/game/voice/current");
+
+export const withdrawVoice = () =>
+  api<{ ok: boolean; status: string; reward: number }>(
+    "/api/game/voice/submission",
+    { method: "DELETE" },
+  );
+
+/** Сдать голосовое: записи из MediaRecorder уходят как есть, файл не храним. */
+export async function uploadVoice(
+  blob: Blob,
+  duration: number,
+): Promise<{ ok: boolean; status: string; reward: number }> {
+  const form = new FormData();
+  form.append("file", blob, "voice.ogg");
+  form.append("duration", String(Math.max(0, Math.round(duration))));
+  const res = await fetch(`${API_BASE}/api/game/voice/submit`, {
+    method: "POST",
+    headers: { Authorization: `tma ${getInitData()}` },
+    body: form,
+  });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail ?? detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+/**
+ * Прослушать вариант: тянем аудио с Authorization и отдаём blob-URL (элемент
+ * `<audio>` не умеет отправлять заголовки сам). URL нужно освобождать.
+ */
+export async function fetchVoiceAudioUrl(id: number): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/game/voice/submissions/${id}/audio`, {
+    headers: { Authorization: `tma ${getInitData()}` },
+  });
+  if (!res.ok) throw new Error("audio_unavailable");
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+export const addMusicTrack = (body: {
+  url: string;
+  title?: string;
+  performer?: string;
+}) =>
+  api<{ ok: boolean; status: string; week_count: number }>(
+    "/api/game/music/tracks",
+    { method: "POST", body: JSON.stringify(body) },
+  );
 
 /** Э15/Э16: «Предложка недели» — свои треки, лимит и история подборок. */
 export interface MusicMineTrack {

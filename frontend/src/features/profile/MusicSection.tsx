@@ -6,14 +6,17 @@
  * Чужие треки до публикации не показываем — интрига сохраняется (и сервер их
  * не отдаёт). Сдавать треки можно только боту в личку; здесь — витрина.
  */
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addMusicTrack,
   fetchMyMusic,
   likeMusicTrack,
   type MusicMineTrack,
   type MusicWeekTrack,
 } from "@/api/game";
 import { ListSkeleton } from "@/components/Skeleton";
+import { haptic, showAlert } from "@/tg/webapp";
 
 function statusLabel(status: string): { text: string; className: string } {
   if (status === "published") {
@@ -65,6 +68,75 @@ function LikeButton({ track }: { track: MusicWeekTrack }) {
   );
 }
 
+/** Э21: сдача трека ссылкой прямо в мини-аппе (аудиофайл — боту в личку). */
+function AddTrackForm() {
+  const queryClient = useQueryClient();
+  const [url, setUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const add = useMutation({
+    mutationFn: () =>
+      addMusicTrack({ url: url.trim(), title: title.trim() || undefined }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        haptic("success");
+        setUrl("");
+        setTitle("");
+        void queryClient.invalidateQueries({ queryKey: ["music", "mine"] });
+      } else {
+        haptic("error");
+        void showAlert(addTrackStatus(res.status));
+      }
+    },
+    onError: () => haptic("error"),
+  });
+  return (
+    <div className="mt-3 space-y-1.5 border-t border-tg-bg/40 pt-3">
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https:// ссылка на трек"
+        inputMode="url"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        className="w-full rounded-lg bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+      />
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Название (необязательно)"
+        className="w-full rounded-lg bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+      />
+      <button
+        type="button"
+        disabled={add.isPending || !url.trim()}
+        onClick={() => {
+          haptic("selection");
+          add.mutate();
+        }}
+        className="w-full rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-50"
+      >
+        {add.isPending ? "Добавляем…" : "Добавить трек по ссылке"}
+      </button>
+    </div>
+  );
+}
+
+function addTrackStatus(status: string): string {
+  switch (status) {
+    case "limit":
+      return "На эту неделю лимит треков уже исчерпан.";
+    case "duplicate":
+      return "Такой трек уже сдан.";
+    case "bad":
+      return "Не похоже на ссылку — проверь адрес.";
+    case "unknown_user":
+      return "Тебя нет в списке участников.";
+    default:
+      return "Не получилось добавить трек.";
+  }
+}
+
 export function MusicScreen() {
   const music = useQuery({ queryKey: ["music", "mine"], queryFn: fetchMyMusic });
   const data = music.data;
@@ -106,6 +178,8 @@ export function MusicScreen() {
           Кидай треки боту в личку — аудиофайлом или ссылкой. Раз в неделю бот
           выкладывает подборку в чат.
         </div>
+        {/* Э21: ссылку можно сдать прямо здесь (аудио — по-прежнему боту). */}
+        <AddTrackForm />
       </section>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">

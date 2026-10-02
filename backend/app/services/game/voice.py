@@ -71,6 +71,9 @@ MODE_ALL = "all"  # награда каждому, чей вариант при�
 MODE_FIRST_ONLY = "first_only"  # награда только первому сдавшему
 # Вид записи в `event_log`, где мы помним режим конкретного задания.
 MODE_KIND = "voice_task_mode"
+# Э21: могилка сдачи — участник убрал свой вариант из мини-аппа. Без неё повторная
+# сдача дала бы второй XP за то же задание (уникальность-то снял delete).
+WITHDRAWN_KIND = "voice_withdrawn"
 
 
 # --------------------------------------------------------------------------
@@ -243,6 +246,32 @@ async def get_task_mode(session: AsyncSession, task_id: int | None) -> str:
     )
     mode = (row.payload or {}).get("mode") if row is not None else None
     return mode if mode in (MODE_ALL, MODE_FIRST_ONLY) else MODE_ALL
+
+
+async def _withdrawn(session: AsyncSession, task_id: int | None, user_id: int) -> bool:
+    """Убирал ли участник свой вариант в этом задании (Э21)."""
+    if task_id is None:  # несохранённое задание (тесты/теоретический вызов)
+        return False
+    found = await session.scalar(
+        select(EventLog.id)
+        .where(
+            EventLog.kind == WITHDRAWN_KIND,
+            EventLog.payload["task_id"].as_integer() == int(task_id),
+            EventLog.payload["user_id"].as_integer() == int(user_id),
+        )
+        .limit(1)
+    )
+    return found is not None
+
+
+def record_withdrawal(session: AsyncSession, *, task_id: int, user_id: int) -> None:
+    """Запомнить, что участник убрал свой вариант (для delete из мини-аппа)."""
+    session.add(
+        EventLog(
+            kind=WITHDRAWN_KIND,
+            payload={"task_id": int(task_id), "user_id": int(user_id)},
+        )
+    )
 
 
 async def _has_open_task(session: AsyncSession, *, now: datetime) -> bool:
@@ -547,6 +576,11 @@ async def submit(
                 )
                 return SubmitResult(LATE, task=task, name=first_name)
             return SubmitResult(SILENT, task=task)
+
+    # Э21: если вариант уже убирали из мини-аппа — второй раз не принимаем,
+    # иначе получался бы второй XP за одно задание (уникальность-то снял delete).
+    if await _withdrawn(session, task.id, int(user_id)):
+        return SubmitResult(ALREADY, task=task, name=name)
 
     session.add(
         GameVoiceSubmission(

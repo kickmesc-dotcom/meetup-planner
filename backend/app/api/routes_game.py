@@ -14,16 +14,28 @@ import asyncio
 from datetime import datetime, timezone
 
 import structlog
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, SessionDep
 from app.config import get_settings
-from app.db.models import GameProfile, User, UserAchievement
+from app.db.models import (
+    GameProfile,
+    GamePrompt,
+    GameVoiceSubmission,
+    GameVoiceTask,
+    User,
+    UserAchievement,
+)
 from app.schemas.game import (
     AchievementItemOut,
     AchievementStatOut,
+    ActivitiesOut,
+    ActivityAnswerIn,
+    ActivityAnswerOut,
+    ActivityOptionOut,
+    ActivityOut,
     DailyEventOut,
     DonationIn,
     DonationOut,
@@ -38,6 +50,8 @@ from app.schemas.game import (
     HolidayOut,
     HolidaysOut,
     LevelUpOut,
+    MusicAddIn,
+    MusicAddOut,
     MusicLikeOut,
     MusicMineOut,
     MusicMineTrackOut,
@@ -47,9 +61,21 @@ from app.schemas.game import (
     MusicWeekTrackOut,
     RankOut,
     RankRowOut,
+    VoiceCurrentOut,
+    VoiceSubmissionOut,
+    VoiceSubmitOut,
     XpRuleOut,
 )
-from app.services.game import achievements, donations, feed, gates, holidays, levels, xp
+from app.services.game import (
+    achievements,
+    donations,
+    events,
+    feed,
+    gates,
+    holidays,
+    levels,
+    xp,
+)
 from app.services.game.achievements_catalog import COMPLETIONIST_CODE, base_achievements
 from app.services.game.config import (
     MAX_LEVEL,
@@ -82,6 +108,21 @@ _DONATION_STATUS = {
 # Таймаут насмешки в чат (см. `_tease_in_chat`): как у остальных TG-вызовов из
 # API — не блокируем webhook дольше сессии.
 _TEASE_TIMEOUT = 15.0
+
+# Э21: верхний размер голосового, принятого из мини-аппа (12 МБ — с запасом на
+# минуту opus). Файлы НЕ храним: пересылаем боту, берём file_id и отдаём его.
+_VOICE_MAX_BYTES = 12 * 1024 * 1024
+
+# Э21: статусы сдачи голосового в мини-аппе → текст (фронт не парсит коды).
+_VOICE_STATUS = {
+    "ok": "принято",
+    "no_task": "задание уже закрыто",
+    "closed": "приём закрыт",
+    "already": "ты уже сдавал вариант",
+    "late": "награду забрал первый",
+    "silent": "ты опоздал",
+    "unknown_user": "ты не в списке участников",
+}
 
 
 def _rank_out(level: int) -> RankOut:
@@ -732,3 +773,286 @@ async def like_music_track(
             status_code=status.HTTP_404_NOT_FOUND, detail="track not published"
         )
     return MusicLikeOut(ok=True, liked=result.liked, likes=result.likes)
+
+
+# --------------------------------------------------------------------------
+# Э21: активности в мини-аппе — вопросы и голосовые, когда бот молчит в чате
+#
+# Зачем: в режимах «ачивки в приложение» / «всё в приложение» бот не пишет в
+# чат, но механики должны продолжать работать. Поэтому лента становится
+# «внутренней расширенной копией чата»: тут можно ответить на вопрос кнопкой или
+# текстом, сдать/убрать голосовое и прослушать чужие варианты — не покидая апп.
+# --------------------------------------------------------------------------
+
+
+def _activity_options(answers: list[dict]) -> tuple[list[ActivityOptionOut], bool]:
+    """Разобрать ответы промпта на кнопки и «нужен ли текст». Чистая функция.
+
+    Кнопка-вариант — там, где у ответа есть человеческая `label` (Э21). Если
+    хоть один ответ без подписи и не медиа — нужен свободный ввод. Если ни
+    кнопок, ни текстового варианта не нашлось — всё равно даём ввод.
+    """
+    options: list[ActivityOptionOut] = []
+    needs_text = False
+    for ans in answers or []:
+        label = str(ans.get("label") or "").strip()
+        if label:
+            options.append(
+                ActivityOptionOut(label=label, xp=int(ans.get("xp") or 0))
+            )
+        elif not ans.get("media"):
+            needs_text = True
+    if not options and not needs_text:
+        needs_text = True
+    return options, needs_text
+
+
+@router.get("/game/activities", response_model=ActivitiesOut)
+async def activities_list(session: SessionDep, user: CurrentUser) -> ActivitiesOut:
+    """Открытые вопросы (случайные события), на которые можно ответить в апп.
+
+    Ответ засчитывается тем же путём, что и сообщение в чате
+    (`events.try_answer`), поэтому «первый подходящий забирает XP» сохраняется.
+    """
+    if not await is_game_enabled(session):
+        return ActivitiesOut(enabled=False, items=[])
+    chat_id = get_settings().group_chat_id
+    if not chat_id:
+        return ActivitiesOut(enabled=True, items=[])
+    now = datetime.now(timezone.utc)
+    rows = (
+        await session.scalars(
+            select(GamePrompt)
+            .where(
+                GamePrompt.chat_id == chat_id,
+                GamePrompt.closed_at.is_(None),
+                GamePrompt.expires_at > now,
+            )
+            .order_by(GamePrompt.id.asc())
+        )
+    ).all()
+    items: list[ActivityOut] = []
+    for prompt in rows:
+        options, needs_text = _activity_options(list(prompt.answers or []))
+        items.append(
+            ActivityOut(
+                id=prompt.id,
+                code=prompt.code,
+                text=prompt.text,
+                options=options,
+                needs_text=needs_text,
+                expires_at=prompt.expires_at,
+                answered_by_me=prompt.winner_user_id == user.id,
+            )
+        )
+    return ActivitiesOut(enabled=True, items=items)
+
+
+@router.post(
+    "/game/activities/{prompt_id}/answer", response_model=ActivityAnswerOut
+)
+async def activity_answer(
+    prompt_id: int, body: ActivityAnswerIn, session: SessionDep, user: CurrentUser
+) -> ActivityAnswerOut:
+    """Ответить на вопрос из мини-аппа: кнопкой (label) или свободным текстом."""
+    if not await is_game_enabled(session):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
+    chat_id = get_settings().group_chat_id
+    if not chat_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "no_chat")
+    won = await events.try_answer(
+        session,
+        chat_id=chat_id,
+        telegram_id=user.telegram_id,
+        text=body.text.strip(),
+        prompt_id=prompt_id,
+    )
+    return ActivityAnswerOut(
+        ok=won, status=("ok" if won else "no_match")
+    )
+
+
+@router.get("/game/voice/current", response_model=VoiceCurrentOut)
+async def voice_current(session: SessionDep, user: CurrentUser) -> VoiceCurrentOut:
+    """Текущее голосовое задание и сдачи — чтобы сдать/послушать прямо в ленте."""
+    from app.services.admin_config import get_game_voice_enabled
+    from app.services.game import voice
+    from app.services.game.voice_catalog import TASKS_BY_CODE
+
+    if not await is_game_enabled(session) or not await get_game_voice_enabled(session):
+        return VoiceCurrentOut(enabled=False)
+    now = datetime.now(timezone.utc)
+    task = await session.scalar(
+        select(GameVoiceTask)
+        .where(
+            GameVoiceTask.closed_at.is_(None),
+            GameVoiceTask.expires_at > now,
+        )
+        .order_by(GameVoiceTask.id.desc())
+        .limit(1)
+    )
+    if task is None:
+        return VoiceCurrentOut(enabled=True)
+    subs = await voice._submissions(session, task.id)
+    names = await voice._user_names(session, [s.user_id for s in subs])
+    catalog = TASKS_BY_CODE.get(task.code)
+    mine = next((s for s in subs if s.user_id == user.id), None)
+    return VoiceCurrentOut(
+        enabled=True,
+        task_id=task.id,
+        title=catalog.title if catalog else task.code,
+        text=task.text,
+        reward=int(task.reward or 0),
+        expires_at=task.expires_at,
+        my_submission_id=mine.id if mine is not None else None,
+        submissions=[
+            VoiceSubmissionOut(
+                id=s.id,
+                user_id=s.user_id,
+                user_name=names.get(s.user_id),
+                duration=s.duration,
+                submitted_at=s.submitted_at,
+                is_mine=s.user_id == user.id,
+            )
+            for s in subs
+        ],
+    )
+
+
+@router.post("/game/voice/submit", response_model=VoiceSubmitOut)
+async def voice_submit_api(
+    session: SessionDep,
+    user: CurrentUser,
+    file: UploadFile = File(...),
+    duration: int | None = Form(default=None),
+) -> VoiceSubmitOut:
+    """Сдать голосовое из мини-аппа.
+
+    Файл НЕ храним: пересылаем боту в личку участника, забираем `file_id` и
+    отдаём его дальше по обычному пути (`voice.submit`). Если Telegram не принял
+    — честно говорим «сдай в чате», а не глотаем ошибку.
+    """
+    from aiogram.types import BufferedInputFile
+
+    from app.bot.dispatcher import get_bot
+    from app.services.admin_config import get_game_voice_enabled
+    from app.services.game import voice
+
+    if not await is_game_enabled(session) or not await get_game_voice_enabled(session):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "voice off")
+    data = await file.read()
+    if not data or len(data) > _VOICE_MAX_BYTES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_audio")
+    bot = get_bot()
+    try:
+        message = await bot.send_voice(
+            chat_id=user.telegram_id,
+            voice=BufferedInputFile(data, filename="voice.ogg"),
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("game.voice_api_upload_failed", error=str(exc))
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "send_failed") from exc
+    sent = getattr(message, "voice", None)
+    if sent is None:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "send_failed")
+    res = await voice.submit(
+        session,
+        telegram_id=user.telegram_id,
+        file_id=sent.file_id,
+        duration=duration if duration is not None else sent.duration,
+        tg_message_id=message.message_id,
+        at=datetime.now(timezone.utc),
+    )
+    return VoiceSubmitOut(ok=res.ok, status=res.status, reward=res.reward)
+
+
+@router.delete("/game/voice/submission", response_model=VoiceSubmitOut)
+async def voice_withdraw_api(session: SessionDep, user: CurrentUser) -> VoiceSubmitOut:
+    """Убрать свой голосовой вариант (пока задание открыто).
+
+    Пишем «могилку» (`voice.record_withdrawal`), поэтому повторная сдача не даст
+    второй XP за то же задание. Опыт не отзываем — это осознанно: откат начислений
+    сложнее, чем цена случайного «убрал-и-передумал» на шестерых.
+    """
+    from app.services.game import voice
+
+    now = datetime.now(timezone.utc)
+    task = await session.scalar(
+        select(GameVoiceTask)
+        .where(
+            GameVoiceTask.closed_at.is_(None),
+            GameVoiceTask.expires_at > now,
+        )
+        .order_by(GameVoiceTask.id.desc())
+        .limit(1)
+    )
+    if task is None:
+        return VoiceSubmitOut(ok=False, status="no_task")
+    sub = await session.scalar(
+        select(GameVoiceSubmission).where(
+            GameVoiceSubmission.task_id == task.id,
+            GameVoiceSubmission.user_id == user.id,
+        )
+    )
+    if sub is None:
+        return VoiceSubmitOut(ok=False, status="nothing")
+    await session.delete(sub)
+    voice.record_withdrawal(session, task_id=task.id, user_id=user.id)
+    await session.commit()
+    return VoiceSubmitOut(ok=True, status="withdrawn")
+
+
+@router.get("/game/voice/submissions/{submission_id}/audio")
+async def voice_audio(
+    submission_id: int, session: SessionDep, _: CurrentUser
+) -> Response:
+    """Прослушать чужой (или свой) вариант прямо в ленте.
+
+    Проксируем: файла у нас нет, берём его у Telegram по `file_id` и стримим
+    клиенту. Ничего не храним — важно для слабого хоста.
+    """
+    from app.bot.dispatcher import get_bot
+
+    sub = await session.get(GameVoiceSubmission, submission_id)
+    if sub is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "submission_not_found")
+    bot = get_bot()
+    try:
+        tg_file = await bot.get_file(sub.file_id)
+        if tg_file is None or not tg_file.file_path:
+            raise RuntimeError("no file_path")
+        buf = await bot.download_file(tg_file.file_path)
+        data = buf.read()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("game.voice_audio_failed", error=str(exc))
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "audio_unavailable"
+        ) from exc
+    return Response(content=data, media_type="audio/ogg")
+
+
+@router.post("/game/music/tracks", response_model=MusicAddOut)
+async def music_add_track(
+    body: MusicAddIn, session: SessionDep, user: CurrentUser
+) -> MusicAddOut:
+    """Э21: сдать трек ссылкой прямо в приложении (аудиофайл — по-прежнему боту).
+
+    Аудио из мини-аппа пока не принимаем: как и голосовые, это требует двойного
+    хопа через Telegram. Ссылки покрывают основной сценарий («вот трек»).
+    """
+    from app.services.admin_config import get_game_music_enabled
+    from app.services.game import music
+
+    if not await is_game_enabled(session) or not await get_game_music_enabled(session):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "music off")
+    res = await music.add_track(
+        session,
+        telegram_id=user.telegram_id,
+        kind="link",
+        url=body.url,
+        title=body.title,
+        performer=body.performer,
+    )
+    return MusicAddOut(
+        ok=res.status == music.OK, status=res.status, week_count=res.week_count
+    )
