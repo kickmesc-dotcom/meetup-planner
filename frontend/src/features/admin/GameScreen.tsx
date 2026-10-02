@@ -1091,6 +1091,18 @@ export default function GameScreen({ users, onBack }: Props) {
                 busy={socialMut.isPending}
                 onSave={(n) => socialMut.mutate({ voice_min_gap_hours: Math.max(1, n) })}
               />
+              <Toggle
+                label="Режим-рулетка: иногда только первый"
+                hint="С шансом 50/50 награду забирает только тот, кто сдал раньше всех; опоздавших бот ловит ещё час"
+                on={social.data.voice_alt_mode_enabled}
+                busy={socialMut.isPending}
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({
+                    voice_alt_mode_enabled: !social.data?.voice_alt_mode_enabled,
+                  });
+                }}
+              />
               <div className="text-[11px] text-tg-hint">
                 Открытых заданий сейчас: {social.data.voice_open}. Задания ставятся
                 только днём (10:00–20:00 по времени чата), окно сбора — часы.

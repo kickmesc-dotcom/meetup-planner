@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from app.db.models import GameVoiceSubmission, GameVoiceTask
+from app.db.models import EventLog, GameVoiceSubmission, GameVoiceTask
 from app.services.game import voice
 from app.services.game.config import (
     VOICE_DAY_END_HOUR,
@@ -74,6 +74,8 @@ def test_build_task_text_has_window_reward_and_dm_hint():
     assert f"+{task.reward} XP" in text
     assert "@ghgbot" in text
     assert "реплаем" in text
+    # Условия участия явные: один вариант с человека, все успевают до закрытия.
+    assert "один с человека" in text and "до закрытия" in text
     # Без username — без «@None», просто «боту в личку».
     fallback = voice.build_task_text(task, expires_at=expires, bot_username=None)
     assert "@None" not in fallback and "боту в личку" in fallback
@@ -145,8 +147,11 @@ class _FakeSession:
         self.rolled += 1
 
 
-def _task(*, closed: bool = False, expired: bool = False) -> GameVoiceTask:
+def _task(
+    *, closed: bool = False, expired: bool = False, task_id: int | None = None
+) -> GameVoiceTask:
     return GameVoiceTask(
+        id=task_id,
         chat_id=-100,
         code="duck",
         text="задание",
@@ -216,6 +221,33 @@ async def test_submit_ok_awards_and_records(no_io):
 
 
 @pytest.mark.asyncio
+async def test_submit_ok_does_not_double_post(monkeypatch):
+    """Одну сдачу сопровождает ОДНО сообщение (ответ хендлера), а не два.
+
+    Раньше `submit` ещё и звал `journal.announce` («X сдал вариант…»), и на одну
+    голосовуху уходило два почти одинаковых сообщения. Теперь анонс — дело
+    хендлера, поэтому из сервиса в журнал ничего не летит.
+    """
+    calls: list = []
+
+    async def _noop(*_a, **_k):  # noqa: ANN002, ANN003
+        return None
+
+    async def _record(*_a, **_k):  # noqa: ANN002, ANN003
+        calls.append(_k)
+        return True
+
+    monkeypatch.setattr(voice.awards, "voice", _noop)
+    monkeypatch.setattr(voice.journal, "announce", _record)
+    session = _FakeSession([_task(), 5, "Митян"])
+    res = await voice.submit(
+        session, telegram_id=111, file_id="f", reply_to_message_id=55, at=NOW
+    )
+    assert res.status == voice.OK
+    assert calls == []
+
+
+@pytest.mark.asyncio
 async def test_submit_second_variant_is_rejected(no_io):
     session = _FakeSession([_task(), 5, "Митян"], fail_commit=True)
     res = await voice.submit(
@@ -237,3 +269,116 @@ async def test_finalize_is_idempotent(no_io):
 
 def test_voice_poll_reward_is_the_bonus_from_the_brief():
     assert VOICE_POLL_REWARD == 50
+
+
+# --------------------------------------------------------------------------
+# Альтернативный режим-«рулетка»: иногда награда только первому
+# --------------------------------------------------------------------------
+
+
+def test_pick_task_mode_toggle():
+    rng = random.Random(1)
+    # Рубильник выкл — всегда «участвуют все».
+    assert voice.pick_task_mode(enabled=False, rng=rng) == voice.MODE_ALL
+    # 0% — тоже все; 100% — всегда только первый.
+    assert voice.pick_task_mode(enabled=True, percent=0, rng=rng) == voice.MODE_ALL
+    assert voice.pick_task_mode(enabled=True, percent=100, rng=rng) == voice.MODE_FIRST_ONLY
+
+
+def test_pick_task_mode_is_a_rough_coin_flip():
+    rng = random.Random(7)
+    picks = [voice.pick_task_mode(enabled=True, percent=50, rng=rng) for _ in range(400)]
+    firsts = picks.count(voice.MODE_FIRST_ONLY)
+    # Не строгая статистика: просто оба исхода возможны и нет перекоса.
+    assert 120 < firsts < 280
+
+
+def test_build_task_text_first_only_terms():
+    task = TASKS[0]
+    expires = NOW + timedelta(minutes=task.window_minutes)
+    text = voice.build_task_text(
+        task, expires_at=expires, bot_username=None, mode=voice.MODE_FIRST_ONLY
+    )
+    assert "только первому" in text
+    assert "первому сдавшему" in text
+    # В режиме «все» этих условий нет.
+    all_text = voice.build_task_text(
+        task, expires_at=expires, bot_username=None, mode=voice.MODE_ALL
+    )
+    assert "только первому" not in all_text
+    assert "один с человека" in all_text
+
+
+def _mode_row(task_id: int = 1) -> EventLog:
+    return EventLog(
+        kind=voice.MODE_KIND, payload={"task_id": task_id, "mode": voice.MODE_FIRST_ONLY}
+    )
+
+
+def _submission(*, minutes_ago: int, user_id: int = 7) -> GameVoiceSubmission:
+    return GameVoiceSubmission(
+        task_id=1,
+        user_id=user_id,
+        file_id="first",
+        submitted_at=NOW - timedelta(minutes=minutes_ago),
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_task_mode_defaults_to_all(no_io):
+    assert await voice.get_task_mode(_FakeSession([None]), 1) == voice.MODE_ALL
+    # Нет id (не сохранено) — тоже дефолт, без обращения к БД.
+    assert await voice.get_task_mode(_FakeSession([]), None) == voice.MODE_ALL
+
+
+@pytest.mark.asyncio
+async def test_first_only_first_submitter_is_rewarded(no_io):
+    session = _FakeSession(
+        [_task(task_id=1), 5, "Митян", _mode_row(), None]  # вариантов ещё нет
+    )
+    res = await voice.submit(
+        session, telegram_id=111, file_id="f", reply_to_message_id=55, at=NOW
+    )
+    assert res.status == voice.OK and res.reward == VOICE_REWARD
+
+
+@pytest.mark.asyncio
+async def test_first_only_latecomer_within_grace_is_told(no_io):
+    session = _FakeSession(
+        [
+            _task(task_id=1),
+            222,
+            "Поздний",
+            _mode_row(),
+            _submission(minutes_ago=10, user_id=7),
+            "Митян",
+        ]
+    )
+    res = await voice.submit(
+        session, telegram_id=222, file_id="late", reply_to_message_id=55, at=NOW
+    )
+    assert res.status == voice.LATE
+    assert res.name == "Митян"  # имя ПЕРВОГО, чтобы опоздавший понял, кто успел
+
+
+@pytest.mark.asyncio
+async def test_first_only_after_grace_is_silent(no_io):
+    session = _FakeSession(
+        [_task(task_id=1), 222, "Поздний", _mode_row(), _submission(minutes_ago=120)]
+    )
+    res = await voice.submit(
+        session, telegram_id=222, file_id="late", reply_to_message_id=55, at=NOW
+    )
+    assert res.status == voice.SILENT
+
+
+@pytest.mark.asyncio
+async def test_first_only_owner_resubmit_is_already(no_io):
+    # Первый сдавший шлёт ещё раз — напоминаем «один на участника», а не «поздняк».
+    session = _FakeSession(
+        [_task(task_id=1), 7, "Митян", _mode_row(), _submission(minutes_ago=5, user_id=7)]
+    )
+    res = await voice.submit(
+        session, telegram_id=7, file_id="again", reply_to_message_id=55, at=NOW
+    )
+    assert res.status == voice.ALREADY

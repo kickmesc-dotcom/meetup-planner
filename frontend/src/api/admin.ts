@@ -1366,6 +1366,8 @@ export interface GameSocialState {
   voice_enabled: boolean;
   voice_poll_enabled: boolean;
   voice_min_gap_hours: number;
+  /** Альтернативный режим: с шансом 50/50 награда только первому сдавшему. */
+  voice_alt_mode_enabled: boolean;
   /** Сколько заданий сейчас открыто (обычно 0 или 1). */
   voice_open: number;
 }

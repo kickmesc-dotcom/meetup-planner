@@ -35,6 +35,17 @@ async def _answer(message: Message, res: voice.SubmitResult, *, private: bool) -
                 f"🎙 Принято, <b>{res.name or 'участник'}</b>! +{res.reward} XP.",
                 parse_mode="HTML",
             )
+        elif res.status == voice.LATE:
+            # Альтернативный режим: награда ушла первому, но опоздавшего ловим
+            # в течение grace-окна и объясняем, почему без XP.
+            await message.reply(
+                "⏰ Поздняк: в этом задании награда <b>только первому</b> — "
+                f"вариант уже сдал <b>{res.name or 'кто-то из своих'}</b>.",
+                parse_mode="HTML",
+            )
+        elif res.status == voice.SILENT:
+            # Опоздал слишком поздно — молчим, чтобы не спамить.
+            return
         elif res.status == voice.ALREADY:
             await message.reply("Этот вариант уже принят — один на участника.")
         elif res.status == voice.CLOSED:

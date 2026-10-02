@@ -4135,6 +4135,7 @@ async def _game_social_state(session) -> GameSocialOut:
         get_game_memorial_enabled,
         get_game_memorial_repeat_days,
         get_game_memorial_silence_days,
+        get_game_voice_alt_mode_enabled,
         get_game_voice_enabled,
         get_game_voice_min_gap_hours,
         get_game_voice_poll_enabled,
@@ -4209,6 +4210,7 @@ async def _game_social_state(session) -> GameSocialOut:
         voice_enabled=await get_game_voice_enabled(session),
         voice_poll_enabled=await get_game_voice_poll_enabled(session),
         voice_min_gap_hours=await get_game_voice_min_gap_hours(session),
+        voice_alt_mode_enabled=await get_game_voice_alt_mode_enabled(session),
         voice_open=voice_open,
     )
 
@@ -4256,6 +4258,7 @@ async def admin_game_social_put(
         set_game_memorial_enabled,
         set_game_memorial_repeat_days,
         set_game_memorial_silence_days,
+        set_game_voice_alt_mode_enabled,
         set_game_voice_enabled,
         set_game_voice_min_gap_hours,
         set_game_voice_poll_enabled,
@@ -4317,6 +4320,8 @@ async def admin_game_social_put(
         await set_game_voice_poll_enabled(session, body.voice_poll_enabled)
     if body.voice_min_gap_hours is not None:
         await set_game_voice_min_gap_hours(session, body.voice_min_gap_hours)
+    if body.voice_alt_mode_enabled is not None:
+        await set_game_voice_alt_mode_enabled(session, body.voice_alt_mode_enabled)
     log.info("admin.game_social_updated", by=user.id)
     return await _game_social_state(session)
 

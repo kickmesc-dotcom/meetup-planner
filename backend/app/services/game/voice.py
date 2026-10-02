@@ -34,8 +34,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.db.models import GameVoiceSubmission, GameVoiceTask, User
+from app.db.models import EventLog, GameVoiceSubmission, GameVoiceTask, User
 from app.services.admin_config import (
+    get_game_voice_alt_mode_enabled,
     get_game_voice_enabled,
     get_game_voice_min_gap_hours,
     get_game_voice_poll_enabled,
@@ -44,6 +45,8 @@ from app.services.game import awards, journal
 from app.services.game.config import (
     VOICE_DAY_END_HOUR,
     VOICE_DAY_START_HOUR,
+    VOICE_FIRST_ONLY_GRACE_MINUTES,
+    VOICE_FIRST_ONLY_PERCENT,
     VOICE_POLL_MAX_OPTIONS,
     VOICE_POLL_MIN_OPTIONS,
     VOICE_POLL_MINUTES,
@@ -60,6 +63,14 @@ NO_TASK = "no_task"
 CLOSED = "closed"
 UNKNOWN_USER = "unknown_user"
 ALREADY = "already"
+LATE = "late"  # альтернативный режим: награда уже ушла первому
+SILENT = "silent"  # альтернативный режим: опоздал слишком поздно — не отвечаем
+
+# Режим награды конкретного задания (альтернативный режим-«рулетка»).
+MODE_ALL = "all"  # награда каждому, чей вариант принят (дефолт)
+MODE_FIRST_ONLY = "first_only"  # награда только первому сдавшему
+# Вид записи в `event_log`, где мы помним режим конкретного задания.
+MODE_KIND = "voice_task_mode"
 
 
 # --------------------------------------------------------------------------
@@ -89,22 +100,49 @@ def pick_task(*, used_codes: set[str], rng: random.Random) -> VoiceTask | None:
     return rng.choice(free)
 
 
+def pick_task_mode(
+    *, enabled: bool, percent: int = VOICE_FIRST_ONLY_PERCENT, rng: random.Random
+) -> str:
+    """Выбрать режим награды для нового задания. Чистая функция (тесты).
+
+    Рубильник выключен → всегда «участвуют все» (дефолт). Включён → с шансом
+    `percent` задание становится «награда только первому» (по умолчанию 50/50).
+    """
+    if not enabled or percent <= 0:
+        return MODE_ALL
+    if percent >= 100:
+        return MODE_FIRST_ONLY
+    return MODE_FIRST_ONLY if rng.randrange(100) < percent else MODE_ALL
+
+
 def build_task_text(
-    task: VoiceTask, *, expires_at: datetime, bot_username: str | None
+    task: VoiceTask,
+    *,
+    expires_at: datetime,
+    bot_username: str | None,
+    mode: str = MODE_ALL,
 ) -> str:
     """Текст задания в чат. Чистая функция.
 
-    Все числа (окно, награда, время) подставляются здесь, чтобы текст в БД и в
-    чате не разъезжались.
+    Все числа (окно, награда, время) и УСЛОВИЯ награды подставляются здесь, чтобы
+    текст в БД и в чате не разъезжались. Условия разные для двух режимов:
+    «участвуют все» и «награда только первому» (альтернативный режим-«рулетка»).
     """
     local_until = (expires_at.astimezone(timezone.utc) + timedelta(hours=VOICE_TZ_OFFSET_HOURS))
     hours = max(1, round(task.window_minutes / 60))
     dm = f"боту в личку @{bot_username}" if bot_username else "боту в личку"
+    if mode == MODE_FIRST_ONLY:
+        terms = "🥇 Награда — <b>только первому</b>: XP забирает тот, кто сдал раньше всех."
+        reward = f"Награда: <b>+{task.reward} XP</b> первому сдавшему."
+    else:
+        terms = "👥 Участвуют все до закрытия, но вариант — <b>один с человека</b>."
+        reward = f"Награда: <b>+{task.reward} XP</b> каждому, чей вариант принят."
     return (
         f"{task.text}\n\n"
         f"🎙 Отвечай <b>голосовым</b>: реплаем на это сообщение или {dm}.\n"
+        f"{terms}\n"
         f"⏳ Приём около {hours} ч (до {local_until.strftime('%H:%M')}). "
-        f"Награда: <b>+{task.reward} XP</b> за вариант."
+        f"{reward}"
     )
 
 
@@ -178,6 +216,35 @@ async def _used_codes(session: AsyncSession, *, now: datetime) -> set[str]:
     return used
 
 
+async def _store_mode(session: AsyncSession, task_id: int, mode: str) -> None:
+    """Запомнить режим задания. Пишем только «нестандартный» (first_only).
+
+    Новая миграция не нужна: режим живёт в `event_log` (`kind=voice_task_mode`).
+    """
+    if mode == MODE_ALL:
+        return
+    session.add(
+        EventLog(kind=MODE_KIND, payload={"task_id": int(task_id), "mode": mode})
+    )
+
+
+async def get_task_mode(session: AsyncSession, task_id: int | None) -> str:
+    """Режим конкретного задания. Нет записи → дефолтный «участвуют все»."""
+    if task_id is None:  # несохранённое задание (тесты/теоретический вызов)
+        return MODE_ALL
+    row = await session.scalar(
+        select(EventLog)
+        .where(
+            EventLog.kind == MODE_KIND,
+            EventLog.payload["task_id"].as_integer() == int(task_id),
+        )
+        .order_by(EventLog.id.desc())
+        .limit(1)
+    )
+    mode = (row.payload or {}).get("mode") if row is not None else None
+    return mode if mode in (MODE_ALL, MODE_FIRST_ONLY) else MODE_ALL
+
+
 async def _has_open_task(session: AsyncSession, *, now: datetime) -> bool:
     found = await session.scalar(
         select(GameVoiceTask.id)
@@ -202,8 +269,14 @@ async def open_task(
     task = pick_task(used_codes=await _used_codes(session, now=now), rng=rng)
     if task is None:
         return None
+    # Альтернативный режим-«рулетка»: включён ли он и какой режим выпал заданию.
+    mode = pick_task_mode(
+        enabled=await get_game_voice_alt_mode_enabled(session), rng=rng
+    )
     expires_at = now + timedelta(minutes=task.window_minutes)
-    text = build_task_text(task, expires_at=expires_at, bot_username=_username(bot))
+    text = build_task_text(
+        task, expires_at=expires_at, bot_username=_username(bot), mode=mode
+    )
     if bot is None:
         return None
     try:
@@ -224,7 +297,11 @@ async def open_task(
     )
     session.add(row)
     await session.commit()
-    log.info("game.voice_opened", code=task.code, task_id=row.id)
+    # Режим пишем после того, как у задания появился id (пишем только first_only).
+    if mode == MODE_FIRST_ONLY:
+        await _store_mode(session, row.id, mode)
+        await session.commit()
+    log.info("game.voice_opened", code=task.code, task_id=row.id, mode=mode)
     return row
 
 
@@ -393,6 +470,23 @@ async def _find_task_for(
     )
 
 
+def _aware(moment: datetime) -> datetime:
+    """Привести время из БД к сознательному UTC (фейки в тестах бывают naive)."""
+    return moment if moment.tzinfo is not None else moment.replace(tzinfo=timezone.utc)
+
+
+async def _first_submission(
+    session: AsyncSession, task_id: int
+) -> GameVoiceSubmission | None:
+    """Первый (по времени) сдавший — в режиме «награда только первому»."""
+    return await session.scalar(
+        select(GameVoiceSubmission)
+        .where(GameVoiceSubmission.task_id == task_id)
+        .order_by(GameVoiceSubmission.submitted_at.asc(), GameVoiceSubmission.id.asc())
+        .limit(1)
+    )
+
+
 async def submit(
     session: AsyncSession,
     *,
@@ -423,6 +517,25 @@ async def submit(
         select(User.display_name).where(User.id == int(user_id))
     )
 
+    # Альтернативный режим: если награда только первому, а вариант уже есть —
+    # награды не будет. Опоздавших в пределах `GRACE` ловим и сообщаем,
+    # кто успел; совсем поздно — молчим (SILENT), чтобы не спамить вечером.
+    mode = await get_task_mode(session, task.id)
+    if mode == MODE_FIRST_ONLY:
+        first = await _first_submission(session, task.id)
+        if first is not None:
+            if first.user_id == int(user_id):
+                # Это тот же первый — просто напоминаем правило «один на участника».
+                return SubmitResult(ALREADY, task=task, name=name)
+            if moment - _aware(first.submitted_at) <= timedelta(
+                minutes=VOICE_FIRST_ONLY_GRACE_MINUTES
+            ):
+                first_name = await session.scalar(
+                    select(User.display_name).where(User.id == first.user_id)
+                )
+                return SubmitResult(LATE, task=task, name=first_name)
+            return SubmitResult(SILENT, task=task)
+
     session.add(
         GameVoiceSubmission(
             task_id=task.id,
@@ -444,15 +557,10 @@ async def submit(
     await awards.voice(
         session, int(user_id), points=task.reward, task_id=task.id, at=moment
     )
-    await journal.announce(
-        session,
-        kind=journal.KIND_EVENT,
-        subject_user_id=int(user_id),
-        text=(
-            f"🎙 <b>{name or 'Участник'}</b> сдал вариант в задании "
-            f"(+{task.reward} XP)."
-        ),
-    )
+    # В чат о сдаче сообщает ХЕНДЛЕР одним ответом-реплаем (`voice_tasks._answer`):
+    # раньше здесь был ещё и `journal.announce`, и на одну голосовуху уходило два
+    # почти одинаковых сообщения («сдал вариант» + «Принято»). Дубль убран —
+    # один ответ вместо спама.
     log.info("game.voice_submitted", task_id=task.id, user_id=int(user_id))
     return SubmitResult(OK, task=task, name=name, reward=task.reward)
 

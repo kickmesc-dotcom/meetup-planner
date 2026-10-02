@@ -1649,6 +1649,7 @@ GAME_CONTRABAND_WORDS_KEY = "game.contraband.words"
 GAME_VOICE_ENABLED_KEY = "game.voice.enabled"
 GAME_VOICE_POLL_KEY = "game.voice.poll_enabled"
 GAME_VOICE_MIN_GAP_KEY = "game.voice.min_gap_hours"
+GAME_VOICE_ALT_MODE_KEY = "game.voice.alt_mode_enabled"
 
 # Э15: музыкальная предложка (GHG8 H.7).
 GAME_MUSIC_ENABLED_KEY = "game.music.enabled"
@@ -1672,6 +1673,9 @@ _GAME_CONTRABAND_ENABLED_DEFAULT = True
 # за лучший вариант — ВЫКЛЮЧЕНО (по заданию «по умолчанию голосование выкл»).
 _GAME_VOICE_ENABLED_DEFAULT = True
 _GAME_VOICE_POLL_DEFAULT = False
+# Э19+: альтернативный режим награды (с шансом 50/50 — «только первому»).
+# По умолчанию ВЫКЛ: задание остаётся «участвуют все до закрытия», как раньше.
+_GAME_VOICE_ALT_MODE_DEFAULT = False
 # Музыкальная предложка — фича из старого backlog (P3, «дизайн не согласован»),
 # поэтому по умолчанию ВЫКЛЮЧЕНА: включит оператор, когда решит запустить.
 _GAME_MUSIC_ENABLED_DEFAULT = False
@@ -1998,6 +2002,16 @@ async def set_game_voice_poll_enabled(session: AsyncSession, value: bool) -> Non
 
 async def set_game_voice_min_gap_hours(session: AsyncSession, hours: int) -> None:
     await _set_value(session, GAME_VOICE_MIN_GAP_KEY, str(max(1, int(hours))))
+
+
+async def get_game_voice_alt_mode_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, GAME_VOICE_ALT_MODE_KEY, _GAME_VOICE_ALT_MODE_DEFAULT
+    )
+
+
+async def set_game_voice_alt_mode_enabled(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, GAME_VOICE_ALT_MODE_KEY, "true" if value else "false")
 
 
 async def get_game_music_enabled(session: AsyncSession) -> bool:

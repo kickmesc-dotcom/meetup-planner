@@ -296,6 +296,8 @@ class GameSocialOut(BaseModel):
     voice_enabled: bool = True
     voice_poll_enabled: bool = False
     voice_min_gap_hours: int = 48
+    # Э19+: альтернативный режим награды — с шансом 50/50 «только первому».
+    voice_alt_mode_enabled: bool = False
     voice_open: int = 0
 
 
@@ -333,6 +335,7 @@ class GameSocialIn(BaseModel):
     voice_enabled: bool | None = None
     voice_poll_enabled: bool | None = None
     voice_min_gap_hours: int | None = Field(None, ge=1, le=720)
+    voice_alt_mode_enabled: bool | None = None
 
 
 class GameDigestFlushOut(BaseModel):
