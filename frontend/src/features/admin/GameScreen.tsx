@@ -152,6 +152,12 @@ export default function GameScreen({ users, onBack }: Props) {
   // Э19: какое слово сейчас раскрыто в редактор (индекс в `words`) — можно
   // поменять само слово и альтернативные написания, а не только владельца/XP.
   const [editingWord, setEditingWord] = useState<number | null>(null);
+  // Э19-fix: текст альтернатив держим ЧЕРНОВИКОМ (сырая строка), а не выводим
+  // его обратно из `labels`. Раньше `value` пересобирался из распарсенных
+  // `labels` на каждое нажатие, поэтому запятая/пробел/перенос тут же
+  // «съедались» разделителем — с телефона нельзя было дописать ни одного
+  // варианта. Теперь разделители живут в черновике до конца редактирования.
+  const [altDraft, setAltDraft] = useState<Record<number, string>>({});
   // Черновики «добавить фразу», по одному на участника (ключ — tg-id).
   const [phraseDraft, setPhraseDraft] = useState<Record<string, string>>({});
   const words = wordsDraft ?? social.data?.contraband_words ?? [];
@@ -186,15 +192,22 @@ export default function GameScreen({ users, onBack }: Props) {
    *  ИИ, ии-шный»), а `phraseToVariant` превращает каждый в префиксную маску
    *  (`\bнейронки\w*`). Так альтернативы видит и человек (labels), и код.
    */
-  const setWordAlternatives = (idx: number, raw: string) => {
-    const items = raw
-      .split(/[,\n]/)
+  const splitAlternatives = (raw: string): string[] =>
+    raw
+      .split(/[,\n;]/)
       .map((s) => s.trim())
       .filter(Boolean);
+
+  const setWordAlternatives = (idx: number, raw: string) => {
+    // Показываем РОВНО то, что набрал оператор (включая запятые и пробелы),
+    // а в модель пишем уже разобранные варианты.
+    setAltDraft((draft) => ({ ...draft, [idx]: raw }));
+    const items = splitAlternatives(raw);
     updateWord(idx, { labels: items, variants: items.map(phraseToVariant) });
   };
 
-  const alternativesText = (w: GameContrabandWord) =>
+  const alternativesText = (w: GameContrabandWord, idx: number) =>
+    altDraft[idx] ??
     (w.labels && w.labels.length ? w.labels : [w.word]).join(", ");
 
   const addPhrase = (telegramId: number | null, key: string) => {
@@ -929,7 +942,18 @@ export default function GameScreen({ users, onBack }: Props) {
                             type="button"
                             onClick={() => {
                               haptic("selection");
-                              setEditingWord(editingWord === idx ? null : idx);
+                              if (editingWord === idx) {
+                                // Закрываем редактор — забываем черновик, чтобы
+                                // повторное открытие взяло актуальные `labels`.
+                                setAltDraft((draft) => {
+                                  const next = { ...draft };
+                                  delete next[idx];
+                                  return next;
+                                });
+                                setEditingWord(null);
+                              } else {
+                                setEditingWord(idx);
+                              }
                             }}
                             aria-label="Редактировать слово и варианты"
                             className="shrink-0 rounded bg-tg-secondary-bg/80 px-2 py-0.5 text-[11px] text-tg-text"
@@ -969,9 +993,14 @@ export default function GameScreen({ users, onBack }: Props) {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              setWordsDraft(words.filter((_, i) => i !== idx))
-                            }
+                            onClick={() => {
+                              setAltDraft((draft) => {
+                                const next = { ...draft };
+                                delete next[idx];
+                                return next;
+                              });
+                              setWordsDraft(words.filter((_, i) => i !== idx));
+                            }}
                             className="rounded bg-status-busy/15 px-2 py-0.5 text-[11px] text-status-busy"
                             aria-label="Удалить фразу"
                           >
@@ -1014,12 +1043,30 @@ export default function GameScreen({ users, onBack }: Props) {
                               ai, аи, ИИ, ии-шный):
                             </div>
                             <textarea
-                              value={alternativesText(w)}
+                              value={alternativesText(w, idx)}
                               onChange={(e) => setWordAlternatives(idx, e.target.value)}
-                              rows={2}
+                              rows={3}
+                              autoCapitalize="off"
+                              autoCorrect="off"
+                              spellCheck={false}
                               placeholder="нейронки, нейро~, ai, аи, ИИ, ии-шный"
                               className="w-full rounded bg-tg-bg/70 px-2 py-1 text-[11px] text-tg-text"
                             />
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] text-tg-hint">
+                                вариантов: {splitAlternatives(alternativesText(w, idx)).length}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  haptic("selection");
+                                  setWordAlternatives(idx, "");
+                                }}
+                                className="rounded bg-tg-secondary-bg/80 px-2 py-0.5 text-[10px] text-tg-text"
+                              >
+                                очистить
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
