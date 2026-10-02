@@ -208,20 +208,22 @@ async def run_events_job(
             if moment - last_at < timedelta(hours=gap_hours):
                 return 0
 
-        # 2. Суточный потолок.
-        day_start = moment.replace(hour=0, minute=0, second=0, microsecond=0)
+        # 2. Суточный потолок. Считаем ЛОКАЛЬНЫЕ сутки чата (сброс в 00:00 МСК),
+        #    как и живые часы/бюджет: раньше здесь была UTC-дата, и ночью
+        #    (00:00–03:00 МСК) лимиты расходились с «сегодня» остальных механик.
+        day_start, day_end = activity.local_day_bounds(moment)
         today = int(
             await session.scalar(
                 select(func.count())
                 .select_from(GamePrompt)
-                .where(GamePrompt.created_at >= day_start)
+                .where(GamePrompt.created_at >= day_start, GamePrompt.created_at < day_end)
             )
             or 0
         )
         if today >= daily_cap(
             await get_game_events_min_per_day(session),
             await get_game_events_max_per_day(session),
-            moment.date(),
+            activity.local_day(moment),
         ):
             return 0
 

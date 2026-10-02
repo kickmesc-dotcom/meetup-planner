@@ -297,6 +297,32 @@ def test_question_prompts_post_then_followup_obvious_ones_do_not():
     assert any(not p.needs_rules for p in PROMPTS)
 
 
+def test_local_day_bounds_reset_at_local_midnight():
+    """«Сегодня» для лимитов — локальные сутки чата (сброс 00:00 МСК), не UTC.
+
+    Баг, который здесь закрывается: ночью (00:00–03:00 МСК = 21:00–24:00 UTC)
+    суточный потолок событий считался по UTC-дате и расходился с живыми часами
+    и бюджетом дня. Теперь границы дня — ОДНА функция на весь проект.
+    """
+    from app.services.game import activity
+
+    # 21:30 UTC 1 окт = 00:30 МСК 2 окт — это уже НОВЫЕ локальные сутки.
+    night = datetime(2026, 10, 1, 21, 30, tzinfo=timezone.utc)
+    assert activity.local_day(night) == date(2026, 10, 2)
+    assert night.date() == date(2026, 10, 1)  # вот в чём был рассинхрон
+    start, end = activity.local_day_bounds(night)
+    assert start == datetime(2026, 10, 1, 21, 0, tzinfo=timezone.utc)
+    assert end == datetime(2026, 10, 2, 21, 0, tzinfo=timezone.utc)
+    # Днём те же границы: сброс строго в 00:00 МСК, а не в полночь UTC.
+    day = datetime(2026, 10, 2, 12, 0, tzinfo=timezone.utc)
+    assert activity.local_day(day) == date(2026, 10, 2)
+    assert activity.local_day_bounds(day)[0] == datetime(2026, 10, 1, 21, 0, tzinfo=timezone.utc)
+    # Границы согласованы с бюджетом авто-постов (он считает те же сутки).
+    assert activity.local_day_bounds(day, tz_offset=3) == activity.local_day_bounds(
+        night, tz_offset=3
+    )
+
+
 def test_every_catalog_prompt_has_a_way_to_win():
     for prompt in PROMPTS:
         assert prompt.answers, prompt.code

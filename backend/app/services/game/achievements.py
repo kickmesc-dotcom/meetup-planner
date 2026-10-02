@@ -98,16 +98,14 @@ _PUNISH_LOG_KIND = "worm_punish"
 def _local_day_bounds(
     now: datetime, *, tz_offset: int = ACTIVITY_TZ_OFFSET_HOURS
 ) -> tuple[datetime, datetime]:
-    """Границы ЛОКАЛЬНЫХ суток (UTC+смещение) как UTC-моменты.
+    """Границы ЛОКАЛЬНЫХ суток — делегируем в общий `activity`.
 
-    Та же арифметика, что в `activity.count_auto_posts_today`, чтобы «за день» у
-    кары и у бюджета авто-постов означало одно и то же (сброс в 00:00 по МСК).
+    Один источник правды: «за день» у кары, бюджета авто-постов и лимита событий
+    означает одно и то же (сброс в 00:00 по МСК), а не три разных полуночи.
     """
-    moment = now.astimezone(timezone.utc)
-    local = moment + timedelta(hours=tz_offset)
-    start_local = datetime.combine(local.date(), time.min)
-    start = (start_local - timedelta(hours=tz_offset)).replace(tzinfo=timezone.utc)
-    return start, start + timedelta(days=1)
+    from app.services.game import activity
+
+    return activity.local_day_bounds(now, tz_offset=tz_offset)
 
 # `availability_ranges.status`: 1 — свободен (см. `services/auto_pick.py`).
 STATUS_FREE = 1

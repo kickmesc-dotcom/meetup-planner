@@ -17,7 +17,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,6 +43,31 @@ BUDGET = "budget"
 def local_hour(now: datetime, *, offset_hours: int = ACTIVITY_TZ_OFFSET_HOURS) -> int:
     """Час в ЛОКАЛЬНОМ времени чата (UTC + смещение). Чистая функция."""
     return (now.astimezone(timezone.utc).hour + offset_hours) % 24
+
+
+def local_day(now: datetime, *, tz_offset: int = ACTIVITY_TZ_OFFSET_HOURS) -> date:
+    """Дата ЛОКАЛЬНЫХ суток чата (UTC + смещение). Чистая функция.
+
+    Именно она, а не `now.date()`, определяет, что считать «сегодня»: сутки
+    сбрасываются в 00:00 по времени чата, а не по UTC. Иначе ночью (21:00–24:00
+    UTC = 00:00–03:00 МСК) «сегодня» в лимитах расходилось с живыми часами.
+    """
+    return (now.astimezone(timezone.utc) + timedelta(hours=tz_offset)).date()
+
+
+def local_day_bounds(
+    now: datetime, *, tz_offset: int = ACTIVITY_TZ_OFFSET_HOURS
+) -> tuple[datetime, datetime]:
+    """Границы ЛОКАЛЬНЫХ суток (UTC+смещение) как UTC-моменты. Чистая функция.
+
+    Один источник правды для всего, что считает «за день»: бюджет авто-постов,
+    суточные лимиты событий и суточные ачивки. Так сброс у них общий — 00:00 МСК.
+    """
+    moment = now.astimezone(timezone.utc)
+    local = moment + timedelta(hours=tz_offset)
+    start_local = datetime.combine(local.date(), time.min)
+    start = (start_local - timedelta(hours=tz_offset)).replace(tzinfo=timezone.utc)
+    return start, start + timedelta(days=1)
 
 
 def is_daytime(
@@ -89,11 +114,7 @@ async def count_auto_posts_today(
     плюс число выплесков журнала — уникальные `sent_at` за день (одна сводка =
     одно сообщение, даже если в ней десять ачивок).
     """
-    moment = now.astimezone(timezone.utc)
-    local = moment + timedelta(hours=tz_offset)
-    start_local = datetime.combine(local.date(), time.min)
-    start = (start_local - timedelta(hours=tz_offset)).replace(tzinfo=timezone.utc)
-    end = start + timedelta(days=1)
+    start, end = local_day_bounds(now, tz_offset=tz_offset)
     total = 0
     for model in (GamePrompt, GameVoiceTask, MusicSelection, MusicGameRound):
         total += int(
