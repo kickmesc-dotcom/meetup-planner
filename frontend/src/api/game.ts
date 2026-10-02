@@ -161,6 +161,62 @@ export interface GuestProfile {
 export const fetchGuestProfile = (userId: number) =>
   api<GuestProfile>(`/api/game/players/${userId}`);
 
+/** Э20: одна запись ленты активности (ачивка/лох/чухан/событие). */
+export interface FeedItem {
+  id: string;
+  source: string;
+  kind: string;
+  icon: string;
+  title: string;
+  text: string;
+  at: string;
+  user_id: number | null;
+  user_name: string | null;
+  user_telegram_id: number | null;
+  avatar_url: string | null;
+}
+
+export interface GameFeed {
+  enabled: boolean;
+  items: FeedItem[];
+  next_offset: number | null;
+  /** Э21: доступные типы записей — для чипов-фильтров. */
+  kinds: string[];
+}
+
+/**
+ * Э20/Э21: лента активности для вкладки «Лента» мини-аппа.
+ * `scope="mine"` — только записи текущего игрока;
+ * `kinds` — фильтр по типам через запятую (пусто/undefined = все).
+ */
+export const fetchFeed = (opts?: {
+  scope?: "all" | "mine";
+  limit?: number;
+  offset?: number;
+  kinds?: string;
+}) => {
+  const params = new URLSearchParams();
+  params.set("scope", opts?.scope ?? "all");
+  params.set("limit", String(opts?.limit ?? 30));
+  params.set("offset", String(opts?.offset ?? 0));
+  if (opts?.kinds) params.set("kinds", opts.kinds);
+  return api<GameFeed>(`/api/game/feed?${params.toString()}`);
+};
+
+/** Э21: подписи и иконки типов записей — те же, что отдаёт бэкенд (`feed.py`). */
+export const FEED_KIND_LABELS: Record<string, { icon: string; title: string }> = {
+  achievement: { icon: "🏆", title: "Ачивки" },
+  loser: { icon: "👑", title: "Лохи" },
+  chukhan: { icon: "🧹", title: "Чуханы" },
+  voice: { icon: "🎙", title: "Голосовые" },
+  music: { icon: "🎧", title: "Музыка" },
+  music_game: { icon: "🎵", title: "Музык-игры" },
+  event: { icon: "⚡️", title: "События" },
+  holiday: { icon: "🎊", title: "Праздники" },
+  contraband: { icon: "💰", title: "Контрабанда" },
+  memorial: { icon: "🕯", title: "Поминовения" },
+};
+
 /** Э15/Э16: «Предложка недели» — свои треки, лимит и история подборок. */
 export interface MusicMineTrack {
   id: number;

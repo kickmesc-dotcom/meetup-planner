@@ -52,7 +52,11 @@ export function isMonthGridZoom(z: ZoomLevel): boolean {
 
 // GHG8 P4.1.d: вкладка "leaderboard" (Топы) заменена на "profile" — топы
 // переехали внутрь профиля вместе с историей и настройками приветствия.
-export type Tab = "calendar" | "meetings" | "polls" | "profile" | "admin";
+// Э21: вкладки пересобраны. Первой идёт "feed" — лента активности, туда
+// приложение открывается по умолчанию (в софт-режимах там вся жизнь чата).
+// "meetings" теперь ОБЪЕДИНЯЕТ встречи и опросы (вкладки "polls" больше нет:
+// ими почти не пользовались, держим один раздел с переключателем внутри).
+export type Tab = "feed" | "calendar" | "meetings" | "profile" | "admin";
 
 interface UIState {
   tab: Tab;
@@ -169,7 +173,8 @@ function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
 }
 
 export const useUI = create<UIState>((set, get) => ({
-  tab: "calendar",
+  // Э21: заходим сразу в ленту — она первая кнопка внизу экрана.
+  tab: "feed",
   setTab: (tab) => set({ tab }),
 
   zoom: "week",

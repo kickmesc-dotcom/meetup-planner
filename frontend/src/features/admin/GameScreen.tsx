@@ -45,6 +45,22 @@ interface Props {
 const QUERY_KEY = ["admin", "game"] as const;
 const SOCIAL_KEY = ["admin", "game", "social"] as const;
 const OBSERVABILITY_KEY = ["admin", "game", "observability"] as const;
+const MUSIC_KEY = ["admin", "game", "music"] as const;
+
+/** Э20: три режима вывода бота в основной чат. */
+const CHAT_OUTPUT_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "normal", label: "Всё в чат", hint: "Как раньше — бот пишет в чат." },
+  {
+    value: "achievements",
+    label: "Ачивки в приложение",
+    hint: "Анонсы ачивок уезжают во вкладку «Лента», остальное работает как прежде.",
+  },
+  {
+    value: "all",
+    label: "Всё в приложение",
+    hint: "В чат — только ответы на команды/@ и напоминания. Вся активность — в ленте.",
+  },
+];
 
 /** Ползунок-тумблер: одинаковый во всех четырёх блоках Э13. */
 function Toggle({
@@ -124,18 +140,97 @@ function NumberRow({
  *
  * Спецсимволы экранируем, а пробелы делаем гибкими (`\s+`), чтобы «я ебал»
  * ловилось и как «я   ебал». Хвост `\w*` — «я ебала/ебал-то» тоже попадают.
+ *
+ * Э21: тильда `~` теперь РАБОТАЕТ как префиксный маркер («ловим всё, что
+ * начинается с …», в том числе с дефисами и прочими не-словесными хвостами):
+ * «нейро~» → `\bнейро\w*`, а «нейро~» в середине — `\w*` на месте тильды.
+ * Раньше тильда попадала в регэксп литералом и НИКОГДА не ловила ничего сверх
+ * самой «нейро~» — дыра, которую просил починить оператор.
  */
-function phraseToVariant(phrase: string): string {
-  const escaped = phrase
-    .trim()
-    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return `\\b${escaped.replace(/\s+/g, "\\s+")}\\w*`;
+export function phraseToVariant(phrase: string): string {
+  const trimmed = phrase.trim();
+  const openEnded = trimmed.endsWith("~");
+  const escaped = trimmed
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/~/g, "\\w*")
+    .replace(/\s+/g, "\\s+");
+  return `\\b${escaped}${openEnded ? "" : "\\w*"}`;
+}
+
+/**
+ * Э21: проверка фразы на живом тексте — для предпросмотра ловли в админке.
+ * Возвращает индексы вариантов, которые поймали текст (для подсветки). Чистая
+ * функция: одна и та же логика, что у бота (`re.search(..., IGNORECASE)`),
+ * поэтому предпросмотр не может «врать» относительно настоящей охоты.
+ */
+export function matchedVariantIndexes(variants: string[], text: string): number[] {
+  if (!text.trim()) return [];
+  const hits: number[] = [];
+  variants.forEach((v, i) => {
+    try {
+      if (new RegExp(v, "i").test(text)) hits.push(i);
+    } catch {
+      /* кривой регэксп — молча пропускаем, как бот */
+    }
+  });
+  return hits;
+}
+
+/**
+ * Э21: живой предпросмотр ловли слова. Оператор вводит пример фразы — компонент
+ * честно прогоняет её через ТЕ ЖЕ регэкспы, что у бота, и показывает, поймает
+ * ли контрабанда. Так можно проверить тильду и альтернативы не покидая админку.
+ */
+function ContrabandProbe({
+  word,
+  probe,
+  onProbe,
+}: {
+  word: GameContrabandWord;
+  probe: string;
+  onProbe: (v: string) => void;
+}) {
+  const variants = word.variants ?? [];
+  const labels = word.labels ?? [];
+  const hits = matchedVariantIndexes(variants, probe);
+  return (
+    <div className="space-y-1 rounded bg-tg-bg/70 p-2">
+      <div className="text-[10px] text-tg-hint">
+        Проверка ловли: введи фразу — покажу, поймает ли бот.
+      </div>
+      <input
+        value={probe}
+        onChange={(e) => onProbe(e.target.value)}
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        placeholder="напр. нейронка сломалась"
+        className="w-full rounded bg-tg-bg/60 px-2 py-1 text-[11px] text-tg-text"
+      />
+      {probe.trim() !== "" && (
+        <div
+          className={[
+            "text-[11px] font-medium",
+            hits.length ? "text-status-free" : "text-status-busy",
+          ].join(" ")}
+        >
+          {hits.length
+            ? `✅ Поймает: ${hits
+                .map((i) => labels[i] ?? variants[i])
+                .join(", ")}`
+            : "❌ Не поймает — допиши эту формулировку в альтернативы"}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function GameScreen({ users, onBack }: Props) {
   const queryClient = useQueryClient();
   const state = useQuery({ queryKey: QUERY_KEY, queryFn: fetchGameAdmin });
   const social = useQuery({ queryKey: SOCIAL_KEY, queryFn: fetchGameSocial });
+  // Э21: музыка читается на уровне экрана — для сводного блока рубильников.
+  const music = useQuery({ queryKey: MUSIC_KEY, queryFn: fetchGameMusic });
   const observability = useQuery({
     queryKey: OBSERVABILITY_KEY,
     queryFn: fetchGameObservability,
@@ -160,6 +255,8 @@ export default function GameScreen({ users, onBack }: Props) {
   const [altDraft, setAltDraft] = useState<Record<number, string>>({});
   // Черновики «добавить фразу», по одному на участника (ключ — tg-id).
   const [phraseDraft, setPhraseDraft] = useState<Record<string, string>>({});
+  // Э21: тексты для живого предпросмотра ловли (ключ — индекс слова).
+  const [probeDraft, setProbeDraft] = useState<Record<number, string>>({});
   const words = wordsDraft ?? social.data?.contraband_words ?? [];
 
   // Группируем реестр ПО УЧАСТНИКАМ: править фразы удобнее рядом с их владельцем,
@@ -323,6 +420,18 @@ export default function GameScreen({ users, onBack }: Props) {
     },
   });
 
+  const musicMut = useMutation({
+    mutationFn: updateGameMusic,
+    onSuccess: (data) => {
+      haptic("success");
+      queryClient.setQueryData(MUSIC_KEY, data);
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
   const flushMut = useMutation({
     mutationFn: flushGameDigest,
     onSuccess: (data) => {
@@ -408,6 +517,112 @@ export default function GameScreen({ users, onBack }: Props) {
           {state.data?.players ?? 0} профилей · ачивок в каталоге:{" "}
           {state.data?.achievements_total ?? 0} · максимум {state.data?.max_level ?? 10} рангов
         </div>
+      </section>
+
+      {/* Э21: СВОДНЫЙ блок рубильников — дублирует родные тумблеры из разделов
+          ниже, но показывает все отключаемые механики на одном экране. Родные
+          тумблеры остаются и работают: переключать можно из любого места. */}
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">🎛 Все механики — быстрая сборка</div>
+          <div className="text-[11px] text-tg-hint">
+            Дублирующий блок: те же рубильники, что и ниже в разделах.
+          </div>
+        </div>
+        <Toggle
+          label="🎮 Игровая система"
+          hint="Мастер-рубильник: опыт, ачивки, гейтинг"
+          on={state.data?.enabled ?? false}
+          busy={toggleMut.isPending}
+          onClick={() => toggleMut.mutate(!(state.data?.enabled ?? false))}
+        />
+        <Toggle
+          label="⚡ Случайные события"
+          hint="Вопросы и призывы «первый, кто напишет…»"
+          on={social.data?.events_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({ events_enabled: !(social.data?.events_enabled ?? false) })
+          }
+        />
+        <Toggle
+          label="🎙 Голосовые задания"
+          hint="Творческая задача, ответ — голосовым"
+          on={social.data?.voice_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({ voice_enabled: !(social.data?.voice_enabled ?? false) })
+          }
+        />
+        <Toggle
+          label="🗳 Опрос «чей вариант лучше»"
+          hint="Бонусное голосование после сводки голосовых"
+          on={social.data?.voice_poll_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({
+              voice_poll_enabled: !(social.data?.voice_poll_enabled ?? false),
+            })
+          }
+        />
+        <Toggle
+          label="🎲 Рулетка голосовых"
+          hint="Иногда награда — только первому сдавшему"
+          on={social.data?.voice_alt_mode_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({
+              voice_alt_mode_enabled: !(social.data?.voice_alt_mode_enabled ?? false),
+            })
+          }
+        />
+        <Toggle
+          label="💰 Контрабанда слов"
+          hint="Опыт владельцу кодового слова"
+          on={social.data?.contraband_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({
+              contraband_enabled: !(social.data?.contraband_enabled ?? false),
+            })
+          }
+        />
+        <Toggle
+          label="🕯 Поминовения"
+          hint="Некрологи по ушедшим участникам"
+          on={social.data?.memorial_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({ memorial_enabled: !(social.data?.memorial_enabled ?? false) })
+          }
+        />
+        <Toggle
+          label="📰 Дайджест в чат"
+          hint="Собирает события в одну сводку"
+          on={social.data?.digest_enabled ?? false}
+          busy={socialMut.isPending}
+          onClick={() =>
+            socialMut.mutate({ digest_enabled: !(social.data?.digest_enabled ?? false) })
+          }
+        />
+        <Toggle
+          label="🎧 Музыкальная предложка"
+          hint="Еженедельная подборка треков"
+          on={music.data?.enabled ?? false}
+          busy={musicMut.isPending}
+          onClick={() =>
+            musicMut.mutate({ enabled: !(music.data?.enabled ?? false) })
+          }
+        />
+        <Toggle
+          label="🎵 Мьюзик-гейм"
+          hint="«Угадай, кто предложил трек»"
+          on={music.data?.game_enabled ?? false}
+          busy={musicMut.isPending}
+          onClick={() =>
+            musicMut.mutate({ game_enabled: !(music.data?.game_enabled ?? false) })
+          }
+        />
       </section>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
@@ -629,6 +844,48 @@ export default function GameScreen({ users, onBack }: Props) {
 
         {social.data && (
           <>
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <div className="text-[12px] font-medium">
+                Режим вывода бота в основной чат
+              </div>
+              <div className="flex flex-col gap-1">
+                {CHAT_OUTPUT_OPTIONS.map((opt) => {
+                  const active = social.data?.chat_output_mode === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        if (active) return;
+                        haptic("selection");
+                        socialMut.mutate({ chat_output_mode: opt.value });
+                      }}
+                      disabled={socialMut.isPending}
+                      className={[
+                        "rounded-lg px-3 py-2 text-left text-sm active:scale-[0.99] disabled:opacity-60",
+                        active
+                          ? "bg-tg-button text-tg-button-text"
+                          : "bg-tg-secondary-bg/80 text-tg-text",
+                      ].join(" ")}
+                    >
+                      <div className="font-medium">
+                        {active ? "✓ " : ""}
+                        {opt.label}
+                      </div>
+                      <div
+                        className={[
+                          "mt-0.5 text-[11px]",
+                          active ? "opacity-80" : "text-tg-hint",
+                        ].join(" ")}
+                      >
+                        {opt.hint}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
               <NumberRow
                 label="бюджет авто-постов в день (0 — без лимита)"
@@ -1067,6 +1324,15 @@ export default function GameScreen({ users, onBack }: Props) {
                                 очистить
                               </button>
                             </div>
+                            {/* Э21: живой предпросмотр — введи фразу и увидишь,
+                                поймает ли её бот (та же логика, что в бою). */}
+                            <ContrabandProbe
+                              word={w}
+                              probe={probeDraft[idx] ?? ""}
+                              onProbe={(v) =>
+                                setProbeDraft((d) => ({ ...d, [idx]: v }))
+                              }
+                            />
                           </div>
                         )}
                       </div>

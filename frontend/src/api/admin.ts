@@ -1370,6 +1370,8 @@ export interface GameSocialState {
   voice_alt_mode_enabled: boolean;
   /** Сколько заданий сейчас открыто (обычно 0 или 1). */
   voice_open: number;
+  /** Э20: режим вывода бота в основной чат — "normal" | "achievements" | "all". */
+  chat_output_mode: string;
 }
 
 export const fetchGameSocial = () =>

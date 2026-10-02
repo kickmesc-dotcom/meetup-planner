@@ -8,10 +8,10 @@ import {
   type UiPrefs,
 } from "./api/availability";
 import CalendarView from "./features/calendar/CalendarView";
-import MeetingsScreen from "./features/meetings/MeetingsScreen";
-import PollsScreen from "./features/polls/PollsScreen";
+import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
 import ProfileScreen from "./features/profile/ProfileScreen";
 import GuestProfileScreen from "./features/profile/GuestProfileScreen";
+import FeedScreen from "./features/feed/FeedScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
@@ -47,10 +47,11 @@ export default function App() {
   const guestUserId = useUI((s) => s.guestUserId);
   const closeGuest = useUI((s) => s.closeGuest);
 
-  // GHG10 (Э4.2): анонс ачивки в чате ведёт по deep link на «свои ачивки».
-  // Открываем профиль — там живут ранг и лист ачивок (наполнение — Э5).
+  // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
+  // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
   useEffect(() => {
-    if (getStartParam() === "achievements") setTab("profile");
+    const start = getStartParam();
+    if (start === "achievements" || start === "feed") setTab("feed");
   }, [setTab]);
 
   if (me.isPending || users.isPending) {
@@ -101,9 +102,9 @@ export default function App() {
   const meData = me.data!;
   const isAdmin = !!meData.is_admin;
 
-  // Если переключились на admin без прав — мягко возвращаем на календарь.
+  // Если переключились на admin без прав — мягко возвращаем на ленту.
   if (tab === "admin" && !isAdmin) {
-    setTab("calendar");
+    setTab("feed");
   }
 
   const greetingHidden = uiPrefs.data?.hide_greeting === true;
@@ -129,30 +130,31 @@ export default function App() {
       </>
     );
   } else if (tab === "meetings") {
+    // Э21: одна вкладка на встречи и опросы — переключатель внутри экрана.
     content = (
       <>
         <header className="px-4 py-3 border-b border-tg-secondary-bg">
-          <div className="text-base font-medium">🤝 Ближайшие встречи</div>
+          <div className="text-base font-medium">🤝 Встречи и опросы</div>
           <div className="text-xs text-tg-hint">
-            На 3 месяца вперёд. Жми RSVP, чтобы остальные знали.
+            RSVP по встречам и голосования за слот — всё в одном месте.
           </div>
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
-          <MeetingsScreen users={users.data} meId={meData.id} />
+          <MeetingsPollsScreen users={users.data} meId={meData.id} />
         </main>
       </>
     );
-  } else if (tab === "polls") {
+  } else if (tab === "feed") {
     content = (
       <>
         <header className="px-4 py-3 border-b border-tg-secondary-bg">
-          <div className="text-base font-medium">🗳️ Опросы</div>
+          <div className="text-base font-medium">🏆 Лента</div>
           <div className="text-xs text-tg-hint">
-            Голосование за слот встречи. Голосуй в TG-чате — результат тут.
+            Кто что открыл и с кем что случилось.
           </div>
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
-          <PollsScreen users={users.data} meId={meData.id} />
+          <FeedScreen meId={meData.id} />
         </main>
       </>
     );
