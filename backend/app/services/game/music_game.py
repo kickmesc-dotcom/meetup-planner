@@ -215,6 +215,11 @@ async def open_round(
     chat_id = settings.group_chat_id
     if not chat_id or bot is None:
         return None
+    # Э20: режим «всё в приложение» — раунд в чат не открываем.
+    from app.services.game import chat_mode
+
+    if await chat_mode.chat_all_silent(session):
+        return None
 
     proposers = await proposer_ids(session)
     if len(proposers) < MUSIC_GAME_MIN_OPTIONS:
@@ -374,7 +379,9 @@ async def finalize_round(
     )
     names = await _names(session, [uid for uid in ([author_id] if author_id else []) + guessed_ids if uid is not None])
 
-    if bot is not None:
+    from app.services.game import chat_mode
+
+    if bot is not None and not await chat_mode.chat_all_silent(session):
         try:
             if author_id is not None:
                 await bot.send_message(

@@ -256,6 +256,12 @@ async def run_dead_chat_job(bot) -> None:
     async with sm() as session:
         if not await get_dead_chat_enabled(session):
             return
+        # Э20: режим «всё в приложение» — чат не пинаем.
+        from app.services.game import chat_mode
+
+        if await chat_mode.chat_all_silent(session):
+            log.info("dead_chat.skipped_chat_muted")
+            return
         # Глобальная пауза (/zaebal и пр.): «бот, помолчи» распространяется и
         # на пинание мёртвого чата — иначе пауза выглядит как повод для шутки.
         from app.services.bot_pause import is_paused

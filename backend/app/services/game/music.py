@@ -453,6 +453,11 @@ async def publish(
     session: AsyncSession, bot, *, now: datetime, rng: random.Random
 ) -> MusicSelection | None:
     """Собрать и выложить подборку. `None` — публиковать нечего или TG не принял."""
+    # Э20: режим «всё в приложение» — подборку в чат не выкладываем.
+    from app.services.game import chat_mode
+
+    if await chat_mode.chat_all_silent(session):
+        return None
     tracks = await pool_tracks(session)
     if len(tracks) < MUSIC_MIN_TRACKS:
         return None
@@ -528,7 +533,9 @@ async def _record_shortfall(
     )
     session.add(selection)
     await session.commit()
-    if chat_id and bot is not None:
+    from app.services.game import chat_mode
+
+    if chat_id and bot is not None and not await chat_mode.chat_all_silent(session):
         try:
             await bot.send_message(
                 chat_id=chat_id,

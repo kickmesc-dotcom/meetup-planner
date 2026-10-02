@@ -299,6 +299,8 @@ class GameSocialOut(BaseModel):
     # Э19+: альтернативный режим награды — с шансом 50/50 «только первому».
     voice_alt_mode_enabled: bool = False
     voice_open: int = 0
+    # Э20: режим вывода бота в основной чат — "normal" | "achievements" | "all".
+    chat_output_mode: str = "normal"
 
 
 class GameSocialIn(BaseModel):
@@ -336,6 +338,37 @@ class GameSocialIn(BaseModel):
     voice_poll_enabled: bool | None = None
     voice_min_gap_hours: int | None = Field(None, ge=1, le=720)
     voice_alt_mode_enabled: bool | None = None
+    chat_output_mode: str | None = None
+
+
+class FeedItemOut(BaseModel):
+    """Э20: одна запись ленты активности в мини-аппе.
+
+    Источник отдаёт готовыми поля (см. `services/game/feed.py`): тип, иконка,
+    текст, кто и когда. `user_id` — внутренний id для перехода в чужой профиль.
+    """
+
+    id: str
+    source: str = ""
+    kind: str = "other"
+    icon: str = "📌"
+    title: str = ""
+    text: str = ""
+    at: datetime
+    user_id: int | None = None
+    user_name: str | None = None
+    user_telegram_id: int | None = None
+    avatar_url: str | None = None
+
+
+class FeedOut(BaseModel):
+    """Лента + признак наличия следующей страницы."""
+
+    enabled: bool = True
+    items: list[FeedItemOut] = []
+    next_offset: int | None = None
+    # Э21: доступные типы записей (для чипов-фильтров на фронте).
+    kinds: list[str] = []
 
 
 class GameDigestFlushOut(BaseModel):

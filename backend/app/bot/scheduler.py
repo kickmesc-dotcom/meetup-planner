@@ -324,6 +324,18 @@ async def _autoloser_job(bot: Bot) -> None:
             session.add(outbox)
             await session.flush()  # фиксируем outbox.id до send'а
 
+            # Э20: режим «всё в приложение» — пост в чат не шлём, но ролл
+            # остаётся (календарь/лента/статистика его видят), а outbox сразу
+            # помечаем sent, чтобы retry-job не крутился впустую.
+            from app.services.game import chat_mode
+
+            if await chat_mode.chat_all_silent(session):
+                outbox.status = "sent"
+                outbox.attempts = 1
+                outbox.sent_at = datetime.now(timezone.utc)
+                log.info("autoloser.outbox_feed_only", loser_roll_id=roll.id)
+                return
+
             # P0.2.d: transport-логирование для диагностики «висящего прокси».
             transport = (
                 "proxy"
@@ -452,6 +464,17 @@ async def _loser_outbox_retry_job(bot: Bot) -> None:
                 header_emoji="👑",
                 header_label="Лох дня",
             )
+
+            # Э20: режим «всё в приложение» — доставку в чат не повторяем.
+            from app.services.game import chat_mode
+
+            if await chat_mode.chat_all_silent(session):
+                outbox.status = "sent"
+                outbox.attempts = outbox.attempts + 1
+                outbox.sent_at = datetime.now(timezone.utc)
+                outbox.last_error = None
+                log.info("loser_outbox_retry.feed_only", outbox_id=outbox.id)
+                continue
 
             transport = (
                 "proxy"

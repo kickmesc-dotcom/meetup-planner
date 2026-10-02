@@ -14,7 +14,7 @@ import asyncio
 from datetime import datetime, timezone
 
 import structlog
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,8 @@ from app.schemas.game import (
     DonationIn,
     DonationOut,
     FeatureOut,
+    FeedItemOut,
+    FeedOut,
     GameCustomizePatch,
     GameProfileOut,
     GuestAchievementOut,
@@ -47,7 +49,7 @@ from app.schemas.game import (
     RankRowOut,
     XpRuleOut,
 )
-from app.services.game import achievements, donations, gates, holidays, levels, xp
+from app.services.game import achievements, donations, feed, gates, holidays, levels, xp
 from app.services.game.achievements_catalog import COMPLETIONIST_CODE, base_achievements
 from app.services.game.config import (
     MAX_LEVEL,
@@ -535,6 +537,46 @@ async def guest_profile(
         achievements_collected=len(items),
         achievements_total=len(bases),
         achievements=items,
+    )
+
+
+@router.get("/game/feed", response_model=FeedOut)
+async def activity_feed(
+    session: SessionDep,
+    user: CurrentUser,
+    scope: str = Query("all", pattern="^(all|mine)$"),
+    limit: int = Query(30, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    kinds: str | None = Query(
+        None, description="фильтр по типам через запятую (achievement,voice,...)"
+    ),
+) -> FeedOut:
+    """Э20/Э21: лента активности — «кто что открыл и с кем что случилось».
+
+    Главная поверхность двух софт-режимов приглушения: в режиме «ачивки в
+    приложение» сюда уезжают ачивки, в режиме «всё в приложение» — вообще вся
+    активность. Но ручка работает и в обычном режиме (просто дублирует чат).
+
+    `scope=mine` — только записи текущего игрока; `limit`/`offset` — страницы;
+    `kinds` — фильтр по типам записей через запятую (Э21).
+    """
+    if not await is_game_enabled(session):
+        return FeedOut(enabled=False, items=[], kinds=[])
+    wanted = (
+        {k.strip() for k in kinds.split(",") if k.strip()} if kinds else None
+    )
+    items = await feed.build_feed(
+        session,
+        user_id=user.id if scope == "mine" else None,
+        limit=limit,
+        offset=offset,
+        kinds=wanted,
+    )
+    return FeedOut(
+        enabled=True,
+        items=[FeedItemOut(**item) for item in items],
+        next_offset=(offset + limit) if len(items) == limit else None,
+        kinds=list(feed.FEED_KIND_ORDER),
     )
 
 

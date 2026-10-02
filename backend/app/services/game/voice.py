@@ -266,6 +266,11 @@ async def open_task(
     chat_id = settings.group_chat_id
     if not chat_id:
         return None
+    # Э20: режим «всё в приложение» — задание в чат не ставим вообще.
+    from app.services.game import chat_mode
+
+    if await chat_mode.chat_all_silent(session):
+        return None
     task = pick_task(used_codes=await _used_codes(session, now=now), rng=rng)
     if task is None:
         return None
@@ -335,7 +340,13 @@ async def finalize_task(
     catalog_task = TASKS_BY_CODE.get(task.code)
     title = catalog_task.title if catalog_task else task.code
 
-    if bot is not None:
+    # Э20: в режиме «всё в приложение» сводку/опрос в чат не отправляем, но
+    # задание всё равно закрываем (иначе оно застрянет открытым навсегда).
+    from app.services.game import chat_mode
+
+    silent = await chat_mode.chat_all_silent(session)
+
+    if bot is not None and not silent:
         try:
             await bot.send_message(
                 chat_id=task.chat_id,
@@ -367,6 +378,7 @@ async def finalize_task(
         task.poll_enabled
         and len(subs) >= VOICE_POLL_MIN_OPTIONS
         and bot is not None
+        and not silent
     ):
         await _create_poll(session, bot, task, subs=subs, names=names)
     await session.commit()

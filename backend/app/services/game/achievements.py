@@ -482,9 +482,23 @@ async def _link_markup(url: str):
 async def announce_granted(
     session: AsyncSession, user_id: int, achs: list[Achievement]
 ) -> bool:
-    """Анонс в общий чат. Best-effort: фейл TG не ломает начисление опыта."""
+    """Анонс в общий чат. Best-effort: фейл TG не ломает начисление опыта.
+
+    Э20: в режимах «ачивки в приложение» и «всё в приложение» анонс в чат
+    ПОЛНОСТЬЮ исключён — ачивка уже записана в `user_achievements`, откуда её
+    читает лента мини-аппа. Опыт/ранг при этом начислены как обычно.
+    """
     if not achs:
         return False
+    from app.services.game import chat_mode
+
+    if await chat_mode.get_chat_mode(session) in ("achievements", "all"):
+        log.info(
+            "game.achievement_announced_feed_only",
+            user_id=user_id,
+            codes=[a.code for a in achs],
+        )
+        return True
     settings = get_settings()
     chat_id = settings.group_chat_id
     if not chat_id:

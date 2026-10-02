@@ -522,6 +522,12 @@ async def run_random_phrases_job(bot: Bot) -> None:
         if not await get_random_phrases_enabled(session):
             log.info("random_phrases.disabled_in_settings")
             return
+        # Э20: режим «всё в приложение» — проактивные цитаты в чат не шлём.
+        from app.services.game import chat_mode
+
+        if await chat_mode.chat_all_silent(session):
+            log.info("random_phrases.skipped_chat_muted")
+            return
 
         user_chance = await get_random_phrases_user_chance(session)
         if user_chance < 1.0 and random.random() > user_chance:

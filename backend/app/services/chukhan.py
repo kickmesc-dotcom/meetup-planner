@@ -349,6 +349,23 @@ async def announce_chukhan(bot: Bot, session: AsyncSession) -> WeeklyChukhan | N
     # она сохранится и ретрай переиспользует ту же фразу; на успехе уедет вместе
     # с posted_at. История (профиль) читает это поле.
     row.reason_text = reason
+    # Э20: режим «всё в приложение» — в чат не постим (ни дроби, ни фото,
+    # ни опроса), но звание фиксируем как выданное: XP, история и лента
+    # мини-аппа читают `weekly_chukhan`, а не факт поста в TG.
+    from app.services.game import chat_mode
+
+    if await chat_mode.chat_all_silent(session):
+        row.posted_at = datetime.now(timezone.utc)
+        await session.commit()
+        from app.services.game import awards as _awards
+
+        await _awards.chukhan(session, user.id, week_start=row.week_start)
+        log.info(
+            "chukhan.posted_feed_only",
+            week_start=row.week_start.isoformat(),
+            user=user.display_name,
+        )
+        return row
     # GHG8 P3: «мог бы стать %name%, но ДР» — до дроби и основного поста.
     # Best-effort: фейл оглашения не блокирует пост. Оглашаем только при
     # свежем пике (created): у ретрая недоставленного поста скипы уже

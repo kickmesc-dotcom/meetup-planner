@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import GameJournalEntry, User
+from app.services.game.chat_mode import chat_all_silent, get_chat_mode
 from app.services.admin_config import (
     get_achievements_pool_gap_minutes,
     get_achievements_pool_interval_hours,
@@ -106,11 +107,23 @@ async def send_now(
     *,
     chat_id: int | None = None,
     reply_markup=None,
+    session: AsyncSession | None = None,
+    force: bool = False,
 ) -> bool:
-    """Прямая отправка в чат. Best-effort, без исключений наружу."""
+    """Прямая отправка в чат. Best-effort, без исключений наружу.
+
+    Э20: если активен режим «всё в приложение» (`chat.output_mode=all`),
+    проактивная отправка в основной чат подавляется — этот хелпер ЕДИНАЯ
+    дверь, через которую такие сообщения и уходят. `force=True` — для
+    сообщений, инициированных человеком (команды, напоминания о встречах),
+    они проходят независимо от режима.
+    """
     settings = get_settings()
     target = chat_id or settings.group_chat_id
     if not target or not text:
+        return False
+    if not force and await chat_all_silent(session):
+        log.info("game.chat_send_suppressed", target=target)
         return False
     bot = _get_bot()
     if bot is None:
@@ -124,6 +137,38 @@ async def send_now(
     except Exception as exc:  # noqa: BLE001
         log.warning("game.journal_send_failed", error=str(exc))
         return False
+
+
+# Виды, которые в режиме «ачивки в приложение» не имеют права попасть в чат
+# (анонсы ачивок и их буферная сводка). Всё остальное работает как прежде.
+_ACHIEVEMENT_KINDS = (KIND_ACHIEVEMENT, KIND_ACHIEVEMENT_POOL)
+
+
+async def _record_feed_only(
+    session: AsyncSession,
+    *,
+    kind: str,
+    text: str,
+    subject_user_id: int | None,
+    chat_id: int | None,
+) -> bool:
+    """Записать анонс ТОЛЬКО в ленту (не в чат).
+
+    `sent_at=now` — чтобы сводка/дайджест-jobs не вытащили эту строку и не
+    отправили её в чат задним числом. Лента (`services/game/feed.py`) читает
+    журнал независимо от `sent_at`.
+    """
+    entry = GameJournalEntry(
+        kind=kind,
+        text=text,
+        subject_user_id=subject_user_id,
+        chat_id=chat_id,
+        sent_at=datetime.now(timezone.utc),
+    )
+    session.add(entry)
+    await session.commit()
+    log.info("game.announce_feed_only", kind=kind, subject_user_id=subject_user_id)
+    return True
 
 
 async def announce(
@@ -140,10 +185,23 @@ async def announce(
     Режим сводки выключен (по умолчанию) → отправляем сразу, как раньше.
     Включён → кладём в журнал; текст уйдёт следующим окном, кнопки в сводке
     общие (одна «свои ачивки» на всё сообщение).
+
+    Э20: два софт-режима приглушения (`chat.output_mode`) — тоже здесь:
+    * `achievements` — ачивки не уходят в чат (только в ленту), остальное как было;
+    * `all` — в чат не уходит НИЧЕГО проактивное (только в ленту).
     """
     if not text:
         return False
     try:
+        mode = await get_chat_mode(session)
+        if mode == "all" or (mode == "achievements" and kind in _ACHIEVEMENT_KINDS):
+            return await _record_feed_only(
+                session,
+                kind=kind,
+                text=text,
+                subject_user_id=subject_user_id,
+                chat_id=chat_id,
+            )
         if not await get_game_digest_enabled(session):
             return await send_now(text, chat_id=chat_id, reply_markup=reply_markup)
         # `chat_id` намеренно не подставляем из настроек здесь: сводка уедет
@@ -244,7 +302,10 @@ async def flush(session: AsyncSession, *, now: datetime | None = None) -> int:
     sent_any = False
     for chunk in chunk_digest(build_digest_text(payload, interval_hours=interval)):
         ok = await send_now(
-            chunk, chat_id=target, reply_markup=markup if not sent_any else None
+            chunk,
+            chat_id=target,
+            reply_markup=markup if not sent_any else None,
+            session=session,
         )
         if not ok:
             return 0  # ничего не пометили — попробуем следующим окном
@@ -500,7 +561,10 @@ async def flush_achievements(session: AsyncSession, *, now: datetime | None = No
     sent_any = False
     for chunk in chunk_digest(text):
         ok = await send_now(
-            chunk, chat_id=target, reply_markup=markup if not sent_any else None
+            chunk,
+            chat_id=target,
+            reply_markup=markup if not sent_any else None,
+            session=session,
         )
         if not ok:
             return 0

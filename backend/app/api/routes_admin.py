@@ -4117,6 +4117,7 @@ async def _game_social_state(session) -> GameSocialOut:
         get_achievements_pool_morning_hour,
         get_achievements_post_mode,
         get_activity_day_end_hour,
+        get_chat_output_mode,
         get_activity_day_start_hour,
         get_activity_max_posts_per_day,
         get_game_contraband_chance_percent,
@@ -4212,6 +4213,7 @@ async def _game_social_state(session) -> GameSocialOut:
         voice_min_gap_hours=await get_game_voice_min_gap_hours(session),
         voice_alt_mode_enabled=await get_game_voice_alt_mode_enabled(session),
         voice_open=voice_open,
+        chat_output_mode=await get_chat_output_mode(session),
     )
 
 
@@ -4240,6 +4242,7 @@ async def admin_game_social_put(
         set_achievements_pool_morning_hour,
         set_achievements_post_mode,
         set_activity_day_end_hour,
+        set_chat_output_mode,
         set_activity_day_start_hour,
         set_activity_max_posts_per_day,
         set_game_contraband_chance_percent,
@@ -4322,6 +4325,8 @@ async def admin_game_social_put(
         await set_game_voice_min_gap_hours(session, body.voice_min_gap_hours)
     if body.voice_alt_mode_enabled is not None:
         await set_game_voice_alt_mode_enabled(session, body.voice_alt_mode_enabled)
+    if body.chat_output_mode is not None:
+        await set_chat_output_mode(session, body.chat_output_mode)
     log.info("admin.game_social_updated", by=user.id)
     return await _game_social_state(session)
 

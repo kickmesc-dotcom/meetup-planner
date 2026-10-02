@@ -1640,6 +1640,10 @@ GAME_ACHIEVEMENTS_POOL_MIN_ITEMS_KEY = "game.achievements.pool.min_items"
 GAME_ACHIEVEMENTS_POOL_GAP_KEY = "game.achievements.pool.gap_minutes"
 GAME_ACHIEVEMENTS_POOL_LAST_FLUSH_KEY = "game.achievements.pool.last_flush_at"
 
+# Э20: режим вывода бота в основной чат (normal / achievements / all). См.
+# `game.config.CHAT_OUTPUT_MODE`. Без миграции — обычный ключ admin_config.
+GAME_CHAT_OUTPUT_MODE_KEY = "game.chat.output_mode"
+
 GAME_CONTRABAND_ENABLED_KEY = "game.contraband.enabled"
 GAME_CONTRABAND_CHANCE_KEY = "game.contraband.chance_percent"
 GAME_CONTRABAND_CAP_KEY = "game.contraband.daily_cap"
@@ -1859,6 +1863,24 @@ async def set_achievements_post_mode(session: AsyncSession, mode: str) -> None:
     if value not in ACHIEVEMENT_POST_MODES:
         value = ACHIEVEMENT_POST_MODES[0]
     await _set_value(session, GAME_ACHIEVEMENTS_POST_MODE_KEY, value)
+
+
+async def get_chat_output_mode(session: AsyncSession) -> str:
+    """Э20: режим вывода бота в основной чат (normal/achievements/all)."""
+    from app.services.game.config import CHAT_OUTPUT_MODE, CHAT_OUTPUT_MODES
+
+    raw = await _get_value(session, GAME_CHAT_OUTPUT_MODE_KEY)
+    value = (raw or "").strip().lower()
+    return value if value in CHAT_OUTPUT_MODES else CHAT_OUTPUT_MODE
+
+
+async def set_chat_output_mode(session: AsyncSession, mode: str) -> None:
+    from app.services.game.config import CHAT_OUTPUT_MODES
+
+    value = (mode or "").strip().lower()
+    if value not in CHAT_OUTPUT_MODES:
+        value = CHAT_OUTPUT_MODES[0]
+    await _set_value(session, GAME_CHAT_OUTPUT_MODE_KEY, value)
 
 
 async def get_achievements_pool_interval_hours(session: AsyncSession) -> int:
