@@ -107,6 +107,15 @@ interface UIState {
   setShowWormHistory: (v: boolean) => void;
 
   /**
+   * Э19: гостевой профиль участника (клик по аватарке на календаре). Хранит
+   * ВНУТРЕННИЙ id юзера; null — оверлей закрыт. Рендерится поверх вкладок,
+   * поэтому настройки своего профиля и пояснения туда не попадают.
+   */
+  guestUserId: number | null;
+  openGuest: (userId: number) => void;
+  closeGuest: () => void;
+
+  /**
    * GHG6 BD2: дата, с которой надо открыть PollSheet при «Назначить встречу»
    * из поповера. PollSheet читает её при монтаже и кладёт в первый вариант.
    */
@@ -202,6 +211,10 @@ export const useUI = create<UIState>((set, get) => ({
 
   showWormHistory: false,
   setShowWormHistory: (showWormHistory) => set({ showWormHistory }),
+
+  guestUserId: null,
+  openGuest: (guestUserId) => set({ guestUserId }),
+  closeGuest: () => set({ guestUserId: null }),
 
   pollSheetPresetDate: null,
   setPollSheetPresetDate: (pollSheetPresetDate) => set({ pollSheetPresetDate }),

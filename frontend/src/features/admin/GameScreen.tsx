@@ -141,11 +141,17 @@ export default function GameScreen({ users, onBack }: Props) {
     queryFn: fetchGameObservability,
   });
   const [selected, setSelected] = useState<number | null>(null);
+  // Э19: развёрнутый блок отладки игрока можно СВЕРНУТЬ, не сбрасывая выбор
+  // участника (жалоба оператора: «развернул Сержа-NEO и не могу свернуть»).
+  const [playerOpen, setPlayerOpen] = useState(true);
   const [code, setCode] = useState("");
   const [xpDraft, setXpDraft] = useState("");
   const [debugDraft, setDebugDraft] = useState<string | null>(null);
   // Реестр слов правим локально и отправляем целиком: он заменяется, а не мержится.
   const [wordsDraft, setWordsDraft] = useState<GameContrabandWord[] | null>(null);
+  // Э19: какое слово сейчас раскрыто в редактор (индекс в `words`) — можно
+  // поменять само слово и альтернативные написания, а не только владельца/XP.
+  const [editingWord, setEditingWord] = useState<number | null>(null);
   // Черновики «добавить фразу», по одному на участника (ключ — tg-id).
   const [phraseDraft, setPhraseDraft] = useState<Record<string, string>>({});
   const words = wordsDraft ?? social.data?.contraband_words ?? [];
@@ -170,6 +176,26 @@ export default function GameScreen({ users, onBack }: Props) {
   const ownerName = (telegramId: number | null) =>
     users.find((u) => u.telegram_id === telegramId)?.display_name ??
     (telegramId == null ? "— без владельца —" : `tg=${telegramId}`);
+
+  // Э19: точечная правка строки реестра (слово/варианты/XP и т.д.).
+  const updateWord = (idx: number, patch: Partial<GameContrabandWord>) =>
+    setWordsDraft(words.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+
+  /** Альтернативные написания → и человеческие подписи, и регэкспы-ловушки.
+   *  Оператор вводит их через запятую/с новой строки («нейронки, нейро~, ai,
+   *  ИИ, ии-шный»), а `phraseToVariant` превращает каждый в префиксную маску
+   *  (`\bнейронки\w*`). Так альтернативы видит и человек (labels), и код.
+   */
+  const setWordAlternatives = (idx: number, raw: string) => {
+    const items = raw
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    updateWord(idx, { labels: items, variants: items.map(phraseToVariant) });
+  };
+
+  const alternativesText = (w: GameContrabandWord) =>
+    (w.labels && w.labels.length ? w.labels : [w.word]).join(", ");
 
   const addPhrase = (telegramId: number | null, key: string) => {
     const text = (phraseDraft[key] ?? "").trim();
@@ -410,6 +436,7 @@ export default function GameScreen({ users, onBack }: Props) {
           onChange={(e) => {
             haptic("selection");
             setSelected(e.target.value ? Number(e.target.value) : null);
+            setPlayerOpen(true);
           }}
           className="w-full rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
         >
@@ -430,15 +457,27 @@ export default function GameScreen({ users, onBack }: Props) {
         {player.data && (
           <>
             <div className="rounded-lg bg-tg-bg/50 p-2 text-xs">
-              <div className="text-sm font-medium">
-                {player.data.name} — {player.data.level}-й «{player.data.rank_name}»
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {player.data.name} — {player.data.level}-й «{player.data.rank_name}»
+                  </div>
+                  <div className="text-tg-hint">
+                    {player.data.xp} XP
+                    {player.data.prestige > 0 ? ` · престиж ${player.data.prestige}` : ""} ·
+                    ачивок: {player.data.achievements.length}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlayerOpen((open) => !open)}
+                  aria-label={playerOpen ? "Свернуть участника" : "Развернуть участника"}
+                  className="shrink-0 rounded bg-tg-secondary-bg/80 px-2 py-0.5 text-[11px] text-tg-text"
+                >
+                  {playerOpen ? "Свернуть ▲" : "Развернуть ▼"}
+                </button>
               </div>
-              <div className="text-tg-hint">
-                {player.data.xp} XP
-                {player.data.prestige > 0 ? ` · престиж ${player.data.prestige}` : ""} ·
-                ачивок: {player.data.achievements.length}
-              </div>
-              {Object.keys(player.data.counters).length > 0 && (
+              {playerOpen && Object.keys(player.data.counters).length > 0 && (
                 <div className="text-tg-hint">
                   накопители:{" "}
                   {Object.entries(player.data.counters)
@@ -446,13 +485,15 @@ export default function GameScreen({ users, onBack }: Props) {
                     .join(", ")}
                 </div>
               )}
-              {player.data.achievements.length > 0 && (
+              {playerOpen && player.data.achievements.length > 0 && (
                 <div className="mt-1 break-words text-tg-hint">
                   {player.data.achievements.join(", ")}
                 </div>
               )}
             </div>
 
+            {playerOpen && (
+              <>
             <div className="flex gap-2">
               <input
                 value={code}
@@ -502,6 +543,8 @@ export default function GameScreen({ users, onBack }: Props) {
             >
               🧹 Сбросить ачивки и накопители
             </button>
+              </>
+            )}
           </>
         )}
       </section>
@@ -869,11 +912,30 @@ export default function GameScreen({ users, onBack }: Props) {
                       </span>
                     </div>
                     {group.items.map(({ word: w, idx }) => (
-                      <div key={`${w.word}-${idx}`} className="space-y-1">
+                      <div key={idx} className="space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="min-w-0 flex-1 truncate text-xs">
-                            «{w.word}»
-                          </span>
+                          {editingWord === idx ? (
+                            <input
+                              value={w.word}
+                              onChange={(e) => updateWord(idx, { word: e.target.value })}
+                              placeholder="слово"
+                              aria-label="Кодовое слово"
+                              className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-text"
+                            />
+                          ) : (
+                            <span className="min-w-0 flex-1 truncate text-xs">«{w.word}»</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              haptic("selection");
+                              setEditingWord(editingWord === idx ? null : idx);
+                            }}
+                            aria-label="Редактировать слово и варианты"
+                            className="shrink-0 rounded bg-tg-secondary-bg/80 px-2 py-0.5 text-[11px] text-tg-text"
+                          >
+                            {editingWord === idx ? "готово" : "✎"}
+                          </button>
                           <input
                             type="number"
                             value={w.xp}
@@ -944,6 +1006,22 @@ export default function GameScreen({ users, onBack }: Props) {
                             </option>
                           ))}
                         </select>
+                        {editingWord === idx && (
+                          <div className="space-y-1 rounded bg-tg-bg/60 p-2">
+                            <div className="text-[11px] text-tg-hint">
+                              Альтернативные написания — через запятую или с новой
+                              строки. Бот ловит любое из них (напр. нейронки, нейро~,
+                              ai, аи, ИИ, ии-шный):
+                            </div>
+                            <textarea
+                              value={alternativesText(w)}
+                              onChange={(e) => setWordAlternatives(idx, e.target.value)}
+                              rows={2}
+                              placeholder="нейронки, нейро~, ai, аи, ИИ, ии-шный"
+                              className="w-full rounded bg-tg-bg/70 px-2 py-1 text-[11px] text-tg-text"
+                            />
+                          </div>
+                        )}
                       </div>
                     ))}
                     <div className="flex gap-1 pt-1">

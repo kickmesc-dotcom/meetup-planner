@@ -153,6 +153,26 @@ async def on_group_message(message: Message) -> None:
             except Exception as exc:  # noqa: BLE001
                 log.warning("chat_capture.game_social_failed", error=str(exc))
 
+            # Э19: подтверждение передачи червя — господин отвечает «да»/«нет».
+            # Обрабатываем ПОСЛЕДНИМ и в своей сессии: трансфер может закрыть
+            # текущее звание и создать новое, это не должно смешиваться с
+            # социальным блоком выше.
+            from app.services.game import worm_transfer
+
+            try:
+                async with sm() as tsession:
+                    outcome = await worm_transfer.consume_confirmation(
+                        tsession,
+                        author_user_id=user_pk,
+                        text=message.text,
+                        chat_id=message.chat.id,
+                        at=message.date,
+                    )
+                    if outcome is not None:
+                        await worm_transfer.apply(tsession, outcome)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("chat_capture.worm_transfer_failed", error=str(exc))
+
     except Exception as exc:  # noqa: BLE001
         log.warning("chat_capture.failed", error=str(exc))
 

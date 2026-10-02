@@ -362,11 +362,22 @@ async def worm_lord(session: AsyncSession, user_id: int) -> None:
 
 
 @_guarded("punish")
-async def punish(session: AsyncSession, user_id: int) -> None:
-    """Э18: применил /punish → «Каратель» и юбилеи."""
+async def punish(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    target_user_id: int | None = None,
+    target_is_bot: bool = False,
+) -> None:
+    """Э18/Э19: применил /punish → «Каратель», юбилеи и суточные ачивки."""
     if not await _enabled(session):
         return
-    await achievements.on_punish(session, user_id)
+    await achievements.on_punish(
+        session,
+        user_id,
+        target_user_id=target_user_id,
+        target_is_bot=target_is_bot,
+    )
 
 
 @_guarded("meme_all_reacted")

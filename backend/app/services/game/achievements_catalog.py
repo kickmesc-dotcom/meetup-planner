@@ -318,6 +318,31 @@ _BASE: tuple[Achievement, ...] = (
         KIND_COUNTER,
         tiers=ANNIVERSARY_TIERS,
     ),
+    # --- Э19: «весёлые» ачивки про кару червя ---
+    # Суточные, поэтому instant (событие уже само по себе ограничено днём).
+    # Учёт ведётся по `event_log` (kind='worm_punish'): и счётчик за день, и
+    # уникальные цели — без новой таблицы и миграции.
+    Achievement(
+        "punish_day3",
+        "Тройная кара",
+        "Применить кару три раза за одни сутки",
+        "⚡",
+        KIND_INSTANT,
+    ),
+    Achievement(
+        "punish_all",
+        "Каратель всея чата",
+        "Наказать каждого участника чата, уложившись в одни сутки",
+        "☠️",
+        KIND_INSTANT,
+    ),
+    Achievement(
+        "punish_bot",
+        "Не по чину",
+        "Попытаться наказать самого бота",
+        "🤖",
+        KIND_INSTANT,
+    ),
     # Капстоун-коллекция: собрать ВСЕ ачивки каталога (кроме себя самой).
     # Даёт особый титул (см. `COMPLETIONIST_TITLE`) — выше «Верховного чухана».
     Achievement(
@@ -364,7 +389,11 @@ GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             COMPLETIONIST_CODE,
         ),
     ),
-    ("worm_master", "🪱 Червь-господин", ("worm_lord", "punisher")),
+    (
+        "worm_master",
+        "🪱 Червь-господин",
+        ("worm_lord", "punisher", "punish_day3", "punish_all", "punish_bot"),
+    ),
     ("chat", "📣 Активность в чате", ("generation_mouthpiece", "read_only")),
     (
         "content",

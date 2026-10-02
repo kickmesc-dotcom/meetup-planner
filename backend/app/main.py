@@ -175,6 +175,35 @@ async def _retry_undelivered_chukhan_on_startup() -> None:
         backoff = min(backoff * 2, 480)
 
 
+async def _announce_worm_transfer_once() -> None:
+    """Э19: единоразовое инфо-уведомление о передаче червя после деплоя.
+
+    Флаг живёт в `admin_config` (переживает рестарт), поэтому объявляем ровно
+    один раз за всю жизнь проекта. Ждём немного — на старте канал/вебхук могут
+    ещё подниматься, и первая отправка могла бы упасть.
+    """
+    log = structlog.get_logger()
+    await asyncio.sleep(20)
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            from app.services.admin_config import (
+                get_worm_transfer_announced,
+                set_worm_transfer_announced,
+            )
+
+            if await get_worm_transfer_announced(session):
+                return
+            from app.services.game import journal
+            from app.services.game.worm_transfer import TRANSFER_NOTICE_TEXT
+
+            if await journal.send_now(TRANSFER_NOTICE_TEXT):
+                await set_worm_transfer_announced(session, True)
+                log.info("game.worm_transfer_announced")
+    except Exception as exc:  # noqa: BLE001 — уведомление не стоит старта
+        log.warning("game.worm_transfer_announce_failed", error=str(exc))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -205,6 +234,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # (если cron-ролл упал в окно недоступности — см. инцидент 03.06).
     chukhan_retry_task = asyncio.create_task(_retry_undelivered_chukhan_on_startup())
 
+    # Э19: единоразовое инфо-уведомление о фиче «передача червя».
+    worm_notice_task = asyncio.create_task(_announce_worm_transfer_once())
+
     # 3. Планировщик стартует независимо от состояния сети.
     try:
         start_scheduler(get_bot())
@@ -214,7 +246,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Завершение: гасим фоновые задачи, если они ещё бегут.
-    for _task in (tg_task, chukhan_retry_task):
+    for _task in (tg_task, chukhan_retry_task, worm_notice_task):
         _task.cancel()
         try:
             await _task

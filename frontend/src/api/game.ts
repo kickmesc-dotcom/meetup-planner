@@ -127,6 +127,40 @@ export const fetchAchievementStats = () =>
 
 export const fetchRanksChart = () => api<RankRow[]>("/api/game/ranks");
 
+/** Э19: собранная ачивка в чужом профиле (без прогресса/тиров). */
+export interface GuestAchievement {
+  code: string;
+  title: string;
+  icon: string;
+}
+
+/** Э19: чужой игровой профиль «глазами гостя» — факты без настроек. */
+export interface GuestProfile {
+  enabled: boolean;
+  telegram_id: number;
+  user_id: number;
+  name: string;
+  avatar_url: string | null;
+  level: number;
+  rank: GameRank | null;
+  rank_name: string;
+  xp: number;
+  prestige: number;
+  supreme: boolean;
+  completionist: boolean;
+  loser_count: number;
+  chukhan_count: number;
+  rank_position: number | null;
+  ranks_total: number;
+  achievements_collected: number;
+  achievements_total: number;
+  achievements: GuestAchievement[];
+}
+
+/** Э19: профиль участника по внутреннему id (клик по аватарке на календаре). */
+export const fetchGuestProfile = (userId: number) =>
+  api<GuestProfile>(`/api/game/players/${userId}`);
+
 /** Э15/Э16: «Предложка недели» — свои треки, лимит и история подборок. */
 export interface MusicMineTrack {
   id: number;

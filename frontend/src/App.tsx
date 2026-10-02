@@ -11,6 +11,7 @@ import CalendarView from "./features/calendar/CalendarView";
 import MeetingsScreen from "./features/meetings/MeetingsScreen";
 import PollsScreen from "./features/polls/PollsScreen";
 import ProfileScreen from "./features/profile/ProfileScreen";
+import GuestProfileScreen from "./features/profile/GuestProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
@@ -42,6 +43,9 @@ export default function App() {
   });
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
+  // Э19: гостевой профиль (клик по аватарке на календаре) — оверлей поверх вкладок.
+  const guestUserId = useUI((s) => s.guestUserId);
+  const closeGuest = useUI((s) => s.closeGuest);
 
   // GHG10 (Э4.2): анонс ачивки в чате ведёт по deep link на «свои ачивки».
   // Открываем профиль — там живут ранг и лист ачивок (наполнение — Э5).
@@ -185,9 +189,12 @@ export default function App() {
   return (
     // DESIGN_SYSTEM §9: центрированная колонка 560px — на планшете/десктопе
     // приложение читается как мини-апп, а не растягивается на всю ширину.
-    <div className="mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+    <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
       {content}
       <TabBar isAdmin={isAdmin} />
+      {guestUserId !== null && (
+        <GuestProfileScreen userId={guestUserId} onClose={closeGuest} />
+      )}
     </div>
   );
 }

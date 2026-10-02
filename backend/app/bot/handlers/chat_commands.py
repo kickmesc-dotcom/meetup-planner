@@ -14,7 +14,7 @@ import structlog
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import Message
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 
 from app.config import get_settings
 from app.db.base import get_sessionmaker
@@ -270,6 +270,93 @@ def _extract_target_from_entities(message: Message) -> str | None:
     return None
 
 
+async def _resolve_user_by_name(session, name: str) -> User | None:
+    """Терпимый поиск участника по display_name/username.
+
+    Точное совпадение без регистра → «начинается с» → «содержит» (как резолв
+    владельца в контрабанде): «Серж» должен находить «Серж-NEO».
+    """
+    base = (name or "").strip().lstrip("@")
+    if not base:
+        return None
+    for pattern in (base, f"{base}%", f"%{base}%"):
+        found = await session.scalar(
+            select(User)
+            .where(
+                or_(User.display_name.ilike(pattern), User.username.ilike(pattern))
+            )
+            .order_by(User.id.asc())
+            .limit(1)
+        )
+        if found is not None:
+            return found
+    return None
+
+
+@router.message(Command(commands=["worm", "червь"]))
+async def on_worm_transfer(message: Message) -> None:
+    """Э19: передача прав червя командой в чат с подтверждением хозяина.
+
+    /worm @участник — бот просит подтверждение; «да»/«нет» ловит обработчик
+    сообщений (`chat_capture`), там же идёт сам перолл и анонс.
+    """
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.services.admin_config import is_worm_master_enabled
+    from app.services.game import worm_transfer
+    from app.services.loser import get_current_worm
+    from app.services.worm_master import extract_punish_target
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            return
+        worm = await get_current_worm(session)
+        if worm is None or worm.user_id != caller.id:
+            await message.answer(
+                "🪱 Передать червя может только текущий червь-господин.",
+            )
+            return
+        target_raw = _extract_target_from_entities(message) or extract_punish_target(
+            message.text
+        )
+        if not target_raw:
+            await message.answer(
+                "🪱 Кому передаём? Использование: <code>/worm @недруг</code>",
+                parse_mode="HTML",
+            )
+            return
+        target_user = await _resolve_user_by_name(session, target_raw)
+        if target_user is None:
+            await message.answer(f"🪱 Не нашёл «{target_raw}» среди участников.")
+            return
+        if target_user.id == caller.id:
+            await message.answer("🪱 Ты и так господин — передавать самому себе нечего.")
+            return
+        ttl = worm_transfer.DEFAULT_TTL_MINUTES
+        sent = await message.answer(
+            f"🪱 <b>{caller.display_name}</b>, подтверди передачу прав червя: "
+            f"новым господином станет <b>{target_user.display_name}</b>.\n"
+            f"Ответь <b>да</b> или <b>нет</b> (реплаем на это сообщение или просто "
+            f"сообщением) в течение {ttl} минут.",
+            parse_mode="HTML",
+        )
+        await worm_transfer.create_pending(
+            session,
+            issuer_id=caller.id,
+            target_id=target_user.id,
+            chat_id=message.chat.id,
+            confirm_message_id=sent.message_id,
+            ttl_minutes=ttl,
+        )
+        await session.commit()
+
+
 @router.message(Command(commands=["punish", "наказать"]))
 async def on_punish(message: Message) -> None:
     if not message.from_user or not _is_member(message.from_user.id):
@@ -350,10 +437,42 @@ async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) 
         if raw is None:
             return False
         await increment_use_count(session, WORM_PUNISH_USE_COUNTS_KEY, raw)
-        # Э18: первое (и каждое) применение кары → ачивка «Каратель» + юбилеи.
+
+        # Э19: определяем ЦЕЛЬ кары — для суточных ачивок («3 кары за сутки»,
+        # «наказать каждого за сутки») и шутки «попытаться наказать бота». Цель
+        # резолвим терпимо по display_name/username (как контрабанда владельца).
+        from app.bot.handlers.bot_reactions import _bot_identity
+
+        _, bot_username = await _bot_identity()
+        target_clean = target.strip().lstrip("@")
+        target_is_bot = bool(bot_username) and target_clean.lower() == bot_username.lower()
+        target_user_id: int | None = None
+        if not target_is_bot and target_clean:
+            for pattern in (target_clean, f"{target_clean}%", f"%{target_clean}%"):
+                found = await session.scalar(
+                    select(User.id)
+                    .where(
+                        or_(
+                            User.display_name.ilike(pattern),
+                            User.username.ilike(pattern),
+                        )
+                    )
+                    .order_by(User.id.asc())
+                    .limit(1)
+                )
+                if found is not None:
+                    target_user_id = int(found)
+                    break
+
+        # Э18/Э19: каждое применение кары → «Каратель» + юбилеи и суточные ачивки.
         from app.services.game import awards as _game_awards
 
-        await _game_awards.punish(session, caller.id)
+        await _game_awards.punish(
+            session,
+            caller.id,
+            target_user_id=target_user_id,
+            target_is_bot=target_is_bot,
+        )
         await session.commit()
     # `username=target`: старые/кастомные пулы кары писали жертву как `{username}`
     # (исторически фразы кары переиспользовали master-плейсхолдер). Раньше подста-

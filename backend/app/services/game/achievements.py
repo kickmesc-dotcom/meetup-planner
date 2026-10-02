@@ -32,6 +32,7 @@ from app.db.models import (
     AchievementCounter,
     AvailabilityRange,
     ChatActivityDaily,
+    EventLog,
     GameNomination,
     GameVoiceSubmission,
     GameVoiceTask,
@@ -56,7 +57,11 @@ from app.services.game.achievements_catalog import (
     get,
     tiers_reached,
 )
-from app.services.game.config import ACHIEVEMENTS_ERA_START, EV_ACHIEVEMENT
+from app.services.game.config import (
+    ACHIEVEMENTS_ERA_START,
+    ACTIVITY_TZ_OFFSET_HOURS,
+    EV_ACHIEVEMENT,
+)
 
 log = structlog.get_logger()
 
@@ -84,6 +89,25 @@ COUNTER_OPIUM_BEST = "opium_streak_best"
 # Э18: червь-господин и кара. Оба — накопители («впервые» + юбилеи).
 COUNTER_WORM_LORD = "worm_lord"
 COUNTER_PUNISH = "punisher"
+# Э19: журнал карательных применений в `event_log` — источник суточных ачивок
+# ("3 кары за сутки", "наказать всех за сутки"). Отдельной таблицы не заводим:
+# `event_log` уже есть в схеме и до сих пор пустовал.
+_PUNISH_LOG_KIND = "worm_punish"
+
+
+def _local_day_bounds(
+    now: datetime, *, tz_offset: int = ACTIVITY_TZ_OFFSET_HOURS
+) -> tuple[datetime, datetime]:
+    """Границы ЛОКАЛЬНЫХ суток (UTC+смещение) как UTC-моменты.
+
+    Та же арифметика, что в `activity.count_auto_posts_today`, чтобы «за день» у
+    кары и у бюджета авто-постов означало одно и то же (сброс в 00:00 по МСК).
+    """
+    moment = now.astimezone(timezone.utc)
+    local = moment + timedelta(hours=tz_offset)
+    start_local = datetime.combine(local.date(), time.min)
+    start = (start_local - timedelta(hours=tz_offset)).replace(tzinfo=timezone.utc)
+    return start, start + timedelta(days=1)
 
 # `availability_ranges.status`: 1 — свободен (см. `services/auto_pick.py`).
 STATUS_FREE = 1
@@ -895,13 +919,79 @@ async def on_worm_lord(
 
 
 async def on_punish(
-    session: AsyncSession, user_id: int, *, announce: bool = True
+    session: AsyncSession,
+    user_id: int,
+    *,
+    target_user_id: int | None = None,
+    target_is_bot: bool = False,
+    now: datetime | None = None,
+    announce: bool = True,
 ) -> list[Achievement]:
-    """Э18: применил /punish (червь-господин натравил бота) → «Каратель» + юбилеи."""
+    """Э18/Э19: кара червя → «Каратель» + юбилеи и «весёлые» суточные ачивки.
+
+    Факт кары пишем в `event_log` (`kind='worm_punish'`), чтобы суточные ачивки
+    считались по существующей таблице — без новой миграции. `target_is_bot` —
+    попытка наказать самого бота (шутка оператора); `target_user_id` — цель для
+    «наказать каждого за сутки».
+    """
     count = await bump_counter(session, user_id, COUNTER_PUNISH)
-    return await _grant_counter(
+    out = await _grant_counter(
         session, user_id, "punisher", count, announce=announce
     )
+
+    moment = now or datetime.now(timezone.utc)
+    session.add(
+        EventLog(
+            at=moment,
+            actor_user_id=user_id,
+            kind=_PUNISH_LOG_KIND,
+            payload={
+                "target_user_id": target_user_id,
+                "target_is_bot": bool(target_is_bot),
+            },
+        )
+    )
+    await session.flush()
+
+    # «Не по чину» — попытка наказать самого бота.
+    if target_is_bot:
+        ach = await grant(session, user_id, "punish_bot", announce=announce)
+        if ach:
+            out.append(ach)
+
+    start, end = _local_day_bounds(moment)
+    rows = (
+        await session.scalars(
+            select(EventLog).where(
+                EventLog.actor_user_id == user_id,
+                EventLog.kind == _PUNISH_LOG_KIND,
+                EventLog.at >= start,
+                EventLog.at < end,
+            )
+        )
+    ).all()
+
+    # «Тройная кара» — три применения за локальные сутки.
+    if len(rows) >= 3:
+        ach = await grant(session, user_id, "punish_day3", announce=announce)
+        if ach:
+            out.append(ach)
+
+    # «Каратель всея чата» — уникальные цели покрыли всех живых за сутки.
+    targets = {
+        int(row.payload["target_user_id"])
+        for row in rows
+        if isinstance(row.payload, dict) and row.payload.get("target_user_id") is not None
+    }
+    targets.discard(user_id)  # себя в «каждого участника» не считаем
+    live = int(await session.scalar(select(func.count()).select_from(User)) or 0)
+    required = max(live - 1, 1)
+    if live > 0 and len(targets) >= required:
+        ach = await grant(session, user_id, "punish_all", announce=announce)
+        if ach:
+            out.append(ach)
+
+    return out
 
 
 async def on_game_winner(

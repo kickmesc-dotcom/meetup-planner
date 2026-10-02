@@ -1659,6 +1659,51 @@ async def admin_bulk_phrase_meta(
     return {"pool": body.pool, "updated": updated}
 
 
+# --- Э19: глобальный свитчер источника фраз (ручные / ИИ / оба) ---
+
+from app.services.admin_config import (
+    PHRASES_SOURCE_MODES as _PHRASES_SOURCE_MODES,
+    get_phrases_source_mode as _get_phrases_source_mode,
+    set_phrases_source_mode as _set_phrases_source_mode,
+)
+
+
+class PhrasesSourceModeOut(BaseModel):
+    mode: str
+    modes: list[str]
+
+
+class PhrasesSourceModeIn(BaseModel):
+    mode: str
+
+
+@router.get("/admin/phrases/source-mode", response_model=PhrasesSourceModeOut)
+async def admin_get_phrases_source_mode(
+    session: SessionDep, user: CurrentUser
+) -> PhrasesSourceModeOut:
+    """Э19: какой источник фраз шлём — `both` / `manual` / `ai`."""
+    _ensure_admin(user)
+    return PhrasesSourceModeOut(
+        mode=await _get_phrases_source_mode(session),
+        modes=list(_PHRASES_SOURCE_MODES),
+    )
+
+
+@router.put("/admin/phrases/source-mode", response_model=PhrasesSourceModeOut)
+async def admin_set_phrases_source_mode(
+    body: PhrasesSourceModeIn, session: SessionDep, user: CurrentUser
+) -> PhrasesSourceModeOut:
+    """Э19: переключить глобальный источник фраз. Влияет на ВСЕ пулы сразу."""
+    _ensure_admin(user)
+    if body.mode not in _PHRASES_SOURCE_MODES:
+        raise HTTPException(status_code=422, detail=f"неизвестный режим: {body.mode}")
+    await _set_phrases_source_mode(session, body.mode)
+    log.info("admin.phrases_source_mode", mode=body.mode, by=user.id)
+    return PhrasesSourceModeOut(
+        mode=body.mode, modes=list(_PHRASES_SOURCE_MODES)
+    )
+
+
 # --- T3.3: алёрты «лох/чухан не запостился» ---
 
 from app.services.posting_alerts import get_posting_alerts as _get_posting_alerts

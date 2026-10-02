@@ -266,10 +266,6 @@ function LevelUpNotice({
           ))}
         </ul>
       )}
-      <div className="mt-1 text-[10px] text-tg-hint">
-        Если прилетело несколько рангов разом — тут все открывшиеся
-        способности, ничего не теряется.
-      </div>
       <button
         type="button"
         onClick={onAck}

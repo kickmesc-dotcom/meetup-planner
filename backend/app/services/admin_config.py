@@ -416,6 +416,33 @@ async def set_random_phrases_mode(session: AsyncSession, mode: str) -> None:
     await _set_value(session, RANDOM_PHRASES_MODE_KEY, mode)
 
 
+# GHG-Э19: ГЛОБАЛЬНЫЙ свитчер источника фраз для ВСЕХ пулов сразу (лох, чухан,
+# советы, фразы кары и т.д.). Оператор: «не понял, как переключаться между
+# ручными и ИИ-фразами — нужен глобальный свитчер». Значения:
+#   "both"   — шлём и ручные, и ИИ (дефолт, как было);
+#   "manual" — только ручные/импортированные (без ИИ-слопа и персон);
+#   "ai"     — только ИИ-фразы (дроп + персоны).
+# Применяется в `phrase_meta.effective_pool` — то есть ровно там, где бот ВЫБИРАЕТ
+# фразу из пула, и с безопасным фолбэком (если выбранный источник пуст, пул не
+# ломается).
+PHRASES_SOURCE_MODE_KEY = "phrases.source_mode"
+PHRASES_SOURCE_MODES = ("both", "manual", "ai")
+_PHRASES_SOURCE_MODE_DEFAULT = "both"
+
+
+async def get_phrases_source_mode(session: AsyncSession) -> str:
+    raw = (await _get_value(session, PHRASES_SOURCE_MODE_KEY)) or _PHRASES_SOURCE_MODE_DEFAULT
+    return raw if raw in PHRASES_SOURCE_MODES else _PHRASES_SOURCE_MODE_DEFAULT
+
+
+async def set_phrases_source_mode(session: AsyncSession, mode: str) -> None:
+    if mode not in PHRASES_SOURCE_MODES:
+        raise ValueError(
+            f"phrases.source_mode must be one of {PHRASES_SOURCE_MODES}, got {mode!r}"
+        )
+    await _set_value(session, PHRASES_SOURCE_MODE_KEY, mode)
+
+
 # --- GHG8 P6.3: версия генератора фраз (legacy = нарезка сообщений v1,
 # personas = типажи v2). Расписание/шанс/ручной триггер ОБЩИЕ для обеих
 # версий (P6.2.b) — переключается только composer.
@@ -1044,6 +1071,20 @@ async def is_worm_master_enabled(session: AsyncSession) -> bool:
 
 async def set_worm_master_enabled(session: AsyncSession, enabled: bool) -> None:
     await _set_value(session, WORM_MASTER_ENABLED_KEY, "true" if enabled else "false")
+
+
+# Э19: единоразовый флаг «инфо-уведомление о передаче червя отправлено». Живёт в
+# `admin_config`, чтобы после деплоя объявить фичу ровно один раз и пережить
+# рестарт контейнера (in-memory флаг бы сбросился и спамил при каждом перезапуске).
+_WORM_TRANSFER_ANNOUNCED_KEY = "game.worm_transfer.announced"
+
+
+async def get_worm_transfer_announced(session: AsyncSession) -> bool:
+    return await _get_bool(session, _WORM_TRANSFER_ANNOUNCED_KEY, False)
+
+
+async def set_worm_transfer_announced(session: AsyncSession, value: bool) -> None:
+    await _set_value(session, _WORM_TRANSFER_ANNOUNCED_KEY, "true" if value else "false")
 
 
 async def is_worm_master_punish_enabled(session: AsyncSession) -> bool:

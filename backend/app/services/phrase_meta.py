@@ -115,6 +115,32 @@ def source_of(
     return normalize_source(entry_for(meta, pool, phrase).get("source"))
 
 
+# Э19: какие источники считаем «ручными», а какие «ИИ». Импорт — это тоже
+# ручной путь (снапшот), персоны — генерация, как и контент-дроп.
+_MANUAL_SOURCES = (SOURCE_MANUAL, SOURCE_IMPORT)
+_AI_SOURCES = (SOURCE_AI, SOURCE_PERSONA)
+
+
+def filter_by_source_mode(
+    meta: dict[str, dict[str, dict[str, Any]]],
+    pool: str,
+    phrases: list[str],
+    mode: str,
+) -> list[str]:
+    """Оставить фразы выбранного источника. Чистая функция.
+
+    `both` — всё; `manual` — ручные/импорт; `ai` — ИИ-дроп и персоны. Неизвестный
+    режим трактуем как `both` (безопасный дефолт).
+    """
+    if mode == "manual":
+        allowed = _MANUAL_SOURCES
+    elif mode == "ai":
+        allowed = _AI_SOURCES
+    else:
+        return list(phrases)
+    return [p for p in phrases if source_of(meta, pool, p) in allowed]
+
+
 def visible_phrases(
     meta: dict[str, dict[str, dict[str, Any]]], pool: str, phrases: list[str]
 ) -> list[str]:
@@ -205,7 +231,15 @@ async def effective_pool(
     visible = visible_phrases(meta, pool, phrases)
     if not visible:
         return phrases
-    return visible
+    # Э19: глобальный свитчер источника (ручные / ИИ / оба). Ленивый импорт —
+    # admin_config уже импортирован модулем, но геттер тянем точечно, как везде.
+    from app.services.admin_config import get_phrases_source_mode
+
+    mode = await get_phrases_source_mode(session)
+    chosen = filter_by_source_mode(meta, pool, visible, mode)
+    # Безопасный фолбэк: если выбранный источник пуст, отдаём видимые фразы —
+    # «только ИИ» на пуле без ИИ не должно ломать постинг.
+    return chosen or visible
 
 
 async def set_flags(

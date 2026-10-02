@@ -63,6 +63,8 @@ export default function ParticipantRow({
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
   const setLoserReasonPopover = useUI((s) => s.setLoserReasonPopover);
   const setShowWormHistory = useUI((s) => s.setShowWormHistory);
+  // Э19: клик по аватарке открывает чужой профиль «глазами гостя».
+  const openGuest = useUI((s) => s.openGuest);
   const qc = useQueryClient();
 
   // Тап по своему свободному дню. Раньше клетка закрашивалась только после
@@ -181,8 +183,14 @@ export default function ParticipantRow({
           горизонтально не скроллится, поэтому sticky здесь — no-op. */}
       <div className="w-[60px] flex flex-col items-center py-1.5 shrink-0 sticky left-0 z-10 bg-tg-bg">
         <div className="relative">
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
+          <button
+            type="button"
+            onClick={() => {
+              haptic("selection");
+              openGuest(user.id);
+            }}
+            aria-label={`Открыть профиль ${user.display_name}`}
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden active:scale-95"
             style={{ background: user.color_hex }}
             title={(() => {
               // GHG7 P10.1.d: title собираем из оставшихся званий — 💩 чухан / 🪱 червь.
@@ -203,7 +211,7 @@ export default function ParticipantRow({
             ) : (
               initials(user.display_name)
             )}
-          </div>
+          </button>
           {/* GHG7 P10.1.b: 💩 «чухан недели» — одиночная иконка СВЕРХУ по центру
               (макушка), без стека. z-20 выше кружка (z-10 колонки).
               GHG7 P11 (инцидент 03.06 #4): убрана фон-плашка `bg-tg-bg` — в тёмной

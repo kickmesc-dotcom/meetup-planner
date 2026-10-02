@@ -5,9 +5,13 @@
 косвенно — диффом `openapi.json`. Здесь одним запросом отдаётся всё, что нужно,
 чтобы отличить «старый код» от «нового кода на другой базе»:
 
-- **отпечаток кода** (`code`): число роутов, хеш их списка и head миграций
-  В КОДЕ. Сравнив с локальным значением (или с ответом другого хоста), сразу
-  видно, на какой ревизии стоит контейнер;
+- **отпечаток кода** (`code`): число роутов, хеш их списка, head миграций
+  В КОДЕ и **маркер сборки** (`build`) — короткий commit sha (если контейнер
+  умеет его прочитать) либо хеш исходников. Раньше отпечаток ловил только
+  изменения СПИСКА роутов: правка логики без новых ручек (и без новых миграций)
+  была невидима и «задеплоилось или нет?» оставалось гадать. `build` меняется
+  от любой правки в `app/`. Сравнив его с ответом другого хоста или с локальным
+  значением, сразу видно, на какой ревизии стоит контейнер;
 - **куда контейнер пишет** (`db`): провайдер (neon / amvera / local / other),
   замаскированный хост, имя базы, версия миграций В БД и версия сервера;
 - **возможности** (`features`): список ручек, которые реально есть в этом
@@ -26,6 +30,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Any
@@ -42,6 +48,7 @@ router = APIRouter(tags=["meta"])
 _DB_CACHE_TTL = 60.0
 _db_cache: tuple[float, dict[str, Any]] | None = None
 _head_cache: str | None = None
+_build_cache: dict[str, Any] | None = None
 
 # Возможности: имя -> (метод, путь). Наличие роута в приложении и есть ответ
 # «умеет ли этот контейнер такую функцию». Список пополняется вместе с ручками,
@@ -49,6 +56,8 @@ _head_cache: str | None = None
 _FEATURE_ROUTES: dict[str, tuple[str, str]] = {
     "me.game": ("GET", "/api/me/game"),
     "me.game.profile": ("PATCH", "/api/me/game/profile"),
+    # Э19: гостевой профиль по клику на аватарку на календаре.
+    "game.player": ("GET", "/api/game/players/{user_id}"),
     "game.achievements": ("GET", "/api/game/achievements"),
     "game.ranks": ("GET", "/api/game/ranks"),
     "game.music": ("GET", "/api/game/music/mine"),
@@ -95,6 +104,104 @@ def code_fingerprint(app: FastAPI) -> dict[str, Any]:
         "api_routes": sum(1 for _, path in routes if path.startswith("/api")),
         "fingerprint": digest,
     }
+
+
+# Имена переменных, которыми хостинги отдают ревизию сборки. Порядок — от самой
+# точной (полный sha коммита) к запасным. Если ни одной нет — считаем хеш
+# исходников (см. `_source_hash`).
+_BUILD_ENV_VARS: tuple[str, ...] = (
+    "GIT_SHA",
+    "COMMIT_SHA",
+    "SOURCE_VERSION",
+    "SOURCE_COMMIT",
+    "HF_COMMIT_SHA",
+    "RENDER_GIT_COMMIT",
+    "GIT_COMMIT",
+    "HEROKU_SLUG_COMMIT",
+    "GITHUB_SHA",
+    "BUILD_SHA",
+)
+
+
+def _source_hash(root: Path) -> str:
+    """Хеш исходников `app/` — маркер, который меняется от любой правки кода.
+
+    Считаем по отсортированным (относительный путь, содержимое) всех `.py`, плюс
+    содержимое `alembic/versions/*.py`. Раскладку по путям берём, чтобы переезд
+    файла тоже менял хеш. Читается один раз за процесс и кэшируется вызывающим.
+    """
+    digest = hashlib.sha256()
+    targets = sorted((root / "app").rglob("*.py")) + sorted(
+        (root / "alembic" / "versions").glob("*.py")
+    )
+    for path in targets:
+        try:
+            rel = path.relative_to(root).as_posix()
+            digest.update(rel.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+        except OSError:  # noqa: PERF203 — один битый файл не должен ронять диагностику
+            continue
+    return digest.hexdigest()[:12]
+
+
+def build_marker() -> dict[str, Any]:
+    """Маркер версии кода: короткий commit sha или хеш исходников.
+
+    Задача оператора: «деплой должно быть видно даже без изменения списка
+    роутов». Отпечаток `fingerprint` ловит только новые ручки, поэтому здесь
+    отдельный маркер:
+
+    1. переменные окружения хостинга (полный sha → берём первые 12 символов);
+    2. `git rev-parse --short HEAD`, если в образе есть `.git` и git;
+    3. иначе — хеш исходников (`_source_hash`).
+
+    `source` говорит, откуда взято значение: env / git / hash / none. Результат
+    кэшируется на процесс: он не меняется до перезапуска контейнера, а именно
+    перезапуск и означает новый деплой.
+    """
+    global _build_cache
+    if _build_cache is not None:
+        return _build_cache
+
+    value: str | None = None
+    source = "none"
+    for name in _BUILD_ENV_VARS:
+        raw = (os.environ.get(name) or "").strip()
+        if raw:
+            value = raw[:12]
+            source = "env"
+            break
+
+    if value is None:
+        root = Path(__file__).resolve().parents[2]
+        try:
+            proc = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=str(root),
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+            out = (proc.stdout or "").strip()
+            if proc.returncode == 0 and out:
+                value = out[:12]
+                source = "git"
+        except (OSError, subprocess.SubprocessError):  # noqa: BLE001
+            value = None
+
+    if value is None:
+        try:
+            value = _source_hash(Path(__file__).resolve().parents[2])
+            source = "hash"
+        except Exception as exc:  # noqa: BLE001 — диагностика не имеет права падать
+            log.warning("meta.build_marker_failed", error=str(exc))
+            value, source = None, "none"
+
+    _build_cache = {"build": value, "source": source}
+    return _build_cache
 
 
 def available_features(app: FastAPI) -> list[str]:
@@ -209,7 +316,11 @@ async def meta(request: Request) -> dict[str, Any]:
     db = {**db_target(), **await _db_snapshot()}
     return {
         "status": "ok",
-        "code": {**code_fingerprint(fastapi_app), "alembic_head": _code_alembic_head()},
+        "code": {
+            **code_fingerprint(fastapi_app),
+            "alembic_head": _code_alembic_head(),
+            **build_marker(),
+        },
         "db": db,
         "features": available_features(fastapi_app),
     }

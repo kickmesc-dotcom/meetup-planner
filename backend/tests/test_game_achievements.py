@@ -55,6 +55,10 @@ def _key_for(row) -> tuple:  # noqa: ANN001
         return (name, (row.user_id, row.code))
     if name == "ChatActivityDaily":
         return (name, (row.user_id, row.day))
+    if name == "EventLog":
+        # Э19: журнал кары. PK автоинкрементный, а в фейке `get` по EventLog не
+        # делается — хватает уникального ключа (identity объекта).
+        return (name, id(row))
     raise AssertionError(f"unexpected model {name}")
 
 
@@ -141,7 +145,7 @@ def test_catalog_has_expected_number_of_base_achievements():
     Тиры — отдельные записи, но база считается по ним ровно один раз.
     """
     bases = base_achievements()
-    assert len(bases) == 29  # +worm_lord, punisher, completionist (Э18)
+    assert len(bases) == 32  # +punish_day3, punish_all, punish_bot (Э19)
     # База + все юбилейные тиры.
     assert catalog_size() == len(bases) + sum(len(a.tiers) for a in bases)
 
@@ -233,7 +237,7 @@ def test_kind_distribution_matches_spec():
     # 1 порог — music_streak (серия); 9 разовых.
     assert kinds.count(KIND_COUNTER) == 18  # + worm_lord, punisher (Э18)
     assert kinds.count(KIND_THRESHOLD) == 1  # music_streak
-    assert kinds.count(KIND_INSTANT) == 10  # + completionist (Э18)
+    assert kinds.count(KIND_INSTANT) == 13  # + punisher-дня/всех/бота (Э19)
 
 
 def test_tiers_reached_is_pure_and_monotonic():
@@ -738,6 +742,40 @@ async def test_worm_lord_and_punisher_are_counters(session: _FakeSession):
     assert [a.code for a in await achievements.on_punish(session, 1, announce=False)] == [
         "punisher"
     ]
+
+
+@pytest.mark.asyncio
+async def test_punish_on_bot_grants_joke_achievement(session: _FakeSession):
+    """Э19: попытка наказать самого бота → «Не по чину» (шутка оператора)."""
+    codes = [
+        a.code
+        for a in await achievements.on_punish(
+            session, 1, target_is_bot=True, announce=False
+        )
+    ]
+    assert "punisher" in codes
+    assert "punish_bot" in codes
+
+
+@pytest.mark.asyncio
+async def test_punish_day3_after_three_punishes(session: _FakeSession):
+    """Э19: три применения кары за сутки → «Тройная кара».
+
+    Считается по журналу `event_log`: три строки за локальные сутки.
+    """
+    rows = [
+        SimpleNamespace(payload={"target_user_id": 2}),
+        SimpleNamespace(payload={"target_user_id": 3}),
+        SimpleNamespace(payload={"target_user_id": 4}),
+    ]
+    session.scalars_queue = [rows]
+    codes = [
+        a.code
+        for a in await achievements.on_punish(
+            session, 1, target_user_id=4, now=_now(), announce=False
+        )
+    ]
+    assert "punish_day3" in codes
 
 
 @pytest.mark.asyncio

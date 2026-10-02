@@ -154,6 +154,43 @@ class RankRowOut(BaseModel):
     supreme: bool = False
 
 
+class GuestAchievementOut(BaseModel):
+    """Короткая строка собранной ачивки для чужого профиля (без прогресса/тиров)."""
+
+    code: str
+    title: str
+    icon: str
+
+
+class GuestProfileOut(BaseModel):
+    """Э19: чужой профиль «глазами гостя» — только факты, без настроек.
+
+    В отличие от `GameProfileOut` (свой профиль): нет правил XP, кастомизации,
+    истории дня и уведомлений левел-апа — гость смотрит, но не правит.
+    """
+
+    enabled: bool = True
+    telegram_id: int
+    user_id: int
+    name: str
+    avatar_url: str | None = None
+    level: int = 1
+    rank: RankOut | None = None
+    rank_name: str = ""
+    xp: int = 0
+    prestige: int = 0
+    supreme: bool = False
+    completionist: bool = False
+    loser_count: int = 0
+    chukhan_count: int = 0
+    # Место в чарте рангов (1 — первый) и сколько всего игроков.
+    rank_position: int | None = None
+    ranks_total: int = 0
+    achievements_collected: int = 0
+    achievements_total: int = 0
+    achievements: list[GuestAchievementOut] = []
+
+
 class HolidayOut(BaseModel):
     """Праздник: ежегодная дата (месяц+день) + текст поздравления (Э10)."""
 
@@ -223,8 +260,9 @@ class GameSocialOut(BaseModel):
     digest_enabled: bool = False
     digest_interval_hours: int = 6
     digest_pending: int = 0
-    # Э19: режим публикации ачивок — "instant" (как раньше) или "pool" (буфер).
-    achievements_post_mode: str = "instant"
+    # Э19: режим публикации ачивок — "instant" (как раньше), "pool" (буфер)
+    # или "hybrid" (днём сразу, ночью сводкой). Дефолт — "hybrid".
+    achievements_post_mode: str = "hybrid"
     achievements_pool_interval_hours: int = 4
     achievements_pool_morning_hour: int = 10
     achievements_pool_min_items: int = 1
@@ -249,7 +287,7 @@ class GameSocialOut(BaseModel):
     contraband_words: list[GameContrabandWord] = []
     unresolved_owners: list[str] = []
     # Э19: единый бюджет дня — максимум авто-постов бота за сутки (0 — без лимита).
-    activity_max_posts_per_day: int = 8
+    activity_max_posts_per_day: int = 6
     # Э19: живые часы (локальное время чата) — днём ачивки в hybrid-режиме
     # выдаются сразу, ночью копятся в буфер.
     activity_day_start_hour: int = 10

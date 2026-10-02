@@ -394,6 +394,25 @@ export const bulkPhraseMeta = (
     body: JSON.stringify({ pool, phrases, ...patch }),
   });
 
+// --- Э19: глобальный свитчер источника фраз (ручные / ИИ / оба) ---
+
+/** `both` — и ручные, и ИИ; `manual` — только ручные/импорт; `ai` — только ИИ. */
+export type PhrasesSourceMode = "both" | "manual" | "ai";
+
+export interface PhrasesSourceModeOut {
+  mode: PhrasesSourceMode;
+  modes: PhrasesSourceMode[];
+}
+
+export const fetchPhrasesSourceMode = () =>
+  api<PhrasesSourceModeOut>("/api/admin/phrases/source-mode");
+
+export const updatePhrasesSourceMode = (mode: PhrasesSourceMode) =>
+  api<PhrasesSourceModeOut>("/api/admin/phrases/source-mode", {
+    method: "PUT",
+    body: JSON.stringify({ mode }),
+  });
+
 // --- T3.3: алёрты «лох/чухан не запостился» ---
 
 export interface PostingLoserAlert {

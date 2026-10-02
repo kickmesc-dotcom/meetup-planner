@@ -403,6 +403,33 @@ async def get_current_worm(session: AsyncSession) -> WormAssignment | None:
     )
 
 
+async def assign_worm_to(
+    session: AsyncSession, user_id: int, *, at: datetime | None = None
+) -> tuple[str | None, WormAssignment | None]:
+    """Э19: передать звание червя конкретному участнику (без ролла лоха).
+
+    Возвращает `(имя прежнего червя | None, новая запись | None)`. `None`-запись
+    означает, что участник и так был червём (передавать нечего). Закрывает
+    активную запись и создаёт новую — как ветка `is_worm` автолох-ролла, только
+    без `LoserRoll`: это ручная передача по команде, а не выпадение.
+    """
+    moment = at or datetime.now(timezone.utc)
+    prev = await get_current_worm(session)
+    if prev is not None:
+        if prev.user_id == user_id:
+            return None, None
+        prev_user = await session.get(User, prev.user_id)
+        prev_name = prev_user.display_name if prev_user else None
+        prev.ended_at = moment
+        await session.flush()
+    else:
+        prev_name = None
+    row = WormAssignment(user_id=user_id, source_loser_roll_id=None)
+    session.add(row)
+    await session.flush()
+    return prev_name, row
+
+
 async def resolve_master_sycophancy(
     session: AsyncSession, user: User
 ) -> "MasterSycophancy | None":

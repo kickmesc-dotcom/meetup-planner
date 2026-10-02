@@ -13,6 +13,7 @@ from app.services.phrase_meta import (
     SOURCE_IMPORT,
     SOURCE_MANUAL,
     entry_for,
+    filter_by_source_mode,
     is_hidden,
     items_for,
     normalize_meta,
@@ -62,6 +63,28 @@ def test_visible_phrases_filters_hidden_preserving_order():
         }
     }
     assert visible_phrases(meta, "p", phrases) == ["a", "c"]
+
+
+# ---------------------------------------------------------------- source mode
+
+def test_filter_by_source_mode_manual_and_ai():
+    """Э19: глобальный свитчер ручные/ИИ/оба на чистом ядре.
+
+    `import` = ручной путь, `persona` = генерация (ИИ), как дроп.
+    """
+    phrases = ["ручная", "дроп", "импорт", "персона"]
+    meta = {
+        "p": {
+            phrase_hash("дроп"): {"source": SOURCE_AI},
+            phrase_hash("импорт"): {"source": SOURCE_IMPORT},
+            phrase_hash("персона"): {"source": "persona"},
+        }
+    }
+    assert filter_by_source_mode(meta, "p", phrases, "both") == phrases
+    assert filter_by_source_mode(meta, "p", phrases, "manual") == ["ручная", "импорт"]
+    assert filter_by_source_mode(meta, "p", phrases, "ai") == ["дроп", "персона"]
+    # Неизвестный режим — безопасный дефолт «оба».
+    assert filter_by_source_mode(meta, "p", phrases, "wat") == phrases
 
 
 def test_visible_phrases_all_hidden_returns_empty():

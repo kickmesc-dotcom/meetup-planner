@@ -16,6 +16,7 @@ from app.api.routes_meta import (
     _mask_host,
     _provider,
     available_features,
+    build_marker,
     code_fingerprint,
     db_target,
 )
@@ -66,6 +67,33 @@ def test_fingerprint_counts_api_routes():
     fp = code_fingerprint(_app_with([("GET", "/api/x"), ("GET", "/tg/webhook")]))
     assert fp["routes"] == 2
     assert fp["api_routes"] == 1
+
+
+# --- маркер сборки ------------------------------------------------------------
+
+def test_build_marker_prefers_env_sha(monkeypatch):
+    """Если хостинг отдал ревизию в env — берём её (короткие 12 символов)."""
+    monkeypatch.setattr(routes_meta, "_build_cache", None)
+    monkeypatch.setenv("GIT_SHA", "abcdef0123456789abcdef")
+    marker = build_marker()
+    assert marker == {"build": "abcdef012345", "source": "env"}
+
+
+def test_build_marker_falls_back_without_env(monkeypatch):
+    """Без env маркер всё равно есть: git или хеш исходников, но не пусто."""
+    monkeypatch.setattr(routes_meta, "_build_cache", None)
+    for name in routes_meta._BUILD_ENV_VARS:
+        monkeypatch.delenv(name, raising=False)
+    marker = build_marker()
+    assert marker["source"] in {"git", "hash"}
+    assert marker["build"]
+
+
+def test_build_marker_is_cached(monkeypatch):
+    monkeypatch.setattr(routes_meta, "_build_cache", None)
+    first = build_marker()
+    second = build_marker()
+    assert first is second
 
 
 # --- возможности -------------------------------------------------------------

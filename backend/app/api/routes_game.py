@@ -30,6 +30,8 @@ from app.schemas.game import (
     FeatureOut,
     GameCustomizePatch,
     GameProfileOut,
+    GuestAchievementOut,
+    GuestProfileOut,
     HolidayCreate,
     HolidayOut,
     HolidaysOut,
@@ -46,7 +48,7 @@ from app.schemas.game import (
     XpRuleOut,
 )
 from app.services.game import achievements, donations, gates, holidays, levels, xp
-from app.services.game.achievements_catalog import base_achievements
+from app.services.game.achievements_catalog import COMPLETIONIST_CODE, base_achievements
 from app.services.game.config import (
     MAX_LEVEL,
     COMPLETIONIST_TITLE,
@@ -448,6 +450,92 @@ async def holiday_delete(
     if not await holidays.remove_holiday(session, holiday_id=holiday_id):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "holiday_not_found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/game/players/{user_id}", response_model=GuestProfileOut)
+async def guest_profile(
+    user_id: int, session: SessionDep, _: CurrentUser
+) -> GuestProfileOut:
+    """Э19: чужой игровой профиль «глазами гостя».
+
+    Отдаёт только факты: ранг, XP, число лохов/чуханов, место в чарте и
+    собранные ачивки. Никакой кастомизации/настроек из своего профиля здесь нет
+    — гость смотрит, но не правит. Зовётся из мини-аппа кликом по аватарке
+    участника на календаре.
+    """
+    from app.services.chukhan import chukhan_stats
+    from app.services.loser import loser_stats
+
+    # Мини-апп ходит по ВНУТРЕННему id (как `/api/users` и чарт рангов), но
+    # принимаем и TG-id запасным ключом — чтобы ручку можно было дёрнуть curl'ом.
+    user = await session.get(User, user_id)
+    if user is None:
+        user = await session.scalar(select(User).where(User.telegram_id == user_id))
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "player_not_found")
+    if not await is_game_enabled(session):
+        return GuestProfileOut(
+            enabled=False,
+            telegram_id=user.telegram_id,
+            user_id=user.id,
+            name=user.display_name,
+        )
+
+    profile = await session.get(GameProfile, user.id)
+    total_xp = profile.xp if profile is not None else 0
+    progress = levels.progress_for_xp(total_xp)
+    supreme = await achievements.is_supreme_chukhan(session, user.id)
+    completionist = await achievements.has(session, user.id, COMPLETIONIST_CODE)
+    rank_name = progress.rank.name
+    if completionist:
+        rank_name = COMPLETIONIST_TITLE
+    elif supreme:
+        rank_name = SUPREME_CHUKHAN_TITLE
+    elif profile is not None and profile.custom_rank_title:
+        rank_name = profile.custom_rank_title
+
+    rows = (
+        await session.scalars(
+            select(GameProfile.user_id, GameProfile.xp).order_by(GameProfile.xp.desc())
+        )
+    ).all()
+    ranks_total = len(rows)
+    rank_position = next(
+        (i for i, row in enumerate(rows, start=1) if int(row[0]) == user.id), None
+    )
+
+    loser_count = int((await loser_stats(session)).get(user.id, 0))
+    chukhan_count = int((await chukhan_stats(session)).get(user.id, 0))
+
+    collected = await achievements.collected_codes(session, user.id)
+    bases = base_achievements()
+    items = [
+        GuestAchievementOut(code=ach.code, title=ach.title, icon=ach.icon)
+        for ach in bases
+        if ach.code in collected
+    ]
+
+    return GuestProfileOut(
+        enabled=True,
+        telegram_id=user.telegram_id,
+        user_id=user.id,
+        name=user.display_name,
+        avatar_url=getattr(user, "avatar_manual_url", None) or getattr(user, "avatar_url", None),
+        level=progress.level,
+        rank=_rank_out(progress.level),
+        rank_name=rank_name,
+        xp=total_xp,
+        prestige=progress.prestige,
+        supreme=supreme,
+        completionist=completionist,
+        loser_count=loser_count,
+        chukhan_count=chukhan_count,
+        rank_position=rank_position,
+        ranks_total=ranks_total,
+        achievements_collected=len(items),
+        achievements_total=len(bases),
+        achievements=items,
+    )
 
 
 @router.get("/game/ranks", response_model=list[RankRowOut])
