@@ -21,10 +21,16 @@ class RankOut(BaseModel):
 
 
 class FeatureOut(BaseModel):
-    """Открытая возможность (для уведомления о левел-апе и подсказки в профиле)."""
+    """Открытая возможность (для уведомления о левел-апе и подсказки в профиле).
+
+    `description` — человеческое «куда зайти, что нажать, что будет», а не
+    технический термин (требование оператора): с ним уведомление о новом ранге
+    объясняет способность сразу, без похода в справку.
+    """
 
     code: str
     title: str
+    description: str = ""
 
 
 class LevelUpOut(BaseModel):
@@ -89,6 +95,8 @@ class GameProfileOut(BaseModel):
     rank_name: str = ""
     # Спец-ранг «Верховный чухан» приоритетнее ранга за уровень (Э3.4).
     supreme: bool = False
+    # Э18: собраны 100% ачивок → особый титул «Идеальный червь».
+    completionist: bool = False
     custom_rank_title: str | None = None
     # Э8.7: своё имя внутри приложения (ранг 8).
     custom_name: str | None = None
@@ -215,6 +223,13 @@ class GameSocialOut(BaseModel):
     digest_enabled: bool = False
     digest_interval_hours: int = 6
     digest_pending: int = 0
+    # Э19: режим публикации ачивок — "instant" (как раньше) или "pool" (буфер).
+    achievements_post_mode: str = "instant"
+    achievements_pool_interval_hours: int = 4
+    achievements_pool_morning_hour: int = 10
+    achievements_pool_min_items: int = 1
+    achievements_pool_gap_minutes: int = 30
+    achievements_pool_pending: int = 0
     memorial_enabled: bool = True
     memorial_silence_days: int = 21
     memorial_repeat_days: int = 7
@@ -233,6 +248,8 @@ class GameSocialOut(BaseModel):
     contraband_custom_registry: bool = False
     contraband_words: list[GameContrabandWord] = []
     unresolved_owners: list[str] = []
+    # Э19: единый бюджет дня — максимум авто-постов бота за сутки (0 — без лимита).
+    activity_max_posts_per_day: int = 8
     # Э14: голосовые задания.
     voice_enabled: bool = True
     voice_poll_enabled: bool = False
@@ -249,6 +266,11 @@ class GameSocialIn(BaseModel):
 
     digest_enabled: bool | None = None
     digest_interval_hours: int | None = None
+    achievements_post_mode: str | None = None
+    achievements_pool_interval_hours: int | None = Field(None, ge=1, le=24)
+    achievements_pool_morning_hour: int | None = Field(None, ge=0, le=23)
+    achievements_pool_min_items: int | None = Field(None, ge=0, le=100)
+    achievements_pool_gap_minutes: int | None = Field(None, ge=0, le=240)
     memorial_enabled: bool | None = None
     memorial_silence_days: int | None = Field(None, ge=1, le=365)
     memorial_repeat_days: int | None = Field(None, ge=1, le=365)
@@ -263,6 +285,7 @@ class GameSocialIn(BaseModel):
     contraband_chance_percent: int | None = Field(None, ge=0, le=100)
     contraband_daily_cap: int | None = Field(None, ge=0, le=100)
     contraband_words: list[GameContrabandWord] | None = None
+    activity_max_posts_per_day: int | None = Field(None, ge=0, le=200)
     voice_enabled: bool | None = None
     voice_poll_enabled: bool | None = None
     voice_min_gap_hours: int | None = Field(None, ge=1, le=720)
@@ -272,6 +295,28 @@ class GameDigestFlushOut(BaseModel):
     """Сколько записей журнала уехало в чат по кнопке «отправить сейчас»."""
 
     sent: int = 0
+
+
+class GameObservabilityRow(BaseModel):
+    """Строка разбивки опыта: за какое событие сколько XP набежало за окно."""
+
+    event: str
+    title: str
+    points: int = 0
+    count: int = 0
+
+
+class GameObservabilityOut(BaseModel):
+    """Э19: сводка активности игры за окно — «не спамит ли бот», без чтения чата."""
+
+    window_days: int = 7
+    events: int = 0
+    events_answered: int = 0
+    voice_tasks: int = 0
+    achievements_granted: int = 0
+    digest_flushes: int = 0
+    xp_total: int = 0
+    by_event: list[GameObservabilityRow] = []
 
 
 class MusicTrackOut(BaseModel):

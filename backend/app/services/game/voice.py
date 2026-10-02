@@ -558,6 +558,12 @@ async def run_voice_job(
         if not is_daytime(moment):
             return {"closed": closed, "opened": 0}
 
+        # Э18: и не перебиваем живое обсуждение (общий режим активностей).
+        from app.services.game import activity
+
+        if await activity.check_window(session, now=moment) != activity.OK:
+            return {"closed": closed, "opened": 0}
+
         task = await open_task(session, bot, now=moment, rng=dice)
         opened = 1 if task is not None else 0
     return {"closed": closed, "opened": opened}

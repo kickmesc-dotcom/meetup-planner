@@ -46,6 +46,8 @@ from app.db.models import (
 )
 from app.services.game import xp
 from app.services.game.achievements_catalog import (
+    CATALOG,
+    COMPLETIONIST_CODE,
     SUPREME_CHUKHAN_CODE,
     SUPREME_CHUKHAN_TIER,
     SUPREME_CHUKHAN_TIER_BASE,
@@ -76,6 +78,12 @@ COUNTER_MUSIC_STREAK_CURRENT = "music_streak_current"
 # Э11: задоначенный опыт. «Кэшбэк» — база «впервые», а юбилеи ×10/×20/… —
 # отдельные ачивки (правило «впервые ≠ юбилей»), поэтому ведём накопитель.
 COUNTER_DONATIONS = "donations_sent"
+# Э18: «Опиум для никого» — честная СЕРИЯ постов подряд без реакции. Текущая
+# рвётся живым постом, рекорд — нет (по нему и выдаются тиры ×3/×10/…).
+COUNTER_OPIUM_BEST = "opium_streak_best"
+# Э18: червь-господин и кара. Оба — накопители («впервые» + юбилеи).
+COUNTER_WORM_LORD = "worm_lord"
+COUNTER_PUNISH = "punisher"
 
 # `availability_ranges.status`: 1 — свободен (см. `services/auto_pick.py`).
 STATUS_FREE = 1
@@ -195,6 +203,11 @@ async def is_supreme_chukhan(session: AsyncSession, user_id: int) -> bool:
     return await has(session, user_id, SUPREME_CHUKHAN_CODE)
 
 
+async def is_completionist(session: AsyncSession, user_id: int) -> bool:
+    """Собрал 100% ачивок → особый титул «Идеальный червь» (Э18)."""
+    return await has(session, user_id, COMPLETIONIST_CODE)
+
+
 async def progress(session: AsyncSession, user_id: int) -> dict[str, int]:
     """Накопленные счётчики для ачивок с прогрессом (для UI «3/10»).
 
@@ -222,6 +235,10 @@ async def progress(session: AsyncSession, user_id: int) -> dict[str, int]:
         ),
         "music_streak": await get_counter(session, user_id, COUNTER_MUSIC_STREAK),
         "cashback": await get_counter(session, user_id, COUNTER_DONATIONS),
+        # «Опиум» показывает РЕКОРД серии постов подряд без реакции.
+        "opium_for_nobody": await get_counter(session, user_id, COUNTER_OPIUM_BEST),
+        "worm_lord": await get_counter(session, user_id, COUNTER_WORM_LORD),
+        "punisher": await get_counter(session, user_id, COUNTER_PUNISH),
     }
 
 
@@ -294,6 +311,27 @@ async def grant(
     if announce:
         await announce_granted(session, user_id, [ach])
     return ach
+
+
+async def reconcile_completionist(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> bool:
+    """True, если у игрока собраны ВСЕ ачивки каталога (кроме самого капстоуна).
+
+    Выдаёт «Идеального червя», если ещё не выдан. Зовётся на поверхностях, где
+    коллекция и так загружается (профиль мини-аппа, лист /ach), а не на каждой
+    выдаче: так нет лишнего SELECT на каждый грант, а капстоун появляется, как
+    только игрок открывает свой профиль. Сам капстоун в требуемый набор НЕ
+    входит (иначе недостижим по определению).
+    """
+    if await has(session, user_id, COMPLETIONIST_CODE):
+        return True
+    collected = await collected_codes(session, user_id)
+    required = set(CATALOG) - {COMPLETIONIST_CODE}
+    if not required.issubset(collected):
+        return False
+    await grant(session, user_id, COMPLETIONIST_CODE, announce=announce)
+    return True
 
 
 def capstone_codes(base: str, count: int) -> list[str]:
@@ -431,6 +469,18 @@ async def announce_granted(
         return False
     user = await session.get(User, user_id)
     name = user.display_name if user else "Участник"
+    # Э19: режим буфера — не постим сразу, а тихо копим. Сводка выплеснется
+    # расписанием (`journal.run_achievements_digest_job`): ночью только сбор,
+    # утром одна компактная сводка, днём — не чаще настроенного шага.
+    from app.services.admin_config import get_achievements_post_mode
+    from app.services.game import journal
+
+    if await get_achievements_post_mode(session) == "pool":
+        lines = [f"{ach.icon} «{ach.title}» (+{ach.points} XP)" for ach in achs]
+        return await journal.queue_achievements(
+            session, user_id=user_id, lines=lines, chat_id=chat_id
+        )
+
     text = build_announcement(name, achs)
     bot = _get_bot()
     try:
@@ -440,8 +490,6 @@ async def announce_granted(
             return False
         # Э13: анонс идёт через журнал — при включённом режиме сводки он не
         # улетает в чат сразу, а ждёт ближайшего окна (см. `journal.announce`).
-        from app.services.game import journal
-
         sent = await journal.announce(
             session,
             kind=journal.KIND_ACHIEVEMENT,
@@ -793,6 +841,54 @@ async def on_music_miss(session: AsyncSession, user_id: int) -> None:
         await session.commit()
 
 
+async def on_music_round_closed(
+    session: AsyncSession, *, guessed_ids: set[int], poll_arrived: bool
+) -> int:
+    """Пропуск раунда рвёт серию угадываний (рекорд не трогаем). Э18.
+
+    Сбрасываем текущую серию у всех, кто в этом раунде НЕ угадал: если просто не
+    участвовать, серию больше не сохранить. Если опрос не долетел (stale-раунд,
+    сбой доставки) — не трогаем: это не вина игрока.
+    """
+    if not poll_arrived:
+        return 0
+    rows = await session.scalars(
+        select(AchievementCounter).where(
+            AchievementCounter.code == COUNTER_MUSIC_STREAK_CURRENT,
+            AchievementCounter.count > 0,
+        )
+    )
+    reset = 0
+    for row in rows.all():
+        if int(row.user_id) in guessed_ids:
+            continue
+        row.count = 0
+        reset += 1
+    if reset:
+        await session.flush()
+    return reset
+
+
+async def on_worm_lord(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э18: стал червём-господином (повелителем бота) → «Червь-господин» + юбилеи."""
+    count = await bump_counter(session, user_id, COUNTER_WORM_LORD)
+    return await _grant_counter(
+        session, user_id, "worm_lord", count, announce=announce
+    )
+
+
+async def on_punish(
+    session: AsyncSession, user_id: int, *, announce: bool = True
+) -> list[Achievement]:
+    """Э18: применил /punish (червь-господин натравил бота) → «Каратель» + юбилеи."""
+    count = await bump_counter(session, user_id, COUNTER_PUNISH)
+    return await _grant_counter(
+        session, user_id, "punisher", count, announce=announce
+    )
+
+
 async def on_game_winner(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
@@ -834,11 +930,18 @@ async def on_meme_all_reacted(
 async def on_meme_reactions(
     session: AsyncSession, user_id: int, *, announce: bool = True
 ) -> list[Achievement]:
-    """Э7: пост закрылся С реакциями → «Успешный успех» (первый) и юбилеи."""
+    """Э7: пост закрылся С реакциями → «Успешный успех» + ОБРЫВ серии «Опиума».
+
+    Живой пост — это и есть «не подряд»: текущая серия постов в пустоту рвётся
+    (рекорд не трогаем — по нему выдаются тиры).
+    """
     count = await bump_counter(session, user_id, COUNTER_SUCCESS)
-    return await _grant_counter(
+    out = await _grant_counter(
         session, user_id, "successful_success", count, announce=announce
     )
+    if await get_counter(session, user_id, COUNTER_OPIUM) != 0:
+        await _set_counter(session, user_id, COUNTER_OPIUM, 0)
+    return out
 
 
 async def on_dead_post(
@@ -860,9 +963,13 @@ async def on_dead_post(
         ach = await grant(session, user_id, "forever_alone", announce=announce)
         if ach:
             out.append(ach)
-    count = await bump_counter(session, user_id, COUNTER_OPIUM)
+    current = await bump_counter(session, user_id, COUNTER_OPIUM)
+    best = await get_counter(session, user_id, COUNTER_OPIUM_BEST)
+    if current > best:
+        await _set_counter(session, user_id, COUNTER_OPIUM_BEST, current)
+        best = current
     out += await _grant_counter(
-        session, user_id, "opium_for_nobody", count, announce=announce
+        session, user_id, "opium_for_nobody", best, announce=announce
     )
     return out
 

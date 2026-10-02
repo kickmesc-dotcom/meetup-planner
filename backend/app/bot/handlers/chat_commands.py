@@ -327,7 +327,7 @@ async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) 
             if worm is not None:
                 master = await session.get(User, worm.user_id)
                 master_name = master.display_name if master else None
-            await _reply_punish_denied(message, master_name)
+            await _reply_punish_denied(message, session, master_name)
             return True
 
         # Цель: сначала сущности (@mention/text_mention), потом текстовый фолбэк.
@@ -350,6 +350,10 @@ async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) 
         if raw is None:
             return False
         await increment_use_count(session, WORM_PUNISH_USE_COUNTS_KEY, raw)
+        # Э18: первое (и каждое) применение кары → ачивка «Каратель» + юбилеи.
+        from app.services.game import awards as _game_awards
+
+        await _game_awards.punish(session, caller.id)
         await session.commit()
     # `username=target`: старые/кастомные пулы кары писали жертву как `{username}`
     # (исторически фразы кары переиспользовали master-плейсхолдер). Раньше подста-
@@ -404,22 +408,35 @@ async def on_otvali(message: Message) -> None:
         log.exception("chat.otvali_failed", by=message.from_user.id)
 
 
-async def _reply_punish_denied(message: Message, master_name: str | None) -> None:
+async def _reply_punish_denied(message: Message, session, master_name: str | None) -> None:
     """QOL: отповедь не-господину, дёрнувшему /punish. Если червь назначен —
-    называем его по имени (named-пул), иначе безымянная отповедь."""
+    называем его по имени (named-пул), иначе безымянная отповедь.
+
+    Пулы берём из admin_config (редактируются в админке / снапшотом фраз), а не
+    из константы: правки оператора обязаны применяться.
+    """
     import random
 
-    from app.services.worm_master import (
-        DEFAULT_WORM_PUNISH_DENIED,
-        DEFAULT_WORM_PUNISH_DENIED_NAMED,
-        render,
+    from app.services.admin_config import (
+        get_worm_punish_denied,
+        get_worm_punish_denied_named,
     )
+    from app.services.phrase_meta import effective_pool
+    from app.services.worm_master import render
 
+    fallback = "Ты мне не господин. Я слушаюсь только червя-повелителя."
     if master_name:
-        raw = random.choice(DEFAULT_WORM_PUNISH_DENIED_NAMED)
-        text = render(raw, username=master_name)
+        pool = await effective_pool(
+            session,
+            "worm_punish_denied_named",
+            await get_worm_punish_denied_named(session),
+        )
+        text = render(random.choice(pool), username=master_name) if pool else fallback
     else:
-        text = random.choice(DEFAULT_WORM_PUNISH_DENIED)
+        pool = await effective_pool(
+            session, "worm_punish_denied", await get_worm_punish_denied(session)
+        )
+        text = random.choice(pool) if pool else fallback
     try:
         await message.reply(f"🪱 {text}", parse_mode="HTML")
     except Exception:

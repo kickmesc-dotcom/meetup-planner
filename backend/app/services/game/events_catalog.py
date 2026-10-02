@@ -42,6 +42,10 @@ class Prompt:
     # Сколько дней промпт не повторяем после использования (чтобы шутки не
     # затирались: «первый, кто напишет я» три дня подряд — уже не смешно).
     cooldown_days: int = 7
+    # Э18: нужен ли поясняющий фоллоу-пост. У вопросов («маму любишь?»,
+    # «признайся») правила неочевидны — фоллоу обязателен. У очевидных призывов
+    # («скинь мем», «первый, кто напишет я») он избыточен и работает как спам.
+    needs_rules: bool = True
 
 
 PROMPTS: tuple[Prompt, ...] = (
@@ -56,6 +60,7 @@ PROMPTS: tuple[Prompt, ...] = (
             ),
         ),
         ttl_minutes=30,
+        needs_rules=False,
     ),
     Prompt(
         code="mom_love",
@@ -112,6 +117,7 @@ PROMPTS: tuple[Prompt, ...] = (
             ),
         ),
         ttl_minutes=120,
+        needs_rules=False,
     ),
     Prompt(
         code="self_roast",
@@ -127,6 +133,7 @@ PROMPTS: tuple[Prompt, ...] = (
             ),
         ),
         ttl_minutes=60,
+        needs_rules=False,
     ),
 )
 

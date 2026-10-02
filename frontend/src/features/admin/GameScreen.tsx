@@ -17,6 +17,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchGameAdmin,
   fetchGameMusic,
+  fetchGameObservability,
   fetchGamePlayer,
   fetchGameSocial,
   flushGameDigest,
@@ -43,6 +44,7 @@ interface Props {
 
 const QUERY_KEY = ["admin", "game"] as const;
 const SOCIAL_KEY = ["admin", "game", "social"] as const;
+const OBSERVABILITY_KEY = ["admin", "game", "observability"] as const;
 
 /** Ползунок-тумблер: одинаковый во всех четырёх блоках Э13. */
 function Toggle({
@@ -134,6 +136,10 @@ export default function GameScreen({ users, onBack }: Props) {
   const queryClient = useQueryClient();
   const state = useQuery({ queryKey: QUERY_KEY, queryFn: fetchGameAdmin });
   const social = useQuery({ queryKey: SOCIAL_KEY, queryFn: fetchGameSocial });
+  const observability = useQuery({
+    queryKey: OBSERVABILITY_KEY,
+    queryFn: fetchGameObservability,
+  });
   const [selected, setSelected] = useState<number | null>(null);
   const [code, setCode] = useState("");
   const [xpDraft, setXpDraft] = useState("");
@@ -500,6 +506,55 @@ export default function GameScreen({ users, onBack }: Props) {
         )}
       </section>
 
+      {/* Э19: наблюдаемость — «сколько бот наработал за неделю». Читается сверху
+          СРАЗУ: видно, не спамит ли бот, без чтения чата. */}
+      {observability.data && (
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+          <div className="text-sm font-semibold">📊 Активность за неделю</div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {[
+              ["Случайных событий", observability.data.events],
+              ["Из них разгадали", observability.data.events_answered],
+              ["Голосовых заданий", observability.data.voice_tasks],
+              ["Открыто ачивок", observability.data.achievements_granted],
+              ["Сводок отправлено", observability.data.digest_flushes],
+              ["XP начислено", observability.data.xp_total],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                className="rounded-lg bg-tg-bg/40 px-2 py-1.5"
+              >
+                <div className="text-[10px] text-tg-hint">{label}</div>
+                <div className="tabular-nums text-sm text-tg-text">{value}</div>
+              </div>
+            ))}
+          </div>
+          {observability.data.by_event.length > 0 && (
+            <div className="space-y-0.5 pt-1">
+              <div className="text-[10px] text-tg-hint">Откуда опыт:</div>
+              {observability.data.by_event.slice(0, 6).map((row) => (
+                <div
+                  key={row.event}
+                  className="flex items-center justify-between gap-2 text-[11px]"
+                >
+                  <span className="min-w-0 truncate text-tg-text">
+                    {row.title}
+                    {row.count > 1 ? ` ×${row.count}` : ""}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-tg-hint">
+                    +{row.points} XP
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="text-[10px] text-tg-hint">
+            Окно — {observability.data.window_days} дней. Если «событий» или
+            «сводок» непропорционально много — поднимите тишину/частоту выше.
+          </div>
+        </section>
+      )}
+
       {/* GHG10 Э13: четыре социальные фичи. Задание просило выключаемость и
           «процент срабатываний» — здесь и то, и другое, без похода в SQL. */}
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
@@ -518,6 +573,20 @@ export default function GameScreen({ users, onBack }: Props) {
 
         {social.data && (
           <>
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <NumberRow
+                label="бюджет авто-постов в день (0 — без лимита)"
+                value={social.data.activity_max_posts_per_day}
+                busy={socialMut.isPending}
+                onSave={(n) => socialMut.mutate({ activity_max_posts_per_day: n })}
+              />
+              <div className="text-[11px] text-tg-hint">
+                Общий потолок на ВСЕ авто-посты сразу (события, голосовые,
+                музыка, сводки): когда он выбран, бот не постит больше ничего
+                до следующих суток.
+              </div>
+            </div>
+
             <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
               <Toggle
                 label="Режим сводки"
@@ -565,6 +634,86 @@ export default function GameScreen({ users, onBack }: Props) {
               >
                 Отправить сводку сейчас
               </button>
+            </div>
+
+            {/* Э19: буфер ачивок. Ночью — только копим; утром одна сводка,
+                днём — не чаще шага; страховка от столкновения с ивентами. */}
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <div className="text-xs font-medium">🏆 Ачивки: режим публикации</div>
+              <div className="flex flex-wrap gap-1">
+                {(
+                  [
+                    ["instant", "По одной (как раньше)"],
+                    ["pool", "Пулом (сводкой)"],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => {
+                      haptic("selection");
+                      socialMut.mutate({ achievements_post_mode: mode });
+                    }}
+                    disabled={socialMut.isPending}
+                    className={[
+                      "rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-60",
+                      social.data?.achievements_post_mode === mode
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-secondary-bg/80 text-tg-text",
+                    ].join(" ")}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="text-[11px] text-tg-hint">
+                {social.data.achievements_post_mode === "pool"
+                  ? `В буфере: ${social.data.achievements_pool_pending} ачивок. Ночью — только сбор, утром одна сводка, днём не чаще шага.`
+                  : "Каждая ачивка уходит отдельным сообщением сразу."}
+              </div>
+              {social.data.achievements_post_mode === "pool" && (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {[1, 2, 3, 4, 6, 8, 12].map((hours) => (
+                      <button
+                        key={hours}
+                        type="button"
+                        onClick={() => {
+                          haptic("selection");
+                          socialMut.mutate({ achievements_pool_interval_hours: hours });
+                        }}
+                        disabled={socialMut.isPending}
+                        className={[
+                          "rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-60",
+                          social.data?.achievements_pool_interval_hours === hours
+                            ? "bg-tg-button text-tg-button-text"
+                            : "bg-tg-secondary-bg/80 text-tg-text",
+                        ].join(" ")}
+                      >
+                        раз в {hours} ч
+                      </button>
+                    ))}
+                  </div>
+                  <NumberRow
+                    label="утренняя сводка, час"
+                    value={social.data.achievements_pool_morning_hour}
+                    busy={socialMut.isPending}
+                    onSave={(n) => socialMut.mutate({ achievements_pool_morning_hour: n })}
+                  />
+                  <NumberRow
+                    label="минимум ачивок для дневной сводки"
+                    value={social.data.achievements_pool_min_items}
+                    busy={socialMut.isPending}
+                    onSave={(n) => socialMut.mutate({ achievements_pool_min_items: n })}
+                  />
+                  <NumberRow
+                    label="зазор от ивентов, мин"
+                    value={social.data.achievements_pool_gap_minutes}
+                    busy={socialMut.isPending}
+                    onSave={(n) => socialMut.mutate({ achievements_pool_gap_minutes: n })}
+                  />
+                </>
+              )}
             </div>
 
             <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">

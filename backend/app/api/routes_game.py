@@ -49,8 +49,10 @@ from app.services.game import achievements, donations, gates, holidays, levels, 
 from app.services.game.achievements_catalog import base_achievements
 from app.services.game.config import (
     MAX_LEVEL,
+    COMPLETIONIST_TITLE,
     SUPREME_CHUKHAN_TITLE,
     XP_RULES,
+    feature_description,
     feature_title,
     unlocks_between,
     unlocks_for_level,
@@ -106,8 +108,13 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
     progress = levels.progress_for_xp(total_xp)
 
     supreme = await achievements.is_supreme_chukhan(session, user.id)
+    # Э18: коллекция загружается и так — здесь же выдаём капстоун «Идеальный червь».
+    completionist = await achievements.reconcile_completionist(session, user.id)
     rank_name = progress.rank.name
-    if supreme:
+    if completionist:
+        # Э18: 100% ачивок — особый титул выше даже «Верховного чухана».
+        rank_name = COMPLETIONIST_TITLE
+    elif supreme:
         # Э3.4: спец-ранг приоритетнее ранга за уровень.
         rank_name = SUPREME_CHUKHAN_TITLE
     elif profile is not None and profile.custom_rank_title:
@@ -126,7 +133,11 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
             to_level=to,
             to_rank=levels.rank_for_level(to).name,
             unlocked=[
-                FeatureOut(code=code, title=feature_title(code))
+                FeatureOut(
+                    code=code,
+                    title=feature_title(code),
+                    description=feature_description(code),
+                )
                 for code in unlocks_between(frm, to)
             ],
         )
@@ -169,6 +180,7 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
         rank=_rank_out(progress.level),
         rank_name=rank_name,
         supreme=supreme,
+        completionist=completionist,
         custom_rank_title=profile.custom_rank_title if profile is not None else None,
         xp_into_level=progress.xp_into_level,
         xp_to_next=progress.xp_to_next,
@@ -177,7 +189,11 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
         custom_name=profile.custom_name if profile is not None else None,
         avatar_manual_url=getattr(user, "avatar_manual_url", None),
         unlocked=[
-            FeatureOut(code=code, title=feature_title(code))
+            FeatureOut(
+                code=code,
+                title=feature_title(code),
+                description=feature_description(code),
+            )
             for code in unlocks_for_level(progress.level)
         ],
         level_up=level_up,

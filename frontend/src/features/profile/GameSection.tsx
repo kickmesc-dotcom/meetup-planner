@@ -71,15 +71,36 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
       )}
 
       {g.unlocked.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {g.unlocked.map((f) => (
-            <span
-              key={f.code}
-              className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
-            >
-              {f.title}
-            </span>
-          ))}
+        <div className="space-y-1">
+          <div className="text-[11px] text-tg-hint">Что уже открыто</div>
+          <div className="flex flex-wrap gap-1">
+            {g.unlocked.map((f) => (
+              <span
+                key={f.code}
+                title={f.description || undefined}
+                className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
+              >
+                {f.title}
+              </span>
+            ))}
+          </div>
+          {g.unlocked.some((f) => f.description) && (
+            <details className="text-[11px]">
+              <summary className="cursor-pointer text-tg-link">
+                Что это значит
+              </summary>
+              <ul className="mt-1 space-y-1.5">
+                {g.unlocked
+                  .filter((f) => f.description)
+                  .map((f) => (
+                    <li key={f.code} className="text-tg-hint">
+                      <span className="font-medium text-tg-text">{f.title}</span>{" "}
+                      — {f.description}
+                    </li>
+                  ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 
@@ -232,14 +253,23 @@ function LevelUpNotice({
         {levelUp.from_rank} → <span className="text-tg-text">{levelUp.to_rank}</span>
       </div>
       {levelUp.unlocked.length > 0 && (
-        <ul className="mt-2 space-y-0.5">
+        <ul className="mt-2 space-y-1.5">
           {levelUp.unlocked.map((f) => (
             <li key={f.code} className="text-xs text-tg-text">
-              • {f.title}
+              <div className="font-medium">• {f.title}</div>
+              {f.description && (
+                <div className="mt-0.5 pl-3 text-[11px] text-tg-hint">
+                  {f.description}
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
+      <div className="mt-1 text-[10px] text-tg-hint">
+        Если прилетело несколько рангов разом — тут все открывшиеся
+        способности, ничего не теряется.
+      </div>
       <button
         type="button"
         onClick={onAck}

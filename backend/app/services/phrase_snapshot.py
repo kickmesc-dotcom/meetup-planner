@@ -43,6 +43,8 @@ _POOL_KEYS = (
     "worm_master_agrees",
     "worm_master_nag",
     "worm_punish",
+    "worm_punish_denied",
+    "worm_punish_denied_named",
     "worm_announce_lines",
     # H.1: короткие реплики бота на reply/mention (фидбек 19.06 #3).
     "reply_phrases",
@@ -168,6 +170,10 @@ async def _pool_getter(session: AsyncSession, name: str) -> list[str]:
         return await ac.get_worm_master_nag(session)
     if name == "worm_punish":
         return await ac.get_worm_punish(session)
+    if name == "worm_punish_denied":
+        return await ac.get_worm_punish_denied(session)
+    if name == "worm_punish_denied_named":
+        return await ac.get_worm_punish_denied_named(session)
     if name == "worm_announce_lines":
         return await ac.get_worm_announce_lines(session)
     if name == "reply_phrases":
@@ -201,6 +207,10 @@ async def _pool_setter(session: AsyncSession, name: str, phrases: list[str]) -> 
         await ac.set_worm_master_nag(session, phrases)
     elif name == "worm_punish":
         await ac.set_worm_punish(session, phrases)
+    elif name == "worm_punish_denied":
+        await ac.set_worm_punish_denied(session, phrases)
+    elif name == "worm_punish_denied_named":
+        await ac.set_worm_punish_denied_named(session, phrases)
     elif name == "worm_announce_lines":
         await ac.set_worm_announce_lines(session, phrases)
     elif name == "reply_phrases":

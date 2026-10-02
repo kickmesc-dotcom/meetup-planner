@@ -28,7 +28,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, replace
 
-from app.services.game.config import ANNIVERSARY_TIERS, tier_title
+from app.services.game.config import (
+    ANNIVERSARY_TIERS,
+    SUPREME_CHUKHAN_LOSER_TIER,
+    tier_points,
+    tier_title,
+)
 
 # Виды ачивок (валидируются в тесте — опечатка не должна проехать молча).
 KIND_COUNTER = "counter"
@@ -70,6 +75,11 @@ class Achievement:
     secret: bool = False
 
 
+# Код ачивки за 100% коллекции и её особый титул (объявлены ДО `_BASE`: каталог
+# ссылается на код при импорте модуля).
+COMPLETIONIST_CODE = "completionist"
+COMPLETIONIST_TITLE = "Идеальный червь"
+
 # --- Ядро каталога: только базовые записи и разовые -------------------------
 # Тир-версии НЕ пишутся руками — они разворачиваются из `tiers` (`_expand`),
 # чтобы набор юбилеев был один на всю систему (`config.ANNIVERSARY_TIERS`).
@@ -83,13 +93,15 @@ _BASE: tuple[Achievement, ...] = (
         KIND_COUNTER,
         tiers=ANNIVERSARY_TIERS,
     ),
+    # Недельные звания выпадают по RNG и редко — 100 таких ждать нереально.
+    # Поэтому у них короткие достижимые тиры (10 недель ≈ 2.5 месяца).
     Achievement(
         "first_worm",
         "Первоход",
         "Стать чуханом недели впервые",
         "🐓",
         KIND_COUNTER,
-        tiers=ANNIVERSARY_TIERS,
+        tiers=(3, 5, 10),
     ),
     Achievement(
         "truth_seeker",
@@ -105,7 +117,7 @@ _BASE: tuple[Achievement, ...] = (
         "Стать самым активным участником чата за неделю впервые",
         "📣",
         KIND_COUNTER,
-        tiers=ANNIVERSARY_TIERS,
+        tiers=(3, 5, 10),
     ),
     Achievement(
         "read_only",
@@ -113,7 +125,7 @@ _BASE: tuple[Achievement, ...] = (
         "Стать самым НЕактивным участником чата за неделю впервые",
         "🔇",
         KIND_COUNTER,
-        tiers=ANNIVERSARY_TIERS,
+        tiers=(3, 5, 10),
     ),
     # --- разовые-мгновенные (Э4.3) ---
     Achievement("self_shot", "Самострел", "Закрутить рулетку и выпасть самому", "🎯", KIND_INSTANT),
@@ -282,10 +294,39 @@ _BASE: tuple[Achievement, ...] = (
     Achievement(
         "supreme_chukhan",
         "Верховный чухан",
-        "Стать лохом 100 раз — высшая ступень лестницы «С почином»",
+        f"Стать лохом {SUPREME_CHUKHAN_LOSER_TIER} раз — высшая ступень лестницы «С почином»",
         "🏅",
         KIND_INSTANT,
         points=100,
+        secret=True,
+    ),
+    # --- Э18: червь-господин и «идеальный червь» ---
+    # Пара ачивок про режим червя-господина (T3.6): собственно звание и кара.
+    Achievement(
+        "worm_lord",
+        "Червь-господин",
+        "Стать червём-господином (повелителем бота) впервые",
+        "👑",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    Achievement(
+        "punisher",
+        "Каратель",
+        "Натравить бота на недруга через /punish впервые",
+        "⚔️",
+        KIND_COUNTER,
+        tiers=ANNIVERSARY_TIERS,
+    ),
+    # Капстоун-коллекция: собрать ВСЕ ачивки каталога (кроме себя самой).
+    # Даёт особый титул (см. `COMPLETIONIST_TITLE`) — выше «Верховного чухана».
+    Achievement(
+        COMPLETIONIST_CODE,
+        "Идеальный червь",
+        "Собрать 100% всех ачивок чата",
+        "🌟",
+        KIND_INSTANT,
+        points=500,
         secret=True,
     ),
 )
@@ -293,7 +334,9 @@ _BASE: tuple[Achievement, ...] = (
 # Код капстоуна, который выдаётся автоматически на последнем тире «С почином».
 SUPREME_CHUKHAN_CODE = "supreme_chukhan"
 SUPREME_CHUKHAN_TIER_BASE = "chin_up"
-SUPREME_CHUKHAN_TIER = ANNIVERSARY_TIERS[-1]
+# Порог берём из config (аудит выполнимости): не ANNIVERSARY_TIERS[-1], иначе
+# капстоун «Идеального червя» ждал бы 100 RNG-выпадений лохом дня.
+SUPREME_CHUKHAN_TIER = SUPREME_CHUKHAN_LOSER_TIER
 
 
 # --------------------------------------------------------------------------
@@ -318,8 +361,10 @@ GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "self_shot",
             "rewrote_history",
             SUPREME_CHUKHAN_CODE,
+            COMPLETIONIST_CODE,
         ),
     ),
+    ("worm_master", "🪱 Червь-господин", ("worm_lord", "punisher")),
     ("chat", "📣 Активность в чате", ("generation_mouthpiece", "read_only")),
     (
         "content",
@@ -383,6 +428,7 @@ def _expand(base: Achievement) -> list[Achievement]:
                 code=f"{base.code}:{tier}",
                 title=tier_title(base.title, tier),
                 description=f"{narrative} — {tier}-й раз (юбилейная ачивка)",
+                points=tier_points(base.points, tier),
                 tier=tier,
                 base=base.code,
             )

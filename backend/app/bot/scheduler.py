@@ -176,6 +176,7 @@ JOB_GAME_MEMES = "game_memes_sweep"  # GHG10 Э7
 JOB_GAME_MEMORIAL = "game_memorial_daily"  # GHG10 Э13
 JOB_GAME_EVENTS = "game_events_hourly"  # GHG10 Э13
 JOB_GAME_DIGEST = "game_digest_flush"  # GHG10 Э13
+JOB_GAME_ACHIEVEMENTS_FLUSH = "game_achievements_flush"  # GHG10 Э19 (буфер ачивок)
 JOB_GAME_VOICE = "game_voice_tick"  # GHG10 Э14
 JOB_GAME_MUSIC = "game_music_weekly"  # GHG10 Э15
 JOB_GAME_MUSIC_GAME = "game_music_game_weekly"  # GHG10 Э16
@@ -934,6 +935,28 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_GAME_DIGEST)
         log.info("scheduler.game_digest_disabled")
+
+    # --- GHG10 (Э19): выплеск буфера ачивок.
+    # Режим буфера живёт в `game.achievements.post_mode`; job тикает часто, а
+    # решение «пора/не пора» принимает сам (ночь — только сбор, утренний слот,
+    # дневной шаг + защита от столкновения с критическими слотами), поэтому
+    # правки настроек работают без рестарта.
+    if game_on:
+        from app.services.game.journal import run_achievements_digest_job
+
+        sched.add_job(
+            _logged_job(JOB_GAME_ACHIEVEMENTS_FLUSH, run_achievements_digest_job),
+            IntervalTrigger(minutes=15),
+            id=JOB_GAME_ACHIEVEMENTS_FLUSH,
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=600,
+        )
+        log.info("scheduler.game_achievements_flush_enabled")
+    else:
+        _remove_job_if_exists(sched, JOB_GAME_ACHIEVEMENTS_FLUSH)
+        log.info("scheduler.game_achievements_flush_disabled")
 
     # --- GHG10 (Э14): голосовые задания. ---
     # Job тикает часто, а решение «ставить ли задание» принимает сам: дневное

@@ -36,7 +36,7 @@ from app.services.admin_config import (
     get_game_memorial_repeat_days,
     get_game_memorial_silence_days,
 )
-from app.services.game import journal
+from app.services.game import activity, journal
 from app.services.game.config import MEMORIAL_RETURN_TEXT
 
 log = structlog.get_logger()
@@ -110,6 +110,11 @@ async def run_memorial_job(*, today: date | None = None, now: datetime | None = 
     posted = 0
     async with sm() as session:
         if not await get_game_memorial_enabled(session):
+            return 0
+        # Э18: единый режим активностей — поминование не лезет ночью и не
+        # перебивает живое обсуждение. Пропуск не теряется: следующее окно
+        # (job тикает ежедневно) догонит.
+        if await activity.check_window(session, now=moment) != activity.OK:
             return 0
         threshold = await get_game_memorial_silence_days(session)
         repeat_days = await get_game_memorial_repeat_days(session)

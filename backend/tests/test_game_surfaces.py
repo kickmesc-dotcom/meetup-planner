@@ -291,10 +291,11 @@ async def test_profile_payload_has_rank_progress_and_level_up(monkeypatch, sessi
     profile.pending_level_up_from = 1
     profile.pending_level_up_to = 2
     session.store[("GameProfile", _User.id)] = profile
-    # supreme? None; затем 5 счётчиков progressа (loser/chukhan/rolls/polls/nominations)
-    session.scalar_queue = [None, 1, 0, 0, 0, 0]
-    # daily_status, collected_codes, unlocked_at_map
-    session.scalars_queue = [[], [], []]
+    # supreme? None; completionist? None; затем 5 счётчиков progressа
+    # (loser/chukhan/rolls/polls/nominations)
+    session.scalar_queue = [None, None, 1, 0, 0, 0, 0]
+    # reconcile-collected, daily_status, collected_codes, unlocked_at_map
+    session.scalars_queue = [[], [], [], []]
 
     out = await routes_game.my_game(session, _User())
     assert out.enabled is True
@@ -407,3 +408,55 @@ async def test_facade_week_activity_silent_when_disabled(monkeypatch, session):
 def test_user_achievement_codes_are_plain_strings():
     """Каталог в коде: смена ачивок не требует миграции (code без FK)."""
     assert UserAchievement.__table__.c.code.type.length == 64
+
+
+# --------------------------------------------------------------------------
+# Э19: человеческие описания способностей и выполнимость капстоуна
+# --------------------------------------------------------------------------
+
+
+def test_every_unlocked_feature_has_title_and_description():
+    """Каждая способность в `LEVEL_UNLOCKS` обязана иметь название и объяснение.
+
+    Иначе уведомление о новом ранге показывало бы игроку голый код/термин —
+    ровно то, на что жаловался оператор («описать куда зайти, что нажать»).
+    """
+    from app.services.game import config
+
+    for level, codes in config.LEVEL_UNLOCKS.items():
+        for code in codes:
+            assert config.feature_title(code) != code, code
+            desc = config.feature_description(code)
+            assert len(desc) > 20, code
+            # Объяснение отвечает «где» и «что будет», а не пересказывает термин.
+            assert any(word in desc.lower() for word in ("где", "мини-апп", "админк", "команд")), code
+
+
+def test_supreme_chukhan_tier_is_reachable():
+    """Аудит выполнимости: капстоун не должен требовать 100 RNG-выпадений.
+
+    Иначе «Идеальный червь» (100% ачивок) был бы заблокирован на годы.
+    """
+    from app.services.game import config
+    from app.services.game import achievements_catalog as catalog
+
+    assert 0 < config.SUPREME_CHUKHAN_LOSER_TIER < 100
+    assert catalog.SUPREME_CHUKHAN_TIER == config.SUPREME_CHUKHAN_LOSER_TIER
+    ach = catalog.get(catalog.SUPREME_CHUKHAN_CODE)
+    assert ach is not None
+    assert str(config.SUPREME_CHUKHAN_LOSER_TIER) in ach.description
+
+
+def test_level_up_notice_lists_features_for_the_whole_range():
+    """Стакание: подъём на несколько рангов разом показывает ВСЕ способности."""
+    from app.services.game import config
+
+    codes = unlocks_between(1, 5)
+    assert set(codes) == {
+        "loser_roulette",
+        "loser_phrases_editor",
+        "chukhan_phrases_editor",
+        "chukhan_reroll",
+    }
+    # Все они имеют описание, которое уедет в уведомление.
+    assert all(config.feature_description(code) for code in codes)

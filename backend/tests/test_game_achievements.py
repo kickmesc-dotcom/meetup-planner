@@ -15,6 +15,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.db.models import ChatActivityDaily, UserAchievement
+from types import SimpleNamespace
+
 from app.services.game import achievements, awards
 from app.services.game.achievements_catalog import (
     ANNIVERSARY_TIERS,
@@ -139,8 +141,8 @@ def test_catalog_has_expected_number_of_base_achievements():
     Тиры — отдельные записи, но база считается по ним ровно один раз.
     """
     bases = base_achievements()
-    assert len(bases) == 26
-    # 26 базовых + все юбилейные тиры.
+    assert len(bases) == 29  # +worm_lord, punisher, completionist (Э18)
+    # База + все юбилейные тиры.
     assert catalog_size() == len(bases) + sum(len(a.tiers) for a in bases)
 
 
@@ -168,9 +170,10 @@ def test_first_time_and_anniversary_are_always_separate():
             continue
         seen += 1
         assert base.kind == KIND_COUNTER, base.code
-        # Стандартные юбилеи обязаны присутствовать; у части ачивок есть свой
-        # дополнительный порог (напр. ×3 у «Агента ВЦИОМ-а»).
-        assert set(ANNIVERSARY_TIERS) <= set(base.tiers), base.code
+        # Обязателен непустой набор юбилеев. У «недельных» званий он короче
+        # (3/5/10 — из-за RNG 100 нереально), у остальных — стандартный плюс
+        # свой порог (напр. ×3 у «Агента ВЦИОМ-а»).
+        assert base.tiers, base.code
         for code in tier_codes(base.code):
             tier = get(code)
             assert not re.search(r"впервые", tier.description, re.IGNORECASE), code
@@ -180,13 +183,15 @@ def test_first_time_and_anniversary_are_always_separate():
 
 def test_anniversary_tiers_expand_to_separate_entries():
     """«Отдельный поздравительный статус и уровень ачивки для каждого юбилея»."""
+    # Недельные звания выпадают по RNG — у них короткие достижимые тиры.
+    for base in ("first_worm", "generation_mouthpiece", "read_only"):
+        assert get(base).tiers == (3, 5, 10)
     for base in (
         "chin_up",
-        "first_worm",
         "truth_seeker",
-        "generation_mouthpiece",
-        "read_only",
         "cashback",
+        "worm_lord",
+        "punisher",
     ):
         assert get(base) is not None
         assert get(base).tiers == ANNIVERSARY_TIERS
@@ -226,9 +231,9 @@ def test_kind_distribution_matches_spec():
     kinds = [a.kind for a in base_achievements()]
     # 11 счётчиков (базовые + Э14–Э17) + 5 бывших порогов, ставших счётчиками;
     # 1 порог — music_streak (серия); 9 разовых.
-    assert kinds.count(KIND_COUNTER) == 16
+    assert kinds.count(KIND_COUNTER) == 18  # + worm_lord, punisher (Э18)
     assert kinds.count(KIND_THRESHOLD) == 1  # music_streak
-    assert kinds.count(KIND_INSTANT) == 9
+    assert kinds.count(KIND_INSTANT) == 10  # + completionist (Э18)
 
 
 def test_tiers_reached_is_pure_and_monotonic():
@@ -336,7 +341,8 @@ async def test_grant_unknown_code_is_noop(session: _FakeSession):
 async def test_grant_counter_grants_base_and_reached_tier(session: _FakeSession):
     granted = await achievements._grant_counter(session, 1, "chin_up", 10, announce=False)
     assert {a.code for a in granted} == {"chin_up", "chin_up:10"}
-    assert session.xp_of(1) == 100  # две ачивки по 50
+    # База 50 + юбилей ×10 (весомее базы: ANNIVERSARY_TIER_POINTS).
+    assert session.xp_of(1) == 50 + 150
 
 
 @pytest.mark.asyncio
@@ -353,8 +359,8 @@ async def test_last_tier_grants_supreme_chukhan_rank(session: _FakeSession):
     assert "chin_up:100" in codes
     assert SUPREME_CHUKHAN_CODE in codes
     assert SUPREME_CHUKHAN_CODE in session.codes_of(1)
-    # 6 тиров «С почином» + капстоун = 7 ачивок по 100 у капстоуна и по 50 у остальных
-    assert session.xp_of(1) == 6 * 50 + 100
+    # База 50 + юбилеи ×10/20/30/50/100 (150/250/350/500/1000) + капстоун 100.
+    assert session.xp_of(1) == 50 + 150 + 250 + 350 + 500 + 1000 + 100
     session.scalar_queue = [1]
     assert await achievements.is_supreme_chukhan(session, 1) is True
 
@@ -676,3 +682,84 @@ async def test_achievements_url_survives_broken_bot():
 
 def test_catalog_icons_are_nonempty_for_every_entry():
     assert all(get(c).icon for c in CATALOG)
+
+
+# --------------------------------------------------------------------------
+# Э18: честные серии, червь-господин и «идеальный червь»
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_opium_is_a_real_streak_reset_by_live_post(session: _FakeSession):
+    """«Опиум для никого» — три поста ПОДРЯД: живой пост рвёт серию, рекорд нет."""
+    for _ in range(3):
+        await achievements.on_dead_post(session, 1, announce=False)
+    assert await achievements.get_counter(session, 1, achievements.COUNTER_OPIUM) == 3
+    assert (
+        await achievements.get_counter(session, 1, achievements.COUNTER_OPIUM_BEST) == 3
+    )
+    assert "opium_for_nobody:3" in session.codes_of(1)
+    # Живой пост (с реакциями) обнуляет ТЕКУЩУЮ серию, рекорд остаётся.
+    await achievements.on_meme_reactions(session, 1, announce=False)
+    assert await achievements.get_counter(session, 1, achievements.COUNTER_OPIUM) == 0
+    assert (
+        await achievements.get_counter(session, 1, achievements.COUNTER_OPIUM_BEST) == 3
+    )
+
+
+@pytest.mark.asyncio
+async def test_music_streak_resets_on_missed_round(session: _FakeSession):
+    row = SimpleNamespace(user_id=5, count=3)
+    session.scalars_queue = [[row]]
+    assert (
+        await achievements.on_music_round_closed(
+            session, guessed_ids={7}, poll_arrived=True
+        )
+        == 1
+    )
+    assert row.count == 0
+    # Сбой доставки (stale-раунд) игрока не наказывает.
+    row2 = SimpleNamespace(user_id=5, count=3)
+    session.scalars_queue = [[row2]]
+    assert (
+        await achievements.on_music_round_closed(
+            session, guessed_ids=set(), poll_arrived=False
+        )
+        == 0
+    )
+    assert row2.count == 3
+
+
+@pytest.mark.asyncio
+async def test_worm_lord_and_punisher_are_counters(session: _FakeSession):
+    assert [a.code for a in await achievements.on_worm_lord(session, 1, announce=False)] == [
+        "worm_lord"
+    ]
+    assert [a.code for a in await achievements.on_punish(session, 1, announce=False)] == [
+        "punisher"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_completionist_grants_on_full_collection(session: _FakeSession):
+    import app.services.game.achievements_catalog as catalog
+
+    # has(completionist) → None; коллекция — всё, кроме самого капстоуна.
+    session.scalar_queue = [None]
+    session.scalars_queue = [
+        [c for c in catalog.CATALOG if c != catalog.COMPLETIONIST_CODE]
+    ]
+    assert (
+        await achievements.reconcile_completionist(session, 1, announce=False) is True
+    )
+    assert catalog.COMPLETIONIST_CODE in session.codes_of(1)
+
+
+@pytest.mark.asyncio
+async def test_completionist_not_granted_without_full_collection(session: _FakeSession):
+    session.scalar_queue = [None]
+    session.scalars_queue = [["chin_up", "first_worm"]]
+    assert (
+        await achievements.reconcile_completionist(session, 1, announce=False) is False
+    )
+    assert session.added == []

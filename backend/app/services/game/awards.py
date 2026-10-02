@@ -353,6 +353,22 @@ async def bot_reply_by_tg(session: AsyncSession, telegram_id: int) -> None:
     await achievements.on_bot_reply(session, int(uid))
 
 
+@_guarded("worm_lord")
+async def worm_lord(session: AsyncSession, user_id: int) -> None:
+    """Э18: стал червём-господином → «Червь-господин» и юбилеи."""
+    if not await _enabled(session):
+        return
+    await achievements.on_worm_lord(session, user_id)
+
+
+@_guarded("punish")
+async def punish(session: AsyncSession, user_id: int) -> None:
+    """Э18: применил /punish → «Каратель» и юбилеи."""
+    if not await _enabled(session):
+        return
+    await achievements.on_punish(session, user_id)
+
+
 @_guarded("meme_all_reacted")
 async def meme_all_reacted(session: AsyncSession, user_id: int) -> None:
     """Э7: на мем отреагировали все живые → «Мемолог» (зовёт телеметрия)."""

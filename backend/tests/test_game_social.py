@@ -30,6 +30,9 @@ class _Rows:
     def all(self) -> list:
         return list(self._rows)
 
+    def __iter__(self):
+        return iter(self._rows)
+
     def first(self):
         return self._rows[0] if self._rows else None
 
@@ -278,14 +281,20 @@ def test_event_followup_always_explains_the_rules():
     assert "30 мин" in events.build_followup_text(ttl_minutes=30)
 
 
-def test_every_prompt_posts_question_then_followup():
-    """Вопрос ВСЕГДА идёт парой с поясняющим постом, и её не разорвать."""
+def test_question_prompts_post_then_followup_obvious_ones_do_not():
+    """Вопросы идут парой с пояснением; очевидные призывы — без лишнего спама."""
     for prompt in PROMPTS:
         posts = events.build_prompt_posts(prompt)
-        assert len(posts) == 2, prompt.code
         assert posts[0] == prompt.text
-        assert "общий чат" in posts[1]
-        assert "первый" in posts[1].lower()
+        if getattr(prompt, "needs_rules", True):
+            assert len(posts) == 2, prompt.code
+            assert "общий чат" in posts[1]
+            assert "первый" in posts[1].lower()
+        else:
+            assert posts == [prompt.text], prompt.code
+    # В каталоге есть и те, и другие (иначе тест ничего не проверяет).
+    assert any(p.needs_rules for p in PROMPTS)
+    assert any(not p.needs_rules for p in PROMPTS)
 
 
 def test_every_catalog_prompt_has_a_way_to_win():
@@ -546,7 +555,10 @@ def test_xp_rules_text_does_not_promise_zero_xp():
 
 def test_manual_blocks_come_from_config():
     ranks = report.manual_ranks_block()
-    assert any("Ручная рулетка лоха" in line for line in ranks)
+    # Названия теперь «как в чате», а не технический термин; строка про рулетку
+    # обязана нести и человеческое объяснение (первое предложение описания).
+    assert any("рулетк" in line.lower() for line in ranks)
+    assert any("мини-апп" in line for line in ranks)
     xp_lines = report.manual_xp_block()
     assert any("Сообщение в чате" in line for line in xp_lines)
 
@@ -638,3 +650,343 @@ async def test_digest_due_respects_interval(monkeypatch):
 
     monkeypatch.setattr(journal, "get_game_digest_last_flush", _old)
     assert await journal.digest_due(_FakeSession(), now=NOW) is True
+
+
+# ------------------------------------------------------ Э18: режим активностей ----
+
+
+def test_activity_live_hours_pure():
+    from app.services.game import activity
+
+    night = datetime(2026, 9, 30, 0, 17, tzinfo=timezone.utc)  # 03:17 локально
+    noon = datetime(2026, 9, 30, 9, 0, tzinfo=timezone.utc)  # 12:00 локально
+    assert activity.is_daytime(night, start_hour=10, end_hour=22) is False
+    assert activity.is_daytime(noon, start_hour=10, end_hour=22) is True
+    # start == end — окно «на весь день».
+    assert activity.is_daytime(night, start_hour=0, end_hour=0) is True
+    # Окно через полночь.
+    assert activity.is_daytime(night, start_hour=22, end_hour=6) is True
+
+
+@pytest.mark.asyncio
+async def test_activity_quiet_blocks_during_flood(monkeypatch):
+    from app.services import admin_config
+    from app.services.game import activity
+
+    async def _start(_s):
+        return 10
+
+    async def _end(_s):
+        return 22
+
+    async def _quiet(_s):
+        return 15
+
+    monkeypatch.setattr(admin_config, "get_activity_day_start_hour", _start)
+    monkeypatch.setattr(admin_config, "get_activity_day_end_hour", _end)
+    monkeypatch.setattr(admin_config, "get_activity_quiet_minutes", _quiet)
+
+    class _S:
+        def __init__(self, count):
+            self.count = count
+
+        async def get(self, *_a, **_k):
+            return None  # ключа в admin_config нет → дефолты (в т.ч. бюджет дня)
+
+        async def scalar(self, *_a, **_k):
+            return self.count
+
+    noon = datetime(2026, 9, 30, 9, 0, tzinfo=timezone.utc)
+    night = datetime(2026, 9, 30, 0, 17, tzinfo=timezone.utc)
+    assert await activity.check_window(_S(0), now=noon, chat_id=-100) == activity.OK
+    assert await activity.check_window(_S(3), now=noon, chat_id=-100) == activity.BUSY
+    assert await activity.check_window(_S(0), now=night, chat_id=-100) == activity.NIGHT
+
+
+# ------------------------------------------- Э19: буфер достижений ----
+
+
+def test_parse_achievement_line_pure():
+    assert journal.parse_achievement_line("📈 «Успешный успех» (+50 XP)") == (
+        "Успешный успех",
+        50,
+    )
+    # Строка без знакомого формата не теряется.
+    assert journal.parse_achievement_line("что-то") == ("что-то", 0)
+    assert journal.parse_achievement_line("") == ("", 0)
+
+
+def test_build_achievements_digest_groups_and_sums():
+    text = journal.build_achievements_digest(
+        [
+            {"name": "Русланище", "lines": ["📈 «Успешный успех» (+50 XP)"]},
+            {
+                "name": "Митян",
+                "lines": [
+                    "💀 «Опиум для никого» (+50 XP)",
+                    "📈 «Успешный успех» (+50 XP)",
+                ],
+            },
+        ],
+        interval_hours=4,
+    )
+    assert "Сводка достижений</b> за 4 ч" in text
+    # Один игрок — одна строка: несколько ачивок схлопываются и суммируют очки.
+    assert "<b>Русланище</b> получает ачивку «Успешный успех» (+50 XP)" in text
+    assert "<b>Митян</b> получает ачивки: «Опиум для никого», «Успешный успех» (+100 XP)" in text
+    assert journal.build_achievements_digest([]) == ""
+
+
+def test_in_reserved_gap_blocks_monday_noon():
+    # 2026-09-28 — понедельник. 09:00 UTC = 12:00 локально (UTC+3).
+    noon = datetime(2026, 9, 28, 9, 0, tzinfo=timezone.utc)
+    assert journal.in_reserved_gap(noon, gap_minutes=30) is True
+    # 08:50 UTC = 11:50 локально — ещё в зазоре ±30 минут.
+    assert journal.in_reserved_gap(
+        datetime(2026, 9, 28, 8, 50, tzinfo=timezone.utc), gap_minutes=30
+    ) is True
+    # 14:00 локально — уже свободно.
+    assert journal.in_reserved_gap(
+        datetime(2026, 9, 28, 11, 0, tzinfo=timezone.utc), gap_minutes=30
+    ) is False
+    # Вторник 12:00 — не понедельничный слот.
+    assert journal.in_reserved_gap(
+        datetime(2026, 9, 29, 9, 0, tzinfo=timezone.utc), gap_minutes=30
+    ) is False
+    assert journal.in_reserved_gap(noon, gap_minutes=0) is False
+
+
+@pytest.mark.asyncio
+async def test_queue_achievements_adds_pool_entries():
+    session = _FakeSession()
+    ok = await journal.queue_achievements(
+        session, user_id=7, lines=["📈 «А» (+50 XP)", "💀 «Б» (+50 XP)"], chat_id=-100
+    )
+    assert ok is True
+    assert [e.kind for e in session.added] == [
+        journal.KIND_ACHIEVEMENT_POOL,
+        journal.KIND_ACHIEVEMENT_POOL,
+    ]
+    assert all(e.subject_user_id == 7 for e in session.added)
+    assert session.commits == 1
+
+
+@pytest.mark.asyncio
+async def test_achievements_digest_due_night_morning_and_slot(monkeypatch):
+    from app.services.game import activity
+
+    async def _count(_s):
+        return 3
+
+    async def _ok(_s, *, now, chat_id=None):
+        return activity.OK
+
+    async def _night(_s, *, now, chat_id=None):
+        return activity.NIGHT
+
+    async def _gap(_s):
+        return 30
+
+    async def _morning(_s):
+        return 10
+
+    async def _interval(_s):
+        return 4
+
+    async def _last_none(_s):
+        return None
+
+    monkeypatch.setattr(journal, "pool_pending_count", _count)
+    monkeypatch.setattr(journal, "get_achievements_pool_gap_minutes", _gap)
+    monkeypatch.setattr(journal, "get_achievements_pool_morning_hour", _morning)
+    monkeypatch.setattr(journal, "get_achievements_pool_interval_hours", _interval)
+    monkeypatch.setattr(journal, "get_achievements_pool_last_flush", _last_none)
+
+    # Ночь — только сбор.
+    monkeypatch.setattr(activity, "check_window", _night)
+    assert (
+        await journal.achievements_digest_due(
+            _FakeSession(), now=datetime(2026, 9, 29, 0, 0, tzinfo=timezone.utc)
+        )
+        is False
+    )
+
+    monkeypatch.setattr(activity, "check_window", _ok)
+    # Утро: 07:00 UTC = 10:00 локально — выплеск ночного «урожая».
+    assert (
+        await journal.achievements_digest_due(
+            _FakeSession(), now=datetime(2026, 9, 29, 7, 0, tzinfo=timezone.utc)
+        )
+        is True
+    )
+    # Понедельник 12:00 локально — критический слот, сводка сдвигается.
+    assert (
+        await journal.achievements_digest_due(
+            _FakeSession(), now=datetime(2026, 9, 28, 9, 0, tzinfo=timezone.utc)
+        )
+        is False
+    )
+    # Пустой пул — не выплёскиваем.
+    async def _zero(_s):
+        return 0
+
+    monkeypatch.setattr(journal, "pool_pending_count", _zero)
+    assert (
+        await journal.achievements_digest_due(
+            _FakeSession(), now=datetime(2026, 9, 29, 7, 0, tzinfo=timezone.utc)
+        )
+        is False
+    )
+
+
+@pytest.mark.asyncio
+async def test_flush_achievements_groups_by_user(monkeypatch):
+    sent: list[str] = []
+
+    async def _send(text, **_kw):
+        sent.append(text)
+        return True
+
+    async def _interval(_s):
+        return 4
+
+    async def _markup():
+        return None
+
+    monkeypatch.setattr(journal, "send_now", _send)
+    monkeypatch.setattr(journal, "get_achievements_pool_interval_hours", _interval)
+    monkeypatch.setattr(journal, "_achievements_markup", _markup)
+
+    rows = [
+        SimpleNamespace(
+            subject_user_id=1, text="📈 «Успешный успех» (+50 XP)", chat_id=-100, sent_at=None
+        ),
+        SimpleNamespace(
+            subject_user_id=1, text="💀 «Опиум для никого» (+50 XP)", chat_id=-100, sent_at=None
+        ),
+    ]
+    session = _FakeSession(scalars=[rows])
+    n = await journal.flush_achievements(session, now=NOW)
+    assert n == 2
+    assert all(row.sent_at == NOW for row in rows)
+    assert "получает ачивки:" in sent[0]
+    assert "(+100 XP)" in sent[0]
+    assert session.commits >= 1
+
+
+@pytest.mark.asyncio
+async def test_post_mode_pool_queues_instead_of_posting(monkeypatch):
+    from app.services import admin_config
+    from app.services.game import achievements as ach_mod
+
+    queued: dict = {}
+
+    async def _mode(_s):
+        return "pool"
+
+    async def _queue(_s, *, user_id, lines, chat_id=None):
+        queued.update(user_id=user_id, lines=lines, chat_id=chat_id)
+        return True
+
+    async def _never_send(*_a, **_k):  # pragma: no cover
+        raise AssertionError("в режиме пула мгновенного поста быть не должно")
+
+    monkeypatch.setattr(admin_config, "get_achievements_post_mode", _mode)
+    monkeypatch.setattr(journal, "queue_achievements", _queue)
+    monkeypatch.setattr(journal, "send_now", _never_send)
+    monkeypatch.setattr(
+        ach_mod,
+        "get_settings",
+        lambda: SimpleNamespace(group_chat_id=-100),
+    )
+
+    ach = SimpleNamespace(
+        icon="📈", title="Успешный успех", points=50, description="...", code="successful_success"
+    )
+    ok = await ach_mod.announce_granted(_FakeSession(), user_id=7, achs=[ach])
+    assert ok is True
+    assert queued["user_id"] == 7
+    assert queued["lines"] == ["📈 «Успешный успех» (+50 XP)"]
+    assert queued["chat_id"] == -100
+
+
+# ------------------------------------- Э19: единый бюджет дня и наблюдаемость ----
+
+
+@pytest.mark.asyncio
+async def test_activity_budget_blocks_after_cap(monkeypatch):
+    from app.services import admin_config
+    from app.services.game import activity
+
+    async def _start(_s):
+        return 0  # окно «на весь день» — проверяем именно бюджет
+
+    async def _end(_s):
+        return 0
+
+    async def _quiet(_s):
+        return 0
+
+    async def _budget(_s):
+        return 5
+
+    monkeypatch.setattr(admin_config, "get_activity_day_start_hour", _start)
+    monkeypatch.setattr(admin_config, "get_activity_day_end_hour", _end)
+    monkeypatch.setattr(admin_config, "get_activity_quiet_minutes", _quiet)
+    monkeypatch.setattr(admin_config, "get_activity_max_posts_per_day", _budget)
+
+    class _S:
+        async def get(self, *_a, **_k):
+            return None
+
+        async def scalar(self, *_a, **_k):
+            return 0
+
+    now = datetime(2026, 9, 30, 9, 0, tzinfo=timezone.utc)
+
+    async def _under(_s, *, now):
+        return 4
+
+    monkeypatch.setattr(activity, "count_auto_posts_today", _under)
+    assert await activity.check_window(_S(), now=now, chat_id=-100) == activity.OK
+
+    async def _at_cap(_s, *, now):
+        return 5
+
+    monkeypatch.setattr(activity, "count_auto_posts_today", _at_cap)
+    assert await activity.check_window(_S(), now=now, chat_id=-100) == activity.BUDGET
+
+    # 0 = без лимита: бюджет не проверяем вовсе.
+    async def _off(_s):
+        return 0
+
+    monkeypatch.setattr(admin_config, "get_activity_max_posts_per_day", _off)
+    assert await activity.check_window(_S(), now=now, chat_id=-100) == activity.OK
+
+
+@pytest.mark.asyncio
+async def test_observability_summary_shape():
+    from app.services.game import observability
+
+    counts = iter([4, 2, 3, 5, 2])  # events, answered, voice, achievements, flushes
+
+    class _Rows:
+        def all(self):
+            return [("message", 30, 12), ("event", 50, 1)]
+
+    class _S:
+        async def scalar(self, *_a, **_k):
+            return next(counts)
+
+        async def execute(self, *_a, **_k):
+            return _Rows()
+
+    data = await observability.summary(_S())
+    assert data["events"] == 4
+    assert data["events_answered"] == 2
+    assert data["voice_tasks"] == 3
+    assert data["achievements_granted"] == 5
+    assert data["digest_flushes"] == 2
+    assert data["xp_total"] == 80
+    assert data["by_event"][0]["event"] == "message"
+    assert data["by_event"][0]["title"] == "Сообщение в чате"

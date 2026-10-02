@@ -24,9 +24,11 @@ from app.services.game import achievements_catalog as catalog
 from app.services.game.config import (
     LEVEL_UNLOCKS,
     MAX_LEVEL,
+    COMPLETIONIST_TITLE,
     SUPREME_CHUKHAN_TITLE,
     XP_CURVE_STEP,
     XP_RULES,
+    feature_description,
     feature_title,
     next_unlock_level,
     unlocks_for_level,
@@ -96,6 +98,9 @@ async def effective_rank_name(
     """
     total = profile.xp if profile is not None else 0
     level = levels.level_for_xp(total)
+    # «Идеальный червь» (100% ачивок) — выше даже «Верховного чухана».
+    if await achievements.is_completionist(session, user_id):
+        return COMPLETIONIST_TITLE
     if await achievements.is_supreme_chukhan(session, user_id):
         return SUPREME_CHUKHAN_TITLE
     if profile is not None and profile.custom_rank_title:
@@ -301,6 +306,10 @@ async def achievements_guide_text(
     if not await is_game_enabled(session):
         return None
 
+    if user_id is not None and session is not None:
+        # Э18: лист ачивок — хороший момент выдать капстоун за 100% коллекции.
+        # Без сессии (статический справочник) коллекцию не проверяем.
+        await achievements.reconcile_completionist(session, user_id)
     collected = (
         await achievements.collected_codes(session, user_id)
         if user_id is not None
@@ -466,12 +475,27 @@ def manual_xp_block() -> list[str]:
     return out
 
 
+def _first_sentence(text: str) -> str:
+    """Первое предложение описания — для компактной памятки в чате. Чистая."""
+    if not text:
+        return ""
+    head = text.split(". ", 1)[0]
+    return head.rstrip(".")
+
+
 def manual_ranks_block() -> list[str]:
-    """Строки про ранги и что они открывают — из `LEVEL_UNLOCKS`."""
+    """Что открывает каждый ранг — человеческим языком, из `FEATURE_DESCRIPTIONS`.
+
+    Оператор: «описать куда зайти, что нажать и что будет». Поэтому в памятке
+    не сухое название, а первое предложение объяснения (полное — в профиле/на
+    уведомлении о ранге), иначе `/game` читался как список терминов.
+    """
     out: list[str] = []
     for level in sorted(LEVEL_UNLOCKS):
-        titles = ", ".join(feature_title(code) for code in LEVEL_UNLOCKS[level])
-        out.append(f"• {level}-й ранг — {titles}")
+        for code in LEVEL_UNLOCKS[level]:
+            hint = _first_sentence(feature_description(code))
+            tail = f": {hint}" if hint else ""
+            out.append(f"• {level} ранг — {feature_title(code)}{tail}")
     return out
 
 
@@ -552,13 +576,23 @@ async def game_manual_text(session: AsyncSession) -> str | None:
         "вываливает одним сообщением раз в 1/6/12/24 ч."
     )
 
-    lines.append(
-        "\n<b>Команды</b>\n"
-        "• /rank — мой ранг и сколько до следующего\n"
-        "• /ranks — чарт рангов\n"
-        "• /levels — подробная стата и уровни всех\n"
-        "• /ach — все ачивки с описаниями\n"
-        "• /xp — за что дают опыт"
+    lines.append("\n<b>Команды</b> — простыми словами:")
+    lines.extend(
+        [
+            "• /rank — твой ранг и сколько XP до следующего",
+            "• /ranks — кто на каком ранге (чарт)",
+            "• /levels — подробная стата и опыт всех",
+            "• /xp — за что капает опыт",
+            "• /ach — все ачивки и что уже собрано",
+            "• /loser — вручную крутнуть рулетку «кто лох» (со 2 ранга)",
+            "• /meetings — кто когда свободен и встречи",
+            "• /top — топ по сообщениям",
+            "• /tasks — что бот умеет по заданиям",
+            "• /nominate — предложить игру в голосование",
+            "• /punish — наказать недруга (если включён режим «червь-господин»)",
+            "• /отвали — попросить бота отстать",
+            "• /game — эта памятка",
+        ]
     )
     return "\n".join(lines)
 

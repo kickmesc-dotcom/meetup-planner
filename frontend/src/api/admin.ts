@@ -1308,6 +1308,16 @@ export interface GameSocialState {
   digest_interval_hours: number;
   /** Сколько событий уже лежит в журнале и ждёт отправки. */
   digest_pending: number;
+  /** Э19: режим публикации ачивок — "instant" (как раньше) или "pool" (буфер). */
+  achievements_post_mode: string;
+  achievements_pool_interval_hours: number;
+  achievements_pool_morning_hour: number;
+  achievements_pool_min_items: number;
+  achievements_pool_gap_minutes: number;
+  /** Сколько ачивок накопилось в буфере и ждёт выплеска. */
+  achievements_pool_pending: number;
+  /** Э19: единый бюджет дня — максимум авто-постов за сутки (0 — без лимита). */
+  activity_max_posts_per_day: number;
   memorial_enabled: boolean;
   memorial_silence_days: number;
   memorial_repeat_days: number;
@@ -1340,6 +1350,28 @@ export interface GameSocialState {
 
 export const fetchGameSocial = () =>
   api<GameSocialState>("/api/admin/game/social");
+
+export interface GameObservabilityRow {
+  event: string;
+  title: string;
+  points: number;
+  count: number;
+}
+
+export interface GameObservability {
+  window_days: number;
+  events: number;
+  events_answered: number;
+  voice_tasks: number;
+  achievements_granted: number;
+  digest_flushes: number;
+  xp_total: number;
+  by_event: GameObservabilityRow[];
+}
+
+/** Э19: сводка «сколько бот наработал за неделю» — видно, не спамит ли он. */
+export const fetchGameObservability = () =>
+  api<GameObservability>("/api/admin/game/observability");
 
 export const updateGameSocial = (body: Partial<Omit<GameSocialState, "contraband_words">> & {
   contraband_words?: GameContrabandWord[];

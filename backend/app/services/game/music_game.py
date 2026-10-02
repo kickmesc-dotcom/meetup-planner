@@ -305,6 +305,13 @@ async def register_guess(
     """
     if round.closed_at is not None:
         return False
+    # Э18 anti-grief: автор трека знает свой трек, поэтому его голос не считаем.
+    # Иначе сабмит трека + голос за себя давали бы и `music_author`, и
+    # `music_guess` (плюс серию) за одно действие — оператор: «не засчитывать
+    # ответ, если его написал сам инициатор события». Тихо игнорируем: это не
+    # промах, серию рвать нечем.
+    if round.correct_user_id is not None and int(round.correct_user_id) == user_id:
+        return False
     index = correct_index(list(round.option_user_ids or []), int(round.correct_user_id or -1))
     if index is None or index != option_index:
         # Э17: неверная догадка обнуляет ТЕКУЩУЮ серию угадываний. Но только если
@@ -353,6 +360,18 @@ async def finalize_round(
 
     author_id = int(round.correct_user_id) if round.correct_user_id is not None else None
     guessed_ids = [int(uid) for uid in (round.correct_voter_ids or [])]
+    # Э18 anti-grief (страховка): старые раунды могли записаться до гварда в
+    # `register_guess` — автор всё равно не должен получать XP за «угадывание»
+    # своего же трека и это не должно считаться промахом серии.
+    if author_id is not None:
+        guessed_ids = [uid for uid in guessed_ids if uid != author_id]
+    # Э18: пропуск раунда рвёт серию угадываний (только при реально закрытом
+    # опросе — сбой доставки игрока не наказывает).
+    from app.services.game import achievements as _achievements
+
+    await _achievements.on_music_round_closed(
+        session, guessed_ids=set(guessed_ids), poll_arrived=poll is not None
+    )
     names = await _names(session, [uid for uid in ([author_id] if author_id else []) + guessed_ids if uid is not None])
 
     if bot is not None:
@@ -474,6 +493,12 @@ async def run_music_game_job(
         hour = await get_game_music_game_hour(session)
         scheduled = music_service.scheduled_utc(moment, weekday=weekday, hour=hour)
         if scheduled is None:
+            return {"closed": closed, "opened": 0}
+
+        # Э18: общий режим активностей — не влезаем в разгар обсуждения.
+        from app.services.game import activity
+
+        if await activity.check_window(session, now=moment) != activity.OK:
             return {"closed": closed, "opened": 0}
 
         last_at = await session.scalar(select(MusicGameRound.created_at).order_by(

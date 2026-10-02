@@ -80,6 +80,10 @@ WORM_MASTER_SUFFIXES_KEY = "worm_master.suffixes"
 WORM_MASTER_AGREES_KEY = "worm_master.agrees"
 WORM_MASTER_NAG_KEY = "worm_master.nag"
 WORM_PUNISH_KEY = "worm_master.punish"
+# T3.6 (в'): отповеди не-господину, дёрнувшему /punish. Раньше брались из
+# констант напрямую — правки в админке на них не влияли. Теперь это пулы.
+WORM_PUNISH_DENIED_KEY = "worm_master.punish_denied"
+WORM_PUNISH_DENIED_NAMED_KEY = "worm_master.punish_denied_named"
 WORM_ANNOUNCE_LINES_KEY = "worm_master.announce_lines"
 
 _WORM_MASTER_ENABLED_DEFAULT = False
@@ -1138,6 +1142,30 @@ async def get_worm_punish(session: AsyncSession) -> list[str]:
     return await _get_pool(session, WORM_PUNISH_KEY, DEFAULT_WORM_PUNISH_PHRASES)
 
 
+async def get_worm_punish_denied(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_PUNISH_DENIED
+
+    return await _get_pool(session, WORM_PUNISH_DENIED_KEY, DEFAULT_WORM_PUNISH_DENIED)
+
+
+async def set_worm_punish_denied(session: AsyncSession, phrases: list[str]) -> None:
+    await _set_pool(session, WORM_PUNISH_DENIED_KEY, phrases)
+
+
+async def get_worm_punish_denied_named(session: AsyncSession) -> list[str]:
+    from app.services.worm_master import DEFAULT_WORM_PUNISH_DENIED_NAMED
+
+    return await _get_pool(
+        session, WORM_PUNISH_DENIED_NAMED_KEY, DEFAULT_WORM_PUNISH_DENIED_NAMED
+    )
+
+
+async def set_worm_punish_denied_named(
+    session: AsyncSession, phrases: list[str]
+) -> None:
+    await _set_pool(session, WORM_PUNISH_DENIED_NAMED_KEY, phrases)
+
+
 async def set_worm_punish(session: AsyncSession, phrases: list[str]) -> None:
     from app.services.phrase_weights import WORM_PUNISH_USE_COUNTS_KEY
 
@@ -1555,6 +1583,22 @@ GAME_EVENTS_MIN_GAP_KEY = "game.events.min_gap_hours"
 GAME_EVENTS_DAY_START_KEY = "game.events.day_start_hour"
 GAME_EVENTS_DAY_END_KEY = "game.events.day_end_hour"
 
+# Э18: единый режим «активностей» для ВСЕХ авто-постов (живые часы + «не
+# перебивать флуд»). См. `services/game/activity.py`.
+GAME_ACTIVITY_DAY_START_KEY = "game.activity.day_start_hour"
+GAME_ACTIVITY_DAY_END_KEY = "game.activity.day_end_hour"
+GAME_ACTIVITY_QUIET_KEY = "game.activity.quiet_minutes"
+# Единый бюджет дня: максимум авто-постов бота за локальные сутки (0 — без лимита).
+GAME_ACTIVITY_MAX_POSTS_KEY = "game.activity.max_posts_per_day"
+
+# Э19: буфер ачивок («тихо копим → сводка») vs мгновенный постинг (как раньше).
+GAME_ACHIEVEMENTS_POST_MODE_KEY = "game.achievements.post_mode"
+GAME_ACHIEVEMENTS_POOL_INTERVAL_KEY = "game.achievements.pool.interval_hours"
+GAME_ACHIEVEMENTS_POOL_MORNING_KEY = "game.achievements.pool.morning_hour"
+GAME_ACHIEVEMENTS_POOL_MIN_ITEMS_KEY = "game.achievements.pool.min_items"
+GAME_ACHIEVEMENTS_POOL_GAP_KEY = "game.achievements.pool.gap_minutes"
+GAME_ACHIEVEMENTS_POOL_LAST_FLUSH_KEY = "game.achievements.pool.last_flush_at"
+
 GAME_CONTRABAND_ENABLED_KEY = "game.contraband.enabled"
 GAME_CONTRABAND_CHANCE_KEY = "game.contraband.chance_percent"
 GAME_CONTRABAND_CAP_KEY = "game.contraband.daily_cap"
@@ -1609,6 +1653,14 @@ def _game_defaults() -> dict:
         "events_min_gap_hours": game_config.EVENTS_MIN_GAP_HOURS,
         "events_day_start_hour": game_config.EVENTS_DAY_START_HOUR,
         "events_day_end_hour": game_config.EVENTS_DAY_END_HOUR,
+        "activity_day_start_hour": game_config.ACTIVITY_DAY_START_HOUR,
+        "activity_day_end_hour": game_config.ACTIVITY_DAY_END_HOUR,
+        "activity_quiet_minutes": game_config.ACTIVITY_QUIET_MINUTES,
+        "activity_max_posts_per_day": game_config.ACTIVITY_MAX_POSTS_PER_DAY,
+        "achievements_pool_interval": game_config.ACHIEVEMENTS_POOL_DEFAULT_INTERVAL,
+        "achievements_pool_morning_hour": game_config.ACHIEVEMENTS_POOL_MORNING_HOUR,
+        "achievements_pool_min_items": game_config.ACHIEVEMENTS_POOL_MIN_ITEMS,
+        "achievements_pool_gap_minutes": game_config.ACHIEVEMENTS_POOL_GAP_MINUTES,
         "contraband_daily_cap": game_config.CONTRABAND_DAILY_CAP,
         "voice_min_gap_hours": game_config.VOICE_TASK_MIN_GAP_HOURS,
         "music_weekday": game_config.MUSIC_DEFAULT_WEEKDAY,
@@ -1712,6 +1764,124 @@ async def get_game_events_day_end_hour(session: AsyncSession) -> int:
 async def get_game_events_min_gap_hours(session: AsyncSession) -> int:
     return await _get_int(
         session, GAME_EVENTS_MIN_GAP_KEY, _game_defaults()["events_min_gap_hours"]
+    )
+
+
+async def get_activity_day_start_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_ACTIVITY_DAY_START_KEY, _game_defaults()["activity_day_start_hour"],
+        hi=23,
+    )
+
+
+async def get_activity_day_end_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_ACTIVITY_DAY_END_KEY, _game_defaults()["activity_day_end_hour"],
+        hi=24,
+    )
+
+
+async def get_activity_quiet_minutes(session: AsyncSession) -> int:
+    return await _get_int(
+        session, GAME_ACTIVITY_QUIET_KEY, _game_defaults()["activity_quiet_minutes"],
+        hi=240,
+    )
+
+
+async def get_activity_max_posts_per_day(session: AsyncSession) -> int:
+    """Единый бюджет дня: 0 — без лимита, иначе максимум авто-постов за сутки."""
+    return await _get_int(
+        session,
+        GAME_ACTIVITY_MAX_POSTS_KEY,
+        _game_defaults()["activity_max_posts_per_day"],
+        hi=200,
+    )
+
+
+async def get_achievements_post_mode(session: AsyncSession) -> str:
+    """Режим публикации ачивок: `instant` (как раньше) или `pool` (буфер+сводка)."""
+    from app.services.game.config import ACHIEVEMENT_POST_MODE, ACHIEVEMENT_POST_MODES
+
+    raw = await _get_value(session, GAME_ACHIEVEMENTS_POST_MODE_KEY)
+    value = (raw or "").strip().lower()
+    return value if value in ACHIEVEMENT_POST_MODES else ACHIEVEMENT_POST_MODE
+
+
+async def set_achievements_post_mode(session: AsyncSession, mode: str) -> None:
+    from app.services.game.config import ACHIEVEMENT_POST_MODES
+
+    value = (mode or "").strip().lower()
+    if value not in ACHIEVEMENT_POST_MODES:
+        value = ACHIEVEMENT_POST_MODES[0]
+    await _set_value(session, GAME_ACHIEVEMENTS_POST_MODE_KEY, value)
+
+
+async def get_achievements_pool_interval_hours(session: AsyncSession) -> int:
+    from app.services.game.config import ACHIEVEMENTS_POOL_INTERVALS
+
+    default = _game_defaults()["achievements_pool_interval"]
+    value = await _get_int(session, GAME_ACHIEVEMENTS_POOL_INTERVAL_KEY, default, lo=1, hi=24)
+    return value if value in ACHIEVEMENTS_POOL_INTERVALS else default
+
+
+async def get_achievements_pool_morning_hour(session: AsyncSession) -> int:
+    return await _get_int(
+        session,
+        GAME_ACHIEVEMENTS_POOL_MORNING_KEY,
+        _game_defaults()["achievements_pool_morning_hour"],
+        hi=23,
+    )
+
+
+async def get_achievements_pool_min_items(session: AsyncSession) -> int:
+    return await _get_int(
+        session,
+        GAME_ACHIEVEMENTS_POOL_MIN_ITEMS_KEY,
+        _game_defaults()["achievements_pool_min_items"],
+        hi=100,
+    )
+
+
+async def get_achievements_pool_gap_minutes(session: AsyncSession) -> int:
+    return await _get_int(
+        session,
+        GAME_ACHIEVEMENTS_POOL_GAP_KEY,
+        _game_defaults()["achievements_pool_gap_minutes"],
+        hi=240,
+    )
+
+
+async def get_achievements_pool_last_flush(session: AsyncSession) -> str | None:
+    return await _get_value(session, GAME_ACHIEVEMENTS_POOL_LAST_FLUSH_KEY)
+
+
+async def set_achievements_pool_last_flush(session: AsyncSession, value: str) -> None:
+    await _set_value(session, GAME_ACHIEVEMENTS_POOL_LAST_FLUSH_KEY, value)
+
+
+async def set_achievements_pool_interval_hours(session: AsyncSession, hours: int) -> None:
+    from app.services.game.config import ACHIEVEMENTS_POOL_INTERVALS
+
+    default = _game_defaults()["achievements_pool_interval"]
+    value = hours if hours in ACHIEVEMENTS_POOL_INTERVALS else default
+    await _set_value(session, GAME_ACHIEVEMENTS_POOL_INTERVAL_KEY, str(value))
+
+
+async def set_achievements_pool_morning_hour(session: AsyncSession, hour: int) -> None:
+    await _set_value(
+        session, GAME_ACHIEVEMENTS_POOL_MORNING_KEY, str(max(0, min(23, hour)))
+    )
+
+
+async def set_achievements_pool_min_items(session: AsyncSession, items: int) -> None:
+    await _set_value(
+        session, GAME_ACHIEVEMENTS_POOL_MIN_ITEMS_KEY, str(max(0, min(100, items)))
+    )
+
+
+async def set_achievements_pool_gap_minutes(session: AsyncSession, minutes: int) -> None:
+    await _set_value(
+        session, GAME_ACHIEVEMENTS_POOL_GAP_KEY, str(max(0, min(240, minutes)))
     )
 
 
@@ -1932,6 +2102,24 @@ async def set_game_events_day_end_hour(session: AsyncSession, value: int) -> Non
 
 async def set_game_events_min_gap_hours(session: AsyncSession, value: int) -> None:
     await _set_value(session, GAME_EVENTS_MIN_GAP_KEY, str(max(0, int(value))))
+
+
+async def set_activity_day_start_hour(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_ACTIVITY_DAY_START_KEY, str(max(0, min(23, int(value)))))
+
+
+async def set_activity_day_end_hour(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_ACTIVITY_DAY_END_KEY, str(max(0, min(24, int(value)))))
+
+
+async def set_activity_quiet_minutes(session: AsyncSession, value: int) -> None:
+    await _set_value(session, GAME_ACTIVITY_QUIET_KEY, str(max(0, int(value))))
+
+
+async def set_activity_max_posts_per_day(session: AsyncSession, value: int) -> None:
+    await _set_value(
+        session, GAME_ACTIVITY_MAX_POSTS_KEY, str(max(0, min(200, int(value))))
+    )
 
 
 async def set_game_contraband_enabled(session: AsyncSession, value: bool) -> None:

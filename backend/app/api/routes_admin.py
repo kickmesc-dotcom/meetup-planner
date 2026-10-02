@@ -16,6 +16,8 @@ from app.db.models import Birthday, LoserRoll, Meeting, MeetingReminder, Poll, U
 from app.schemas.game import (
     GameContrabandWord,
     GameDigestFlushOut,
+    GameObservabilityOut,
+    GameObservabilityRow,
     GameSocialIn,
     GameSocialOut,
     MusicSelectionOut,
@@ -4064,6 +4066,12 @@ async def _game_social_state(session) -> GameSocialOut:
     """Собрать состояние всех четырёх фич (одна ручка вместо четырёх запросов)."""
     from app.db.models import GameJournalEntry, GamePrompt, GameVoiceTask
     from app.services.admin_config import (
+        get_achievements_pool_gap_minutes,
+        get_achievements_pool_interval_hours,
+        get_achievements_pool_min_items,
+        get_achievements_pool_morning_hour,
+        get_achievements_post_mode,
+        get_activity_max_posts_per_day,
         get_game_contraband_chance_percent,
         get_game_contraband_daily_cap,
         get_game_contraband_enabled,
@@ -4096,6 +4104,8 @@ async def _game_social_state(session) -> GameSocialOut:
         if owner_id is None:
             unresolved.append(str(entry.get("owner") or entry.get("word")))
 
+    from app.services.game import journal as journal_service
+
     pending = int(
         await session.scalar(
             select(func.count())
@@ -4104,6 +4114,7 @@ async def _game_social_state(session) -> GameSocialOut:
         )
         or 0
     )
+    achievements_pending = await journal_service.pool_pending_count(session)
     open_prompts = int(
         await session.scalar(
             select(func.count()).select_from(GamePrompt).where(GamePrompt.closed_at.is_(None))
@@ -4122,6 +4133,13 @@ async def _game_social_state(session) -> GameSocialOut:
         digest_enabled=await get_game_digest_enabled(session),
         digest_interval_hours=await get_game_digest_interval_hours(session),
         digest_pending=pending,
+        achievements_post_mode=await get_achievements_post_mode(session),
+        achievements_pool_interval_hours=await get_achievements_pool_interval_hours(session),
+        achievements_pool_morning_hour=await get_achievements_pool_morning_hour(session),
+        achievements_pool_min_items=await get_achievements_pool_min_items(session),
+        achievements_pool_gap_minutes=await get_achievements_pool_gap_minutes(session),
+        achievements_pool_pending=achievements_pending,
+        activity_max_posts_per_day=await get_activity_max_posts_per_day(session),
         memorial_enabled=await get_game_memorial_enabled(session),
         memorial_silence_days=await get_game_memorial_silence_days(session),
         memorial_repeat_days=await get_game_memorial_repeat_days(session),
@@ -4165,6 +4183,12 @@ async def admin_game_social_put(
     """
     _ensure_admin(user)
     from app.services.admin_config import (
+        set_achievements_pool_gap_minutes,
+        set_achievements_pool_interval_hours,
+        set_achievements_pool_min_items,
+        set_achievements_pool_morning_hour,
+        set_achievements_post_mode,
+        set_activity_max_posts_per_day,
         set_game_contraband_chance_percent,
         set_game_contraband_daily_cap,
         set_game_contraband_enabled,
@@ -4190,6 +4214,18 @@ async def admin_game_social_put(
         await set_game_digest_enabled(session, body.digest_enabled)
     if body.digest_interval_hours is not None:
         await set_game_digest_interval(session, body.digest_interval_hours)
+    if body.achievements_post_mode is not None:
+        await set_achievements_post_mode(session, body.achievements_post_mode)
+    if body.achievements_pool_interval_hours is not None:
+        await set_achievements_pool_interval_hours(session, body.achievements_pool_interval_hours)
+    if body.achievements_pool_morning_hour is not None:
+        await set_achievements_pool_morning_hour(session, body.achievements_pool_morning_hour)
+    if body.achievements_pool_min_items is not None:
+        await set_achievements_pool_min_items(session, body.achievements_pool_min_items)
+    if body.achievements_pool_gap_minutes is not None:
+        await set_achievements_pool_gap_minutes(session, body.achievements_pool_gap_minutes)
+    if body.activity_max_posts_per_day is not None:
+        await set_activity_max_posts_per_day(session, body.activity_max_posts_per_day)
     if body.memorial_enabled is not None:
         await set_game_memorial_enabled(session, body.memorial_enabled)
     if body.memorial_silence_days is not None:
@@ -4234,13 +4270,44 @@ async def admin_game_social_put(
 async def admin_game_social_flush(
     session: SessionDep, user: CurrentUser
 ) -> GameDigestFlushOut:
-    """«Вывали сводку сейчас» — не ждать окна (удобно проверить режим)."""
+    """«Вывали сводку сейчас» — не ждать окна (удобно проверить режим).
+
+    Отправляет и общий журнал, и буфер ачивок (Э19): не ждать утреннего слота,
+    если оператор хочет проверить, как выглядит сводка.
+    """
     _ensure_admin(user)
     from app.services.game import journal
 
     sent = await journal.flush(session)
+    sent += await journal.flush_achievements(session)
     log.info("admin.game_digest_flushed", sent=sent, by=user.id)
     return GameDigestFlushOut(sent=sent)
+
+
+@router.get("/admin/game/observability", response_model=GameObservabilityOut)
+async def admin_game_observability(
+    session: SessionDep, user: CurrentUser
+) -> GameObservabilityOut:
+    """Э19: сводка активности игры за неделю — «не спамит ли бот».
+
+    Только чтение существующих таблиц: сколько событий выпало, сколько из них
+    разгадали, сколько открылось ачивок, сколько раз уходят сводки и сколько XP
+    набежало (с разбивкой по источнику). Без похода в чат.
+    """
+    _ensure_admin(user)
+    from app.services.game import observability
+
+    data = await observability.summary(session)
+    return GameObservabilityOut(
+        window_days=data["window_days"],
+        events=data["events"],
+        events_answered=data["events_answered"],
+        voice_tasks=data["voice_tasks"],
+        achievements_granted=data["achievements_granted"],
+        digest_flushes=data["digest_flushes"],
+        xp_total=data["xp_total"],
+        by_event=[GameObservabilityRow(**row) for row in data["by_event"]],
+    )
 
 
 # --------------------------------------------------------------------------

@@ -349,6 +349,10 @@ async def roll_loser(
                 await session.commit()
                 await session.refresh(row)
                 await _award_game(session, row, rolled_by, loser)
+                # Э18: повторное/продлённое владение званием тоже засчитываем.
+                from app.services.game import awards as _game_awards
+
+                await _game_awards.worm_lord(session, loser.id)
                 return row
             prev_worm.ended_at = datetime.now(timezone.utc)
             await session.flush()
@@ -384,6 +388,11 @@ async def roll_loser(
     await session.commit()
     await session.refresh(row)
     await _award_game(session, row, rolled_by, loser)
+    if is_worm:
+        # Э18: стал червём-господином → «Червь-господин» и юбилеи.
+        from app.services.game import awards as _game_awards
+
+        await _game_awards.worm_lord(session, loser.id)
     return row
 
 

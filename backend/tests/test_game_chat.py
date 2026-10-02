@@ -181,7 +181,7 @@ async def test_ach_lists_every_base_achievement_with_description(monkeypatch):
         assert base.description in text
     assert "юбилейные ачивки:" in text
     # Секретную ачивку без личных отметок не спойлерим.
-    assert "Скрытых ачивок: 1" in text
+    assert "Скрытых ачивок: 2" in text  # supreme_chukhan + completionist
     assert "Верховный чухан" not in text
 
 
@@ -190,7 +190,7 @@ async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
     _game(monkeypatch, True)
 
     async def _collected(_session, _user_id):
-        return {"chin_up:10", "supreme_chukhan"}
+        return {"chin_up:10", "supreme_chukhan", "completionist"}
 
     async def _progress(_session, _user_id):
         # Серия — единственный оставшийся порог; у неё прогресс «сейчас: N».
@@ -199,7 +199,7 @@ async def test_ach_marks_own_progress_and_reveals_collected_secret(monkeypatch):
     monkeypatch.setattr(report.achievements, "collected_codes", _collected)
     monkeypatch.setattr(report.achievements, "progress", _progress)
     text = await report.achievements_guide_text(None, user_id=1)
-    assert f"У тебя: <b>2</b>/{catalog.catalog_size()}" in text
+    assert f"У тебя: <b>3</b>/{catalog.catalog_size()}" in text
     assert "×10 ✅" in text and "×20 ▫️" in text
     # Накопитель: «разовая» и «случаев» — разные строки (первый раз vs счётчик).
     assert "случаев: <b>12</b>" in text
@@ -224,8 +224,12 @@ async def test_ach_shows_rarity_percent(monkeypatch):
 
         return [AchievementStat("chin_up", 3, 6), AchievementStat("first_worm", 0, 6)]
 
+    async def _no_reconcile(*_a, **_k):
+        return False
+
     monkeypatch.setattr(report.achievements, "progress", _empty)
     monkeypatch.setattr(report.achievements, "collected_codes", _empty)
+    monkeypatch.setattr(report.achievements, "reconcile_completionist", _no_reconcile)
     monkeypatch.setattr(report.achievements, "rarity_stats", _rarity)
     text = await report.achievements_guide_text(object(), user_id=1)
     assert "имеют: <b>50%</b> (3/6)" in text
@@ -244,8 +248,12 @@ async def test_ach_survives_rarity_failure(monkeypatch):
     async def _boom(*_a, **_k):
         raise RuntimeError("db down")
 
+    async def _no_reconcile(*_a, **_k):
+        return False
+
     monkeypatch.setattr(report.achievements, "progress", _empty)
     monkeypatch.setattr(report.achievements, "collected_codes", _empty)
+    monkeypatch.setattr(report.achievements, "reconcile_completionist", _no_reconcile)
     monkeypatch.setattr(report.achievements, "rarity_stats", _boom)
     text = await report.achievements_guide_text(object(), user_id=1)
     assert "Ачивки" in text

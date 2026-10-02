@@ -145,6 +145,15 @@ export default function ProfileScreen({ users, me }: Props) {
  * Счётчики лоха/чухана остались, но ушли в приглушённую строку-чипсы внизу:
  * данные берём из тех же публичных эндпоинтов, что и Топы (отдельного API нет).
  */
+/** Склонение слова «раз» под число: 1 раз, 2 раза, 5 раз, 11 раз, 21 раз. */
+function timesWord(n: number): string {
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  if (mod10 === 1 && mod100 !== 11) return "раз";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "раза";
+  return "раз";
+}
+
 function CharacterCard({
   me,
   game,
@@ -235,15 +244,29 @@ function CharacterCard({
         </div>
       )}
 
-      {/* Второстепенное: сколько раз был лохом/чуханом. Приглушённые чипсы. */}
+      {/* Второстепенное: сколько раз был лохом/чуханом. Приглушённые чипсы.
+          Формулировка «18 раз лохом» читалась коряво (прод-фидбек): теперь прямо
+          сказано, ЧЕМ был и сколько раз, с правильным склонением слова «раз». */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-tg-bg/40 pt-2.5 text-[11px] text-tg-hint">
-        <span className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5">
-          🤡 <span className="tabular-nums">{countersLoading ? "…" : loserCount}</span>
-          <span className="truncate">раз лохом</span>
+        <span
+          className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5"
+          title="Сколько раз тебя выбирали лохом дня (👑) с начала игры"
+        >
+          🤡 Лохом дня:
+          <span className="tabular-nums text-tg-text">
+            {countersLoading ? "…" : loserCount}
+          </span>
+          <span className="truncate">{timesWord(loserCount)}</span>
         </span>
-        <span className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5">
-          💩 <span className="tabular-nums">{countersLoading ? "…" : chukhanCount}</span>
-          <span className="truncate">раз чуханом</span>
+        <span
+          className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5"
+          title="Сколько раз тебя выбирали чуханом недели (💩) с начала игры"
+        >
+          💩 Чуханом недели:
+          <span className="tabular-nums text-tg-text">
+            {countersLoading ? "…" : chukhanCount}
+          </span>
+          <span className="truncate">{timesWord(chukhanCount)}</span>
         </span>
       </div>
     </section>

@@ -30,14 +30,12 @@ from app.config import get_settings
 from app.db.models import GamePrompt, User
 from app.services.admin_config import (
     get_game_events_chance_percent,
-    get_game_events_day_end_hour,
-    get_game_events_day_start_hour,
     get_game_events_enabled,
     get_game_events_max_per_day,
     get_game_events_min_gap_hours,
     get_game_events_min_per_day,
 )
-from app.services.game import awards, journal
+from app.services.game import activity, awards, journal
 from app.services.game.config import EVENTS_TZ_OFFSET_HOURS
 from app.services.game.events_catalog import (
     PROMPTS,
@@ -89,25 +87,16 @@ def render_reply(template: str, *, name: str, xp: int) -> str:
 
 def local_hour(now: datetime, *, offset_hours: int = EVENTS_TZ_OFFSET_HOURS) -> int:
     """Час в ЛОКАЛЬНОМ времени чата (UTC + смещение). Чистая функция."""
-    return (now.astimezone(timezone.utc).hour + offset_hours) % 24
+    return activity.local_hour(now, offset_hours=offset_hours)
 
 
-def is_daytime(
-    now: datetime, *, start_hour: int, end_hour: int
-) -> bool:
-    """Живое ли сейчас окно для публикации события. Чистая функция.
+def is_daytime(now: datetime, *, start_hour: int, end_hour: int) -> bool:
+    """Живое ли сейчас окно для публикации (делегирует в общий `activity`).
 
-    Границы задаст оператор (дефолт 10–22). Верхняя граница исключающая: в 22:00
-    новое событие уже не уходит. `start == end` — окно «на весь день» (не
-    «никогда»): так выключение окна не путается с «событий нет».
+    Держим тонкую обёртку: у событий она исторически в публичном API и на ней
+    висят тесты; честная логика — одна на проект (`services/game/activity.py`).
     """
-    hour = local_hour(now)
-    if start_hour == end_hour:
-        return True
-    if start_hour < end_hour:
-        return start_hour <= hour < end_hour
-    # Окно через полночь (напр. 22–06) — тоже допустимо.
-    return hour >= start_hour or hour < end_hour
+    return activity.is_daytime(now, start_hour=start_hour, end_hour=end_hour)
 
 
 def daily_cap(min_per_day: int, max_per_day: int, day: date) -> int:
@@ -148,12 +137,17 @@ def build_followup_text(*, ttl_minutes: int) -> str:
 
 
 def build_prompt_posts(prompt: Prompt) -> list[str]:
-    """Тексты поста призыва: сам вопрос + ОБЯЗАТЕЛЬНЫЙ поясняющий пост.
+    """Тексты поста призыва: сам вопрос (+ поясняющий пост, если нужен).
 
-    Чистая функция, чтобы гарантию «вопрос всегда с фоллоу-постом» можно было
-    проверить без БД и без Telegram (и чтобы job не мог случайно опубликовать
-    первое без второго)."""
-    return [prompt.text, build_followup_text(ttl_minutes=prompt.ttl_minutes)]
+    У вопросов (`needs_rules=True`, «маму любишь?», «признайся») правила
+    неочевидны — фоллоу обязателен. У очевидных призывов («скинь мем»,
+    «первый, кто напишет я») он избыточен и работает как спам, поэтому не шлём.
+    Чистая функция: видно и тестируется без БД/Telegram.
+    """
+    posts = [prompt.text]
+    if getattr(prompt, "needs_rules", True):
+        posts.append(build_followup_text(ttl_minutes=prompt.ttl_minutes))
+    return posts
 
 
 def pick_prompt(*, used_codes: set[str], rng: random.Random) -> Prompt | None:
@@ -200,12 +194,9 @@ async def run_events_job(
         if not chat_id:
             return 0
 
-        # 0. Дневное окно: ночью событий не публикуем (фидбек «в 3:17 ночи»).
-        if not is_daytime(
-            moment,
-            start_hour=await get_game_events_day_start_hour(session),
-            end_hour=await get_game_events_day_end_hour(session),
-        ):
+        # 0. Единый режим активностей: живые часы + «не перебивать флуд». Ночью
+        #    событий нет («в 3:17 ночи»), а в разгар обсуждения бот не влезает.
+        if await activity.check_window(session, now=moment, chat_id=chat_id) != activity.OK:
             return 0
 
         # 1. Пауза между событиями.

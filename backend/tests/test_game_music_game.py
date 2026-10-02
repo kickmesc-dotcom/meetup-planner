@@ -79,6 +79,18 @@ class _Session:
     async def commit(self) -> None:
         self.commits += 1
 
+    async def flush(self) -> None:
+        return None
+
+    async def scalars(self, *_a, **_k):  # noqa: ANN002, ANN003
+        # Э18: `finalize_round` проверяет счётчики серий (пусто на фейке).
+        return _Empty()
+
+
+class _Empty:
+    def all(self):  # noqa: ANN201
+        return []
+
 
 def _round(*, option_user_ids=(10, 20, 30), correct=20, voters=None, closed=None):
     return MusicGameRound(
@@ -108,6 +120,20 @@ async def test_register_guess_records_correct_vote():
     )
     assert again is False
     assert row.correct_voter_ids == [99]
+
+
+@pytest.mark.asyncio
+async def test_register_guess_ignores_author_of_track():
+    # Э18 anti-grief: автор трека знает ответ — его голос не засчитываем и
+    # серию ему не рвём (это не промах).
+    row = _round(correct=20)
+    session = _Session()
+    ok = await music_game.register_guess(
+        session, round=row, user_id=20, option_index=1
+    )
+    assert ok is False
+    assert row.correct_voter_ids == []
+    assert session.commits == 0
 
 
 @pytest.mark.asyncio
@@ -297,6 +323,26 @@ async def test_finalize_round_awards_author_and_guessers(monkeypatch):
     assert await music_game.finalize_round(session, bot, row, now=NOW) is None
     assert len(awards.authors) == 1
     assert len(awards.guesses) == 2
+
+
+@pytest.mark.asyncio
+async def test_finalize_round_filters_author_from_legacy_voters(monkeypatch):
+    # Э18 anti-grief (страховка): раунд, записанный до гварда в register_guess,
+    # мог содержать автора среди «угадавших» — XP и тир ему не выдаём.
+    row = _round(voters=[20, 7])
+    monkeypatch.setattr(
+        music_game, "_names", lambda _s, ids: _async({20: "Автор", 7: "Аня"})
+    )
+    awards = _Awards()
+    monkeypatch.setattr(music_game, "awards", awards)
+    monkeypatch.setattr(music_game, "journal", _Journal())
+
+    result = await music_game.finalize_round(
+        _Session(), _Bot(), row, now=NOW, poll=SimpleNamespace()
+    )
+    assert result is not None
+    assert result.guessed_ids == [7]
+    assert awards.guesses == [(7, MUSIC_GAME_GUESS_REWARD)]
 
 
 @pytest.mark.asyncio

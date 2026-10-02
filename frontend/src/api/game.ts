@@ -18,6 +18,8 @@ export interface GameRank {
 export interface GameFeature {
   code: string;
   title: string;
+  /** Человеческое «куда зайти, что нажать, что будет» (Э19). */
+  description?: string;
 }
 
 export interface GameLevelUp {
@@ -66,6 +68,8 @@ export interface GameProfile {
   rank: GameRank | null;
   rank_name: string;
   supreme: boolean;
+  /** Э18: собраны 100% ачивок — особый титул «Идеальный червь». */
+  completionist: boolean;
   custom_rank_title: string | null;
   custom_name: string | null;
   avatar_manual_url: string | null;

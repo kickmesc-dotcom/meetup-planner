@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.game.config import (
+    COMPLETIONIST_TITLE,
     MAX_LEVEL,
     MIN_LEVEL,
     RANK_BY_LEVEL,
@@ -146,13 +147,17 @@ def levels_gained(old_xp: int, new_xp: int) -> list[int]:
     )
 
 
-def effective_rank_name(xp: int, *, supreme_chukhan: bool) -> str:
-    """Название ранга с учётом спец-ранга.
+def effective_rank_name(
+    xp: int, *, supreme_chukhan: bool, completionist: bool = False
+) -> str:
+    """Название ранга с учётом спец-титулов.
 
-    «Верховный чухан» — единственный ранг, который приоритетнее ранга за
-    уровень (по заданию). Приходит он ачивкой-юбилеем, поэтому передаётся
-    флагом, а не выводится из XP.
+    «Верховный чухан» — ранг-ачивка приоритетнее ранга за уровень, а «Идеальный
+    червь» (100% ачивок, Э18) — выше него. Оба приходят ачивками, поэтому
+    передаются флагами, а не выводятся из XP.
     """
+    if completionist:
+        return COMPLETIONIST_TITLE
     if supreme_chukhan:
         return SUPREME_CHUKHAN_TITLE
     return rank_for_xp(xp).name
