@@ -359,6 +359,10 @@ class FeedItemOut(BaseModel):
     user_name: str | None = None
     user_telegram_id: int | None = None
     avatar_url: str | None = None
+    # Э22: подробности для раскрытия карточки в ленте — «за что дана ачивка»,
+    # условия и окно голосового задания, треки подборки с лайками. Свободный
+    # словарь: у разных типов записей разный состав, фронт читает по `kind`.
+    detail: dict | None = None
 
 
 class FeedOut(BaseModel):
@@ -616,11 +620,18 @@ class VoiceCurrentOut(BaseModel):
 
 
 class VoiceSubmitOut(BaseModel):
-    """Итог сдачи голосового из мини-аппа."""
+    """Итог сдачи голосового из мини-аппа.
+
+    `detail` — машиночитаемый код причины отказа (Э22): фронт переводит его в
+    человеческий текст, а не полагается на HTTP-статус. Нужен прежде всего для
+    ошибок Telegram (`user_unreachable`, `bad_format`, …), когда участник должен
+    понять, что именно поправить.
+    """
 
     ok: bool = False
     status: str = ""
     reward: int = 0
+    detail: str | None = None
 
 
 class MusicAddIn(BaseModel):

@@ -11,6 +11,11 @@ import {
   type VoiceSubmission,
 } from "@/api/game";
 import { haptic, showAlert } from "@/tg/webapp";
+import {
+  pickRecorderFormat,
+  prepareVoiceBlob,
+  type RecorderFormat,
+} from "@/lib/voiceFormat";
 
 /**
  * Э21: активности прямо в приложении.
@@ -280,6 +285,8 @@ function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
   const chunksRef = useRef<Blob[]>([]);
   const startedAtRef = useRef<number>(0);
   const timerRef = useRef<number | null>(null);
+  // Формат выбираем один раз при старте записи — он же решает, нужен ли remux.
+  const formatRef = useRef<RecorderFormat | null>(null);
 
   const stopTimer = () => {
     if (timerRef.current !== null) {
@@ -292,7 +299,14 @@ function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
     haptic("light");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      // Prefer OGG/OPUS (Firefox) или M4A (Safari); в Chrome получим WebM —
+      // его переупакуем в OGG перед отправкой (`prepareVoiceBlob`).
+      const fmt = pickRecorderFormat();
+      formatRef.current = fmt;
+      const recorder = new MediaRecorder(
+        stream,
+        fmt.mimeType ? { mimeType: fmt.mimeType } : undefined,
+      );
       chunksRef.current = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -328,10 +342,21 @@ function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
       };
       recorder.stop();
     });
-    if (blob.size === 0) return;
+    if (blob.size === 0) {
+      haptic("error");
+      void showAlert("Запись получилась пустой — попробуй ещё раз.");
+      return;
+    }
     setSending(true);
+    const fmt = formatRef.current ?? pickRecorderFormat();
     try {
-      const res = await uploadVoice(blob, durationMs / 1000);
+      // Chrome отдаёт WebM/OPUS — переупаковываем в OGG (Telegram иначе отбивает).
+      const prepared = await prepareVoiceBlob(blob, fmt);
+      const res = await uploadVoice(
+        prepared.blob,
+        durationMs / 1000,
+        prepared.filename,
+      );
       if (res.ok) {
         haptic("success");
         onUploaded();
@@ -341,11 +366,7 @@ function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
       }
     } catch (e) {
       haptic("error");
-      void showAlert(
-        e instanceof Error && e.message === "send_failed"
-          ? "Telegram не принял голосовое — попробуй записать через чат с ботом."
-          : "Не получилось отправить голосовое.",
-      );
+      void showAlert(uploadErrorText(e instanceof Error ? e.message : ""));
     } finally {
       setSending(false);
     }
@@ -373,6 +394,7 @@ function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
   );
 }
 
+/** Тексты для статусов сервиса `voice.submit` (200-й ответ с `ok:false`). */
 function statusText(status: string): string {
   switch (status) {
     case "no_task":
@@ -387,8 +409,37 @@ function statusText(status: string): string {
       return "Ты немного опоздал.";
     case "unknown_user":
       return "Тебя нет в списке участников.";
+    case "nothing":
+      return "Ты ещё ничего не сдавал.";
     default:
       return "Не получилось принять голосовое.";
+  }
+}
+
+/**
+ * Тексты для ошибок Telegram (Э22). Бэкенд отдаёт машинный код, здесь —
+ * человеческое объяснение и что именно сделать, чтобы получилось.
+ */
+function uploadErrorText(code: string): string {
+  switch (code) {
+    case "user_unreachable":
+      return "Бот не может тебе написать в личку. Открой диалог с ботом, нажми «Start» и попробуй снова.";
+    case "voice_forbidden":
+      return "У тебя в Telegram отключены голосовые сообщения. Включи их в настройках приватности.";
+    case "bad_format":
+      return "Telegram не принял формат записи. Попробуй записать ещё раз — коротко, 5–30 секунд.";
+    case "bad_audio":
+      return "Запись получилась пустой — попробуй ещё раз.";
+    case "too_big":
+      return "Запись слишком длинная — сделай короче.";
+    case "no_audio":
+    case "not_webm":
+    case "empty_webm":
+      return "Не удалось распознать запись. Попробуй записать ещё раз.";
+    case "send_failed":
+      return "Telegram не принял голосовое — попробуй записать через чат с ботом.";
+    default:
+      return "Не получилось отправить голосовое. Попробуй ещё раз.";
   }
 }
 

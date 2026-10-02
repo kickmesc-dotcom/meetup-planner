@@ -12,7 +12,7 @@
  * Гейтинга по рангам тут нет: админ — это админ. Ручной опыт НЕ выставляет
  * уведомление о левел-апе, поэтому отладка не всплывает у игрока в профиле.
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchGameAdmin,
@@ -62,6 +62,91 @@ const CHAT_OUTPUT_OPTIONS: { value: string; label: string; hint: string }[] = [
   },
 ];
 
+/**
+ * Э22: где окажется механика при текущем мастер-режиме вывода.
+ *
+ * `off` — рубильник механики выключен: она НЕ работает нигде (это «выключить»);
+ * `chat` — идёт в основной чат; `app` — перенесена в приложение (работает, но
+ * бот молчит в чате, всё видно во вкладке «Лента»).
+ */
+type Delivery = "off" | "chat" | "app";
+
+const DELIVERY_META: Record<Delivery, { text: string; cls: string }> = {
+  off: { text: "⛔ выключено", cls: "bg-tg-secondary-bg/80 text-tg-hint" },
+  chat: { text: "💬 в чат", cls: "bg-status-free/15 text-status-free" },
+  app: { text: "📱 в приложение", cls: "bg-tg-link/15 text-tg-link" },
+};
+
+/**
+ * Э22: куда поедет механика. Мастер-режим `all` переносит ВСЁ в приложение,
+ * `achievements` — только ачивки в приложение, остальное остаётся в чате.
+ * Выключенная механика — вне зависимости от режима остаётся выключенной.
+ */
+export function deliveryFor(
+  mode: string,
+  enabled: boolean,
+  achievement = false,
+): Delivery {
+  if (!enabled) return "off";
+  if (mode === "all") return "app";
+  if (mode === "achievements") return achievement ? "app" : "chat";
+  return "chat";
+}
+
+/** Маленькая плашка «куда поедет механика» — рядом с каждым рубильником. */
+function DeliveryBadge({ d }: { d: Delivery }) {
+  const meta = DELIVERY_META[d];
+  return (
+    <span
+      className={["inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium", meta.cls].join(
+        " ",
+      )}
+    >
+      {meta.text}
+    </span>
+  );
+}
+
+/**
+ * Э22: сворачиваемый раздел — чтобы рубильники и редакторы жили в своих
+ * подменю, а не одной бесконечной простынёй.
+ */
+function Accordion({
+  icon,
+  title,
+  subtitle,
+  children,
+  defaultOpen = false,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="overflow-hidden rounded-xl bg-tg-secondary-bg/60">
+      <button
+        type="button"
+        onClick={() => {
+          haptic("selection");
+          setOpen((o) => !o);
+        }}
+        className="flex w-full items-center gap-2 p-3 text-left active:scale-[0.99]"
+      >
+        <span className="text-base">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-tg-text">{title}</span>
+          <span className="block text-[11px] text-tg-hint">{subtitle}</span>
+        </span>
+        <span className="shrink-0 text-tg-hint">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && <div className="space-y-2 border-t border-tg-hint/15 p-3">{children}</div>}
+    </section>
+  );
+}
+
 /** Ползунок-тумблер: одинаковый во всех четырёх блоках Э13. */
 function Toggle({
   label,
@@ -69,17 +154,23 @@ function Toggle({
   on,
   busy,
   onClick,
+  delivery,
 }: {
   label: string;
   hint: string;
   on: boolean;
   busy: boolean;
   onClick: () => void;
+  /** Э22: куда механика уедет при текущем мастер-режиме (вкл/выкл видно отдельно). */
+  delivery?: Delivery;
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="min-w-0">
-        <div className="text-sm font-semibold">{label}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-semibold">{label}</span>
+          {delivery && <DeliveryBadge d={delivery} />}
+        </div>
         <div className="text-[11px] text-tg-hint">{hint}</div>
       </div>
       <button
@@ -258,6 +349,21 @@ export default function GameScreen({ users, onBack }: Props) {
   // Э21: тексты для живого предпросмотра ловли (ключ — индекс слова).
   const [probeDraft, setProbeDraft] = useState<Record<number, string>>({});
   const words = wordsDraft ?? social.data?.contraband_words ?? [];
+  // Э22: текущий мастер-режим вывода — им подсвечиваем, куда поедет каждая
+  // механика (плюс каскад-превью под мастер-свитчером).
+  const chatMode = social.data?.chat_output_mode ?? "normal";
+  // Каскад-превью под мастер-свитчером: каждая механика и её рубильник.
+  const cascadeRows: { label: string; enabled: boolean; achievement?: boolean }[] = [
+    { label: "🏆 Ачивки", enabled: state.data?.enabled ?? false, achievement: true },
+    { label: "⚡ События", enabled: social.data?.events_enabled ?? false },
+    { label: "🎙 Голосовые", enabled: social.data?.voice_enabled ?? false },
+    { label: "🗳 Опрос голосовых", enabled: social.data?.voice_poll_enabled ?? false },
+    { label: "💰 Контрабанда", enabled: social.data?.contraband_enabled ?? false },
+    { label: "🕯 Поминовения", enabled: social.data?.memorial_enabled ?? false },
+    { label: "📰 Дайджест", enabled: social.data?.digest_enabled ?? false },
+    { label: "🎧 Музыка", enabled: music.data?.enabled ?? false },
+    { label: "🎵 Мьюзик-гейм", enabled: music.data?.game_enabled ?? false },
+  ];
 
   // Группируем реестр ПО УЧАСТНИКАМ: править фразы удобнее рядом с их владельцем,
   // а не в общем списке, где непонятно, чьи они.
@@ -519,15 +625,127 @@ export default function GameScreen({ users, onBack }: Props) {
         </div>
       </section>
 
-      {/* Э21: СВОДНЫЙ блок рубильников — дублирует родные тумблеры из разделов
-          ниже, но показывает все отключаемые механики на одном экране. Родные
-          тумблеры остаются и работают: переключать можно из любого места. */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold">🎛 Все механики — быстрая сборка</div>
-          <div className="text-[11px] text-tg-hint">
-            Дублирующий блок: те же рубильники, что и ниже в разделах.
+      {/* Э22: МАСТЕР-режим вывода бота — в самом верху. Его переключение и есть тот
+          момент, когда все механики разом «перепрыгивают»: в чат / в приложение /
+          гибрид. Ниже — каскад-превью: куда поедет каждая механика прямо сейчас. */}
+      {social.data && (
+        <section className="space-y-2 rounded-xl bg-tg-secondary-bg/60 p-3">
+          <div>
+            <div className="text-sm font-semibold">🌐 Режим вывода бота в чат</div>
+            <div className="text-[11px] text-tg-hint">
+              Главный рубильник. Решает, КУДА бот пишет: в чат, в приложение или в
+              гибрид. Отдельные механики ниже переезжают вслед за ним.
+            </div>
           </div>
+          <div className="flex flex-col gap-1">
+            {CHAT_OUTPUT_OPTIONS.map((opt) => {
+              const active = social.data?.chat_output_mode === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    if (active) return;
+                    haptic("selection");
+                    socialMut.mutate({ chat_output_mode: opt.value });
+                  }}
+                  disabled={socialMut.isPending}
+                  className={[
+                    "rounded-lg px-3 py-2 text-left text-sm active:scale-[0.99] disabled:opacity-60",
+                    active
+                      ? "bg-tg-button text-tg-button-text"
+                      : "bg-tg-secondary-bg/80 text-tg-text",
+                  ].join(" ")}
+                >
+                  <div className="font-medium">
+                    {active ? "✓ " : ""}
+                    {opt.label}
+                  </div>
+                  <div
+                    className={[
+                      "mt-0.5 text-[11px]",
+                      active ? "opacity-80" : "text-tg-hint",
+                    ].join(" ")}
+                  >
+                    {opt.hint}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          <div className="space-y-1 rounded-lg bg-tg-bg/40 p-2">
+            <div className="text-[11px] font-medium">Куда поедет каждая механика</div>
+            {cascadeRows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between gap-2 text-[11px]"
+              >
+                <span className="min-w-0 truncate text-tg-text">{row.label}</span>
+                <DeliveryBadge
+                  d={deliveryFor(chatMode, row.enabled, row.achievement ?? false)}
+                />
+              </div>
+            ))}
+            <div className="pt-0.5 text-[10px] text-tg-hint">
+              «Выключено» — механика не работает нигде. «В приложение» — работает,
+              но бот молчит в чате: смотри вкладку «Лента».
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Э22: бюджет активности — вынесен наверх: оператор просил найти его сразу.
+          Ограничить 1 публикацией в день можно одной кнопкой. */}
+      {social.data && (
+        <section className="space-y-2 rounded-xl bg-tg-secondary-bg/60 p-3">
+          <div>
+            <div className="text-sm font-semibold">💰 Бюджет активности</div>
+            <div className="text-[11px] text-tg-hint">
+              Общий потолок авто-постов бота за сутки (события, голосовые, музыка,
+              ачивки, сводки). Поставь 1 — и за день бот опубликует не больше одной
+              активности.
+            </div>
+          </div>
+          <NumberRow
+            label="постов в день (0 — без лимита)"
+            value={social.data.activity_max_posts_per_day}
+            busy={socialMut.isPending}
+            onSave={(n) => socialMut.mutate({ activity_max_posts_per_day: n })}
+          />
+          <div className="flex flex-wrap gap-1">
+            {[1, 2, 3, 5, 0].map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  socialMut.mutate({ activity_max_posts_per_day: v });
+                }}
+                disabled={socialMut.isPending}
+                className={[
+                  "rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-60",
+                  social.data?.activity_max_posts_per_day === v
+                    ? "bg-tg-button text-tg-button-text"
+                    : "bg-tg-secondary-bg/80 text-tg-text",
+                ].join(" ")}
+              >
+                {v === 0 ? "без лимита" : `${v}/день`}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Э22: рубильники механик вынесены в ОТДЕЛЬНОЕ подменю (сворачиваемый
+          раздел). Родные тумблеры в разделах ниже остаются и тоже работают. */}
+      <Accordion
+        icon="🎛"
+        title="Механики — рубильники"
+        subtitle="Включить/выключить каждую механику по отдельности"
+      >
+        <div className="rounded-lg bg-tg-bg/40 p-2 text-[11px] text-tg-hint">
+          «Выключить» = механика не работает нигде. «В приложение» = работает, но
+          бот молчит в чате — см. вкладку «Лента» и мастер-режим выше.
         </div>
         <Toggle
           label="🎮 Игровая система"
@@ -623,7 +841,7 @@ export default function GameScreen({ users, onBack }: Props) {
             musicMut.mutate({ game_enabled: !(music.data?.game_enabled ?? false) })
           }
         />
-      </section>
+      </Accordion>
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="text-sm font-semibold">Отладочные TG-id</div>
@@ -844,60 +1062,9 @@ export default function GameScreen({ users, onBack }: Props) {
 
         {social.data && (
           <>
-            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
-              <div className="text-[12px] font-medium">
-                Режим вывода бота в основной чат
-              </div>
-              <div className="flex flex-col gap-1">
-                {CHAT_OUTPUT_OPTIONS.map((opt) => {
-                  const active = social.data?.chat_output_mode === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        if (active) return;
-                        haptic("selection");
-                        socialMut.mutate({ chat_output_mode: opt.value });
-                      }}
-                      disabled={socialMut.isPending}
-                      className={[
-                        "rounded-lg px-3 py-2 text-left text-sm active:scale-[0.99] disabled:opacity-60",
-                        active
-                          ? "bg-tg-button text-tg-button-text"
-                          : "bg-tg-secondary-bg/80 text-tg-text",
-                      ].join(" ")}
-                    >
-                      <div className="font-medium">
-                        {active ? "✓ " : ""}
-                        {opt.label}
-                      </div>
-                      <div
-                        className={[
-                          "mt-0.5 text-[11px]",
-                          active ? "opacity-80" : "text-tg-hint",
-                        ].join(" ")}
-                      >
-                        {opt.hint}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
-              <NumberRow
-                label="бюджет авто-постов в день (0 — без лимита)"
-                value={social.data.activity_max_posts_per_day}
-                busy={socialMut.isPending}
-                onSave={(n) => socialMut.mutate({ activity_max_posts_per_day: n })}
-              />
-              <div className="text-[11px] text-tg-hint">
-                Общий потолок на ВСЕ авто-посты сразу (события, голосовые,
-                музыка, сводки): когда он выбран, бот не постит больше ничего
-                до следующих суток.
-              </div>
+            <div className="rounded-lg bg-tg-bg/40 p-2 text-[11px] text-tg-hint">
+              Режим вывода бота и бюджет активности вынесены наверх экрана —
+              это мастер-настройки, они задают поведение всех механик разом.
             </div>
 
             <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">

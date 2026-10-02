@@ -30,6 +30,7 @@ import BotPauseBar from "./BotPauseBar";
 import JobsQueueScreen from "./JobsQueueScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
 import GameScreen from "./GameScreen";
+import AllFeaturesScreen from "./AllFeaturesScreen";
 
 type Section =
   | "root"
@@ -54,6 +55,7 @@ type Section =
   | "intervals"
   | "jobs"
   | "game"
+  | "all-features"
   | "space-restart";
 
 interface Props {
@@ -108,6 +110,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
   if (section === "game") return <GameScreen users={users} onBack={back} />;
+  if (section === "all-features") return <AllFeaturesScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -364,6 +367,17 @@ export default function AdminScreen({ users }: Props) {
           title="Червь-господин"
           subtitle="Подхалимаж, /punish, анонс становления"
           onClick={() => select("worm-master")}
+        />
+      </SectionGroup>
+
+      {/* Э22: «Все функции» — один экран со всеми рубильниками бота. Ставим
+          САМЫМ ПЕРВЫМ разделом: это точка входа для «выключить одну штуку». */}
+      <SectionGroup icon="🧰" title="Все функции">
+        <Card
+          icon="🧰"
+          title="Все функции бота"
+          subtitle="Включить/выключить любую функцию по отдельности"
+          onClick={() => select("all-features")}
         />
       </SectionGroup>
 

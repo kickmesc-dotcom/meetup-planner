@@ -919,6 +919,58 @@ async def voice_current(session: SessionDep, user: CurrentUser) -> VoiceCurrentO
     )
 
 
+# Э22: ключевые фразы ошибок Telegram Bot API → понятный код для мини-аппа.
+# Порядок важен — проверяем по подстроке в нижнем регистре.
+_VOICE_TG_ERROR_HINTS: tuple[tuple[str, str], ...] = (
+    ("can't initiate conversation", "user_unreachable"),
+    ("bot was blocked", "user_unreachable"),
+    ("chat not found", "user_unreachable"),
+    ("user is deactivated", "user_unreachable"),
+    ("voice_messages_forbidden", "voice_forbidden"),
+    ("must be in an .ogg", "bad_format"),
+    (".ogg file encoded", "bad_format"),
+    ("file must be non-empty", "bad_audio"),
+    ("file is too big", "too_big"),
+    ("request entity too large", "too_big"),
+)
+
+
+def _voice_tg_error(exc: Exception) -> str:
+    """Разобрать ошибку Telegram в машинный код (Э22).
+
+    Нужен, чтобы мини-апп сказал участнику «открой личку и нажми /start» или
+    «формат не подошёл», а не пожимал плечами одним «send_failed».
+    """
+    text = str(exc).lower()
+    for needle, code in _VOICE_TG_ERROR_HINTS:
+        if needle in text:
+            return code
+    return "send_failed"
+
+
+def _voice_filename(content_type: str | None, filename: str | None) -> str:
+    """Имя файла с расширением по реальному типу.
+
+    Telegram распознаёт формат в том числе по имени, поэтому нельзя всегда
+    подсовывать `voice.ogg`: мини-апп отдаёт OGG/OPUS после remux, но может
+    прислать и M4A/MP3 — их тоже принимает `sendVoice`.
+    """
+    ct = (content_type or "").lower()
+    name = (filename or "").lower()
+    for ext in ("ogg", "opus", "m4a", "mp4", "mp3", "webm"):
+        if name.endswith("." + ext):
+            return f"voice.{'ogg' if ext == 'opus' else ext}"
+    if "ogg" in ct or "opus" in ct:
+        return "voice.ogg"
+    if "mpeg" in ct or "mp3" in ct:
+        return "voice.mp3"
+    if "mp4" in ct or "m4a" in ct or "aac" in ct:
+        return "voice.m4a"
+    if "webm" in ct:
+        return "voice.webm"
+    return "voice.ogg"
+
+
 @router.post("/game/voice/submit", response_model=VoiceSubmitOut)
 async def voice_submit_api(
     session: SessionDep,
@@ -943,15 +995,17 @@ async def voice_submit_api(
     data = await file.read()
     if not data or len(data) > _VOICE_MAX_BYTES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "bad_audio")
+    filename = _voice_filename(file.content_type, file.filename)
     bot = get_bot()
     try:
         message = await bot.send_voice(
             chat_id=user.telegram_id,
-            voice=BufferedInputFile(data, filename="voice.ogg"),
+            voice=BufferedInputFile(data, filename=filename),
         )
     except Exception as exc:  # noqa: BLE001
-        log.warning("game.voice_api_upload_failed", error=str(exc))
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "send_failed") from exc
+        code = _voice_tg_error(exc)
+        log.warning("game.voice_api_upload_failed", error=str(exc), code=code)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, code) from exc
     sent = getattr(message, "voice", None)
     if sent is None:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "send_failed")

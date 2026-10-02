@@ -166,6 +166,44 @@ export interface GuestProfile {
 export const fetchGuestProfile = (userId: number) =>
   api<GuestProfile>(`/api/game/players/${userId}`);
 
+/**
+ * Э22: подробности записи ленты для раскрытия карточки.
+ *
+ * Состав зависит от `kind`: у ачивки — «за что дана», у голосового — условие и
+ * окно, у подборки — треки с лайками. Поля необязательные: тип читается мягко.
+ */
+export interface FeedDetail {
+  code?: string;
+  description?: string;
+  points?: number;
+  title?: string;
+  condition?: string;
+  opened_at?: string | null;
+  closed_at?: string | null;
+  expires_at?: string | null;
+  reward?: number;
+  closed?: boolean;
+  track_count?: number;
+  selection_id?: number;
+  week_start?: string | null;
+  reason?: string | null;
+  submissions?: {
+    id: number;
+    user_id: number;
+    user_name: string | null;
+    duration: number | null;
+  }[];
+  tracks?: {
+    id: number;
+    kind: string;
+    title: string | null;
+    performer: string | null;
+    url: string | null;
+    likes: number;
+    liked: boolean;
+  }[];
+}
+
 /** Э20: одна запись ленты активности (ачивка/лох/чухан/событие). */
 export interface FeedItem {
   id: string;
@@ -179,6 +217,8 @@ export interface FeedItem {
   user_name: string | null;
   user_telegram_id: number | null;
   avatar_url: string | null;
+  /** Э22: подробности раскрывающейся карточки (см. `FeedDetail`). */
+  detail?: FeedDetail | null;
 }
 
 export interface GameFeed {
@@ -293,13 +333,18 @@ export const withdrawVoice = () =>
     { method: "DELETE" },
   );
 
-/** Сдать голосовое: записи из MediaRecorder уходят как есть, файл не храним. */
+/**
+ * Сдать голосовое. Запись уже приведена к формату Telegram (OGG/OPUS, M4A или
+ * MP3 — см. `lib/voiceFormat`), файл не храним: сервер перешлёт его боту и
+ * заберёт `file_id`. `filename` важен — Telegram смотрит на расширение.
+ */
 export async function uploadVoice(
   blob: Blob,
   duration: number,
-): Promise<{ ok: boolean; status: string; reward: number }> {
+  filename: string = "voice.ogg",
+): Promise<{ ok: boolean; status: string; reward: number; detail?: string | null }> {
   const form = new FormData();
-  form.append("file", blob, "voice.ogg");
+  form.append("file", blob, filename);
   form.append("duration", String(Math.max(0, Math.round(duration))));
   const res = await fetch(`${API_BASE}/api/game/voice/submit`, {
     method: "POST",

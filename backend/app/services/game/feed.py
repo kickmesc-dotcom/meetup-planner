@@ -135,7 +135,61 @@ async def build_feed(
         items = [it for it in items if it["kind"] in kinds]
 
     items.sort(key=lambda it: it["at"], reverse=True)
-    return items[offset : offset + limit]
+    page = items[offset : offset + limit]
+    # Э22: тяжёлые подробности — только для страницы, а не для всех 500 строк.
+    await _attach_details(session, page, user_id=user_id)
+    return page
+
+
+async def _attach_details(
+    session: AsyncSession, items: list[dict], *, user_id: int | None
+) -> None:
+    """Дотянуть подробности для раскрывающихся карточек ленты (Э22).
+
+    Список сдач голосового и треки подборки — отдельные выборки, поэтому делаем
+    их лишь для тех строк, что реально попали на экран, а не для всего источника.
+    """
+    from app.services.game import music, voice
+
+    for it in items:
+        row_id = it["id"]
+        detail = dict(it.get("detail") or {})
+        if row_id.startswith("voice:"):
+            task_id = int(row_id.split(":", 1)[1])
+            subs = await voice._submissions(session, task_id)
+            names = await voice._user_names(session, [s.user_id for s in subs])
+            detail["submissions"] = [
+                {
+                    "id": s.id,
+                    "user_id": s.user_id,
+                    "user_name": names.get(s.user_id),
+                    "duration": s.duration,
+                }
+                for s in subs
+            ]
+        elif row_id.startswith("music:"):
+            sel_id = int(row_id.split(":", 1)[1])
+            tracks = await music.selection_tracks(session, sel_id)
+            ids = [t.id for t in tracks]
+            likes = await music.like_counts(session, ids)
+            mine = (
+                await music.liked_track_ids(session, user_id, ids)
+                if user_id is not None
+                else set()
+            )
+            detail["tracks"] = [
+                {
+                    "id": t.id,
+                    "kind": t.kind,
+                    "title": t.title,
+                    "performer": t.performer,
+                    "url": t.url,
+                    "likes": likes.get(t.id, 0),
+                    "liked": t.id in mine,
+                }
+                for t in tracks
+            ]
+        it["detail"] = detail or None
 
 
 async def _achievement_items(
@@ -164,6 +218,11 @@ async def _achievement_items(
                 at=row.unlocked_at,
                 text=f"«{ach.title}» (+{ach.points} XP)",
                 user=user,
+                detail={
+                    "code": ach.code,
+                    "description": ach.description,
+                    "points": ach.points,
+                },
             )
         )
     return out
@@ -194,6 +253,7 @@ async def _loser_items(
                 at=roll.rolled_at,
                 text=text,
                 user=user,
+                detail={"reason": reason},
             )
         )
     return out
@@ -225,6 +285,7 @@ async def _chukhan_items(
                 at=at,
                 text=text,
                 user=user,
+                detail={"reason": reason, "week_start": chukhan.week_start},
             )
         )
     return out
@@ -261,6 +322,15 @@ async def _voice_items(session: AsyncSession, *, depth: int) -> list[dict]:
                     + (" · задание закрыто" if closed else " · идёт приём")
                 ),
                 user=None,
+                detail={
+                    "title": title,
+                    "condition": task.text,
+                    "opened_at": task.created_at,
+                    "closed_at": task.closed_at,
+                    "expires_at": task.expires_at,
+                    "reward": reward,
+                    "closed": closed,
+                },
             )
         )
     return out
@@ -284,6 +354,7 @@ async def _music_items(session: AsyncSession, *, depth: int) -> list[dict]:
             at=sel.created_at,
             text=f"Подборка недели — {int(sel.track_count or 0)} треков",
             user=None,
+            detail={"selection_id": sel.id, "track_count": int(sel.track_count or 0)},
         )
         for sel in rows
     ]
@@ -312,6 +383,7 @@ async def _music_game_items(session: AsyncSession, *, depth: int) -> list[dict]:
                     + (" · раунд закрыт" if closed else " · идёт голосование")
                 ),
                 user=None,
+                detail={"closed_at": round_.closed_at, "closed": closed},
             )
         )
     return out
@@ -360,6 +432,7 @@ def _item(
     at,
     text: str,
     user: User | None,
+    detail: dict | None = None,
 ) -> dict:
     return {
         "id": row_id,
@@ -369,6 +442,7 @@ def _item(
         "title": FEED_TITLES.get(kind, "Событие"),
         "text": text,
         "at": at,
+        "detail": detail,
         "user_id": user.id if user is not None else None,
         "user_name": user.display_name if user is not None else None,
         "user_telegram_id": user.telegram_id if user is not None else None,

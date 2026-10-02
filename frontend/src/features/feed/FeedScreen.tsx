@@ -1,6 +1,13 @@
-import { useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { fetchFeed, FEED_KIND_LABELS, type FeedItem } from "@/api/game";
+import { useEffect, useState, type MouseEvent } from "react";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  fetchFeed,
+  fetchVoiceAudioUrl,
+  likeMusicTrack,
+  FEED_KIND_LABELS,
+  type FeedDetail,
+  type FeedItem,
+} from "@/api/game";
 import ActivitiesPanel from "./ActivitiesPanel";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
@@ -208,6 +215,16 @@ function KindChip({
   );
 }
 
+/** Э22: типы, которые раскрываются в подробности по тапу. */
+const EXPANDABLE_KINDS = new Set([
+  "achievement",
+  "loser",
+  "chukhan",
+  "voice",
+  "music",
+  "music_game",
+]);
+
 function FeedRow({
   item,
   onOpenUser,
@@ -218,46 +235,99 @@ function FeedRow({
 }) {
   const when = formatWhen(item.at);
   const clickable = item.user_id !== null && item.user_id !== undefined;
+  const [open, setOpen] = useState(false);
+  const expandable = EXPANDABLE_KINDS.has(item.kind);
+  // Музыка и голосовые — «плеер»: сворачиваем ОТДЕЛЬНОЙ кнопкой, чтобы тап
+  // по треку/аудио не закрывал панель во время прослушивания.
+  const playerLike = item.kind === "music" || item.kind === "voice";
+
+  const toggle = () => {
+    if (!expandable || playerLike) return;
+    haptic("light");
+    setOpen((o) => !o);
+  };
 
   return (
-    <div className="flex items-start gap-3 rounded-2xl bg-tg-secondary-bg/50 p-3">
-      {item.avatar_url ? (
-        <button
-          type="button"
-          onClick={() => clickable && onOpenUser(item.user_id!)}
-          className="h-10 w-10 shrink-0 overflow-hidden rounded-full"
-        >
-          <img src={item.avatar_url} alt="" className="h-full w-full object-cover" />
-        </button>
-      ) : (
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tg-secondary-bg text-lg">
-          {item.icon}
-        </div>
-      )}
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-xs text-tg-hint">
-          <span>{item.icon}</span>
-          <span className="font-medium">{item.title}</span>
-          <span className="ml-auto shrink-0">{when}</span>
-        </div>
-        {item.user_name && (
+    <div
+      onClick={toggle}
+      className={[
+        "rounded-2xl bg-tg-secondary-bg/50 p-3",
+        expandable && !playerLike ? "cursor-pointer active:scale-[0.99]" : "",
+      ].join(" ")}
+    >
+      <div className="flex items-start gap-3">
+        {item.avatar_url ? (
           <button
             type="button"
-            onClick={() => clickable && onOpenUser(item.user_id!)}
-            className="mt-0.5 block truncate text-sm font-medium text-tg-text"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (clickable) onOpenUser(item.user_id!);
+            }}
+            className="h-10 w-10 shrink-0 overflow-hidden rounded-full"
           >
-            {item.user_name}
+            <img src={item.avatar_url} alt="" className="h-full w-full object-cover" />
           </button>
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tg-secondary-bg text-lg">
+            {item.icon}
+          </div>
         )}
-        {item.text && (
-          <div
-            className="mt-0.5 text-sm text-tg-hint [word-break:break-word]"
-            // Тексты анонсов приходят с HTML-разметкой (<b>/<i>), как в чате.
-            dangerouslySetInnerHTML={{ __html: item.text }}
-          />
-        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 text-xs text-tg-hint">
+            <span>{item.icon}</span>
+            <span className="font-medium">{item.title}</span>
+            <span className="ml-auto shrink-0">{when}</span>
+            {expandable && (
+              <span className="shrink-0 text-tg-hint">
+                {playerLike ? "▸" : open ? "▾" : "▸"}
+              </span>
+            )}
+          </div>
+          {item.user_name && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (clickable) onOpenUser(item.user_id!);
+              }}
+              className="mt-0.5 block truncate text-sm font-medium text-tg-text"
+            >
+              {item.user_name}
+            </button>
+          )}
+          {item.text && (
+            <div
+              className="mt-0.5 text-sm text-tg-hint [word-break:break-word]"
+              // Тексты анонсов приходят с HTML-разметкой (<b>/<i>), как в чате.
+              dangerouslySetInnerHTML={{ __html: item.text }}
+            />
+          )}
+          {expandable && playerLike && !open && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptic("light");
+                setOpen(true);
+              }}
+              className="mt-1 rounded-lg bg-tg-secondary-bg/80 px-2 py-1 text-[11px] font-medium text-tg-text"
+            >
+              {item.kind === "music" ? "🎧 Слушать и лайкать" : "🎙 Подробности и прослушать"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {expandable && open && (
+        <div className="mt-2 border-t border-tg-hint/15 pt-2">
+          <FeedDetailPanel
+            item={item}
+            playerLike={playerLike}
+            onClose={() => setOpen(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -274,4 +344,266 @@ function formatWhen(iso: string): string {
     return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
   }
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+/** Полная дата+время — «Серёга получил в 14:23, 3 октября» (Э22). */
+function formatFull(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+// ---------------------------------------------------------------------------
+// Э22: раскрывающиеся подробности записи ленты
+// ---------------------------------------------------------------------------
+
+function FeedDetailPanel({
+  item,
+  playerLike,
+  onClose,
+}: {
+  item: FeedItem;
+  playerLike: boolean;
+  onClose: () => void;
+}) {
+  const d: FeedDetail = item.detail ?? {};
+  return (
+    <div className="space-y-1.5">
+      {item.kind === "achievement" && (
+        <>
+          {d.description && (
+            <div className="text-xs text-tg-text">
+              <span className="text-tg-hint">За что: </span>
+              {d.description}
+            </div>
+          )}
+          <div className="text-[11px] text-tg-hint">
+            {item.user_name ? `${item.user_name} получил: ` : "Получено: "}
+            {formatFull(item.at)}
+          </div>
+          {typeof d.points === "number" && (
+            <div className="text-[11px] text-tg-hint">Награда: +{d.points} XP</div>
+          )}
+        </>
+      )}
+
+      {item.kind === "voice" && (
+        <>
+          {d.condition && (
+            <div className="text-xs text-tg-text">
+              <span className="text-tg-hint">Условие: </span>
+              {d.condition}
+            </div>
+          )}
+          <div className="text-[11px] text-tg-hint">Открыто: {formatFull(d.opened_at)}</div>
+          <div className="text-[11px] text-tg-hint">
+            {d.closed
+              ? `Закрыто: ${formatFull(d.closed_at)}`
+              : `Идёт приём до: ${formatFull(d.expires_at)}`}
+          </div>
+          {typeof d.reward === "number" && (
+            <div className="text-[11px] text-tg-hint">Награда: +{d.reward} XP</div>
+          )}
+          {(d.submissions?.length ?? 0) > 0 ? (
+            <div className="space-y-1">
+              {d.submissions!.map((s) => (
+                <SubmissionPlayer key={s.id} submission={s} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-tg-hint">Сдач не было.</div>
+          )}
+        </>
+      )}
+
+      {item.kind === "music" && <MusicDetail d={d} />}
+
+      {item.kind === "music_game" && (
+        <div className="text-[11px] text-tg-hint">
+          {d.closed ? `Раунд закрыт: ${formatFull(d.closed_at)}` : "Голосование ещё идёт"}
+        </div>
+      )}
+
+      {(item.kind === "loser" || item.kind === "chukhan") && (
+        <div className="text-[11px] text-tg-hint">
+          Когда: {formatFull(item.at)}
+          {item.kind === "chukhan" && d.week_start
+            ? ` · неделя с ${formatDate(d.week_start)}`
+            : ""}
+        </div>
+      )}
+
+      {playerLike && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            haptic("light");
+            onClose();
+          }}
+          className="w-full rounded-lg bg-tg-secondary-bg/70 py-1.5 text-xs font-medium text-tg-text active:scale-[0.99]"
+        >
+          ▲ Свернуть
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Проигрыватель одной сдачи: аудио тянется блобом (нужен Authorization). */
+function SubmissionPlayer({
+  submission,
+}: {
+  submission: NonNullable<FeedDetail["submissions"]>[number];
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const play = async (e: MouseEvent) => {
+    e.stopPropagation();
+    haptic("light");
+    if (url) {
+      URL.revokeObjectURL(url);
+      setUrl(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      setUrl(await fetchVoiceAudioUrl(submission.id));
+    } catch {
+      haptic("error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(
+    () => () => {
+      if (url) URL.revokeObjectURL(url);
+    },
+    [url],
+  );
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5"
+    >
+      <button
+        type="button"
+        onClick={play}
+        disabled={loading}
+        className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-sm disabled:opacity-50"
+        aria-label="Прослушать"
+      >
+        {loading ? "…" : url ? "⏸" : "▶️"}
+      </button>
+      <span className="min-w-0 flex-1 truncate text-sm">
+        {submission.user_name ?? "участник"}
+      </span>
+      {submission.duration != null && (
+        <span className="shrink-0 text-xs tabular-nums text-tg-hint">
+          {submission.duration}с
+        </span>
+      )}
+      {url && (
+        <audio
+          src={url}
+          autoPlay
+          onEnded={() => {
+            URL.revokeObjectURL(url);
+            setUrl(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function MusicDetail({ d }: { d: FeedDetail }) {
+  const tracks = d.tracks ?? [];
+  if (tracks.length === 0) {
+    return <div className="text-[11px] text-tg-hint">Треков нет.</div>;
+  }
+  return (
+    <div className="space-y-1">
+      {tracks.map((t) => (
+        <MusicTrackRow key={t.id} track={t} />
+      ))}
+    </div>
+  );
+}
+
+function MusicTrackRow({
+  track,
+}: {
+  track: NonNullable<FeedDetail["tracks"]>[number];
+}) {
+  const qc = useQueryClient();
+  const like = useMutation({
+    mutationFn: () => likeMusicTrack(track.id),
+    onSuccess: () => {
+      haptic("success");
+      void qc.invalidateQueries({ queryKey: ["game-feed"] });
+    },
+    onError: () => haptic("error"),
+  });
+  const liked = like.data?.liked ?? track.liked;
+  const likes = like.data?.likes ?? track.likes;
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm text-tg-text">
+          {track.title || track.performer || "трек"}
+        </div>
+        {track.performer && track.title && (
+          <div className="truncate text-[11px] text-tg-hint">{track.performer}</div>
+        )}
+      </div>
+      {track.url && (
+        <a
+          href={track.url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
+          aria-label="Открыть трек"
+        >
+          ▶️
+        </a>
+      )}
+      <button
+        type="button"
+        disabled={like.isPending}
+        onClick={(e) => {
+          e.stopPropagation();
+          haptic("light");
+          like.mutate();
+        }}
+        className={[
+          "shrink-0 rounded-full px-2 py-1 text-xs disabled:opacity-60",
+          liked ? "bg-status-busy/20 text-status-busy" : "bg-tg-secondary-bg text-tg-hint",
+        ].join(" ")}
+      >
+        {liked ? "❤️" : "🤍"} {likes}
+      </button>
+    </div>
+  );
 }
