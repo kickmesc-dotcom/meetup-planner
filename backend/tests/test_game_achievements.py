@@ -187,11 +187,13 @@ def test_first_time_and_anniversary_are_always_separate():
 
 def test_anniversary_tiers_expand_to_separate_entries():
     """«Отдельный поздравительный статус и уровень ачивки для каждого юбилея»."""
+    # GHG11: лох дня и чухан недели — RNG, поэтому у них ровно «впервые» + ×10.
+    for base in ("chin_up", "first_worm"):
+        assert get(base).tiers == (10,)
     # Недельные звания выпадают по RNG — у них короткие достижимые тиры.
-    for base in ("first_worm", "generation_mouthpiece", "read_only"):
+    for base in ("generation_mouthpiece", "read_only"):
         assert get(base).tiers == (3, 5, 10)
     for base in (
-        "chin_up",
         "truth_seeker",
         "cashback",
         "worm_lord",
@@ -244,7 +246,8 @@ def test_tiers_reached_is_pure_and_monotonic():
     assert tiers_reached("chin_up", 1) == []
     assert tiers_reached("chin_up", 9) == []
     assert tiers_reached("chin_up", 10) == ["chin_up:10"]
-    assert tiers_reached("chin_up", 30) == ["chin_up:10", "chin_up:20", "chin_up:30"]
+    # GHG11: у лоха только один юбилей — ×10; дальше тиры не набегают.
+    assert tiers_reached("chin_up", 30) == ["chin_up:10"]
     assert tiers_reached("chin_up", 10_000) == tier_codes("chin_up")
 
 
@@ -357,14 +360,18 @@ async def test_grant_counter_skips_everything_at_zero(session: _FakeSession):
 
 @pytest.mark.asyncio
 async def test_last_tier_grants_supreme_chukhan_rank(session: _FakeSession):
-    """Капстоун: юбилей ×100 автоматически даёт спец-ранг «Верховный чухан»."""
-    granted = await achievements._grant_counter(session, 1, "chin_up", 100, announce=False)
+    """Капстоун: набравший порог даёт спец-ранг «Верховный чухан».
+
+    GHG11: юбилей у лоха только ×10, а капстоун-ранг выдаётся по порогу
+    `capstone_codes` независимо от набора тиров.
+    """
+    granted = await achievements._grant_counter(session, 1, "chin_up", 30, announce=False)
     codes = {a.code for a in granted}
-    assert "chin_up:100" in codes
+    assert "chin_up:10" in codes
     assert SUPREME_CHUKHAN_CODE in codes
     assert SUPREME_CHUKHAN_CODE in session.codes_of(1)
-    # База 50 + юбилеи ×10/20/30/50/100 (150/250/350/500/1000) + капстоун 100.
-    assert session.xp_of(1) == 50 + 150 + 250 + 350 + 500 + 1000 + 100
+    # База 50 + юбилей ×10 (150) + капстоун 100.
+    assert session.xp_of(1) == 50 + 150 + 100
     session.scalar_queue = [1]
     assert await achievements.is_supreme_chukhan(session, 1) is True
 

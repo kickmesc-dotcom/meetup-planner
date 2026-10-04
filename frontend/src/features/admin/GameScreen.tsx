@@ -15,6 +15,7 @@
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  addGamePlayerXp,
   fetchGameAdmin,
   fetchGameMusic,
   fetchGameObservability,
@@ -24,7 +25,9 @@ import {
   grantGameAchievement,
   removeMusicTrack,
   resetGameAchievements,
+  resetGamePlayerXp,
   setGamePlayerXp,
+  setGamePrestige,
   updateGameAdmin,
   updateGameMusic,
   updateGameSocial,
@@ -513,6 +516,26 @@ export default function GameScreen({ users, onBack }: Props) {
     },
   });
 
+  // GHG11: блок отладки — прибавить опыт, обнулить, тумблер престижа.
+  const debugXpMut = useMutation({
+    mutationFn: (action: { kind: "add" } | { kind: "reset" } | { kind: "prestige"; on: boolean }) => {
+      if (action.kind === "add") {
+        return addGamePlayerXp(selected as number, Number(xpDraft || "0"));
+      }
+      if (action.kind === "reset") return resetGamePlayerXp(selected as number);
+      return setGamePrestige(selected as number, action.on);
+    },
+    onSuccess: (data) => {
+      haptic("success");
+      setXpDraft("");
+      refreshPlayer(data);
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
   const socialMut = useMutation({
     mutationFn: updateGameSocial,
     onSuccess: (data) => {
@@ -699,11 +722,12 @@ export default function GameScreen({ users, onBack }: Props) {
       {social.data && (
         <section className="space-y-2 rounded-xl bg-tg-secondary-bg/60 p-3">
           <div>
-            <div className="text-sm font-semibold">💰 Бюджет активности</div>
+            <div className="text-sm font-semibold">💰 Бюджет игровой активности</div>
             <div className="text-[11px] text-tg-hint">
-              Общий потолок авто-постов бота за сутки (события, голосовые, музыка,
-              ачивки, сводки). Поставь 1 — и за день бот опубликует не больше одной
-              активности.
+              Считает ТОЛЬКО игровую активность (события, голосовые, музыка,
+              контрабанда, мьюзик-гейм) — как будто ограничитель на авто-посты
+              игры. Ачивки, а также старые модули (чухан, лох, встречи) сюда НЕ
+              входят. 0 — без лимита.
             </div>
           </div>
           <NumberRow
@@ -712,27 +736,17 @@ export default function GameScreen({ users, onBack }: Props) {
             busy={socialMut.isPending}
             onSave={(n) => socialMut.mutate({ activity_max_posts_per_day: n })}
           />
-          <div className="flex flex-wrap gap-1">
-            {[1, 2, 3, 5, 0].map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  socialMut.mutate({ activity_max_posts_per_day: v });
-                }}
-                disabled={socialMut.isPending}
-                className={[
-                  "rounded-lg px-2.5 py-1 text-xs font-medium disabled:opacity-60",
-                  social.data?.activity_max_posts_per_day === v
-                    ? "bg-tg-button text-tg-button-text"
-                    : "bg-tg-secondary-bg/80 text-tg-text",
-                ].join(" ")}
-              >
-                {v === 0 ? "без лимита" : `${v}/день`}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              haptic("selection");
+              socialMut.mutate({ activity_max_posts_per_day: 0 });
+            }}
+            disabled={socialMut.isPending}
+            className="w-full rounded-lg bg-tg-secondary-bg/80 px-3 py-2 text-xs font-medium text-tg-text disabled:opacity-60"
+          >
+            🚫 Выключить ограничитель (без лимита)
+          </button>
         </section>
       )}
 
@@ -965,7 +979,7 @@ export default function GameScreen({ users, onBack }: Props) {
                 value={xpDraft}
                 onChange={(e) => setXpDraft(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 inputMode="numeric"
-                placeholder="XP всего (напр. 800)"
+                placeholder="XP (напр. 800)"
                 className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
               />
               <button
@@ -978,6 +992,45 @@ export default function GameScreen({ users, onBack }: Props) {
                 className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
               >
                 Поставить
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  debugXpMut.mutate({ kind: "add" });
+                }}
+                disabled={!xpDraft.trim() || debugXpMut.isPending}
+                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
+              >
+                + Прибавить
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  debugXpMut.mutate({ kind: "reset" });
+                }}
+                disabled={debugXpMut.isPending}
+                className="shrink-0 rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
+              >
+                ♻️ Обнулить опыт
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  debugXpMut.mutate({
+                    kind: "prestige",
+                    on: !(player.data.prestige > 0),
+                  });
+                }}
+                disabled={debugXpMut.isPending}
+                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium active:scale-[0.98] disabled:opacity-60"
+              >
+                {player.data.prestige > 0 ? "🎖 Престиж: вкл" : "🎖 Престиж: выкл"}
               </button>
             </div>
 

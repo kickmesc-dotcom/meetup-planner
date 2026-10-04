@@ -318,6 +318,11 @@ async def grant(
     if ach is None:
         log.warning("game.achievement_unknown_code", code=code)
         return None
+    # GHG11: модуль ачивок выключен — не считаем и не выдаём ничего.
+    from app.services.game import delivery
+
+    if await delivery.get_feature_mode(session, "achievements") == delivery.MODE_OFF:
+        return None
     if await has(session, user_id, code):
         return None
     session.add(UserAchievement(user_id=user_id, code=code))
@@ -490,9 +495,13 @@ async def announce_granted(
     """
     if not achs:
         return False
-    from app.services.game import chat_mode
+    from app.services.game import delivery
 
-    if await chat_mode.get_chat_mode(session) in ("achievements", "all"):
+    _delivery_mode = await delivery.get_feature_mode(session, "achievements")
+    if _delivery_mode == delivery.MODE_OFF:
+        return False
+    if _delivery_mode == delivery.MODE_APP:
+        # Ачивка уже в `user_achievements` — лента мини-аппа её покажет.
         log.info(
             "game.achievement_announced_feed_only",
             user_id=user_id,

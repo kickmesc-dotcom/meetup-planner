@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  fetchPersonas,
   fetchRPGenerator,
   updateRPGenerator,
   type PhraseGeneratorVersion,
@@ -86,8 +85,6 @@ export function GeneratorVersionBody() {
   const qc = useQueryClient();
 
   const gen = useQuery({ queryKey: ["admin", "rp-generator"], queryFn: fetchRPGenerator });
-  // Сколько персоналий реально заведено — чтобы предупредить о фолбэке.
-  const personas = useQuery({ queryKey: ["admin", "personas"], queryFn: fetchPersonas });
 
   const setVersion = useMutation({
     mutationFn: (version: PhraseGeneratorVersion) => {
@@ -117,53 +114,29 @@ export function GeneratorVersionBody() {
     onSettled: () => qc.invalidateQueries({ queryKey: ["admin", "rp-generator"] }),
   });
 
-  const genVersion: PhraseGeneratorVersion =
-    gen.data?.generator_version ?? "legacy";
-  const seededCount = personas.data?.filter((p) => p.persona_text != null).length;
-  const noPersonas =
-    genVersion === "personas" && personas.data != null && seededCount === 0;
 
   return (
     <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
       <div>
         <div className="text-base font-semibold mb-1">🎭 Версия генератора</div>
         <div className="text-xs text-tg-hint mb-2">
-          {genVersion === "personas"
-            ? "Типажи: фраза собирается из шаблонов персоналии участника (редактор — «Персоналии» отдельным пунктом меню). Если ни одной персоналии нет — авто-фолбэк на нарезку."
-            : "Нарезка: классическая шизо-цитата из кусков реальных сообщений чата."}
+          Нарезка: классическая шизо-цитата из кусков реальных сообщений чата.
+          Режим «типажи» убран.
         </div>
         {gen.isPending || !gen.data ? (
           <ListSkeleton rows={2} />
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 gap-2">
             <ModeChip
-              active={genVersion === "legacy"}
+              active
               onClick={() => {
-                if (genVersion === "legacy" || setVersion.isPending) return;
+                if (setVersion.isPending) return;
                 haptic("selection");
                 setVersion.mutate("legacy");
               }}
             >
               ✂️ Нарезка
             </ModeChip>
-            <ModeChip
-              active={genVersion === "personas"}
-              onClick={() => {
-                if (genVersion === "personas" || setVersion.isPending) return;
-                haptic("selection");
-                setVersion.mutate("personas");
-              }}
-            >
-              🎭 Типажи
-            </ModeChip>
-          </div>
-        )}
-        {/* GHG8 T1.4: выбрано «Типажи», но пул пуст → бэкенд молча уйдёт в
-            нарезку. Объясняем «пусто», которое видел пользователь. */}
-        {noPersonas && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
-            ⚠ Ни одной персоналии не заведено — бот будет генерировать «нарезкой»,
-            пока вы не заполните хотя бы одного участника в «Персоналии».
           </div>
         )}
         {setVersion.isPending && (

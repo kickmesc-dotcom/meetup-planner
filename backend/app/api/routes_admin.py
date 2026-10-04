@@ -14,6 +14,10 @@ from app.bot.scheduler import get_scheduler, reload_dynamic_jobs
 from app.config import get_settings
 from app.db.models import Birthday, LoserRoll, Meeting, MeetingReminder, Poll, User, WeeklyChukhan
 from app.schemas.game import (
+    DeliveryApplyIn,
+    DeliveryFeatureOut,
+    DeliveryIn,
+    DeliveryOut,
     GameContrabandWord,
     GameDigestFlushOut,
     GameObservabilityOut,
@@ -2278,7 +2282,8 @@ class GeneratorSettingsOut(BaseModel):
     recency_quarantine_hours: float = Field(18.0, ge=0.0, le=168.0)
     recency_quarantine_weight: float = Field(0.05, ge=0.0, le=1.0)
     # GHG8 P6.3: версия генератора — legacy (нарезка v1) | personas (типажи v2).
-    generator_version: str = Field("legacy", pattern="^(legacy|personas)$")
+    # GHG11: вариант «типажи» (personas) убран — остался только legacy.
+    generator_version: str = Field("legacy", pattern="^legacy$")
 
 
 class GeneratorSettingsUpdate(BaseModel):
@@ -2293,7 +2298,7 @@ class GeneratorSettingsUpdate(BaseModel):
     recency_quarantine_hours: float = Field(18.0, ge=0.0, le=168.0)
     recency_quarantine_weight: float = Field(0.05, ge=0.0, le=1.0)
     # GHG8 P6.3: дефолт legacy — старые клиенты не присылают поле.
-    generator_version: str = Field("legacy", pattern="^(legacy|personas)$")
+    generator_version: str = Field("legacy", pattern="^legacy$")
 
 
 @router.get("/admin/random-phrases/generator", response_model=GeneratorSettingsOut)
@@ -2459,13 +2464,24 @@ class AutoLoserSettingsOut(BaseModel):
     window_start_hour: int
     window_end_hour: int
     interval_hours: int
+    # GHG11: понятный шедулер.
+    days: list[int] = []
+    mode: str = "random"
+    fixed_hour: int = 18
+    fixed_minute: int = 0
+    interval_slot: str = "day"
 
 
 class AutoLoserSettingsUpdate(BaseModel):
-    enabled: bool
-    window_start_hour: int = Field(..., ge=0, le=23)
-    window_end_hour: int = Field(..., ge=0, le=23)
-    interval_hours: int = Field(..., ge=0, le=72)
+    enabled: bool | None = None
+    window_start_hour: int | None = Field(None, ge=0, le=23)
+    window_end_hour: int | None = Field(None, ge=0, le=23)
+    interval_hours: int | None = Field(None, ge=0, le=72)
+    days: list[int] | None = None
+    mode: str | None = None
+    fixed_hour: int | None = Field(None, ge=0, le=23)
+    fixed_minute: int | None = Field(None, ge=0, le=59)
+    interval_slot: str | None = None
 
 
 @router.get("/admin/autoloser", response_model=AutoLoserSettingsOut)
@@ -2478,18 +2494,56 @@ async def get_autoloser(session: SessionDep, user: CurrentUser) -> AutoLoserSett
 async def update_autoloser(
     body: AutoLoserSettingsUpdate, session: SessionDep, user: CurrentUser
 ) -> AutoLoserSettingsOut:
+    """Частичная правка шедулера автолоха (режим/дни/время).
+
+    GHG11: пустой набор дней = попытка сохранить «ничего не выбрано» — по
+    требованию оператора это переводит фичу в состояние ВЫКЛ.
+    """
     _ensure_admin(user)
+    current = await get_autoloser_settings(session)
+    days = body.days if body.days is not None else current["days"]
+    enabled = body.enabled if body.enabled is not None else current["enabled"]
+    if body.days is not None and not body.days:
+        enabled = False
     await set_autoloser_settings(
         session,
-        enabled=body.enabled,
-        window_start_hour=body.window_start_hour,
-        window_end_hour=body.window_end_hour,
-        interval_hours=body.interval_hours,
+        enabled=enabled,
+        window_start_hour=(
+            body.window_start_hour
+            if body.window_start_hour is not None
+            else current["window_start_hour"]
+        ),
+        window_end_hour=(
+            body.window_end_hour
+            if body.window_end_hour is not None
+            else current["window_end_hour"]
+        ),
+        interval_hours=(
+            body.interval_hours
+            if body.interval_hours is not None
+            else current["interval_hours"]
+        ),
+        days=days,
+        mode=(body.mode if body.mode is not None else current["mode"]),
+        fixed_hour=(
+            body.fixed_hour if body.fixed_hour is not None else current["fixed_hour"]
+        ),
+        fixed_minute=(
+            body.fixed_minute
+            if body.fixed_minute is not None
+            else current["fixed_minute"]
+        ),
+        interval_slot=(
+            body.interval_slot
+            if body.interval_slot is not None
+            else current["interval_slot"]
+        ),
     )
     from app.bot.dispatcher import get_bot
+
     await reload_dynamic_jobs(get_bot())
     log.info("admin.autoloser_updated", body=body.model_dump(), by=user.id)
-    return body
+    return AutoLoserSettingsOut(**(await get_autoloser_settings(session)))
 
 
 # --- E8: «Червь-пидор» ---
@@ -4485,3 +4539,223 @@ async def admin_game_music_remove_track(
         await session.commit()
         log.info("admin.game_music_track_removed", track_id=track_id, by=user.id)
     return await _music_state(session)
+
+
+# --------------------------------------------------------------------------
+# GHG11: единая модель доставки бота (off / chat / app / both)
+# --------------------------------------------------------------------------
+
+
+async def _delivery_state(session) -> DeliveryOut:  # noqa: ANN001
+    from app.services.game import delivery
+
+    mode_map = await delivery.get_mode_map(session)
+    return DeliveryOut(
+        modes=list(delivery.MODES),
+        mode_labels=dict(delivery.MODE_LABELS),
+        master_general=await delivery.get_master_status(
+            session, delivery.MODULE_GENERAL
+        ),
+        master_achievements=await delivery.get_master_status(
+            session, delivery.MODULE_ACHIEVEMENTS
+        ),
+        features=[
+            DeliveryFeatureOut(
+                key=f.key,
+                label=f.label,
+                module=f.module,
+                mode=mode_map.get(f.key, f.default),
+                hint=f.hint,
+            )
+            for f in delivery.FEATURES
+        ],
+    )
+
+
+@router.get("/admin/delivery", response_model=DeliveryOut)
+async def admin_delivery_get(session: SessionDep, user: CurrentUser) -> DeliveryOut:
+    """Мастер-свитчеры (общий и ачивки) + режим каждой фичи."""
+    _ensure_admin(user)
+    return await _delivery_state(session)
+
+
+@router.put("/admin/delivery", response_model=DeliveryOut)
+async def admin_delivery_put(
+    body: DeliveryIn, session: SessionDep, user: CurrentUser
+) -> DeliveryOut:
+    """Правка мастер-свитчеров и/или отдельных фич.
+
+    Мастер переводит ВСЕ свои фичи в указанное состояние. Точечная правка фичи
+    оставляет остальные как есть — мастер отобразит `custom`.
+    """
+    _ensure_admin(user)
+    from app.services.game import delivery
+
+    if body.master_general is not None:
+        await delivery.set_master_mode(
+            session, delivery.MODULE_GENERAL, body.master_general
+        )
+    if body.master_achievements is not None:
+        await delivery.set_master_mode(
+            session, delivery.MODULE_ACHIEVEMENTS, body.master_achievements
+        )
+    if body.feature is not None and body.mode is not None:
+        await delivery.set_feature_mode(session, body.feature, body.mode)
+    if body.features:
+        for key, mode in body.features.items():
+            await delivery.set_feature_mode(session, key, mode)
+    log.info("admin.delivery_updated", by=user.id)
+    return await _delivery_state(session)
+
+
+@router.post("/admin/delivery/apply-all", response_model=DeliveryOut)
+async def admin_delivery_apply_all(
+    body: DeliveryApplyIn, session: SessionDep, user: CurrentUser
+) -> DeliveryOut:
+    """Одним кликом перевести ВСЕ фичи (оба мастера) в один режим."""
+    _ensure_admin(user)
+    from app.services.game import delivery
+
+    for module in delivery.MODULES:
+        await delivery.set_master_mode(session, module, body.mode)
+    log.info("admin.delivery_apply_all", mode=body.mode, by=user.id)
+    return await _delivery_state(session)
+
+
+# --------------------------------------------------------------------------
+# GHG11: блок отладки игрока (в самый низ игрового раздела)
+# --------------------------------------------------------------------------
+
+
+class GameXpAddIn(GamePlayerIn):
+    """Прибавить (или отнять) опыт к текущему значению."""
+
+    delta: int = Field(..., ge=-100000, le=100000)
+
+
+class GamePrestigeIn(GamePlayerIn):
+    """Включить/выключить престиж (выводится из опыта, поэтому правим опыт)."""
+
+    enabled: bool
+
+
+async def _profile_xp(session, target) -> int:  # noqa: ANN001
+    from app.db.models import GameProfile
+
+    profile = await session.get(GameProfile, target.id)
+    return int(profile.xp) if profile is not None else 0
+
+
+@router.post("/admin/game/xp/add", response_model=GamePlayerOut)
+async def admin_game_add_xp(
+    body: GameXpAddIn, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Прибавить кастомное значение опыта к текущему (отладка)."""
+    _ensure_admin(user)
+    from app.db.models import GameProfile
+
+    target = await _game_player(
+        session, telegram_id=body.telegram_id, user_id=body.user_id
+    )
+    profile = await session.get(GameProfile, target.id)
+    new_xp = max(0, await _profile_xp(session, target) + body.delta)
+    if profile is None:
+        session.add(GameProfile(user_id=target.id, xp=new_xp))
+    else:
+        profile.xp = new_xp
+    await session.commit()
+    log.info("admin.game_xp_added", target=target.id, delta=body.delta, by=user.id)
+    return await _game_player_out(session, target)
+
+
+@router.post("/admin/game/xp/reset", response_model=GamePlayerOut)
+async def admin_game_reset_xp(
+    body: GamePlayerIn, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Обнулить опыт выбранного участника."""
+    _ensure_admin(user)
+    from app.db.models import GameProfile
+
+    target = await _game_player(
+        session, telegram_id=body.telegram_id, user_id=body.user_id
+    )
+    profile = await session.get(GameProfile, target.id)
+    if profile is None:
+        session.add(GameProfile(user_id=target.id, xp=0))
+    else:
+        profile.xp = 0
+    await session.commit()
+    log.info("admin.game_xp_reset", target=target.id, by=user.id)
+    return await _game_player_out(session, target)
+
+
+@router.post("/admin/game/prestige", response_model=GamePlayerOut)
+async def admin_game_prestige(
+    body: GamePrestigeIn, session: SessionDep, user: CurrentUser
+) -> GamePlayerOut:
+    """Переключатель престижа: вкл → опыт выше порога максимума, выкл → ровно порог.
+
+    Престиж в проекте ВЫВОДИТСЯ из опыта (`levels.prestige_for_xp`), поэтому
+    «тумблер» подкручивает опыт ровно к порогу, чтобы ранг и престиж были
+    консистентны.
+    """
+    _ensure_admin(user)
+    from app.db.models import GameProfile
+    from app.services.game.levels import xp_cap
+
+    target = await _game_player(
+        session, telegram_id=body.telegram_id, user_id=body.user_id
+    )
+    cap = xp_cap()
+    new_xp = cap + 100 if body.enabled else cap
+    profile = await session.get(GameProfile, target.id)
+    if profile is None:
+        session.add(GameProfile(user_id=target.id, xp=new_xp))
+    else:
+        profile.xp = new_xp
+    await session.commit()
+    log.info(
+        "admin.game_prestige", target=target.id, enabled=body.enabled, by=user.id
+    )
+    return await _game_player_out(session, target)
+
+
+# --------------------------------------------------------------------------
+# GHG11: очистка пула фраз (просмотр пула был read-only)
+# --------------------------------------------------------------------------
+
+
+@router.delete("/admin/random-phrases/pool", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def clear_rp_pool(
+    session: SessionDep,
+    user: CurrentUser,
+    user_id: int | None = None,
+    all_time: bool = False,
+) -> Response:
+    """Удалить фразы из пула: у одного участника или весь пул.
+
+    Пул — это `chat_messages` (в пределах lookback, либо вообще, если
+    `all_time=true`). Возвращаем 204.
+    """
+    _ensure_admin(user)
+    from datetime import timedelta as _td
+
+    from app.db.models import ChatMessage as _CM
+
+    stmt = delete(_CM)
+    if not all_time:
+        lookback_days = await get_random_phrases_lookback_days(session)
+        cutoff = datetime.now(timezone.utc) - _td(days=lookback_days)
+        stmt = stmt.where(_CM.sent_at >= cutoff)
+    if user_id is not None:
+        stmt = stmt.where(_CM.user_id == user_id)
+    result = await session.execute(stmt)
+    await session.commit()
+    log.info(
+        "admin.rp_pool_cleared",
+        removed=result.rowcount,
+        user_id=user_id,
+        all_time=all_time,
+        by=user.id,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -341,6 +341,45 @@ class GameSocialIn(BaseModel):
     chat_output_mode: str | None = None
 
 
+class DeliveryFeatureOut(BaseModel):
+    """GHG11: одна фича в единой модели доставки."""
+
+    key: str
+    label: str
+    module: str = "general"
+    mode: str = "chat"
+    hint: str = ""
+
+
+class DeliveryOut(BaseModel):
+    """Состояние мастер-свитчеров и всех фич.
+
+    `master_*` — одно из четырёх состояний либо `custom` (фичи разъехались).
+    """
+
+    modes: list[str]
+    mode_labels: dict[str, str]
+    master_general: str = "chat"
+    master_achievements: str = "chat"
+    features: list[DeliveryFeatureOut] = []
+
+
+class DeliveryIn(BaseModel):
+    """Частичная правка: мастер(ы) и/или одна фича и/или пачка фич."""
+
+    master_general: str | None = None
+    master_achievements: str | None = None
+    feature: str | None = None
+    mode: str | None = None
+    features: dict[str, str] | None = None
+
+
+class DeliveryApplyIn(BaseModel):
+    """Применить один режим ко ВСЕМ фичам обоих мастеров."""
+
+    mode: str
+
+
 class FeedItemOut(BaseModel):
     """Э20: одна запись ленты активности в мини-аппе.
 

@@ -262,7 +262,16 @@ async def _autoloser_job(bot: Bot) -> None:
             return
         # Окно — мягкая защита: cron уже стартует только внутри окна,
         # но кейс interval=0 (random) может попасть точно на границу.
-        now = datetime.now()
+        # GHG11: выбранные дни недели (пусто → все) + выключенный мастером автолох.
+        days = cfg.get("days") or []
+        if days and now.weekday() not in days:
+            log.info("autoloser.day_skipped", weekday=now.weekday(), days=days)
+            return
+        from app.services.game import delivery as _delivery
+
+        if await _delivery.get_feature_mode(session, "loser_auto") == _delivery.MODE_OFF:
+            log.info("autoloser.feature_off")
+            return
         if not (cfg["window_start_hour"] <= now.hour < cfg["window_end_hour"]):
             log.info("autoloser.outside_window", hour=now.hour, cfg=cfg)
             return
@@ -577,15 +586,49 @@ def _parse_hhmm(s: str) -> tuple[int, int]:
         return 19, 37
 
 
-def _build_autoloser_trigger(cfg: dict, tz: str):
-    """A6: либо фиксированный интервал в часах, либо random раз в сутки в окне.
+def _autoloser_days_csv(cfg: dict) -> str:
+    """CSV дней недели для CronTrigger (0=пн..6=вс). Пусто → все дни."""
+    days = cfg.get("days")
+    if not days:
+        return "mon-sun"
+    return ",".join({0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}[d] for d in sorted(days))
 
-    Для random берём одно случайное HH:MM в окне на сегодня/завтра и ставим
-    DateTrigger; после выстрела `reload_dynamic_jobs` ставит следующий день.
+
+def _build_autoloser_trigger(cfg: dict, tz: str):
+    """GHG11: три понятных режима автолоха.
+
+    * ``fixed``    — одно и то же время (`fixed_hour:fixed_minute`) по выбранным
+      дням недели (дефолт 18:00, все дни);
+    * ``random``   — раз в сутки в окне `autoloser.window_*` (как раньше);
+    * ``interval`` — по слоту день/ночь (``interval_slot``) — кладём интервал
+      ``intervals.day_*`` / ``intervals.night_*`` и перезапускаем раз в сутки.
+
+    Если `days` задан — фиксированный режим получает список дней, а
+    random/interval всё равно проверяют день недели внутри job.
     """
-    if cfg["interval_hours"] > 0:
-        # Фиксированный интервал — IntervalTrigger; окно проверяем внутри job.
-        return IntervalTrigger(hours=cfg["interval_hours"], jitter=300)
+    mode = cfg.get("mode") or ("interval" if cfg.get("interval_hours", 0) > 0 else "random")
+    if mode == "fixed":
+        return CronTrigger(
+            day_of_week=_autoloser_days_csv(cfg),
+            hour=cfg.get("fixed_hour", 18),
+            minute=cfg.get("fixed_minute", 0),
+            timezone=tz,
+        )
+    if mode == "interval":
+        # Интервал как «раз в сутки» в выбранном слоте: ставим следующий DateTrigger
+        # по времени из интервала день/ночь.
+        slot = cfg.get("interval_slot", "day")
+        win = cfg.get("interval_window") or {}
+        start = win.get(f"{slot}_start", "18:00")
+        try:
+            hh, mm = (int(x) for x in str(start).split(":"))
+        except (ValueError, AttributeError):
+            hh, mm = 18, 0
+        now = datetime.now()
+        candidate = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+        if candidate <= now:
+            candidate = candidate + timedelta(days=1)
+        return DateTrigger(run_date=candidate)
     # random раз в сутки: следующий запуск — случайная минута в окне.
     start_h = cfg["window_start_hour"]
     end_h = cfg["window_end_hour"]
@@ -680,6 +723,13 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
         "window_start_hour": sched_cfg["loser"]["window_start_hour"],
         "window_end_hour": sched_cfg["loser"]["window_end_hour"],
         "interval_hours": sched_cfg["loser"]["interval_hours"],
+        # GHG11: дни недели, режим (fixed/random/interval), слот и время fixed.
+        "days": sched_cfg["loser"].get("days") or [],
+        "mode": sched_cfg["loser"].get("mode") or "random",
+        "fixed_hour": sched_cfg["loser"].get("fixed_hour", 18),
+        "fixed_minute": sched_cfg["loser"].get("fixed_minute", 0),
+        "interval_slot": sched_cfg["loser"].get("interval_slot", "day"),
+        "interval_window": sched_cfg.get("intervals") or {},
     }
     if autoloser_cfg["enabled"]:
         sched.add_job(

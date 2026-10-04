@@ -159,7 +159,8 @@ def test_tier_marks_show_which_anniversaries_are_taken():
     codes = catalog.tier_codes("chin_up")
     marks = report.tier_marks("chin_up", {codes[0]})
     assert "×10 ✅" in marks
-    assert "×20 ▫️" in marks
+    # GHG11: у лоха остался ровно один юбилей ×10 — ×20 больше нет.
+    assert "×20" not in marks
     # У ачивки без юбилеев строки нет вообще — не рисуем пустое «юбилеи:».
     assert report.tier_marks("self_shot", set()) == ""
 

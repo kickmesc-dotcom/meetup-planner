@@ -1,6 +1,7 @@
 import { ReactNode, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
+  clearRandomPhrasesPool,
   fetchRandomPhrasesPool,
   triggerRandomPhrases,
 } from "@/api/admin";
@@ -10,7 +11,6 @@ import ChukhanScreen from "./ChukhanScreen";
 import LoserScreen from "./loser/LoserScreen";
 import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
 import RandomPhrasesScreen from "./RandomPhrasesScreen";
-import PersonasScreen from "./PersonasScreen";
 import BotReactionsScreen from "./BotReactionsScreen";
 import MediaReactionsScreen from "./MediaReactionsScreen";
 import AdviceScreen from "./AdviceScreen";
@@ -31,6 +31,7 @@ import JobsQueueScreen from "./JobsQueueScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
 import GameScreen from "./GameScreen";
 import AllFeaturesScreen from "./AllFeaturesScreen";
+import DeliveryScreen from "./DeliveryScreen";
 
 type Section =
   | "root"
@@ -38,7 +39,6 @@ type Section =
   | "loser"
   | "scheduled-pubs"
   | "rp"
-  | "personas"
   | "bot-reactions"
   | "media-reactions"
   | "advice"
@@ -56,6 +56,7 @@ type Section =
   | "jobs"
   | "game"
   | "all-features"
+  | "delivery"
   | "space-restart";
 
 interface Props {
@@ -79,6 +80,16 @@ export default function AdminScreen({ users }: Props) {
     staleTime: 30_000,
   });
 
+  // GHG11: очистка пула фраз (был только просмотр).
+  const clearPool = useMutation({
+    mutationFn: () => clearRandomPhrasesPool(),
+    onSuccess: () => {
+      haptic("success");
+      void pool.refetch();
+    },
+    onError: () => haptic("error"),
+  });
+
   // T3.3: счётчик пропущенных постов для бейджа на карточке (read-only, обычно 0).
   const postingAlerts = useQuery({
     queryKey: ["admin", "posting-alerts"],
@@ -92,7 +103,6 @@ export default function AdminScreen({ users }: Props) {
   if (section === "loser") return <LoserScreen users={users} onBack={back} />;
   if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
   if (section === "rp") return <RandomPhrasesScreen onBack={back} />;
-  if (section === "personas") return <PersonasScreen onBack={back} />;
   if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
   if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "advice") return <AdviceScreen onBack={back} />;
@@ -111,6 +121,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
   if (section === "game") return <GameScreen users={users} onBack={back} />;
   if (section === "all-features") return <AllFeaturesScreen onBack={back} />;
+  if (section === "delivery") return <DeliveryScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -122,6 +133,17 @@ export default function AdminScreen({ users }: Props) {
       {/* GHG6 E11: статус глобальной паузы — sticky-плашка при active, иначе
           компактная полоска «в эфире» с кнопкой инициации паузы. */}
       <BotPauseBar />
+
+      {/* GHG11: «Режим бота» — мастер-свитчеры доставки САМЫМ ПЕРВЫМ разделом:
+          это точка входа для «куда вообще пишет бот» (чат / мини-апп / оба). */}
+      <SectionGroup icon="🎛" title="Режим бота">
+        <Card
+          icon="🎛"
+          title="Куда пишет бот"
+          subtitle="Мастер-режим: Выкл · Чат · Мини-апп · Чат+апп (все механики)"
+          onClick={() => select("delivery")}
+        />
+      </SectionGroup>
 
       {/* ⚡ Quick actions
           GHG6 D4: убрали «Крутануть лоха» — он игнорил cooldown и не показывал recent;
@@ -191,6 +213,17 @@ export default function AdminScreen({ users }: Props) {
                     </li>
                   ))}
                 </ul>
+                <button
+                  type="button"
+                  disabled={clearPool.isPending}
+                  onClick={() => {
+                    haptic("medium");
+                    clearPool.mutate();
+                  }}
+                  className="mt-2 w-full min-h-9 rounded-lg bg-status-busy/15 px-3 py-1.5 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
+                >
+                  {clearPool.isPending ? "🗑 Чистим…" : "🗑 Очистить пул фраз"}
+                </button>
               </>
             ) : null}
           </div>
@@ -252,13 +285,6 @@ export default function AdminScreen({ users }: Props) {
           title="Рандомные фразы"
           subtitle="Расписание автопоста + параметры генератора"
           onClick={() => select("rp")}
-        />
-        {/* GHG8 P6.1: редактор типажей для генератора v2. */}
-        <Card
-          icon="🎭"
-          title="Персоналии"
-          subtitle="Типажи участников для генератора фраз v2"
-          onClick={() => select("personas")}
         />
         {/* GHG7 P2.3.h: «Лох дня» (автовыбор) больше не отдельный пункт здесь —
             настройки автовыбора влиты в единый экран «Лох» (см. ниже). */}

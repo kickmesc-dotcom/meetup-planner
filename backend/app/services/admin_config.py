@@ -53,6 +53,34 @@ AUTOLOSER_ENABLED_KEY = "autoloser.enabled"
 AUTOLOSER_WINDOW_START_HOUR_KEY = "autoloser.window_start_hour"  # default 7
 AUTOLOSER_WINDOW_END_HOUR_KEY = "autoloser.window_end_hour"      # default 22
 AUTOLOSER_INTERVAL_HOURS_KEY = "autoloser.interval_hours"        # 0 = random раз в сутки
+# GHG11: понятный шедулер автолоха вместо «сложного рандома с интервалами».
+#   * `autoloser.days` — CSV дней недели (0=пн..6=вс), по умолчанию все;
+#   * `autoloser.mode` — "fixed" (одно время) | "random" (раз в сутки) |
+#                         "interval" (по слоту день/ночь);
+#   * `autoloser.fixed_hour`/`fixed_minute` — время для fixed (18:00);
+#   * `autoloser.interval_slot` — "day" | "night" для interval.
+AUTOLOSER_DAYS_KEY = "autoloser.days"
+AUTOLOSER_MODE_KEY = "autoloser.mode"
+AUTOLOSER_FIXED_HOUR_KEY = "autoloser.fixed_hour"
+AUTOLOSER_FIXED_MINUTE_KEY = "autoloser.fixed_minute"
+AUTOLOSER_INTERVAL_SLOT_KEY = "autoloser.interval_slot"
+
+AUTOLOSER_MODES = ("fixed", "random", "interval")
+AUTOLOSER_SLOTS = ("day", "night")
+_DEFAULT_AUTOLOSER_DAYS = (0, 1, 2, 3, 4, 5, 6)
+
+# GHG11: раздельные интервалы «день»/«ночь» — общая величина, на которую
+# ссылаются другие фичи (интервальный автолох, чухан, рандомные фразы).
+INTERVAL_DAY_START_KEY = "intervals.day_start"    # "07:00"
+INTERVAL_DAY_END_KEY = "intervals.day_end"        # "23:00"
+INTERVAL_NIGHT_START_KEY = "intervals.night_start"  # "23:00"
+INTERVAL_NIGHT_END_KEY = "intervals.night_end"      # "07:00"
+_DEFAULT_INTERVALS = {
+    "day_start": "07:00",
+    "day_end": "23:00",
+    "night_start": "23:00",
+    "night_end": "07:00",
+}
 
 # --- T3.4: «магический шар» (/advice / #совет) ---
 ADVICE_ENABLED_KEY = "advice.enabled"   # default True
@@ -446,8 +474,10 @@ async def set_phrases_source_mode(session: AsyncSession, mode: str) -> None:
 # --- GHG8 P6.3: версия генератора фраз (legacy = нарезка сообщений v1,
 # personas = типажи v2). Расписание/шанс/ручной триггер ОБЩИЕ для обеих
 # версий (P6.2.b) — переключается только composer.
+# GHG11: вариант «типажи» (personas) убран из настроек — остаётся только
+# legacy-генератор. Ветка `personas` в `random_phrases` становится недостижимой.
 PHRASE_GENERATOR_VERSION_KEY = "phrase_generator.version"
-PHRASE_GENERATOR_VERSIONS = ("legacy", "personas")
+PHRASE_GENERATOR_VERSIONS = ("legacy",)
 _PHRASE_GENERATOR_VERSION_DEFAULT = "legacy"
 
 
@@ -531,13 +561,47 @@ async def set_poll_time_presets(session: AsyncSession, presets: list[dict]) -> N
 
 # --- A6: Auto-loser ---
 
+def _parse_weekdays(raw: str | None) -> list[int]:
+    """"0,1,2" → [0,1,2]. Пусто/мусор → все дни (пн-вс)."""
+    if raw is None:
+        return list(_DEFAULT_AUTOLOSER_DAYS)
+    out: list[int] = []
+    for chunk in raw.replace(";", ",").split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        try:
+            d = int(chunk)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= d <= 6 and d not in out:
+            out.append(d)
+    return sorted(out)
+
+
 async def get_autoloser_settings(session: AsyncSession) -> dict:
+    start_h = max(0, min(23, await _get_int(session, AUTOLOSER_WINDOW_START_HOUR_KEY, 7)))
+    end_h = max(0, min(23, await _get_int(session, AUTOLOSER_WINDOW_END_HOUR_KEY, 22)))
+    mode = await _get_value(session, AUTOLOSER_MODE_KEY)
+    if mode not in AUTOLOSER_MODES:
+        # Наследуем из старого поведения: interval_hours>0 → interval, иначе random.
+        legacy_interval = await _get_int(session, AUTOLOSER_INTERVAL_HOURS_KEY, 0)
+        mode = "interval" if legacy_interval > 0 else "random"
+    slot = await _get_value(session, AUTOLOSER_INTERVAL_SLOT_KEY)
+    if slot not in AUTOLOSER_SLOTS:
+        slot = "day"
+    days = _parse_weekdays(await _get_value(session, AUTOLOSER_DAYS_KEY))
     return {
         "enabled": await _get_bool(session, AUTOLOSER_ENABLED_KEY, False),
-        "window_start_hour": max(0, min(23, await _get_int(session, AUTOLOSER_WINDOW_START_HOUR_KEY, 7))),
-        "window_end_hour": max(0, min(23, await _get_int(session, AUTOLOSER_WINDOW_END_HOUR_KEY, 22))),
+        "window_start_hour": start_h,
+        "window_end_hour": end_h,
         # 0 = random раз в сутки в окне; >0 = фиксированный интервал в часах.
         "interval_hours": max(0, min(72, await _get_int(session, AUTOLOSER_INTERVAL_HOURS_KEY, 0))),
+        "days": days,
+        "mode": mode,
+        "fixed_hour": max(0, min(23, await _get_int(session, AUTOLOSER_FIXED_HOUR_KEY, 18))),
+        "fixed_minute": max(0, min(59, await _get_int(session, AUTOLOSER_FIXED_MINUTE_KEY, 0))),
+        "interval_slot": slot,
     }
 
 
@@ -548,6 +612,11 @@ async def set_autoloser_settings(
     window_start_hour: int,
     window_end_hour: int,
     interval_hours: int,
+    days: list[int] | None = None,
+    mode: str | None = None,
+    fixed_hour: int = 18,
+    fixed_minute: int = 0,
+    interval_slot: str = "day",
 ) -> None:
     await _set_value(session, AUTOLOSER_ENABLED_KEY, "true" if enabled else "false")
     await _set_value(
@@ -559,6 +628,41 @@ async def set_autoloser_settings(
     await _set_value(
         session, AUTOLOSER_INTERVAL_HOURS_KEY, str(max(0, min(72, interval_hours)))
     )
+    if days is not None:
+        clean = sorted({d for d in days if 0 <= d <= 6})
+        await _set_value(session, AUTOLOSER_DAYS_KEY, ",".join(str(d) for d in clean))
+    if mode is not None:
+        if mode not in AUTOLOSER_MODES:
+            raise ValueError(f"bad autoloser mode: {mode!r}")
+        await _set_value(session, AUTOLOSER_MODE_KEY, mode)
+    await _set_value(session, AUTOLOSER_FIXED_HOUR_KEY, str(max(0, min(23, fixed_hour))))
+    await _set_value(
+        session, AUTOLOSER_FIXED_MINUTE_KEY, str(max(0, min(59, fixed_minute)))
+    )
+    if interval_slot not in AUTOLOSER_SLOTS:
+        interval_slot = "day"
+    await _set_value(session, AUTOLOSER_INTERVAL_SLOT_KEY, interval_slot)
+
+
+async def get_intervals(session: AsyncSession) -> dict:
+    """GHG11: раздельные интервалы день/ночь ("HH:MM"). Читают разные фичи."""
+    return {
+        "day_start": await _get_hhmm(session, INTERVAL_DAY_START_KEY, "07:00"),
+        "day_end": await _get_hhmm(session, INTERVAL_DAY_END_KEY, "23:00"),
+        "night_start": await _get_hhmm(session, INTERVAL_NIGHT_START_KEY, "23:00"),
+        "night_end": await _get_hhmm(session, INTERVAL_NIGHT_END_KEY, "07:00"),
+    }
+
+
+async def set_intervals(session: AsyncSession, body: dict) -> None:
+    for key, cfg_key, default in (
+        ("day_start", INTERVAL_DAY_START_KEY, "07:00"),
+        ("day_end", INTERVAL_DAY_END_KEY, "23:00"),
+        ("night_start", INTERVAL_NIGHT_START_KEY, "23:00"),
+        ("night_end", INTERVAL_NIGHT_END_KEY, "07:00"),
+    ):
+        if key in body:
+            await _set_value(session, cfg_key, _validate_hhmm(body[key], default))
 
 
 # =============================================================================
@@ -863,7 +967,14 @@ async def get_scheduled_settings(session: AsyncSession) -> dict:
             "window_start_hour": auto["window_start_hour"],
             "window_end_hour": auto["window_end_hour"],
             "interval_hours": auto["interval_hours"],
+            # GHG11: понятный шедулер автолоха.
+            "days": auto["days"],
+            "mode": auto["mode"],
+            "fixed_hour": auto["fixed_hour"],
+            "fixed_minute": auto["fixed_minute"],
+            "interval_slot": auto["interval_slot"],
         },
+        "intervals": await get_intervals(session),
         "phrases": {
             "enabled": await get_random_phrases_enabled(session),
             "window_start": await _get_hhmm(session, PHRASES_WINDOW_START_KEY, "07:30"),
@@ -923,8 +1034,17 @@ async def set_scheduled_settings(session: AsyncSession, body: dict) -> None:
             window_start_hour=int(loser.get("window_start_hour", 7)),
             window_end_hour=int(loser.get("window_end_hour", 22)),
             interval_hours=int(loser.get("interval_hours", interval)),
+            days=loser.get("days") if "days" in loser else None,
+            mode=loser.get("mode"),
+            fixed_hour=int(loser.get("fixed_hour", 18)),
+            fixed_minute=int(loser.get("fixed_minute", 0)),
+            interval_slot=loser.get("interval_slot", "day"),
         )
         await _set_value(session, LOSER_AUTO_PER_DAY_KEY, str(max(1, min(12, per_day))))
+
+    intervals = body.get("intervals") or {}
+    if intervals:
+        await set_intervals(session, intervals)
 
     phrases = body.get("phrases") or {}
     if "enabled" in phrases:

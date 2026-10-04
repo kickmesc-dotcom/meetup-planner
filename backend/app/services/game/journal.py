@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.models import GameJournalEntry, User
+from app.services.game import delivery
 from app.services.game.chat_mode import chat_all_silent, get_chat_mode
 from app.services.admin_config import (
     get_achievements_pool_gap_minutes,
@@ -109,6 +110,7 @@ async def send_now(
     reply_markup=None,
     session: AsyncSession | None = None,
     force: bool = False,
+    feature: str | None = None,
 ) -> bool:
     """Прямая отправка в чат. Best-effort, без исключений наружу.
 
@@ -117,14 +119,23 @@ async def send_now(
     дверь, через которую такие сообщения и уходят. `force=True` — для
     сообщений, инициированных человеком (команды, напоминания о встречах),
     они проходят независимо от режима.
+
+    GHG11: если задан `feature` — чат-часть фичи молчит в режимах ``off`` и
+    ``app`` (активность уходит только в ленту мини-аппа).
     """
     settings = get_settings()
     target = chat_id or settings.group_chat_id
     if not target or not text:
         return False
-    if not force and await chat_all_silent(session):
-        log.info("game.chat_send_suppressed", target=target)
-        return False
+    if not force:
+        if feature is not None and not delivery.chat_enabled(
+            await delivery.get_feature_mode(session, feature)
+        ):
+            log.info("game.chat_send_suppressed", target=target, feature=feature)
+            return False
+        if await chat_all_silent(session):
+            log.info("game.chat_send_suppressed", target=target)
+            return False
     bot = _get_bot()
     if bot is None:
         return False
@@ -171,6 +182,17 @@ async def _record_feed_only(
     return True
 
 
+# GHG11: как вид журнальной записи соотносится с фичей реестра доставки.
+KIND_FEATURE: dict[str, str] = {
+    KIND_ACHIEVEMENT: "achievements",
+    KIND_ACHIEVEMENT_POOL: "achievements",
+    KIND_HOLIDAY: "holidays",
+    KIND_EVENT: "events",
+    KIND_CONTRABAND: "contraband",
+    KIND_MEMORIAL: "memorial",
+}
+
+
 async def announce(
     session: AsyncSession,
     *,
@@ -182,19 +204,23 @@ async def announce(
 ) -> bool:
     """Единственная точка анонса игровых событий.
 
-    Режим сводки выключен (по умолчанию) → отправляем сразу, как раньше.
-    Включён → кладём в журнал; текст уйдёт следующим окном, кнопки в сводке
-    общие (одна «свои ачивки» на всё сообщение).
+    GHG11: маршрут определяется режимом фичи (off/chat/app/both).
 
-    Э20: два софт-режима приглушения (`chat.output_mode`) — тоже здесь:
-    * `achievements` — ачивки не уходят в чат (только в ленту), остальное как было;
-    * `all` — в чат не уходит НИЧЕГО проактивное (только в ленту).
+    * ``off``  — запись отбрасывается;
+    * ``app``  — только строка в ленте (в чат ничего);
+    * ``chat`` — как раньше: сразу или через сводку (`game.digest.enabled`);
+    * ``both`` — в чат И строка в ленте.
+
+    Для видов без фичи (``other``) сохраняется прежнее поведение с учётом
+    legacy-режима `chat.output_mode` (Э20).
     """
     if not text:
         return False
     try:
-        mode = await get_chat_mode(session)
-        if mode == "all" or (mode == "achievements" and kind in _ACHIEVEMENT_KINDS):
+        # Legacy-режим Э20 (`chat.output_mode`) остаётся в силе: он уже настроен
+        # в бою и должен продолжать работать поверх новой модели доставки.
+        legacy = await get_chat_mode(session)
+        if legacy == "all" or (legacy == "achievements" and kind in _ACHIEVEMENT_KINDS):
             return await _record_feed_only(
                 session,
                 kind=kind,
@@ -202,6 +228,44 @@ async def announce(
                 subject_user_id=subject_user_id,
                 chat_id=chat_id,
             )
+        feature = KIND_FEATURE.get(kind)
+        if feature is not None:
+            mode = await delivery.get_feature_mode(session, feature)
+            if mode == delivery.MODE_OFF:
+                log.info("game.announce_feature_off", kind=kind, feature=feature)
+                return False
+            if mode == delivery.MODE_APP:
+                return await _record_feed_only(
+                    session,
+                    kind=kind,
+                    text=text,
+                    subject_user_id=subject_user_id,
+                    chat_id=chat_id,
+                )
+            if mode == delivery.MODE_BOTH:
+                # Дублируем в ленту. При включённой сводке чат-часть уезжает
+                # очередью — там строку ленты даст сама запись журнала, и
+                # второй (feed-only) строки заводить не нужно.
+                if not await get_game_digest_enabled(session):
+                    await _record_feed_only(
+                        session,
+                        kind=kind,
+                        text=text,
+                        subject_user_id=subject_user_id,
+                        chat_id=chat_id,
+                    )
+            # chat / both: чат-часть ниже, как в legacy-пути.
+        else:
+            # Вид без фичи — прежнее поведение Э20.
+            mode = await get_chat_mode(session)
+            if mode == "all" or (mode == "achievements" and kind in _ACHIEVEMENT_KINDS):
+                return await _record_feed_only(
+                    session,
+                    kind=kind,
+                    text=text,
+                    subject_user_id=subject_user_id,
+                    chat_id=chat_id,
+                )
         if not await get_game_digest_enabled(session):
             return await send_now(text, chat_id=chat_id, reply_markup=reply_markup)
         # `chat_id` намеренно не подставляем из настроек здесь: сводка уедет

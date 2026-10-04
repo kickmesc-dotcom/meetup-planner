@@ -131,11 +131,12 @@ def test_pick_activity_skews_distribution():
 # --- P6.3: версия генератора ---
 
 def test_generator_versions_and_default():
-    assert set(PHRASE_GENERATOR_VERSIONS) == {"legacy", "personas"}
+    # GHG11: «типажи» убраны из настроек — остался только legacy-генератор.
+    assert set(PHRASE_GENERATOR_VERSIONS) == {"legacy"}
     assert _PHRASE_GENERATOR_VERSION_DEFAULT == "legacy"
 
 
-@pytest.mark.parametrize("v", ["legacy", "personas"])
+@pytest.mark.parametrize("v", ["legacy"])
 def test_generator_settings_accepts_valid_version(v):
     out = GeneratorSettingsOut(
         count_min=2, count_max=6, lookback_days=7,

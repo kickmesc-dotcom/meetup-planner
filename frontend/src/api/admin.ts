@@ -1307,6 +1307,39 @@ export const setGamePlayerXp = (telegramId: number, xpTotal: number) =>
     body: JSON.stringify({ telegram_id: telegramId, xp_total: xpTotal }),
   });
 
+// GHG11: блок отладки — прибавить/обнулить опыт, тумблер престижа.
+export const addGamePlayerXp = (telegramId: number, delta: number) =>
+  api<GamePlayerState>("/api/admin/game/xp/add", {
+    method: "POST",
+    body: JSON.stringify({ telegram_id: telegramId, delta }),
+  });
+
+export const resetGamePlayerXp = (telegramId: number) =>
+  api<GamePlayerState>("/api/admin/game/xp/reset", {
+    method: "POST",
+    body: JSON.stringify({ telegram_id: telegramId }),
+  });
+
+export const setGamePrestige = (telegramId: number, enabled: boolean) =>
+  api<GamePlayerState>("/api/admin/game/prestige", {
+    method: "POST",
+    body: JSON.stringify({ telegram_id: telegramId, enabled }),
+  });
+
+/** GHG11: очистка пула фраз (всё или только у одного участника). */
+export const clearRandomPhrasesPool = (opts: {
+  userId?: number;
+  allTime?: boolean;
+} = {}) => {
+  const q = new URLSearchParams();
+  if (opts.userId != null) q.set("user_id", String(opts.userId));
+  if (opts.allTime) q.set("all_time", "true");
+  const suffix = q.toString() ? `?${q.toString()}` : "";
+  return api<void>(`/api/admin/random-phrases/pool${suffix}`, {
+    method: "DELETE",
+  });
+};
+
 // --- GHG10 Э13: сводка, поминовения, события, контрабанда ---
 
 /** Слово-контрабанда: чьё, сколько платит, в каких формулировках ловится. */
@@ -1472,3 +1505,45 @@ export const updateGameMusic = (
 
 export const removeMusicTrack = (trackId: number) =>
   api<MusicState>(`/api/admin/game/music/tracks/${trackId}`, { method: "DELETE" });
+
+// --- GHG11: единая модель доставки (off / chat / app / both) ---
+
+export type DeliveryMode = "off" | "chat" | "app" | "both";
+export type DeliveryMaster = DeliveryMode | "custom";
+
+export interface DeliveryFeature {
+  key: string;
+  label: string;
+  module: string;
+  mode: DeliveryMode;
+  hint: string;
+}
+
+export interface DeliveryState {
+  modes: DeliveryMode[];
+  mode_labels: Record<string, string>;
+  master_general: DeliveryMaster;
+  master_achievements: DeliveryMaster;
+  features: DeliveryFeature[];
+}
+
+export const fetchDelivery = () => api<DeliveryState>("/api/admin/delivery");
+
+export const updateDelivery = (body: {
+  master_general?: DeliveryMode;
+  master_achievements?: DeliveryMode;
+  feature?: string;
+  mode?: DeliveryMode;
+  features?: Record<string, DeliveryMode>;
+}) =>
+  api<DeliveryState>("/api/admin/delivery", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+
+/** Одним кликом перевести ВСЕ фичи (оба мастера) в один режим. */
+export const applyDeliveryAll = (mode: DeliveryMode) =>
+  api<DeliveryState>("/api/admin/delivery/apply-all", {
+    method: "POST",
+    body: JSON.stringify({ mode }),
+  });
