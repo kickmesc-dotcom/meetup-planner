@@ -76,6 +76,14 @@ export interface ScheduledJob {
 export const fetchScheduledJobs = () =>
   api<ScheduledJob[]>("/api/admin/jobs");
 
+/**
+ * GHG11(3): мастер-кнопка «схлопнуть все запланированные авто-задачи».
+ * Полностью пересобирает планировщик (как рестарт спейса): сбрасывает зависшие
+ * экземпляры и перечитывает расписание из конфига.
+ */
+export const collapseScheduler = () =>
+  api<{ jobs: number }>("/api/admin/scheduler/collapse", { method: "POST" });
+
 // GHG6 N1: история опросов и игр.
 export interface PollHistoryVote {
   user_id: number;

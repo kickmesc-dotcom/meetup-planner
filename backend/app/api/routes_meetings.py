@@ -340,15 +340,8 @@ async def loser_roll_endpoint(
                 header_emoji="🤡",
                 header_label="Автолох",
             )
-            # GHG11: в app/both дублируем результат в ленту мини-аппа.
-            if loser_app_ok and text:
-                await delivery.record_feed_event(
-                    session,
-                    feature="loser_manual",
-                    text=text,
-                    user_id=loser.id,
-                    icon="🤡",
-                )
+            # GHG11(3): запись о ролле в ленту пишем ПОСЛЕ `roll_loser` в самом
+            # эндпоинте (нужны roller/loser/reason и факт выдачи ачивки) — см. ниже.
             # GHG11: в «только апп»/выкл в чат не пишем — не утекает.
             if not loser_chat_ok or not target_chat:
                 return
@@ -379,6 +372,9 @@ async def loser_roll_endpoint(
         except Exception as exc:  # noqa: BLE001
             log.warning("loser.announce_unexpected", error=str(exc), **timings)
 
+    from app.services.game import achievements as _ach
+
+    had_truth = await _ach.has(session, user.id, "truth_seeker")
     try:
         row = await roll_loser(
             session, rolled_by=user, on_announce=_announce, source="duel"
@@ -394,6 +390,31 @@ async def loser_roll_endpoint(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="loser_roll_failed",
         ) from exc
+
+    # GHG11(3): в app/both — запись в ленту о ролле: кто крутил, кто выпал,
+    # причина и что за это начислено. В чат в «только апп» не утекает.
+    if loser_app_ok:
+        loser_user = await session.get(User, row.loser_user_id)
+        loser_name = (
+            loser_user.display_name if loser_user is not None else "кто-то"
+        )
+        reason = (row.reason_text or "").strip()
+        xp_note = ""
+        if not had_truth and await _ach.has(session, user.id, "truth_seeker"):
+            xp_note = " За рулетку выдан «Искатель истины» (+50 XP)."
+        feed_text = (
+            f"🤡 <b>{user.display_name}</b> прокрутил рулетку — выпал "
+            f"<b>{loser_name}</b>."
+            + (f" Причина: «{reason}»." if reason else "")
+            + xp_note
+        )
+        await delivery.record_feed_event(
+            session,
+            feature="loser_manual",
+            text=feed_text,
+            user_id=row.loser_user_id,
+            icon="🤡",
+        )
 
     log.info(
         "loser.rolled_ok",

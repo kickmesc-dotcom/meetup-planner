@@ -473,6 +473,19 @@ async def event(
     )
 
 
+@_guarded("advice")
+async def advice(
+    session: AsyncSession, user_id: int, *, cursed: bool = False
+) -> None:
+    """GHG11(3): закрутил магический шар → «Пифия» (+ юбилей ×10), а за
+    фирменный ответ «иди на хуй» — отдельная ачивка. Опыта сам шар не даёт:
+    только ачивки (у них свой XP).
+    """
+    if not await _enabled(session):
+        return
+    await achievements.on_advice(session, user_id, cursed=cursed)
+
+
 @_guarded(EV_CONTRABAND)
 async def contraband(
     session: AsyncSession,

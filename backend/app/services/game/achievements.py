@@ -89,6 +89,8 @@ COUNTER_OPIUM_BEST = "opium_streak_best"
 # Э18: червь-господин и кара. Оба — накопители («впервые» + юбилеи).
 COUNTER_WORM_LORD = "worm_lord"
 COUNTER_PUNISH = "punisher"
+# GHG11(3): сколько раз участник спросил магический шар. База «Пифия» + юбилей ×10.
+COUNTER_ADVICE = "advice_seeker"
 # Э19: журнал карательных применений в `event_log` — источник суточных ачивок
 # ("3 кары за сутки", "наказать всех за сутки"). Отдельной таблицы не заводим:
 # `event_log` уже есть в схеме и до сих пор пустовал.
@@ -261,6 +263,7 @@ async def progress(session: AsyncSession, user_id: int) -> dict[str, int]:
         "opium_for_nobody": await get_counter(session, user_id, COUNTER_OPIUM_BEST),
         "worm_lord": await get_counter(session, user_id, COUNTER_WORM_LORD),
         "punisher": await get_counter(session, user_id, COUNTER_PUNISH),
+        "advice_seeker": await get_counter(session, user_id, COUNTER_ADVICE),
     }
 
 
@@ -747,6 +750,29 @@ async def on_chukhan(
         session, user_id, "first_worm", await count_chukhan(session, user_id),
         announce=announce,
     )
+
+
+async def on_advice(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    cursed: bool = False,
+    announce: bool = True,
+) -> list[Achievement]:
+    """GHG11(3): закрутил магический шар → «Пифия» (первый) и юбилей ×10.
+
+    `cursed=True` — выпал фирменный ответ «иди на хуй»: отдельная instant-ачивка.
+    Счётчик ведём собственным `AchievementCounter` (источник — не таблица).
+    """
+    count = await bump_counter(session, user_id, COUNTER_ADVICE)
+    out = await _grant_counter(
+        session, user_id, "advice_seeker", count, announce=announce
+    )
+    if cursed:
+        ach = await grant(session, user_id, "advice_sent", announce=announce)
+        if ach:
+            out.append(ach)
+    return out
 
 
 async def on_availability(

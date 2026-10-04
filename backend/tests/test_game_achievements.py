@@ -145,7 +145,8 @@ def test_catalog_has_expected_number_of_base_achievements():
     Тиры — отдельные записи, но база считается по ним ровно один раз.
     """
     bases = base_achievements()
-    assert len(bases) == 32  # +punish_day3, punish_all, punish_bot (Э19)
+    # +advice_seeker, advice_sent (GHG11(3): магический шар).
+    assert len(bases) == 34
     # База + все юбилейные тиры.
     assert catalog_size() == len(bases) + sum(len(a.tiers) for a in bases)
 
@@ -237,9 +238,9 @@ def test_kind_distribution_matches_spec():
     kinds = [a.kind for a in base_achievements()]
     # 11 счётчиков (базовые + Э14–Э17) + 5 бывших порогов, ставших счётчиками;
     # 1 порог — music_streak (серия); 9 разовых.
-    assert kinds.count(KIND_COUNTER) == 18  # + worm_lord, punisher (Э18)
+    assert kinds.count(KIND_COUNTER) == 19  # + advice_seeker (GHG11(3))
     assert kinds.count(KIND_THRESHOLD) == 1  # music_streak
-    assert kinds.count(KIND_INSTANT) == 13  # + punisher-дня/всех/бота (Э19)
+    assert kinds.count(KIND_INSTANT) == 14  # + advice_sent (GHG11(3))
 
 
 def test_tiers_reached_is_pure_and_monotonic():

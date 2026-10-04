@@ -137,6 +137,16 @@ export interface GuestAchievement {
   code: string;
   title: string;
   icon: string;
+  /** GHG11(3): когда и за что — раскрывается по тапу. */
+  description?: string | null;
+  points?: number;
+  unlocked_at?: string | null;
+}
+
+/** GHG11(3): событие звания в истории участника. */
+export interface GuestTitleEvent {
+  at: string;
+  reason: string | null;
 }
 
 /** Э19: чужой игровой профиль «глазами гостя» — факты без настроек. */
@@ -159,6 +169,13 @@ export interface GuestProfile {
   ranks_total: number;
   achievements_collected: number;
   achievements_total: number;
+  /** GHG11(3): процент открытых ачивок (для сравнения со своими). */
+  achievements_percent: number;
+  /** GHG11(3): история званий — когда и за что был лохом/чуханом. */
+  loser_history: GuestTitleEvent[];
+  chukhan_history: GuestTitleEvent[];
+  /** GHG11(3): суммарно сколько участник продержал червя (дней). */
+  worm_total_days: number;
   achievements: GuestAchievement[];
   /** GHG11: сегодняшние «носимые» звания с причинами (плашка над головой). */
   today: GuestTodayTitle | null;
@@ -346,7 +363,7 @@ export const likeVoiceSubmission = (id: number) =>
 
 /** GHG11: модерация ленты — админ удаляет для всех, участник скрывает у себя. */
 export const deleteFeedItem = (itemId: string) =>
-  api<{ ok: boolean }>("/api/game/feed/delete", {
+  api<{ ok: boolean; hard?: boolean }>("/api/game/feed/delete", {
     method: "POST",
     body: JSON.stringify({ item_id: itemId }),
   });
@@ -371,9 +388,31 @@ export interface AdviceResult {
   ok: boolean;
   status: string;
   text: string;
+  /** GHG11(3): фирменный ответ «иди на хуй» (10% шанс). */
+  cursed?: boolean;
+  question?: string | null;
+  target?: "feed" | "header";
 }
-export const askAdvice = () =>
-  api<AdviceResult>("/api/game/advice", { method: "POST" });
+
+/**
+ * GHG11(3): закрутить магический шар.
+ * `target="feed"` (по умолчанию) — результат уходит в ленту от лица игрока;
+ * `target="header"` — вернуть текст, показать в шапке.
+ */
+export const askAdvice = (question?: string, target: "feed" | "header" = "feed") =>
+  api<AdviceResult>("/api/game/advice", {
+    method: "POST",
+    body: JSON.stringify({ question: question?.trim() || null, target }),
+  });
+
+/** GHG11(3): админский ручной «прогон фразы» — фраза уходит в ленту. */
+export interface PhraseRunResult {
+  ok: boolean;
+  status: string;
+  text: string;
+}
+export const runPhrase = () =>
+  api<PhraseRunResult>("/api/game/phrases", { method: "POST" });
 
 /** GHG11: номинации игр и голосование «во что сыграем» в аппе. */
 export interface NominationItem {

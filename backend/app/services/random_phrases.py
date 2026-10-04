@@ -627,6 +627,58 @@ async def run_random_phrases_job(bot: Bot) -> None:
         log.exception("random_phrases.unexpected_error")
 
 
+async def push_phrase_to_feed(
+    session: AsyncSession, *, user_id: int | None = None
+) -> str | None:
+    """GHG11(3): ручной «прогон фразы» из аппа — фраза СРАЗУ в ленте.
+
+    В отличие от `run_random_phrases_job` НЕ проверяет `user_chance` и НЕ пишет
+    в чат: админ жмёт кнопку и видит результат в ленте мини-аппа (лента вместо
+    чата). Возвращает текст фразы или None, если собрать не удалось.
+    """
+    from app.services.game import delivery
+
+    mode = await get_random_phrases_mode(session)
+    lookback_days = await get_random_phrases_lookback_days(session)
+    collective_chance = await get_random_phrases_collective_chance(session)
+    recency_hours = await get_random_phrases_recency_quarantine_hours(session)
+    recency_weight = await get_random_phrases_recency_quarantine_weight(session)
+    cmin, cmax = await get_random_phrases_count_range(session)
+    generator_version = await get_phrase_generator_version(session)
+    n = random.randint(cmin, cmax)
+    try:
+        text: str | None = None
+        author_id: int | None = None
+        if generator_version == "personas":
+            from app.services.personas import compose_persona_phrase
+
+            text = await compose_persona_phrase(session, lookback_days=lookback_days)
+        if text is None:
+            text, author_id = await compose_random_phrase_attributed(
+                session,
+                n,
+                lookback_days=lookback_days,
+                collective_chance=collective_chance,
+                mode=mode,
+                recency_quarantine_hours=recency_hours,
+                recency_quarantine_weight=recency_weight,
+            )
+    except Exception:
+        log.exception("random_phrases.compose_failed")
+        return None
+    if not text:
+        return None
+    if author_id is not None:
+        from app.services.game import awards
+
+        await awards.quote(session, author_id)
+    await delivery.record_feed_event(
+        session, feature="phrases", text=text, user_id=author_id, icon="🗯"
+    )
+    log.info("random_phrases.pushed_to_feed", n=n)
+    return text
+
+
 # --- H.1: отдельный пул коротких ответов бота (фидбек 19.06 #3) ---
 # Раньше reply/mention отвечали шизо-цитатой из общего пула → «в 99% ахинея».
 # Теперь у режима ответа СВОЙ короткий пул «согласия/отмазки» — он курируется в

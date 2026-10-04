@@ -89,6 +89,12 @@ def _is_transient_db_error(exc: BaseException | None) -> bool:
     return False
 
 
+# GHG11(3): job_id → монотонное время старта. Watchdog находит задачи, которые
+# «провисли» (повисли в сетевом вызове и из-за max_instances=1 блокируют
+# следующий запуск), и аварийно схлопывает планировщик.
+_RUNNING_SINCE: dict[str, float] = {}
+
+
 def _logged_job(
     job_id: str,
     func: Callable[..., Awaitable[Any]],
@@ -113,35 +119,42 @@ def _logged_job(
     @functools.wraps(func)
     async def _wrapped(*args: Any, **kwargs: Any) -> None:
         log.info("scheduler.job_fired", job_id=job_id)
-        attempt = 0
-        while True:
-            attempt += 1
-            try:
-                await func(*args, **kwargs)
-            except Exception as exc:
-                transient = _is_transient_db_error(exc)
-                if transient and attempt < _SCHEDULER_DB_RETRY_ATTEMPTS:
-                    delay = _SCHEDULER_DB_RETRY_BASE_DELAY_SEC * (2 ** (attempt - 1))
-                    log.warning(
-                        "scheduler.job_retry",
+        # GHG11(3): запоминаем момент старта — по нему watchdog находит задачи,
+        # провисевшие аномально долго (повисли и блокируют следующий запуск из-за
+        # max_instances=1), и схлопывает их. finally гарантирует очистку.
+        _RUNNING_SINCE[job_id] = time.monotonic()
+        try:
+            attempt = 0
+            while True:
+                attempt += 1
+                try:
+                    await func(*args, **kwargs)
+                except Exception as exc:
+                    transient = _is_transient_db_error(exc)
+                    if transient and attempt < _SCHEDULER_DB_RETRY_ATTEMPTS:
+                        delay = _SCHEDULER_DB_RETRY_BASE_DELAY_SEC * (2 ** (attempt - 1))
+                        log.warning(
+                            "scheduler.job_retry",
+                            job_id=job_id,
+                            attempt=attempt,
+                            max_attempts=_SCHEDULER_DB_RETRY_ATTEMPTS,
+                            delay_sec=delay,
+                            error=f"{type(exc).__name__}: {exc}",
+                        )
+                        await asyncio.sleep(delay)
+                        continue
+                    log.exception(
+                        "scheduler.job_failed",
                         job_id=job_id,
                         attempt=attempt,
-                        max_attempts=_SCHEDULER_DB_RETRY_ATTEMPTS,
-                        delay_sec=delay,
-                        error=f"{type(exc).__name__}: {exc}",
+                        transient=transient,
                     )
-                    await asyncio.sleep(delay)
-                    continue
-                log.exception(
-                    "scheduler.job_failed",
-                    job_id=job_id,
-                    attempt=attempt,
-                    transient=transient,
-                )
-                raise
-            else:
-                log.info("scheduler.job_done", job_id=job_id, attempts=attempt)
-                return
+                    raise
+                else:
+                    log.info("scheduler.job_done", job_id=job_id, attempts=attempt)
+                    return
+        finally:
+            _RUNNING_SINCE.pop(job_id, None)
 
     return _wrapped
 
@@ -180,6 +193,7 @@ JOB_GAME_ACHIEVEMENTS_FLUSH = "game_achievements_flush"  # GHG10 Э19 (буфе�
 JOB_GAME_VOICE = "game_voice_tick"  # GHG10 Э14
 JOB_GAME_MUSIC = "game_music_weekly"  # GHG10 Э15
 JOB_GAME_MUSIC_GAME = "game_music_game_weekly"  # GHG10 Э16
+JOB_WATCHDOG = "scheduler_watchdog"  # GHG11(3): схлопывание зависших задач
 
 
 def _env_int(name: str, default: int) -> int:
@@ -1102,6 +1116,62 @@ def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:
         sched.remove_job(job_id)
 
 
+# GHG11(3): сколько секунд задача может висеть до аварийного схлопывания.
+# 15 минут — с запасом больше самого долгого send (25с) и ретраев БД (~6с).
+STALE_JOB_SECONDS = _env_int("STALE_JOB_SECONDS", 900)
+
+
+async def collapse_stale_jobs(
+    bot: Bot | None = None, *, max_seconds: int | None = None
+) -> list[str]:
+    """GHG11(3): аварийно схлопнуть задачи, провисевшие аномально долго.
+
+    Задача, повисшая в сетевом вызове, при ``max_instances=1`` блокирует свой
+    следующий запуск (APScheduler просто пропускает его). Если такие найдены —
+    полностью пересобираем планировщик (как после рестарта спейса).
+    Возвращает список схлопнутых job-id (пусто — всё в порядке).
+    """
+    limit = max_seconds if max_seconds is not None else STALE_JOB_SECONDS
+    now = time.monotonic()
+    stale = [
+        jid
+        for jid, started in list(_RUNNING_SINCE.items())
+        if now - started > limit
+    ]
+    if not stale:
+        return []
+    log.warning(
+        "scheduler.stale_jobs_detected",
+        jobs=stale,
+        max_seconds=limit,
+    )
+    if bot is not None:
+        await collapse_all_jobs(bot)
+    return stale
+
+
+async def collapse_all_jobs(bot: Bot) -> int:
+    """GHG11(3): МАСТЕР-схлопывание — пересобрать планировщик с нуля.
+
+    Гасим текущий scheduler и поднимаем новый (`start_scheduler` заново
+    регистрирует и infra-job'ы, и динамические из конфига). Действует как
+    рестарт спейса: сбрасывает зависшие экземпляры и «кэш» расписания.
+    Возвращает число зарегистрированных job'ов после пересборки.
+    """
+    global _scheduler
+    _RUNNING_SINCE.clear()
+    if _scheduler is not None:
+        try:
+            _scheduler.shutdown(wait=False)
+        except Exception as exc:  # noqa: BLE001 — гасим «мягко», дальше пересоберём
+            log.warning("scheduler.shutdown_failed", error=str(exc))
+    _scheduler = None
+    sched = start_scheduler(bot)
+    count = len(sched.get_jobs())
+    log.warning("scheduler.collapsed_all", jobs=count)
+    return count
+
+
 async def _space_restart_job() -> None:
     """GHG8 G (антиспам): one-shot job рестарта Space. Делает решение+вызов HF
     (`run_space_restart_tick`), затем перевзводит следующий one-shot
@@ -1308,6 +1378,28 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     # off/раз-в-неделю, поэтому job чаще всего не зарегистрирован вовсе.
     # Перевзвод — после start (sched должен быть running), рядом с
     # reload_dynamic_jobs.
+
+    # GHG11(3): watchdog зависших задач. Каждые 5 минут проверяет, не провисла
+    # ли какая-то задача дольше STALE_JOB_SECONDS, и при необходимости
+    # аварийно пересобирает планировщик — чтобы зависшая задача не блокировала
+    # запуск следующей. В простое это один дешёвый проход по словарю в памяти.
+    async def _watchdog_tick(*, bot: Bot) -> None:
+        # Пересбор планировщика запускаем ОТДЕЛЬНОЙ задачей: сам watchdog крутится
+        # в нём же, и shutdown изнутри job'а отменил бы текущую корутину.
+        stale = await collapse_stale_jobs(None)
+        if stale:
+            asyncio.create_task(collapse_all_jobs(bot))
+
+    sched.add_job(
+        _logged_job(JOB_WATCHDOG, _watchdog_tick),
+        IntervalTrigger(minutes=5, jitter=60),
+        kwargs={"bot": bot},
+        id=JOB_WATCHDOG,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=600,
+    )
 
     sched.start()
     log.info("scheduler.started", chukhan_cron=settings.chukhan_cron, tz=settings.scheduler_tz)

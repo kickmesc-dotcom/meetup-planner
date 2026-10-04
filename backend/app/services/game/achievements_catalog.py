@@ -115,6 +115,24 @@ _BASE: tuple[Achievement, ...] = (
         KIND_COUNTER,
         tiers=ANNIVERSARY_TIERS,
     ),
+    # GHG11(3): магический шар. База — «впервые спросил», юбилей — ×10
+    # (оператор: «за первое использование + отдельно за 10 раз»).
+    Achievement(
+        "advice_seeker",
+        "Пифия",
+        "Спросить магический шар впервые",
+        "🔮",
+        KIND_COUNTER,
+        tiers=(10,),
+    ),
+    # 10% шанс, что шар пошлёт нахуй. Отдельная instant-ачивка «за то, что послали».
+    Achievement(
+        "advice_sent",
+        "Иди на хуй",
+        "Попасть под 10% шанс, когда магический шар посылает тебя куда подальше",
+        "🖕",
+        KIND_INSTANT,
+    ),
     Achievement(
         "generation_mouthpiece",
         "Рупор поколения",
@@ -387,6 +405,8 @@ GROUPS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "chin_up",
             "first_worm",
             "truth_seeker",
+            "advice_seeker",
+            "advice_sent",
             "self_shot",
             "rewrote_history",
             SUPREME_CHUKHAN_CODE,

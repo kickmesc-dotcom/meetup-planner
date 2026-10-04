@@ -155,11 +155,25 @@ class RankRowOut(BaseModel):
 
 
 class GuestAchievementOut(BaseModel):
-    """Короткая строка собранной ачивки для чужого профиля (без прогресса/тиров)."""
+    """Собранная ачивка для чужого профиля (без прогресса/тиров).
+
+    GHG11(3): добавлены подробности (когда и за что) — по тапу в профиле гостя
+    раскрывается, когда ачивка получена и что за неё дали.
+    """
 
     code: str
     title: str
     icon: str
+    description: str | None = None
+    points: int = 0
+    unlocked_at: datetime | None = None
+
+
+class GuestTitleEventOut(BaseModel):
+    """GHG11(3): событие звания в истории участника — когда и за что."""
+
+    at: datetime
+    reason: str | None = None
 
 
 class GuestTodayTitleOut(BaseModel):
@@ -202,6 +216,13 @@ class GuestProfileOut(BaseModel):
     ranks_total: int = 0
     achievements_collected: int = 0
     achievements_total: int = 0
+    # GHG11(3): процент открытых ачивок — для блока сравнения со своими.
+    achievements_percent: int = 0
+    # GHG11(3): история званий — когда и за что был лохом/чуханом.
+    loser_history: list[GuestTitleEventOut] = []
+    chukhan_history: list[GuestTitleEventOut] = []
+    # GHG11(3): суммарно сколько участник продержал червя (дней).
+    worm_total_days: int = 0
     achievements: list[GuestAchievementOut] = []
     # GHG11: сегодняшние «носимые» звания с причинами (плашка над головой).
     today: GuestTodayTitleOut | None = None
@@ -686,6 +707,8 @@ class FeedItemActionOut(BaseModel):
     ok: bool = True
     deleted: bool | None = None
     hidden: bool | None = None
+    # GHG11(3): источник физически удалён из БД → «Отменить» не сработает.
+    hard: bool = False
 
 
 class NominationOut(BaseModel):
@@ -717,8 +740,32 @@ class NominationVoteOut(BaseModel):
     votes: int = 0
 
 
+class AdviceIn(BaseModel):
+    """GHG11(3): закрутить магический шар из аппа.
+
+    `question` — необязательный вопрос шара (выводится в ленте); `target` —
+    куда положить результат: ``feed`` (в ленту, по умолчанию) или ``header``
+    (вернуть в ответ, показать в шапке).
+    """
+
+    question: str | None = Field(default=None, max_length=500)
+    target: str = "feed"
+
+
 class AdviceOut(BaseModel):
     """GHG11: ответ магического шара прямо в аппе."""
+
+    ok: bool = False
+    status: str = ""
+    text: str = ""
+    # GHG11(3): фирменный ответ «иди на хуй» (10% шанс) — за него отдельная ачивка.
+    cursed: bool = False
+    question: str | None = None
+    target: str = "feed"
+
+
+class PhraseRunOut(BaseModel):
+    """GHG11(3): ручной прогон фразы из аппа — текст сразу уходит в ленту."""
 
     ok: bool = False
     status: str = ""

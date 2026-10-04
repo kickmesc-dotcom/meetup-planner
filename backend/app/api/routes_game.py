@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, SessionDep
@@ -25,8 +25,11 @@ from app.db.models import (
     GamePrompt,
     GameVoiceSubmission,
     GameVoiceTask,
+    LoserRoll,
     User,
     UserAchievement,
+    WeeklyChukhan,
+    WormAssignment,
 )
 from app.schemas.game import (
     AchievementItemOut,
@@ -37,6 +40,7 @@ from app.schemas.game import (
     ActivityOptionOut,
     ActivityOut,
     DailyEventOut,
+    AdviceIn,
     AdviceOut,
     DonationIn,
     DonationOut,
@@ -49,6 +53,7 @@ from app.schemas.game import (
     GameProfileOut,
     GuestAchievementOut,
     GuestProfileOut,
+    GuestTitleEventOut,
     GuestTodayTitleOut,
     HolidayCreate,
     HolidayOut,
@@ -67,6 +72,7 @@ from app.schemas.game import (
     NominationOut,
     NominationsOut,
     NominationVoteOut,
+    PhraseRunOut,
     RankOut,
     RankRowOut,
     VoiceCurrentOut,
@@ -567,13 +573,63 @@ async def guest_profile(
     loser_count = int((await loser_stats(session)).get(user.id, 0))
     chukhan_count = int((await chukhan_stats(session)).get(user.id, 0))
 
-    collected = await achievements.collected_codes(session, user.id)
+    # GHG11(3): подробная сводка — ачивки с датой/«за что», история званий и
+    # сколько всего продержал червя. Гость видит это всё (по запросу оператора).
+    collected_rows = await achievements.collected(session, user.id)
     bases = base_achievements()
     items = [
-        GuestAchievementOut(code=ach.code, title=ach.title, icon=ach.icon)
-        for ach in bases
-        if ach.code in collected
+        GuestAchievementOut(
+            code=row.achievement.code,
+            title=row.achievement.title,
+            icon=row.achievement.icon,
+            description=row.achievement.description,
+            points=row.achievement.points,
+            unlocked_at=row.unlocked_at,
+        )
+        for row in collected_rows
     ]
+    collected_base = len({row.achievement.code.split(":", 1)[0] for row in collected_rows})
+    percent = round(collected_base * 100 / len(bases)) if bases else 0
+
+    loser_rows = (
+        await session.scalars(
+            select(LoserRoll)
+            .where(
+                LoserRoll.loser_user_id == user.id,
+                or_(LoserRoll.source != "duel", LoserRoll.source.is_(None)),
+            )
+            .order_by(LoserRoll.rolled_at.desc())
+            .limit(10)
+        )
+    ).all()
+    chukhan_rows = (
+        await session.scalars(
+            select(WeeklyChukhan)
+            .where(
+                WeeklyChukhan.user_id == user.id,
+                WeeklyChukhan.posted_at.is_not(None),
+            )
+            .order_by(WeeklyChukhan.week_start.desc())
+            .limit(10)
+        )
+    ).all()
+
+    now_utc = datetime.now(timezone.utc)
+    worm_rows = (
+        await session.scalars(
+            select(WormAssignment).where(WormAssignment.user_id == user.id)
+        )
+    ).all()
+    worm_seconds = 0.0
+    for w in worm_rows:
+        started = w.started_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        ended = w.ended_at or now_utc
+        if ended.tzinfo is None:
+            ended = ended.replace(tzinfo=timezone.utc)
+        worm_seconds += max(0.0, (ended - started).total_seconds())
+
     # GHG11: звания «сегодня» с причинами — плашка над головой в профиле.
     from app.services.game import today_titles
 
@@ -598,6 +654,21 @@ async def guest_profile(
         ranks_total=ranks_total,
         achievements_collected=len(items),
         achievements_total=len(bases),
+        achievements_percent=percent,
+        loser_history=[
+            GuestTitleEventOut(
+                at=row.rolled_at, reason=(row.reason_text or "").strip() or None
+            )
+            for row in loser_rows
+        ],
+        chukhan_history=[
+            GuestTitleEventOut(
+                at=row.posted_at or row.week_start,
+                reason=(row.reason_text or "").strip() or None,
+            )
+            for row in chukhan_rows
+        ],
+        worm_total_days=round(worm_seconds / 86400),
         achievements=items,
         today=GuestTodayTitleOut(**today),
     )
@@ -1234,24 +1305,58 @@ async def game_nomination_vote(
     return NominationVoteOut(ok=True, voted=voted, votes=votes)
 
 
+# GHG11(3): фирменный ответ шара — 10% шанс на любой вопрос. Грубо, но так
+# задумано оператором: за него даётся отдельная ачивка «Иди на хуй».
+_ADVICE_CURSE_CHANCE = 0.10
+_ADVICE_CURSE_TEXT = "Иди на хуй"
+
+
 @router.post("/game/advice", response_model=AdviceOut)
-async def game_advice(session: SessionDep, user: CurrentUser) -> AdviceOut:
-    """Магический шар прямо из ленты. app → только лента, chat/both → и чат."""
+async def game_advice(
+    session: SessionDep, user: CurrentUser, body: AdviceIn | None = None
+) -> AdviceOut:
+    """GHG11(3): магический шар прямо из ленты.
+
+    Результат по умолчанию уходит в ЛЕНТУ от лица участника («Серж покрутил шар
+    и получил ответ…»), а не в шапку. Если задан `question` — вопрос попадает в
+    ту же запись. `target="header"` возвращает текст в ответ (старое поведение).
+    С шансом 10% шар посылает нахуй — и выдаёт за это отдельную ачивку.
+    """
+    import random
+
     from app.services.admin_config import get_advice_enabled, get_advice_phrases
     from app.services.advice import pick_advice
     from app.services.phrase_meta import effective_pool
 
+    body = body or AdviceIn()
+    target = body.target if body.target in ("feed", "header") else "feed"
+    question = (body.question or "").strip() or None
+
     mode = await delivery.get_feature_mode(session, "advice")
     if mode == delivery.MODE_OFF:
-        return AdviceOut(ok=False, status="off")
+        return AdviceOut(ok=False, status="off", target=target)
     if not await get_advice_enabled(session):
-        return AdviceOut(ok=False, status="disabled")
-    phrases = await effective_pool(session, "advice", await get_advice_phrases(session))
-    text = pick_advice(phrases)
-    if not text:
-        return AdviceOut(ok=False, status="empty")
-    feed_text = f"🔮 {text}"
-    if delivery.app_enabled(mode):
+        return AdviceOut(ok=False, status="disabled", target=target)
+
+    cursed = random.random() < _ADVICE_CURSE_CHANCE
+    if cursed:
+        text = _ADVICE_CURSE_TEXT
+    else:
+        phrases = await effective_pool(
+            session, "advice", await get_advice_phrases(session)
+        )
+        text = pick_advice(phrases)
+        if not text:
+            return AdviceOut(ok=False, status="empty", target=target)
+
+    name = user.display_name
+    if question:
+        intro = f"задал вопрос магическому шару: «{question}» — и услышал: {text}"
+    else:
+        intro = f"покрутил магический шар и получил ответ: {text}"
+    feed_text = f"🔮 <b>{name}</b> {intro}"
+
+    if delivery.app_enabled(mode) and target == "feed":
         await delivery.record_feed_event(
             session, feature="advice", text=feed_text, user_id=user.id, icon="🔮"
         )
@@ -1259,7 +1364,18 @@ async def game_advice(session: SessionDep, user: CurrentUser) -> AdviceOut:
         from app.services.game import journal
 
         await journal.send_now(feed_text, feature="advice")
-    return AdviceOut(ok=True, status="ok", text=text)
+    # Ачивки шара — после фида/чата (свои commit'ы внутри `_guarded`).
+    from app.services.game import awards
+
+    await awards.advice(session, user.id, cursed=cursed)
+    return AdviceOut(
+        ok=True,
+        status="ok",
+        text=text,
+        cursed=cursed,
+        question=question,
+        target=target,
+    )
 
 
 @router.get("/game/worm", response_model=WormOut)
@@ -1348,8 +1464,10 @@ async def feed_delete(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "admin_only")
     from app.services.game import feed_moderation
 
-    await feed_moderation.delete_item(session, item_id=body.item_id, actor=user.id)
-    return FeedItemActionOut(ok=True, deleted=True)
+    hard = await feed_moderation.delete_item(
+        session, item_id=body.item_id, actor=user.id
+    )
+    return FeedItemActionOut(ok=True, deleted=True, hard=hard)
 
 
 @router.post("/game/feed/restore", response_model=FeedItemActionOut)
@@ -1385,3 +1503,28 @@ async def feed_unhide(
 
     await feed_moderation.unhide_item(session, item_id=body.item_id, user_id=user.id)
     return FeedItemActionOut(ok=True, hidden=False)
+
+
+@router.post("/game/phrases", response_model=PhraseRunOut)
+async def game_phrase_run(session: SessionDep, user: CurrentUser) -> PhraseRunOut:
+    """GHG11(3): админский «прогон фразы» из аппа — фраза уходит в ЛЕНТУ.
+
+    Не блокирует интерфейс и не требует плашки: результат виден прямо в ленте.
+    Обходит `user_chance` (иначе одиночный прогон часто пропускался бы).
+    """
+    from app.services.admin_config import get_random_phrases_enabled
+    from app.services.random_phrases import push_phrase_to_feed
+
+    if not _is_admin(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin_only")
+    if not await is_game_enabled(session):
+        return PhraseRunOut(ok=False, status="game_disabled")
+    mode = await delivery.get_feature_mode(session, "phrases")
+    if mode == delivery.MODE_OFF:
+        return PhraseRunOut(ok=False, status="off")
+    if not await get_random_phrases_enabled(session):
+        return PhraseRunOut(ok=False, status="disabled")
+    text = await push_phrase_to_feed(session)
+    if not text:
+        return PhraseRunOut(ok=False, status="empty")
+    return PhraseRunOut(ok=True, status="ok", text=text)

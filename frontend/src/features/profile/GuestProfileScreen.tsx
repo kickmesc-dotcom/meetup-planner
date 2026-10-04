@@ -1,5 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchGuestProfile } from "@/api/game";
+import {
+  fetchGuestProfile,
+  fetchMyGame,
+  type GuestAchievement,
+  type GuestTitleEvent,
+} from "@/api/game";
 import RankPlaque from "@/components/RankPlaque";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
@@ -24,8 +30,19 @@ export default function GuestProfileScreen({
     queryKey: ["guest-profile", userId],
     queryFn: () => fetchGuestProfile(userId),
   });
+  // GHG11(3): свой процент открытых ачивок — чтобы сравнить в профиле гостя.
+  const myQ = useQuery({
+    queryKey: ["me-game"],
+    queryFn: fetchMyGame,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const p = q.data;
+  const myPercent = (() => {
+    const items = myQ.data?.achievements;
+    if (!items || items.length === 0) return null;
+    return Math.round((items.filter((a) => a.collected).length * 100) / items.length);
+  })();
 
   return (
     <div className="absolute inset-0 z-40 flex flex-col bg-tg-bg">
@@ -125,22 +142,57 @@ export default function GuestProfileScreen({
                 }
               />
               <Stat
-                label="🎖 Ачивки"
-                value={`${p.achievements_collected}/${p.achievements_total}`}
+                label="🪱 Держал червя"
+                value={p.worm_total_days > 0 ? `${p.worm_total_days} дн.` : "—"}
               />
             </section>
 
+            {/* GHG11(3): процент открытых ачивок + сравнение со своими. */}
             <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-              <div className="text-sm font-semibold">Собранные ачивки</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">📊 Открыто ачивок</div>
+                <div className="text-sm font-semibold tabular-nums text-tg-text">
+                  {p.achievements_percent}%
+                </div>
+              </div>
+              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-tg-bg/70">
+                <div
+                  className="h-full rounded-full bg-tg-link"
+                  style={{ width: `${Math.min(100, p.achievements_percent)}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[11px] text-tg-hint">
+                {p.achievements_collected}/{p.achievements_total} ачивок
+                {myPercent != null &&
+                  ` · у тебя ${myPercent}% — ${
+                    p.achievements_percent > myPercent
+                      ? `${p.name} впереди`
+                      : p.achievements_percent < myPercent
+                        ? "ты впереди"
+                        : "наравне"
+                  }`}
+              </div>
+            </section>
+
+            <TitleHistory
+              title="🤡 История «лоха дня»"
+              empty="Ни разу не был лохом дня."
+              events={p.loser_history}
+            />
+            <TitleHistory
+              title="💩 История «чухана недели»"
+              empty="Ни разу не был чуханом недели."
+              events={p.chukhan_history}
+            />
+
+            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+              <div className="text-sm font-semibold">Последние ачивки</div>
               {p.achievements.length === 0 ? (
                 <div className="mt-1 text-xs text-tg-hint">Пока пусто — ни одной ачивки.</div>
               ) : (
                 <ul className="mt-2 space-y-1">
-                  {p.achievements.map((a) => (
-                    <li key={a.code} className="flex items-center gap-2 text-xs text-tg-text">
-                      <span className="w-5 shrink-0 text-center text-sm">{a.icon}</span>
-                      <span className="min-w-0 truncate">{a.title}</span>
-                    </li>
+                  {p.achievements.slice(0, 12).map((a) => (
+                    <GuestAchievementRow key={a.code} a={a} />
                   ))}
                 </ul>
               )}
@@ -150,6 +202,74 @@ export default function GuestProfileScreen({
       </div>
     </div>
   );
+}
+
+/** GHG11(3): история звания — когда и за что. */
+function TitleHistory({
+  title,
+  empty,
+  events,
+}: {
+  title: string;
+  empty: string;
+  events: GuestTitleEvent[];
+}) {
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="text-sm font-semibold">{title}</div>
+      {events.length === 0 ? (
+        <div className="mt-1 text-xs text-tg-hint">{empty}</div>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {events.map((e, i) => (
+            <li key={`${e.at}-${i}`} className="text-xs text-tg-text">
+              <span className="text-tg-hint">{formatDate(e.at)}</span>
+              {e.reason ? ` — «${e.reason}»` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** GHG11(3): ачивка гостя — по тапу раскрываются «когда» и «за что». */
+function GuestAchievementRow({ a }: { a: GuestAchievement }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li
+      onClick={() => {
+        haptic("light");
+        setOpen((v) => !v);
+      }}
+      className="cursor-pointer rounded-lg bg-tg-bg/40 px-2 py-1.5"
+    >
+      <div className="flex items-center gap-2 text-xs text-tg-text">
+        <span className="w-5 shrink-0 text-center text-sm">{a.icon}</span>
+        <span className="min-w-0 flex-1 truncate">{a.title}</span>
+        <span className="shrink-0 text-tg-hint">{open ? "▾" : "▸"}</span>
+      </div>
+      {open && (
+        <div className="mt-1 space-y-0.5 pl-7 text-[11px] text-tg-hint">
+          {a.description && <div>За что: {a.description}</div>}
+          {a.unlocked_at && <div>Когда: {formatDate(a.unlocked_at)}</div>}
+          {typeof a.points === "number" && a.points > 0 && (
+            <div>Награда: +{a.points} XP</div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

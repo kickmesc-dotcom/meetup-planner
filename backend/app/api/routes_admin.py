@@ -10,7 +10,7 @@ from sqlalchemy import delete, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.deps import CurrentUser, SessionDep, resync_if_expired
-from app.bot.scheduler import get_scheduler, reload_dynamic_jobs
+from app.bot.scheduler import collapse_all_jobs, get_scheduler, reload_dynamic_jobs
 from app.config import get_settings
 from app.db.models import Birthday, LoserRoll, Meeting, MeetingReminder, Poll, User, WeeklyChukhan
 from app.schemas.game import (
@@ -463,6 +463,22 @@ async def cancel_job(
         by=user.id,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.post("/admin/scheduler/collapse")
+async def collapse_scheduler(user: CurrentUser) -> dict[str, int]:
+    """GHG11(3): МАСТЕР-кнопка «схлопнуть все запланированные авто-задачи».
+
+    Полностью пересобирает планировщик (как рестарт спейса): гасит текущие job'ы
+    вместе с зависшими экземплярами и поднимает всё заново из конфига. Лечит
+    ситуацию, когда повисшая задача блокирует следующий запуск.
+    """
+    _ensure_admin(user)
+    from app.bot.dispatcher import get_bot
+
+    jobs = await collapse_all_jobs(get_bot())
+    log.warning("admin.scheduler_collapsed", jobs=jobs, by=user.id)
+    return {"jobs": jobs}
+
 
 @router.get("/admin/random-phrases", response_model=RandomPhrasesSettings)
 async def get_random_phrases(

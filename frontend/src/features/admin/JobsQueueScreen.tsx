@@ -18,6 +18,7 @@ import { format } from "date-fns";
 
 import {
   cancelScheduledJob,
+  collapseScheduler,
   fetchScheduledJobs,
   rescheduleScheduledJob,
   type ScheduledJob,
@@ -85,6 +86,17 @@ export default function JobsQueueScreen({ onBack }: Props) {
     onError: errAlert,
   });
 
+  const collapse = useMutation({
+    mutationFn: collapseScheduler,
+    onSuccess: (res) => {
+      haptic("success");
+      enterHotMode();
+      qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
+      void showAlert(`Планировщик пересобран: ${res.jobs} задач.`);
+    },
+    onError: errAlert,
+  });
+
   return (
     <SubScreen
       title="📋 Очередь задач"
@@ -111,6 +123,26 @@ export default function JobsQueueScreen({ onBack }: Props) {
           ✎ — подвинуть время ближайшего запуска. 🚫 — пропустить ближайший
           запуск (recurring остаётся, one-shot/reminder удаляются).
         </div>
+        {/* GHG11(3): аварийная мастер-кнопка — пересобрать планировщик с нуля. */}
+        <button
+          type="button"
+          onClick={() => {
+            if (
+              confirm(
+                "Схлопнуть ВСЕ запланированные авто-задачи? Планировщик пересоберётся с нуля, как после рестарта.",
+              )
+            ) {
+              haptic("medium");
+              collapse.mutate();
+            }
+          }}
+          disabled={collapse.isPending}
+          className="mb-2 w-full rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-semibold text-status-busy active:scale-[0.99] disabled:opacity-50"
+        >
+          {collapse.isPending
+            ? "Пересобираем…"
+            : "🧨 Схлопнуть все запланированные авто-задачи"}
+        </button>
         {jobs.isPending ? (
           <ListSkeleton rows={4} />
         ) : (jobs.data ?? []).length === 0 ? (

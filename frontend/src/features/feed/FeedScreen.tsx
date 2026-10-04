@@ -14,6 +14,7 @@ import {
   hideFeedItem,
   likeMusicTrack,
   restoreFeedItem,
+  runPhrase,
   transferWorm,
   unhideFeedItem,
   FEED_KIND_LABELS,
@@ -29,7 +30,6 @@ import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { fetchMe, fetchUsers } from "@/api/availability";
-import { triggerRandomPhrases } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 
 /**
@@ -61,9 +61,10 @@ export default function FeedScreen({ meId }: { meId: number }) {
 
   // GHG11: плашка-отмена после удаления/скрытия записи. Держимся ~4.5 сек —
   // этого хватает, чтобы передумать, но запись не «залипает» в ленте.
-  const [toast, setToast] = useState<{ text: string; undo: () => Promise<unknown> | unknown } | null>(
-    null,
-  );
+  const [toast, setToast] = useState<{
+    text: string;
+    undo?: () => Promise<unknown> | unknown;
+  } | null>(null);
   const toastTimer = useRef<number | null>(null);
   const dismissToast = () => {
     if (toastTimer.current !== null) {
@@ -72,7 +73,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
     }
     setToast(null);
   };
-  const showToast = (text: string, undo: () => Promise<unknown> | unknown) => {
+  const showToast = (text: string, undo?: () => Promise<unknown> | unknown) => {
     if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
     setToast({ text, undo });
     toastTimer.current = window.setTimeout(() => {
@@ -265,23 +266,25 @@ export default function FeedScreen({ meId }: { meId: number }) {
         <div className="pointer-events-none fixed inset-x-0 bottom-20 z-40 flex justify-center px-4">
           <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-tg-secondary-bg px-3 py-2 shadow-lg">
             <span className="text-xs text-tg-text">{toast.text}</span>
-            <button
-              type="button"
-              onClick={async () => {
-                haptic("medium");
-                const undo = toast.undo;
-                dismissToast();
-                try {
-                  await undo();
-                } catch {
-                  haptic("error");
-                }
-                void invalidateFeed();
-              }}
-              className="shrink-0 rounded-lg bg-tg-link/15 px-2.5 py-1 text-xs font-semibold text-tg-link"
-            >
-              Отменить
-            </button>
+            {toast.undo && (
+              <button
+                type="button"
+                onClick={async () => {
+                  haptic("medium");
+                  const undo = toast.undo!;
+                  dismissToast();
+                  try {
+                    await undo();
+                  } catch {
+                    haptic("error");
+                  }
+                  void invalidateFeed();
+                }}
+                className="shrink-0 rounded-lg bg-tg-link/15 px-2.5 py-1 text-xs font-semibold text-tg-link"
+              >
+                Отменить
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -401,17 +404,28 @@ function FeedActions({
   onDone: () => void;
   onOpenNominations: () => void;
 }) {
+  const qc = useQueryClient();
   const setLoser = useUI((s) => s.setShowLoserSheet);
   const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
   const isAdmin = !!meQ.data?.is_admin;
 
   const wormQ = useQuery({ queryKey: ["worm"], queryFn: fetchWorm, staleTime: 30_000 });
 
+  // GHG11(3): сценарий шара — вопрос (необязательно) + куда положить результат.
+  const [showAdvice, setShowAdvice] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [adviceTarget, setAdviceTarget] = useState<"feed" | "header">("feed");
+
   const phrases = useMutation({
-    mutationFn: triggerRandomPhrases,
-    onSuccess: () => {
-      haptic("success");
-      void showAlert("Прогон фраз запущен.");
+    mutationFn: runPhrase,
+    onSuccess: (res) => {
+      if (res.ok) {
+        haptic("success");
+        // GHG11(3): фраза уже в ленте — просто обновляем её, без плашки.
+        qc.invalidateQueries({ queryKey: ["game-feed"] });
+      } else {
+        haptic("error");
+      }
     },
     onError: (e) => {
       haptic("error");
@@ -420,10 +434,14 @@ function FeedActions({
   });
 
   const advice = useMutation({
-    mutationFn: askAdvice,
+    mutationFn: () => askAdvice(question, adviceTarget),
     onSuccess: (res) => {
       if (res.ok) {
         haptic("success");
+        setQuestion("");
+        if (adviceTarget === "feed") {
+          qc.invalidateQueries({ queryKey: ["game-feed"] });
+        }
       } else {
         haptic("error");
         if (res.status === "disabled") void showAlert("Магический шар выключен в настройках.");
@@ -451,9 +469,9 @@ function FeedActions({
         <ActionChip
           onClick={() => {
             haptic("light");
-            advice.mutate();
+            setShowAdvice((v) => !v);
           }}
-          label={advice.isPending ? "🔮 Спрашиваем…" : "🔮 Магический шар"}
+          label="🔮 Магический шар"
         />
         <ActionChip onClick={open(() => setLoser(true))} label="🤡 Автолох" />
         <ActionChip onClick={onOpenNominations} label="🎮 Номинации" />
@@ -468,10 +486,45 @@ function FeedActions({
         )}
       </div>
 
-      {advice.data?.ok && advice.data.text && (
-        <div className="mt-2 rounded-xl bg-tg-bg/60 px-3 py-2 text-sm text-tg-text">
-          <span className="mr-1">🔮</span>
-          {advice.data.text}
+      {/* GHG11(3): сценарий шара — вопрос + радио «в ленту / в шапку». */}
+      {showAdvice && (
+        <div className="mt-2 space-y-2 rounded-xl bg-tg-bg/60 px-3 py-2">
+          <input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Вопрос шару (необязательно)"
+            maxLength={500}
+            className="w-full rounded-lg bg-tg-secondary-bg px-2 py-1.5 text-sm text-tg-text outline-none"
+          />
+          <div className="flex gap-1.5">
+            <TargetRadio
+              active={adviceTarget === "feed"}
+              onClick={() => setAdviceTarget("feed")}
+              label="🔮 В ленту"
+            />
+            <TargetRadio
+              active={adviceTarget === "header"}
+              onClick={() => setAdviceTarget("header")}
+              label="📌 В шапку"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={advice.isPending}
+            onClick={() => {
+              haptic("medium");
+              advice.mutate();
+            }}
+            className="w-full rounded-lg bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text disabled:opacity-50"
+          >
+            {advice.isPending ? "Крутим…" : "Закрутить шар"}
+          </button>
+          {adviceTarget === "header" && advice.data?.ok && advice.data.text && (
+            <div className="rounded-lg bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text">
+              <span className="mr-1">🔮</span>
+              {advice.data.text}
+            </div>
+          )}
         </div>
       )}
 
@@ -559,6 +612,34 @@ function transferStatusText(status: string): string {
   }
 }
 
+/** GHG11(3): радиокнопка «куда положить результат шара». */
+function TargetRadio({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        haptic("selection");
+        onClick();
+      }}
+      className={[
+        "flex-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+        active ? "bg-tg-link text-white" : "bg-tg-secondary-bg/80 text-tg-hint",
+      ].join(" ")}
+    >
+      {active ? "◉ " : "◯ "}
+      {label}
+    </button>
+  );
+}
+
 function ActionChip({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button
@@ -591,7 +672,7 @@ function FeedRow({
   meId: number;
   isAdmin: boolean;
   onOpenUser: (userId: number) => void;
-  onModerated: (text: string, undo: () => Promise<unknown> | unknown) => void;
+  onModerated: (text: string, undo?: () => Promise<unknown> | unknown) => void;
 }) {
   const when = formatWhen(item.at);
   const clickable = item.user_id !== null && item.user_id !== undefined;
@@ -621,11 +702,16 @@ function FeedRow({
 
   const remove = useMutation({
     mutationFn: () => deleteFeedItem(item.id),
-    onSuccess: () => {
+    onSuccess: (res) => {
       haptic("medium");
       setMenu(false);
       void invalidateFeed();
-      onModerated("Запись удалена из ленты", () => restoreFeedItem(item.id));
+      if (res?.hard) {
+        // GHG11(3): источник стёрт из БД — откатывать нечего.
+        onModerated("Запись удалена из базы");
+      } else {
+        onModerated("Запись удалена из ленты", () => restoreFeedItem(item.id));
+      }
     },
     onError: (e) => {
       haptic("error");
@@ -693,7 +779,7 @@ function FeedRow({
               }}
               className="shrink-0 rounded-md px-1 text-base leading-none text-tg-hint"
             >
-              ⋯
+              👁
             </button>
           </div>
           {item.user_name && (
