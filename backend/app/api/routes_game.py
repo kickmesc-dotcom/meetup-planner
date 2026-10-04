@@ -538,8 +538,12 @@ async def guest_profile(
     elif profile is not None and profile.custom_rank_title:
         rank_name = profile.custom_rank_title
 
+    # GHG11-fix: `session.scalars` вернул бы только ПЕРВУЮ колонку (int), и
+    # `row[0]` в строке ниже падал с `TypeError` → 500 без CORS-заголовков →
+    # фронт показывал «Failed to fetch». Это и была давняя поломка чужого
+    # профиля. Берём пары через `execute`.
     rows = (
-        await session.scalars(
+        await session.execute(
             select(GameProfile.user_id, GameProfile.xp).order_by(GameProfile.xp.desc())
         )
     ).all()
