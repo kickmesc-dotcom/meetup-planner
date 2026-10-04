@@ -66,6 +66,16 @@ async def test_master_cascades_to_all_features():
     assert await delivery.get_master_status(session, delivery.MODULE_GENERAL) == delivery.MODE_APP
     # Ачивки — отдельный модуль, их мастер не тронут.
     assert await delivery.get_feature_mode(session, "achievements") == delivery.MODE_CHAT
+    # Legacy-режим Э20 синхронизирован: app → all (чтобы чат реально замолчал).
+    assert session._rows["game.chat.output_mode"].value == "all"
+
+
+@pytest.mark.asyncio
+async def test_master_back_to_chat_restores_legacy_mode():
+    session = _StoreSession()
+    await delivery.set_master_mode(session, delivery.MODULE_GENERAL, delivery.MODE_APP)
+    await delivery.set_master_mode(session, delivery.MODULE_GENERAL, delivery.MODE_CHAT)
+    assert session._rows["game.chat.output_mode"].value == "normal"
 
 
 @pytest.mark.asyncio

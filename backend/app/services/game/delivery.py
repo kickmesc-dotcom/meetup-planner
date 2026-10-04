@@ -234,3 +234,12 @@ async def set_master_mode(session: AsyncSession, module: str, mode: str) -> None
     await _set_value(session, f"{MASTER_KEY_PREFIX}{module}", mode)
     for spec in features_of(module):
         await _set_value(session, f"{FEATURE_KEY_PREFIX}{spec.key}", mode)
+    # GHG11: держим legacy-режим Э20 (`game.chat.output_mode`) в согласии с
+    # ОБЩИМ мастером — иначе перевод обратно в «чат» не вернул бы чат (legacy
+    # `all` глушит `send_now` независимо от delivery).
+    if module == MODULE_GENERAL:
+        from app.services.admin_config import GAME_CHAT_OUTPUT_MODE_KEY
+
+        await _set_value(
+            session, GAME_CHAT_OUTPUT_MODE_KEY, "all" if mode == MODE_APP else "normal"
+        )
