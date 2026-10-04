@@ -223,6 +223,49 @@ async def set_feature_mode(session: AsyncSession, key: str, mode: str) -> None:
     await _set_value(session, f"{FEATURE_KEY_PREFIX}{key}", mode)
 
 
+async def record_feed_event(
+    session: AsyncSession,
+    *,
+    feature: str,
+    text: str,
+    user_id: int | None = None,
+    icon: str | None = None,
+) -> bool:
+    """Записать активность фичи только в ленту мини-аппа (kind="feature").
+
+    Нужна для механик, у которых нет «своей» таблицы-источника в ленте (совет,
+    червь, реакции, номинации): в режимах ``app``/``both`` их анонс должен быть
+    виден в аппе. Запись кладём в `game_journal` с ``sent_at=now``, чтобы сводка
+    и дайджест-джобы её не подхватили и не отправили в чат задним числом.
+    Best-effort: любой сбой только логируем.
+    """
+    if not text:
+        return False
+    try:
+        from datetime import datetime, timezone
+
+        from app.db.models import GameJournalEntry
+
+        session.add(
+            GameJournalEntry(
+                kind="feature",
+                text=text,
+                subject_user_id=user_id,
+                sent_at=datetime.now(timezone.utc),
+            )
+        )
+        await session.commit()
+        log.info("game.feature_feed_only", feature=feature, user_id=user_id)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("game.feature_feed_failed", feature=feature, error=str(exc))
+        try:
+            await session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return False
+
+
 async def set_master_mode(session: AsyncSession, module: str, mode: str) -> None:
     """Принудительно перевести ВСЕ фичи модуля в ``mode``."""
     if module not in MODULES:

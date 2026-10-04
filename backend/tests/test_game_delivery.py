@@ -107,6 +107,20 @@ async def test_rejects_unknown_feature_or_mode():
 
 
 @pytest.mark.asyncio
+async def test_record_feed_event_writes_feed_only_row():
+    session = _StoreSession()
+    ok = await delivery.record_feed_event(
+        session, feature="advice", text="🔮 Да.", user_id=5
+    )
+    assert ok is True
+    assert len(session.added) == 1
+    entry = session.added[0]
+    assert entry.kind == "feature"
+    assert entry.sent_at is not None
+    assert entry.subject_user_id == 5
+
+
+@pytest.mark.asyncio
 async def test_announce_off_drops_event(monkeypatch):
     session = _StoreSession({"delivery.feature.events": delivery.MODE_OFF})
 

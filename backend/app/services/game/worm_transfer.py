@@ -200,7 +200,9 @@ async def apply(session: AsyncSession, outcome: tuple[EventLog, bool]) -> None:
     pending, confirmed = outcome
     payload = pending.payload or {}
     if not confirmed:
-        await journal.send_now("🪱 Передача отменена — господин остаётся прежним.")
+        await journal.send_now(
+            "🪱 Передача отменена — господин остаётся прежним.", feature="worm"
+        )
         return
     target_id = payload.get("target_user_id")
     if target_id is None:
@@ -208,7 +210,9 @@ async def apply(session: AsyncSession, outcome: tuple[EventLog, bool]) -> None:
     target_id = int(target_id)
     prev_name, row = await loser.assign_worm_to(session, target_id)
     if row is None:
-        await journal.send_now("🪱 Этот участник и так господин — передача не нужна.")
+        await journal.send_now(
+            "🪱 Этот участник и так господин — передача не нужна.", feature="worm"
+        )
         return
     # Э18: звание червя — та же ачивка «Червь-господин» и её юбилеи.
     await awards.worm_lord(session, target_id)
@@ -220,7 +224,7 @@ async def apply(session: AsyncSession, outcome: tuple[EventLog, bool]) -> None:
         f"{prev_name or 'Прежний господин'} слагает полномочия — новый "
         f"червь-господин: <b>{new_name}</b>. Слушаюсь, повелитель."
     )
-    await journal.send_now(text)
+    await journal.send_now(text, feature="worm")
     log.info("game.worm_transferred", new_worm=target_id)
 
 

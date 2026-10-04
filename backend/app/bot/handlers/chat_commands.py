@@ -230,18 +230,33 @@ async def reply_advice(message: Message) -> bool:
     """
     from app.services.admin_config import get_advice_enabled, get_advice_phrases
     from app.services.advice import pick_advice
+    from app.services.game import delivery
     from app.services.phrase_meta import effective_pool
 
     sm = get_sessionmaker()
     async with sm() as session:
+        # GHG11: режим фичи. off — заглушка, app — только в ленту, chat/both — в чат.
+        mode = await delivery.get_feature_mode(session, "advice")
+        if mode == delivery.MODE_OFF:
+            try:
+                await message.reply("🔮 Магический шар сейчас выключен.")
+            except Exception:  # noqa: BLE001
+                pass
+            return True
         if not await get_advice_enabled(session):
             return False
         phrases = await get_advice_phrases(session)
         # J.1: мягкое скрытие — hidden-советы не выпадают.
         phrases = await effective_pool(session, "advice", phrases)
-    text = pick_advice(phrases)
-    if not text:
-        return False
+        text = pick_advice(phrases)
+        if not text:
+            return False
+        feed_text = f"🔮 {text}"
+        if delivery.app_enabled(mode):
+            await delivery.record_feed_event(session, feature="advice", text=feed_text)
+        chat_ok = delivery.chat_enabled(mode)
+    if not chat_ok:
+        return True
     try:
         await message.reply(f"🔮 {text}", parse_mode="HTML")
     except Exception:
@@ -587,7 +602,15 @@ async def on_loser(message: Message) -> None:
 
         # GHG10 Э8.1: ручная рулетка лоха — со 2 ранга (гейт молчит при
         # выключенной игре и обходится «Серж нео»).
-        from app.services.game import gates
+        from app.services.game import delivery, gates
+
+        # GHG11: режим фичи «Лох-рулетка (ручная)».
+        _mode = await delivery.get_feature_mode(session, "loser_manual")
+        if _mode == delivery.MODE_OFF:
+            await message.answer("🤡 Лох-рулетка сейчас выключена.")
+            return
+        _chat_ok = delivery.chat_enabled(_mode)
+        _app_ok = delivery.app_enabled(_mode)
 
         gate = await gates.check_feature(
             session,
@@ -601,13 +624,6 @@ async def on_loser(message: Message) -> None:
 
         async def _announce(roll, loser, extras=None):
             target = chat_id if chat_id else message.chat.id
-            # GHG8 P3: «мог бы стать %name%, но ДР» — перед основным постом.
-            if extras is not None and getattr(extras, "immunity_skipped", None):
-                from app.services.birthday_immunity import announce_immunity_skips
-
-                await announce_immunity_skips(
-                    bot, target, extras.immunity_skipped
-                )
             text = compose_loser_message(
                 loser_name=loser.display_name,
                 reason_text=roll.reason_text or "",
@@ -616,6 +632,21 @@ async def on_loser(message: Message) -> None:
                 header_emoji="🤡",
                 header_label="Автолох",
             )
+            # GHG11: в app/both дублируем в ленту (дуэльные роллы из неё обычно
+            # исключены, поэтому кладём явную активность).
+            if _app_ok:
+                await delivery.record_feed_event(
+                    session, feature="loser_manual", text=text, user_id=loser.id
+                )
+            if not _chat_ok:
+                return
+            # GHG8 P3: «мог бы стать %name%, но ДР» — перед основным постом.
+            if extras is not None and getattr(extras, "immunity_skipped", None):
+                from app.services.birthday_immunity import announce_immunity_skips
+
+                await announce_immunity_skips(
+                    bot, target, extras.immunity_skipped
+                )
             await bot.send_message(chat_id=target, text=text, parse_mode="HTML")
 
         try:

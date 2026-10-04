@@ -14,6 +14,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchAdvice,
   fetchBotReactions,
+  fetchDelivery,
+  updateDelivery,
+  type DeliveryMode,
   fetchGameAdmin,
   fetchGameMusic,
   fetchGameSocial,
@@ -112,6 +115,8 @@ export default function AllFeaturesScreen({ onBack }: { onBack: () => void }) {
   const game = useQuery({ queryKey: ["admin", "game"], queryFn: fetchGameAdmin });
   const social = useQuery({ queryKey: ["admin", "game", "social"], queryFn: fetchGameSocial });
   const music = useQuery({ queryKey: ["admin", "game", "music"], queryFn: fetchGameMusic });
+  // GHG11: дублируем мастер-свитчеры доставки — на случай, если лень листать вверх.
+  const delivery = useQuery({ queryKey: ["admin", "delivery"], queryFn: fetchDelivery });
 
   // Один общий «пуск»: после любого переключения обновляем всю ветку admin-
   // запросов, чтобы бейджи на других экранах не врали.
@@ -133,8 +138,56 @@ export default function AllFeaturesScreen({ onBack }: { onBack: () => void }) {
       <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-[11px] text-tg-hint">
         Каждая функция бота — со своим рубильником. «Включить/Выключить» гасит
         функцию целиком; тонкая настройка (окна, проценты, тексты) — в родных
-        разделах, как указано в подписи.
+        разделах, как указано в подписи. Куда бот вообще пишет (чат/апп/оба)
+        задаёт мастер-режим — см. «Режим бота» в самом верху админки.
       </div>
+
+      {delivery.data && (
+        <Group icon="🎛" title="Режим доставки (дубль мастера)">
+          {[
+            { label: "Общий (всё кроме ачивок)", value: delivery.data.master_general },
+            { label: "Ачивки", value: delivery.data.master_achievements },
+          ].map((m, idx) => (
+            <div key={m.label} className="rounded-xl bg-tg-secondary-bg/60 p-2.5 space-y-1.5">
+              <div className="text-xs font-semibold text-tg-text">
+                {m.label}
+                {m.value === "custom" && (
+                  <span className="ml-2 rounded-full bg-status-busy/20 px-2 py-0.5 text-[10px] text-status-busy">
+                    Custom
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(delivery.data!.modes as DeliveryMode[]).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      haptic("selection");
+                      set(() =>
+                        updateDelivery(
+                          idx === 0
+                            ? { master_general: mode }
+                            : { master_achievements: mode },
+                        ),
+                      );
+                    }}
+                    className={[
+                      "min-h-9 rounded-lg px-2 py-1 text-[11px] font-medium active:scale-[0.98] disabled:opacity-60",
+                      m.value === mode
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-bg/60 text-tg-text",
+                    ].join(" ")}
+                  >
+                    {delivery.data!.mode_labels[mode] ?? mode}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </Group>
+      )}
 
       <Group icon="📣" title="Что бот публикует сам">
         <FeatureRow

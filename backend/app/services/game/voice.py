@@ -295,11 +295,14 @@ async def open_task(
     chat_id = settings.group_chat_id
     if not chat_id:
         return None
-    # Э20: режим «всё в приложение» — задание в чат не ставим вообще.
-    from app.services.game import chat_mode
+    # GHG11: режим фичи «Голосовые задания». app — задание создаётся, но без
+    # сообщения в чате (его видно и можно сдать в мини-аппе); chat/both — как было.
+    from app.services.game import delivery
 
-    if await chat_mode.chat_all_silent(session):
+    vmode = await delivery.get_feature_mode(session, "voice")
+    if vmode == delivery.MODE_OFF:
         return None
+    chat_ok = delivery.chat_enabled(vmode)
     task = pick_task(used_codes=await _used_codes(session, now=now), rng=rng)
     if task is None:
         return None
@@ -311,21 +314,24 @@ async def open_task(
     text = build_task_text(
         task, expires_at=expires_at, bot_username=_username(bot), mode=mode
     )
-    if bot is None:
-        return None
-    try:
-        # ⚠️ Отправляем ДО записи в БД (как `games_poll`): если TG не принял,
-        # «висящего» задания без сообщения в чате не остаётся.
-        message = await bot.send_message(chat_id=chat_id, text=text, parse_mode="HTML")
-    except Exception as exc:  # noqa: BLE001
-        log.warning("game.voice_send_failed", code=task.code, error=str(exc))
-        return None
+    tg_message_id: int | None = None
+    if chat_ok and bot is not None:
+        try:
+            # ⚠️ Отправляем ДО записи в БД (как `games_poll`): если TG не принял,
+            # «висящего» задания без сообщения в чате не остаётся.
+            message = await bot.send_message(
+                chat_id=chat_id, text=text, parse_mode="HTML"
+            )
+            tg_message_id = message.message_id
+        except Exception as exc:  # noqa: BLE001
+            log.warning("game.voice_send_failed", code=task.code, error=str(exc))
+            return None
     row = GameVoiceTask(
         chat_id=chat_id,
         code=task.code,
         text=text,
         reward=task.reward,
-        tg_message_id=message.message_id,
+        tg_message_id=tg_message_id,
         expires_at=expires_at,
         poll_enabled=await get_game_voice_poll_enabled(session),
     )

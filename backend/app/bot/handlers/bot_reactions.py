@@ -107,12 +107,21 @@ async def _react(message: Message) -> None:
     ахинея». Пул курируется в админке («🤖 Реакции бота»), учитывает скрытые
     фразы и use_counts. Пусто → бот молчит.
     """
+    from app.services.game import delivery
     from app.services.random_phrases import compose_reply_phrase
 
     sm = get_sessionmaker()
     async with sm() as session:
+        # GHG11: режим фичи «Реакции чата».
+        mode = await delivery.get_feature_mode(session, "chat_reactions")
+        if mode == delivery.MODE_OFF:
+            return
         text = await compose_reply_phrase(session)
-    if not text:
+        if text and delivery.app_enabled(mode):
+            await delivery.record_feed_event(
+                session, feature="chat_reactions", text=text
+            )
+    if not text or not delivery.chat_enabled(mode):
         return
     try:
         await message.reply(text, parse_mode="HTML")

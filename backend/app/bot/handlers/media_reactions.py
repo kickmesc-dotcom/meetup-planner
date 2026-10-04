@@ -221,16 +221,28 @@ async def _do_react(
         both       — и эмодзи, и фраза;
         random_one — случайно одно из двух.
     """
+    from app.services.game import delivery
     from app.services.phrase_meta import effective_pool
 
     sm = get_sessionmaker()
     async with sm() as session:
+        # GHG11: режим фичи «Реакции на медиа».
+        mode = await delivery.get_feature_mode(session, "media_reactions")
+        if mode == delivery.MODE_OFF:
+            return
+        chat_ok = delivery.chat_enabled(mode)
+        if delivery.app_enabled(mode):
+            await delivery.record_feed_event(
+                session,
+                feature="media_reactions",
+                text=f"📸 Бот отреагировал на медиа ({author_name})",
+            )
         if kind == "collection":
             phrases = await effective_pool(
                 session, "media_collection", await get_collection_phrases(session)
             )
             phrase = pick_phrase(phrases)
-            if phrase:
+            if phrase and chat_ok:
                 await _send_reply_phrase(
                     chat_id, message_id, substitute_username(phrase, author_name)
                 )
@@ -243,6 +255,8 @@ async def _do_react(
         )
         whitelist = await get_emoji_whitelist(session)
 
+    if not chat_ok:
+        return
     response_mode = settings["single_response_mode"]
     want_emoji = response_mode in {"emoji", "both"}
     want_phrase = response_mode in {"phrase", "both"}

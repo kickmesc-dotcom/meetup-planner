@@ -453,11 +453,14 @@ async def publish(
     session: AsyncSession, bot, *, now: datetime, rng: random.Random
 ) -> MusicSelection | None:
     """Собрать и выложить подборку. `None` — публиковать нечего или TG не принял."""
-    # Э20: режим «всё в приложение» — подборку в чат не выкладываем.
-    from app.services.game import chat_mode
+    # GHG11: режим фичи «Музыкальная предложка». off — молчим; app — подборка
+    # формируется, но в чат не выкладывается (видна в ленте); chat/both — как было.
+    from app.services.game import delivery
 
-    if await chat_mode.chat_all_silent(session):
+    mode = await delivery.get_feature_mode(session, "music")
+    if mode == delivery.MODE_OFF:
         return None
+    chat_ok = delivery.chat_enabled(mode)
     tracks = await pool_tracks(session)
     if len(tracks) < MUSIC_MIN_TRACKS:
         return None
@@ -467,7 +470,7 @@ async def publish(
 
     settings = get_settings()
     chat_id = settings.group_chat_id
-    if not chat_id or bot is None:
+    if not chat_id:
         return None
 
     selection = MusicSelection(
@@ -478,34 +481,35 @@ async def publish(
 
     lines = build_publication_lines(chosen, names, attribute=attribute)
     header = publication_header(count=len(chosen))
-    try:
-        message = await bot.send_message(
-            chat_id=chat_id,
-            text=header + "\n" + "\n".join(lines),
-            parse_mode="HTML",
-        )
-        selection.tg_message_id = message.message_id
-        # Аудио-файлы доигрываем отдельными сообщениями: ссылки в строке нет,
-        # а `file_id` — единственное, что у нас есть.
-        for index, track in enumerate(chosen, start=1):
-            if track.kind != "audio" or not track.file_id:
-                continue
-            caption = f"№{index} — <b>{track.title or track.performer or 'трек'}</b>"
-            if attribute and names.get(track.user_id):
-                caption += f" <i>(от {names[track.user_id]})</i>"
-            try:
-                await bot.send_audio(
-                    chat_id=chat_id,
-                    audio=track.file_id,
-                    caption=caption,
-                    parse_mode="HTML",
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.warning("game.music_audio_send_failed", error=str(exc))
-    except Exception as exc:  # noqa: BLE001
-        log.warning("game.music_publish_failed", error=str(exc))
-        await session.rollback()
-        return None
+    if chat_ok and bot is not None:
+        try:
+            message = await bot.send_message(
+                chat_id=chat_id,
+                text=header + "\n" + "\n".join(lines),
+                parse_mode="HTML",
+            )
+            selection.tg_message_id = message.message_id
+            # Аудио-файлы доигрываем отдельными сообщениями: ссылки в строке нет,
+            # а `file_id` — единственное, что у нас есть.
+            for index, track in enumerate(chosen, start=1):
+                if track.kind != "audio" or not track.file_id:
+                    continue
+                caption = f"№{index} — <b>{track.title or track.performer or 'трек'}</b>"
+                if attribute and names.get(track.user_id):
+                    caption += f" <i>(от {names[track.user_id]})</i>"
+                try:
+                    await bot.send_audio(
+                        chat_id=chat_id,
+                        audio=track.file_id,
+                        caption=caption,
+                        parse_mode="HTML",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("game.music_audio_send_failed", error=str(exc))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("game.music_publish_failed", error=str(exc))
+            await session.rollback()
+            return None
 
     for track in chosen:
         track.status = STATUS_PUBLISHED

@@ -51,6 +51,8 @@ FEED_CHUKHAN = "chukhan"
 FEED_VOICE = "voice"
 FEED_MUSIC = "music"
 FEED_MUSIC_GAME = "music_game"
+# GHG11: активность механик без своей таблицы (совет, червь, реакции, номинации).
+FEED_FEATURE = "feature"
 
 # Ярлыки для фронта: одинаково и в ленте, и в фильтрах.
 FEED_ICONS: dict[str, str] = {
@@ -64,6 +66,7 @@ FEED_ICONS: dict[str, str] = {
     journal.KIND_HOLIDAY: "🎊",
     journal.KIND_CONTRABAND: "💰",
     journal.KIND_MEMORIAL: "🕯",
+    FEED_FEATURE: "✨",
 }
 
 FEED_TITLES: dict[str, str] = {
@@ -77,6 +80,7 @@ FEED_TITLES: dict[str, str] = {
     journal.KIND_HOLIDAY: "Праздник",
     journal.KIND_CONTRABAND: "Контрабанда",
     journal.KIND_MEMORIAL: "Поминовение",
+    FEED_FEATURE: "Активность",
 }
 
 # Порядок «от общего к частному» — для фильтров на фронте (чипы).
@@ -91,6 +95,7 @@ FEED_KIND_ORDER: tuple[str, ...] = (
     journal.KIND_HOLIDAY,
     journal.KIND_CONTRABAND,
     journal.KIND_MEMORIAL,
+    FEED_FEATURE,
 )
 
 # journal-виды, которые показываем в ленте (буфер ачивок не дублируем — ачивки
@@ -100,6 +105,7 @@ _JOURNAL_KINDS = (
     journal.KIND_HOLIDAY,
     journal.KIND_CONTRABAND,
     journal.KIND_MEMORIAL,
+    FEED_FEATURE,
 )
 
 # Сколько строк максимум берём из каждого источника (защита от O(N) на большом
