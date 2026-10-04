@@ -122,7 +122,23 @@ function installFocusScrollFix(): void {
 
 export function getInitData(): string {
   // Inside Telegram, WebApp.initData is the raw query string we send to backend.
-  return WebApp.initData ?? "";
+  const fromTg = WebApp.initData ?? "";
+  if (fromTg) return fromTg;
+  // GHG11 ops: живой смоук вне Telegram (обычный браузер) — можно подложить
+  // настоящий initData через `?initData=<...>` или sessionStorage.devInitData.
+  // Ветка срабатывает ТОЛЬКО когда Telegram initData пуст, поэтому в бою внутри
+  // мини-аппа она недостижима и подменить авторизацию нельзя.
+  try {
+    const q = new URLSearchParams(window.location.search).get("initData");
+    if (q) return q;
+  } catch {
+    // нет window.location — игнорируем
+  }
+  try {
+    return sessionStorage.getItem("devInitData") ?? "";
+  } catch {
+    return "";
+  }
 }
 
 /**
