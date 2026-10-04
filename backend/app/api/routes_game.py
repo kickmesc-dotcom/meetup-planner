@@ -46,6 +46,7 @@ from app.schemas.game import (
     GameProfileOut,
     GuestAchievementOut,
     GuestProfileOut,
+    GuestTodayTitleOut,
     HolidayCreate,
     HolidayOut,
     HolidaysOut,
@@ -557,6 +558,10 @@ async def guest_profile(
         for ach in bases
         if ach.code in collected
     ]
+    # GHG11: звания «сегодня» с причинами — плашка над головой в профиле.
+    from app.services.game import today_titles
+
+    today = await today_titles.titles_for_user(session, user.id)
 
     return GuestProfileOut(
         enabled=True,
@@ -578,6 +583,7 @@ async def guest_profile(
         achievements_collected=len(items),
         achievements_total=len(bases),
         achievements=items,
+        today=GuestTodayTitleOut(**today),
     )
 
 
@@ -1022,13 +1028,18 @@ async def voice_submit_api(
 
 @router.delete("/game/voice/submission", response_model=VoiceSubmitOut)
 async def voice_withdraw_api(session: SessionDep, user: CurrentUser) -> VoiceSubmitOut:
-    """Убрать свой голосовой вариант (пока задание открыто).
+    """Убрать свой голосовой вариант (пока задание открыто) с откатом опыта.
 
-    Пишем «могилку» (`voice.record_withdrawal`), поэтому повторная сдача не даст
-    второй XP за то же задание. Опыт не отзываем — это осознанно: откат начислений
-    сложнее, чем цена случайного «убрал-и-передумал» на шестерых.
+    GHG11: удаление теперь ПОЛНОСТЬЮ отменяет сдачу — строка сдачи удаляется, а
+    начислённый за неё опыт отзывается (`awards.revoke_voice`). «Могилку» НЕ
+    пишем: раз опыт вернулся, участник вправе сдать заново (и получить его
+    снова один раз). Взаимоучёт с чатом держит уникальность `(task_id, user_id)`:
+    пока сдача жива, вторую не создать ни в аппе, ни в чате.
+
+    Мини-апп обязан спросить ДВОЙНОЕ подтверждение до вызова — операция не
+    подлежит отмене и обнуляет прогресс по заданию.
     """
-    from app.services.game import voice
+    from app.services.game import awards
 
     now = datetime.now(timezone.utc)
     task = await session.scalar(
@@ -1050,10 +1061,12 @@ async def voice_withdraw_api(session: SessionDep, user: CurrentUser) -> VoiceSub
     )
     if sub is None:
         return VoiceSubmitOut(ok=False, status="nothing")
+    reward = int(task.reward or 0)
     await session.delete(sub)
-    voice.record_withdrawal(session, task_id=task.id, user_id=user.id)
     await session.commit()
-    return VoiceSubmitOut(ok=True, status="withdrawn")
+    # Опыт — после своего commit'а (инвариант фасада `awards`).
+    revoked = await awards.revoke_voice(session, user.id, points=reward, at=now)
+    return VoiceSubmitOut(ok=True, status="withdrawn", reward=revoked)
 
 
 @router.get("/game/voice/submissions/{submission_id}/audio")

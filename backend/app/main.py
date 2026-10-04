@@ -197,7 +197,8 @@ async def _announce_worm_transfer_once() -> None:
             from app.services.game import journal
             from app.services.game.worm_transfer import TRANSFER_NOTICE_TEXT
 
-            if await journal.send_now(TRANSFER_NOTICE_TEXT):
+            # GHG11: фиче-гейт — в «только апп»/выкл инфо-уведомление в чат не уходит.
+            if await journal.send_now(TRANSFER_NOTICE_TEXT, feature="worm"):
                 await set_worm_transfer_announced(session, True)
                 log.info("game.worm_transfer_announced")
     except Exception as exc:  # noqa: BLE001 — уведомление не стоит старта

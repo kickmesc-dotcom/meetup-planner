@@ -534,6 +534,18 @@ async def voice(
     await achievements.on_voice_submitted(session, user_id)
 
 
+async def revoke_voice(
+    session: AsyncSession, user_id: int, *, points: int, at: datetime | None = None
+) -> int:
+    """GHG11: отозвать опыт за удалённый голосовой вариант (тот же EV_VOICE).
+
+    Возвращает снятую сумму. Ачивка «подал голос» не откатывается осознанно:
+    пересчёт прогрессов переживёт не всякая гонка, а повторная сдача того же
+    задания невозможна (уникальность `(task_id, user_id)` до отзыва).
+    """
+    return await xp.revoke(session, user_id, EV_VOICE, points=points, at=at)
+
+
 @_guarded(EV_VOICE_BEST)
 async def voice_best(
     session: AsyncSession,

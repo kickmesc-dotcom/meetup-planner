@@ -266,6 +266,39 @@ async def record_feed_event(
         return False
 
 
+async def route_feature(
+    session: AsyncSession,
+    *,
+    feature: str,
+    text: str,
+    user_id: int | None = None,
+    icon: str | None = None,
+) -> bool:
+    """Единый маршрут активности фичи по её режиму (GHG11).
+
+    * ``off``  — ничего;
+    * ``app``  — только запись в ленте (`record_feed_event`);
+    * ``chat`` — только чат (`journal.send_now`);
+    * ``both`` — чат + дубль в ленте.
+
+    Нужен механикам без своей таблицы-источника (червь, совет, реакции), чтобы
+    в режиме «только апп» их событие всё равно было видно в ленте, а в чат не
+    утекло. Best-effort: ошибки только логируются вышестоящими хелперами.
+    """
+    mode = await get_feature_mode(session, feature)
+    if mode == MODE_OFF:
+        return False
+    if app_enabled(mode):
+        await record_feed_event(
+            session, feature=feature, text=text, user_id=user_id, icon=icon
+        )
+    if chat_enabled(mode):
+        from app.services.game import journal
+
+        await journal.send_now(text, feature=feature)
+    return True
+
+
 async def set_master_mode(session: AsyncSession, module: str, mode: str) -> None:
     """Принудительно перевести ВСЕ фичи модуля в ``mode``."""
     if module not in MODULES:

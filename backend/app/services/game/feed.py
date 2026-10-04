@@ -140,6 +140,15 @@ async def build_feed(
     if kinds:
         items = [it for it in items if it["kind"] in kinds]
 
+    # GHG11: плашки званий над головой (сегодня лох/чухан/червь) — одним
+    # проходом на всю ленту, дальше просто раскидываем по строкам.
+    from app.services.game import today_titles
+
+    badges = await today_titles.badge_map(session)
+    for it in items:
+        uid = it.get("user_id")
+        it["badges"] = badges.get(uid, []) if uid is not None else []
+
     items.sort(key=lambda it: it["at"], reverse=True)
     page = items[offset : offset + limit]
     # Э22: тяжёлые подробности — только для страницы, а не для всех 500 строк.
@@ -449,6 +458,7 @@ def _item(
         "text": text,
         "at": at,
         "detail": detail,
+        "badges": [],
         "user_id": user.id if user is not None else None,
         "user_name": user.display_name if user is not None else None,
         "user_telegram_id": user.telegram_id if user is not None else None,

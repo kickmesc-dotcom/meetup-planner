@@ -314,10 +314,11 @@ export default function AdminScreen({ users }: Props) {
           subtitle="Новый таймлайн / legacy-вид (по умолчанию legacy)"
           onClick={() => select("calendar-settings")}
         />
+        {/* GHG11: дни рождения и праздники объединены в один экран «Настройки». */}
         <Card
-          icon="🎂"
-          title="Дни рождения"
-          subtitle="Дата + что напоминать по каждому"
+          icon="⚙️"
+          title="Настройки"
+          subtitle="Дни рождения + праздники (даты и поздравления)"
           onClick={() => select("birthdays")}
         />
         <Card

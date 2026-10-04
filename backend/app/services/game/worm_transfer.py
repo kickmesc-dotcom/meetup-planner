@@ -195,13 +195,17 @@ async def apply(session: AsyncSession, outcome: tuple[EventLog, bool]) -> None:
     """
     from app.db.models import User
     from app.services import loser
-    from app.services.game import awards, journal
+    from app.services.game import awards, delivery
 
     pending, confirmed = outcome
     payload = pending.payload or {}
     if not confirmed:
-        await journal.send_now(
-            "🪱 Передача отменена — господин остаётся прежним.", feature="worm"
+        # GHG11: маршрут по режиму фичи — в «только апп» отмена видна в ленте, в
+        # чат не утекает; выключатель глушит совсем.
+        await delivery.route_feature(
+            session,
+            feature="worm",
+            text="🪱 Передача отменена — господин остаётся прежним.",
         )
         return
     target_id = payload.get("target_user_id")
@@ -210,8 +214,10 @@ async def apply(session: AsyncSession, outcome: tuple[EventLog, bool]) -> None:
     target_id = int(target_id)
     prev_name, row = await loser.assign_worm_to(session, target_id)
     if row is None:
-        await journal.send_now(
-            "🪱 Этот участник и так господин — передача не нужна.", feature="worm"
+        await delivery.route_feature(
+            session,
+            feature="worm",
+            text="🪱 Этот участник и так господин — передача не нужна.",
         )
         return
     # Э18: звание червя — та же ачивка «Червь-господин» и её юбилеи.
@@ -222,9 +228,12 @@ async def apply(session: AsyncSession, outcome: tuple[EventLog, bool]) -> None:
     text = (
         "🪱 <b>Передача власти</b>\n"
         f"{prev_name or 'Прежний господин'} слагает полномочия — новый "
-        f"червь-господин: <b>{new_name}</b>. Слушаюсь, повелитель."
+        f"червь-господин: <b>{new_name}</b>. "
+        "За звание «Червь-господин» начислен опыт."
     )
-    await journal.send_now(text, feature="worm")
+    await delivery.route_feature(
+        session, feature="worm", text=text, user_id=target_id, icon="🪱"
+    )
     log.info("game.worm_transferred", new_worm=target_id)
 
 

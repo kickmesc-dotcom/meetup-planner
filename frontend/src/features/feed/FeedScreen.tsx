@@ -1,5 +1,10 @@
 import { useEffect, useState, type MouseEvent } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   fetchFeed,
   fetchVoiceAudioUrl,
@@ -9,10 +14,16 @@ import {
   type FeedItem,
 } from "@/api/game";
 import ActivitiesPanel from "./ActivitiesPanel";
+import AutoPickSheet from "@/features/actions/AutoPickSheet";
+import LoserSheet from "@/features/actions/LoserSheet";
+import PollSheet from "@/features/actions/PollSheet";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
-import { haptic } from "@/tg/webapp";
+import { haptic, showAlert } from "@/tg/webapp";
+import { fetchMe } from "@/api/availability";
+import { triggerRandomPhrases } from "@/api/admin";
+import { humanizeApiError } from "@/api/client";
 
 /**
  * Э20: лента активности.
@@ -28,7 +39,16 @@ export default function FeedScreen({ meId }: { meId: number }) {
   const [scope, setScope] = useState<"all" | "mine">("all");
   // Э21: фильтр по типам. Пустое множество = «все типы».
   const [kinds, setKinds] = useState<Set<string>>(new Set());
+  // GHG11: чтобы лента занимала максимум места, фильтры по категориям и панель
+  // действий свёрнуты и раскрываются по клику в шапке.
+  const [showFilters, setShowFilters] = useState(false);
+  const [showActions, setShowActions] = useState(false);
   const openGuest = useUI((s) => s.openGuest);
+  // Кнопка «Действие» переиспользует готовые шиты календаря (они читают флаги
+  // из общего стора), поэтому монтируем их и здесь.
+  const showLoser = useUI((s) => s.showLoserSheet);
+  const showAuto = useUI((s) => s.showAutoPickSheet);
+  const showPoll = useUI((s) => s.showPollSheet);
   const kindsParam = [...kinds].sort().join(",");
 
   const q = useInfiniteQuery({
@@ -79,42 +99,83 @@ export default function FeedScreen({ meId }: { meId: number }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-tg-secondary-bg px-3 py-2">
-        <ScopeButton
-          active={scope === "all"}
-          onClick={() => setScope("all")}
-          label="Все"
-        />
-        <ScopeButton
-          active={scope === "mine"}
-          onClick={() => setScope("mine")}
-          label="Только мои"
-        />
+      {/* GHG11: компактная шапка — заголовок в одну строку, а строка управления
+          (охват + фильтры + действие) сразу под ним. Максимум места — ленте. */}
+      <div className="border-b border-tg-secondary-bg px-3 py-2">
+        <div className="flex items-baseline gap-2 overflow-hidden">
+          <h2 className="shrink-0 text-sm font-semibold text-tg-text">🏆 Лента</h2>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-tg-hint">
+            Кто что открыл и с кем что случилось.
+          </span>
+        </div>
+        <div className="mt-2 flex items-center gap-1.5">
+          <ScopeButton
+            active={scope === "all"}
+            onClick={() => setScope("all")}
+            label="Все события"
+          />
+          <ScopeButton
+            active={scope === "mine"}
+            onClick={() => setScope("mine")}
+            label="Только мои"
+          />
+          <div className="ml-auto flex items-center gap-1.5">
+            <TopToggle
+              active={showFilters}
+              onClick={() => {
+                haptic("selection");
+                setShowFilters((v) => !v);
+              }}
+              label={`🎚 Фильтры${kinds.size > 0 ? ` · ${kinds.size}` : ""}`}
+              open={showFilters}
+            />
+            <TopToggle
+              active={showActions}
+              onClick={() => {
+                haptic("selection");
+                setShowActions((v) => !v);
+              }}
+              label="⚡ Действие"
+              open={showActions}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Э21: фильтр по типу записи — чипы. Пусто = все типы. */}
-      <div className="flex flex-wrap gap-1.5 border-b border-tg-secondary-bg px-3 py-2">
-        <KindChip
-          active={kinds.size === 0}
-          onClick={() => {
-            if (kinds.size === 0) return;
-            haptic("selection");
-            setKinds(new Set());
-          }}
-          label="Все"
-        />
-        {availableKinds.map((k) => {
-          const meta = FEED_KIND_LABELS[k] ?? { icon: "📌", title: k };
-          return (
-            <KindChip
-              key={k}
-              active={kinds.has(k)}
-              onClick={() => toggleKind(k)}
-              label={`${meta.icon} ${meta.title}`}
-            />
-          );
-        })}
-      </div>
+      {/* Э21: фильтр по типу записи — чипы. Пусто = все типы. Свёрнут по клику. */}
+      {showFilters && (
+        <div className="flex flex-wrap gap-1.5 border-b border-tg-secondary-bg px-3 py-2">
+          <KindChip
+            active={kinds.size === 0}
+            onClick={() => {
+              if (kinds.size === 0) return;
+              haptic("selection");
+              setKinds(new Set());
+            }}
+            label="Все"
+          />
+          {availableKinds.map((k) => {
+            const meta = FEED_KIND_LABELS[k] ?? { icon: "📌", title: k };
+            return (
+              <KindChip
+                key={k}
+                active={kinds.has(k)}
+                onClick={() => toggleKind(k)}
+                label={`${meta.icon} ${meta.title}`}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* GHG11: панель действий — инициировать механики прямо из ленты. В режиме
+          «только апп» их отклик уезжает в ленту, в чат бот молчит. */}
+      {showActions && <FeedActions onDone={() => setShowActions(false)} />}
+
+      {/* Шиты календаря, переиспользуемые кнопкой действия. */}
+      {showAuto && <AutoPickSheet />}
+      {showLoser && <LoserSheet />}
+      {showPoll && <PollSheet users={[]} />}
 
       {first && !first.enabled && (
         <div className="p-6 text-center text-sm text-tg-hint">
@@ -215,6 +276,98 @@ function KindChip({
   );
 }
 
+/** GHG11: компактная кнопка-переключатель в шапке ленты (Фильтры/Действие). */
+function TopToggle({
+  active,
+  onClick,
+  label,
+  open,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  open: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className={[
+        "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+        active
+          ? "bg-tg-link text-white"
+          : "bg-tg-secondary-bg/70 text-tg-text",
+      ].join(" ")}
+    >
+      {label} <span aria-hidden>{open ? "▴" : "▾"}</span>
+    </button>
+  );
+}
+
+/**
+ * GHG11: панель действий в ленте.
+ *
+ * Даёт инициировать механики, не уходя на календарь: авто-подбор, опрос,
+ * автолох и (админам) прогон фразы. Шиты — те же, что в календаре, поэтому
+ * поведение и результат совпадают. В режиме «только мини-апп» отклик бота
+ * приходит в ленту, а не в чат.
+ */
+function FeedActions({ onDone }: { onDone: () => void }) {
+  const setAuto = useUI((s) => s.setShowAutoPickSheet);
+  const setPoll = useUI((s) => s.setShowPollSheet);
+  const setLoser = useUI((s) => s.setShowLoserSheet);
+  const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
+  const isAdmin = !!meQ.data?.is_admin;
+
+  const phrases = useMutation({
+    mutationFn: triggerRandomPhrases,
+    onSuccess: () => {
+      haptic("success");
+      void showAlert("Прогон фраз запущен.");
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  const open = (fn: () => void) => () => {
+    haptic("light");
+    fn();
+    onDone();
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1.5 border-b border-tg-secondary-bg bg-tg-secondary-bg/20 px-3 py-2">
+      <ActionChip onClick={open(() => setAuto(true))} label="🎯 Авто-подбор" />
+      <ActionChip onClick={open(() => setPoll(true))} label="📊 Опрос" />
+      <ActionChip onClick={open(() => setLoser(true))} label="🤡 Автолох" />
+      {isAdmin && (
+        <ActionChip
+          onClick={() => {
+            haptic("light");
+            phrases.mutate();
+          }}
+          label="🗯 Прогон фразы"
+        />
+      )}
+    </div>
+  );
+}
+
+function ActionChip({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg bg-tg-secondary-bg/80 px-2.5 py-1.5 text-[11px] font-medium text-tg-text active:scale-[0.97]"
+    >
+      {label}
+    </button>
+  );
+}
+
 /** Э22: типы, которые раскрываются в подробности по тапу. */
 const EXPANDABLE_KINDS = new Set([
   "achievement",
@@ -256,22 +409,30 @@ function FeedRow({
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        {item.avatar_url ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (clickable) onOpenUser(item.user_id!);
-            }}
-            className="h-10 w-10 shrink-0 overflow-hidden rounded-full"
-          >
-            <img src={item.avatar_url} alt="" className="h-full w-full object-cover" />
-          </button>
-        ) : (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-tg-secondary-bg text-lg">
-            {item.icon}
-          </div>
-        )}
+        <div className="relative shrink-0">
+          {item.avatar_url ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (clickable) onOpenUser(item.user_id!);
+              }}
+              className="block h-10 w-10 overflow-hidden rounded-full"
+            >
+              <img src={item.avatar_url} alt="" className="h-full w-full object-cover" />
+            </button>
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-tg-secondary-bg text-lg">
+              {item.icon}
+            </div>
+          )}
+          {/* GHG11: плашки званий над головой — сегодня лох/чухан/червь. */}
+          {(item.badges?.length ?? 0) > 0 && (
+            <span className="pointer-events-none absolute -right-1 -top-1 text-[11px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.35))]">
+              {item.badges!.join("")}
+            </span>
+          )}
+        </div>
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-xs text-tg-hint">

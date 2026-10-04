@@ -160,6 +160,17 @@ export interface GuestProfile {
   achievements_collected: number;
   achievements_total: number;
   achievements: GuestAchievement[];
+  /** GHG11: сегодняшние «носимые» звания с причинами (плашка над головой). */
+  today: GuestTodayTitle | null;
+}
+
+/** GHG11: звания «сегодня» — лох дня / чухан недели / червь-пидор. */
+export interface GuestTodayTitle {
+  loser: boolean;
+  loser_reason: string | null;
+  chukhan: boolean;
+  chukhan_reason: string | null;
+  worm: boolean;
 }
 
 /** Э19: профиль участника по внутреннему id (клик по аватарке на календаре). */
@@ -217,6 +228,8 @@ export interface FeedItem {
   user_name: string | null;
   user_telegram_id: number | null;
   avatar_url: string | null;
+  /** GHG11: эмодзи-плашки званий над головой (сегодня лох/чухан/червь). */
+  badges?: string[];
   /** Э22: подробности раскрывающейся карточки (см. `FeedDetail`). */
   detail?: FeedDetail | null;
 }
@@ -260,7 +273,13 @@ export const FEED_KIND_LABELS: Record<string, { icon: string; title: string }> =
   holiday: { icon: "🎊", title: "Праздники" },
   contraband: { icon: "💰", title: "Контрабанда" },
   memorial: { icon: "🕯", title: "Поминовения" },
+  // GHG11: активность механик без своей таблицы (совет, червь, реакции,
+  // номинации). Метка должна совпадать с `feed.FEED_TITLES[FEED_FEATURE]`.
+  feature: { icon: "✨", title: "Активность" },
 };
+
+/** GHG11: вид записи ленты «feature» — активность механик. */
+export const FEED_FEATURE_KIND = "feature";
 
 /**
  * Э21: активности в мини-аппе, когда бот молчит в чате.

@@ -717,39 +717,6 @@ export default function GameScreen({ users, onBack }: Props) {
         </section>
       )}
 
-      {/* Э22: бюджет активности — вынесен наверх: оператор просил найти его сразу.
-          Ограничить 1 публикацией в день можно одной кнопкой. */}
-      {social.data && (
-        <section className="space-y-2 rounded-xl bg-tg-secondary-bg/60 p-3">
-          <div>
-            <div className="text-sm font-semibold">💰 Бюджет игровой активности</div>
-            <div className="text-[11px] text-tg-hint">
-              Считает ТОЛЬКО игровую активность (события, голосовые, музыка,
-              контрабанда, мьюзик-гейм) — как будто ограничитель на авто-посты
-              игры. Ачивки, а также старые модули (чухан, лох, встречи) сюда НЕ
-              входят. 0 — без лимита.
-            </div>
-          </div>
-          <NumberRow
-            label="постов в день (0 — без лимита)"
-            value={social.data.activity_max_posts_per_day}
-            busy={socialMut.isPending}
-            onSave={(n) => socialMut.mutate({ activity_max_posts_per_day: n })}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              haptic("selection");
-              socialMut.mutate({ activity_max_posts_per_day: 0 });
-            }}
-            disabled={socialMut.isPending}
-            className="w-full rounded-lg bg-tg-secondary-bg/80 px-3 py-2 text-xs font-medium text-tg-text disabled:opacity-60"
-          >
-            🚫 Выключить ограничитель (без лимита)
-          </button>
-        </section>
-      )}
-
       {/* Э22: рубильники механик вынесены в ОТДЕЛЬНОЕ подменю (сворачиваемый
           раздел). Родные тумблеры в разделах ниже остаются и тоже работают. */}
       <Accordion
@@ -856,197 +823,39 @@ export default function GameScreen({ users, onBack }: Props) {
           }
         />
       </Accordion>
-
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
-        <div className="text-sm font-semibold">Отладочные TG-id</div>
-        <div className="text-[11px] text-tg-hint">
-          Им ранговый гейтинг не указ (по умолчанию добавь свой id, иначе
-          проверять новые функции придётся с 1 ранга)
-        </div>
-        <input
-          value={debugDraft ?? debugIds.join(", ")}
-          onChange={(e) => setDebugDraft(e.target.value)}
-          placeholder="123456, 789012"
-          inputMode="numeric"
-          className="w-full rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            haptic("selection");
-            const ids = (debugDraft ?? debugIds.join(", "))
-              .split(/[,\s]+/)
-              .map((s) => s.trim())
-              .filter(Boolean)
-              .map(Number)
-              .filter((n) => Number.isFinite(n));
-            debugMut.mutate(ids);
-          }}
-          disabled={debugDraft === null || debugMut.isPending}
-          className="w-full rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
-        >
-          Сохранить список
-        </button>
-      </section>
-
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
-        <div className="text-sm font-semibold">Отладка игрока</div>
-        <select
-          value={selected ?? ""}
-          onChange={(e) => {
-            haptic("selection");
-            setSelected(e.target.value ? Number(e.target.value) : null);
-            setPlayerOpen(true);
-          }}
-          className="w-full rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-        >
-          <option value="">— выбери участника —</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.telegram_id}>
-              {u.display_name}
-            </option>
-          ))}
-        </select>
-
-        {player.isPending && selected !== null && (
-          <div className="text-xs text-tg-hint">
-            <Spinner size={12} /> Считаем…
+      {/* Э22: бюджет активности — вынесен наверх: оператор просил найти его сразу.
+          Ограничить 1 публикацией в день можно одной кнопкой. */}
+      {social.data && (
+        <section className="space-y-2 rounded-xl bg-tg-secondary-bg/60 p-3">
+          <div>
+            <div className="text-sm font-semibold">💰 Бюджет игровой активности</div>
+            <div className="text-[11px] text-tg-hint">
+              Считает ТОЛЬКО игровую активность (события, голосовые, музыка,
+              контрабанда, мьюзик-гейм) — как будто ограничитель на авто-посты
+              игры. Ачивки, а также старые модули (чухан, лох, встречи) сюда НЕ
+              входят. 0 — без лимита.
+            </div>
           </div>
-        )}
+          <NumberRow
+            label="постов в день (0 — без лимита)"
+            value={social.data.activity_max_posts_per_day}
+            busy={socialMut.isPending}
+            onSave={(n) => socialMut.mutate({ activity_max_posts_per_day: n })}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              haptic("selection");
+              socialMut.mutate({ activity_max_posts_per_day: 0 });
+            }}
+            disabled={socialMut.isPending}
+            className="w-full rounded-lg bg-tg-secondary-bg/80 px-3 py-2 text-xs font-medium text-tg-text disabled:opacity-60"
+          >
+            🚫 Выключить ограничитель (без лимита)
+          </button>
+        </section>
+      )}
 
-        {player.data && (
-          <>
-            <div className="rounded-lg bg-tg-bg/50 p-2 text-xs">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">
-                    {player.data.name} — {player.data.level}-й «{player.data.rank_name}»
-                  </div>
-                  <div className="text-tg-hint">
-                    {player.data.xp} XP
-                    {player.data.prestige > 0 ? ` · престиж ${player.data.prestige}` : ""} ·
-                    ачивок: {player.data.achievements.length}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPlayerOpen((open) => !open)}
-                  aria-label={playerOpen ? "Свернуть участника" : "Развернуть участника"}
-                  className="shrink-0 rounded bg-tg-secondary-bg/80 px-2 py-0.5 text-[11px] text-tg-text"
-                >
-                  {playerOpen ? "Свернуть ▲" : "Развернуть ▼"}
-                </button>
-              </div>
-              {playerOpen && Object.keys(player.data.counters).length > 0 && (
-                <div className="text-tg-hint">
-                  накопители:{" "}
-                  {Object.entries(player.data.counters)
-                    .map(([k, v]) => `${k}=${v}`)
-                    .join(", ")}
-                </div>
-              )}
-              {playerOpen && player.data.achievements.length > 0 && (
-                <div className="mt-1 break-words text-tg-hint">
-                  {player.data.achievements.join(", ")}
-                </div>
-              )}
-            </div>
-
-            {playerOpen && (
-              <>
-            <div className="flex gap-2">
-              <input
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="код ачивки (chin_up)"
-                className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  grantMut.mutate();
-                }}
-                disabled={!code.trim() || grantMut.isPending}
-                className="shrink-0 rounded-lg bg-tg-button px-3 py-2 text-xs font-medium text-tg-button-text disabled:opacity-60"
-              >
-                Выдать
-              </button>
-            </div>
-
-            <div className="flex gap-2">
-              <input
-                value={xpDraft}
-                onChange={(e) => setXpDraft(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                inputMode="numeric"
-                placeholder="XP (напр. 800)"
-                className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  xpMut.mutate();
-                }}
-                disabled={!xpDraft.trim() || xpMut.isPending}
-                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
-              >
-                Поставить
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  debugXpMut.mutate({ kind: "add" });
-                }}
-                disabled={!xpDraft.trim() || debugXpMut.isPending}
-                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
-              >
-                + Прибавить
-              </button>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  debugXpMut.mutate({ kind: "reset" });
-                }}
-                disabled={debugXpMut.isPending}
-                className="shrink-0 rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
-              >
-                ♻️ Обнулить опыт
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  debugXpMut.mutate({
-                    kind: "prestige",
-                    on: !(player.data.prestige > 0),
-                  });
-                }}
-                disabled={debugXpMut.isPending}
-                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium active:scale-[0.98] disabled:opacity-60"
-              >
-                {player.data.prestige > 0 ? "🎖 Престиж: вкл" : "🎖 Престиж: выкл"}
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => void onResetAll()}
-              disabled={resetMut.isPending}
-              className="w-full rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
-            >
-              🧹 Сбросить ачивки и накопители
-            </button>
-              </>
-            )}
-          </>
-        )}
-      </section>
 
       {/* Э19: наблюдаемость — «сколько бот наработал за неделю». Читается сверху
           СРАЗУ: видно, не спамит ли бот, без чтения чата. */}
@@ -1646,6 +1455,197 @@ export default function GameScreen({ users, onBack }: Props) {
       </section>
 
       <MusicSection users={users} />
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <div className="text-sm font-semibold">Отладочные TG-id</div>
+        <div className="text-[11px] text-tg-hint">
+          Им ранговый гейтинг не указ (по умолчанию добавь свой id, иначе
+          проверять новые функции придётся с 1 ранга)
+        </div>
+        <input
+          value={debugDraft ?? debugIds.join(", ")}
+          onChange={(e) => setDebugDraft(e.target.value)}
+          placeholder="123456, 789012"
+          inputMode="numeric"
+          className="w-full rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            haptic("selection");
+            const ids = (debugDraft ?? debugIds.join(", "))
+              .split(/[,\s]+/)
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .map(Number)
+              .filter((n) => Number.isFinite(n));
+            debugMut.mutate(ids);
+          }}
+          disabled={debugDraft === null || debugMut.isPending}
+          className="w-full rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
+        >
+          Сохранить список
+        </button>
+      </section>
+
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <div className="text-sm font-semibold">Отладка игрока</div>
+        <select
+          value={selected ?? ""}
+          onChange={(e) => {
+            haptic("selection");
+            setSelected(e.target.value ? Number(e.target.value) : null);
+            setPlayerOpen(true);
+          }}
+          className="w-full rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+        >
+          <option value="">— выбери участника —</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.telegram_id}>
+              {u.display_name}
+            </option>
+          ))}
+        </select>
+
+        {player.isPending && selected !== null && (
+          <div className="text-xs text-tg-hint">
+            <Spinner size={12} /> Считаем…
+          </div>
+        )}
+
+        {player.data && (
+          <>
+            <div className="rounded-lg bg-tg-bg/50 p-2 text-xs">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {player.data.name} — {player.data.level}-й «{player.data.rank_name}»
+                  </div>
+                  <div className="text-tg-hint">
+                    {player.data.xp} XP
+                    {player.data.prestige > 0 ? ` · престиж ${player.data.prestige}` : ""} ·
+                    ачивок: {player.data.achievements.length}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlayerOpen((open) => !open)}
+                  aria-label={playerOpen ? "Свернуть участника" : "Развернуть участника"}
+                  className="shrink-0 rounded bg-tg-secondary-bg/80 px-2 py-0.5 text-[11px] text-tg-text"
+                >
+                  {playerOpen ? "Свернуть ▲" : "Развернуть ▼"}
+                </button>
+              </div>
+              {playerOpen && Object.keys(player.data.counters).length > 0 && (
+                <div className="text-tg-hint">
+                  накопители:{" "}
+                  {Object.entries(player.data.counters)
+                    .map(([k, v]) => `${k}=${v}`)
+                    .join(", ")}
+                </div>
+              )}
+              {playerOpen && player.data.achievements.length > 0 && (
+                <div className="mt-1 break-words text-tg-hint">
+                  {player.data.achievements.join(", ")}
+                </div>
+              )}
+            </div>
+
+            {playerOpen && (
+              <>
+            <div className="flex gap-2">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="код ачивки (chin_up)"
+                className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  grantMut.mutate();
+                }}
+                disabled={!code.trim() || grantMut.isPending}
+                className="shrink-0 rounded-lg bg-tg-button px-3 py-2 text-xs font-medium text-tg-button-text disabled:opacity-60"
+              >
+                Выдать
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                value={xpDraft}
+                onChange={(e) => setXpDraft(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                placeholder="XP (напр. 800)"
+                className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  xpMut.mutate();
+                }}
+                disabled={!xpDraft.trim() || xpMut.isPending}
+                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
+              >
+                Поставить
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  debugXpMut.mutate({ kind: "add" });
+                }}
+                disabled={!xpDraft.trim() || debugXpMut.isPending}
+                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium disabled:opacity-60"
+              >
+                + Прибавить
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  debugXpMut.mutate({ kind: "reset" });
+                }}
+                disabled={debugXpMut.isPending}
+                className="shrink-0 rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
+              >
+                ♻️ Обнулить опыт
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  debugXpMut.mutate({
+                    kind: "prestige",
+                    on: !(player.data.prestige > 0),
+                  });
+                }}
+                disabled={debugXpMut.isPending}
+                className="shrink-0 rounded-lg bg-tg-secondary-bg px-3 py-2 text-xs font-medium active:scale-[0.98] disabled:opacity-60"
+              >
+                {player.data.prestige > 0 ? "🎖 Престиж: вкл" : "🎖 Престиж: выкл"}
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void onResetAll()}
+              disabled={resetMut.isPending}
+              className="w-full rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
+            >
+              🧹 Сбросить ачивки и накопители
+            </button>
+              </>
+            )}
+          </>
+        )}
+      </section>
+
     </SubScreen>
   );
 }

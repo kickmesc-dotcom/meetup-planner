@@ -42,8 +42,9 @@ export default function GuestProfileScreen({
           ← Назад
         </button>
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">👤 Чужой профиль</div>
-          <div className="text-[11px] text-tg-hint">Глазами гостя — только просмотр</div>
+          <div className="truncate text-sm font-semibold">
+            👤 {p?.name ? `Профиль участника ${p.name}` : "Профиль участника"}
+          </div>
         </div>
       </header>
 
@@ -92,6 +93,24 @@ export default function GuestProfileScreen({
                 Ур. {p.level} · {p.xp} XP
                 {p.prestige > 0 ? ` · престиж ${p.prestige}` : ""}
               </div>
+              {/* GHG11: сегодняшние звания с причинами — плашка над головой. */}
+              {p.today && (p.today.loser || p.today.chukhan || p.today.worm) && (
+                <div className="mt-2 space-y-0.5 text-[11px] text-tg-text">
+                  {p.today.loser && (
+                    <div>
+                      👑 Сегодня лох дня
+                      {p.today.loser_reason ? `: «${p.today.loser_reason}»` : ""}
+                    </div>
+                  )}
+                  {p.today.chukhan && (
+                    <div>
+                      💩 Чухан недели
+                      {p.today.chukhan_reason ? `: «${p.today.chukhan_reason}»` : ""}
+                    </div>
+                  )}
+                  {p.today.worm && <div>🪱 Сейчас червь-пидор</div>}
+                </div>
+              )}
             </section>
 
             <section className="grid grid-cols-2 gap-2">

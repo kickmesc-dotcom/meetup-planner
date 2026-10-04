@@ -150,7 +150,7 @@ async def run_memorial_job(*, today: date | None = None, now: datetime | None = 
             # ему незачем (и в журнале оно не должно висеть как «непоказанное»).
             entry.sent_at = moment
             await session.commit()
-            if await journal.send_now(text):
+            if await journal.send_now(text, feature="memorial"):
                 posted += 1
         if posted:
             log.info("game.memorials_posted", count=posted)
@@ -171,6 +171,6 @@ async def note_return(
         return False
     entry.resolved_at = at or datetime.now(timezone.utc)
     await session.commit()
-    await journal.send_now(MEMORIAL_RETURN_TEXT)
+    await journal.send_now(MEMORIAL_RETURN_TEXT, feature="memorial")
     log.info("game.memorial_returned", user_id=user_id)
     return True

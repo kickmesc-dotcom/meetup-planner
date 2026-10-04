@@ -169,11 +169,15 @@ function VoiceBlock() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: QUERY_VOICE, queryFn: fetchVoiceCurrent, staleTime: 15_000 });
   const data = q.data;
+  // GHG11: удаление варианта — двойное подтверждение (операция откатывает опыт
+  // и не подлежит отмене). Первый тап — «Убрать», второй — «Да, убрать».
+  const [confirming, setConfirming] = useState(false);
 
   const withdraw = useMutation({
     mutationFn: withdrawVoice,
     onSuccess: () => {
       haptic("medium");
+      setConfirming(false);
       invalidateAll(qc);
     },
     onError: () => haptic("error"),
@@ -205,20 +209,47 @@ function VoiceBlock() {
         {data.my_submission_id !== null ? (
           <div className="flex items-center gap-2">
             <span className="flex-1 text-xs text-tg-hint">Твой вариант принят.</span>
-            <button
-              type="button"
-              disabled={withdraw.isPending}
-              onClick={() => {
-                if (!confirm("Убрать свой вариант? Опыт останется, но сдать заново уже нельзя.")) return;
-                withdraw.mutate();
-              }}
-              className="shrink-0 rounded-lg bg-status-busy/15 px-3 py-1.5 text-xs font-medium text-status-busy disabled:opacity-50"
-            >
-              Убрать
-            </button>
+            {!confirming ? (
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  setConfirming(true);
+                }}
+                className="shrink-0 rounded-lg bg-status-busy/15 px-3 py-1.5 text-xs font-medium text-status-busy"
+              >
+                Убрать
+              </button>
+            ) : (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  className="rounded-lg bg-tg-secondary-bg/70 px-2.5 py-1.5 text-xs font-medium text-tg-text"
+                >
+                  Оставить
+                </button>
+                <button
+                  type="button"
+                  disabled={withdraw.isPending}
+                  onClick={() => {
+                    haptic("medium");
+                    withdraw.mutate();
+                  }}
+                  className="rounded-lg bg-status-busy px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {withdraw.isPending ? "Убираем…" : "Да, убрать"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <VoiceRecorder onUploaded={() => invalidateAll(qc)} />
+        )}
+        {confirming && (
+          <div className="mt-1 text-[11px] text-status-busy">
+            Удаление отменит сдачу и откатит полученный за неё опыт.
+          </div>
         )}
       </div>
     </div>

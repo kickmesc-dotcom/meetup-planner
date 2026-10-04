@@ -259,6 +259,38 @@ async def award(
     )
 
 
+async def revoke(
+    session: AsyncSession,
+    user_id: int,
+    event: str,
+    *,
+    points: int,
+    at: datetime | None = None,
+    commit: bool = True,
+) -> int:
+    """Отозвать ранее начисленный опыт (GHG11: удаление голосового варианта).
+
+    Списываем с профиля (не ниже нуля) и правим дневную историю. Идемпотентного
+    ключа не трогаем: отзыв — редкое ручное действие, а не поток. Возвращает
+    фактически снятую сумму.
+    """
+    profile = await session.get(GameProfile, user_id)
+    if profile is None:
+        return 0
+    xp_after = max(0, profile.xp - points)
+    removed = profile.xp - xp_after
+    profile.xp = xp_after
+    day = utc_day(at)
+    bucket = await session.get(XpDaily, (user_id, day, event))
+    if bucket is not None:
+        bucket.points -= points
+        bucket.count -= 1
+        if bucket.count <= 0:
+            await session.delete(bucket)
+    await _flush_or_commit(session, commit)
+    return removed
+
+
 async def award_many(
     session: AsyncSession,
     user_ids: list[int],

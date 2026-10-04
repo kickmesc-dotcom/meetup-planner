@@ -121,6 +121,68 @@ async def test_record_feed_event_writes_feed_only_row():
 
 
 @pytest.mark.asyncio
+async def test_route_feature_off_drops_everything(monkeypatch):
+    session = _StoreSession({"delivery.feature.worm": delivery.MODE_OFF})
+
+    async def _send(*_a, **_k):  # pragma: no cover
+        raise AssertionError("off: в чат не пишем")
+
+    monkeypatch.setattr(journal, "send_now", _send)
+    ok = await delivery.route_feature(session, feature="worm", text="🪱 текст")
+    assert ok is False
+    assert session.added == []
+
+
+@pytest.mark.asyncio
+async def test_route_feature_app_only_feed(monkeypatch):
+    session = _StoreSession({"delivery.feature.worm": delivery.MODE_APP})
+
+    async def _send(*_a, **_k):  # pragma: no cover
+        raise AssertionError("app: в чат не пишем")
+
+    monkeypatch.setattr(journal, "send_now", _send)
+    ok = await delivery.route_feature(
+        session, feature="worm", text="🪱 передача", user_id=7
+    )
+    assert ok is True
+    assert len(session.added) == 1
+    assert session.added[0].kind == "feature"
+    assert session.added[0].subject_user_id == 7
+
+
+@pytest.mark.asyncio
+async def test_route_feature_chat_only_sends(monkeypatch):
+    session = _StoreSession({"delivery.feature.worm": delivery.MODE_CHAT})
+    sent: list[str] = []
+
+    async def _send(text, **_kw):
+        sent.append(text)
+        return True
+
+    monkeypatch.setattr(journal, "send_now", _send)
+    ok = await delivery.route_feature(session, feature="worm", text="🪱 текст")
+    assert ok is True
+    assert sent == ["🪱 текст"]
+    assert session.added == []
+
+
+@pytest.mark.asyncio
+async def test_route_feature_both_sends_and_records(monkeypatch):
+    session = _StoreSession({"delivery.feature.worm": delivery.MODE_BOTH})
+    sent: list[str] = []
+
+    async def _send(text, **_kw):
+        sent.append(text)
+        return True
+
+    monkeypatch.setattr(journal, "send_now", _send)
+    ok = await delivery.route_feature(session, feature="worm", text="🪱 текст", user_id=3)
+    assert ok is True
+    assert sent == ["🪱 текст"]
+    assert len(session.added) == 1
+
+
+@pytest.mark.asyncio
 async def test_announce_off_drops_event(monkeypatch):
     session = _StoreSession({"delivery.feature.events": delivery.MODE_OFF})
 

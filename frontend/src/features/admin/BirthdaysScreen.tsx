@@ -14,6 +14,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { Checkbox, Toggle as TgToggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
+import HolidaysCard from "./HolidaysCard";
 
 interface Props {
   onBack: () => void;
@@ -41,8 +42,8 @@ export default function BirthdaysScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🎂 Дни рождения"
-      subtitle="Дата + что напоминать"
+      title="⚙️ Настройки"
+      subtitle="Дни рождения и праздники в одном месте"
       onBack={onBack}
     >
       <BirthdaysMasterSwitch />
@@ -62,6 +63,9 @@ export default function BirthdaysScreen({ onBack }: Props) {
           ⚠ {String((save.error as Error)?.message ?? save.error)}
         </div>
       )}
+
+      {/* GHG11: праздники переехали из профиля сюда — единый экран «Настройки». */}
+      <HolidaysCard />
     </SubScreen>
   );
 }

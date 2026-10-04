@@ -13,10 +13,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ackLevelUp,
-  createHoliday,
-  deleteHoliday,
   fetchAchievementStats,
-  fetchHolidays,
   fetchMyGame,
   fetchRanksChart,
   updateGameProfile,
@@ -472,7 +469,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
         )}
       </section>
 
-      <HolidaysSection />
+      {/* GHG11: праздники переехали в админку («Настройки») — из профиля убраны. */}
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <h2 className="text-base font-semibold">📈 Ранги участников</h2>
@@ -504,136 +501,6 @@ export function AchievementsScreen({ users }: { users: User[] }) {
         )}
       </section>
     </div>
-  );
-}
-
-/**
- * Э10.3: пул праздников — «дата + сообщение», ежегодно, +50 XP всему чату.
- *
- * Читать может любой участник (праздник влияет на всех), править — с 6 ранга
- * (или отладочным админам). Право приходит с сервера (`can_manage`), поэтому
- * UI не повторяет логику гейтинга: если кнопки нет, её и не должно быть.
- */
-function HolidaysSection() {
-  const queryClient = useQueryClient();
-  const holidays = useQuery({ queryKey: ["game", "holidays"], queryFn: fetchHolidays });
-  const [month, setMonth] = useState("");
-  const [day, setDay] = useState("");
-  const [message, setMessage] = useState("");
-
-  const invalidate = () =>
-    void queryClient.invalidateQueries({ queryKey: ["game", "holidays"] });
-
-  const addMut = useMutation({
-    mutationFn: () => createHoliday(Number(month), Number(day), message.trim()),
-    onSuccess: () => {
-      haptic("success");
-      setMonth("");
-      setDay("");
-      setMessage("");
-      invalidate();
-    },
-    onError: (e) => {
-      haptic("error");
-      void showAlert(humanizeApiError(e));
-    },
-  });
-
-  const removeMut = useMutation({
-    mutationFn: (id: number) => deleteHoliday(id),
-    onSuccess: () => {
-      haptic("success");
-      invalidate();
-    },
-    onError: (e) => {
-      haptic("error");
-      void showAlert(humanizeApiError(e));
-    },
-  });
-
-  const data = holidays.data;
-  if (!data || holidays.isError) return null;
-  if (!data.items.length && !data.can_manage) return null;
-
-  const ready = month.trim() && day.trim() && message.trim();
-
-  return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-      <h2 className="text-base font-semibold">🎉 Праздники</h2>
-      <div className="text-xs text-tg-hint mb-2">
-        В эти дни всем участникам капает +50 XP, а бот поздравляет в чате
-      </div>
-
-      {data.items.length ? (
-        <ul className="space-y-1">
-          {data.items.map((h) => (
-            <li key={h.id} className="flex items-center gap-2 text-sm">
-              <span className="shrink-0 tabular-nums text-tg-hint">
-                {String(h.day).padStart(2, "0")}.{String(h.month).padStart(2, "0")}
-              </span>
-              <span className="min-w-0 flex-1 truncate">{h.message}</span>
-              {data.can_manage && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic("selection");
-                    removeMut.mutate(h.id);
-                  }}
-                  disabled={removeMut.isPending}
-                  className="shrink-0 rounded bg-tg-bg/60 px-2 py-1 text-xs text-status-busy active:scale-95 disabled:opacity-60"
-                >
-                  ✕
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <div className="text-xs text-tg-hint py-1">Пока ни одного праздника.</div>
-      )}
-
-      {data.can_manage ? (
-        <div className="mt-3 space-y-2 border-t border-tg-bg/60 pt-2">
-          <div className="flex gap-2">
-            <input
-              value={day}
-              onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
-              inputMode="numeric"
-              placeholder="ДД"
-              className="w-14 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-            />
-            <input
-              value={month}
-              onChange={(e) => setMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
-              inputMode="numeric"
-              placeholder="ММ"
-              className="w-14 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-            />
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value.slice(0, 120))}
-              placeholder="Что за праздник"
-              className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              haptic("selection");
-              addMut.mutate();
-            }}
-            disabled={!ready || addMut.isPending}
-            className="w-full rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
-          >
-            + Добавить праздник
-          </button>
-        </div>
-      ) : (
-        <div className="mt-2 text-[11px] text-tg-hint">
-          🔒 Добавлять праздники можно с {data.required_level ?? 6} ранга
-        </div>
-      )}
-    </section>
   );
 }
 

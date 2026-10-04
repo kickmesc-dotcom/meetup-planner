@@ -162,6 +162,20 @@ class GuestAchievementOut(BaseModel):
     icon: str
 
 
+class GuestTodayTitleOut(BaseModel):
+    """GHG11: «сегодня висит звание» — для плашки над головой в профиле и ленте.
+
+    Отдельный лёгкий блок: кто сегодня лох дня / чухан недели / червь-пидор и
+    ЗА ЧТО (причина). Пустые поля — звания нет.
+    """
+
+    loser: bool = False
+    loser_reason: str | None = None
+    chukhan: bool = False
+    chukhan_reason: str | None = None
+    worm: bool = False
+
+
 class GuestProfileOut(BaseModel):
     """Э19: чужой профиль «глазами гостя» — только факты, без настроек.
 
@@ -189,6 +203,8 @@ class GuestProfileOut(BaseModel):
     achievements_collected: int = 0
     achievements_total: int = 0
     achievements: list[GuestAchievementOut] = []
+    # GHG11: сегодняшние «носимые» звания с причинами (плашка над головой).
+    today: GuestTodayTitleOut | None = None
 
 
 class HolidayOut(BaseModel):
@@ -398,6 +414,8 @@ class FeedItemOut(BaseModel):
     user_name: str | None = None
     user_telegram_id: int | None = None
     avatar_url: str | None = None
+    # GHG11: эмодзи-плашки званий над головой (сегодня лох/чухан/червь).
+    badges: list[str] = []
     # Э22: подробности для раскрытия карточки в ленте — «за что дана ачивка»,
     # условия и окно голосового задания, треки подборки с лайками. Свободный
     # словарь: у разных типов записей разный состав, фронт читает по `kind`.
