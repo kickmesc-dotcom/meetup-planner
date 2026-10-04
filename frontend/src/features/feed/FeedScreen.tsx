@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -6,22 +6,29 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  askAdvice,
+  deleteFeedItem,
   fetchFeed,
   fetchVoiceAudioUrl,
+  fetchWorm,
+  hideFeedItem,
   likeMusicTrack,
+  restoreFeedItem,
+  transferWorm,
+  unhideFeedItem,
   FEED_KIND_LABELS,
   type FeedDetail,
   type FeedItem,
 } from "@/api/game";
 import ActivitiesPanel from "./ActivitiesPanel";
-import AutoPickSheet from "@/features/actions/AutoPickSheet";
+import NominationsSheet from "./NominationsSheet";
+import VoiceLikeButton from "./VoiceLikeButton";
 import LoserSheet from "@/features/actions/LoserSheet";
-import PollSheet from "@/features/actions/PollSheet";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
-import { fetchMe } from "@/api/availability";
+import { fetchMe, fetchUsers } from "@/api/availability";
 import { triggerRandomPhrases } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 
@@ -43,13 +50,44 @@ export default function FeedScreen({ meId }: { meId: number }) {
   // действий свёрнуты и раскрываются по клику в шапке.
   const [showFilters, setShowFilters] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  const [showNominations, setShowNominations] = useState(false);
   const openGuest = useUI((s) => s.openGuest);
-  // Кнопка «Действие» переиспользует готовые шиты календаря (они читают флаги
-  // из общего стора), поэтому монтируем их и здесь.
   const showLoser = useUI((s) => s.showLoserSheet);
-  const showAuto = useUI((s) => s.showAutoPickSheet);
-  const showPoll = useUI((s) => s.showPollSheet);
   const kindsParam = [...kinds].sort().join(",");
+
+  const qc = useQueryClient();
+  const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
+  const isAdmin = !!meQ.data?.is_admin;
+
+  // GHG11: плашка-отмена после удаления/скрытия записи. Держимся ~4.5 сек —
+  // этого хватает, чтобы передумать, но запись не «залипает» в ленте.
+  const [toast, setToast] = useState<{ text: string; undo: () => Promise<unknown> | unknown } | null>(
+    null,
+  );
+  const toastTimer = useRef<number | null>(null);
+  const dismissToast = () => {
+    if (toastTimer.current !== null) {
+      window.clearTimeout(toastTimer.current);
+      toastTimer.current = null;
+    }
+    setToast(null);
+  };
+  const showToast = (text: string, undo: () => Promise<unknown> | unknown) => {
+    if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    setToast({ text, undo });
+    toastTimer.current = window.setTimeout(() => {
+      toastTimer.current = null;
+      setToast(null);
+    }, 4500);
+  };
+  useEffect(
+    () => () => {
+      if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+    },
+    [],
+  );
+
+  const invalidateFeed = () => qc.invalidateQueries({ queryKey: ["game-feed"] });
 
   const q = useInfiniteQuery({
     queryKey: ["game-feed", scope, kindsParam],
@@ -102,13 +140,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
       {/* GHG11: компактная шапка — заголовок в одну строку, а строка управления
           (охват + фильтры + действие) сразу под ним. Максимум места — ленте. */}
       <div className="border-b border-tg-secondary-bg px-3 py-2">
-        <div className="flex items-baseline gap-2 overflow-hidden">
-          <h2 className="shrink-0 text-sm font-semibold text-tg-text">🏆 Лента</h2>
-          <span className="min-w-0 flex-1 truncate text-[11px] text-tg-hint">
-            Кто что открыл и с кем что случилось.
-          </span>
-        </div>
-        <div className="mt-2 flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           <ScopeButton
             active={scope === "all"}
             onClick={() => setScope("all")}
@@ -126,7 +158,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
                 haptic("selection");
                 setShowFilters((v) => !v);
               }}
-              label={`🎚 Фильтры${kinds.size > 0 ? ` · ${kinds.size}` : ""}`}
+              label={kinds.size > 0 ? `Фильтры · ${kinds.size}` : "Фильтры"}
               open={showFilters}
             />
             <TopToggle
@@ -135,7 +167,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
                 haptic("selection");
                 setShowActions((v) => !v);
               }}
-              label="⚡ Действие"
+              label="Действия"
               open={showActions}
             />
           </div>
@@ -170,12 +202,20 @@ export default function FeedScreen({ meId }: { meId: number }) {
 
       {/* GHG11: панель действий — инициировать механики прямо из ленты. В режиме
           «только апп» их отклик уезжает в ленту, в чат бот молчит. */}
-      {showActions && <FeedActions onDone={() => setShowActions(false)} />}
+      {showActions && (
+        <FeedActions
+          onDone={() => setShowActions(false)}
+          onOpenNominations={() => {
+            haptic("light");
+            setShowActions(false);
+            setShowNominations(true);
+          }}
+        />
+      )}
 
-      {/* Шиты календаря, переиспользуемые кнопкой действия. */}
-      {showAuto && <AutoPickSheet />}
+      {/* Шит автолоха (свой, гейтится по рангу). */}
       {showLoser && <LoserSheet />}
-      {showPoll && <PollSheet users={[]} />}
+      {showNominations && <NominationsSheet onClose={() => setShowNominations(false)} />}
 
       {first && !first.enabled && (
         <div className="p-6 text-center text-sm text-tg-hint">
@@ -199,10 +239,12 @@ export default function FeedScreen({ meId }: { meId: number }) {
             key={it.id}
             item={it}
             meId={meId}
+            isAdmin={isAdmin}
             onOpenUser={(uid) => {
               haptic("light");
               openGuest(uid);
             }}
+            onModerated={showToast}
           />
         ))}
 
@@ -217,6 +259,32 @@ export default function FeedScreen({ meId }: { meId: number }) {
           </button>
         )}
       </div>
+
+      {/* GHG11: плашка-отмена поверх ленты. */}
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-20 z-40 flex justify-center px-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-tg-secondary-bg px-3 py-2 shadow-lg">
+            <span className="text-xs text-tg-text">{toast.text}</span>
+            <button
+              type="button"
+              onClick={async () => {
+                haptic("medium");
+                const undo = toast.undo;
+                dismissToast();
+                try {
+                  await undo();
+                } catch {
+                  haptic("error");
+                }
+                void invalidateFeed();
+              }}
+              className="shrink-0 rounded-lg bg-tg-link/15 px-2.5 py-1 text-xs font-semibold text-tg-link"
+            >
+              Отменить
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -276,7 +344,7 @@ function KindChip({
   );
 }
 
-/** GHG11: компактная кнопка-переключатель в шапке ленты (Фильтры/Действие). */
+/** GHG11: компактная кнопка-переключатель в шапке ленты (Фильтры/Действия). */
 function TopToggle({
   active,
   onClick,
@@ -294,13 +362,26 @@ function TopToggle({
       onClick={onClick}
       aria-expanded={open}
       className={[
-        "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
-        active
-          ? "bg-tg-link text-white"
-          : "bg-tg-secondary-bg/70 text-tg-text",
+        "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors",
+        active ? "bg-tg-link text-white" : "bg-tg-secondary-bg/70 text-tg-text",
       ].join(" ")}
     >
-      {label} <span aria-hidden>{open ? "▴" : "▾"}</span>
+      {label}
+      <svg
+        aria-hidden
+        viewBox="0 0 12 12"
+        className={[
+          "h-2.5 w-2.5 transition-transform",
+          open ? "rotate-180" : "",
+        ].join(" ")}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M2.5 4.5 6 8l3.5-3.5" />
+      </svg>
     </button>
   );
 }
@@ -308,17 +389,23 @@ function TopToggle({
 /**
  * GHG11: панель действий в ленте.
  *
- * Даёт инициировать механики, не уходя на календарь: авто-подбор, опрос,
- * автолох и (админам) прогон фразы. Шиты — те же, что в календаре, поэтому
- * поведение и результат совпадают. В режиме «только мини-апп» отклик бота
- * приходит в ленту, а не в чат.
+ * Даёт инициировать механики, не уходя на календарь: магический шар (совет),
+ * автолох, номинации/голосование и (для владельца червя) передачу червя.
+ * Админам — прогон фразы. В режиме «только мини-апп» отклик бота приходит в
+ * ленту, а не в чат.
  */
-function FeedActions({ onDone }: { onDone: () => void }) {
-  const setAuto = useUI((s) => s.setShowAutoPickSheet);
-  const setPoll = useUI((s) => s.setShowPollSheet);
+function FeedActions({
+  onDone,
+  onOpenNominations,
+}: {
+  onDone: () => void;
+  onOpenNominations: () => void;
+}) {
   const setLoser = useUI((s) => s.setShowLoserSheet);
   const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
   const isAdmin = !!meQ.data?.is_admin;
+
+  const wormQ = useQuery({ queryKey: ["worm"], queryFn: fetchWorm, staleTime: 30_000 });
 
   const phrases = useMutation({
     mutationFn: triggerRandomPhrases,
@@ -332,28 +419,144 @@ function FeedActions({ onDone }: { onDone: () => void }) {
     },
   });
 
+  const advice = useMutation({
+    mutationFn: askAdvice,
+    onSuccess: (res) => {
+      if (res.ok) {
+        haptic("success");
+      } else {
+        haptic("error");
+        if (res.status === "disabled") void showAlert("Магический шар выключен в настройках.");
+        else if (res.status === "empty") void showAlert("Пул советов пуст.");
+      }
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
   const open = (fn: () => void) => () => {
     haptic("light");
     fn();
     onDone();
   };
 
+  const ownerName = wormQ.data?.owner_name;
+  const isWormOwner = wormQ.data?.is_owner === true;
+
   return (
-    <div className="flex flex-wrap gap-1.5 border-b border-tg-secondary-bg bg-tg-secondary-bg/20 px-3 py-2">
-      <ActionChip onClick={open(() => setAuto(true))} label="🎯 Авто-подбор" />
-      <ActionChip onClick={open(() => setPoll(true))} label="📊 Опрос" />
-      <ActionChip onClick={open(() => setLoser(true))} label="🤡 Автолох" />
-      {isAdmin && (
+    <div className="border-b border-tg-secondary-bg bg-tg-secondary-bg/20 px-3 py-2">
+      <div className="flex flex-wrap gap-1.5">
         <ActionChip
           onClick={() => {
             haptic("light");
-            phrases.mutate();
+            advice.mutate();
           }}
-          label="🗯 Прогон фразы"
+          label={advice.isPending ? "🔮 Спрашиваем…" : "🔮 Магический шар"}
         />
+        <ActionChip onClick={open(() => setLoser(true))} label="🤡 Автолох" />
+        <ActionChip onClick={onOpenNominations} label="🎮 Номинации" />
+        {isAdmin && (
+          <ActionChip
+            onClick={() => {
+              haptic("light");
+              phrases.mutate();
+            }}
+            label="🗯 Прогон фразы"
+          />
+        )}
+      </div>
+
+      {advice.data?.ok && advice.data.text && (
+        <div className="mt-2 rounded-xl bg-tg-bg/60 px-3 py-2 text-sm text-tg-text">
+          <span className="mr-1">🔮</span>
+          {advice.data.text}
+        </div>
+      )}
+
+      {/* GHG11: действия червя доступны только его владельцу. */}
+      {isWormOwner && (
+        <div className="mt-2 rounded-xl bg-tg-bg/60 px-3 py-2">
+          <div className="text-[11px] text-tg-hint">
+            🪱 Ты — червь-господин{ownerName ? ` (${ownerName})` : ""}. Передай власть:
+          </div>
+          <WormTransfer />
+        </div>
       )}
     </div>
   );
+}
+
+function WormTransfer() {
+  const qc = useQueryClient();
+  const usersQ = useQuery({ queryKey: ["users"], queryFn: fetchUsers, staleTime: 60_000 });
+  const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
+  const [target, setTarget] = useState<string>("");
+  const users = (usersQ.data ?? []).filter((u) => u.id !== meQ.data?.id);
+
+  const mut = useMutation({
+    mutationFn: (userId: number) => transferWorm(userId),
+    onSuccess: (res) => {
+      if (res.ok) {
+        haptic("success");
+        void showAlert("Червь передан.");
+        setTarget("");
+      } else {
+        haptic("error");
+        void showAlert(transferStatusText(res.status));
+      }
+      void qc.invalidateQueries({ queryKey: ["worm"] });
+      void qc.invalidateQueries({ queryKey: ["game-feed"] });
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  return (
+    <div className="mt-1.5 flex gap-1.5">
+      <select
+        value={target}
+        onChange={(e) => setTarget(e.target.value)}
+        className="min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 py-1.5 text-sm"
+      >
+        <option value="">Кому передать…</option>
+        {users.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.display_name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        disabled={!target || mut.isPending}
+        onClick={() => {
+          haptic("medium");
+          mut.mutate(Number(target));
+        }}
+        className="shrink-0 rounded-lg bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text disabled:opacity-50"
+      >
+        {mut.isPending ? "…" : "Передать"}
+      </button>
+    </div>
+  );
+}
+
+function transferStatusText(status: string): string {
+  switch (status) {
+    case "not_owner":
+      return "Ты больше не владелец червя.";
+    case "unknown_user":
+      return "Участник не найден.";
+    case "self":
+      return "Нельзя передать червя самому себе.";
+    case "same":
+      return "Этот участник и так червь-господин.";
+    default:
+      return "Не получилось передать червя.";
+  }
 }
 
 function ActionChip({ onClick, label }: { onClick: () => void; label: string }) {
@@ -380,19 +583,55 @@ const EXPANDABLE_KINDS = new Set([
 
 function FeedRow({
   item,
+  isAdmin,
   onOpenUser,
+  onModerated,
 }: {
   item: FeedItem;
   meId: number;
+  isAdmin: boolean;
   onOpenUser: (userId: number) => void;
+  onModerated: (text: string, undo: () => Promise<unknown> | unknown) => void;
 }) {
   const when = formatWhen(item.at);
   const clickable = item.user_id !== null && item.user_id !== undefined;
   const [open, setOpen] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const qc = useQueryClient();
   const expandable = EXPANDABLE_KINDS.has(item.kind);
   // Музыка и голосовые — «плеер»: сворачиваем ОТДЕЛЬНОЙ кнопкой, чтобы тап
   // по треку/аудио не закрывал панель во время прослушивания.
   const playerLike = item.kind === "music" || item.kind === "voice";
+
+  const invalidateFeed = () => qc.invalidateQueries({ queryKey: ["game-feed"] });
+
+  const hide = useMutation({
+    mutationFn: () => hideFeedItem(item.id),
+    onSuccess: () => {
+      haptic("medium");
+      setMenu(false);
+      void invalidateFeed();
+      onModerated("Запись скрыта у тебя", () => unhideFeedItem(item.id));
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: () => deleteFeedItem(item.id),
+    onSuccess: () => {
+      haptic("medium");
+      setMenu(false);
+      void invalidateFeed();
+      onModerated("Запись удалена из ленты", () => restoreFeedItem(item.id));
+    },
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
+  });
 
   const toggle = () => {
     if (!expandable || playerLike) return;
@@ -444,6 +683,18 @@ function FeedRow({
                 {playerLike ? "▸" : open ? "▾" : "▸"}
               </span>
             )}
+            <button
+              type="button"
+              aria-label="Действия с записью"
+              onClick={(e) => {
+                e.stopPropagation();
+                haptic("selection");
+                setMenu((m) => !m);
+              }}
+              className="shrink-0 rounded-md px-1 text-base leading-none text-tg-hint"
+            >
+              ⋯
+            </button>
           </div>
           {item.user_name && (
             <button
@@ -476,6 +727,33 @@ function FeedRow({
             >
               {item.kind === "music" ? "🎧 Слушать и лайкать" : "🎙 Подробности и прослушать"}
             </button>
+          )}
+
+          {/* GHG11: модерация — «скрыть у себя» всем, «удалить» админу. */}
+          {menu && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="mt-2 flex flex-wrap gap-1.5"
+            >
+              <button
+                type="button"
+                disabled={hide.isPending}
+                onClick={() => hide.mutate()}
+                className="rounded-lg bg-tg-secondary-bg px-2.5 py-1 text-[11px] font-medium text-tg-text disabled:opacity-50"
+              >
+                🙈 Скрыть у себя
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate()}
+                  className="rounded-lg bg-status-busy/15 px-2.5 py-1 text-[11px] font-medium text-status-busy disabled:opacity-50"
+                >
+                  🗑 Удалить
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -680,6 +958,12 @@ function SubmissionPlayer({
           {submission.duration}с
         </span>
       )}
+      <VoiceLikeButton
+        submissionId={submission.id}
+        initialLiked={submission.liked ?? false}
+        initialLikes={submission.likes ?? 0}
+        invalidateKey="game-feed"
+      />
       {url && (
         <audio
           src={url}

@@ -117,6 +117,7 @@ async def build_feed(
     session: AsyncSession,
     *,
     user_id: int | None = None,
+    viewer_id: int | None = None,
     limit: int = 30,
     offset: int = 0,
     kinds: set[str] | None = None,
@@ -124,6 +125,7 @@ async def build_feed(
     """Собрать объединённую ленту, свежие сверху.
 
     `user_id` — если задан, лента сужается до записей этого игрока («только мои»).
+    `viewer_id` — кто смотрит: его личные «скрыто у себя» не показываем (GHG11).
     `kinds` — если задан, оставляем только записи этих типов (фильтр на фронте).
     Возвращает готовые к сериализации словари (см. `FeedItemOut`).
     """
@@ -140,6 +142,15 @@ async def build_feed(
     if kinds:
         items = [it for it in items if it["kind"] in kinds]
 
+    # GHG11: удалённые админом (для всех) и «скрытые у себя» (для смотрящего).
+    from app.services.game import feed_moderation
+
+    removed = await feed_moderation.deleted_item_ids(session)
+    if viewer_id is not None:
+        removed |= await feed_moderation.hidden_item_ids(session, viewer_id)
+    if removed:
+        items = [it for it in items if it["id"] not in removed]
+
     # GHG11: плашки званий над головой (сегодня лох/чухан/червь) — одним
     # проходом на всю ленту, дальше просто раскидываем по строкам.
     from app.services.game import today_titles
@@ -151,8 +162,9 @@ async def build_feed(
 
     items.sort(key=lambda it: it["at"], reverse=True)
     page = items[offset : offset + limit]
-    # Э22: тяжёлые подробности — только для страницы, а не для всех 500 строк.
-    await _attach_details(session, page, user_id=user_id)
+    # Э22: тяжёлые подробности — только для страницы. Лайки «мои» считаем по
+    # смотрящему (`viewer_id`), а не по фильтру ленты (`user_id`).
+    await _attach_details(session, page, user_id=viewer_id if viewer_id is not None else user_id)
     return page
 
 
@@ -173,12 +185,21 @@ async def _attach_details(
             task_id = int(row_id.split(":", 1)[1])
             subs = await voice._submissions(session, task_id)
             names = await voice._user_names(session, [s.user_id for s in subs])
+            sub_ids = [s.id for s in subs]
+            likes = await voice.like_counts(session, sub_ids)
+            mine = (
+                await voice.liked_ids(session, user_id, sub_ids)
+                if user_id is not None
+                else set()
+            )
             detail["submissions"] = [
                 {
                     "id": s.id,
                     "user_id": s.user_id,
                     "user_name": names.get(s.user_id),
                     "duration": s.duration,
+                    "likes": likes.get(s.id, 0),
+                    "liked": s.id in mine,
                 }
                 for s in subs
             ]

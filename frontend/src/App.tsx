@@ -147,11 +147,13 @@ export default function App() {
   } else if (tab === "feed") {
     content = (
       <>
-        <header className="px-4 py-3 border-b border-tg-secondary-bg">
-          <div className="text-base font-medium">🏆 Лента</div>
-          <div className="text-xs text-tg-hint">
+        {/* GHG11: заголовок ленты — ОДНОЙ строкой (раньше дублировался внутри
+            FeedScreen). Сама лента ниже отдаёт строку управления. */}
+        <header className="flex items-baseline gap-2 overflow-hidden border-b border-tg-secondary-bg px-4 py-2.5">
+          <span className="shrink-0 text-base font-medium">🏆 Лента</span>
+          <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
             Кто что открыл и с кем что случилось.
-          </div>
+          </span>
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
           <FeedScreen meId={meData.id} />

@@ -274,6 +274,91 @@ def record_withdrawal(session: AsyncSession, *, task_id: int, user_id: int) -> N
     )
 
 
+# --- GHG11: лайки вариантов голосового задания (мини-апп) -------------------
+# Файла/таблицы не заводим: лайк — запись в `event_log`
+# (kind="voice_like", payload={submission_id, user_id}). Один лайк на пару
+# (участник, сдача), повторный тап снимает.
+LIKE_KIND = "voice_like"
+
+
+async def like_counts(
+    session: AsyncSession, submission_ids: list[int]
+) -> dict[int, int]:
+    """submission_id → число лайков."""
+    if not submission_ids:
+        return {}
+    from sqlalchemy import select as _select
+
+    rows = await session.execute(
+        _select(EventLog.payload["submission_id"].as_integer()).where(
+            EventLog.kind == LIKE_KIND,
+            EventLog.payload["submission_id"].as_integer().in_(submission_ids),
+        )
+    )
+    out: dict[int, int] = {}
+    for (sid,) in rows.all():
+        if sid is None:
+            continue
+        out[int(sid)] = out.get(int(sid), 0) + 1
+    return out
+
+
+async def liked_ids(
+    session: AsyncSession, user_id: int, submission_ids: list[int]
+) -> set[int]:
+    """Сдачи, которые ЭТОТ участник лайкнул."""
+    if not submission_ids:
+        return set()
+    from sqlalchemy import select as _select
+
+    rows = await session.scalars(
+        _select(EventLog.payload["submission_id"].as_integer()).where(
+            EventLog.kind == LIKE_KIND,
+            EventLog.payload["user_id"].as_integer() == int(user_id),
+            EventLog.payload["submission_id"].as_integer().in_(submission_ids),
+        )
+    )
+    return {int(x) for x in rows.all() if x is not None}
+
+
+async def toggle_like(
+    session: AsyncSession, *, submission_id: int, user_id: int
+) -> tuple[bool, int]:
+    """Поставить/снять лайк. Возвращает (лайкнуто_теперь, число лайков)."""
+    from sqlalchemy import delete as _delete
+    from sqlalchemy import select as _select
+
+    existing = await session.scalar(
+        _select(EventLog.id).where(
+            EventLog.kind == LIKE_KIND,
+            EventLog.payload["user_id"].as_integer() == int(user_id),
+            EventLog.payload["submission_id"].as_integer() == int(submission_id),
+        )
+    )
+    if existing is not None:
+        await session.execute(
+            _delete(EventLog).where(
+                EventLog.kind == LIKE_KIND,
+                EventLog.payload["user_id"].as_integer() == int(user_id),
+                EventLog.payload["submission_id"].as_integer() == int(submission_id),
+            )
+        )
+        await session.commit()
+        liked = False
+    else:
+        session.add(
+            EventLog(
+                kind=LIKE_KIND,
+                actor_user_id=user_id,
+                payload={"submission_id": int(submission_id), "user_id": int(user_id)},
+            )
+        )
+        await session.commit()
+        liked = True
+    counts = await like_counts(session, [submission_id])
+    return liked, counts.get(submission_id, 0)
+
+
 async def _has_open_task(session: AsyncSession, *, now: datetime) -> bool:
     found = await session.scalar(
         select(GameVoiceTask.id)

@@ -37,9 +37,12 @@ from app.schemas.game import (
     ActivityOptionOut,
     ActivityOut,
     DailyEventOut,
+    AdviceOut,
     DonationIn,
     DonationOut,
     FeatureOut,
+    FeedItemActionIn,
+    FeedItemActionOut,
     FeedItemOut,
     FeedOut,
     GameCustomizePatch,
@@ -60,15 +63,24 @@ from app.schemas.game import (
     MusicTopTrackOut,
     MusicWeekOut,
     MusicWeekTrackOut,
+    NominationCreateIn,
+    NominationOut,
+    NominationsOut,
+    NominationVoteOut,
     RankOut,
     RankRowOut,
     VoiceCurrentOut,
+    VoiceLikeOut,
     VoiceSubmissionOut,
     VoiceSubmitOut,
+    WormOut,
+    WormTransferIn,
+    WormTransferOut,
     XpRuleOut,
 )
 from app.services.game import (
     achievements,
+    delivery,
     donations,
     events,
     feed,
@@ -619,6 +631,7 @@ async def activity_feed(
     items = await feed.build_feed(
         session,
         user_id=user.id if scope == "mine" else None,
+        viewer_id=user.id,
         limit=limit,
         offset=offset,
         kinds=wanted,
@@ -905,6 +918,9 @@ async def voice_current(session: SessionDep, user: CurrentUser) -> VoiceCurrentO
         return VoiceCurrentOut(enabled=True)
     subs = await voice._submissions(session, task.id)
     names = await voice._user_names(session, [s.user_id for s in subs])
+    sub_ids = [s.id for s in subs]
+    likes = await voice.like_counts(session, sub_ids)
+    liked = await voice.liked_ids(session, user.id, sub_ids)
     catalog = TASKS_BY_CODE.get(task.code)
     mine = next((s for s in subs if s.user_id == user.id), None)
     return VoiceCurrentOut(
@@ -923,6 +939,8 @@ async def voice_current(session: SessionDep, user: CurrentUser) -> VoiceCurrentO
                 duration=s.duration,
                 submitted_at=s.submitted_at,
                 is_mine=s.user_id == user.id,
+                likes=likes.get(s.id, 0),
+                liked=s.id in liked,
             )
             for s in subs
         ],
@@ -1127,3 +1145,243 @@ async def music_add_track(
     return MusicAddOut(
         ok=res.status == music.OK, status=res.status, week_count=res.week_count
     )
+
+# ==========================================================================
+# GHG11: действия в ленте — совет, червь, номинации, лайки, модерация записей
+# ==========================================================================
+
+
+async def _nominations_out(session: AsyncSession, user_id: int) -> NominationsOut:
+    """Собрать список номинаций с голосами (одна точка для GET/POST)."""
+    from app.services import games
+    from app.services.game import nominations
+
+    rows = await games.list_active_nominations(session)
+    ids = [r.id for r in rows]
+    counts = await nominations.vote_counts(session, ids)
+    my = await nominations.my_vote(session, user_id)
+    return NominationsOut(
+        enabled=True,
+        can_add=len(rows) < games.MAX_ACTIVE_NOMINATIONS,
+        max_active=games.MAX_ACTIVE_NOMINATIONS,
+        my_vote_id=my,
+        items=[
+            NominationOut(
+                id=r.id, name=r.name, votes=counts.get(r.id, 0), voted=(my == r.id)
+            )
+            for r in rows
+        ],
+    )
+
+
+@router.get("/game/nominations", response_model=NominationsOut)
+async def game_nominations(
+    session: SessionDep, user: CurrentUser
+) -> NominationsOut:
+    """Номинации игр и голосование «во что сыграем» прямо в мини-аппе."""
+    if not await is_game_enabled(session):
+        return NominationsOut(enabled=False)
+    mode = await delivery.get_feature_mode(session, "nominations")
+    if mode == delivery.MODE_OFF:
+        return NominationsOut(enabled=False)
+    return await _nominations_out(session, user.id)
+
+
+@router.post("/game/nominations", response_model=NominationsOut)
+async def game_nomination_add(
+    body: NominationCreateIn, session: SessionDep, user: CurrentUser
+) -> NominationsOut:
+    """Номинировать игру. В app/both активность дублируется в ленту."""
+    from app.services import games
+
+    if not await is_game_enabled(session):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "game_disabled")
+    mode = await delivery.get_feature_mode(session, "nominations")
+    if mode == delivery.MODE_OFF:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "nominations_disabled")
+    try:
+        row = await games.add_nomination(
+            session, name=body.name, added_by_tg_id=user.telegram_id
+        )
+    except games.NominationEmpty as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except games.NominationLimitExceeded as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    if delivery.app_enabled(mode):
+        await delivery.record_feed_event(
+            session,
+            feature="nominations",
+            text=f"🎮 Номинирована игра: <b>{row.name}</b>",
+            user_id=user.id,
+            icon="🎮",
+        )
+    return await _nominations_out(session, user.id)
+
+
+@router.post("/game/nominations/{nomination_id}/vote", response_model=NominationVoteOut)
+async def game_nomination_vote(
+    nomination_id: int, session: SessionDep, user: CurrentUser
+) -> NominationVoteOut:
+    """Голос за номинацию (single choice). Повторный тап снимает голос."""
+    from app.services.game import nominations
+
+    mode = await delivery.get_feature_mode(session, "nominations")
+    if mode == delivery.MODE_OFF:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "nominations_disabled")
+    voted, votes = await nominations.toggle_vote(
+        session, nomination_id=nomination_id, user_id=user.id
+    )
+    return NominationVoteOut(ok=True, voted=voted, votes=votes)
+
+
+@router.post("/game/advice", response_model=AdviceOut)
+async def game_advice(session: SessionDep, user: CurrentUser) -> AdviceOut:
+    """Магический шар прямо из ленты. app → только лента, chat/both → и чат."""
+    from app.services.admin_config import get_advice_enabled, get_advice_phrases
+    from app.services.advice import pick_advice
+    from app.services.phrase_meta import effective_pool
+
+    mode = await delivery.get_feature_mode(session, "advice")
+    if mode == delivery.MODE_OFF:
+        return AdviceOut(ok=False, status="off")
+    if not await get_advice_enabled(session):
+        return AdviceOut(ok=False, status="disabled")
+    phrases = await effective_pool(session, "advice", await get_advice_phrases(session))
+    text = pick_advice(phrases)
+    if not text:
+        return AdviceOut(ok=False, status="empty")
+    feed_text = f"🔮 {text}"
+    if delivery.app_enabled(mode):
+        await delivery.record_feed_event(
+            session, feature="advice", text=feed_text, user_id=user.id, icon="🔮"
+        )
+    if delivery.chat_enabled(mode):
+        from app.services.game import journal
+
+        await journal.send_now(feed_text, feature="advice")
+    return AdviceOut(ok=True, status="ok", text=text)
+
+
+@router.get("/game/worm", response_model=WormOut)
+async def game_worm(session: SessionDep, user: CurrentUser) -> WormOut:
+    """Кто сейчас червь-господин и мой ли это червь (для действий в ленте)."""
+    from app.services.loser import get_current_worm
+
+    mode = await delivery.get_feature_mode(session, "worm")
+    if mode == delivery.MODE_OFF:
+        return WormOut(enabled=False)
+    worm = await get_current_worm(session)
+    if worm is None:
+        return WormOut(enabled=True)
+    owner = await session.get(User, worm.user_id)
+    return WormOut(
+        enabled=True,
+        is_owner=worm.user_id == user.id,
+        owner_user_id=worm.user_id,
+        owner_name=owner.display_name if owner is not None else None,
+    )
+
+
+@router.post("/game/worm/transfer", response_model=WormTransferOut)
+async def game_worm_transfer(
+    body: WormTransferIn, session: SessionDep, user: CurrentUser
+) -> WormTransferOut:
+    """Передать червя прямо из аппа (без чат-подтверждения). Только владелец."""
+    from app.services import loser
+
+    mode = await delivery.get_feature_mode(session, "worm")
+    if mode == delivery.MODE_OFF:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "worm_disabled")
+    worm = await loser.get_current_worm(session)
+    if worm is None or worm.user_id != user.id:
+        return WormTransferOut(ok=False, status="not_owner")
+    target = await session.get(User, body.user_id)
+    if target is None:
+        return WormTransferOut(ok=False, status="unknown_user")
+    if target.id == user.id:
+        return WormTransferOut(ok=False, status="self")
+    prev_name, row = await loser.assign_worm_to(session, target.id)
+    if row is None:
+        return WormTransferOut(ok=False, status="same")
+    from app.services.game import awards
+
+    await awards.worm_lord(session, target.id)
+    await session.commit()
+    text = (
+        "🪱 <b>Передача власти</b>\n"
+        f"{prev_name or 'Прежний господин'} слагает полномочия — новый "
+        f"червь-господин: <b>{target.display_name}</b>. "
+        "За звание «Червь-господин» начислен опыт."
+    )
+    await delivery.route_feature(
+        session, feature="worm", text=text, user_id=target.id, icon="🪱"
+    )
+    return WormTransferOut(ok=True, status="ok")
+
+
+@router.post(
+    "/game/voice/submissions/{submission_id}/like", response_model=VoiceLikeOut
+)
+async def voice_submission_like(
+    submission_id: int, session: SessionDep, user: CurrentUser
+) -> VoiceLikeOut:
+    """Поставить/снять лайк варианту голосового (toggle)."""
+    from app.services.admin_config import get_game_voice_enabled
+    from app.services.game import voice
+
+    if not await is_game_enabled(session) or not await get_game_voice_enabled(session):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "voice off")
+    if await session.get(GameVoiceSubmission, submission_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "submission_not_found")
+    liked, likes = await voice.toggle_like(
+        session, submission_id=submission_id, user_id=user.id
+    )
+    return VoiceLikeOut(ok=True, liked=liked, likes=likes)
+
+
+@router.post("/game/feed/delete", response_model=FeedItemActionOut)
+async def feed_delete(
+    body: FeedItemActionIn, session: SessionDep, user: CurrentUser
+) -> FeedItemActionOut:
+    """Админ убирает запись ленты для всех (с возможностью «отменить»)."""
+    if not _is_admin(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin_only")
+    from app.services.game import feed_moderation
+
+    await feed_moderation.delete_item(session, item_id=body.item_id, actor=user.id)
+    return FeedItemActionOut(ok=True, deleted=True)
+
+
+@router.post("/game/feed/restore", response_model=FeedItemActionOut)
+async def feed_restore(
+    body: FeedItemActionIn, session: SessionDep, user: CurrentUser
+) -> FeedItemActionOut:
+    """Отменить удаление записи (кнопка «Отменить» в плашке)."""
+    if not _is_admin(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "admin_only")
+    from app.services.game import feed_moderation
+
+    await feed_moderation.restore_item(session, item_id=body.item_id)
+    return FeedItemActionOut(ok=True, deleted=False)
+
+
+@router.post("/game/feed/hide", response_model=FeedItemActionOut)
+async def feed_hide(
+    body: FeedItemActionIn, session: SessionDep, user: CurrentUser
+) -> FeedItemActionOut:
+    """Скрыть запись ТОЛЬКО у себя (у любого участника)."""
+    from app.services.game import feed_moderation
+
+    await feed_moderation.hide_item(session, item_id=body.item_id, user_id=user.id)
+    return FeedItemActionOut(ok=True, hidden=True)
+
+
+@router.post("/game/feed/unhide", response_model=FeedItemActionOut)
+async def feed_unhide(
+    body: FeedItemActionIn, session: SessionDep, user: CurrentUser
+) -> FeedItemActionOut:
+    """Отменить «скрыто у себя»."""
+    from app.services.game import feed_moderation
+
+    await feed_moderation.unhide_item(session, item_id=body.item_id, user_id=user.id)
+    return FeedItemActionOut(ok=True, hidden=False)

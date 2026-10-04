@@ -522,12 +522,19 @@ async def run_random_phrases_job(bot: Bot) -> None:
         if not await get_random_phrases_enabled(session):
             log.info("random_phrases.disabled_in_settings")
             return
-        # Э20: режим «всё в приложение» — проактивные цитаты в чат не шлём.
-        from app.services.game import chat_mode
+        # GHG11: режим фичи «Прогон фраз» (off/chat/app/both).
+        from app.services.game import chat_mode, delivery
 
-        if await chat_mode.chat_all_silent(session):
-            log.info("random_phrases.skipped_chat_muted")
+        pmode = await delivery.get_feature_mode(session, "phrases")
+        if pmode == delivery.MODE_OFF:
+            log.info("random_phrases.feature_off")
             return
+        p_chat_ok = delivery.chat_enabled(pmode)
+        p_app_ok = delivery.app_enabled(pmode)
+        # Э20-предохранитель: «всё в приложение» глушит чат-часть.
+        if p_chat_ok and await chat_mode.chat_all_silent(session):
+            log.info("random_phrases.skipped_chat_muted")
+            p_chat_ok = False
 
         user_chance = await get_random_phrases_user_chance(session)
         if user_chance < 1.0 and random.random() > user_chance:
@@ -593,8 +600,17 @@ async def run_random_phrases_job(bot: Bot) -> None:
 
             await awards.quote(session, author_id)
 
+        # GHG11: в режиме «только апп» фраза видна в ленте (в чат не уходит).
+        if text and p_app_ok:
+            await delivery.record_feed_event(
+                session, feature="phrases", text=text, user_id=author_id, icon="🗯"
+            )
+
     if not text:
         log.warning("random_phrases.empty_text_after_compose")
+        return
+    if not p_chat_ok:
+        log.info("random_phrases.feed_only")
         return
 
     try:

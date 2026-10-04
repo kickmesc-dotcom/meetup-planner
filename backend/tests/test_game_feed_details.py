@@ -45,13 +45,30 @@ async def test_voice_item_gets_submissions(monkeypatch):
     async def fake_names(session, ids):
         return {5: "Серёга"}
 
+    async def fake_likes(session, ids):
+        assert ids == [11]
+        return {11: 2}
+
+    async def fake_mine(session, uid, ids):
+        assert uid == 1
+        return {11}
+
     monkeypatch.setattr(voice, "_submissions", fake_subs)
     monkeypatch.setattr(voice, "_user_names", fake_names)
+    monkeypatch.setattr(voice, "like_counts", fake_likes)
+    monkeypatch.setattr(voice, "liked_ids", fake_mine)
 
     items = [_voice_item()]
     await feed._attach_details(None, items, user_id=1)
     assert items[0]["detail"]["submissions"] == [
-        {"id": 11, "user_id": 5, "user_name": "Серёга", "duration": 3}
+        {
+            "id": 11,
+            "user_id": 5,
+            "user_name": "Серёга",
+            "duration": 3,
+            "likes": 2,
+            "liked": True,
+        }
     ]
     # Условие и награда не потерялись.
     assert items[0]["detail"]["condition"] == "спой"

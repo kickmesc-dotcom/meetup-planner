@@ -289,6 +289,16 @@ async def loser_roll_endpoint(
     from app.services.game import gates
 
     await gates.require_feature(session, user, "loser_roulette")
+    # GHG11: режим фичи «Лох-рулетка (ручная)». Раньше публичный /loser/roll
+    # всегда слал в чат — в режиме «только апп» это была УТЕЧКА. Теперь:
+    # off — не крутим вовсе; app — только лента; chat/both — чат (+ лента в both).
+    from app.services.game import delivery
+
+    loser_mode = await delivery.get_feature_mode(session, "loser_manual")
+    if loser_mode == delivery.MODE_OFF:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "loser_disabled")
+    loser_chat_ok = delivery.chat_enabled(loser_mode)
+    loser_app_ok = delivery.app_enabled(loser_mode)
     settings = get_settings()
     target_chat = settings.group_chat_id
     sent_flag = {"ok": False}
@@ -299,14 +309,17 @@ async def loser_roll_endpoint(
         """Best-effort публикация в группу. Любое исключение глотается —
         запись ролла всё равно коммитится. Принцип: «лучше зафиксированный
         ролл без объявления, чем зависший HTTP-запрос с 504»."""
-        if not target_chat:
-            return  # No chat configured — silent success, row still saved.
         from app.bot.dispatcher import get_bot
 
         try:
             # GHG8 P3: оглашаем «черновых» именинников (announce-режим
             # иммунитета) перед основным постом. Best-effort внутри.
-            if extras is not None and getattr(extras, "immunity_skipped", None):
+            if (
+                loser_chat_ok
+                and target_chat
+                and extras is not None
+                and getattr(extras, "immunity_skipped", None)
+            ):
                 from app.services.birthday_immunity import announce_immunity_skips
 
                 await announce_immunity_skips(
@@ -327,6 +340,18 @@ async def loser_roll_endpoint(
                 header_emoji="🤡",
                 header_label="Автолох",
             )
+            # GHG11: в app/both дублируем результат в ленту мини-аппа.
+            if loser_app_ok and text:
+                await delivery.record_feed_event(
+                    session,
+                    feature="loser_manual",
+                    text=text,
+                    user_id=loser.id,
+                    icon="🤡",
+                )
+            # GHG11: в «только апп»/выкл в чат не пишем — не утекает.
+            if not loser_chat_ok or not target_chat:
+                return
             send_started = time.monotonic()
             await asyncio.wait_for(
                 get_bot().send_message(

@@ -11,6 +11,7 @@ import {
   type VoiceSubmission,
 } from "@/api/game";
 import { haptic, showAlert } from "@/tg/webapp";
+import VoiceLikeButton from "./VoiceLikeButton";
 import {
   pickRecorderFormat,
   prepareVoiceBlob,
@@ -303,6 +304,12 @@ function SubmissionRow({ submission }: { submission: VoiceSubmission }) {
           {submission.duration}с
         </span>
       )}
+      <VoiceLikeButton
+        submissionId={submission.id}
+        initialLiked={submission.liked}
+        initialLikes={submission.likes}
+        invalidateKey="game-voice"
+      />
       {url && <audio src={url} autoPlay onEnded={() => { URL.revokeObjectURL(url); setUrl(null); }} />}
     </div>
   );

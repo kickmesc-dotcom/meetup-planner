@@ -661,6 +661,86 @@ class VoiceSubmissionOut(BaseModel):
     duration: int | None = None
     submitted_at: datetime | None = None
     is_mine: bool = False
+    # GHG11: лайки варианта (мини-апп).
+    likes: int = 0
+    liked: bool = False
+
+
+class VoiceLikeOut(BaseModel):
+    """Итог лайка варианта голосового."""
+
+    ok: bool = True
+    liked: bool = False
+    likes: int = 0
+
+
+class FeedItemActionIn(BaseModel):
+    """GHG11: действие над записью ленты (ключ вида `ach:12`)."""
+
+    item_id: str
+
+
+class FeedItemActionOut(BaseModel):
+    """Итог модерации записи ленты."""
+
+    ok: bool = True
+    deleted: bool | None = None
+    hidden: bool | None = None
+
+
+class NominationOut(BaseModel):
+    """Номинированная игра + голоса (мини-апп)."""
+
+    id: int
+    name: str
+    votes: int = 0
+    voted: bool = False
+
+
+class NominationsOut(BaseModel):
+    """Список номинаций «во что сыграем» с голосованием в аппе."""
+
+    enabled: bool = True
+    can_add: bool = True
+    max_active: int = 10
+    my_vote_id: int | None = None
+    items: list[NominationOut] = []
+
+
+class NominationCreateIn(BaseModel):
+    name: str
+
+
+class NominationVoteOut(BaseModel):
+    ok: bool = True
+    voted: bool = False
+    votes: int = 0
+
+
+class AdviceOut(BaseModel):
+    """GHG11: ответ магического шара прямо в аппе."""
+
+    ok: bool = False
+    status: str = ""
+    text: str = ""
+
+
+class WormOut(BaseModel):
+    """GHG11: текущий червь-господин (для действий в ленте)."""
+
+    enabled: bool = True
+    is_owner: bool = False
+    owner_user_id: int | None = None
+    owner_name: str | None = None
+
+
+class WormTransferIn(BaseModel):
+    user_id: int
+
+
+class WormTransferOut(BaseModel):
+    ok: bool = False
+    status: str = ""
 
 
 class VoiceCurrentOut(BaseModel):

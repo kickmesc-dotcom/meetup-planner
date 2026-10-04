@@ -203,6 +203,8 @@ export interface FeedDetail {
     user_id: number;
     user_name: string | null;
     duration: number | null;
+    likes?: number;
+    liked?: boolean;
   }[];
   tracks?: {
     id: number;
@@ -330,7 +332,88 @@ export interface VoiceSubmission {
   duration: number | null;
   submitted_at: string | null;
   is_mine: boolean;
+  /** GHG11: лайки варианта. */
+  likes: number;
+  liked: boolean;
 }
+
+/** GHG11: поставить/снять лайк варианту голосового (toggle). */
+export const likeVoiceSubmission = (id: number) =>
+  api<{ ok: boolean; liked: boolean; likes: number }>(
+    `/api/game/voice/submissions/${id}/like`,
+    { method: "POST" },
+  );
+
+/** GHG11: модерация ленты — админ удаляет для всех, участник скрывает у себя. */
+export const deleteFeedItem = (itemId: string) =>
+  api<{ ok: boolean }>("/api/game/feed/delete", {
+    method: "POST",
+    body: JSON.stringify({ item_id: itemId }),
+  });
+export const restoreFeedItem = (itemId: string) =>
+  api<{ ok: boolean }>("/api/game/feed/restore", {
+    method: "POST",
+    body: JSON.stringify({ item_id: itemId }),
+  });
+export const hideFeedItem = (itemId: string) =>
+  api<{ ok: boolean }>("/api/game/feed/hide", {
+    method: "POST",
+    body: JSON.stringify({ item_id: itemId }),
+  });
+export const unhideFeedItem = (itemId: string) =>
+  api<{ ok: boolean }>("/api/game/feed/unhide", {
+    method: "POST",
+    body: JSON.stringify({ item_id: itemId }),
+  });
+
+/** GHG11: магический шар прямо из ленты. */
+export interface AdviceResult {
+  ok: boolean;
+  status: string;
+  text: string;
+}
+export const askAdvice = () =>
+  api<AdviceResult>("/api/game/advice", { method: "POST" });
+
+/** GHG11: номинации игр и голосование «во что сыграем» в аппе. */
+export interface NominationItem {
+  id: number;
+  name: string;
+  votes: number;
+  voted: boolean;
+}
+export interface Nominations {
+  enabled: boolean;
+  can_add: boolean;
+  max_active: number;
+  my_vote_id: number | null;
+  items: NominationItem[];
+}
+export const fetchNominations = () => api<Nominations>("/api/game/nominations");
+export const addNomination = (name: string) =>
+  api<Nominations>("/api/game/nominations", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+export const voteNomination = (id: number) =>
+  api<{ ok: boolean; voted: boolean; votes: number }>(
+    `/api/game/nominations/${id}/vote`,
+    { method: "POST" },
+  );
+
+/** GHG11: червь-господин — состояние и передача из аппа. */
+export interface WormState {
+  enabled: boolean;
+  is_owner: boolean;
+  owner_user_id: number | null;
+  owner_name: string | null;
+}
+export const fetchWorm = () => api<WormState>("/api/game/worm");
+export const transferWorm = (userId: number) =>
+  api<{ ok: boolean; status: string }>("/api/game/worm/transfer", {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  });
 
 export interface VoiceCurrent {
   enabled: boolean;
