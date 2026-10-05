@@ -27,6 +27,40 @@ import ProgressBar from "@/components/ProgressBar";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
+import { useUI, type Tab } from "@/store/ui";
+
+const FEATURE_TABS: readonly string[] = [
+  "feed",
+  "calendar",
+  "meetings",
+  "profile",
+  "admin",
+];
+
+/**
+ * GHG11(4): переход из анонса фичи туда, где её сразу можно применить.
+ *
+ * Переключаем вкладку мини-аппа и доскроллим до якоря (id DOM-элемента).
+ * Якорь может ещё не отрисоваться после смены вкладки — поэтому несколько
+ * ретраев с небольшой паузой, потом молча сдаёмся.
+ */
+function goToFeature(tab?: string, anchor?: string) {
+  if (!tab || !FEATURE_TABS.includes(tab)) return;
+  haptic("light");
+  // Просим целевой экран раскрыть нужный блок (лента — «Действия»).
+  useUI.getState().setFeedAnchor(anchor ?? null);
+  useUI.getState().setTab(tab as Tab);
+  if (!anchor) return;
+  const scroll = (tries: number) => {
+    const el = document.getElementById(anchor);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else if (tries < 10) {
+      window.setTimeout(() => scroll(tries + 1), 90);
+    }
+  };
+  window.setTimeout(() => scroll(0), 80);
+}
 
 const LIMIT_LABELS: Record<string, string> = {
   day: "раз в день",
@@ -71,15 +105,27 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
         <div className="space-y-1">
           <div className="text-[11px] text-tg-hint">Что уже открыто</div>
           <div className="flex flex-wrap gap-1">
-            {g.unlocked.map((f) => (
-              <span
-                key={f.code}
-                title={f.description || undefined}
-                className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
-              >
-                {f.title}
-              </span>
-            ))}
+            {g.unlocked.map((f) =>
+              f.tab ? (
+                <button
+                  key={f.code}
+                  type="button"
+                  title={f.description || undefined}
+                  onClick={() => goToFeature(f.tab, f.anchor)}
+                  className="rounded-md bg-tg-button/10 px-2 py-0.5 text-[11px] text-tg-link active:scale-[0.97]"
+                >
+                  {f.title} →
+                </button>
+              ) : (
+                <span
+                  key={f.code}
+                  title={f.description || undefined}
+                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
+                >
+                  {f.title}
+                </span>
+              ),
+            )}
           </div>
           {g.unlocked.some((f) => f.description) && (
             <details className="text-[11px]">
@@ -185,7 +231,7 @@ function CustomizeSection({ profile }: { profile: GameProfile }) {
   const dirty = Object.keys(patch).length > 0;
 
   return (
-    <div className="space-y-2 border-t border-tg-bg/40 pt-3">
+    <div id="profile-custom" className="space-y-2 border-t border-tg-bg/40 pt-3">
       <div className="text-xs font-semibold text-tg-text">🎨 Кастомизация</div>
       {canAvatar && (
         <Field label="Ссылка на аватарку" value={avatar} onChange={setAvatar} placeholder="https://…" />
@@ -258,6 +304,15 @@ function LevelUpNotice({
                 <div className="mt-0.5 pl-3 text-[11px] text-tg-hint">
                   {f.description}
                 </div>
+              )}
+              {f.tab && (
+                <button
+                  type="button"
+                  onClick={() => goToFeature(f.tab, f.anchor)}
+                  className="mt-1 ml-3 rounded-md bg-tg-button/15 px-2 py-0.5 text-[11px] font-medium text-tg-link active:scale-[0.97]"
+                >
+                  Открыть и применить →
+                </button>
               )}
             </li>
           ))}

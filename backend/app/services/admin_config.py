@@ -706,6 +706,28 @@ async def set_calendar_timeline_enabled(session: AsyncSession, enabled: bool) ->
     )
 
 
+# --- GHG11(4): вид ленты активности (новый компактный / старый) ---
+
+FEED_VIEW_COMPACT_KEY = "feed.view_compact"
+
+
+async def get_feed_view_compact(session: AsyncSession) -> bool:
+    """GHG11(4): глобальный переключатель вида ленты.
+
+    Default = True — «новый» компактный вид (миниатюры участников под заданием).
+    Оператор: «переключи сразу на новый». Старый вид («спам отдельными блоками»)
+    остаётся доступен тумблером в админке.
+    """
+    return await _get_bool(session, FEED_VIEW_COMPACT_KEY, True)
+
+
+async def set_feed_view_compact(session: AsyncSession, enabled: bool) -> None:
+    await _set_value(
+        session, FEED_VIEW_COMPACT_KEY, "true" if enabled else "false"
+    )
+
+
+
 # --- BD2: Birthdays greeting templates ---
 
 BIRTHDAYS_GREETING_TEMPLATES_KEY = "birthdays.greeting_templates"

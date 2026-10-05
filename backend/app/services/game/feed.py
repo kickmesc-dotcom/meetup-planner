@@ -192,16 +192,27 @@ async def _attach_details(
                 if user_id is not None
                 else set()
             )
+            # GHG11(4): сколько XP получил каждый — для миниатюр под заданием.
+            # `all` — награда каждому; `first_only` — только первому сдавшему.
+            reward = int((it.get("detail") or {}).get("reward") or 0)
+            mode = await voice.get_task_mode(session, task_id)
+            avatars = await _submission_avatars(session, [s.user_id for s in subs])
             detail["submissions"] = [
                 {
                     "id": s.id,
                     "user_id": s.user_id,
                     "user_name": names.get(s.user_id),
+                    "avatar_url": avatars.get(s.user_id),
                     "duration": s.duration,
                     "likes": likes.get(s.id, 0),
                     "liked": s.id in mine,
+                    "xp": (
+                        reward
+                        if mode != voice.MODE_FIRST_ONLY or index == 0
+                        else 0
+                    ),
                 }
-                for s in subs
+                for index, s in enumerate(subs)
             ]
         elif row_id.startswith("music:"):
             sel_id = int(row_id.split(":", 1)[1])
@@ -226,6 +237,20 @@ async def _attach_details(
                 for t in tracks
             ]
         it["detail"] = detail or None
+
+
+async def _submission_avatars(
+    session: AsyncSession, user_ids: list[int]
+) -> dict[int, str | None]:
+    """user_id → аватарка (мануальная или TG) одним SELECT — для миниатюр."""
+    if not user_ids:
+        return {}
+    rows = await session.execute(
+        select(User.id, User.avatar_manual_url, User.avatar_url).where(
+            User.id.in_(set(user_ids))
+        )
+    )
+    return {int(uid): (manual or tg) for uid, manual, tg in rows.all()}
 
 
 async def _achievement_items(

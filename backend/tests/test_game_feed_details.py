@@ -53,10 +53,18 @@ async def test_voice_item_gets_submissions(monkeypatch):
         assert uid == 1
         return {11}
 
+    async def fake_mode(session, task_id):
+        return voice.MODE_ALL
+
+    async def fake_avatars(session, ids):
+        return {5: "http://a/5.png"}
+
     monkeypatch.setattr(voice, "_submissions", fake_subs)
     monkeypatch.setattr(voice, "_user_names", fake_names)
     monkeypatch.setattr(voice, "like_counts", fake_likes)
     monkeypatch.setattr(voice, "liked_ids", fake_mine)
+    monkeypatch.setattr(voice, "get_task_mode", fake_mode)
+    monkeypatch.setattr(feed, "_submission_avatars", fake_avatars)
 
     items = [_voice_item()]
     await feed._attach_details(None, items, user_id=1)
@@ -65,9 +73,11 @@ async def test_voice_item_gets_submissions(monkeypatch):
             "id": 11,
             "user_id": 5,
             "user_name": "Серёга",
+            "avatar_url": "http://a/5.png",
             "duration": 3,
             "likes": 2,
             "liked": True,
+            "xp": 50,
         }
     ]
     # Условие и награда не потерялись.

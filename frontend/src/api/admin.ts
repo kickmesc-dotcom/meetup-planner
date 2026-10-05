@@ -969,6 +969,21 @@ export const setCalendarTimelineFlag = (enabled: boolean) =>
     body: JSON.stringify({ enabled }),
   });
 
+// GHG11(4): вид ленты активности — новый компактный / старый.
+// GET/PUT — админские; лента сама читает `feed_view` из /game/feed.
+export interface FeedViewFlag {
+  compact: boolean;
+}
+
+export const fetchFeedViewFlag = () =>
+  api<FeedViewFlag>("/api/admin/feed/view");
+
+export const setFeedViewFlag = (compact: boolean) =>
+  api<FeedViewFlag>("/api/admin/feed/view", {
+    method: "PUT",
+    body: JSON.stringify({ compact }),
+  });
+
 // --- GHG6 E11: bot pause + zaebal settings ---
 
 export interface BotPauseState {

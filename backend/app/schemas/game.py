@@ -31,6 +31,10 @@ class FeatureOut(BaseModel):
     code: str
     title: str
     description: str = ""
+    # GHG11(4): куда ведёт кнопка «Открыть» в анонсе — вкладка мини-аппа и
+    # якорь DOM-элемента для доскролла (см. `config.FEATURE_TARGETS`).
+    tab: str = ""
+    anchor: str = ""
 
 
 class LevelUpOut(BaseModel):
@@ -451,6 +455,9 @@ class FeedOut(BaseModel):
     next_offset: int | None = None
     # Э21: доступные типы записей (для чипов-фильтров на фронте).
     kinds: list[str] = []
+    # GHG11(4): какой вид ленты рисовать — "compact" (новый, по умолчанию)
+    # или "classic" (старый). Глобальная настройка админа.
+    feed_view: str = "compact"
 
 
 class GameDigestFlushOut(BaseModel):

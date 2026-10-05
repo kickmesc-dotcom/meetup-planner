@@ -21,6 +21,7 @@ import { fetchPostingAlerts } from "@/api/admin";
 import HistoryScreen from "./HistoryScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
+import FeedSettingsScreen from "./FeedSettingsScreen";
 import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
 import GamesScreen from "./GamesScreen";
@@ -48,6 +49,7 @@ type Section =
   | "history"
   | "birthdays"
   | "calendar-settings"
+  | "feed-settings"
   | "poll-presets"
   | "proxy"
   | "games"
@@ -112,6 +114,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
+  if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
   if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "games") return <GamesScreen onBack={back} />;
@@ -142,6 +145,13 @@ export default function AdminScreen({ users }: Props) {
           title="Куда пишет бот"
           subtitle="Мастер-режим: Выкл · Чат · Мини-апп · Чат+апп (все механики)"
           onClick={() => select("delivery")}
+        />
+        {/* GHG11(4): вид ленты активности — новый компактный / классический. */}
+        <Card
+          icon="📰"
+          title="Вид ленты"
+          subtitle="Компактный (миниатюры участников) / классический"
+          onClick={() => select("feed-settings")}
         />
       </SectionGroup>
 
@@ -342,6 +352,7 @@ export default function AdminScreen({ users }: Props) {
 
       <SectionGroup icon="🤡" title="Лох">
         <Card
+          id="admin-phrase-editor"
           icon="👑"
           title="Лох дня"
           subtitle="Автовыбор, реролл, шаблоны, история"
@@ -351,6 +362,7 @@ export default function AdminScreen({ users }: Props) {
 
       <SectionGroup icon="💩" title="Чухан">
         <Card
+          id="admin-chukhan"
           icon="⚖️"
           title="Чухан недели"
           subtitle="Веса, ре-ролл, история, шаблоны фраз"
@@ -468,6 +480,7 @@ function Card({
   subtitle,
   onClick,
   badge,
+  id,
 }: {
   icon: string;
   title: string;
@@ -475,10 +488,13 @@ function Card({
   onClick: () => void;
   /** Опц. счётчик-бейдж справа (T3.3: число пропущенных постов). >0 → красный. */
   badge?: number;
+  /** GHG11(4): якорь для перехода из анонса фичи (доскролл к карточке). */
+  id?: string;
 }) {
   return (
     <button
       type="button"
+      id={id}
       onClick={onClick}
       className="w-full text-left rounded-xl bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
     >

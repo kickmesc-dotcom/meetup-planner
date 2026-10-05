@@ -53,6 +53,15 @@ export default function FeedScreen({ meId }: { meId: number }) {
   const [showNominations, setShowNominations] = useState(false);
   const openGuest = useUI((s) => s.openGuest);
   const showLoser = useUI((s) => s.showLoserSheet);
+  // GHG11(4): переход из анонса фичи — раскрываем панель «Действия».
+  const feedAnchor = useUI((s) => s.feedAnchor);
+  const setFeedAnchor = useUI((s) => s.setFeedAnchor);
+  useEffect(() => {
+    if (feedAnchor === "feed-actions") {
+      setShowActions(true);
+      setFeedAnchor(null);
+    }
+  }, [feedAnchor, setFeedAnchor]);
   const kindsParam = [...kinds].sort().join(",");
 
   const qc = useQueryClient();
@@ -104,6 +113,8 @@ export default function FeedScreen({ meId }: { meId: number }) {
   });
 
   const first = q.data?.pages[0];
+  // GHG11(4): новый компактный вид по умолчанию; "classic" — старый.
+  const compact = first?.feed_view !== "classic";
 
   const availableKinds = first?.kinds ?? Object.keys(FEED_KIND_LABELS);
   const toggleKind = (k: string) => {
@@ -241,6 +252,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
             item={it}
             meId={meId}
             isAdmin={isAdmin}
+            compact={compact}
             onOpenUser={(uid) => {
               haptic("light");
               openGuest(uid);
@@ -464,7 +476,10 @@ function FeedActions({
   const isWormOwner = wormQ.data?.is_owner === true;
 
   return (
-    <div className="border-b border-tg-secondary-bg bg-tg-secondary-bg/20 px-3 py-2">
+    <div
+      id="feed-actions"
+      className="border-b border-tg-secondary-bg bg-tg-secondary-bg/20 px-3 py-2"
+    >
       <div className="flex flex-wrap gap-1.5">
         <ActionChip
           onClick={() => {
@@ -667,17 +682,23 @@ function FeedRow({
   isAdmin,
   onOpenUser,
   onModerated,
+  compact,
 }: {
   item: FeedItem;
   meId: number;
   isAdmin: boolean;
   onOpenUser: (userId: number) => void;
   onModerated: (text: string, undo?: () => Promise<unknown> | unknown) => void;
+  /** GHG11(4): новый компактный вид — миниатюры участников под заданием. */
+  compact: boolean;
 }) {
   const when = formatWhen(item.at);
   const clickable = item.user_id !== null && item.user_id !== undefined;
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState(false);
+  // GHG11(4): факт тапа по миниатюре — какую сдачу включить при раскрытии.
+  const [playId, setPlayId] = useState<number | null>(null);
+  const voiceSubs = item.kind === "voice" ? item.detail?.submissions ?? [] : [];
   const qc = useQueryClient();
   const expandable = EXPANDABLE_KINDS.has(item.kind);
   // Музыка и голосовые — «плеер»: сворачиваем ОТДЕЛЬНОЙ кнопкой, чтобы тап
@@ -801,12 +822,25 @@ function FeedRow({
               dangerouslySetInnerHTML={{ __html: item.text }}
             />
           )}
+          {/* GHG11(4): новый вид — компактно, без раскрытия: кто сдал и сколько XP. */}
+          {compact && voiceSubs.length > 0 && (
+            <ParticipantsStrip
+              submissions={voiceSubs}
+              reward={item.detail?.reward}
+              onPlay={(id) => {
+                haptic("light");
+                setPlayId(id);
+                setOpen(true);
+              }}
+            />
+          )}
           {expandable && playerLike && !open && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 haptic("light");
+                setPlayId(null);
                 setOpen(true);
               }}
               className="mt-1 rounded-lg bg-tg-secondary-bg/80 px-2 py-1 text-[11px] font-medium text-tg-text"
@@ -849,6 +883,8 @@ function FeedRow({
           <FeedDetailPanel
             item={item}
             playerLike={playerLike}
+            compact={compact}
+            autoPlayId={playId}
             onClose={() => setOpen(false)}
           />
         </div>
@@ -898,10 +934,14 @@ function formatDate(iso: string | null | undefined): string {
 function FeedDetailPanel({
   item,
   playerLike,
+  compact,
+  autoPlayId,
   onClose,
 }: {
   item: FeedItem;
   playerLike: boolean;
+  compact: boolean;
+  autoPlayId?: number | null;
   onClose: () => void;
 }) {
   const d: FeedDetail = item.detail ?? {};
@@ -930,7 +970,12 @@ function FeedDetailPanel({
           {d.condition && (
             <div className="text-xs text-tg-text">
               <span className="text-tg-hint">Условие: </span>
-              {d.condition}
+              {/* GHG11(4): текст задания приходит с HTML-разметкой (<b>/<i>),
+                  как в чате, — рендерим её, а не показываем теги текстом. */}
+              <span
+                className="[word-break:break-word]"
+                dangerouslySetInnerHTML={{ __html: d.condition }}
+              />
             </div>
           )}
           <div className="text-[11px] text-tg-hint">Открыто: {formatFull(d.opened_at)}</div>
@@ -945,11 +990,19 @@ function FeedDetailPanel({
           {(d.submissions?.length ?? 0) > 0 ? (
             <div className="space-y-1">
               {d.submissions!.map((s) => (
-                <SubmissionPlayer key={s.id} submission={s} />
+                <SubmissionPlayer
+                  key={s.id}
+                  submission={s}
+                  reward={d.reward}
+                  autoPlay={autoPlayId === s.id}
+                  compact={compact}
+                />
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-tg-hint">Сдач не было.</div>
+            <div className="text-[11px] text-tg-hint">
+              Никто не отправил свой вариант.
+            </div>
           )}
         </>
       )}
@@ -988,23 +1041,70 @@ function FeedDetailPanel({
   );
 }
 
+/**
+ * GHG11(4): компактный ряд миниатюр участников голосового задания.
+ *
+ * В новом виде ленты под блоком задания сразу видно, кто принял участие и
+ * сколько XP получил за вариант, — без раскрытия и без «спама отдельными
+ * блоками». Тап по миниатюре открывает запись и включает этот вариант.
+ */
+function ParticipantsStrip({
+  submissions,
+  reward,
+  onPlay,
+}: {
+  submissions: NonNullable<FeedDetail["submissions"]>;
+  reward?: number;
+  onPlay: (id: number) => void;
+}) {
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1.5">
+      {submissions.map((s) => {
+        const xp = s.xp ?? reward;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            title={s.user_name ?? "участник"}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay(s.id);
+            }}
+            className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-tg-secondary-bg text-xs font-semibold text-tg-text ring-1 ring-tg-hint/20"
+          >
+            {s.avatar_url ? (
+              <img src={s.avatar_url} alt="" className="h-full w-full object-cover" />
+            ) : (
+              (s.user_name ?? "?").slice(0, 1).toUpperCase()
+            )}
+            {typeof xp === "number" && xp > 0 && (
+              <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-status-free px-1 text-[9px] font-bold leading-tight text-white">
+                +{xp}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Проигрыватель одной сдачи: аудио тянется блобом (нужен Authorization). */
 function SubmissionPlayer({
   submission,
+  reward,
+  autoPlay = false,
+  compact = false,
 }: {
   submission: NonNullable<FeedDetail["submissions"]>[number];
+  reward?: number;
+  autoPlay?: boolean;
+  compact?: boolean;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const play = async (e: MouseEvent) => {
-    e.stopPropagation();
-    haptic("light");
-    if (url) {
-      URL.revokeObjectURL(url);
-      setUrl(null);
-      return;
-    }
+  const load = async () => {
     setLoading(true);
     try {
       setUrl(await fetchVoiceAudioUrl(submission.id));
@@ -1015,6 +1115,24 @@ function SubmissionPlayer({
     }
   };
 
+  const play = async (e: MouseEvent) => {
+    e.stopPropagation();
+    haptic("light");
+    if (url) {
+      URL.revokeObjectURL(url);
+      setUrl(null);
+      return;
+    }
+    await load();
+  };
+
+  // GHG11(4): тап по миниатюре в новом виде сразу включает эту сдачу.
+  useEffect(() => {
+    if (autoPlay) void load();
+    // Загружаем один раз — на монтирование с флагом авто-проигрывания.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay]);
+
   useEffect(
     () => () => {
       if (url) URL.revokeObjectURL(url);
@@ -1022,10 +1140,15 @@ function SubmissionPlayer({
     [url],
   );
 
+  const xp = submission.xp ?? reward;
+
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5"
+      className={[
+        "flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5",
+        compact && autoPlay ? "ring-1 ring-tg-link/40" : "",
+      ].join(" ")}
     >
       <button
         type="button"
@@ -1038,6 +1161,11 @@ function SubmissionPlayer({
       </button>
       <span className="min-w-0 flex-1 truncate text-sm">
         {submission.user_name ?? "участник"}
+        {typeof xp === "number" && xp > 0 && (
+          <span className="ml-1.5 text-[11px] font-medium text-status-free">
+            +{xp} XP
+          </span>
+        )}
       </span>
       {submission.duration != null && (
         <span className="shrink-0 text-xs tabular-nums text-tg-hint">

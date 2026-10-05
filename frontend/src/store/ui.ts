@@ -141,6 +141,15 @@ interface UIState {
    */
   timelineCellWidth: number | null;
   setTimelineCellWidth: (w: number | null) => void;
+
+  /**
+   * GHG11(4): якорь, к которому надо доскроллить и, если нужно, раскрыть
+   * соответствующий блок при переходе из анонса фичи. Ставится перед сменой
+   * вкладки, потребляется целевым экраном (напр. лента раскрывает «Действия»)
+   * и сразу очищается.
+   */
+  feedAnchor: string | null;
+  setFeedAnchor: (a: string | null) => void;
 }
 
 function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
@@ -230,4 +239,7 @@ export const useUI = create<UIState>((set, get) => ({
 
   timelineCellWidth: null,
   setTimelineCellWidth: (timelineCellWidth) => set({ timelineCellWidth }),
+
+  feedAnchor: null,
+  setFeedAnchor: (feedAnchor) => set({ feedAnchor }),
 }));

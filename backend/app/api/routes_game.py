@@ -102,6 +102,7 @@ from app.services.game.config import (
     SUPREME_CHUKHAN_TITLE,
     XP_RULES,
     feature_description,
+    feature_target,
     feature_title,
     unlocks_between,
     unlocks_for_level,
@@ -201,6 +202,8 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
                     code=code,
                     title=feature_title(code),
                     description=feature_description(code),
+                    tab=feature_target(code)[0],
+                    anchor=feature_target(code)[1],
                 )
                 for code in unlocks_between(frm, to)
             ],
@@ -257,6 +260,8 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
                 code=code,
                 title=feature_title(code),
                 description=feature_description(code),
+                tab=feature_target(code)[0],
+                anchor=feature_target(code)[1],
             )
             for code in unlocks_for_level(progress.level)
         ],
@@ -695,7 +700,7 @@ async def activity_feed(
     `kinds` — фильтр по типам записей через запятую (Э21).
     """
     if not await is_game_enabled(session):
-        return FeedOut(enabled=False, items=[], kinds=[])
+        return FeedOut(enabled=False, items=[], kinds=[], feed_view="compact")
     wanted = (
         {k.strip() for k in kinds.split(",") if k.strip()} if kinds else None
     )
@@ -707,11 +712,15 @@ async def activity_feed(
         offset=offset,
         kinds=wanted,
     )
+    from app.services.admin_config import get_feed_view_compact
+
+    compact = await get_feed_view_compact(session)
     return FeedOut(
         enabled=True,
         items=[FeedItemOut(**item) for item in items],
         next_offset=(offset + limit) if len(items) == limit else None,
         kinds=list(feed.FEED_KIND_ORDER),
+        feed_view="compact" if compact else "classic",
     )
 
 

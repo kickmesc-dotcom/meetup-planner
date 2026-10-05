@@ -205,8 +205,9 @@ FEATURE_TITLES: dict[str, str] = {
     # «своя рулетка „кто лох“». Зафиксированные трактовки: «Ручная рулетка»
     # (эта способность) и «Принудительный реролл» (способности ниже).
     "loser_roulette": "Ручная рулетка «крутануть лоха» 🎲",
-    "loser_phrases_editor": "Свой набор фраз для лоха ✍️",
-    "chukhan_phrases_editor": "Свой набор фраз для чухана ✍️",
+    # GHG11(4): не «свой список», а редактирование ОБЩЕГО пула фраз.
+    "loser_phrases_editor": "Редактор шаблонов фраз лоха ✍️",
+    "chukhan_phrases_editor": "Редактор шаблонов фраз чухана ✍️",
     "chukhan_reroll": "Принудительный реролл чухана 🌀",
     "custom_avatar": "Своя аватарка в мини-аппе 🖼",
     "holidays_manage": "Свои праздники 🎉",
@@ -231,12 +232,14 @@ FEATURE_DESCRIPTIONS: dict[str, str] = {
         "поймаешь ачивку «Самострел»."
     ),
     "loser_phrases_editor": (
-        "Собираешь свой список фраз, которыми бот подкалывает лоха дня. "
-        "Где: админка → «Лох» → «Фразы». Что будет: свои строки попадают в ротацию "
-        "вместе с общими — в день, когда лохом стал ты или твой соперник."
+        "Редактируешь ОБЩИЙ набор шаблонов фраз, которыми бот подкалывает лоха дня "
+        "(это не твой личный список — правка влияет на всех). "
+        "Где: админка → «Лох» → «Фразы». Что будет: строки сразу уходят в общую "
+        "ротацию подколов."
     ),
     "chukhan_phrases_editor": (
-        "Свой список фраз для еженедельного чухана. "
+        "Редактируешь ОБЩИЙ набор шаблонов фраз для еженедельного чухана "
+        "(не свой список — на всех). "
         "Где: админка → «Чухан» → «Фразы». Что будет: строки идут в общий пул "
         "подколов на всю неделю звания."
     ),
@@ -281,6 +284,31 @@ FEATURE_DESCRIPTIONS: dict[str, str] = {
         "твоя плашка покажет своё имя везде, где есть ранги."
     ),
 }
+
+
+# GHG11(4): куда ведёт кнопка «Открыть» в анонсе фичи. Первое значение —
+# вкладка мини-аппа (`store/ui.ts`: feed|calendar|meetings|profile|admin),
+# второе — якорь (id DOM-элемента), к которому надо доскроллить. Пустой якорь
+# = просто переключить вкладку. Мэппинг держим рядом с описаниями, чтобы текст
+# «Где: …» и фактический переход не разъезжались.
+FEATURE_TARGETS: dict[str, tuple[str, str]] = {
+    "loser_roulette": ("feed", "feed-actions"),
+    "forced_loser_reroll": ("feed", "feed-actions"),
+    "loser_phrases_editor": ("admin", "admin-phrase-editor"),
+    "chukhan_phrases_editor": ("admin", "admin-chukhan"),
+    "chukhan_reroll": ("admin", "admin-chukhan"),
+    "custom_avatar": ("profile", "profile-custom"),
+    "custom_name": ("profile", "profile-custom"),
+    "custom_rank": ("profile", "profile-custom"),
+    "holidays_manage": ("calendar", "calendar-holidays"),
+    "loser_immunity": ("profile", "profile-custom"),
+    "chukhan_immunity": ("profile", "profile-custom"),
+}
+
+
+def feature_target(code: str) -> tuple[str, str]:
+    """(вкладка, якорь) для перехода из анонса фичи. Неизвестный код → («», «»)."""
+    return FEATURE_TARGETS.get(code, ("", ""))
 
 
 def feature_description(code: str) -> str:

@@ -25,6 +25,10 @@ export interface GameFeature {
   title: string;
   /** Человеческое «куда зайти, что нажать, что будет» (Э19). */
   description?: string;
+  /** GHG11(4): вкладка мини-аппа, куда ведёт кнопка «Открыть» в анонсе. */
+  tab?: string;
+  /** GHG11(4): id DOM-элемента для доскролла на этой вкладке. */
+  anchor?: string;
 }
 
 export interface GameLevelUp {
@@ -222,6 +226,10 @@ export interface FeedDetail {
     duration: number | null;
     likes?: number;
     liked?: boolean;
+    /** GHG11(4): сколько XP получил участник за этот вариант. */
+    xp?: number;
+    /** GHG11(4): аватарка для миниатюры участника под заданием. */
+    avatar_url?: string | null;
   }[];
   tracks?: {
     id: number;
@@ -259,6 +267,8 @@ export interface GameFeed {
   next_offset: number | null;
   /** Э21: доступные типы записей — для чипов-фильтров. */
   kinds: string[];
+  /** GHG11(4): "compact" (новый вид) или "classic" (старый). */
+  feed_view?: string;
 }
 
 /**

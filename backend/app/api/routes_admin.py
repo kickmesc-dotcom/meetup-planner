@@ -3280,6 +3280,39 @@ async def admin_calendar_timeline_put(
     return CalendarTimelineOut(enabled=body.enabled)
 
 
+# =============================================================================
+# GHG11(4): вид ленты активности (новый компактный / старый).
+# GET читает любой залогиненный (фронт берёт view из /game/feed, тут — для админки);
+# PUT — только админ.
+# =============================================================================
+
+
+class FeedViewOut(BaseModel):
+    compact: bool
+
+
+class FeedViewIn(BaseModel):
+    compact: bool
+
+
+@router.get("/admin/feed/view", response_model=FeedViewOut)
+async def admin_feed_view_get(session: SessionDep, user: CurrentUser) -> FeedViewOut:
+    _ensure_admin(user)
+    from app.services.admin_config import get_feed_view_compact
+    return FeedViewOut(compact=await get_feed_view_compact(session))
+
+
+@router.put("/admin/feed/view", response_model=FeedViewOut)
+async def admin_feed_view_put(
+    body: FeedViewIn, session: SessionDep, user: CurrentUser
+) -> FeedViewOut:
+    _ensure_admin(user)
+    from app.services.admin_config import set_feed_view_compact
+    await set_feed_view_compact(session, body.compact)
+    log.info("admin.feed_view_set", compact=body.compact, by=user.id)
+    return FeedViewOut(compact=body.compact)
+
+
 # --- GHG6 E11: bot pause + zaebal settings ---
 
 
