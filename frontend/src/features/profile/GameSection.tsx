@@ -51,15 +51,22 @@ function goToFeature(tab?: string, anchor?: string) {
   useUI.getState().setFeedAnchor(anchor ?? null);
   useUI.getState().setTab(tab as Tab);
   if (!anchor) return;
-  const scroll = (tries: number) => {
+  // Экран может ещё дорисовываться (раскрытие блока, подгрузка данных) —
+  // поэтому водим прокрутку несколько раз, пока элемент не окажется в поле
+  // зрения, но не дольше ~2.4с.
+  let ticks = 0;
+  const scroll = () => {
+    ticks += 1;
     const el = document.getElementById(anchor);
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else if (tries < 10) {
-      window.setTimeout(() => scroll(tries + 1), 90);
+      const r = el.getBoundingClientRect();
+      const visible = r.top >= 0 && r.bottom <= window.innerHeight;
+      if (!visible) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      else if (ticks > 3) return; // уже видно и поздно перескакивать
     }
+    if (ticks < 20) window.setTimeout(scroll, 120);
   };
-  window.setTimeout(() => scroll(0), 80);
+  window.setTimeout(scroll, 80);
 }
 
 const LIMIT_LABELS: Record<string, string> = {
