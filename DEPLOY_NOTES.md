@@ -1,9 +1,25 @@
-# 🔎 GHG11 (5): аудит + single-writer планировщика, откат XP, миниатюры, тесты (ГОТОВО К ВЫКЛАДКЕ)
+# 🔎 GHG11 (5): аудит + single-writer планировщика, откат XP, миниатюры, тесты (ЗАДЕПЛЕНО)
 
-> Аудит по `AUDIT_PLAN.md` (Phase 0–1) и фиксы. Миграций НЕТ (`head` остаётся
-> `0026_music_track_likes`). Артефакты: `AUDIT_REPORT.md` (формат A–N),
-> `AUDIT_EVENTS.md` (карта событий). FINGERPRINT `/api/meta` не меняется —
-> выкладку подтверждать по `code.build` (F10) и поведенчески.
+> ✅ **Выложено 2026-10-05.** Монорепо `8042f70` (код) + `f643f20` (fix ops) → GitHub.
+> Зеркало `13a0d91` → HF origin и Amvera (`main:master`), затем `1e693d2` (fix ops)
+> на оба. Amvera build `fcf41324e863`, HF build `1e693d231b87`. Миграций НЕТ (`head`
+> `0026_music_track_likes`). FINGERPRINT `/api/meta` не меняется — выкладку
+> подтверждаем по `code.build` (F10).
+>
+> **Смоук (прод):** `scheduler.leader` в Neon — ровно 1 строка, owner
+> `run-meetup-planner-…:10` (Amvera) → single-writer активен, HF лидером не стал.
+> `getWebhookInfo` → Amvera, `pending=0`. `/api/game/feed` отдаёт
+> `detail.participants` для `loser`/`chukhan`/`feature`/`music`; живой мини-апп —
+> 9 `participants-strip` (включая «Чухан недели»/«Активность»/«Лох дня»).
+>
+> **Инцидент по пути:** HF Space ушёл в `RUNTIME_ERROR` (exit 3) — там `BOT_TOKEN`
+> невалиден, и `get_bot()` в lifespan бросил `TokenValidationError`. Раньше это
+> глоталось; обёрнуто в try/except (fix `f643f20`/`1e693d2`). Побочно выяснилось,
+> что HF из-за невалидного токена и раньше не поднимал планировщик (см. F1 —
+> латентный риск, теперь закрыт лизом).
+>
+> Аудит по `AUDIT_PLAN.md` (Phase 0–1) и фиксы. Артефакты: `AUDIT_REPORT.md`
+> (формат A–N), `AUDIT_EVENTS.md` (карта событий).
 
 ## Что сделали
 
