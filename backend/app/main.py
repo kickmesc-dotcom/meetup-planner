@@ -248,7 +248,17 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # job'ы поднимает только владелец лиза (`services/scheduler_leader.py`).
     # При `SCHEDULER_LEADER_DISABLED=true` поведение прежнее (каждый сам себе).
     arm_leader_gate()
-    scheduler_task = asyncio.create_task(run_scheduler_leadership(get_bot()))
+    # ВАЖНО: `get_bot()` может бросить (невалидный/отсутствующий BOT_TOKEN на
+    # вторичном хосте — так и есть на HF Space). Раньше это глоталось и хост
+    # всё равно поднимал API; не даём тривиальной ошибке бота уронить lifespan
+    # (смоук-инцидент 2026-10-05: HF Space ушёл в RUNTIME_ERROR/code 3).
+    try:
+        scheduler_task: asyncio.Task | None = asyncio.create_task(
+            run_scheduler_leadership(get_bot())
+        )
+    except Exception as exc:  # noqa: BLE001
+        scheduler_task = None
+        structlog.get_logger().warning("scheduler.start_failed", error=str(exc))
 
     yield
 
@@ -260,16 +270,20 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         except (asyncio.CancelledError, Exception):  # noqa: BLE001
             pass
 
-    scheduler_task.cancel()
-    try:
-        await scheduler_task
-    except (asyncio.CancelledError, Exception):  # noqa: BLE001
-        pass
+    if scheduler_task is not None:
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
     # Отпускаем лиз лидерства до общего shutdown — второй инстанс подхватит сразу.
     await release_scheduler_leadership()
     await shutdown_scheduler()
-    bot = get_bot()
-    await bot.session.close()
+    try:
+        bot = get_bot()
+        await bot.session.close()
+    except Exception as exc:  # noqa: BLE001 — невалидный токен не должен ломать выход
+        structlog.get_logger().warning("bot.close_failed", error=str(exc))
 
 def create_app() -> FastAPI:
     settings = get_settings()
