@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
 import random
 import time
 from collections.abc import Awaitable, Callable
@@ -19,6 +20,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.config import get_settings
 from app.db.base import get_sessionmaker
+from app.services import scheduler_leader
 from app.services.admin_config import (
     get_autoloser_settings,
     get_random_phrases_schedule,
@@ -227,6 +229,112 @@ _SCHEDULER_DB_RETRY_ATTEMPTS = max(1, _env_int("SCHEDULER_DB_RETRY_ATTEMPTS", 3)
 _SCHEDULER_DB_RETRY_BASE_DELAY_SEC = max(
     0.0, _env_float("SCHEDULER_DB_RETRY_BASE_DELAY_SEC", 2.0)
 )
+
+
+# --- GHG11(5): single-writer лидерство планировщика ------------------------
+# H1: Amvera и HF Space — один код против одной Neon. APScheduler в lifespan
+# КАЖДОГО процесса → дубли ежедневных анонсов. Держим лиз лидерства в
+# `admin_config` (см. `services/scheduler_leader.py`): планировщик стартует
+# только у лидера. Гейт включается в lifespan (`run_scheduler_leadership`); по
+# умолчанию ВЫКЛЮЧЕН, поэтому прямые вызовы `start_scheduler` в тестах/CLI
+# работают как раньше. `SCHEDULER_LEADER_DISABLED=true` полностью возвращает
+# старое поведение «каждый сам себе планировщик» (напр. для одного хоста без
+# общей БД).
+_INSTANCE_ID = scheduler_leader.instance_id()
+_LEADER_GATE_ENABLED = False
+_is_leader = False
+SCHEDULER_LEADER_DISABLED = os.getenv("SCHEDULER_LEADER_DISABLED", "").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+LEADER_LEASE_TTL_SECONDS = max(30, _env_int("SCHEDULER_LEASE_TTL_SECONDS", 300))
+LEADER_RENEW_INTERVAL_SECONDS = max(10, _env_int("SCHEDULER_LEASE_RENEW_SECONDS", 60))
+
+
+def is_leader() -> bool:
+    """Лидер ли этот инстанс (для диагностики/тестов)."""
+    return _is_leader
+
+
+def _leadership_ok() -> bool:
+    """Разрешено ли этому инстансу регистрировать/держать job'ы.
+
+    При включённом гейте — только лидеру. Пока гейт не включён (до резолва
+    лидерства), разрешаем, чтобы одиночный хост не ждал первый round-trip к БД.
+    """
+    if SCHEDULER_LEADER_DISABLED:
+        return True
+    if not _LEADER_GATE_ENABLED:
+        return True
+    return _is_leader
+
+
+def arm_leader_gate() -> None:
+    """Включить гейт лидерства СИНХРОННО (до первого тика цикла лидерства).
+
+    Нужно, чтобы окно между стартом lifespan и первой проверкой лиза не
+    позволило не-лидеру зарегистрировать job'ы через админ-запрос.
+    """
+    global _LEADER_GATE_ENABLED
+    _LEADER_GATE_ENABLED = True
+
+
+async def run_scheduler_leadership(bot: Bot) -> None:
+    """Цикл лидерства: забрать/продлить лиз и поднять/погасить планировщик.
+
+    Каждый тик: атомарно подтверждаем лидерство. Стали лидером — стартуем
+    планировщик; потеряли (лиз просрочен и перехвачен) — гасим свои job'ы,
+    чтобы не дублировать с новым лидером. При сбое БД СОХРАНЯЕМ текущий статус
+    (секундный блип Neon не должен ронять джобы у лидера).
+    """
+    global _LEADER_GATE_ENABLED, _is_leader
+    _LEADER_GATE_ENABLED = True
+    log.info(
+        "scheduler.leadership_loop_started",
+        instance=_INSTANCE_ID,
+        ttl=LEADER_LEASE_TTL_SECONDS,
+        renew=LEADER_RENEW_INTERVAL_SECONDS,
+    )
+    while True:
+        ok = _is_leader  # по умолчанию — сохраняем текущий статус (см. except)
+        try:
+            sm = get_sessionmaker()
+            async with sm() as session:
+                ok = await scheduler_leader.acquire_or_renew(
+                    session, _INSTANCE_ID, ttl_seconds=LEADER_LEASE_TTL_SECONDS
+                )
+        except Exception as exc:  # noqa: BLE001 — сбой БД не меняет лидерство
+            log.warning("scheduler.leader_acquire_failed", error=str(exc))
+
+        if ok and not _is_leader:
+            _is_leader = True
+            log.info("scheduler.leader_acquired", instance=_INSTANCE_ID)
+            try:
+                start_scheduler(bot)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("scheduler.start_failed", error=str(exc))
+        elif not ok and _is_leader:
+            _is_leader = False
+            log.warning("scheduler.leader_lost", instance=_INSTANCE_ID)
+            await shutdown_scheduler()
+
+        await asyncio.sleep(LEADER_RENEW_INTERVAL_SECONDS)
+
+
+async def release_scheduler_leadership() -> None:
+    """Отпустить лиз при graceful shutdown, чтобы второй инстанс подхватил сразу."""
+    global _is_leader
+    if not _is_leader:
+        return
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            await scheduler_leader.release(session, _INSTANCE_ID)
+    except Exception as exc:  # noqa: BLE001 — на выходе уже не критично
+        log.warning("scheduler.leader_release_failed", error=str(exc))
+    _is_leader = False
 
 
 # GHG6 PX6 / GHG7 P8.4: онлайн-статус раз в час (было 10 мин). Каждый тик —
@@ -667,6 +775,10 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     (`/admin/scheduled` PUT). Респектит master-toggle'ы GHG6 AD6: если
     `enabled=false` — соответствующий job удаляется, не пере-создаётся.
     """
+    # GHG11(5): не-лидер не держит job'ов — пересборка бессмысленна.
+    if not _leadership_ok():
+        log.info("scheduler.reload_skipped_not_leader")
+        return
     settings = get_settings()
     sched = get_scheduler()
     sm = get_sessionmaker()
@@ -1159,6 +1271,11 @@ async def collapse_all_jobs(bot: Bot) -> int:
     Возвращает число зарегистрированных job'ов после пересборки.
     """
     global _scheduler
+    # GHG11(5): схлопывать планировщик имеет смысл только у лидера. Иначе
+    # админ-запрос на не-лидере поднял бы у него job'ы → дубли.
+    if not _leadership_ok():
+        log.info("scheduler.collapse_skipped_not_leader")
+        return 0
     _RUNNING_SINCE.clear()
     if _scheduler is not None:
         try:
@@ -1197,6 +1314,8 @@ async def reschedule_proxy_health(bot: Bot) -> None:
     """
     from app.services.proxies import ProxyMode, get_proxy_mode, proxy_health_tick
 
+    if not _leadership_ok():
+        return
     sched = get_scheduler()
     sm = get_sessionmaker()
     async with sm() as session:
@@ -1233,6 +1352,8 @@ async def reschedule_space_restart() -> None:
         get_schedule,
     )
 
+    if not _leadership_ok():
+        return
     sched = get_scheduler()
     sm = get_sessionmaker()
     async with sm() as session:
@@ -1268,6 +1389,10 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     settings = get_settings()
     sched = get_scheduler()
     if sched.running:
+        return sched
+    # GHG11(5): не-лидер job'ов не регистрирует (single-writer).
+    if not _leadership_ok():
+        log.info("scheduler.start_skipped_not_leader")
         return sched
 
     # GHG6 AD6: chukhan/avatars/birthdays теперь регистрирует

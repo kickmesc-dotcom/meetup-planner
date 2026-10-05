@@ -161,6 +161,90 @@ async def test_music_without_liked_when_scope_all(monkeypatch):
     assert items[0]["detail"]["tracks"][0]["liked"] is False
 
 
+def _subject() -> SimpleNamespace:
+    return SimpleNamespace(
+        id=5,
+        display_name="Серёга",
+        telegram_id=306733739,
+        avatar_url="http://a/5.png",
+    )
+
+
+@pytest.mark.asyncio
+async def test_loser_and_chukhan_get_single_participant(monkeypatch):
+    """GHG11(5): лох/чухан получают миниатюру-субъекта (без XP/лайков)."""
+    loser = feed._item(
+        source="loser",
+        row_id="loser:3",
+        kind=feed.FEED_LOSER,
+        at=None,
+        text="«причина»",
+        user=_subject(),
+        detail={"reason": "причина"},
+    )
+    chukhan = feed._item(
+        source="chukhan",
+        row_id="chukhan:4",
+        kind=feed.FEED_CHUKHAN,
+        at=None,
+        text="«другая»",
+        user=_subject(),
+        detail={"reason": "другая"},
+    )
+    await feed._attach_details(None, [loser, chukhan], user_id=1)
+    expected = [
+        {
+            "user_id": 5,
+            "user_name": "Серёга",
+            "avatar_url": "http://a/5.png",
+            "xp": 0,
+            "likes": 0,
+        }
+    ]
+    assert loser["detail"]["participants"] == expected
+    assert chukhan["detail"]["participants"] == expected
+    # прежние поля подробностей не потерялись
+    assert loser["detail"]["reason"] == "причина"
+
+
+@pytest.mark.asyncio
+async def test_feature_journal_item_gets_participant(monkeypatch):
+    """GHG11(5): активность фичи (kind=feature) тоже даёт миниатюру участника."""
+    feature = feed._item(
+        source="journal",
+        row_id="journal:9",
+        kind=feed.FEED_FEATURE,
+        at=None,
+        text="🔮 совет",
+        user=_subject(),
+    )
+    await feed._attach_details(None, [feature], user_id=1)
+    assert feature["detail"]["participants"] == [
+        {
+            "user_id": 5,
+            "user_name": "Серёга",
+            "avatar_url": "http://a/5.png",
+            "xp": 0,
+            "likes": 0,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_generic_journal_event_has_no_participant():
+    """Глобальные события (event/holiday) остаются без миниатюр-участников."""
+    event = feed._item(
+        source="journal",
+        row_id="journal:11",
+        kind="event",
+        at=None,
+        text="⚡️ событие",
+        user=_subject(),
+    )
+    await feed._attach_details(None, [event], user_id=1)
+    assert event["detail"] is None
+
+
 def test_item_carries_detail_field():
     item = feed._item(
         source="ach",

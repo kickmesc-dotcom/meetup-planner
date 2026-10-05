@@ -9,7 +9,8 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { FeedDetailPanel, ParticipantsStrip } from "./FeedScreen";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { FeedDetailPanel, FeedRow, ParticipantsStrip } from "./FeedScreen";
 import type { FeedItem } from "@/api/game";
 
 afterEach(cleanup);
@@ -109,5 +110,73 @@ describe("FeedDetailPanel: разметка условия задания (GHG11
       />,
     );
     expect(screen.getByText(/Никто не отправил свой вариант/)).toBeTruthy();
+  });
+});
+
+describe("FeedRow: миниатюры для лох/чухан/активность (GHG11(5))", () => {
+  const loserItem = (): FeedItem => ({
+    id: "loser:3",
+    source: "loser",
+    kind: "loser",
+    icon: "👑",
+    title: "Лох дня",
+    text: "«за что-то»",
+    at: new Date().toISOString(),
+    user_id: 5,
+    user_name: "Серж",
+    user_telegram_id: 306733739,
+    avatar_url: null,
+    badges: [],
+    detail: {
+      participants: [
+        { user_id: 5, user_name: "Серж", avatar_url: null, xp: 0, likes: 0 },
+      ],
+    },
+  });
+
+  function renderRow(item: FeedItem, compact: boolean) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <FeedRow
+          item={item}
+          meId={5}
+          isAdmin={false}
+          onOpenUser={() => {}}
+          onModerated={() => {}}
+          compact={compact}
+        />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("в компактном виде рисует миниатюру у лоха", () => {
+    const { container } = renderRow(loserItem(), true);
+    expect(
+      container.querySelector('[data-testid="participants-strip"]'),
+    ).toBeTruthy();
+    expect(screen.getByTitle("Серж")).toBeTruthy();
+  });
+
+  it("в классическом виде миниатюры нет", () => {
+    const { container } = renderRow(loserItem(), false);
+    expect(
+      container.querySelector('[data-testid="participants-strip"]'),
+    ).toBeNull();
+  });
+
+  it("активность фичи (feature) даёт миниатюру", () => {
+    const item: FeedItem = {
+      ...loserItem(),
+      id: "journal:9",
+      source: "journal",
+      kind: "feature",
+      title: "Активность",
+      icon: "✨",
+    };
+    const { container } = renderRow(item, true);
+    expect(
+      container.querySelector('[data-testid="participants-strip"]'),
+    ).toBeTruthy();
   });
 });

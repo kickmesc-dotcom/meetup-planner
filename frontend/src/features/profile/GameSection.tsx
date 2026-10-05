@@ -44,11 +44,12 @@ const FEATURE_TABS: readonly string[] = [
  * Якорь может ещё не отрисоваться после смены вкладки — поэтому несколько
  * ретраев с небольшой паузой, потом молча сдаёмся.
  */
-function goToFeature(tab?: string, anchor?: string, adminSection?: string) {
+export function goToFeature(tab?: string, anchor?: string, adminSection?: string) {
   if (!tab || !FEATURE_TABS.includes(tab)) return;
   haptic("light");
   // Просим целевой экран раскрыть нужный блок (лента — «Действия»).
-  useUI.getState().setFeedAnchor(anchor ?? null);
+  // Пустой якорь нормализуем в null — у админских фич якоря нет вовсе.
+  useUI.getState().setFeedAnchor(anchor || null);
   // Админка — сразу открыть нужный подраздел (фразы лоха/чухана и т.п.).
   useUI.getState().setPendingAdminSection(
     tab === "admin" ? adminSection ?? null : null,

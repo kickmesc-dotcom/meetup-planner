@@ -102,6 +102,11 @@ FEED_KIND_ORDER: tuple[str, ...] = (
     FEED_FEATURE,
 )
 
+# GHG11(5): виды с ОДНИМ участником-субъектом (лох/чухан/активность фичи). Им
+# тоже даём миниатюру-подложку, чтобы у каждого блока ленты был одинаковый
+# быстрый обзор «кто это», а не только у голосовых/музыки.
+_SINGLE_PARTICIPANT_KINDS = (FEED_LOSER, FEED_CHUKHAN, FEED_FEATURE)
+
 # journal-виды, которые показываем в ленте (буфер ачивок не дублируем — ачивки
 # и так приходят из `user_achievements`).
 _JOURNAL_KINDS = (
@@ -185,6 +190,20 @@ async def _attach_details(
     for it in items:
         row_id = it["id"]
         detail = dict(it.get("detail") or {})
+        # GHG11(5): лох/чухан/активность фичи — миниатюра-субъект (та же форма,
+        # что у музыки/голосовых: без XP/лайков → аватарка без бейджа).
+        if it["kind"] in _SINGLE_PARTICIPANT_KINDS and not detail.get("participants"):
+            uid = it.get("user_id")
+            if uid is not None:
+                detail["participants"] = [
+                    {
+                        "user_id": uid,
+                        "user_name": it.get("user_name"),
+                        "avatar_url": it.get("avatar_url"),
+                        "xp": 0,
+                        "likes": 0,
+                    }
+                ]
         if row_id.startswith("voice:"):
             task_id = int(row_id.split(":", 1)[1])
             subs = await voice._submissions(session, task_id)

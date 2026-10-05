@@ -1,3 +1,49 @@
+# 🔎 GHG11 (5): аудит + single-writer планировщика, откат XP, миниатюры, тесты (ГОТОВО К ВЫКЛАДКЕ)
+
+> Аудит по `AUDIT_PLAN.md` (Phase 0–1) и фиксы. Миграций НЕТ (`head` остаётся
+> `0026_music_track_likes`). Артефакты: `AUDIT_REPORT.md` (формат A–N),
+> `AUDIT_EVENTS.md` (карта событий). FINGERPRINT `/api/meta` не меняется —
+> выкладку подтверждать по `code.build` (F10) и поведенчески.
+
+## Что сделали
+
+- **H1 — двойной планировщик (P1, FIXED).** Amvera и HF Space стартовали
+  APScheduler каждый → дубли анонсов. Добавлен single-writer лиз лидерства в
+  `admin_config[scheduler.leader]` (`services/scheduler_leader.py`):
+  `acquire_or_renew` через `SELECT … FOR UPDATE`, TTL 300с, renew 60с, failover
+  после истечения TTL, release при graceful shutdown. Планировщик поднимает
+  только лидер; `reload_dynamic_jobs`/`collapse_all_jobs`/`start_scheduler` у
+  не-лидера — no-op. Гейт включается в `lifespan` (`arm_leader_gate`); обходной
+  выключатель `SCHEDULER_LEADER_DISABLED=true` возвращает прежнее поведение.
+  Проверено на боевом Neon: первый acquire=True, второй blocked, после release
+  снова доступен, лишних строк нет.
+- **H3 — откат XP при админском удалении голосового (P2, FIXED).** `feed_moderation.
+  _cascade_delete` теперь отзывает XP (`awards.revoke_voice`) у всех сдавших
+  (с учётом режима «только первый») и ставит «могилку» `voice_withdrawn`.
+- **Миниатюры участников — на лох/чухан/активность фич.** `feed._attach_details`
+  даёт `detail.participants` и для `loser`/`chukhan`/`feature`: у каждого блока
+  ленты одинаковый компактный обзор. Тап по миниатюре у неактивных фич открывает
+  гостевой профиль.
+- **Фронт-тесты.** `GameSection.test.tsx` — deep-link CTA (`goToFeature`:
+  вкладка/подраздел админки/якорь); `FeedSettingsScreen.test.tsx` — переключатель
+  компактного/классического вида; `FeedScreen.test.tsx` расширен блоком `FeedRow`
+  (миниатюры лох/чухан/feature в компактном виде).
+
+## Проверка
+
+```bash
+# монорепо
+./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q   # 1003 passed
+cd meetup-planner-main/frontend && npm run typecheck                   # чисто
+npx vitest run && npm run build                                        # 24 passed, dist ок
+# зеркало
+./meetup-planner-backend/.venv/Scripts/python.exe -m pytest -q         # 1002 passed, 1 skipped
+# лиза на боевом Neon (создаёт и удаляет временный ключ)
+first_acquire=True second_blocked=True after_release=True leftover_rows=0
+```
+
+---
+
 # 🌙 GHG11 (4.1): миниатюры для музыки/муз-гейма, deep-link в подраздел админки, тесты ленты (ЗАДЕПЛЕНО)
 
 > ✅ **Выложено 2026-10-05.** Монорепо `35aee1f` (+ `5b08496` — план аудита) → GitHub.

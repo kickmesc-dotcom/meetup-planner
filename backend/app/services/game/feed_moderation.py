@@ -55,6 +55,25 @@ async def _cascade_delete(session: AsyncSession, item_id: str) -> bool:
             sa_delete(GameJournalEntry).where(GameJournalEntry.id == row_id)
         )
     elif prefix == "voice":
+        # GHG11(5) / H3: перед удалением собрать сдачи, чтобы отозвать опыт за
+        # них — иначе награда за удалённый контент остаётся на игроке (раньше
+        # откат был только на ручном withdraw из мини-аппа, но не на админском
+        # каскаде). В режиме «только первый» опыт получал лишь первый сдавший.
+        from app.services.game import awards
+        from app.services.game import voice as _voice
+
+        task = await session.get(GameVoiceTask, row_id)
+        reward = int(getattr(task, "reward", 0) or 0)
+        mode = (
+            await _voice.get_task_mode(session, row_id) if task is not None else None
+        )
+        subs = list(
+            await session.scalars(
+                select(GameVoiceSubmission)
+                .where(GameVoiceSubmission.task_id == row_id)
+                .order_by(GameVoiceSubmission.id.asc())
+            )
+        )
         await session.execute(
             sa_delete(GameVoiceSubmission).where(
                 GameVoiceSubmission.task_id == row_id
@@ -63,6 +82,15 @@ async def _cascade_delete(session: AsyncSession, item_id: str) -> bool:
         await session.execute(
             sa_delete(GameVoiceTask).where(GameVoiceTask.id == row_id)
         )
+        if reward > 0:
+            for index, sub in enumerate(subs):
+                if mode == _voice.MODE_FIRST_ONLY and index != 0:
+                    continue
+                await awards.revoke_voice(session, sub.user_id, points=reward)
+        # «Могилка»: если задание когда-либо пересоздастся с тем же id, повторная
+        # сдача этих участников не даст второй опыт за один и тот же вариант.
+        for sub in subs:
+            _voice.record_withdrawal(session, task_id=row_id, user_id=sub.user_id)
     elif prefix == "music":
         await session.execute(
             sa_delete(MusicSelection).where(MusicSelection.id == row_id)

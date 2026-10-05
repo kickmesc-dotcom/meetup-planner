@@ -31,7 +31,12 @@ from app.api import (
 )
 from app.bot import webhook as bot_webhook
 from app.bot.dispatcher import get_bot
-from app.bot.scheduler import shutdown_scheduler, start_scheduler
+from app.bot.scheduler import (
+    arm_leader_gate,
+    release_scheduler_leadership,
+    run_scheduler_leadership,
+    shutdown_scheduler,
+)
 from app.services.chukhan import retry_undelivered_chukhan
 from app.config import get_settings
 from app.db.base import get_sessionmaker
@@ -238,11 +243,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Э19: единоразовое инфо-уведомление о фиче «передача червя».
     worm_notice_task = asyncio.create_task(_announce_worm_transfer_once())
 
-    # 3. Планировщик стартует независимо от состояния сети.
-    try:
-        start_scheduler(get_bot())
-    except Exception as exc:  # noqa: BLE001
-        structlog.get_logger().warning("scheduler.start_failed", error=str(exc))
+    # 3. GHG11(5): планировщик стартует НЕ безусловно, а через цикл лидерства.
+    # Amvera и HF Space делят одну Neon, поэтому активный писатель ровно один:
+    # job'ы поднимает только владелец лиза (`services/scheduler_leader.py`).
+    # При `SCHEDULER_LEADER_DISABLED=true` поведение прежнее (каждый сам себе).
+    arm_leader_gate()
+    scheduler_task = asyncio.create_task(run_scheduler_leadership(get_bot()))
 
     yield
 
@@ -254,6 +260,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         except (asyncio.CancelledError, Exception):  # noqa: BLE001
             pass
 
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except (asyncio.CancelledError, Exception):  # noqa: BLE001
+        pass
+    # Отпускаем лиз лидерства до общего shutdown — второй инстанс подхватит сразу.
+    await release_scheduler_leadership()
     await shutdown_scheduler()
     bot = get_bot()
     await bot.session.close()

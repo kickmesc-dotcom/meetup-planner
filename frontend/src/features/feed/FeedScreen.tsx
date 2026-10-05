@@ -678,7 +678,7 @@ const EXPANDABLE_KINDS = new Set([
   "music_game",
 ]);
 
-function FeedRow({
+export function FeedRow({
   item,
   isAdmin,
   onOpenUser,
@@ -836,8 +836,18 @@ function FeedRow({
               reward={item.detail?.reward}
               onSelect={(p) => {
                 haptic("light");
-                if (item.kind === "voice") setPlayId((p as { id?: number }).id ?? null);
-                setOpen(true);
+                if (item.kind === "voice") {
+                  setPlayId((p as { id?: number }).id ?? null);
+                  setOpen(true);
+                  return;
+                }
+                // GHG11(5): у раскрываемых (музыка/раунд/лох/чухан) — раскрыть
+                // подробности; у активности фичи деталей нет → гостевой профиль.
+                if (expandable) {
+                  setOpen(true);
+                  return;
+                }
+                if (p.user_id != null) onOpenUser(p.user_id);
               }}
             />
           )}
