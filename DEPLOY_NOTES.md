@@ -1,3 +1,47 @@
+# 🌙 GHG11 (4.1): миниатюры для музыки/муз-гейма, deep-link в подраздел админки, тесты ленты (ЗАДЕПЛЕНО)
+
+> ✅ **Выложено 2026-10-05.** Монорепо `35aee1f` (+ `5b08496` — план аудита) → GitHub.
+> Зеркало `meetup-planner-backend` — `330a710`, HF origin и Amvera (`main:master`).
+> Фингерпринт `/api/meta` не менялся (`3e372e27a6df`, routes=220) — новых роутов
+> нет; факт выкладки подтверждён поведенчески: `/api/game/feed` отдаёт
+> `participants` для подборки, `/api/me/game` — `admin_section='loser'` у
+> `loser_phrases_editor`. Живой мини-апп: под подборкой видна миниатюра `❤️1`,
+> кнопка «Редактор шаблонов фраз лоха» открывает экран «👑 Лох дня» напрямую.
+
+Продолжение GHG11(4) по доп. требованиям оператора. Миграций НЕТ.
+
+## Что сделали
+
+- **Компактный вид — для музыки и муз-гейма.** `feed._attach_details` отдаёт
+  `detail.participants`: у подборки — владельцы треков с суммой лайков;
+  у раунда муз-гейма — автор трека (`+MUSIC_GAME_AUTHOR_REWARD`) и угадавшие
+  (`+MUSIC_GAME_GUESS_REWARD`), плюс `track_likes` загаданного трека. Треки
+  получили `user_id`/`user_name`/`avatar_url`.
+- **`ParticipantsStrip` обобщён**: один компонент на голосовые сдачи, подборки и
+  раунды; бейдж — `+XP` либо `❤️<лайки>`. В раскрытой карточке муз-гейма — роли
+  (🎼 автор / 🎯 угадавшие) с XP.
+- **CTA из анонса открывает подраздел админки.** `config.FEATURE_ADMIN_SECTION`
+  (`loser_phrases_editor`/`forced_loser_reroll` → `loser`, `chukhan_*` → `chukhan`)
+  → `FeatureOut.admin_section` → `store.pendingAdminSection` → `AdminScreen`
+  сразу выбирает нужный раздел. У админских фич `anchor` теперь пуст.
+- **Фронт-тесты.** Добавлены `jsdom` + `@testing-library/react`; тест
+  `FeedScreen.test.tsx` (6 тестов) проверяет `ParticipantsStrip` (миниатюры,
+  `+XP`, `❤️`, клик) и рендер разметки условия задания (`<b>` тегом, не текстом;
+  «Никто не отправил свой вариант.»). `vitest` include расширен на `.tsx`.
+
+## Проверка
+
+```bash
+# монорепо
+./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q   # 989 passed
+cd meetup-planner-main/frontend && npm run typecheck                   # чисто
+npx vitest run && npm run build                                        # 13 passed, dist ок
+# зеркало
+./meetup-planner-backend/.venv/Scripts/python.exe -m pytest -q         # 988 passed, 1 skipped
+```
+
+---
+
 # 🌙 GHG11 (4): разметка в ленте, компактный вид задания, переход из анонса фичи (ЗАДЕПЛЕНО)
 
 > ✅ **Выложено 2026-10-05.** Монорепо `e601be7` (партия) + `ff30a52` (устойчивый
