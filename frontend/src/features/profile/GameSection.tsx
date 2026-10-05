@@ -44,11 +44,15 @@ const FEATURE_TABS: readonly string[] = [
  * Якорь может ещё не отрисоваться после смены вкладки — поэтому несколько
  * ретраев с небольшой паузой, потом молча сдаёмся.
  */
-function goToFeature(tab?: string, anchor?: string) {
+function goToFeature(tab?: string, anchor?: string, adminSection?: string) {
   if (!tab || !FEATURE_TABS.includes(tab)) return;
   haptic("light");
   // Просим целевой экран раскрыть нужный блок (лента — «Действия»).
   useUI.getState().setFeedAnchor(anchor ?? null);
+  // Админка — сразу открыть нужный подраздел (фразы лоха/чухана и т.п.).
+  useUI.getState().setPendingAdminSection(
+    tab === "admin" ? adminSection ?? null : null,
+  );
   useUI.getState().setTab(tab as Tab);
   if (!anchor) return;
   // Экран может ещё дорисовываться (раскрытие блока, подгрузка данных) —
@@ -118,7 +122,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
                   key={f.code}
                   type="button"
                   title={f.description || undefined}
-                  onClick={() => goToFeature(f.tab, f.anchor)}
+                  onClick={() => goToFeature(f.tab, f.anchor, f.admin_section)}
                   className="rounded-md bg-tg-button/10 px-2 py-0.5 text-[11px] text-tg-link active:scale-[0.97]"
                 >
                   {f.title} →
@@ -315,7 +319,7 @@ function LevelUpNotice({
               {f.tab && (
                 <button
                   type="button"
-                  onClick={() => goToFeature(f.tab, f.anchor)}
+                  onClick={() => goToFeature(f.tab, f.anchor, f.admin_section)}
                   className="mt-1 ml-3 rounded-md bg-tg-button/15 px-2 py-0.5 text-[11px] font-medium text-tg-link active:scale-[0.97]"
                 >
                   Открыть и применить →

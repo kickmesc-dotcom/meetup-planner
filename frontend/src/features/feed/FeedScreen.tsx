@@ -20,6 +20,7 @@ import {
   FEED_KIND_LABELS,
   type FeedDetail,
   type FeedItem,
+  type FeedParticipant,
 } from "@/api/game";
 import ActivitiesPanel from "./ActivitiesPanel";
 import NominationsSheet from "./NominationsSheet";
@@ -698,7 +699,12 @@ function FeedRow({
   const [menu, setMenu] = useState(false);
   // GHG11(4): факт тапа по миниатюре — какую сдачу включить при раскрытии.
   const [playId, setPlayId] = useState<number | null>(null);
-  const voiceSubs = item.kind === "voice" ? item.detail?.submissions ?? [] : [];
+  // GHG11(4): компактные миниатюры — голосовые сдачи, владельцы треков подборки
+  // или участники раунда мьюзик-гейма.
+  const stripParticipants: FeedParticipant[] =
+    item.kind === "voice"
+      ? item.detail?.submissions ?? []
+      : item.detail?.participants ?? [];
   const qc = useQueryClient();
   const expandable = EXPANDABLE_KINDS.has(item.kind);
   // Музыка и голосовые — «плеер»: сворачиваем ОТДЕЛЬНОЙ кнопкой, чтобы тап
@@ -822,18 +828,26 @@ function FeedRow({
               dangerouslySetInnerHTML={{ __html: item.text }}
             />
           )}
-          {/* GHG11(4): новый вид — компактно, без раскрытия: кто сдал и сколько XP. */}
-          {compact && voiceSubs.length > 0 && (
+          {/* GHG11(4): новый вид — компактно, без раскрытия: кто участвовал и
+              сколько XP/лайков. */}
+          {compact && stripParticipants.length > 0 && (
             <ParticipantsStrip
-              submissions={voiceSubs}
+              participants={stripParticipants}
               reward={item.detail?.reward}
-              onPlay={(id) => {
+              onSelect={(p) => {
                 haptic("light");
-                setPlayId(id);
+                if (item.kind === "voice") setPlayId((p as { id?: number }).id ?? null);
                 setOpen(true);
               }}
             />
           )}
+          {compact &&
+            item.kind === "music_game" &&
+            typeof item.detail?.track_likes === "number" && (
+              <div className="mt-1 text-[11px] text-tg-hint">
+                ❤️ Лайков у трека: {item.detail.track_likes}
+              </div>
+            )}
           {expandable && playerLike && !open && (
             <button
               type="button"
@@ -931,7 +945,7 @@ function formatDate(iso: string | null | undefined): string {
 // Э22: раскрывающиеся подробности записи ленты
 // ---------------------------------------------------------------------------
 
-function FeedDetailPanel({
+export function FeedDetailPanel({
   item,
   playerLike,
   compact,
@@ -1010,9 +1024,29 @@ function FeedDetailPanel({
       {item.kind === "music" && <MusicDetail d={d} />}
 
       {item.kind === "music_game" && (
-        <div className="text-[11px] text-tg-hint">
-          {d.closed ? `Раунд закрыт: ${formatFull(d.closed_at)}` : "Голосование ещё идёт"}
-        </div>
+        <>
+          <div className="text-[11px] text-tg-hint">
+            {d.closed ? `Раунд закрыт: ${formatFull(d.closed_at)}` : "Голосование ещё идёт"}
+          </div>
+          {/* GHG11(4): кто получил опыт — автор трека и угадавшие. */}
+          {(d.participants?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {d.participants!.map((p, i) => (
+                <span
+                  key={p.user_id ?? i}
+                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
+                >
+                  {p.role === "author" ? "🎼 " : "🎯 "}
+                  {p.user_name ?? "участник"}
+                  {typeof p.xp === "number" && p.xp > 0 ? ` +${p.xp} XP` : ""}
+                </span>
+              ))}
+            </div>
+          )}
+          {typeof d.track_likes === "number" && (
+            <div className="text-[11px] text-tg-hint">❤️ Лайков у трека: {d.track_likes}</div>
+          )}
+        </>
       )}
 
       {(item.kind === "loser" || item.kind === "chukhan") && (
@@ -1042,33 +1076,41 @@ function FeedDetailPanel({
 }
 
 /**
- * GHG11(4): компактный ряд миниатюр участников голосового задания.
+ * GHG11(4): компактный ряд миниатюр участников под блоком записи.
  *
- * В новом виде ленты под блоком задания сразу видно, кто принял участие и
- * сколько XP получил за вариант, — без раскрытия и без «спама отдельными
- * блоками». Тап по миниатюре открывает запись и включает этот вариант.
+ * Общий для голосовых сдач, владельцев треков подборки и участников раунда
+ * мьюзик-гейма: кто принял участие и сколько получил (XP) или собрал (лайки) —
+ * без раскрытия и без «спама отдельными блоками». Тап открывает запись;
+ * для голосовых ещё и включает именно этот вариант.
  */
-function ParticipantsStrip({
-  submissions,
+export function ParticipantsStrip({
+  participants,
   reward,
-  onPlay,
+  onSelect,
 }: {
-  submissions: NonNullable<FeedDetail["submissions"]>;
+  participants: FeedParticipant[];
   reward?: number;
-  onPlay: (id: number) => void;
+  onSelect?: (p: FeedParticipant) => void;
 }) {
   return (
-    <div className="mt-1.5 flex flex-wrap gap-1.5">
-      {submissions.map((s) => {
+    <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="participants-strip">
+      {participants.map((s, i) => {
         const xp = s.xp ?? reward;
+        const likes = s.likes ?? 0;
+        const badge =
+          typeof xp === "number" && xp > 0
+            ? `+${xp}`
+            : likes > 0
+              ? `❤️${likes}`
+              : null;
         return (
           <button
-            key={s.id}
+            key={s.user_id ?? `${s.user_name ?? "u"}-${i}`}
             type="button"
             title={s.user_name ?? "участник"}
             onClick={(e) => {
               e.stopPropagation();
-              onPlay(s.id);
+              onSelect?.(s);
             }}
             className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-tg-secondary-bg text-xs font-semibold text-tg-text ring-1 ring-tg-hint/20"
           >
@@ -1077,9 +1119,9 @@ function ParticipantsStrip({
             ) : (
               (s.user_name ?? "?").slice(0, 1).toUpperCase()
             )}
-            {typeof xp === "number" && xp > 0 && (
+            {badge && (
               <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-status-free px-1 text-[9px] font-bold leading-tight text-white">
-                +{xp}
+                {badge}
               </span>
             )}
           </button>

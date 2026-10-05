@@ -35,3 +35,15 @@ def test_phrases_editors_point_at_admin_tab():
     # Редакторы фраз лоха/чухана живут в админке.
     assert config.feature_target("loser_phrases_editor")[0] == "admin"
     assert config.feature_target("chukhan_phrases_editor")[0] == "admin"
+
+
+def test_admin_features_open_the_right_subsection():
+    """CTA из анонса открывает ПОДРАЗДЕЛ админки, а не только корень."""
+    assert config.feature_admin_section("loser_phrases_editor") == "loser"
+    assert config.feature_admin_section("forced_loser_reroll") == "loser"
+    assert config.feature_admin_section("chukhan_phrases_editor") == "chukhan"
+    assert config.feature_admin_section("chukhan_reroll") == "chukhan"
+    # Фичи вне админки подраздела не задают.
+    assert config.feature_admin_section("custom_avatar") == ""
+    # И у админских фич якорь пуст — навигацию делает подраздел, а не скролл.
+    assert config.feature_target("loser_phrases_editor")[1] == ""

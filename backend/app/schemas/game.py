@@ -35,6 +35,8 @@ class FeatureOut(BaseModel):
     # якорь DOM-элемента для доскролла (см. `config.FEATURE_TARGETS`).
     tab: str = ""
     anchor: str = ""
+    # GHG11(4): подраздел админки, который открыть сразу ("loser"/"chukhan").
+    admin_section: str = ""
 
 
 class LevelUpOut(BaseModel):

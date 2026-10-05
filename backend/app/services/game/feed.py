@@ -39,6 +39,10 @@ from app.db.models import (
 )
 from app.services.game import journal
 from app.services.game.achievements_catalog import get as get_achievement
+from app.services.game.config import (
+    MUSIC_GAME_AUTHOR_REWARD,
+    MUSIC_GAME_GUESS_REWARD,
+)
 from app.services.game.music import NOTE_PUBLISHED as _MUSIC_PUBLISHED
 from app.services.game.voice_catalog import TASKS_BY_CODE as _VOICE_TASKS
 
@@ -224,6 +228,7 @@ async def _attach_details(
                 if user_id is not None
                 else set()
             )
+            meta = await _user_meta(session, [t.user_id for t in tracks])
             detail["tracks"] = [
                 {
                     "id": t.id,
@@ -233,9 +238,20 @@ async def _attach_details(
                     "url": t.url,
                     "likes": likes.get(t.id, 0),
                     "liked": t.id in mine,
+                    "user_id": t.user_id,
+                    "user_name": meta.get(t.user_id, {}).get("user_name"),
+                    "avatar_url": meta.get(t.user_id, {}).get("avatar_url"),
                 }
                 for t in tracks
             ]
+            # GHG11(4): компактные миниатюры участников — владельцы треков этой
+            # подборки, с суммой лайков по их трекам.
+            detail["participants"] = _aggregate_participants(tracks, meta, likes)
+        elif row_id.startswith("music_game:"):
+            round_id = int(row_id.split(":", 1)[1])
+            round_ = await session.get(MusicGameRound, round_id)
+            if round_ is not None:
+                detail = await _music_game_detail(session, round_, detail)
         it["detail"] = detail or None
 
 
@@ -251,6 +267,92 @@ async def _submission_avatars(
         )
     )
     return {int(uid): (manual or tg) for uid, manual, tg in rows.all()}
+
+
+async def _user_meta(
+    session: AsyncSession, user_ids: list[int]
+) -> dict[int, dict]:
+    """user_id → {user_name, avatar_url} одним SELECT — для миниатюр."""
+    if not user_ids:
+        return {}
+    rows = await session.execute(
+        select(User.id, User.display_name, User.avatar_manual_url, User.avatar_url).where(
+            User.id.in_(set(user_ids))
+        )
+    )
+    return {
+        int(uid): {"user_name": name, "avatar_url": manual or tg}
+        for uid, name, manual, tg in rows.all()
+    }
+
+
+def _aggregate_participants(tracks: list, meta: dict[int, dict], likes: dict[int, int]) -> list[dict]:
+    """Участники подборки: по одному элементу на владельца треков + лайки.
+
+    Миниатюры в ленте должны быть компактными, поэтому один владелец — один
+    элемент (а не строка на трек); лайки его треков суммируются.
+    """
+    agg: dict[int, dict] = {}
+    for t in tracks:
+        entry = agg.setdefault(
+            t.user_id,
+            {
+                "user_id": t.user_id,
+                "user_name": meta.get(t.user_id, {}).get("user_name"),
+                "avatar_url": meta.get(t.user_id, {}).get("avatar_url"),
+                "xp": 0,
+                "likes": 0,
+            },
+        )
+        entry["likes"] += int(likes.get(t.id, 0))
+    return list(agg.values())
+
+
+async def _music_game_detail(
+    session: AsyncSession, round_, detail: dict
+) -> dict:
+    """Подробности раунда мьюзик-гейма: автор + угадавшие с XP и лайки трека.
+
+    `participants` — те, кто получил опыт: автор трека (+AUTHOR_REWARD) и
+    угадавшие (+GUESS_REWARD). `track_likes` — лайки загаданного трека.
+    """
+    from app.services.game import music as _music
+
+    ids: list[int] = []
+    if round_.correct_user_id is not None:
+        ids.append(int(round_.correct_user_id))
+    ids.extend(int(uid) for uid in (round_.correct_voter_ids or []))
+    meta = await _user_meta(session, ids)
+    participants: list[dict] = []
+    if round_.correct_user_id is not None:
+        cid = int(round_.correct_user_id)
+        participants.append(
+            {
+                "user_id": cid,
+                "user_name": meta.get(cid, {}).get("user_name"),
+                "avatar_url": meta.get(cid, {}).get("avatar_url"),
+                "xp": MUSIC_GAME_AUTHOR_REWARD,
+                "likes": 0,
+                "role": "author",
+            }
+        )
+    for uid in round_.correct_voter_ids or []:
+        uid = int(uid)
+        participants.append(
+            {
+                "user_id": uid,
+                "user_name": meta.get(uid, {}).get("user_name"),
+                "avatar_url": meta.get(uid, {}).get("avatar_url"),
+                "xp": MUSIC_GAME_GUESS_REWARD,
+                "likes": 0,
+                "role": "guesser",
+            }
+        )
+    detail["participants"] = participants
+    if round_.track_id is not None:
+        counts = await _music.like_counts(session, [int(round_.track_id)])
+        detail["track_likes"] = counts.get(int(round_.track_id), 0)
+    return detail
 
 
 async def _achievement_items(

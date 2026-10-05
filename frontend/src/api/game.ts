@@ -29,6 +29,21 @@ export interface GameFeature {
   tab?: string;
   /** GHG11(4): id DOM-элемента для доскролла на этой вкладке. */
   anchor?: string;
+  /** GHG11(4): подраздел админки, который открыть сразу ("loser"/"chukhan"). */
+  admin_section?: string;
+}
+
+/**
+ * GHG11(4): миниатюра участника под блоком задания/подборки/раунда.
+ * Общая форма для голосовых сдач, владельцев треков и угадавших в муз-гейме.
+ */
+export interface FeedParticipant {
+  user_id?: number;
+  user_name: string | null;
+  avatar_url?: string | null;
+  xp?: number;
+  likes?: number;
+  role?: string;
 }
 
 export interface GameLevelUp {
@@ -231,6 +246,10 @@ export interface FeedDetail {
     /** GHG11(4): аватарка для миниатюры участника под заданием. */
     avatar_url?: string | null;
   }[];
+  /** GHG11(4): компактные участники для музыки и муз-гейма. */
+  participants?: FeedParticipant[];
+  /** GHG11(4): лайки загаданного трека в муз-гейме. */
+  track_likes?: number;
   tracks?: {
     id: number;
     kind: string;
@@ -239,6 +258,10 @@ export interface FeedDetail {
     url: string | null;
     likes: number;
     liked: boolean;
+    /** GHG11(4): владелец трека — для миниатюр участников подборки. */
+    user_id?: number;
+    user_name?: string | null;
+    avatar_url?: string | null;
   }[];
 }
 

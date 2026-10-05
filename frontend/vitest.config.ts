@@ -8,7 +8,9 @@ export default defineConfig({
     alias: { "@": path.resolve(__dirname, "src") },
   },
   test: {
+    // По умолчанию node (чистая логика); компонентные тесты переключают
+    // окружение на jsdom через docblock `@vitest-environment jsdom`.
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

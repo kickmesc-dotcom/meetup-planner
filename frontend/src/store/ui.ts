@@ -150,6 +150,14 @@ interface UIState {
    */
   feedAnchor: string | null;
   setFeedAnchor: (a: string | null) => void;
+
+  /**
+   * GHG11(4): подраздел админки, который надо открыть сразу при переходе из
+   * анонса фичи ("loser"/"chukhan"/…). Потребляется `AdminScreen` и
+   * очищается после применения.
+   */
+  pendingAdminSection: string | null;
+  setPendingAdminSection: (s: string | null) => void;
 }
 
 function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
@@ -242,4 +250,7 @@ export const useUI = create<UIState>((set, get) => ({
 
   feedAnchor: null,
   setFeedAnchor: (feedAnchor) => set({ feedAnchor }),
+
+  pendingAdminSection: null,
+  setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),
 }));

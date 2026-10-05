@@ -293,10 +293,10 @@ FEATURE_DESCRIPTIONS: dict[str, str] = {
 # «Где: …» и фактический переход не разъезжались.
 FEATURE_TARGETS: dict[str, tuple[str, str]] = {
     "loser_roulette": ("feed", "feed-actions"),
-    "forced_loser_reroll": ("feed", "feed-actions"),
-    "loser_phrases_editor": ("admin", "admin-phrase-editor"),
-    "chukhan_phrases_editor": ("admin", "admin-chukhan"),
-    "chukhan_reroll": ("admin", "admin-chukhan"),
+    "forced_loser_reroll": ("admin", ""),
+    "loser_phrases_editor": ("admin", ""),
+    "chukhan_phrases_editor": ("admin", ""),
+    "chukhan_reroll": ("admin", ""),
     "custom_avatar": ("profile", "profile-custom"),
     "custom_name": ("profile", "profile-custom"),
     "custom_rank": ("profile", "profile-custom"),
@@ -305,10 +305,25 @@ FEATURE_TARGETS: dict[str, tuple[str, str]] = {
     "chukhan_immunity": ("profile", "profile-custom"),
 }
 
+# GHG11(4): сразу открыть нужный ПОДРАЗДЕЛ админки при переходе из анонса
+# (иначе кнопка вела только на корень админки). Значения = `Section` в
+# `frontend/src/features/admin/AdminScreen.tsx`.
+FEATURE_ADMIN_SECTION: dict[str, str] = {
+    "loser_phrases_editor": "loser",
+    "forced_loser_reroll": "loser",
+    "chukhan_phrases_editor": "chukhan",
+    "chukhan_reroll": "chukhan",
+}
+
 
 def feature_target(code: str) -> tuple[str, str]:
     """(вкладка, якорь) для перехода из анонса фичи. Неизвестный код → («», «»)."""
     return FEATURE_TARGETS.get(code, ("", ""))
+
+
+def feature_admin_section(code: str) -> str:
+    """Подраздел админки, который надо открыть сразу. Неизвестный код → пусто."""
+    return FEATURE_ADMIN_SECTION.get(code, "")
 
 
 def feature_description(code: str) -> str:

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   clearRandomPhrasesPool,
@@ -33,6 +33,7 @@ import SpaceRestartScreen from "./SpaceRestartScreen";
 import GameScreen from "./GameScreen";
 import AllFeaturesScreen from "./AllFeaturesScreen";
 import DeliveryScreen from "./DeliveryScreen";
+import { useUI } from "@/store/ui";
 
 type Section =
   | "root"
@@ -61,6 +62,34 @@ type Section =
   | "delivery"
   | "space-restart";
 
+/** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
+const VALID_SECTIONS: Section[] = [
+  "chukhan",
+  "loser",
+  "scheduled-pubs",
+  "rp",
+  "bot-reactions",
+  "media-reactions",
+  "advice",
+  "worm-master",
+  "phrases-snapshot",
+  "posting-alerts",
+  "history",
+  "birthdays",
+  "calendar-settings",
+  "feed-settings",
+  "poll-presets",
+  "proxy",
+  "games",
+  "zaebal",
+  "intervals",
+  "jobs",
+  "game",
+  "all-features",
+  "delivery",
+  "space-restart",
+];
+
 interface Props {
   users: User[];
 }
@@ -68,6 +97,17 @@ interface Props {
 export default function AdminScreen({ users }: Props) {
   const [section, setSection] = useState<Section>("root");
   const [poolOpen, setPoolOpen] = useState(false);
+
+  // GHG11(4): переход из анонса фичи — сразу открыть нужный подраздел.
+  const pendingAdminSection = useUI((s) => s.pendingAdminSection);
+  const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);
+  useEffect(() => {
+    if (!pendingAdminSection) return;
+    if (VALID_SECTIONS.includes(pendingAdminSection as Section)) {
+      setSection(pendingAdminSection as Section);
+    }
+    setPendingAdminSection(null);
+  }, [pendingAdminSection, setPendingAdminSection]);
 
   const runPhrases = useMutation({
     mutationFn: triggerRandomPhrases,

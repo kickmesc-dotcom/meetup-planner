@@ -101,6 +101,7 @@ from app.services.game.config import (
     COMPLETIONIST_TITLE,
     SUPREME_CHUKHAN_TITLE,
     XP_RULES,
+    feature_admin_section,
     feature_description,
     feature_target,
     feature_title,
@@ -204,6 +205,7 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
                     description=feature_description(code),
                     tab=feature_target(code)[0],
                     anchor=feature_target(code)[1],
+                    admin_section=feature_admin_section(code),
                 )
                 for code in unlocks_between(frm, to)
             ],
@@ -262,6 +264,7 @@ async def my_game(session: SessionDep, user: CurrentUser) -> GameProfileOut:
                 description=feature_description(code),
                 tab=feature_target(code)[0],
                 anchor=feature_target(code)[1],
+                admin_section=feature_admin_section(code),
             )
             for code in unlocks_for_level(progress.level)
         ],

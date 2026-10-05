@@ -89,7 +89,11 @@ async def test_voice_item_gets_submissions(monkeypatch):
 async def test_music_item_gets_tracks_with_likes(monkeypatch):
     async def fake_sel(session, sel_id):
         assert sel_id == 3
-        return [SimpleNamespace(id=9, kind="link", title="T", performer="P", url="u")]
+        return [
+            SimpleNamespace(
+                id=9, kind="link", title="T", performer="P", url="u", user_id=5
+            )
+        ]
 
     async def fake_likes(session, ids):
         return {9: 4}
@@ -97,9 +101,13 @@ async def test_music_item_gets_tracks_with_likes(monkeypatch):
     async def fake_mine(session, uid, ids):
         return {9}
 
+    async def fake_meta(session, ids):
+        return {5: {"user_name": "Серёга", "avatar_url": "http://a/5.png"}}
+
     monkeypatch.setattr(music, "selection_tracks", fake_sel)
     monkeypatch.setattr(music, "like_counts", fake_likes)
     monkeypatch.setattr(music, "liked_track_ids", fake_mine)
+    monkeypatch.setattr(feed, "_user_meta", fake_meta)
 
     items = [_music_item()]
     await feed._attach_details(None, items, user_id=1)
@@ -112,6 +120,19 @@ async def test_music_item_gets_tracks_with_likes(monkeypatch):
             "url": "u",
             "likes": 4,
             "liked": True,
+            "user_id": 5,
+            "user_name": "Серёга",
+            "avatar_url": "http://a/5.png",
+        }
+    ]
+    # GHG11(4): миниатюры участников подборки — владелец + суммарные лайки.
+    assert items[0]["detail"]["participants"] == [
+        {
+            "user_id": 5,
+            "user_name": "Серёга",
+            "avatar_url": "http://a/5.png",
+            "xp": 0,
+            "likes": 4,
         }
     ]
 
@@ -119,13 +140,21 @@ async def test_music_item_gets_tracks_with_likes(monkeypatch):
 @pytest.mark.asyncio
 async def test_music_without_liked_when_scope_all(monkeypatch):
     async def fake_sel(session, sel_id):
-        return [SimpleNamespace(id=9, kind="link", title="T", performer="P", url="u")]
+        return [
+            SimpleNamespace(
+                id=9, kind="link", title="T", performer="P", url="u", user_id=5
+            )
+        ]
 
     async def fake_likes(session, ids):
         return {9: 4}
 
+    async def fake_meta(session, ids):
+        return {5: {"user_name": "Серёга", "avatar_url": None}}
+
     monkeypatch.setattr(music, "selection_tracks", fake_sel)
     monkeypatch.setattr(music, "like_counts", fake_likes)
+    monkeypatch.setattr(feed, "_user_meta", fake_meta)
 
     items = [_music_item()]
     await feed._attach_details(None, items, user_id=None)
