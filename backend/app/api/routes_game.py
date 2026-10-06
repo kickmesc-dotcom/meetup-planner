@@ -933,8 +933,11 @@ async def music_track_audio(
     if track.kind != "audio" or not track.file_id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "track_has_no_audio")
 
-    bot = get_bot()
+    # `get_bot()` тоже внутри try: на хосте с невалидным BOT_TOKEN он бросает
+    # `TokenValidationError`, и без этого ручка отдавала бы 500 со стектрейсом
+    # вместо честного «аудио недоступно» (ср. фикс lifespan в GHG11(5)).
     try:
+        bot = get_bot()
         tg_file = await bot.get_file(track.file_id)
         if tg_file is None or not tg_file.file_path:
             raise RuntimeError("no file_path")

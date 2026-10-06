@@ -94,6 +94,21 @@ async def test_telegram_failure_is_502(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_broken_bot_token_is_502_not_500(monkeypatch):
+    """Хост с невалидным BOT_TOKEN (как HF) не должен падать 500."""
+    import app.bot.dispatcher as dispatcher
+
+    def _boom():
+        raise RuntimeError("TokenValidationError")
+
+    monkeypatch.setattr(dispatcher, "get_bot", _boom)
+    with pytest.raises(HTTPException) as exc:
+        await routes_game.music_track_audio(11, _FakeSession(_audio_track()), None)
+    assert exc.value.status_code == 502
+    assert exc.value.detail == "audio_unavailable"
+
+
+@pytest.mark.asyncio
 async def test_too_large_is_413(monkeypatch):
     _install_bot(
         monkeypatch,
