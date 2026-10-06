@@ -16,6 +16,7 @@ import {
   type MusicWeekTrack,
 } from "@/api/game";
 import { ListSkeleton } from "@/components/Skeleton";
+import { MusicPlayButton } from "@/components/MusicPlayButton";
 import { haptic, showAlert } from "@/tg/webapp";
 
 function statusLabel(status: string): { text: string; className: string } {
@@ -241,6 +242,21 @@ export function MusicScreen() {
                     </div>
                   )}
                 </div>
+                {/* GHG11(6): треки, загруженные боту, слушаются тут же —
+                    ссылки открываются на своём источнике. */}
+                {t.kind === "link" && t.url ? (
+                  <a
+                    href={t.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
+                    aria-label="Открыть трек"
+                  >
+                    ▶️
+                  </a>
+                ) : t.kind === "audio" ? (
+                  <MusicPlayButton trackId={t.id} />
+                ) : null}
                 <LikeButton track={t} />
               </div>
             ))}

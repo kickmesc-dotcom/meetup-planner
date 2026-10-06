@@ -26,6 +26,7 @@ from app.db.models import (
     GameVoiceSubmission,
     GameVoiceTask,
     LoserRoll,
+    MusicTrack,
     User,
     UserAchievement,
     WeeklyChukhan,
@@ -133,6 +134,35 @@ _TEASE_TIMEOUT = 15.0
 # Э21: верхний размер голосового, принятого из мини-аппа (12 МБ — с запасом на
 # минуту opus). Файлы НЕ храним: пересылаем боту, берём file_id и отдаём его.
 _VOICE_MAX_BYTES = 12 * 1024 * 1024
+
+# GHG11(6): верхний размер трека, который согласны вытянуть из Telegram и
+# отдать блобом (лимит Bot API на скачивание — 20 МБ, берём его же). Треки —
+# это mp3 по 3-10 МБ: больше лимита в чат и не заливается.
+_MUSIC_AUDIO_MAX_BYTES = 20 * 1024 * 1024
+
+# Расширение файла у Telegram → MIME для `<audio>` в мини-аппе. Прод-проверка
+# показала, что аудио-документы Telegram отдаёт БЕЗ расширения (`music/file_182`),
+# а внутри лежит mp3 (ID3) — поэтому по умолчанию mp3. Отображение нужно для
+# тех случаев, когда расширение всё-таки есть (например, отправленные
+# голосовыми .ogg).
+_MUSIC_MIME_BY_EXT = {
+    "mp3": "audio/mpeg",
+    "m4a": "audio/mp4",
+    "mp4": "audio/mp4",
+    "aac": "audio/aac",
+    "ogg": "audio/ogg",
+    "oga": "audio/ogg",
+    "opus": "audio/ogg",
+    "wav": "audio/wav",
+    "flac": "audio/flac",
+}
+
+
+def _music_media_type(file_path: str | None) -> str:
+    """MIME аудио по расширению `file_path` из Telegram (по умолчанию mp3)."""
+    ext = (file_path or "").rpartition(".")[2].lower()
+    return _MUSIC_MIME_BY_EXT.get(ext, "audio/mpeg")
+
 
 # Э21: статусы сдачи голосового в мини-аппе → текст (фронт не парсит коды).
 _VOICE_STATUS = {
@@ -879,6 +909,56 @@ async def like_music_track(
             status_code=status.HTTP_404_NOT_FOUND, detail="track not published"
         )
     return MusicLikeOut(ok=True, liked=result.liked, likes=result.likes)
+
+
+@router.get("/game/music/tracks/{track_id}/audio")
+async def music_track_audio(
+    track_id: int, session: SessionDep, _: CurrentUser
+) -> Response:
+    """Послушать трек подборки прямо в ленте/предложке (GHG11(6)).
+
+    Баг прод-смоука: у загруженных в бота треков (`kind='audio'`) есть только
+    `file_id` — ссылки (`url`) нет, а кнопка «▶️» рисовалась ровно по `url`.
+    Поэтому такие треки нельзя было послушать вообще никак: ни в ленте, ни в
+    «Предложке недели». Проксируем ровно как голосовые сдачи: файла у нас нет,
+    тянем его у Telegram по `file_id` и стримим клиенту.
+
+    Треки-ссылки сюда не ходят (у них открывается свой источник) — отдаём 404.
+    """
+    from app.bot.dispatcher import get_bot
+
+    track = await session.get(MusicTrack, track_id)
+    if track is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "track_not_found")
+    if track.kind != "audio" or not track.file_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "track_has_no_audio")
+
+    bot = get_bot()
+    try:
+        tg_file = await bot.get_file(track.file_id)
+        if tg_file is None or not tg_file.file_path:
+            raise RuntimeError("no file_path")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("game.music_audio_failed", error=str(exc), track_id=track_id)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "audio_unavailable"
+        ) from exc
+
+    size = int(getattr(tg_file, "file_size", 0) or 0)
+    if size > _MUSIC_AUDIO_MAX_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "audio_too_large"
+        )
+
+    try:
+        buf = await bot.download_file(tg_file.file_path)
+        data = buf.read()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("game.music_audio_failed", error=str(exc), track_id=track_id)
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY, "audio_unavailable"
+        ) from exc
+    return Response(content=data, media_type=_music_media_type(tg_file.file_path))
 
 
 # --------------------------------------------------------------------------

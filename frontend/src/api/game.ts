@@ -551,6 +551,22 @@ export async function fetchVoiceAudioUrl(id: number): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
+/**
+ * GHG11(6): прослушать трек подборки, загруженный в бота (а не ссылкой).
+ *
+ * У таких треков есть только Telegram `file_id`, поэтому звук тянем блобом с
+ * Authorization — тем же путём, что и голосовые сдачи. Для треков-ссылок этот
+ * роут не нужен: они открываются по `url` на своём источнике.
+ */
+export async function fetchMusicAudioUrl(trackId: number): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/game/music/tracks/${trackId}/audio`, {
+    headers: { Authorization: `tma ${getInitData()}` },
+  });
+  if (!res.ok) throw new Error("audio_unavailable");
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 export const addMusicTrack = (body: {
   url: string;
   title?: string;

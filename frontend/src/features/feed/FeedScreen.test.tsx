@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { FeedDetailPanel, FeedRow, ParticipantsStrip } from "./FeedScreen";
-import type { FeedItem } from "@/api/game";
+import type { FeedDetail, FeedItem } from "@/api/game";
 
 afterEach(cleanup);
 
@@ -110,6 +110,71 @@ describe("FeedDetailPanel: разметка условия задания (GHG11
       />,
     );
     expect(screen.getByText(/Никто не отправил свой вариант/)).toBeTruthy();
+  });
+});
+
+describe("FeedDetailPanel: кнопка play у треков подборки (GHG11(6))", () => {
+  const musicItem = (tracks: NonNullable<FeedDetail["tracks"]>): FeedItem => ({
+    id: "music:3",
+    source: "music",
+    kind: "music",
+    icon: "🎧",
+    title: "Подборка недели",
+    text: "Подборка недели — 1 треков",
+    at: new Date().toISOString(),
+    user_id: null,
+    user_name: null,
+    user_telegram_id: null,
+    avatar_url: null,
+    detail: { selection_id: 3, track_count: tracks.length, tracks },
+  });
+
+  const renderPanel = (tracks: NonNullable<FeedDetail["tracks"]>) => {
+    // `MusicTrackRow` ходит в react-query (лайки) — нужен провайдер.
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <FeedDetailPanel
+          item={musicItem(tracks)}
+          playerLike
+          compact
+          autoPlayId={null}
+          onClose={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+  };
+
+  it("у загруженного в бота трека есть кнопка «слушать»", () => {
+    renderPanel([
+      {
+        id: 11,
+        kind: "audio",
+        title: "BUR0UT X BFG decent mix topdog G8",
+        performer: "robustklaxons467",
+        url: null,
+        likes: 1,
+        liked: false,
+      },
+    ]);
+    expect(screen.getByLabelText("Прослушать трек")).toBeTruthy();
+  });
+
+  it("у трека-ссылки кнопка ведёт на источник, а не в плеер", () => {
+    const { container } = renderPanel([
+      {
+        id: 12,
+        kind: "link",
+        title: "Трек по ссылке",
+        performer: null,
+        url: "https://youtu.be/abc",
+        likes: 0,
+        liked: false,
+      },
+    ]);
+    expect(screen.getByLabelText("Открыть трек")).toBeTruthy();
+    expect(screen.queryByLabelText("Прослушать трек")).toBeNull();
+    expect(container.querySelector("audio")).toBeNull();
   });
 });
 

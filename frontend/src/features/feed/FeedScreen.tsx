@@ -27,6 +27,7 @@ import NominationsSheet from "./NominationsSheet";
 import VoiceLikeButton from "./VoiceLikeButton";
 import LoserSheet from "@/features/actions/LoserSheet";
 import { Spinner } from "@/components/Spinner";
+import { MusicPlayButton } from "@/components/MusicPlayButton";
 import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -1288,7 +1289,7 @@ function MusicTrackRow({
           <div className="truncate text-[11px] text-tg-hint">{track.performer}</div>
         )}
       </div>
-      {track.url && (
+      {track.url ? (
         <a
           href={track.url}
           target="_blank"
@@ -1299,7 +1300,12 @@ function MusicTrackRow({
         >
           ▶️
         </a>
-      )}
+      ) : track.kind === "audio" ? (
+        // GHG11(6): трек, загруженный в бота, живёт в Telegram (`file_id`) —
+        // играем его блобом через сервер. Раньше кнопки «play» у таких треков
+        // не было вообще: она рисовалась только по `url` (т.е. у ссылок).
+        <MusicPlayButton trackId={track.id} />
+      ) : null}
       <button
         type="button"
         disabled={like.isPending}

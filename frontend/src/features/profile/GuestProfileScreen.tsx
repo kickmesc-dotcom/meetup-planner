@@ -18,6 +18,11 @@ import { haptic } from "@/tg/webapp";
  * ни пояснений «куда зайти» — только факты: ранг, XP, сколько раз был лохом/
  * чуханом, место в чарте и собранные ачивки. Свой профиль (с редактированием и
  * справкой) остаётся на вкладке «Профиль».
+ *
+ * GHG11(6): порядок блоков переставлен по прод-фидбеку — сверху СВЕЖЕЕ
+ * (последние ачивки с датой/временем получения), ниже история «лоха дня»,
+ * ещё ниже история «чухана недели». Обе истории свёрнуты по умолчанию: раньше
+ * профиль открывался тремя простынями текста.
  */
 export default function GuestProfileScreen({
   userId,
@@ -83,6 +88,11 @@ export default function GuestProfileScreen({
 
         {p && p.enabled && (
           <div className="space-y-3">
+            {/* GHG11(6): профиль читался как «простыня историй» — первым делом
+                показываем СВЕЖЕЕ (последние ачивки с датой/временем получения),
+                а историю званий уводим ниже и сворачиваем. */}
+            <AchievementsBlock achievements={p.achievements} />
+
             <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center gap-3">
                 <div
@@ -174,29 +184,16 @@ export default function GuestProfileScreen({
               </div>
             </section>
 
-            <TitleHistory
+            <CollapsibleHistory
               title="🤡 История «лоха дня»"
               empty="Ни разу не был лохом дня."
               events={p.loser_history}
             />
-            <TitleHistory
+            <CollapsibleHistory
               title="💩 История «чухана недели»"
               empty="Ни разу не был чуханом недели."
               events={p.chukhan_history}
             />
-
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-              <div className="text-sm font-semibold">Последние ачивки</div>
-              {p.achievements.length === 0 ? (
-                <div className="mt-1 text-xs text-tg-hint">Пока пусто — ни одной ачивки.</div>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {p.achievements.slice(0, 12).map((a) => (
-                    <GuestAchievementRow key={a.code} a={a} />
-                  ))}
-                </ul>
-              )}
-            </section>
           </div>
         )}
       </div>
@@ -204,8 +201,41 @@ export default function GuestProfileScreen({
   );
 }
 
-/** GHG11(3): история звания — когда и за что. */
-function TitleHistory({
+/**
+ * GHG11(6): последние ачивки — ПЕРВЫЙ блок профиля.
+ *
+ * `achievements` приходят с сервера новыми сверху (`achievements.collected`
+ * сортирует по `unlocked_at desc`), поэтому «последние» получаются без
+ * пересортировки на клиенте.
+ */
+function AchievementsBlock({
+  achievements,
+}: {
+  achievements: GuestAchievement[];
+}) {
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="text-sm font-semibold">🏅 Последние ачивки</div>
+      {achievements.length === 0 ? (
+        <div className="mt-1 text-xs text-tg-hint">Пока пусто — ни одной ачивки.</div>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {achievements.slice(0, 12).map((a) => (
+            <GuestAchievementRow key={a.code} a={a} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * GHG11(6): история звания — «когда и за что», свёрнутая по умолчанию.
+ *
+ * Содержимое осталось прежним; добавился только заголовок-кнопка с числом
+ * записей и стрелкой — профиль больше не растягивается на три простыни.
+ */
+function CollapsibleHistory({
   title,
   empty,
   events,
@@ -214,28 +244,60 @@ function TitleHistory({
   empty: string;
   events: GuestTitleEvent[];
 }) {
-  return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-      <div className="text-sm font-semibold">{title}</div>
-      {events.length === 0 ? (
+  const [open, setOpen] = useState(false);
+
+  // Пустую историю сворачивать нечего — показываем сразу одной строкой.
+  if (events.length === 0) {
+    return (
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-sm font-semibold">{title}</div>
         <div className="mt-1 text-xs text-tg-hint">{empty}</div>
-      ) : (
-        <ul className="mt-2 space-y-1">
-          {events.map((e, i) => (
-            <li key={`${e.at}-${i}`} className="text-xs text-tg-text">
-              <span className="text-tg-hint">{formatDate(e.at)}</span>
-              {e.reason ? ` — «${e.reason}»` : ""}
-            </li>
-          ))}
-        </ul>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60">
+      <button
+        type="button"
+        onClick={() => {
+          haptic("light");
+          setOpen((v) => !v);
+        }}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 p-3 text-left"
+      >
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {title}
+        </span>
+        <span className="shrink-0 text-[11px] tabular-nums text-tg-hint">
+          {events.length} шт.
+        </span>
+        <span className="shrink-0 text-tg-hint">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3">
+          <ul className="space-y-1">
+            {events.map((e, i) => (
+              <li key={`${e.at}-${i}`} className="text-xs text-tg-text">
+                <span className="text-tg-hint">{formatDate(e.at)}</span>
+                {e.reason ? ` — «${e.reason}»` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </section>
   );
 }
 
-/** GHG11(3): ачивка гостя — по тапу раскрываются «когда» и «за что». */
+/**
+ * GHG11(3/6): ачивка гостя — дата и время получения справа (ненавязчиво),
+ * по тапу раскрывается «за что» и награда.
+ */
 function GuestAchievementRow({ a }: { a: GuestAchievement }) {
   const [open, setOpen] = useState(false);
+  const when = a.unlocked_at ? splitWhen(a.unlocked_at) : null;
   return (
     <li
       onClick={() => {
@@ -247,12 +309,22 @@ function GuestAchievementRow({ a }: { a: GuestAchievement }) {
       <div className="flex items-center gap-2 text-xs text-tg-text">
         <span className="w-5 shrink-0 text-center text-sm">{a.icon}</span>
         <span className="min-w-0 flex-1 truncate">{a.title}</span>
+        {when && (
+          <span className="shrink-0 text-right leading-tight">
+            <span className="block text-[10px] tabular-nums text-tg-hint">
+              {when.date}
+            </span>
+            <span className="block text-[10px] tabular-nums text-tg-hint opacity-70">
+              {when.time}
+            </span>
+          </span>
+        )}
         <span className="shrink-0 text-tg-hint">{open ? "▾" : "▸"}</span>
       </div>
       {open && (
         <div className="mt-1 space-y-0.5 pl-7 text-[11px] text-tg-hint">
           {a.description && <div>За что: {a.description}</div>}
-          {a.unlocked_at && <div>Когда: {formatDate(a.unlocked_at)}</div>}
+          {when && <div>Когда: {when.date}, {when.time}</div>}
           {typeof a.points === "number" && a.points > 0 && (
             <div>Награда: +{a.points} XP</div>
           )}
@@ -260,6 +332,20 @@ function GuestAchievementRow({ a }: { a: GuestAchievement }) {
       )}
     </li>
   );
+}
+
+/** GHG11(6): дата и время получения — в две приглушённые строки справа. */
+function splitWhen(iso: string): { date: string; time: string } | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    date: d.toLocaleDateString("ru-RU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }),
+    time: d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }),
+  };
 }
 
 function formatDate(iso: string): string {
