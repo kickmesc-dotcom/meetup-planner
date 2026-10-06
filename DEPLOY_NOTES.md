@@ -53,10 +53,10 @@
 ## Проверка
 
 ```bash
-./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q   # 1016 passed
+./meetup-planner-main/backend/.venv/Scripts/python.exe -m pytest -q   # 1017 passed
 cd meetup-planner-main/frontend && npm run typecheck                   # чисто
 npx vitest run && npm run build                            # 31 passed, dist ок
-./meetup-planner-backend/.venv/Scripts/python.exe -m pytest -q  # 1015 passed, 1 skipped
+./meetup-planner-backend/.venv/Scripts/python.exe -m pytest -q  # 1016 passed, 1 skipped
 ruff check app/api/routes_game.py tests/test_game_music_audio.py  # 10 UP017 — как в HEAD (не наши)
 ```
 
