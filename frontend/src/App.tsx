@@ -16,6 +16,7 @@ import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
+import { PlayerBar, PlayerProvider } from "./components/GlobalPlayer";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
 
@@ -194,12 +195,17 @@ export default function App() {
   return (
     // DESIGN_SYSTEM §9: центрированная колонка 560px — на планшете/десктопе
     // приложение читается как мини-апп, а не растягивается на всю ширину.
-    <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
-      {content}
-      <TabBar isAdmin={isAdmin} />
-      {guestUserId !== null && (
-        <GuestProfileScreen userId={guestUserId} onClose={closeGuest} />
-      )}
-    </div>
+    <PlayerProvider>
+      <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+        {content}
+        {/* GHG11(8): плеер подборки недели — в общем каркасе, поэтому играет
+            поверх всех вкладок и не сбрасывается при переключении. */}
+        <PlayerBar />
+        <TabBar isAdmin={isAdmin} />
+        {guestUserId !== null && (
+          <GuestProfileScreen userId={guestUserId} onClose={closeGuest} />
+        )}
+      </div>
+    </PlayerProvider>
   );
 }

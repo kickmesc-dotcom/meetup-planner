@@ -32,7 +32,6 @@ vi.mock("@/api/availability", async (importOriginal) => {
 });
 
 // Панель активностей тянет свои эндпоинты — в этом тесте она не нужна.
-vi.mock("./ActivitiesPanel", () => ({ default: () => null }));
 
 afterEach(() => {
   cleanup();

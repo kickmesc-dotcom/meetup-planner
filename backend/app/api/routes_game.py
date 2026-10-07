@@ -87,6 +87,7 @@ from app.schemas.game import (
 )
 from app.services.game import (
     achievements,
+    activity,
     delivery,
     donations,
     events,
@@ -987,22 +988,12 @@ async def music_track_audio(
 def _activity_options(answers: list[dict]) -> tuple[list[ActivityOptionOut], bool]:
     """Разобрать ответы промпта на кнопки и «нужен ли текст». Чистая функция.
 
-    Кнопка-вариант — там, где у ответа есть человеческая `label` (Э21). Если
-    хоть один ответ без подписи и не медиа — нужен свободный ввод. Если ни
-    кнопок, ни текстового варианта не нашлось — всё равно даём ввод.
+    Правило разбора общее с лентой (`activity.split_activity_options`,
+    GHG11(8)): та же кнопка, что в блоке «Активности», приходит и в анонс
+    задания внутри ленты.
     """
-    options: list[ActivityOptionOut] = []
-    needs_text = False
-    for ans in answers or []:
-        label = str(ans.get("label") or "").strip()
-        if label:
-            options.append(
-                ActivityOptionOut(label=label, xp=int(ans.get("xp") or 0))
-            )
-        elif not ans.get("media"):
-            needs_text = True
-    if not options and not needs_text:
-        needs_text = True
+    split, needs_text = activity.split_activity_options(answers)
+    options = [ActivityOptionOut(label=label, xp=xp) for label, xp in split]
     return options, needs_text
 
 

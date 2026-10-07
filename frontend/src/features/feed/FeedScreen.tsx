@@ -28,17 +28,13 @@ import {
   type FeedItem,
   type FeedParticipant,
 } from "@/api/game";
-import ActivitiesPanel from "./ActivitiesPanel";
+import { ActivityResponse, OrphanActivities, VoiceTaskAction } from "./ActivityBlocks";
+import { useGlobalPlayer } from "@/components/GlobalPlayer";
 import NominationsSheet from "./NominationsSheet";
 import ParticipantsFilterSheet from "./ParticipantsFilterSheet";
 import VoiceLikeButton from "./VoiceLikeButton";
 import LoserSheet from "@/features/actions/LoserSheet";
 import { Spinner } from "@/components/Spinner";
-import {
-  MiniPlayerBar,
-  useMiniPlayer,
-  type MiniPlayer,
-} from "@/components/MiniPlayer";
 import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -186,6 +182,13 @@ export default function FeedScreen({ meId }: { meId: number }) {
   }
 
   const items: FeedItem[] = q.data?.pages.flatMap((p) => p.items) ?? [];
+  // GHG11(8): id заданий, которые уже доступны прямо в анонсах ленты — их не
+  // дублируем в блоке-страховке выше.
+  const seenActivityIds = new Set<number>();
+  for (const it of items) {
+    const id = it.detail?.activity?.id;
+    if (typeof id === "number") seenActivityIds.add(id);
+  }
 
   // GHG11(7): pull-to-refresh «как в рилсах» — тянем ленту вниз от верхней
   // кромки и отпускаем. Работает только когда список прокручен в самый верх,
@@ -359,8 +362,12 @@ export default function FeedScreen({ meId }: { meId: number }) {
                 : "Тяни вниз…"}
           </div>
         )}
-        {/* Э21: активности прямо в приложении — вопросы и голосовое задание. */}
-        {scope === "all" && <ActivitiesPanel />}
+        {/* GHG11(8): участие живёт в самих анонсах (см. FeedDetailPanel).
+            Здесь — только страховка: открытый призыв, у которого анонса в
+            загруженной странице нет (напр. режим «только чат»). */}
+        {scope === "all" && (
+          <OrphanActivities seenIds={seenActivityIds} />
+        )}
         {items.map((it) => (
           <FeedRow
             key={it.id}
@@ -792,6 +799,13 @@ const EXPANDABLE_KINDS = new Set([
   "music_game",
 ]);
 
+/** GHG11(8): id голосового задания у записи ленты (поле или из `voice:<id>`). */
+function voiceTaskId(item: FeedItem): number | null {
+  if (typeof item.detail?.task_id === "number") return item.detail.task_id;
+  const m = /^voice:(\d+)$/.exec(item.id);
+  return m ? Number(m[1]) : null;
+}
+
 export function FeedRow({
   item,
   isAdmin,
@@ -820,7 +834,10 @@ export function FeedRow({
       ? item.detail?.submissions ?? []
       : item.detail?.participants ?? [];
   const qc = useQueryClient();
-  const expandable = EXPANDABLE_KINDS.has(item.kind);
+  // GHG11(8): анонс открытого задания раскрывается, даже если у его типа
+  // («event») подробностей не было — внутри интерфейс участия.
+  const expandable =
+    EXPANDABLE_KINDS.has(item.kind) || item.detail?.activity !== undefined;
   // Музыка и голосовые — «плеер»: сворачиваем ОТДЕЛЬНОЙ кнопкой, чтобы тап
   // по треку/аудио не закрывал панель во время прослушивания.
   const playerLike = item.kind === "music" || item.kind === "voice";
@@ -1083,6 +1100,7 @@ export function FeedDetailPanel({
   onClose: () => void;
 }) {
   const d: FeedDetail = item.detail ?? {};
+  const taskId = item.kind === "voice" ? voiceTaskId(item) : null;
   return (
     <div className="space-y-1.5">
       {item.kind === "achievement" && (
@@ -1125,6 +1143,8 @@ export function FeedDetailPanel({
           {typeof d.reward === "number" && (
             <div className="text-[11px] text-tg-hint">Награда: +{d.reward} XP</div>
           )}
+          {/* GHG11(8): участие прямо у задания — запись или отказ от своей. */}
+          {!d.closed && taskId !== null && <VoiceTaskAction taskId={taskId} />}
           {(d.submissions?.length ?? 0) > 0 ? (
             <div className="space-y-1">
               {d.submissions!.map((s) => (
@@ -1143,6 +1163,12 @@ export function FeedDetailPanel({
             </div>
           )}
         </>
+      )}
+
+      {/* GHG11(8): анонс призыва — кнопки-варианты и/или поле ввода прямо в
+          карточке, чтобы ответить из ленты, не уходя в чат. */}
+      {item.kind === "event" && d.activity && (
+        <ActivityResponse activity={d.activity} />
       )}
 
       {item.kind === "music" && <MusicDetail d={d} />}
@@ -1360,28 +1386,29 @@ function SubmissionPlayer({
 
 function MusicDetail({ d }: { d: FeedDetail }) {
   const tracks = d.tracks ?? [];
-  // GHG11(7): один плеер на подборку — прогресс, ⏮/⏭, пауза без потери позиции.
-  const player = useMiniPlayer(tracks);
   if (tracks.length === 0) {
     return <div className="text-[11px] text-tg-hint">Треков нет.</div>;
   }
+  // GHG11(8): подборка — это только список. Играет ОДИН плеер приложения
+  // (`GlobalPlayer`), поэтому музыка не рвётся при смене вкладки, а очередь —
+  // все аудио-треки подборки (⏮/⏭ и авто-переход).
   return (
     <div className="space-y-1">
       {tracks.map((t) => (
-        <MusicTrackRow key={t.id} track={t} player={player} />
+        <MusicTrackRow key={t.id} track={t} collection={tracks} />
       ))}
-      <MiniPlayerBar player={player} />
     </div>
   );
 }
 
 function MusicTrackRow({
   track,
-  player,
+  collection,
 }: {
   track: NonNullable<FeedDetail["tracks"]>[number];
-  player: MiniPlayer;
+  collection: NonNullable<FeedDetail["tracks"]>;
 }) {
+  const player = useGlobalPlayer();
   const qc = useQueryClient();
   const like = useMutation({
     mutationFn: () => likeMusicTrack(track.id),
@@ -1414,7 +1441,7 @@ function MusicTrackRow({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            player.select(track.id);
+            player.playTrack(track, collection);
           }}
           className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
           aria-label="Прослушать трек"

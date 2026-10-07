@@ -23,12 +23,15 @@
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     GameJournalEntry,
+    GamePrompt,
     GameVoiceTask,
     LoserRoll,
     MusicGameRound,
@@ -37,7 +40,7 @@ from app.db.models import (
     UserAchievement,
     WeeklyChukhan,
 )
-from app.services.game import journal
+from app.services.game import activity, journal
 from app.services.game.achievements_catalog import get as get_achievement
 from app.services.game.config import (
     MUSIC_GAME_AUTHOR_REWARD,
@@ -121,6 +124,12 @@ _JOURNAL_KINDS = (
 # чате); на маленьком это с запасом покрывает любую пагинацию.
 _MAX_PER_SOURCE = 500
 
+# GHG11(8): насколько далеко от создания промпта может лежать его анонс в ленте.
+# Промпт и обе записи журнала создаются в ОДНОМ тике планировщика, поэтому
+# реальный разрыв — миллисекунды. Окно нужно как страховка и главное — чтобы НЕ
+# привязать к открытому промпту старый анонс с тем же текстом (кулдаун 7 дней).
+_ACTIVITY_MATCH_WINDOW = timedelta(minutes=10)
+
 
 async def build_feed(
     session: AsyncSession,
@@ -192,6 +201,78 @@ async def build_feed(
     return page
 
 
+def _as_utc(moment: datetime | None) -> datetime | None:
+    """Наивное время из БД считаем UTC (сравниваем только с UTC-моментами)."""
+    if moment is None:
+        return None
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=timezone.utc)
+    return moment
+
+
+async def _open_prompts(
+    session: AsyncSession | None, *, now: datetime
+) -> list[GamePrompt]:
+    """Открытые промпты (случайные события), ещё ждущие ответа.
+
+    `session=None` — так `_attach_details` зовут тесты (подменяют сервисы и БД
+    не используют): активностей тогда просто нет.
+    """
+    if session is None:
+        return []
+    rows = await session.scalars(
+        select(GamePrompt).where(
+            GamePrompt.closed_at.is_(None),
+            GamePrompt.expires_at > now,
+        )
+    )
+    return list(rows)
+
+
+def match_prompt_activity(
+    item: dict,
+    prompts: list[GamePrompt],
+    *,
+    window: timedelta = _ACTIVITY_MATCH_WINDOW,
+) -> GamePrompt | None:
+    """Найти промпт, чей анонс — эта запись ленты. Чистая функция.
+
+    Прямой связи «запись журнала → промпт» в БД нет, но анонс публикует сам
+    промпт своим текстом и в тот же тик планировщика — поэтому сверяем текст и
+    близость по времени. Окно отсекает старые анонсы того же текста, поэтому
+    участие доступно ровно у свежего задания, а не у прошлых.
+    """
+    if item.get("kind") != journal.KIND_EVENT:
+        return None
+    text = (item.get("text") or "").strip()
+    at = _as_utc(item.get("at"))
+    if not text or at is None:
+        return None
+    best: GamePrompt | None = None
+    for prompt in prompts:
+        if (prompt.text or "").strip() != text:
+            continue
+        created = _as_utc(prompt.created_at)
+        if created is None or abs((at - created).total_seconds()) > window.total_seconds():
+            continue
+        if best is None or created > _as_utc(best.created_at):
+            best = prompt
+    return best
+
+
+def activity_detail(prompt: GamePrompt, *, user_id: int | None) -> dict:
+    """Интерфейс участия в задании для карточки ленты: варианты и/или ввод."""
+    options, needs_text = activity.split_activity_options(list(prompt.answers or []))
+    return {
+        "id": prompt.id,
+        "code": prompt.code,
+        "options": [{"label": label, "xp": xp} for label, xp in options],
+        "needs_text": needs_text,
+        "expires_at": prompt.expires_at,
+        "answered_by_me": user_id is not None and prompt.winner_user_id == user_id,
+    }
+
+
 async def _attach_details(
     session: AsyncSession, items: list[dict], *, user_id: int | None
 ) -> None:
@@ -201,6 +282,12 @@ async def _attach_details(
     их лишь для тех строк, что реально попали на экран, а не для всего источника.
     """
     from app.services.game import music, voice
+
+    # GHG11(8): открытые задания-призывы нужны только если на странице есть их
+    # анонсы (журнальные «event») — иначе лишний SELECT на каждую ленту.
+    open_prompts: list[GamePrompt] = []
+    if any(it.get("kind") == journal.KIND_EVENT for it in items):
+        open_prompts = await _open_prompts(session, now=datetime.now(timezone.utc))
 
     for it in items:
         row_id = it["id"]
@@ -286,6 +373,13 @@ async def _attach_details(
             round_ = await session.get(MusicGameRound, round_id)
             if round_ is not None:
                 detail = await _music_game_detail(session, round_, detail)
+        # GHG11(8): анонс задания — сам себе форма участия. Если это свежий
+        # призыв (открытый промпт), в карточку кладём кнопки/поле ввода, чтобы
+        # ответить прямо из ленты, не уходя в чат.
+        if it.get("kind") == journal.KIND_EVENT and open_prompts:
+            prompt = match_prompt_activity(it, open_prompts)
+            if prompt is not None:
+                detail["activity"] = activity_detail(prompt, user_id=user_id)
         it["detail"] = detail or None
 
 
@@ -520,6 +614,7 @@ async def _voice_items(session: AsyncSession, *, depth: int) -> list[dict]:
                 ),
                 user=None,
                 detail={
+                    "task_id": task.id,
                     "title": title,
                     "condition": task.text,
                     "opened_at": task.created_at,

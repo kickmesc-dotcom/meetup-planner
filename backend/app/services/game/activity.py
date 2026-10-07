@@ -86,6 +86,38 @@ def is_daytime(
     return hour >= start_hour or hour < end_hour
 
 
+# --------------------------------------------------------------------------
+# GHG11(8): разбор ответов промпта на «кнопки» и «нужен ли текст»
+#
+# Нужен и API (`routes_game._activity_options`), и ленте (`feed.py`): анонс
+# задания в ленте должен приносить с собой интерфейс участия. Держим правило
+# в одном месте, чтобы кнопки в ленте и в блоке «Активности» не разошлись.
+# --------------------------------------------------------------------------
+
+
+def split_activity_options(
+    answers: list[dict] | None,
+) -> tuple[list[tuple[str, int]], bool]:
+    """Ответы промпта → (кнопки[(подпись, xp)], нужен свободный ввод). Чистая.
+
+    Кнопка — там, где у ответа есть человеческая `label`. Если хоть один ответ
+    без подписи и не медиа — нужен свободный ввод. Если ни кнопок, ни текстового
+    варианта не нашлось (например, только медиа) — всё равно даём ввод: ссылку
+    на мем можно прислать текстом.
+    """
+    options: list[tuple[str, int]] = []
+    needs_text = False
+    for ans in answers or []:
+        label = str(ans.get("label") or "").strip()
+        if label:
+            options.append((label, int(ans.get("xp") or 0)))
+        elif not ans.get("media"):
+            needs_text = True
+    if not options and not needs_text:
+        needs_text = True
+    return options, needs_text
+
+
 async def recent_message_count(
     session: AsyncSession, chat_id: int, *, minutes: int, now: datetime
 ) -> int:

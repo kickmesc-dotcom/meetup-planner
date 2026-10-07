@@ -229,6 +229,23 @@ export interface FeedDetail {
   description?: string;
   points?: number;
   title?: string;
+  /** GHG11(8): id голосового задания — по нему карточка находит своё задание. */
+  task_id?: number;
+  /**
+   * GHG11(8): интерфейс участия в задании-призыве прямо в ленте.
+   *
+   * Приходит у анонса открытого события: `options` — кнопки-варианты,
+   * `needs_text` — поле ввода. Ответ уходит тем же путём, что и сообщение в
+   * чате, поэтому «первый подходящий забирает XP» сохраняется.
+   */
+  activity?: {
+    id: number;
+    code: string;
+    options: ActivityOption[];
+    needs_text: boolean;
+    expires_at: string | null;
+    answered_by_me: boolean;
+  };
   condition?: string;
   opened_at?: string | null;
   closed_at?: string | null;

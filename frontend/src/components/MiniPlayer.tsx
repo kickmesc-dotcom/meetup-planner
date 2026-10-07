@@ -11,6 +11,10 @@
  *    открываются на своём источнике — в плеере их нет);
  *  - пауза НЕ сбрасывает позицию: держим один `<audio>` и просто `pause()`.
  *
+ * GHG11(8): это ядро плеера. Очередь недели, показ поверх всех вкладок и
+ * память «последний трек + позиция» надстроены сверху (`GlobalPlayer.tsx`):
+ * с `persistKey` хук сам восстанавливает трек из localStorage.
+ *
  * Звук треков, загруженных в бота (`kind='audio'`), тянется блобом с
  * Authorization через `fetchMusicAudioUrl` (элемент `<audio>` не умеет слать
  * заголовки). Блоб освобождаем при смене трека и на размонтирование.
@@ -49,17 +53,76 @@ export function formatTime(sec: number): string {
 }
 
 /**
+ * Где плеер помнит «последний трек и позицию» (GHG11(8)).
+ *
+ * `sessionStorage`-подобное поведение не подходит: участник закрывает мини-апп
+ * и открывает заново — надо продолжить с того же места. Поэтому `localStorage`,
+ * но доступ к нему аккуратный: в приватном режиме/старом webview его может не
+ * быть — тогда плеер просто не переживёт перезапуск, но не упадёт.
+ */
+export interface PlayerSnapshot {
+  id: number | null;
+  time: number;
+}
+
+function readSnapshot(key: string): PlayerSnapshot | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<PlayerSnapshot>;
+    const id = typeof parsed.id === "number" ? parsed.id : null;
+    const time = typeof parsed.time === "number" && parsed.time > 0 ? parsed.time : 0;
+    if (id === null) return null;
+    return { id, time };
+  } catch {
+    return null;
+  }
+}
+
+function writeSnapshot(key: string, snapshot: PlayerSnapshot): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(key, JSON.stringify(snapshot));
+  } catch {
+    // приватный режим или переполнение — не повод ронять плеер
+  }
+}
+
+/** Забыть последний трек (пользователь закрыл плеер крестиком). */
+export function clearPlayerSnapshot(key: string): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/**
  * Состояние плеера для одной подборки.
  *
  * Рендерит контролы `MiniPlayerBar`; логика (источник, игра/пауза, позиция)
  * живёт здесь, чтобы экраны не дублировали `<audio>`.
+ *
+ * GHG11(8): с `persistKey` плеер запоминает последний трек и позицию между
+ * сессиями — восстановление происходит, как только очередь готова (см. ниже).
  */
-export function useMiniPlayer(tracks: MiniTrack[]) {
+/**
+ * Треки, которые вообще можно проиграть: загруженные в бота (`kind='audio'`).
+ * Ссылки играют на своём источнике — в очереди плеера их нет.
+ */
+export function playableTracks(tracks: MiniTrack[]): MiniTrack[] {
+  return tracks.filter((t) => t.kind === "audio" && !t.url);
+}
+
+export function useMiniPlayer(
+  tracks: MiniTrack[],
+  opts?: { persistKey?: string },
+) {
+  const persistKey = opts?.persistKey;
   // Играем только треки, загруженные в бота: у ссылок нет blob-аудио.
-  const playable = useMemo(
-    () => tracks.filter((t) => t.kind === "audio" && !t.url),
-    [tracks],
-  );
+  const playable = useMemo(() => playableTracks(tracks), [tracks]);
 
   const [currentId, setCurrentId] = useState<number | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -67,9 +130,41 @@ export function useMiniPlayer(tracks: MiniTrack[]) {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [src, setSrc] = useState<string | null>(null);
+  // GHG11(8): секунда из сохранённой сессии — прыгаем к ней, как только трек
+  // получит метаданные (до этого `currentTime` выставить некуда).
+  const [pendingSeek, setPendingSeek] = useState<number | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobRef = useRef<string | null>(null);
+  const restoredRef = useRef(false);
+
+  // GHG11(8): восстановление последнего трека. Ждём, пока очередь готова
+  // (в глобальном плеере она приезжает запросом «Подборка недели»), и делаем
+  // это один раз — дальше состоянием управляет пользователь. Играть сразу НЕ
+  // начинаем: автоплей в webview всё равно заблокирован, а «продолжить» —
+  // осознанное действие.
+  useEffect(() => {
+    if (!persistKey || restoredRef.current || playable.length === 0) return;
+    restoredRef.current = true;
+    const saved = readSnapshot(persistKey);
+    if (!saved || saved.id === null) return;
+    if (!playable.some((t) => t.id === saved.id)) {
+      clearPlayerSnapshot(persistKey);
+      return;
+    }
+    setCurrentId(saved.id);
+    setPlaying(false);
+    if (saved.time > 1) setPendingSeek(saved.time);
+  }, [persistKey, playable]);
+
+  // GHG11(8): помним последний трек и позицию. Пишем не на каждый тик, а при
+  // смене трека и при переходе на новую секунду; пустой `currentId` (закрытый
+  // плеер) ничего не перезаписывает.
+  useEffect(() => {
+    if (!persistKey || currentId == null) return;
+    writeSnapshot(persistKey, { id: currentId, time });
+    // `Math.floor(time)` — дешёвое «раз в секунду» без лишних записей в LS.
+  }, [persistKey, currentId, Math.floor(time)]);
 
   const revokeBlob = () => {
     // В старых webview / jsdom `revokeObjectURL` может отсутствовать — не падаем.
@@ -162,9 +257,16 @@ export function useMiniPlayer(tracks: MiniTrack[]) {
     setPlaying(true);
   };
 
+  // Закрыть плеер. GHG11(8): ещё и забываем сохранённую позицию — иначе
+  // крестик «закрывал» плеер, а после перезапуска он возвращался сам.
   const stop = () => {
     setPlaying(false);
+    // Плашка исчезает вместе с `<audio>`, но элемент, вынутый из документа,
+    // по спецификации может продолжать играть — поэтому глушим явно.
+    audioRef.current?.pause();
     setCurrentId(null);
+    setPendingSeek(null);
+    if (persistKey) clearPlayerSnapshot(persistKey);
   };
 
   /** Перемотка: доля 0..1 от длительности. */
@@ -209,7 +311,17 @@ export function useMiniPlayer(tracks: MiniTrack[]) {
     isCurrent,
     audioRef,
     onTimeUpdate: () => setTime(audioRef.current?.currentTime ?? 0),
-    onLoadedMetadata: () => setDuration(audioRef.current?.duration ?? 0),
+    // Метаданные готовы: длительность + прыжок к сохранённой позиции (один раз).
+    onLoadedMetadata: () => {
+      const el = audioRef.current;
+      setDuration(el?.duration ?? 0);
+      if (el && pendingSeek != null && Number.isFinite(el.duration)) {
+        const target = Math.min(pendingSeek, Math.max(0, el.duration - 0.25));
+        el.currentTime = target;
+        setTime(target);
+      }
+      setPendingSeek(null);
+    },
   };
 }
 

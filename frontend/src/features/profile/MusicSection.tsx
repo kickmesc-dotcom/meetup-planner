@@ -17,7 +17,7 @@ import {
   type MusicWeekTrack,
 } from "@/api/game";
 import { ListSkeleton } from "@/components/Skeleton";
-import { MiniPlayerBar, useMiniPlayer } from "@/components/MiniPlayer";
+import { useGlobalPlayer } from "@/components/GlobalPlayer";
 import { haptic, showAlert } from "@/tg/webapp";
 
 function statusLabel(status: string): { text: string; className: string } {
@@ -140,15 +140,15 @@ function addTrackStatus(status: string): string {
 }
 
 /**
- * GHG11(7): «Подборка недели» с общим мини-плеером.
+ * GHG11(7/8): «Подборка недели» — список треков для ОДНОГО плеера приложения.
  *
- * Раньше на каждый трек была отдельная кнопка со своим `<audio>` — без
- * прогресса и переключения. Теперь один плеер на подборку: тап по кнопке
- * трека выбирает его, дальше работают ⏮/⏭/пауза (пауза сохраняет позицию).
- * Ссылки по-прежнему открываются на своём источнике — плеер их не ведёт.
+ * Тап по кнопке трека включает его в общем плеере (плашка над таб-баром),
+ * поэтому музыка продолжает играть при переходе на другую вкладку, а ⏮/⏭ и
+ * авто-переход идут по ВСЕМ аудио-трекам подборки. Ссылки по-прежнему
+ * открываются на своём источнике — плеер их не ведёт.
  */
 function WeekTracksSection({ week }: { week: MusicWeek }) {
-  const player = useMiniPlayer(week.tracks);
+  const player = useGlobalPlayer();
   return (
     <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
@@ -174,7 +174,7 @@ function WeekTracksSection({ week }: { week: MusicWeek }) {
             {t.kind === "audio" ? (
               <button
                 type="button"
-                onClick={() => player.select(t.id)}
+                onClick={() => player.playTrack(t, week.tracks)}
                 className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
                 aria-label="Прослушать трек"
               >
@@ -195,7 +195,6 @@ function WeekTracksSection({ week }: { week: MusicWeek }) {
           </div>
         ))}
       </div>
-      <MiniPlayerBar player={player} className="mt-2" />
     </section>
   );
 }
