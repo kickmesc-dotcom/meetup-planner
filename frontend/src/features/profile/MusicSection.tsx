@@ -13,10 +13,11 @@ import {
   fetchMyMusic,
   likeMusicTrack,
   type MusicMineTrack,
+  type MusicWeek,
   type MusicWeekTrack,
 } from "@/api/game";
 import { ListSkeleton } from "@/components/Skeleton";
-import { MusicPlayButton } from "@/components/MusicPlayButton";
+import { MiniPlayerBar, useMiniPlayer } from "@/components/MiniPlayer";
 import { haptic, showAlert } from "@/tg/webapp";
 
 function statusLabel(status: string): { text: string; className: string } {
@@ -138,6 +139,67 @@ function addTrackStatus(status: string): string {
   }
 }
 
+/**
+ * GHG11(7): «Подборка недели» с общим мини-плеером.
+ *
+ * Раньше на каждый трек была отдельная кнопка со своим `<audio>` — без
+ * прогресса и переключения. Теперь один плеер на подборку: тап по кнопке
+ * трека выбирает его, дальше работают ⏮/⏭/пауза (пауза сохраняет позицию).
+ * Ссылки по-прежнему открываются на своём источнике — плеер их не ведёт.
+ */
+function WeekTracksSection({ week }: { week: MusicWeek }) {
+  const player = useMiniPlayer(week.tracks);
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-base font-semibold">📻 Подборка недели</div>
+        <span className="shrink-0 text-xs tabular-nums text-tg-hint">
+          {shortDate(week.created_at)}
+        </span>
+      </div>
+      <div className="mb-2 text-xs text-tg-hint">
+        Ткни лайк — лучшие попадут в топ недели.
+      </div>
+      <div className="divide-y divide-tg-bg/40">
+        {week.tracks.map((t) => (
+          <div key={t.id} className="flex items-center gap-2 py-2">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm">{trackTitle(t)}</div>
+              {t.kind === "link" && t.url && (
+                <div className="truncate text-[11px] text-tg-hint">
+                  {t.url}
+                </div>
+              )}
+            </div>
+            {t.kind === "audio" ? (
+              <button
+                type="button"
+                onClick={() => player.select(t.id)}
+                className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
+                aria-label="Прослушать трек"
+              >
+                {player.isCurrent(t.id) && player.playing ? "⏸" : "▶️"}
+              </button>
+            ) : t.kind === "link" && t.url ? (
+              <a
+                href={t.url}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
+                aria-label="Открыть трек"
+              >
+                ▶️
+              </a>
+            ) : null}
+            <LikeButton track={t} />
+          </div>
+        ))}
+      </div>
+      <MiniPlayerBar player={player} className="mt-2" />
+    </section>
+  );
+}
+
 export function MusicScreen() {
   const music = useQuery({ queryKey: ["music", "mine"], queryFn: fetchMyMusic });
   const data = music.data;
@@ -220,49 +282,7 @@ export function MusicScreen() {
         )}
       </section>
 
-      {week && week.tracks.length > 0 && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-base font-semibold">📻 Подборка недели</div>
-            <span className="shrink-0 text-xs tabular-nums text-tg-hint">
-              {shortDate(week.created_at)}
-            </span>
-          </div>
-          <div className="mb-2 text-xs text-tg-hint">
-            Ткни лайк — лучшие попадут в топ недели.
-          </div>
-          <div className="divide-y divide-tg-bg/40">
-            {week.tracks.map((t) => (
-              <div key={t.id} className="flex items-center gap-2 py-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{trackTitle(t)}</div>
-                  {t.kind === "link" && t.url && (
-                    <div className="truncate text-[11px] text-tg-hint">
-                      {t.url}
-                    </div>
-                  )}
-                </div>
-                {/* GHG11(6): треки, загруженные боту, слушаются тут же —
-                    ссылки открываются на своём источнике. */}
-                {t.kind === "link" && t.url ? (
-                  <a
-                    href={t.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
-                    aria-label="Открыть трек"
-                  >
-                    ▶️
-                  </a>
-                ) : t.kind === "audio" ? (
-                  <MusicPlayButton trackId={t.id} />
-                ) : null}
-                <LikeButton track={t} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {week && week.tracks.length > 0 && <WeekTracksSection week={week} />}
 
       {top.length > 0 && (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3">

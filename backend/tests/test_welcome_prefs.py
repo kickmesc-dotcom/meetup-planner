@@ -42,8 +42,41 @@ def test_ui_prefs_patch_all_fields_optional():
     # Старые клиенты шлют {hide_greeting} без формата — совместимость.
     p = UiPrefsPatch()
     assert p.hide_greeting is None and p.welcome_format is None
+    assert p.muted_feed is None
     p2 = UiPrefsPatch(hide_greeting=True)
     assert p2.hide_greeting is True and p2.welcome_format is None
+
+
+# --- GHG11(7): персональный фильтр ленты «по участникам» ---
+
+def test_ui_prefs_patch_accepts_muted_feed():
+    assert UiPrefsPatch(muted_feed=[2, 5]).muted_feed == [2, 5]
+
+
+@pytest.mark.asyncio
+async def test_muted_feed_storage_roundtrip(monkeypatch):
+    """Список хранится строкой id через запятую и разбирается обратно."""
+    from app.services import admin_config as ac
+
+    store: dict[str, str] = {}
+
+    async def fake_get(session, key):
+        return store.get(key)
+
+    async def fake_set(session, key, value):
+        store[key] = value
+
+    monkeypatch.setattr(ac, "_get_value", fake_get)
+    monkeypatch.setattr(ac, "_set_value", fake_set)
+
+    assert await ac.get_ui_muted_feed(None, 777) == set()
+    await ac.set_ui_muted_feed(None, 777, {7, 3, 3})
+    assert store["ui.muted_feed:777"] == "3,7"
+    assert await ac.get_ui_muted_feed(None, 777) == {3, 7}
+
+    # Мусор в значении не роняет парсер.
+    store["ui.muted_feed:778"] = "3, x, 5"
+    assert await ac.get_ui_muted_feed(None, 778) == {3, 5}
 
 
 # --- P4.1.d: /top в каталоге команд ---

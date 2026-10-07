@@ -14,6 +14,8 @@ export type WelcomeFormat = "name" | "avatar" | "both";
 export interface UiPrefs {
   hide_greeting: boolean;
   welcome_format: WelcomeFormat;
+  /** GHG11(7): кого скрыть в ленте (внутренние id). Своя галочка неснимаемая. */
+  muted_feed: number[];
 }
 export const fetchUiPrefs = () => api<UiPrefs>("/api/me/ui-prefs");
 export const updateUiPrefs = (prefs: Partial<UiPrefs>) =>

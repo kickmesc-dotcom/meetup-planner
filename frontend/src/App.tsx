@@ -32,6 +32,7 @@ export default function App() {
       qc.setQueryData<UiPrefs>(["ui-prefs"], {
         welcome_format: prev?.welcome_format ?? "avatar",
         hide_greeting: true,
+        muted_feed: prev?.muted_feed ?? [],
       });
       return { prev };
     },

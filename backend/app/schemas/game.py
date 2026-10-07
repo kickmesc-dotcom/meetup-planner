@@ -212,6 +212,12 @@ class GuestProfileOut(BaseModel):
     rank: RankOut | None = None
     rank_name: str = ""
     xp: int = 0
+    # GHG11(7): прогресс до следующего уровня — главная плашка профиля гостя
+    # обещает «сколько до следующего», как в своём профиле.
+    max_level: int = 1
+    xp_into_level: int = 0
+    xp_to_next: int | None = None
+    at_max: bool = False
     prestige: int = 0
     supreme: bool = False
     completionist: bool = False

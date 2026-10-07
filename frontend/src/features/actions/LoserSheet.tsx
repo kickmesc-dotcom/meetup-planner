@@ -78,6 +78,8 @@ export default function LoserSheet() {
       haptic("success");
       qc.invalidateQueries({ queryKey: ["loser-stats"] });
       qc.invalidateQueries({ queryKey: ["loser", "stats"] });
+      // GHG11(7): автолох рождает запись в ленте — обновляем её сразу.
+      qc.invalidateQueries({ queryKey: ["game-feed"] });
       setError(null);
     },
     onError: (e) => {

@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type TouchEvent,
+} from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -24,14 +30,19 @@ import {
 } from "@/api/game";
 import ActivitiesPanel from "./ActivitiesPanel";
 import NominationsSheet from "./NominationsSheet";
+import ParticipantsFilterSheet from "./ParticipantsFilterSheet";
 import VoiceLikeButton from "./VoiceLikeButton";
 import LoserSheet from "@/features/actions/LoserSheet";
 import { Spinner } from "@/components/Spinner";
-import { MusicPlayButton } from "@/components/MusicPlayButton";
+import {
+  MiniPlayerBar,
+  useMiniPlayer,
+  type MiniPlayer,
+} from "@/components/MiniPlayer";
 import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
-import { fetchMe, fetchUsers } from "@/api/availability";
+import { fetchMe, fetchUiPrefs, fetchUsers } from "@/api/availability";
 import { humanizeApiError } from "@/api/client";
 
 /**
@@ -53,6 +64,12 @@ export default function FeedScreen({ meId }: { meId: number }) {
   const [showFilters, setShowFilters] = useState(false);
   const [showActions, setShowActions] = useState(false);
   const [showNominations, setShowNominations] = useState(false);
+  // GHG11(7): всплывающее окно фильтра «по участникам».
+  const [showParticipants, setShowParticipants] = useState(false);
+  // GHG11(7): состояние pull-to-refresh (жест «потяни и отпусти»).
+  const pullStart = useRef<number | null>(null);
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const openGuest = useUI((s) => s.openGuest);
   const showLoser = useUI((s) => s.showLoserSheet);
   // GHG11(4): переход из анонса фичи — раскрываем панель «Действия».
@@ -66,7 +83,15 @@ export default function FeedScreen({ meId }: { meId: number }) {
   }, [feedAnchor, setFeedAnchor]);
   const kindsParam = [...kinds].sort().join(",");
 
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const qc = useQueryClient();
+  // GHG11(7): сколько участников скрыто в моей ленте — для бейджа кнопки.
+  const prefsQ = useQuery({
+    queryKey: ["ui-prefs"],
+    queryFn: fetchUiPrefs,
+    staleTime: 5 * 60 * 1000,
+  });
+  const mutedCount = prefsQ.data?.muted_feed?.length ?? 0;
   const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
   const isAdmin = !!meQ.data?.is_admin;
 
@@ -77,6 +102,8 @@ export default function FeedScreen({ meId }: { meId: number }) {
     undo?: () => Promise<unknown> | unknown;
   } | null>(null);
   const toastTimer = useRef<number | null>(null);
+  // GHG11(7): отложенное повторное обновление ленты (см. invalidateFeed).
+  const followUpTimer = useRef<number | null>(null);
   const dismissToast = () => {
     if (toastTimer.current !== null) {
       window.clearTimeout(toastTimer.current);
@@ -95,11 +122,22 @@ export default function FeedScreen({ meId }: { meId: number }) {
   useEffect(
     () => () => {
       if (toastTimer.current !== null) window.clearTimeout(toastTimer.current);
+      if (followUpTimer.current !== null) window.clearTimeout(followUpTimer.current);
     },
     [],
   );
 
-  const invalidateFeed = () => qc.invalidateQueries({ queryKey: ["game-feed"] });
+  // GHG11(7): запись в ленте пишет бот, и она появляется чуть ПОЗЖЕ ответа
+  // действия. Обновляем сразу и ещё раз через мгновение — иначе свежая строка
+  // «приходила с ощутимой задержкой» (прод-фидбек).
+  const invalidateFeed = () => {
+    void qc.invalidateQueries({ queryKey: ["game-feed"] });
+    if (followUpTimer.current !== null) window.clearTimeout(followUpTimer.current);
+    followUpTimer.current = window.setTimeout(() => {
+      followUpTimer.current = null;
+      void qc.invalidateQueries({ queryKey: ["game-feed"] });
+    }, 1200);
+  };
 
   const q = useInfiniteQuery({
     queryKey: ["game-feed", scope, kindsParam],
@@ -148,6 +186,41 @@ export default function FeedScreen({ meId }: { meId: number }) {
   }
 
   const items: FeedItem[] = q.data?.pages.flatMap((p) => p.items) ?? [];
+
+  // GHG11(7): pull-to-refresh «как в рилсах» — тянем ленту вниз от верхней
+  // кромки и отпускаем. Работает только когда список прокручен в самый верх,
+  // чтобы не мешать обычному скроллу.
+  const PULL_THRESHOLD = 56;
+  const onPullStart = (e: TouchEvent) => {
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) return;
+    pullStart.current = e.touches?.[0]?.clientY ?? null;
+  };
+  const onPullMove = (e: TouchEvent) => {
+    if (pullStart.current == null) return;
+    const el = scrollRef.current;
+    if (!el || el.scrollTop > 0) {
+      pullStart.current = null;
+      setPull(0);
+      return;
+    }
+    const dy = (e.touches?.[0]?.clientY ?? 0) - pullStart.current;
+    setPull(dy > 0 ? Math.min(96, dy * 0.5) : 0);
+  };
+  const onPullEnd = async () => {
+    if (pullStart.current == null) return;
+    const shouldRefresh = pull >= PULL_THRESHOLD;
+    pullStart.current = null;
+    setPull(0);
+    if (!shouldRefresh) return;
+    haptic("medium");
+    setRefreshing(true);
+    try {
+      await q.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -211,6 +284,15 @@ export default function FeedScreen({ meId }: { meId: number }) {
               />
             );
           })}
+          {/* GHG11(7): фильтр «по участникам» — своё окно с чекбоксами. */}
+          <KindChip
+            active={mutedCount > 0}
+            onClick={() => {
+              haptic("selection");
+              setShowParticipants(true);
+            }}
+            label={`👥 По участникам${mutedCount > 0 ? ` · ${mutedCount}` : ""}`}
+          />
         </div>
       )}
 
@@ -218,7 +300,11 @@ export default function FeedScreen({ meId }: { meId: number }) {
           «только апп» их отклик уезжает в ленту, в чат бот молчит. */}
       {showActions && (
         <FeedActions
-          onDone={() => setShowActions(false)}
+          onDone={() => {
+            setShowActions(false);
+            // GHG11(7): действие могло родить запись — обновляем ленту без тапа.
+            invalidateFeed();
+          }}
           onOpenNominations={() => {
             haptic("light");
             setShowActions(false);
@@ -230,6 +316,12 @@ export default function FeedScreen({ meId }: { meId: number }) {
       {/* Шит автолоха (свой, гейтится по рангу). */}
       {showLoser && <LoserSheet />}
       {showNominations && <NominationsSheet onClose={() => setShowNominations(false)} />}
+      {showParticipants && (
+        <ParticipantsFilterSheet
+          meId={meId}
+          onClose={() => setShowParticipants(false)}
+        />
+      )}
 
       {first && !first.enabled && (
         <div className="p-6 text-center text-sm text-tg-hint">
@@ -245,7 +337,28 @@ export default function FeedScreen({ meId }: { meId: number }) {
         </div>
       )}
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+      <div
+        ref={scrollRef}
+        data-testid="feed-scroll"
+        onTouchStart={onPullStart}
+        onTouchMove={onPullMove}
+        onTouchEnd={onPullEnd}
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3"
+      >
+        {/* GHG11(7): индикатор pull-to-refresh. */}
+        {(pull > 0 || refreshing) && (
+          <div
+            data-testid="feed-pull-indicator"
+            className="flex items-center justify-center text-[11px] text-tg-hint"
+            style={{ height: refreshing ? 24 : Math.max(0, pull) }}
+          >
+            {refreshing
+              ? "Обновляем…"
+              : pull >= PULL_THRESHOLD
+                ? "Отпусти, чтобы обновить"
+                : "Тяни вниз…"}
+          </div>
+        )}
         {/* Э21: активности прямо в приложении — вопросы и голосовое задание. */}
         {scope === "all" && <ActivitiesPanel />}
         {items.map((it) => (
@@ -1247,22 +1360,27 @@ function SubmissionPlayer({
 
 function MusicDetail({ d }: { d: FeedDetail }) {
   const tracks = d.tracks ?? [];
+  // GHG11(7): один плеер на подборку — прогресс, ⏮/⏭, пауза без потери позиции.
+  const player = useMiniPlayer(tracks);
   if (tracks.length === 0) {
     return <div className="text-[11px] text-tg-hint">Треков нет.</div>;
   }
   return (
     <div className="space-y-1">
       {tracks.map((t) => (
-        <MusicTrackRow key={t.id} track={t} />
+        <MusicTrackRow key={t.id} track={t} player={player} />
       ))}
+      <MiniPlayerBar player={player} />
     </div>
   );
 }
 
 function MusicTrackRow({
   track,
+  player,
 }: {
   track: NonNullable<FeedDetail["tracks"]>[number];
+  player: MiniPlayer;
 }) {
   const qc = useQueryClient();
   const like = useMutation({
@@ -1289,7 +1407,22 @@ function MusicTrackRow({
           <div className="truncate text-[11px] text-tg-hint">{track.performer}</div>
         )}
       </div>
-      {track.url ? (
+      {track.kind === "audio" ? (
+        // GHG11(7): трек, загруженный в бота, — в общий плеер подборки:
+        // кнопка выбирает трек, дальше прогресс/переключение/пауза живут в нём.
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            player.select(track.id);
+          }}
+          className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-1 text-xs"
+          aria-label="Прослушать трек"
+        >
+          {player.isCurrent(track.id) && player.playing ? "⏸" : "▶️"}
+        </button>
+      ) : track.url ? (
+        // Трек-ссылка играет на своём источнике — плеер её не ведёт.
         <a
           href={track.url}
           target="_blank"
@@ -1300,11 +1433,6 @@ function MusicTrackRow({
         >
           ▶️
         </a>
-      ) : track.kind === "audio" ? (
-        // GHG11(6): трек, загруженный в бота, живёт в Telegram (`file_id`) —
-        // играем его блобом через сервер. Раньше кнопки «play» у таких треков
-        // не было вообще: она рисовалась только по `url` (т.е. у ссылок).
-        <MusicPlayButton trackId={track.id} />
       ) : null}
       <button
         type="button"

@@ -683,6 +683,11 @@ async def guest_profile(
         rank=_rank_out(progress.level),
         rank_name=rank_name,
         xp=total_xp,
+        # GHG11(7): «сколько до следующего» — та же арифметика, что в своём профиле.
+        max_level=MAX_LEVEL,
+        xp_into_level=progress.xp_into_level,
+        xp_to_next=progress.xp_to_next,
+        at_max=progress.at_max,
         prestige=progress.prestige,
         supreme=supreme,
         completionist=completionist,
@@ -737,6 +742,10 @@ async def activity_feed(
     wanted = (
         {k.strip() for k in kinds.split(",") if k.strip()} if kinds else None
     )
+    # GHG11(7): персональный фильтр «по участникам» — у каждого свой список.
+    from app.services.admin_config import get_ui_muted_feed
+
+    muted = await get_ui_muted_feed(session, user.telegram_id)
     items = await feed.build_feed(
         session,
         user_id=user.id if scope == "mine" else None,
@@ -744,6 +753,7 @@ async def activity_feed(
         limit=limit,
         offset=offset,
         kinds=wanted,
+        muted_ids=muted,
     )
     from app.services.admin_config import get_feed_view_compact
 

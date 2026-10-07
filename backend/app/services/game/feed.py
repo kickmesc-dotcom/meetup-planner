@@ -130,12 +130,16 @@ async def build_feed(
     limit: int = 30,
     offset: int = 0,
     kinds: set[str] | None = None,
+    muted_ids: set[int] | None = None,
 ) -> list[dict]:
     """Собрать объединённую ленту, свежие сверху.
 
     `user_id` — если задан, лента сужается до записей этого игрока («только мои»).
     `viewer_id` — кто смотрит: его личные «скрыто у себя» не показываем (GHG11).
     `kinds` — если задан, оставляем только записи этих типов (фильтр на фронте).
+    `muted_ids` — GHG11(7): участники, чьи события смотрящий скрыл у себя в ленте
+    («по участникам»). Свои события из ленты не выкидываем никогда — иначе
+    лента «сломается» (свою галочку отключить нельзя).
     Возвращает готовые к сериализации словари (см. `FeedItemOut`).
     """
     depth = min(_MAX_PER_SOURCE, max(limit + offset, limit) + offset)
@@ -150,6 +154,17 @@ async def build_feed(
 
     if kinds:
         items = [it for it in items if it["kind"] in kinds]
+
+    # GHG11(7): персональный фильтр «по участникам». Записи без субъекта
+    # (голосовые задания, подборки, муз-гейм) и свои собственные остаются.
+    if muted_ids:
+        items = [
+            it
+            for it in items
+            if it["user_id"] is None
+            or it["user_id"] not in muted_ids
+            or it["user_id"] == viewer_id
+        ]
 
     # GHG11: удалённые админом (для всех) и «скрытые у себя» (для смотрящего).
     from app.services.game import feed_moderation

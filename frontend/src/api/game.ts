@@ -179,6 +179,11 @@ export interface GuestProfile {
   rank: GameRank | null;
   rank_name: string;
   xp: number;
+  /** GHG11(7): сколько до следующего уровня (как в своём профиле). */
+  max_level: number;
+  xp_into_level: number;
+  xp_to_next: number | null;
+  at_max: boolean;
   prestige: number;
   supreme: boolean;
   completionist: boolean;

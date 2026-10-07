@@ -10,8 +10,10 @@ from app.db.models import GameProfile, User
 from app.schemas.user import UserOut
 from app.services.admin_config import (
     get_ui_hide_greeting,
+    get_ui_muted_feed,
     get_ui_welcome_format,
     set_ui_hide_greeting,
+    set_ui_muted_feed,
     set_ui_welcome_format,
 )
 
@@ -136,6 +138,8 @@ async def avatar_proxy(user_id: int, session: SessionDep, response: Response):
 class UiPrefsOut(BaseModel):
     hide_greeting: bool
     welcome_format: str  # name | avatar | both
+    # GHG11(7): кого скрыть в ленте (внутренние id) — своя галочка неснимаемая.
+    muted_feed: list[int] = []
 
 
 class UiPrefsPatch(BaseModel):
@@ -143,6 +147,7 @@ class UiPrefsPatch(BaseModel):
     welcome_format: str | None = Field(
         None, pattern="^(name|avatar|both)$"
     )
+    muted_feed: list[int] | None = None
 
 
 @router.get("/me/ui-prefs", response_model=UiPrefsOut)
@@ -150,6 +155,7 @@ async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
     return UiPrefsOut(
         hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
         welcome_format=await get_ui_welcome_format(session, user.telegram_id),
+        muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
     )
 
 
@@ -163,7 +169,16 @@ async def put_ui_prefs(
         await set_ui_welcome_format(
             session, user.telegram_id, body.welcome_format
         )
+    if body.muted_feed is not None:
+        # Себя из списка выкидываем: свою ленту ломать нельзя (их галочка
+        # неснимаемая на фронте, но сервер тоже защищается от кривого клиента).
+        await set_ui_muted_feed(
+            session,
+            user.telegram_id,
+            {i for i in body.muted_feed if i != user.id},
+        )
     return UiPrefsOut(
         hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
         welcome_format=await get_ui_welcome_format(session, user.telegram_id),
+        muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
     )

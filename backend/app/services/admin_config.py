@@ -1563,6 +1563,35 @@ async def set_ui_welcome_format(
     await _set_value(session, f"{UI_WELCOME_FORMAT_PREFIX}{tg_id}", fmt)
 
 
+# GHG11(7): «не показывать события участника в моей ленте». Храним СПИСОК
+# внутренних id через запятую: `ui.muted_feed:{tg_id}` -> "3,5". Фильтр
+# персональный (каждый настраивает себе сам), а собственные события участника
+# замьютить нельзя — сервер всегда оставляет записи смотрящего (см. feed).
+UI_MUTED_FEED_PREFIX = "ui.muted_feed:"
+
+
+async def get_ui_muted_feed(session: AsyncSession, tg_id: int) -> set[int]:
+    """Кого текущий юзер скрыл из своей ленты (внутренние id)."""
+    raw = await _get_value(session, f"{UI_MUTED_FEED_PREFIX}{tg_id}")
+    if not raw:
+        return set()
+    out: set[int] = set()
+    for part in raw.split(","):
+        part = part.strip()
+        if part.lstrip("-").isdigit():
+            out.add(int(part))
+    return out
+
+
+async def set_ui_muted_feed(
+    session: AsyncSession, tg_id: int, user_ids: set[int] | list[int]
+) -> None:
+    clean = sorted({int(i) for i in user_ids})
+    await _set_value(
+        session, f"{UI_MUTED_FEED_PREFIX}{tg_id}", ",".join(str(i) for i in clean)
+    )
+
+
 # --- G2/G3: настройки опросов в чате ---
 
 def _parse_bool(raw: str | None, default: bool) -> bool:
