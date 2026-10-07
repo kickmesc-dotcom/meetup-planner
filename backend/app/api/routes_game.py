@@ -1038,6 +1038,23 @@ async def activities_list(session: SessionDep, user: CurrentUser) -> ActivitiesO
     return ActivitiesOut(enabled=True, items=items)
 
 
+def _answer_block_reason(prompt: GamePrompt | None, *, now: datetime) -> str | None:
+    """Почему отвечать уже нельзя. `None` — задание открыто. Чистая функция.
+
+    GHG11(8.a): задание могло закрыться, пока карточка участия висела в ленте
+    (победил другой, истекло окно, анонс удалён). Тогда ответ не засчитываем и
+    отдаём машинный код — фронт сворачивает поле/кнопки и пишет «закрыто»,
+    а не «не подошло, попробуй другой ответ», как было раньше.
+    """
+    if prompt is None:
+        return "not_found"
+    if prompt.closed_at is not None:
+        return "closed"
+    if prompt.expires_at is not None and prompt.expires_at <= now:
+        return "expired"
+    return None
+
+
 @router.post(
     "/game/activities/{prompt_id}/answer", response_model=ActivityAnswerOut
 )
@@ -1050,6 +1067,12 @@ async def activity_answer(
     chat_id = get_settings().group_chat_id
     if not chat_id:
         raise HTTPException(status.HTTP_409_CONFLICT, "no_chat")
+    # Сначала — «а можно ли вообще»: закрытое задание не должно притворяться
+    # «ответ не подошёл» (карточка в ленте обязана закрыться).
+    prompt = await session.get(GamePrompt, prompt_id)
+    blocked = _answer_block_reason(prompt, now=datetime.now(timezone.utc))
+    if blocked is not None:
+        return ActivityAnswerOut(ok=False, status=blocked)
     won = await events.try_answer(
         session,
         chat_id=chat_id,

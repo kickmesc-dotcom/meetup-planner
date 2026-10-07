@@ -244,6 +244,9 @@ export interface FeedDetail {
     options: ActivityOption[];
     needs_text: boolean;
     expires_at: string | null;
+    /** GHG11(8.a): задание закрыто (победитель есть или окно истекло). */
+    closed?: boolean;
+    closed_at?: string | null;
     answered_by_me: boolean;
   };
   condition?: string;

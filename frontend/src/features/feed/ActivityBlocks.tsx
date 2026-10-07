@@ -49,7 +49,12 @@ export interface ActivityLike {
   needs_text: boolean;
   expires_at: string | null;
   answered_by_me: boolean;
+  /** GHG11(8.a): задание уже закрыто — ввод/кнопки не показываем. */
+  closed?: boolean;
 }
+
+/** Коды отказа, которые означают «задание закрылось», а не «ответ не подошёл». */
+const CLOSED_STATUSES = new Set(["closed", "expired", "not_found"]);
 
 // ---------------------------------------------------------------------------
 // Ответ на призыв (варианты кнопками и/или свободный текст)
@@ -65,11 +70,15 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
   const qc = useQueryClient();
   const [text, setText] = useState("");
   const [answer, setAnswer] = useState<{ ok: boolean } | null>(null);
+  // Код отказа с сервера: «closed/expired/not_found» — задание закрылось, пока
+  // карточка висела в ленте. Тогда сворачиваем ввод до следующего рефетча.
+  const [blocked, setBlocked] = useState<string | null>(null);
 
   const send = useMutation({
     mutationFn: (value: string) => answerActivity(activity.id, value),
     onSuccess: (res) => {
       setAnswer({ ok: res.ok });
+      if (!res.ok && CLOSED_STATUSES.has(res.status)) setBlocked(res.status);
       haptic(res.ok ? "success" : "error");
       invalidateAll(qc);
     },
@@ -77,6 +86,11 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
   });
 
   const done = answer?.ok === true || activity.answered_by_me;
+  // «Истекло» замечаем и без рефетча — по времени из анонса.
+  const expired =
+    activity.expires_at != null &&
+    Date.now() > new Date(activity.expires_at).getTime();
+  const closed = !done && (activity.closed === true || expired || blocked !== null);
 
   return (
     <div
@@ -87,6 +101,14 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
       {done ? (
         <div className="rounded-lg bg-status-free/15 px-2 py-1.5 text-xs font-medium text-status-free">
           ✅ Засчитано! Опыт уже в профиле.
+        </div>
+      ) : closed ? (
+        // GHG11(8.a): задание закрывается — поле ввода/кнопки тоже.
+        <div
+          className="rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs font-medium text-tg-hint"
+          data-testid="feed-activity-closed"
+        >
+          ⛔ Задание закрыто — приём ответов окончен.
         </div>
       ) : (
         <>
@@ -139,7 +161,7 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
           )}
         </>
       )}
-      {activity.expires_at && (
+      {!closed && !done && activity.expires_at && (
         <div className="text-[11px] text-tg-hint">
           Ответы принимаются {formatUntil(activity.expires_at)}
         </div>
@@ -174,7 +196,12 @@ export function VoiceTaskAction({ taskId }: { taskId: number }) {
       {data.my_submission_id !== null ? (
         <VoiceWithdraw />
       ) : (
-        <VoiceRecorder onUploaded={() => invalidateAll(qc)} />
+        // GHG11(8.a): если задание закрылось, пока участник записывал, сервер
+        // ответит `no_task`/`closed` — обновляем запросы, и блок записи исчезает.
+        <VoiceRecorder
+          onUploaded={() => invalidateAll(qc)}
+          onClosed={() => invalidateAll(qc)}
+        />
       )}
     </div>
   );
@@ -240,7 +267,14 @@ export function VoiceWithdraw() {
   );
 }
 
-export function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
+export function VoiceRecorder({
+  onUploaded,
+  onClosed,
+}: {
+  onUploaded: () => void;
+  /** GHG11(8.a): задание закрылось — зовём, чтобы блок записи свернулся. */
+  onClosed?: () => void;
+}) {
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [sending, setSending] = useState(false);
@@ -326,6 +360,7 @@ export function VoiceRecorder({ onUploaded }: { onUploaded: () => void }) {
       } else {
         haptic("error");
         void showAlert(statusText(res.status));
+        if (res.status === "no_task" || res.status === "closed") onClosed?.();
       }
     } catch (e) {
       haptic("error");

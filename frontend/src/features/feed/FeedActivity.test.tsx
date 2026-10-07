@@ -64,6 +64,13 @@ function announceItem(): FeedItem {
   };
 }
 
+/** Тот же анонс, но задание уже закрыто. */
+function closedItem(): FeedItem {
+  const item = announceItem();
+  item.detail!.activity!.closed = true;
+  return item;
+}
+
 /** Голосовое задание с открытым приёмом. */
 function voiceItem(): FeedItem {
   return {
@@ -121,6 +128,60 @@ describe("FeedDetailPanel: призыв из ленты (GHG11(8))", () => {
     fireEvent.click(screen.getByText("да"));
     expect(await screen.findByText(/Засчитано/)).toBeTruthy();
     expect(answerActivity).toHaveBeenCalledWith(7, "да");
+  });
+
+  it("закрытое задание не даёт ни кнопок, ни поля ввода", () => {
+    renderInProvider(
+      <FeedDetailPanel
+        item={closedItem()}
+        playerLike={false}
+        compact
+        autoPlayId={null}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("feed-activity-closed")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ответь прямо здесь…")).toBeNull();
+    expect(screen.queryByText("да")).toBeNull();
+    expect(screen.queryByText("нет")).toBeNull();
+  });
+
+  it("истёкшее окно закрывает задание даже без флага с сервера", () => {
+    const item = announceItem();
+    item.detail!.activity!.expires_at = new Date(Date.now() - 60_000).toISOString();
+    renderInProvider(
+      <FeedDetailPanel
+        item={item}
+        playerLike={false}
+        compact
+        autoPlayId={null}
+        onClose={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("feed-activity-closed")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ответь прямо здесь…")).toBeNull();
+  });
+
+  it("если сервер ответил «закрыто», карточка сворачивается сама", async () => {
+    vi.mocked(answerActivity).mockResolvedValue({
+      ok: false,
+      status: "closed",
+      xp: 0,
+    });
+    renderInProvider(
+      <FeedDetailPanel
+        item={announceItem()}
+        playerLike={false}
+        compact
+        autoPlayId={null}
+        onClose={() => {}}
+      />,
+    );
+    fireEvent.click(screen.getByText("да"));
+    expect(await screen.findByTestId("feed-activity-closed")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Ответь прямо здесь…")).toBeNull();
+    // Это не «ответ не подошёл» — другое сообщение.
+    expect(screen.queryByText(/Не подошло/)).toBeNull();
   });
 
   it("своё засчитанное задание сразу помечено", () => {

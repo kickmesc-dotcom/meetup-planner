@@ -130,6 +130,10 @@ _MAX_PER_SOURCE = 500
 # привязать к открытому промпту старый анонс с тем же текстом (кулдаун 7 дней).
 _ACTIVITY_MATCH_WINDOW = timedelta(minutes=10)
 
+# Сколько последних заданий сверяем с записями ленты. С запасом покрывает
+# любую страницу ленты: анонсов у нас не больше, чем самих заданий.
+_ACTIVITY_PROMPT_DEPTH = 60
+
 
 async def build_feed(
     session: AsyncSession,
@@ -210,10 +214,14 @@ def _as_utc(moment: datetime | None) -> datetime | None:
     return moment
 
 
-async def _open_prompts(
-    session: AsyncSession | None, *, now: datetime
-) -> list[GamePrompt]:
-    """Открытые промпты (случайные события), ещё ждущие ответа.
+async def _recent_prompts(session: AsyncSession | None) -> list[GamePrompt]:
+    """Последние призывы-задания — и открытые, и уже закрытые.
+
+    GHG11(8.a): закрытые тоже нужны — иначе у анонса закрытого задания просто
+    пропадала карточка, а участник не понимал, почему она исчезла. Теперь
+    карточка остаётся и говорит «задание закрыто». Берём только свежие
+    (`_ACTIVITY_PROMPT_DEPTH`): глубоко в пагинации ленты анонс всё равно
+    показывается как обычная запись.
 
     `session=None` — так `_attach_details` зовут тесты (подменяют сервисы и БД
     не используют): активностей тогда просто нет.
@@ -221,10 +229,7 @@ async def _open_prompts(
     if session is None:
         return []
     rows = await session.scalars(
-        select(GamePrompt).where(
-            GamePrompt.closed_at.is_(None),
-            GamePrompt.expires_at > now,
-        )
+        select(GamePrompt).order_by(GamePrompt.id.desc()).limit(_ACTIVITY_PROMPT_DEPTH)
     )
     return list(rows)
 
@@ -260,15 +265,27 @@ def match_prompt_activity(
     return best
 
 
-def activity_detail(prompt: GamePrompt, *, user_id: int | None) -> dict:
-    """Интерфейс участия в задании для карточки ленты: варианты и/или ввод."""
+def activity_detail(
+    prompt: GamePrompt, *, user_id: int | None, now: datetime | None = None
+) -> dict:
+    """Интерфейс участия в задании для карточки ленты: варианты и/или ввод.
+
+    `closed` (`GHG11(8.a)`) считаем на сервере: задание закрывается либо
+    победителем, либо истекшим окном. Фронт по этому флагу сворачивает поле
+    ввода/кнопки и пишет «задание закрыто» вместо того, чтобы давать отвечать
+    в пустоту.
+    """
     options, needs_text = activity.split_activity_options(list(prompt.answers or []))
+    moment = now or datetime.now(timezone.utc)
+    expired = prompt.expires_at is not None and _as_utc(prompt.expires_at) <= moment
     return {
         "id": prompt.id,
         "code": prompt.code,
         "options": [{"label": label, "xp": xp} for label, xp in options],
         "needs_text": needs_text,
         "expires_at": prompt.expires_at,
+        "closed": prompt.closed_at is not None or expired,
+        "closed_at": prompt.closed_at,
         "answered_by_me": user_id is not None and prompt.winner_user_id == user_id,
     }
 
@@ -283,11 +300,14 @@ async def _attach_details(
     """
     from app.services.game import music, voice
 
-    # GHG11(8): открытые задания-призывы нужны только если на странице есть их
-    # анонсы (журнальные «event») — иначе лишний SELECT на каждую ленту.
-    open_prompts: list[GamePrompt] = []
+    # GHG11(8): задания-призывы нужны только если на странице есть их анонсы
+    # (журнальные «event») — иначе лишний SELECT на каждую ленту.
+    recent_prompts: list[GamePrompt] = []
+    # Один «сейчас» на всю страницу — чтобы «закрыто/истекло» у всех карточек
+    # считалось по одному моменту времени.
+    activity_now = datetime.now(timezone.utc)
     if any(it.get("kind") == journal.KIND_EVENT for it in items):
-        open_prompts = await _open_prompts(session, now=datetime.now(timezone.utc))
+        recent_prompts = await _recent_prompts(session)
 
     for it in items:
         row_id = it["id"]
@@ -373,13 +393,15 @@ async def _attach_details(
             round_ = await session.get(MusicGameRound, round_id)
             if round_ is not None:
                 detail = await _music_game_detail(session, round_, detail)
-        # GHG11(8): анонс задания — сам себе форма участия. Если это свежий
-        # призыв (открытый промпт), в карточку кладём кнопки/поле ввода, чтобы
-        # ответить прямо из ленты, не уходя в чат.
-        if it.get("kind") == journal.KIND_EVENT and open_prompts:
-            prompt = match_prompt_activity(it, open_prompts)
+        # GHG11(8): анонс задания — сам себе форма участия. Кладём кнопки/поле
+        # ввода (или признак «закрыто» для завершённого задания), чтобы отвечать
+        # прямо из ленты, не уходя в чат.
+        if it.get("kind") == journal.KIND_EVENT and recent_prompts:
+            prompt = match_prompt_activity(it, recent_prompts)
             if prompt is not None:
-                detail["activity"] = activity_detail(prompt, user_id=user_id)
+                detail["activity"] = activity_detail(
+                    prompt, user_id=user_id, now=activity_now
+                )
         it["detail"] = detail or None
 
 
