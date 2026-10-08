@@ -870,11 +870,18 @@ URL вебхука (какой бэкенд обслуживает бота), а
 
 ```bash
 python tools/switch-db.py status          # что сейчас у обоих
-python tools/switch-db.py check --list    # какие DSN вообще известны
+python tools/switch-db.py reserves        # все известные базы + кто на них смотрит
+python tools/switch-db.py check --list    # какие базы вообще известны (с маской пароля)
 python tools/switch-db.py check current   # проверка кандидата
 python tools/switch-db.py switch dsn2     # переключить и подтвердить
-python tools/switch-db.py webhook amvera  # то, что делали .bat
+python tools/switch-db.py webhook amvera  # то, что делали .bat (алиас: backend)
 ```
+
+Скрипт версионируется здесь, в монорепо (`tools/switch-db.py`); в корне рабочей
+папки остался одноимённый шим — старые команды `python tools/switch-db.py …`
+продолжают работать. Конфигурацию для запуска в один клик (включая
+`db-switch`/`db-reserves`) дают ASCII-лаунчеры в `meetup-switch/`, а где лежат
+секреты — `secrets/README.md`.
 
 ---
 
