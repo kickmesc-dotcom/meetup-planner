@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import datetime, timezone
 
 import structlog
@@ -763,6 +764,30 @@ _APP_ACTIVITY_KINDS = (
 )
 
 
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _plain(text: str | None, limit: int) -> str | None:
+    """Текст без HTML-разметки и лишних пробелов — для превью активности.
+
+    В журнале игровые анонсы хранятся с разметкой (`<b>`/`<i>`), а в компактном
+    блоке профиля рендерить её незачем: показываем чистый текст.
+    """
+    if not text:
+        return None
+    cleaned = _TAG_RE.sub("", text)
+    for entity, char in (
+        ("&amp;", "&"),
+        ("&lt;", "<"),
+        ("&gt;", ">"),
+        ("&quot;", '"'),
+        ("&#39;", "'"),
+    ):
+        cleaned = cleaned.replace(entity, char)
+    cleaned = " ".join(cleaned.split())
+    return cleaned[:limit] or None
+
+
 async def _recent_activity(
     session: AsyncSession, user: User, profile: GameProfile | None
 ) -> list[GuestRecentOut]:
@@ -792,7 +817,7 @@ async def _recent_activity(
                 kind="message",
                 icon="💬",
                 label="Последнее сообщение в чат",
-                text=(msg.text or "").strip()[:140] or None,
+                text=_plain(msg.text, 140),
                 at=msg.sent_at,
             )
         )
@@ -831,7 +856,7 @@ async def _recent_activity(
                 kind="activity",
                 icon="🎮",
                 label="Последнее действие в мини-аппе",
-                text=(act.text or "").strip()[:200] or None,
+                text=_plain(act.text, 200),
                 at=act.created_at,
             )
         )

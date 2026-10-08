@@ -251,6 +251,24 @@ def test_feed_registry_knows_media_kind():
     assert feed.FEED_MEDIA in feed.FEED_KIND_ORDER
 
 
+# --- последняя активность: чистка разметки ---------------------------------
+
+def test_plain_strips_tags_and_collapses_whitespace():
+    from app.api.routes_game import _plain
+
+    raw = "👤 <b>Сомов вещает:</b>\n\n«<i>Но мне некогда</i>»"
+    assert _plain(raw, 200) == "👤 Сомов вещает: «Но мне некогда»"
+
+
+def test_plain_unescapes_entities_and_handles_empty():
+    from app.api.routes_game import _plain
+
+    assert _plain("a &amp; b &lt;c&gt;", 50) == "a & b <c>"
+    assert _plain(None, 50) is None
+    assert _plain("   ", 50) is None
+    assert _plain("длинно", 3) == "дли"
+
+
 # --- последний заход (presence) ---------------------------------------------
 
 def test_presence_should_touch_throttles():

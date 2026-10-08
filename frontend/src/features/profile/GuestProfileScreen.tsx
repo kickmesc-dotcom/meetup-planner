@@ -470,8 +470,11 @@ function MuteFeedSwitch({
       data-testid="mute-feed-switch"
       className="flex items-center justify-between gap-2 px-2 py-1.5"
     >
-      <div className="min-w-0 truncate text-[10px] leading-tight text-tg-hint/80">
-        🙈 Не показывать события {name} в моей ленте
+      <div
+        title={name}
+        className="min-w-0 truncate text-[10px] leading-tight text-tg-hint/80"
+      >
+        🙈 Не показывать события участника в моей ленте
       </div>
       <Switch
         size="sm"
