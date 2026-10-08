@@ -12,7 +12,8 @@ export default function NavBar() {
   const today = isToday(startOfDay(anchor));
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-tg-secondary-bg bg-tg-bg">
+    // GHG11(11): `pr-12` — правый верхний угол занят свитчером темы из оболочки.
+    <div className="flex items-center gap-2 border-b border-tg-secondary-bg bg-tg-bg py-2 pl-3 pr-12">
       <button
         type="button"
         onClick={() => {

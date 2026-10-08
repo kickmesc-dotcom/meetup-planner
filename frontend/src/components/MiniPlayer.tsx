@@ -425,67 +425,76 @@ export function MiniPlayerBar({
   if (!player.active) return null;
   const canSwitch = player.playable.length > 1;
   return (
+    // GHG11(11): раскладка разведена на строки. Раньше название, время,
+    // счётчик трека, транспорт и крестик делили ОДНУ линию: на узком экране
+    // пять целей жались друг к другу, а длинное название выдавливало кнопки.
+    // Теперь у каждой группы своя строка и свои отступы (gap-2):
+    //   1) что играет + ✕;  2) транспорт по центру, справа — время и счётчик;
+    //   3) полоса перемотки;  4) режимы/лайк (extras);  5) подпись подборки.
     <div
       data-testid="mini-player"
       className={[
-        "rounded-xl bg-tg-secondary-bg/80 px-2.5 py-2",
+        "flex flex-col gap-2 rounded-xl bg-tg-secondary-bg/80 px-3 py-2.5",
         className ?? "",
       ].join(" ")}
     >
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => player.step(-1)}
-          disabled={!canSwitch}
-          aria-label="Предыдущий трек"
-          className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-1 text-xs disabled:opacity-40"
-        >
-          ⏮
-        </button>
-        <button
-          type="button"
-          onClick={player.toggle}
-          aria-label={player.playing ? "Пауза" : "Воспроизвести"}
-          className="shrink-0 rounded-full bg-tg-bg/60 px-2.5 py-1 text-sm"
-        >
-          {player.loading ? "…" : player.playing ? "⏸" : "▶️"}
-        </button>
-        <button
-          type="button"
-          onClick={() => player.step(1)}
-          disabled={!canSwitch}
-          aria-label="Следующий трек"
-          className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-1 text-xs disabled:opacity-40"
-        >
-          ⏭
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium text-tg-text">
-            {player.title}
-          </div>
-          {canSwitch && (
-            <div className="text-[10px] tabular-nums text-tg-hint">
-              трек {Math.max(1, player.index + 1)} из {player.playable.length}
-            </div>
-          )}
+        <div className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text">
+          {player.title}
         </div>
-        <span className="shrink-0 text-[10px] tabular-nums text-tg-hint">
-          {formatTime(player.time)} / {formatTime(player.duration)}
-        </span>
         <button
           type="button"
           onClick={player.stop}
           aria-label="Закрыть плеер"
-          className="shrink-0 rounded-full px-1.5 text-sm text-tg-hint"
+          className="-my-1 shrink-0 rounded-full px-1.5 text-sm text-tg-hint"
         >
           ✕
         </button>
       </div>
 
-      {/* GHG11(9): доп. ряд — режимы и лайк. Пока ничего не передали, ряд пуст. */}
-      {extras && <div className="mt-1.5 flex items-center gap-1.5">{extras}</div>}
+      <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+        <div className="flex items-center justify-center gap-4">
+          <button
+            type="button"
+            onClick={() => player.step(-1)}
+            disabled={!canSwitch}
+            aria-label="Предыдущий трек"
+            className="shrink-0 rounded-full bg-tg-bg/60 px-3 py-1.5 text-sm disabled:opacity-40"
+          >
+            ⏮
+          </button>
+          <button
+            type="button"
+            onClick={player.toggle}
+            aria-label={player.playing ? "Пауза" : "Воспроизвести"}
+            className="shrink-0 rounded-full bg-tg-bg/60 px-4 py-1.5 text-base"
+          >
+            {player.loading ? "…" : player.playing ? "⏸" : "▶️"}
+          </button>
+          <button
+            type="button"
+            onClick={() => player.step(1)}
+            disabled={!canSwitch}
+            aria-label="Следующий трек"
+            className="shrink-0 rounded-full bg-tg-bg/60 px-3 py-1.5 text-sm disabled:opacity-40"
+          >
+            ⏭
+          </button>
+        </div>
+        <div className="shrink-0 text-right text-[10px] leading-tight tabular-nums text-tg-hint">
+          <div>
+            {formatTime(player.time)} / {formatTime(player.duration)}
+          </div>
+          {canSwitch && (
+            <div>
+              трек {Math.max(1, player.index + 1)} из {player.playable.length}
+            </div>
+          )}
+        </div>
+      </div>
 
-      {/* Полоса прогресса: тап по ней — перемотка. */}
+      {/* Полоса прогресса: тап по ней — перемотка. Сразу под транспортом,
+          чтобы «где мы внутри трека» не отделялось от самих кнопок. */}
       <button
         type="button"
         aria-label="Перемотать"
@@ -493,7 +502,7 @@ export function MiniPlayerBar({
           const rect = e.currentTarget.getBoundingClientRect();
           if (rect.width > 0) player.seek((e.clientX - rect.left) / rect.width);
         }}
-        className="mt-1.5 block h-4 w-full"
+        className="block h-4 w-full"
       >
         <span className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-tg-bg/70">
           <span
@@ -502,6 +511,9 @@ export function MiniPlayerBar({
           />
         </span>
       </button>
+
+      {/* GHG11(9): доп. блок — режимы, лайк и подпись подборки. */}
+      {extras && <div className="flex flex-col gap-1.5">{extras}</div>}
 
       <audio
         ref={player.audioRef}

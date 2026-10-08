@@ -410,51 +410,56 @@ export function PlayerBar() {
         player={player}
         extras={
           <>
-            <button
-              type="button"
-              data-testid="player-shuffle"
-              aria-pressed={player.shuffle}
-              aria-label="Перемешать очередь"
-              onClick={player.toggleShuffle}
-              className={[
-                "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                player.shuffle
-                  ? "bg-tg-button text-tg-button-text"
-                  : "bg-tg-bg/60 text-tg-hint",
-              ].join(" ")}
-            >
-              🔀 SHUFFLE
-            </button>
-            <button
-              type="button"
-              data-testid="player-liked-mode"
-              aria-pressed={player.likedMode}
-              onClick={player.toggleLikedMode}
-              className={[
-                "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                player.likedMode
-                  ? "bg-tg-button text-tg-button-text"
-                  : "bg-tg-bg/60 text-tg-hint",
-              ].join(" ")}
-            >
-              ❤️ лайкнутые{player.likedCount > 0 ? ` (${player.likedCount})` : ""}
-            </button>
-            {player.currentLikes && (
+            {/* GHG11(11): режимы и лайк — в одну спокойную строку (лайк у
+                правого края), а подпись подборки — отдельной строкой. Раньше
+                четыре элемента теснились в один ряд и подпись отжимала кнопки. */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                data-testid="player-like"
-                aria-label={likeLabel}
-                aria-pressed={player.currentLikes.liked}
-                disabled={player.likePending}
-                onClick={player.toggleLike}
-                className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-[11px] font-medium text-tg-text disabled:opacity-50"
+                data-testid="player-shuffle"
+                aria-pressed={player.shuffle}
+                aria-label="Перемешать очередь"
+                onClick={player.toggleShuffle}
+                className={[
+                  "shrink-0 rounded-full px-2.5 py-1 text-2xs font-medium",
+                  player.shuffle
+                    ? "bg-tg-button text-tg-button-text"
+                    : "bg-tg-bg/60 text-tg-hint",
+                ].join(" ")}
               >
-                {player.currentLikes.liked ? "❤️" : "🤍"} {player.currentLikes.likes}
+                🔀 SHUFFLE
               </button>
-            )}
-            <span className="ml-auto min-w-0 truncate text-[10px] text-tg-hint">
+              <button
+                type="button"
+                data-testid="player-liked-mode"
+                aria-pressed={player.likedMode}
+                onClick={player.toggleLikedMode}
+                className={[
+                  "shrink-0 rounded-full px-2.5 py-1 text-2xs font-medium",
+                  player.likedMode
+                    ? "bg-tg-button text-tg-button-text"
+                    : "bg-tg-bg/60 text-tg-hint",
+                ].join(" ")}
+              >
+                ❤️ лайкнутые{player.likedCount > 0 ? ` (${player.likedCount})` : ""}
+              </button>
+              {player.currentLikes && (
+                <button
+                  type="button"
+                  data-testid="player-like"
+                  aria-label={likeLabel}
+                  aria-pressed={player.currentLikes.liked}
+                  disabled={player.likePending}
+                  onClick={player.toggleLike}
+                  className="ml-auto shrink-0 rounded-full bg-tg-bg/60 px-2.5 py-1 text-2xs font-medium text-tg-text disabled:opacity-50"
+                >
+                  {player.currentLikes.liked ? "❤️" : "🤍"} {player.currentLikes.likes}
+                </button>
+              )}
+            </div>
+            <div className="truncate text-2xs text-tg-hint">
               {player.playlistTitle}
-            </span>
+            </div>
           </>
         }
       />

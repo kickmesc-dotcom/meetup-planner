@@ -49,7 +49,9 @@ export default function WelcomeBanner({ users, meName, format, onHide }: Props) 
   };
 
   return (
-    <header className="relative px-4 py-0 border-b border-tg-secondary-bg pr-10">
+    // GHG11(11): `pr-16` + кнопка закрытия на `right-12` — правый верхний угол
+    // занят глобальным свитчером темы (оболочка приложения).
+    <header className="relative px-4 py-0 border-b border-tg-secondary-bg pr-16">
       <button
         type="button"
         onClick={toggle}
@@ -148,7 +150,7 @@ export default function WelcomeBanner({ users, meName, format, onHide }: Props) 
         }}
         aria-label="Скрыть приветствие"
         title="Не показывать в следующий раз"
-        className="absolute top-2 right-2 min-h-11 min-w-11 rounded-md text-tg-hint hover:text-tg-text active:scale-95 transition-transform"
+        className="absolute top-2 right-12 min-h-11 min-w-11 rounded-md text-tg-hint hover:text-tg-text active:scale-95 transition-transform"
       >
         ✕
       </button>

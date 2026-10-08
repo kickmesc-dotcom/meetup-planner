@@ -163,6 +163,23 @@ export function getStartParam(): string {
   }
 }
 
+/**
+ * GHG11(11): подкрасить «хром» мини-аппа под выбранную тему.
+ *
+ * CSS-переменных для этого мало: верхняя панель Telegram и фон под жестом
+ * сворачивания рисуются клиентом, а не страницей. Best-effort: вне Telegram
+ * (или в старом клиенте без этих методов) просто ничего не делаем.
+ */
+export function syncWebAppChrome(theme: "dark" | "light"): void {
+  const bg = theme === "dark" ? "#17212b" : "#ffffff";
+  try {
+    WebApp.setHeaderColor?.(bg);
+    WebApp.setBackgroundColor?.(bg);
+  } catch {
+    // клиент не поддерживает смену хрома — не повод падать
+  }
+}
+
 export type HapticKind =
   | "light"
   | "medium"

@@ -18,6 +18,7 @@ import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
 import { PlayerBar, PlayerProvider } from "./components/GlobalPlayer";
 import NotificationsBell from "./features/notifications/NotificationsBell";
+import ThemeSwitcher from "./components/ThemeSwitcher";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
 
@@ -137,7 +138,7 @@ export default function App() {
     // Э21: одна вкладка на встречи и опросы — переключатель внутри экрана.
     content = (
       <>
-        <header className="px-4 py-3 border-b border-tg-secondary-bg">
+        <header className="border-b border-tg-secondary-bg py-3 pl-4 pr-12">
           <div className="text-base font-medium">🤝 Встречи и опросы</div>
           <div className="text-xs text-tg-hint">
             RSVP по встречам и голосования за слот — всё в одном месте.
@@ -153,7 +154,8 @@ export default function App() {
       <>
         {/* GHG11: заголовок ленты — ОДНОЙ строкой (раньше дублировался внутри
             FeedScreen). Сама лента ниже отдаёт строку управления. */}
-        <header className="relative flex items-center gap-2 overflow-hidden border-b border-tg-secondary-bg px-4 py-2.5">
+        {/* GHG11(11): `pr-12` — место под свитчер темы, который лежит в углу оболочки. */}
+        <header className="relative flex items-center gap-2 overflow-hidden border-b border-tg-secondary-bg py-2.5 pl-4 pr-12">
           <span className="shrink-0 text-base font-medium">🏆 Лента</span>
           <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
             Кто что открыл и с кем что случилось.
@@ -169,7 +171,7 @@ export default function App() {
   } else if (tab === "profile") {
     content = (
       <>
-        <header className="px-4 py-3 border-b border-tg-secondary-bg">
+        <header className="border-b border-tg-secondary-bg py-3 pl-4 pr-12">
           <div className="text-base font-medium">👤 Профиль</div>
           <div className="text-xs text-tg-hint">
             Топы, история и настройки приветствия.
@@ -183,7 +185,7 @@ export default function App() {
   } else if (tab === "admin") {
     content = (
       <>
-        <header className="px-4 py-3 border-b border-tg-secondary-bg">
+        <header className="border-b border-tg-secondary-bg py-3 pl-4 pr-12">
           <div className="text-base font-medium">⚙️ Админка</div>
           <div className="text-xs text-tg-hint">
             Только для {meData.display_name}-уровня админов.
@@ -201,6 +203,11 @@ export default function App() {
     // приложение читается как мини-апп, а не растягивается на всю ширину.
     <PlayerProvider>
       <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+        {/* GHG11(11): тема — глобальная настройка, поэтому свитчер живёт в
+            оболочке, а не в каком-то одном экране. Верхний угол, тихий вид. */}
+        <div className="absolute right-1.5 top-1.5 z-20">
+          <ThemeSwitcher />
+        </div>
         {content}
         {/* GHG11(8): плеер подборки недели — в общем каркасе, поэтому играет
             поверх всех вкладок и не сбрасывается при переключении. */}
