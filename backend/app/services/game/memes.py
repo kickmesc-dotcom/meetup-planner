@@ -83,11 +83,17 @@ async def record_post(
     telegram_id: int,
     kind: str,
     at: datetime | None = None,
+    media_type: str | None = None,
+    media_count: int | None = None,
+    preview_file_id: str | None = None,
 ) -> bool:
     """Запомнить медиа-пост. False — уже записан / автор не участник / игра off.
 
     Дедупликация по (chat_id, tg_message_id): телеграм умеет доставить апдейт
     повторно, а двойной учёт сломал бы счётчики «Успешного успеха» и «Опиума».
+
+    GHG11(10): вместе с постом пишем тип медиа, число файлов подборки и file_id
+    миниатюры — из этого лента строит осмысленный анонс реакции бота.
     """
     if not await is_game_enabled(session):
         return False
@@ -111,10 +117,44 @@ async def record_post(
             posted_at=_as_utc(at) if at else _now(),
             responders=[],
             window_responders=[],
+            media_type=media_type,
+            media_count=media_count,
+            preview_file_id=preview_file_id,
         )
     )
     await session.commit()
     return True
+
+
+async def record_bot_reaction(
+    session: AsyncSession,
+    *,
+    chat_id: int,
+    tg_message_id: int,
+    emoji: str | None,
+    phrase: str | None,
+    at: datetime | None = None,
+) -> tuple[int, int] | None:
+    """GHG11(10): записать реакцию бота на пост. `(post_id, user_id)` или None.
+
+    Заполненный `reacted_at` — признак, по которому лента (`feed.py`, вид
+    `media`) показывает запись «бот отреагировал на …». Возвращаем id поста и
+    автора, чтобы вызывающий код начислил опыт именно автору и не искал пост
+    повторно.
+    """
+    post = await session.scalar(
+        select(GameMediaPost).where(
+            GameMediaPost.chat_id == chat_id,
+            GameMediaPost.tg_message_id == tg_message_id,
+        )
+    )
+    if post is None:
+        return None
+    post.reaction_emoji = emoji
+    post.reaction_phrase = phrase
+    post.reacted_at = _as_utc(at) if at else _now()
+    await session.commit()
+    return int(post.id), int(post.user_id)
 
 
 async def _touch(

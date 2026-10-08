@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import (
     GameJournalEntry,
+    GameMediaPost,
     GamePrompt,
     GameVoiceTask,
     LoserRoll,
@@ -43,11 +44,14 @@ from app.db.models import (
 from app.services.game import activity, journal
 from app.services.game.achievements_catalog import get as get_achievement
 from app.services.game.config import (
+    EV_MEDIA_REACTION,
     MUSIC_GAME_AUTHOR_REWARD,
     MUSIC_GAME_GUESS_REWARD,
+    points_for,
 )
 from app.services.game.music import NOTE_PUBLISHED as _MUSIC_PUBLISHED
 from app.services.game.voice_catalog import TASKS_BY_CODE as _VOICE_TASKS
+from app.services.media_reactions import reaction_announcement
 
 log = structlog.get_logger()
 
@@ -60,6 +64,8 @@ FEED_MUSIC = "music"
 FEED_MUSIC_GAME = "music_game"
 # GHG11: активность механик без своей таблицы (совет, червь, реакции, номинации).
 FEED_FEATURE = "feature"
+# GHG11(10): реакция бота на медиа участника (источник — `game_media_posts`).
+FEED_MEDIA = "media"
 
 # Ярлыки для фронта: одинаково и в ленте, и в фильтрах.
 FEED_ICONS: dict[str, str] = {
@@ -74,6 +80,7 @@ FEED_ICONS: dict[str, str] = {
     journal.KIND_CONTRABAND: "💰",
     journal.KIND_MEMORIAL: "🕯",
     FEED_FEATURE: "✨",
+    FEED_MEDIA: "📸",
 }
 
 FEED_TITLES: dict[str, str] = {
@@ -88,6 +95,7 @@ FEED_TITLES: dict[str, str] = {
     journal.KIND_CONTRABAND: "Контрабанда",
     journal.KIND_MEMORIAL: "Поминовение",
     FEED_FEATURE: "Активность",
+    FEED_MEDIA: "Реакция на медиа",
 }
 
 # Порядок «от общего к частному» — для фильтров на фронте (чипы).
@@ -98,6 +106,7 @@ FEED_KIND_ORDER: tuple[str, ...] = (
     FEED_VOICE,
     FEED_MUSIC,
     FEED_MUSIC_GAME,
+    FEED_MEDIA,
     journal.KIND_EVENT,
     journal.KIND_HOLIDAY,
     journal.KIND_CONTRABAND,
@@ -163,6 +172,7 @@ async def build_feed(
     items.extend(await _voice_items(session, depth=depth))
     items.extend(await _music_items(session, depth=depth))
     items.extend(await _music_game_items(session, depth=depth))
+    items.extend(await _media_items(session, user_id=user_id, depth=depth))
     items.extend(await _journal_items(session, user_id=user_id, depth=depth))
 
     if kinds:
@@ -323,6 +333,19 @@ async def _attach_details(
                         "user_name": it.get("user_name"),
                         "avatar_url": it.get("avatar_url"),
                         "xp": 0,
+                        "likes": 0,
+                    }
+                ]
+        # GHG11(10): миниатюра автора с наградой за реакцию бота на его медиа.
+        if it["kind"] == FEED_MEDIA and not detail.get("participants"):
+            uid = it.get("user_id")
+            if uid is not None:
+                detail["participants"] = [
+                    {
+                        "user_id": uid,
+                        "user_name": it.get("user_name"),
+                        "avatar_url": it.get("avatar_url"),
+                        "xp": points_for(EV_MEDIA_REACTION),
                         "likes": 0,
                     }
                 ]
@@ -698,6 +721,60 @@ async def _music_game_items(session: AsyncSession, *, depth: int) -> list[dict]:
                 ),
                 user=None,
                 detail={"closed_at": round_.closed_at, "closed": closed},
+            )
+        )
+    return out
+
+
+async def _media_items(
+    session: AsyncSession, *, user_id: int | None, depth: int
+) -> list[dict]:
+    """GHG11(10): реакции бота на медиа — по записи на пост/подборку.
+
+    Источник — `game_media_posts` с заполненным `reacted_at` (пишется только
+    когда фича «реакции на медиа» показывает активность в ленте). Из записи
+    видно ЧТО было за медиа (тип/число файлов) и ЧЕМ бот отреагировал
+    (эмодзи-реакция и/или цитата из пула) — раньше в ленте была безликая
+    строка «бот отреагировал на медиа (кто-то)».
+
+    Подборка-альбом — ОДНА запись: Telegram присылает её отдельными апдейтами,
+    но в БД это один пост с `media_count > 1`, поэтому «объединение подборки в
+    рамках одного анонса» получается само собой.
+    """
+    stmt = (
+        select(GameMediaPost, User)
+        .join(User, User.id == GameMediaPost.user_id)
+        .where(GameMediaPost.reacted_at.is_not(None))
+        .order_by(GameMediaPost.reacted_at.desc(), GameMediaPost.id.desc())
+        .limit(depth)
+    )
+    if user_id is not None:
+        stmt = stmt.where(GameMediaPost.user_id == user_id)
+    rows = (await session.execute(stmt)).all()
+    out: list[dict] = []
+    for post, user in rows:
+        out.append(
+            _item(
+                source="media",
+                row_id=f"media:{post.id}",
+                kind=FEED_MEDIA,
+                at=post.reacted_at,
+                text=reaction_announcement(
+                    kind=post.kind,
+                    media_type=post.media_type,
+                    count=post.media_count,
+                    emoji=post.reaction_emoji,
+                    phrase=post.reaction_phrase,
+                ),
+                user=user,
+                detail={
+                    "post_id": post.id,
+                    "media_type": post.media_type or "photo",
+                    "media_count": post.media_count or 1,
+                    "media_kind": post.kind,
+                    "emoji": post.reaction_emoji,
+                    "phrase": post.reaction_phrase,
+                },
             )
         )
     return out

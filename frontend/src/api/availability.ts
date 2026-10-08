@@ -16,6 +16,8 @@ export interface UiPrefs {
   welcome_format: WelcomeFormat;
   /** GHG11(7): кого скрыть в ленте (внутренние id). Своя галочка неснимаемая. */
   muted_feed: number[];
+  /** GHG11(10): показывать ли другим мой последний заход в мини-апп. */
+  show_last_seen: boolean;
 }
 export const fetchUiPrefs = () => api<UiPrefs>("/api/me/ui-prefs");
 export const updateUiPrefs = (prefs: Partial<UiPrefs>) =>

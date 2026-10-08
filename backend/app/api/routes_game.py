@@ -21,6 +21,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import CurrentUser, SessionDep
 from app.config import get_settings
 from app.db.models import (
+    ChatMessage,
+    GameJournalEntry,
+    GameMediaPost,
     GameProfile,
     GamePrompt,
     GameVoiceSubmission,
@@ -54,6 +57,7 @@ from app.schemas.game import (
     GameProfileOut,
     GuestAchievementOut,
     GuestProfileOut,
+    GuestRecentOut,
     GuestTitleEventOut,
     GuestTodayTitleOut,
     HolidayCreate,
@@ -717,7 +721,155 @@ async def guest_profile(
         worm_total_days=round(worm_seconds / 86400),
         achievements=items,
         today=GuestTodayTitleOut(**today),
+        # GHG11(10): превью последней активности — самый низ чужого профиля.
+        recent=await _recent_activity(session, user, profile),
     )
+
+
+@router.get("/media/{post_id}")
+async def media_preview(post_id: int, session: SessionDep) -> Response:
+    """GHG11(10): миниатюра медиа-поста — превью в ленте и чужом профиле.
+
+    ПУБЛИЧНЫЙ (без tma-auth), как `/api/avatar/{user_id}`: тег `<img>` не умеет
+    слать Authorization. Токен бота наружу не утекает — отдаём байты сами, а не
+    редиректим на file-URL с токеном. Отдаём только картинку-миниатюру (фото
+    или JPEG-превью видео/гифки); нет превью — 404, фронт рисует иконку типа.
+    """
+    from app.bot.dispatcher import get_bot
+    from app.services.avatars import fetch_avatar_bytes
+
+    post = await session.get(GameMediaPost, post_id)
+    if post is None or not post.preview_file_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "no_preview")
+    data = await fetch_avatar_bytes(get_bot(), post.preview_file_id)
+    if data is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "media_unavailable")
+    payload, content_type = data
+    return Response(
+        content=payload,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+# Виды записей журнала, которые считаем «действием в мини-аппе» для превью
+# последней активности (участие в задании, находка слова, праздник, активность
+# механик без своей таблицы).
+_APP_ACTIVITY_KINDS = (
+    "event",
+    "contraband",
+    "holiday",
+    "feature",
+)
+
+
+async def _recent_activity(
+    session: AsyncSession, user: User, profile: GameProfile | None
+) -> list[GuestRecentOut]:
+    """GHG11(10): превью последней активности участника (низ чужого профиля).
+
+    Пять независимых источников, каждый — последняя запись:
+    1) сообщение в чат (`chat_messages`); 2) открытая ачивка (`user_achievements`);
+    3) действие в мини-аппе (`game_journal` по субъекту); 4) медиа в чат
+    (`game_media_posts`, с превью); 5) последний заход (`game_profiles`).
+    Возвращаем строки в этом порядке; отсутствующие источники пропускаем.
+    """
+    from app.services.admin_config import get_ui_show_last_seen
+    from app.services.game.achievements_catalog import get as get_achievement
+    from app.services.media_reactions import describe_media
+
+    out: list[GuestRecentOut] = []
+
+    msg = await session.scalar(
+        select(ChatMessage)
+        .where(ChatMessage.user_id == user.id)
+        .order_by(ChatMessage.sent_at.desc())
+        .limit(1)
+    )
+    if msg is not None:
+        out.append(
+            GuestRecentOut(
+                kind="message",
+                icon="💬",
+                label="Последнее сообщение в чат",
+                text=(msg.text or "").strip()[:140] or None,
+                at=msg.sent_at,
+            )
+        )
+
+    ach = await session.scalar(
+        select(UserAchievement)
+        .where(UserAchievement.user_id == user.id)
+        .order_by(UserAchievement.unlocked_at.desc(), UserAchievement.id.desc())
+        .limit(1)
+    )
+    if ach is not None:
+        catalog = get_achievement(ach.code)
+        if catalog is not None:
+            out.append(
+                GuestRecentOut(
+                    kind="achievement",
+                    icon=catalog.icon,
+                    label="Последняя открытая ачивка",
+                    text=f"«{catalog.title}» (+{catalog.points} XP)",
+                    at=ach.unlocked_at,
+                )
+            )
+
+    act = await session.scalar(
+        select(GameJournalEntry)
+        .where(
+            GameJournalEntry.subject_user_id == user.id,
+            GameJournalEntry.kind.in_(_APP_ACTIVITY_KINDS),
+        )
+        .order_by(GameJournalEntry.created_at.desc())
+        .limit(1)
+    )
+    if act is not None:
+        out.append(
+            GuestRecentOut(
+                kind="activity",
+                icon="🎮",
+                label="Последнее действие в мини-аппе",
+                text=(act.text or "").strip()[:200] or None,
+                at=act.created_at,
+            )
+        )
+
+    media = await session.scalar(
+        select(GameMediaPost)
+        .where(GameMediaPost.user_id == user.id)
+        .order_by(GameMediaPost.posted_at.desc(), GameMediaPost.id.desc())
+        .limit(1)
+    )
+    if media is not None:
+        out.append(
+            GuestRecentOut(
+                kind="media",
+                icon="📸",
+                label="Последнее медиа в чат",
+                text=describe_media(media.kind, media.media_type, media.media_count),
+                at=media.posted_at,
+                post_id=media.id,
+                media_type=media.media_type or "photo",
+                media_count=media.media_count or 1,
+            )
+        )
+
+    if (
+        profile is not None
+        and profile.last_app_seen_at is not None
+        and await get_ui_show_last_seen(session, user.telegram_id)
+    ):
+        out.append(
+            GuestRecentOut(
+                kind="visit",
+                icon="🚪",
+                label="Последний заход в мини-апп",
+                at=profile.last_app_seen_at,
+            )
+        )
+    return out
 
 
 @router.get("/game/feed", response_model=FeedOut)

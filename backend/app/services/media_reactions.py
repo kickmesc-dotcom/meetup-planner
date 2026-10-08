@@ -330,6 +330,50 @@ def substitute_username(template: str, username: str) -> str:
     return template.replace("%username%", username)
 
 
+# GHG11(10): человеческое имя типа медиа — для осмысленного анонса реакции в
+# ленте («на фото», «на подборку из 5 файлов»).
+MEDIA_WORDS: dict[str, str] = {
+    "photo": "фото",
+    "video": "видео",
+    "animation": "гифку",
+    "sticker": "стикер",
+    "document": "файл",
+    "voice": "голосовое",
+    "video_note": "кружок",
+    "audio": "аудио",
+    "media": "медиа",
+}
+
+
+def describe_media(kind: str, media_type: str | None, count: int | None) -> str:
+    """Что за медиа: «фото», «видео», «подборку (5 файлов)». Чистая."""
+    if kind == "collection":
+        return f"подборку ({max(2, int(count or 2))} файлов)"
+    return MEDIA_WORDS.get(media_type or "photo", "медиа")
+
+
+def reaction_announcement(
+    *,
+    kind: str,
+    media_type: str | None,
+    count: int | None,
+    emoji: str | None,
+    phrase: str | None,
+) -> str:
+    """Осмысленный текст записи ленты: ЧТО за медиа и ЧЕМ бот отреагировал.
+
+    Примеры: «Бот отреагировал на фото — 🔥», «Бот отреагировал на подборку
+    (5 файлов) — «Сегодня лучше»». Если реакции неизвестны (старые записи) —
+    остаётся честное «Бот отреагировал на фото».
+    """
+    what = describe_media(kind, media_type, count)
+    reaction = " ".join(
+        part for part in (emoji or "", f"«{phrase}»" if phrase else "") if part
+    )
+    base = f"Бот отреагировал на {what}"
+    return f"{base} — {reaction}" if reaction else base
+
+
 def pick_phrase(phrases: list[str], rng: random.Random | None = None) -> str | None:
     """Случайная фраза из пула, None если пул пуст."""
     if not phrases:

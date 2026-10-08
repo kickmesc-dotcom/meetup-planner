@@ -96,6 +96,58 @@ const PROFILE: GuestProfile = {
     chukhan_reason: null,
     worm: false,
   },
+  recent: [
+    {
+      kind: "message",
+      icon: "💬",
+      label: "Последнее сообщение в чат",
+      text: "ну что, кто сегодня лох",
+      at: "2026-10-08T11:55:00Z",
+      post_id: null,
+      media_type: null,
+      media_count: null,
+    },
+    {
+      kind: "achievement",
+      icon: "🎙",
+      label: "Последняя открытая ачивка",
+      text: "«Голос из народа» (+20 XP)",
+      at: "2026-10-04T21:47:00Z",
+      post_id: null,
+      media_type: null,
+      media_count: null,
+    },
+    {
+      kind: "activity",
+      icon: "🎮",
+      label: "Последнее действие в мини-аппе",
+      text: "Случайное событие в чате",
+      at: "2026-10-07T20:00:00Z",
+      post_id: null,
+      media_type: null,
+      media_count: null,
+    },
+    {
+      kind: "media",
+      icon: "📸",
+      label: "Последнее медиа в чат",
+      text: "фото",
+      at: "2026-10-06T19:30:00Z",
+      post_id: 42,
+      media_type: "photo",
+      media_count: 1,
+    },
+    {
+      kind: "visit",
+      icon: "🚪",
+      label: "Последний заход в мини-апп",
+      text: null,
+      at: "2026-10-08T12:30:00Z",
+      post_id: null,
+      media_type: null,
+      media_count: null,
+    },
+  ],
 };
 
 function renderProfile() {
@@ -125,11 +177,13 @@ beforeEach(() => {
     hide_greeting: false,
     welcome_format: "avatar",
     muted_feed: [],
+    show_last_seen: true,
   });
   vi.mocked(updateUiPrefs).mockImplementation(async (p) => ({
     hide_greeting: false,
     welcome_format: "avatar",
     muted_feed: p.muted_feed ?? [],
+    show_last_seen: p.show_last_seen ?? true,
   }));
 });
 
@@ -148,12 +202,15 @@ describe("GuestProfileScreen: порядок блоков (GHG11(7))", () => {
     const loser = texts.findIndex((t) => t.includes("История «лоха дня»"));
     const chukhan = texts.findIndex((t) => t.includes("История «чухана недели»"));
     const mute = texts.findIndex((t) => t.includes("Не показывать события"));
+    const recent = texts.findIndex((t) => t.includes("Последняя активность"));
     expect(plaque).toBe(0);
     expect(stats).toBeGreaterThan(plaque);
     expect(ach).toBeGreaterThan(stats);
     expect(loser).toBeGreaterThan(ach);
     expect(chukhan).toBeGreaterThan(loser);
     expect(mute).toBeGreaterThan(chukhan);
+    // GHG11(10): превью последней активности — в самом низу профиля.
+    expect(recent).toBeGreaterThan(mute);
   });
 
   it("в плашке активное состояние с причиной", async () => {
@@ -208,6 +265,17 @@ describe("GuestProfileScreen: история разнострочно (GHG11(7))
 });
 
 describe("GuestProfileScreen: свитчер ленты (GHG11(7))", () => {
+  it("компактный: контейнер-строка без карточки и свитчер размера sm", async () => {
+    renderProfile();
+    const wrap = await screen.findByTestId("mute-feed-switch");
+    expect(wrap.className).not.toContain("rounded-xl");
+    // Тот же контейнер держит переключатель.
+    const sw = wrap.querySelector('[role="switch"]');
+    expect(sw).not.toBeNull();
+    expect(sw!.className).toContain("h-4");
+    expect(sw!.className).toContain("w-8");
+  });
+
   it("выключен по умолчанию, при тапе скрывает события участника", async () => {
     renderProfile();
     const sw = await screen.findByRole("switch");
@@ -228,5 +296,28 @@ describe("GuestProfileScreen: свитчер ленты (GHG11(7))", () => {
     renderProfile();
     await screen.findByText("📊 Открыто ачивок");
     expect(screen.queryByRole("switch")).toBeNull();
+  });
+});
+
+describe("GuestProfileScreen: последняя активность (GHG11(10))", () => {
+  it("показывает пять строк: сообщение, ачивка, действие, медиа, заход", async () => {
+    renderProfile();
+    expect(await screen.findByText("Последняя активность", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Последнее сообщение в чат")).toBeTruthy();
+    expect(screen.getByText("Последняя открытая ачивка")).toBeTruthy();
+    expect(screen.getByText("Последнее действие в мини-аппе")).toBeTruthy();
+    expect(screen.getByText("Последнее медиа в чат")).toBeTruthy();
+    expect(screen.getByText("Последний заход в мини-апп")).toBeTruthy();
+    expect(screen.getByText("ну что, кто сегодня лох")).toBeTruthy();
+  });
+
+  it("медиа-превью открывается в лайтбоксе по клику", async () => {
+    renderProfile();
+    const thumb = await screen.findByTestId("media-thumb");
+    expect(screen.queryByTestId("media-lightbox")).toBeNull();
+    fireEvent.click(thumb);
+    expect(await screen.findByTestId("media-lightbox")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("media-lightbox"));
+    await waitFor(() => expect(screen.queryByTestId("media-lightbox")).toBeNull());
   });
 });

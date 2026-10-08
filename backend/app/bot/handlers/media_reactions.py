@@ -56,6 +56,7 @@ from app.services.media_reactions import (
     get_single_phrases,
     pick_emoji,
     pick_phrase,
+    reaction_announcement,
     roll_chance,
     save_recent_media,
     substitute_username,
@@ -106,6 +107,10 @@ class _AlbumBuf:
     # дата «альбом дособрался» (разница — окно debounce).
     posted_at: datetime | None = None
     count: int = 1
+    # GHG11(10): тип первого элемента и его миниатюра — для записи поста и
+    # осмысленного анонса («подборка (5 файлов)»).
+    media_type: str | None = None
+    preview_file_id: str | None = None
     task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -210,7 +215,11 @@ async def _send_reply_phrase(chat_id: int, message_id: int, text: str) -> bool:
 
 
 async def _do_react(
-    kind: MediaKind, chat_id: int, message_id: int, author_name: str
+    kind: MediaKind,
+    chat_id: int,
+    message_id: int,
+    author_name: str,
+    author_tg_id: int | None = None,
 ) -> None:
     """Выполнить реакцию согласно типу медиа и настройкам single_response_mode.
 
@@ -220,8 +229,12 @@ async def _do_react(
         phrase     — только reply-фраза (из single-пула);
         both       — и эмодзи, и фраза;
         random_one — случайно одно из двух.
+
+    GHG11(10): выбранную реакцию сохраняем на сам пост (`memes.record_bot_reaction`)
+    — из него лента строит анонс с превью медиа и указанием, ЧЕМ бот отреагировал.
+    Автору поста начисляется опыт (`awards.media_reaction`).
     """
-    from app.services.game import delivery
+    from app.services.game import awards, delivery, memes
     from app.services.phrase_meta import effective_pool
 
     sm = get_sessionmaker()
@@ -231,56 +244,95 @@ async def _do_react(
         if mode == delivery.MODE_OFF:
             return
         chat_ok = delivery.chat_enabled(mode)
-        if delivery.app_enabled(mode):
-            await delivery.record_feed_event(
-                session,
-                feature="media_reactions",
-                text=f"📸 Бот отреагировал на медиа ({author_name})",
-            )
-        if kind == "collection":
-            phrases = await effective_pool(
-                session, "media_collection", await get_collection_phrases(session)
-            )
-            phrase = pick_phrase(phrases)
-            if phrase and chat_ok:
-                await _send_reply_phrase(
-                    chat_id, message_id, substitute_username(phrase, author_name)
-                )
-            log.info("media_reactions.reacted", kind=kind, message_id=message_id)
-            return
-
-        settings = await get_media_reactions_settings(session)
+        app_ok = delivery.app_enabled(mode)
         single_phrases = await effective_pool(
             session, "media_single", await get_single_phrases(session)
         )
+        collection_phrases = await effective_pool(
+            session, "media_collection", await get_collection_phrases(session)
+        )
         whitelist = await get_emoji_whitelist(session)
+        settings = await get_media_reactions_settings(session)
 
-    if not chat_ok:
-        return
-    response_mode = settings["single_response_mode"]
-    want_emoji = response_mode in {"emoji", "both"}
-    want_phrase = response_mode in {"phrase", "both"}
-    if response_mode == "random_one":
-        if random.random() < 0.5:
-            want_emoji = True
-        else:
-            want_phrase = True
+    # Что именно «говорит» бот: подборке — фраза, одиночному медиа — по режиму.
+    emoji: str | None = None
+    phrase: str | None = None
+    if kind == "collection":
+        phrase = pick_phrase(collection_phrases)
+    else:
+        response_mode = settings["single_response_mode"]
+        want_emoji = response_mode in {"emoji", "both"}
+        want_phrase = response_mode in {"phrase", "both"}
+        if response_mode == "random_one":
+            if random.random() < 0.5:
+                want_emoji = True
+            else:
+                want_phrase = True
+        if want_emoji:
+            emoji = pick_emoji(whitelist)
+        if want_phrase:
+            phrase = pick_phrase(single_phrases)
 
-    if want_emoji:
-        emoji = pick_emoji(whitelist)
+    # Чат: только выбранное, и только если фича разрешает чат.
+    rendered = substitute_username(phrase, author_name) if phrase else None
+    if chat_ok:
         if emoji:
             await _send_emoji_reaction(chat_id, message_id, emoji)
-    if want_phrase:
-        phrase = pick_phrase(single_phrases)
-        if phrase:
-            await _send_reply_phrase(
-                chat_id, message_id, substitute_username(phrase, author_name)
+        if rendered:
+            await _send_reply_phrase(chat_id, message_id, rendered)
+
+    # Лента мини-аппа (источник записи — сам пост) + опыт автору. Одна сессия.
+    sm = get_sessionmaker()
+    async with sm() as session:
+        reacted_author: int | None = None
+        if app_ok:
+            try:
+                recorded = await memes.record_bot_reaction(
+                    session,
+                    chat_id=chat_id,
+                    tg_message_id=message_id,
+                    emoji=emoji,
+                    phrase=rendered,
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("media_reactions.feed_record_failed", error=str(exc))
+                recorded = None
+            if recorded is not None:
+                reacted_author = recorded[1]
+            else:
+                # Игра выключена / пост не сохранён — минимальный текстовый анонс,
+                # чтобы реакция была видна в ленте и в этом случае.
+                try:
+                    await delivery.record_feed_event(
+                        session,
+                        feature="media_reactions",
+                        text="📸 "
+                        + reaction_announcement(
+                            kind=kind,
+                            media_type=None,
+                            count=None,
+                            emoji=emoji,
+                            phrase=rendered,
+                        ),
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("media_reactions.feed_event_failed", error=str(exc))
+        if reacted_author is None and author_tg_id is not None:
+            reacted_author = await awards.user_id_for_tg(session, author_tg_id)
+        if reacted_author is not None:
+            await awards.media_reaction(
+                session,
+                reacted_author,
+                chat_id=chat_id,
+                message_id=message_id,
             )
+
     log.info(
         "media_reactions.reacted",
         kind=kind,
         message_id=message_id,
-        response_mode=response_mode,
+        emoji=emoji,
+        has_phrase=bool(rendered),
     )
 
 
@@ -290,11 +342,18 @@ async def _record_game_post(
     message_id: int,
     author_id: int,
     at: datetime | None,
+    *,
+    media_type: str | None = None,
+    media_count: int | None = None,
+    preview_file_id: str | None = None,
 ) -> None:
     """GHG10 Э7: записать пост в телеметрию мем-ачивок (best-effort).
 
     Внутри сам решает, включена ли игра — здесь дублировать проверку незачем:
     функция не должна ничего знать про рубильник, кроме того, что он есть.
+
+    GHG11(10): вместе с постом сохраняем тип медиа, число файлов подборки и
+    file_id миниатюры — из этого лента строит осмысленный анонс реакции.
     """
     from app.services.game import memes
 
@@ -308,9 +367,44 @@ async def _record_game_post(
                 telegram_id=author_id,
                 kind=kind,
                 at=at,
+                media_type=media_type,
+                media_count=media_count,
+                preview_file_id=preview_file_id,
             )
     except Exception as exc:  # noqa: BLE001
         log.warning("media_reactions.game_record_failed", error=str(exc))
+
+
+def _preview_file_id(obj: object) -> str | None:
+    """file_id JPEG-миниатюры у видео/гифки/документа/кружка (`thumbnail`)."""
+    thumb = getattr(obj, "thumbnail", None)
+    return getattr(thumb, "file_id", None)
+
+
+def _media_meta(message: Message) -> tuple[str, str | None]:
+    """GHG11(10): (тип медиа, file_id миниатюры) для записи поста.
+
+    Для картинок превью — сам файл; для видео/гифок/документов — их JPEG-миниатюра
+    (она есть у Telegram всегда, поэтому превью работает без скачивания видео).
+    """
+    if message.photo:
+        return "photo", message.photo[-1].file_id
+    if message.sticker:
+        thumb = message.sticker.thumbnail
+        return "sticker", thumb.file_id if thumb else message.sticker.file_id
+    if message.video:
+        return "video", _preview_file_id(message.video)
+    if message.animation:
+        return "animation", _preview_file_id(message.animation)
+    if message.document:
+        return "document", _preview_file_id(message.document)
+    if message.video_note:
+        return "video_note", _preview_file_id(message.video_note)
+    if message.audio:
+        return "audio", _preview_file_id(message.audio)
+    if message.voice:
+        return "voice", None
+    return "media", None
 
 
 async def _record_game_reaction(
@@ -353,7 +447,12 @@ def get_recent(chat_id: int, kind: MediaKind) -> tuple[int, str] | None:
 # --- отложенная реакция (wait_then_chance) ----------------------------------
 
 async def _wait_then_react(
-    kind: MediaKind, chat_id: int, message_id: int, author_name: str, window_min: int
+    kind: MediaKind,
+    chat_id: int,
+    message_id: int,
+    author_name: str,
+    window_min: int,
+    author_tg_id: int | None = None,
 ) -> None:
     """Грейс-окно для wait_then_chance: ждём `window_min` минут, давая людям
     отреагировать самим. Если живая реакция случилась — молчим. Иначе реагируем.
@@ -366,7 +465,7 @@ async def _wait_then_react(
     if (chat_id, message_id) in _reacted:
         log.info("media_reactions.skipped_human", kind=kind, message_id=message_id)
         return
-    await _do_react(kind, chat_id, message_id, author_name)
+    await _do_react(kind, chat_id, message_id, author_name, author_tg_id)
 
 
 async def _schedule_reaction(
@@ -407,7 +506,7 @@ async def _schedule_reaction(
     if mode == "never":
         return
     if mode == "always":
-        await _do_react(kind, chat_id, message_id, author_name)
+        await _do_react(kind, chat_id, message_id, author_name, author_id)
         return
 
     # chance / wait_then_chance — один честный ролл на заданный chance_pct.
@@ -416,12 +515,17 @@ async def _schedule_reaction(
         return
 
     if mode == "chance":
-        await _do_react(kind, chat_id, message_id, author_name)
+        await _do_react(kind, chat_id, message_id, author_name, author_id)
         return
     # wait_then_chance — реагируем после грейс-окна, уступая живым реакциям.
     asyncio.create_task(
         _wait_then_react(
-            kind, chat_id, message_id, author_name, settings["wait_window_min"]
+            kind,
+            chat_id,
+            message_id,
+            author_name,
+            settings["wait_window_min"],
+            author_id,
         )
     )
 
@@ -449,7 +553,14 @@ async def _finalize_album(media_group_id: str) -> None:
         kind=kind,
     )
     await _record_game_post(
-        kind, buf.chat_id, buf.first_message_id, buf.author_id, buf.posted_at
+        kind,
+        buf.chat_id,
+        buf.first_message_id,
+        buf.author_id,
+        buf.posted_at,
+        media_type=buf.media_type,
+        media_count=buf.count,
+        preview_file_id=buf.preview_file_id,
     )
     await _schedule_reaction(
         kind, buf.chat_id, buf.first_message_id, buf.author_id, buf.author_name
@@ -478,8 +589,16 @@ async def _on_media_impl(message: Message) -> None:
     if mgid is None:
         # Одиночное медиа — реагируем сразу (планируем серию/реакцию).
         author_name = await _author_name(author_id)
+        media_type, preview = _media_meta(message)
         await _record_game_post(
-            "single", chat_id, message.message_id, author_id, message.date
+            "single",
+            chat_id,
+            message.message_id,
+            author_id,
+            message.date,
+            media_type=media_type,
+            media_count=1,
+            preview_file_id=preview,
         )
         await _schedule_reaction(
             "single", chat_id, message.message_id, author_id, author_name
@@ -488,6 +607,7 @@ async def _on_media_impl(message: Message) -> None:
 
     # Часть альбома — собираем в буфер с debounce.
     buf = _albums.get(mgid)
+    media_type, preview = _media_meta(message)
     if buf is None:
         author_name = await _author_name(author_id)
         buf = _AlbumBuf(
@@ -496,11 +616,18 @@ async def _on_media_impl(message: Message) -> None:
             author_name=author_name,
             first_message_id=message.message_id,
             posted_at=message.date,
+            media_type=media_type,
+            preview_file_id=preview,
         )
         _albums[mgid] = buf
         buf.task = asyncio.create_task(_finalize_album(mgid))
     else:
         buf.count += 1
+        # GHG11(10): если у первого элемента превью не было (напр. документ без
+        # миниатюры), берём его у следующего — превью для ленты важнее типа.
+        if buf.preview_file_id is None and preview is not None:
+            buf.preview_file_id = preview
+            buf.media_type = media_type
         # reply вешаем на первый элемент альбома — он уже сохранён в буфере.
 
 

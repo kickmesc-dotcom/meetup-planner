@@ -196,6 +196,24 @@ class GuestTodayTitleOut(BaseModel):
     worm: bool = False
 
 
+class GuestRecentOut(BaseModel):
+    """GHG11(10): строка «последней активности» в чужом профиле.
+
+    Пять независимых источников (сообщение в чат, ачивка, действие в мини-аппе,
+    медиа, последний заход) — каждый со своей датой. Для медиа есть `post_id`:
+    превью тянется через `/api/media/{post_id}` и открывается по клику.
+    """
+
+    kind: str  # message | achievement | activity | media | visit
+    icon: str
+    label: str
+    text: str | None = None
+    at: datetime | None = None
+    post_id: int | None = None
+    media_type: str | None = None
+    media_count: int | None = None
+
+
 class GuestProfileOut(BaseModel):
     """Э19: чужой профиль «глазами гостя» — только факты, без настроек.
 
@@ -238,6 +256,9 @@ class GuestProfileOut(BaseModel):
     achievements: list[GuestAchievementOut] = []
     # GHG11: сегодняшние «носимые» звания с причинами (плашка над головой).
     today: GuestTodayTitleOut | None = None
+    # GHG11(10): превью последней активности — сообщение/ачивка/действие/медиа/
+    # заход. Последний заход показывается, если участник не выключил его у себя.
+    recent: list[GuestRecentOut] = []
 
 
 class HolidayOut(BaseModel):

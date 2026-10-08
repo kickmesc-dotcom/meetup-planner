@@ -339,6 +339,20 @@ function GreetingSettings() {
               ))}
             </div>
           </div>
+          {/* GHG11(10): виден ли другим мой последний заход в мини-апп
+              (по умолчанию включено у всех). */}
+          <div className="flex items-center justify-between gap-3 pt-2.5">
+            <div className="min-w-0">
+              <div className="text-sm text-tg-text">🚪 Последний заход</div>
+              <div className="text-[11px] text-tg-hint truncate">
+                Видно другим в профиле
+              </div>
+            </div>
+            <Switch
+              checked={p.show_last_seen}
+              onChange={(show) => save.mutate({ show_last_seen: show })}
+            />
+          </div>
         </>
       )}
     </section>

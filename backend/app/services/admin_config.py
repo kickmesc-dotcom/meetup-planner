@@ -1592,6 +1592,30 @@ async def set_ui_muted_feed(
     )
 
 
+# GHG11(10): «показывать другим, когда я последний раз заходил в мини-апп».
+# По умолчанию ВКЛЮЧЕНО у всех (прод-фидбек), в своём профиле можно выключить.
+# Флаг читает гость, смотрящий чужой профиль: `ui.show_last_seen:{tg_id}`
+# -> "1"/"0". Запись есть только если участник реально выключал.
+UI_SHOW_LAST_SEEN_PREFIX = "ui.show_last_seen:"
+_UI_SHOW_LAST_SEEN_DEFAULT = True
+
+
+async def get_ui_show_last_seen(session: AsyncSession, tg_id: int) -> bool:
+    """Показывать ли другим последний заход этого участника (дефолт — да)."""
+    return _parse_bool(
+        await _get_value(session, f"{UI_SHOW_LAST_SEEN_PREFIX}{tg_id}"),
+        _UI_SHOW_LAST_SEEN_DEFAULT,
+    )
+
+
+async def set_ui_show_last_seen(
+    session: AsyncSession, tg_id: int, value: bool
+) -> None:
+    await _set_value(
+        session, f"{UI_SHOW_LAST_SEEN_PREFIX}{tg_id}", "1" if value else "0"
+    )
+
+
 # --- G2/G3: настройки опросов в чате ---
 
 def _parse_bool(raw: str | None, default: bool) -> bool:

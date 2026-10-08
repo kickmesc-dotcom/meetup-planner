@@ -203,6 +203,25 @@ export interface GuestProfile {
   achievements: GuestAchievement[];
   /** GHG11: сегодняшние «носимые» звания с причинами (плашка над головой). */
   today: GuestTodayTitle | null;
+  /** GHG11(10): превью последней активности (низ профиля, в заданном порядке). */
+  recent: GuestRecent[];
+}
+
+/**
+ * GHG11(10): строка «последней активности» участника.
+ *
+ * `kind`: message | achievement | activity | media | visit. Для `media` есть
+ * `post_id` — превью тянется через `/api/media/{post_id}` и открывается по клику.
+ */
+export interface GuestRecent {
+  kind: "message" | "achievement" | "activity" | "media" | "visit";
+  icon: string;
+  label: string;
+  text: string | null;
+  at: string | null;
+  post_id: number | null;
+  media_type: string | null;
+  media_count: number | null;
 }
 
 /** GHG11: звания «сегодня» — лох дня / чухан недели / червь-пидор. */
@@ -257,6 +276,13 @@ export interface FeedDetail {
   closed?: boolean;
   track_count?: number;
   selection_id?: number;
+  /** GHG11(10): реакция бота на медиа — превью и сама реакция. */
+  post_id?: number;
+  media_type?: string;
+  media_count?: number;
+  media_kind?: string;
+  emoji?: string | null;
+  phrase?: string | null;
   week_start?: string | null;
   reason?: string | null;
   submissions?: {
@@ -353,6 +379,8 @@ export const FEED_KIND_LABELS: Record<string, { icon: string; title: string }> =
   // GHG11: активность механик без своей таблицы (совет, червь, реакции,
   // номинации). Метка должна совпадать с `feed.FEED_TITLES[FEED_FEATURE]`.
   feature: { icon: "✨", title: "Активность" },
+  // GHG11(10): реакция бота на медиа участника (с превью).
+  media: { icon: "📸", title: "Реакция на медиа" },
 };
 
 /** GHG11: вид записи ленты «feature» — активность механик. */

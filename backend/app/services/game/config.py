@@ -117,6 +117,10 @@ XP_RULES: dict[str, XpRule] = {
         # Повтор защищён состоянием раунда (закрывается один раз).
         XpRule("music_author", 0, "Твой трек выпал в мьюзик-гейме", variable=True),
         XpRule("music_guess", 0, "Угадал автора трека", variable=True),
+        # GHG11(10): бот отреагировал на мем участника (эмодзи или фраза).
+        # Дискриминатор — конкретное сообщение, поэтому ретрай апдейта или
+        # повторный вызов не начислят дважды за один и тот же пост.
+        XpRule("media_reaction", 3, "Бот отреагировал на твой мем", limit="day"),
     )
 }
 
@@ -138,6 +142,7 @@ EV_VOICE = "voice"
 EV_VOICE_BEST = "voice_best"
 EV_MUSIC_AUTHOR = "music_author"
 EV_MUSIC_GUESS = "music_guess"
+EV_MEDIA_REACTION = "media_reaction"
 
 
 def points_for(code: str) -> int:

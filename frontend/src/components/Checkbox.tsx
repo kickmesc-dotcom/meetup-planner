@@ -51,6 +51,8 @@ interface SwitchProps {
   className?: string;
   /** Тактильная отдача при переключении (по умолчанию — да). */
   hapticOnChange?: boolean;
+  /** GHG11(10): `sm` — вполовину меньше, для тихих «необязательных» настроек. */
+  size?: "sm" | "md";
 }
 
 /**
@@ -69,7 +71,12 @@ export function Switch({
   disabled,
   className,
   hapticOnChange = true,
+  size = "md",
 }: SwitchProps) {
+  // GHG11(10): `sm` — ровно вполовину визуально меньше (`h-4 w-8` против
+  // `h-6 w-11`), для тихих настроек «хорошо иметь», которые не должны
+  // выглядеть как рекомендованное действие.
+  const small = size === "sm";
   return (
     <button
       type="button"
@@ -79,7 +86,8 @@ export function Switch({
         onChange(!checked);
       }}
       className={[
-        "shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50",
+        "shrink-0 inline-flex items-center rounded-full transition-colors disabled:opacity-50",
+        small ? "h-4 w-8" : "h-6 w-11",
         checked ? "bg-tg-button" : "bg-tg-hint/30",
         className ?? "",
       ].join(" ")}
@@ -88,8 +96,15 @@ export function Switch({
     >
       <span
         className={[
-          "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-          checked ? "translate-x-5" : "translate-x-0.5",
+          "inline-block transform rounded-full bg-white shadow transition-transform",
+          small ? "h-3 w-3" : "h-5 w-5",
+          checked
+            ? small
+              ? "translate-x-4"
+              : "translate-x-5"
+            : small
+              ? "translate-x-0.5"
+              : "translate-x-0.5",
         ].join(" ")}
       />
     </button>

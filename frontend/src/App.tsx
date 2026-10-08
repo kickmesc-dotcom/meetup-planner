@@ -35,6 +35,7 @@ export default function App() {
         welcome_format: prev?.welcome_format ?? "avatar",
         hide_greeting: true,
         muted_feed: prev?.muted_feed ?? [],
+        show_last_seen: prev?.show_last_seen ?? true,
       });
       return { prev };
     },

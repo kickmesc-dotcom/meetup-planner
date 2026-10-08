@@ -61,6 +61,7 @@ def quiet_feed(monkeypatch):
         "_voice_items",
         "_music_items",
         "_music_game_items",
+        "_media_items",
         "_journal_items",
     ):
         monkeypatch.setattr(feed, name, empty)

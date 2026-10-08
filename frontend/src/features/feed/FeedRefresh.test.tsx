@@ -54,6 +54,7 @@ beforeEach(() => {
     hide_greeting: false,
     welcome_format: "avatar",
     muted_feed: [],
+    show_last_seen: true,
   });
   vi.mocked(fetchUsers).mockResolvedValue([]);
 });

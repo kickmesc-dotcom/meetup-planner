@@ -45,6 +45,7 @@ from app.services.game.config import (
     EV_HOLIDAY,
     EV_MEETING,
     EV_MESSAGE,
+    EV_MEDIA_REACTION,
     EV_MUSIC_AUTHOR,
     EV_MUSIC_GUESS,
     EV_QUOTE,
@@ -613,6 +614,26 @@ async def music_guess(
     await achievements.on_music_guess(session, user_id)
 
 
+@_guarded(EV_MEDIA_REACTION)
+async def media_reaction(
+    session: AsyncSession,
+    user_id: int,
+    *,
+    chat_id: int | None = None,
+    message_id: int | None = None,
+    at: datetime | None = None,
+) -> None:
+    """GHG11(10): бот отреагировал на медиа участника → опыт автору.
+
+    Дискриминатор = `chat:message`, поэтому один пост даёт опыт максимум раз,
+    даже если реакция по какой-то причине обработается повторно.
+    """
+    if not await _enabled(session):
+        return
+    disc = f"{chat_id}:{message_id}" if message_id is not None else None
+    await xp.award(session, user_id, EV_MEDIA_REACTION, at=at, discriminator=disc)
+
+
 @_guarded("music_published")
 async def music_published(
     session: AsyncSession, user_id: int, *, track_id: int | None = None
@@ -661,4 +682,5 @@ ALL_EVENTS = (
     EV_VOICE_BEST,
     EV_MUSIC_AUTHOR,
     EV_MUSIC_GUESS,
+    EV_MEDIA_REACTION,
 )

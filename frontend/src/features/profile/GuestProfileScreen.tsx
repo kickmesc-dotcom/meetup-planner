@@ -5,9 +5,11 @@ import {
   fetchMyGame,
   type GuestAchievement,
   type GuestProfile,
+  type GuestRecent,
   type GuestTitleEvent,
 } from "@/api/game";
 import { fetchMe, fetchUiPrefs, updateUiPrefs } from "@/api/availability";
+import { apiPublicUrl } from "@/api/client";
 import RankPlaque from "@/components/RankPlaque";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
@@ -137,6 +139,9 @@ export default function GuestProfileScreen({
             {!isSelf && (
               <MuteFeedSwitch userId={p.user_id} name={p.name} onDone={() => qc.invalidateQueries({ queryKey: ["ui-prefs"] })} />
             )}
+
+            {/* GHG11(10): превью последней активности — в самом низу профиля. */}
+            <RecentActivity recent={p.recent ?? []} />
           </div>
         )}
       </div>
@@ -427,7 +432,10 @@ function CollapsibleHistory({
   );
 }
 
-/** GHG11(7): «не показывать события участника в моей ленте» — персонально. */
+/**
+ * GHG11(10): «не показывать события участника» — тихая, вполовину меньшая
+ * настройка «хорошо иметь». Без карточки, без акцента, размер — `sm`.
+ */
 function MuteFeedSwitch({
   userId,
   name,
@@ -458,22 +466,147 @@ function MuteFeedSwitch({
   };
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/40 px-3 py-2.5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs text-tg-hint">
-            🙈 Не показывать события этого участника в моей ленте
-          </div>
-          <div className="truncate text-[10px] text-tg-hint/80">{name}</div>
-        </div>
-        <Switch
-          checked={checked}
-          disabled={save.isPending || !prefs.data}
-          onChange={toggle}
-        />
+    <section
+      data-testid="mute-feed-switch"
+      className="flex items-center justify-between gap-2 px-2 py-1.5"
+    >
+      <div className="min-w-0 truncate text-[10px] leading-tight text-tg-hint/80">
+        🙈 Не показывать события {name} в моей ленте
       </div>
+      <Switch
+        size="sm"
+        checked={checked}
+        disabled={save.isPending || !prefs.data}
+        onChange={toggle}
+      />
     </section>
   );
+}
+
+/**
+ * GHG11(10): блок последней активности участника (низ профиля).
+ *
+ * Пять источников от бэкенда: последнее сообщение в чат, последняя ачивка,
+ * последнее действие в мини-аппе, последнее медиа (с превью) и последний заход.
+ * Порядок задаёт сервер; отсутствующие источники просто не приходят.
+ */
+function RecentActivity({ recent }: { recent: GuestRecent[] }) {
+  const [lightbox, setLightbox] = useState<{
+    postId: number;
+    mediaType: string | null;
+  } | null>(null);
+
+  if (recent.length === 0) return null;
+
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="text-sm font-semibold">🕘 Последняя активность</div>
+      <div className="mt-2 space-y-1.5">
+        {recent.map((r) => (
+          <div key={r.kind} className="rounded-lg bg-tg-bg/40 px-2 py-1.5">
+            <div className="flex items-start gap-2">
+              <span className="shrink-0 text-sm leading-tight">{r.icon}</span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[10px] text-tg-hint">{r.label}</div>
+                {r.text && (
+                  <div className="text-xs text-tg-text [word-break:break-word]">
+                    {r.text}
+                  </div>
+                )}
+                {r.at && (
+                  <div className="text-[10px] tabular-nums text-tg-hint">
+                    {formatDateTime(r.at)}
+                  </div>
+                )}
+              </div>
+            </div>
+            {r.kind === "media" && r.post_id != null && (
+              <MediaThumb
+                postId={r.post_id}
+                mediaType={r.media_type}
+                onOpen={() =>
+                  setLightbox({ postId: r.post_id!, mediaType: r.media_type })
+                }
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {lightbox && (
+        <div
+          data-testid="media-lightbox"
+          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 p-4"
+        >
+          <img
+            src={apiPublicUrl(`/api/media/${lightbox.postId}`)}
+            alt=""
+            className="max-h-[80vh] max-w-full rounded-lg object-contain"
+          />
+          <div className="mt-3 text-xs text-white/70">Нажми, чтобы закрыть</div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** GHG11(10): мини-превью медиа; по клику открывается крупно (лайтбокс). */
+function MediaThumb({
+  postId,
+  mediaType,
+  onOpen,
+}: {
+  postId: number;
+  mediaType: string | null;
+  onOpen: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <button
+      type="button"
+      data-testid="media-thumb"
+      onClick={() => {
+        haptic("light");
+        onOpen();
+      }}
+      className="mt-1.5 block h-20 w-20 overflow-hidden rounded-lg bg-tg-bg/60"
+    >
+      {failed ? (
+        <span className="flex h-full w-full items-center justify-center text-xl">
+          {mediaIcon(mediaType)}
+        </span>
+      ) : (
+        <img
+          src={apiPublicUrl(`/api/media/${postId}`)}
+          alt=""
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      )}
+    </button>
+  );
+}
+
+/** Иконка типа медиа — когда картинки-превью нет (видео без миниатюры и т.п.). */
+function mediaIcon(mediaType: string | null): string {
+  switch (mediaType) {
+    case "video":
+    case "video_note":
+      return "🎬";
+    case "animation":
+      return "🖼";
+    case "sticker":
+      return "🏷";
+    case "voice":
+      return "🎙";
+    case "audio":
+      return "🎵";
+    case "document":
+      return "📄";
+    default:
+      return "📷";
+  }
 }
 
 /**
@@ -557,6 +690,18 @@ function formatDate(iso: string): string {
     day: "numeric",
     month: "short",
     year: "numeric",
+  });
+}
+
+/** GHG11(10): дата и время одной строкой — для последней активности. */
+function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 

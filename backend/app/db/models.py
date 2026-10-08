@@ -555,6 +555,10 @@ class GameProfile(Base):
     # Сбрасывается, когда юзер посмотрел профиль (POST /me/game/level-up/ack).
     pending_level_up_from: Mapped[int | None] = mapped_column(Integer)
     pending_level_up_to: Mapped[int | None] = mapped_column(Integer)
+    # GHG11(10): когда участник последний раз открывал мини-апп. Обновляется
+    # best-effort в `/api/me` (см. `services/game/presence.py`); показывается в
+    # чужом профиле, если участник не выключил это у себя (`ui.show_last_seen`).
+    last_app_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -763,6 +767,22 @@ class GameMediaPost(Base):
     # "alive" — пост собрал реакции; "dead" — 12 часов никто не откликнулся.
     outcome: Mapped[str | None] = mapped_column(String(16))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # GHG11(10): что именно бот отреагировал и на что — чтобы лента показывала
+    # осмысленный анонс (тип медиа, превью, эмодзи-реакция или цитата из пула),
+    # а не безликую строку «бот отреагировал на медиа».
+    # "photo" | "video" | "animation" | "sticker" | "document" | "voice" | ...
+    media_type: Mapped[str | None] = mapped_column(String(16))
+    # Сколько файлов в подборке-альбоме (для single — 1).
+    media_count: Mapped[int | None] = mapped_column(Integer)
+    # file_id миниатюры (фото/превью видео) — отдаётся через `/api/media/{id}`.
+    preview_file_id: Mapped[str | None] = mapped_column(Text)
+    # Чем именно бот отреагировал: эмодзи-реакция И/ИЛИ reply-фраза из пула.
+    reaction_emoji: Mapped[str | None] = mapped_column(String(16))
+    reaction_phrase: Mapped[str | None] = mapped_column(Text)
+    # Момент реакции. Заполнен ⇒ пост показывается в ленте как «реакция бота»
+    # (пишется только когда фича «реакции на медиа» в режиме ленты/обеих).
+    reacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class GameJournalEntry(Base):

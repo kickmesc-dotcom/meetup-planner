@@ -39,7 +39,7 @@ import ErrorState from "@/components/ErrorState";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { fetchMe, fetchUiPrefs, fetchUsers } from "@/api/availability";
-import { humanizeApiError } from "@/api/client";
+import { apiPublicUrl, humanizeApiError } from "@/api/client";
 
 /**
  * Э20: лента активности.
@@ -959,6 +959,13 @@ export function FeedRow({
               dangerouslySetInnerHTML={{ __html: item.text }}
             />
           )}
+          {/* GHG11(10): реакция бота на медиа — видно ЧТО было за медиа. */}
+          {item.kind === "media" && typeof item.detail?.post_id === "number" && (
+            <FeedMediaPreview
+              postId={item.detail.post_id}
+              mediaType={item.detail.media_type}
+            />
+          )}
           {/* GHG11(4): новый вид — компактно, без раскрытия: кто участвовал и
               сколько XP/лайков. */}
           {compact && stripParticipants.length > 0 && (
@@ -1046,6 +1053,84 @@ export function FeedRow({
       )}
     </div>
   );
+}
+
+/**
+ * GHG11(10): превью медиа в ленте. Миниатюра тянется из публичного
+ * `/api/media/{id}`; по клику открывается крупно (лайтбокс) — так по записи
+ * ленты видно, ЧТО именно бот отреагировал, а не только «медиа». Подборка -
+ * альбом показывает превью первого файла и число файлов в тексте анонса.
+ */
+function FeedMediaPreview({
+  postId,
+  mediaType,
+}: {
+  postId: number;
+  mediaType?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const src = apiPublicUrl(`/api/media/${postId}`);
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="feed-media-thumb"
+        onClick={(e) => {
+          e.stopPropagation();
+          haptic("light");
+          setOpen(true);
+        }}
+        className="mt-1.5 block h-16 w-16 overflow-hidden rounded-lg bg-tg-bg/60"
+      >
+        {failed ? (
+          <span className="flex h-full w-full items-center justify-center text-lg">
+            {mediaTypeIcon(mediaType)}
+          </span>
+        ) : (
+          <img
+            src={src}
+            alt=""
+            onError={() => setFailed(true)}
+            className="h-full w-full object-cover"
+          />
+        )}
+      </button>
+      {open && (
+        <div
+          data-testid="feed-media-lightbox"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 p-4"
+        >
+          <img src={src} alt="" className="max-h-[80vh] max-w-full rounded-lg object-contain" />
+          <div className="mt-3 text-xs text-white/70">Нажми, чтобы закрыть</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function mediaTypeIcon(mediaType?: string): string {
+  switch (mediaType) {
+    case "video":
+    case "video_note":
+      return "🎬";
+    case "animation":
+      return "🖼";
+    case "sticker":
+      return "🏷";
+    case "voice":
+      return "🎙";
+    case "audio":
+      return "🎵";
+    case "document":
+      return "📄";
+    default:
+      return "📷";
+  }
 }
 
 function formatWhen(iso: string): string {

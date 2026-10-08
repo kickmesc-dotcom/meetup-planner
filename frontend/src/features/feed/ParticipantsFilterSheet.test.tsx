@@ -49,11 +49,13 @@ beforeEach(() => {
     hide_greeting: false,
     welcome_format: "avatar",
     muted_feed: [],
+    show_last_seen: true,
   });
   vi.mocked(updateUiPrefs).mockImplementation(async (p) => ({
     hide_greeting: false,
     welcome_format: "avatar",
     muted_feed: p.muted_feed ?? [],
+    show_last_seen: p.show_last_seen ?? true,
   }));
 });
 
@@ -89,6 +91,7 @@ describe("ParticipantsFilterSheet (GHG11(7))", () => {
       hide_greeting: false,
       welcome_format: "avatar",
       muted_feed: [2, 3],
+      show_last_seen: true,
     });
     renderSheet();
     await screen.findByText("Митян");

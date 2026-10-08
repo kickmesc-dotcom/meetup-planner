@@ -2,6 +2,15 @@ import { getInitData } from "@/tg/webapp";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
+/**
+ * GHG11(10): абсолютный URL публичного `<img>`-ресурса (аватарка/превью медиа).
+ * Медиа-превью отдаётся без tma-заголовка, как `/api/avatar/{id}`, поэтому
+ * тег `<img>` работает с обычным URL — и в dev через VITE_API_BASE, и в проде.
+ */
+export function apiPublicUrl(path: string): string {
+  return path.startsWith("http") ? path : `${API_BASE}${path}`;
+}
+
 export class ApiError extends Error {
   constructor(public status: number, public detail: string) {
     super(`${status}: ${detail}`);

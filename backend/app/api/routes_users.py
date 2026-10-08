@@ -13,9 +13,11 @@ from app.schemas.user import UserOut
 from app.services.admin_config import (
     get_ui_hide_greeting,
     get_ui_muted_feed,
+    get_ui_show_last_seen,
     get_ui_welcome_format,
     set_ui_hide_greeting,
     set_ui_muted_feed,
+    set_ui_show_last_seen,
     set_ui_welcome_format,
 )
 
@@ -66,6 +68,11 @@ def _to_out(
 
 @router.get("/me", response_model=UserOut)
 async def me(session: SessionDep, user: CurrentUser) -> UserOut:
+    # GHG11(10): мини-апп при запуске зовёт `/me` — здесь и отмечаем «последний
+    # заход». Best-effort и троттлинг внутри (см. services/game/presence).
+    from app.services.game import presence
+
+    await presence.touch_last_app_seen(session, user.id)
     admin_ids = get_settings().admin_tg_id_set
     custom_name = await session.scalar(
         select(GameProfile.custom_name).where(GameProfile.user_id == user.id)
@@ -142,6 +149,8 @@ class UiPrefsOut(BaseModel):
     welcome_format: str  # name | avatar | both
     # GHG11(7): кого скрыть в ленте (внутренние id) — своя галочка неснимаемая.
     muted_feed: list[int] = []
+    # GHG11(10): показывать ли другим мой последний заход в мини-апп (дефолт — да).
+    show_last_seen: bool = True
 
 
 class NotificationOut(BaseModel):
@@ -177,6 +186,7 @@ class UiPrefsPatch(BaseModel):
         None, pattern="^(name|avatar|both)$"
     )
     muted_feed: list[int] | None = None
+    show_last_seen: bool | None = None
 
 
 @router.get("/me/ui-prefs", response_model=UiPrefsOut)
@@ -185,6 +195,7 @@ async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
         hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
         welcome_format=await get_ui_welcome_format(session, user.telegram_id),
         muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
+        show_last_seen=await get_ui_show_last_seen(session, user.telegram_id),
     )
 
 
@@ -260,8 +271,11 @@ async def put_ui_prefs(
             user.telegram_id,
             {i for i in body.muted_feed if i != user.id},
         )
+    if body.show_last_seen is not None:
+        await set_ui_show_last_seen(session, user.telegram_id, body.show_last_seen)
     return UiPrefsOut(
         hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
         welcome_format=await get_ui_welcome_format(session, user.telegram_id),
         muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
+        show_last_seen=await get_ui_show_last_seen(session, user.telegram_id),
     )
