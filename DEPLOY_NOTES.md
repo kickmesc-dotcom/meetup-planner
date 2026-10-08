@@ -6,9 +6,14 @@
 > светлая/тёмная, по умолчанию тёмная** — свитчер вверху скраю, компактный и
 > ненавязчивый.
 
-✅ **Выложено 2026-10-08.** Монорепо → GitHub (`origin/main`), фронт Cloudflare
-Pages пересобрался сам: бандл `index-Cza-KDeO.js` / `index-C2rHWT1z.css`
-(пришёл на смену `index-BbD7DtMJ.js` из GHG11 (10)). Бэкенд в этой задаче не менялся:
+✅ **Выложено 2026-10-08.** Монорепо `39b941f` → GitHub
+(`5f3dd0d..39b941f`, `origin/main`), фронт Cloudflare Pages пересобрался сам:
+боевой бандл `assets/index-B_ih8bZp.js` + `assets/index-C2rHWT1z.css` (пришёл
+на смену `index-BbD7DtMJ.js` из GHG11 (10)). Хеш JS у CF-сборки отличается от
+локального (`index-Cza-KDeO.js`) при совпадающем CSS — окружение сборки чуть
+иное; что уехал ИМЕННО этот код, проверено грепом по бандлу
+(`ghg.theme.v1`, `theme-switcher`, `Закрыть плеер`, `Предыдущий трек`,
+`player-liked-mode`) и живым смоуком ниже. Бэкенд в этой задаче не менялся:
 миграций нет, `alembic_head` остался `0028_media_feed_profile`, зеркало
 `meetup-planner-backend`/HF/Amvera не пушились. Единственная запись в БД —
 бэкфилл старых реакций (см. §3), откатывается одной командой.
@@ -17,7 +22,14 @@ Pages пересобрался сам: бандл `index-Cza-KDeO.js` / `index-C
 rc=0; моно-бэкенд **1068 passed**; `tools/tests` **32 passed** (14 новых — на
 бэкфилл-тул).
 
-**Живой UI-смоук (vite на 5199 + `server.proxy` → Amvera, настоящий initData
+**Живой UI-смоук БОЯ (CF Pages, `https://meetup-planner1.pages.dev` + настоящий
+initData):** тема тёмная по умолчанию (`--tg-theme-bg-color=#17212b`), свитчер
+на месте, в ленте те же 6 записей «Реакция на медиа» уже из боевого API, плеер
+— четыре строки; тап по свитчеру даёт светлую (`#ffffff`, `--tg-theme-hint-color
+= #707579`), кнопки плеера читаемы; консоль чистая (только штатные warning'и
+Telegram WebApp v6.0).
+
+**Живой UI-смоук локально (vite на 5199 + `server.proxy` → Amvera, initData
 Сомова через dev-хук `?initData=…`):** тема тёмная по умолчанию
 (`document.documentElement.dataset.theme=dark`, `--tg-theme-bg-color=#17212b`),
 свитчер — компактная кнопка в правом верхнем углу; тап по ней переключает на
