@@ -605,6 +605,31 @@ class MusicLikeOut(BaseModel):
     likes: int = 0
 
 
+class MusicPlaylistOut(BaseModel):
+    """Подборка как плейлист очереди плеера (GHG11(9)).
+
+    `key` — устойчивый идентификатор для фронта (`week:12`, `liked`), чтобы плеер
+    не принимал новую подборку за другую при рефетче и не начинал заново.
+    """
+
+    key: str
+    title: str
+    created_at: datetime | None = None
+    tracks: list[MusicWeekTrackOut] = []
+
+
+class MusicQueueOut(BaseModel):
+    """Очередь плеера: подборки подряд + режим «только лайкнутые» (GHG11(9)).
+
+    Подборки идут в порядке воспроизведения (свежая первая), `liked` —
+    отдельный набор для переключателя «играть только лайкнутые».
+    """
+
+    enabled: bool = False
+    playlists: list[MusicPlaylistOut] = []
+    liked: list[MusicWeekTrackOut] = []
+
+
 class MusicMineOut(BaseModel):
     """Экран «Предложка недели» в мини-аппе.
 

@@ -17,6 +17,7 @@ import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
 import { PlayerBar, PlayerProvider } from "./components/GlobalPlayer";
+import NotificationsBell from "./features/notifications/NotificationsBell";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
 
@@ -151,11 +152,13 @@ export default function App() {
       <>
         {/* GHG11: заголовок ленты — ОДНОЙ строкой (раньше дублировался внутри
             FeedScreen). Сама лента ниже отдаёт строку управления. */}
-        <header className="flex items-baseline gap-2 overflow-hidden border-b border-tg-secondary-bg px-4 py-2.5">
+        <header className="relative flex items-center gap-2 overflow-hidden border-b border-tg-secondary-bg px-4 py-2.5">
           <span className="shrink-0 text-base font-medium">🏆 Лента</span>
           <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
             Кто что открыл и с кем что случилось.
           </span>
+          {/* GHG11(9): личные уведомления (лайки своих треков) — в шапке ленты. */}
+          <NotificationsBell />
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
           <FeedScreen meId={meData.id} />

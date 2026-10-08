@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -142,6 +144,33 @@ class UiPrefsOut(BaseModel):
     muted_feed: list[int] = []
 
 
+class NotificationOut(BaseModel):
+    """Уведомление в колокольчике (GHG11(9)).
+
+    `track_id` вытаскиваем из `payload` — фронту его хватает, чтобы отвести к
+    треку; сам `payload` наружу не отдаём (внутренний формат).
+    """
+
+    id: int
+    kind: str
+    text: str
+    track_id: int | None = None
+    created_at: datetime | None = None
+    read: bool = False
+
+
+class NotificationsOut(BaseModel):
+    items: list[NotificationOut] = []
+    unread: int = 0
+
+
+class NotificationsReadIn(BaseModel):
+    """Отметить прочитанными: список id или всё сразу (`all=true`)."""
+
+    ids: list[int] | None = None
+    all: bool = False
+
+
 class UiPrefsPatch(BaseModel):
     hide_greeting: bool | None = None
     welcome_format: str | None = Field(
@@ -157,6 +186,60 @@ async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
         welcome_format=await get_ui_welcome_format(session, user.telegram_id),
         muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
     )
+
+
+async def _notifications_out(session: SessionDep, user_id: int) -> NotificationsOut:
+    """Уведомления + счётчик непрочитанных — общее для GET и POST."""
+    from app.services import notifications
+
+    rows = await notifications.list_for_user(session, user_id)
+    return NotificationsOut(
+        items=[
+            NotificationOut(
+                id=row.id,
+                kind=row.kind,
+                text=row.text,
+                track_id=_payload_track_id(row.payload),
+                created_at=row.created_at,
+                read=row.read_at is not None,
+            )
+            for row in rows
+        ],
+        unread=await notifications.unread_count(session, user_id),
+    )
+
+
+def _payload_track_id(payload: object) -> int | None:
+    """`track_id` из payload уведомления — с защитой от мусора в JSONB."""
+    if not isinstance(payload, dict):
+        return None
+    value = payload.get("track_id")
+    return int(value) if isinstance(value, int) else None
+
+
+@router.get("/me/notifications", response_model=NotificationsOut)
+async def my_notifications(session: SessionDep, user: CurrentUser) -> NotificationsOut:
+    """Личные уведомления (пока — лайки своих треков) и счётчик непрочитанных.
+
+    Своё, не общее: в чат такие события не ходят, поэтому и в ленте их нет —
+    они ждут здесь, в колокольчике.
+    """
+    return await _notifications_out(session, user.id)
+
+
+@router.post("/me/notifications/read", response_model=NotificationsOut)
+async def read_notifications(
+    body: NotificationsReadIn, session: SessionDep, user: CurrentUser
+) -> NotificationsOut:
+    """Отметить прочитанными (`ids` или всё сразу) и вернуть новый список.
+
+    Возвращаем состояние целиком, а не только «ok»: фронту сразу нужен новый
+    счётчик для бейджа, а лишний рефетч — лишний запрос к базе.
+    """
+    from app.services import notifications
+
+    await notifications.mark_read(session, user.id, ids=body.ids, all_=body.all)
+    return await _notifications_out(session, user.id)
 
 
 @router.put("/me/ui-prefs", response_model=UiPrefsOut)

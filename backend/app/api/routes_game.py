@@ -65,6 +65,8 @@ from app.schemas.game import (
     MusicLikeOut,
     MusicMineOut,
     MusicMineTrackOut,
+    MusicPlaylistOut,
+    MusicQueueOut,
     MusicSelectionOut,
     MusicTopTrackOut,
     MusicWeekOut,
@@ -896,6 +898,68 @@ async def my_music(session: SessionDep, user: CurrentUser) -> MusicMineOut:
     )
 
 
+def _music_track_out(
+    track, likes: dict[int, int], mine: set[int]
+) -> MusicWeekTrackOut:
+    """Трек подборки с лайками — общий для `week` и очереди плеера (GHG11(9))."""
+    return MusicWeekTrackOut(
+        id=track.id,
+        kind=track.kind,
+        title=track.title,
+        performer=track.performer,
+        url=track.url,
+        likes=likes.get(track.id, 0),
+        liked=track.id in mine,
+    )
+
+
+def _music_playlist_title(idx: int, created_at) -> str:
+    """Название плейлиста в плеере: свежая подборка — «недели», старые — по дате."""
+    if idx == 0:
+        return "Подборка недели"
+    if created_at is not None:
+        return f"Подборка от {created_at:%d.%m.%Y}"
+    return "Прошлая подборка"
+
+
+@router.get("/game/music/queue", response_model=MusicQueueOut)
+async def music_queue(session: SessionDep, user: CurrentUser) -> MusicQueueOut:
+    """Очередь плеера: подборки подряд + «только лайкнутые» (GHG11(9)).
+
+    Плеер в мини-аппе не должен упираться в одну подборку: здесь отдаём сразу
+    несколько (свежая → предыдущие), чтобы треки текли без остановки, и набор
+    лайкнутых — для отдельного режима. Лайки/свои лайки считаем ОДНИМ запросом
+    на все треки, а не по подборке (иначе N+1 на каждую подборку).
+    """
+    from app.services.admin_config import get_game_music_enabled
+    from app.services.game import music
+
+    if not await is_game_enabled(session) or not await get_game_music_enabled(session):
+        return MusicQueueOut(enabled=False)
+
+    rows = await music.queue_playlists(session)
+    liked_rows = await music.liked_tracks(session, user.id)
+
+    ids = [t.id for _, tracks in rows for t in tracks]
+    ids += [t.id for t in liked_rows if t.id not in ids]
+    likes = await music.like_counts(session, ids)
+    mine = await music.liked_track_ids(session, user.id, ids)
+
+    return MusicQueueOut(
+        enabled=True,
+        playlists=[
+            MusicPlaylistOut(
+                key=f"week:{sel.id}",
+                title=_music_playlist_title(idx, sel.created_at),
+                created_at=sel.created_at,
+                tracks=[_music_track_out(t, likes, mine) for t in tracks],
+            )
+            for idx, (sel, tracks) in enumerate(rows)
+        ],
+        liked=[_music_track_out(t, likes, mine) for t in liked_rows],
+    )
+
+
 @router.post("/game/music/tracks/{track_id}/like", response_model=MusicLikeOut)
 async def like_music_track(
     track_id: int, session: SessionDep, user: CurrentUser
@@ -914,7 +978,14 @@ async def like_music_track(
     ):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="music off")
 
-    result = await music.toggle_like(session, user_id=user.id, track_id=track_id)
+    result = await music.toggle_like(
+        session,
+        user_id=user.id,
+        track_id=track_id,
+        # Имя лайкающего — для уведомления автору трека (GHG11(9)): роут уже
+        # знает его, поэтому лишнего SELECT по `users` не делаем.
+        liker_name=user.display_name,
+    )
     if result.status != music.LIKE_OK:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="track not published"

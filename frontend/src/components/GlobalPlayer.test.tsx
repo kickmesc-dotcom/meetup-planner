@@ -17,7 +17,12 @@ import {
   PlayerProvider,
   useGlobalPlayer,
 } from "./GlobalPlayer";
-import { fetchMusicAudioUrl, fetchMyMusic, type MusicMine } from "@/api/game";
+import {
+  fetchMusicAudioUrl,
+  fetchMusicQueue,
+  fetchMyMusic,
+  type MusicMine,
+} from "@/api/game";
 
 vi.mock("@/api/game", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/game")>();
@@ -25,6 +30,10 @@ vi.mock("@/api/game", async (importOriginal) => {
     ...actual,
     fetchMusicAudioUrl: vi.fn(),
     fetchMyMusic: vi.fn(),
+    // GHG11(9): провайдер плеера теперь спрашивает ещё и очередь подборок;
+    // пустая очередь — фолбэк на подборку недели, как в GHG11(8).
+    fetchMusicQueue: vi.fn(),
+    likeMusicTrack: vi.fn(),
   };
 });
 
@@ -46,6 +55,11 @@ const TRACKS: MiniTrack[] = [
 beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
+  vi.mocked(fetchMusicQueue).mockResolvedValue({
+    enabled: true,
+    playlists: [],
+    liked: [],
+  });
 });
 
 afterEach(cleanup);

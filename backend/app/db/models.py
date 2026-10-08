@@ -1057,6 +1057,36 @@ class MusicTrackLike(Base):
     )
 
 
+class AppNotification(Base):
+    """GHG11(9): личное уведомление внутри мини-аппа.
+
+    В чат такие события не ходят (лайк чужого трека — не новость для шестёрки),
+    поэтому уведомление живёт в приложении: колокольчик с бейджем непрочитанных.
+    `payload` — свободный JSON (`{"track_id": 12}`), чтобы новые типы уведомлений
+    не требовали новых колонок. `read_at IS NULL` — непрочитанное.
+    """
+
+    __tablename__ = "app_notifications"
+    __table_args__ = (
+        Index("ix_app_notifications_user", "user_id", "created_at"),
+        Index("ix_app_notifications_unread", "user_id", "read_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # 'music_like' — пока единственный тип; строка, чтобы не делать миграцию
+    # ради каждого нового повода.
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 # Цвет для User: если перед insert color_hex пустой — заполнить детерминированно
 # из telegram_id (палитра в app.db.seed.color_for_user).
 from sqlalchemy import event as _sa_event

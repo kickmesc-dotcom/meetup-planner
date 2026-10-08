@@ -19,7 +19,7 @@
  * Authorization через `fetchMusicAudioUrl` (элемент `<audio>` не умеет слать
  * заголовки). Блоб освобождаем при смене трека и на размонтирование.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { fetchMusicAudioUrl } from "@/api/game";
 import { haptic } from "@/tg/webapp";
 
@@ -137,6 +137,13 @@ export function useMiniPlayer(
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobRef = useRef<string | null>(null);
   const restoredRef = useRef(false);
+  // GHG11(9): заготовленные блобы следующего трека. Скачиваем ЗАРАНЕЕ, пока
+  // играет текущий, — тогда переход не ждёт сеть и не рвёт воспроизведение.
+  const cacheRef = useRef<Map<number, string>>(new Map());
+  // Актуальный трек для асинхронных заготовок: колбэк предзагрузки не должен
+  // перечитывать устаревшее значение `currentId` из замыкания.
+  const currentIdRef = useRef<number | null>(null);
+  currentIdRef.current = currentId;
 
   // GHG11(8): восстановление последнего трека. Ждём, пока очередь готова
   // (в глобальном плеере она приезжает запросом «Подборка недели»), и делаем
@@ -174,25 +181,82 @@ export function useMiniPlayer(
     blobRef.current = null;
   };
 
-  // Смена трека: тянем новый источник, старый блоб освобождаем.
+  // GHG11(9): текущий трек ищем по id и держим как ОБЪЕКТ.
+  //
+  // Это принципиально для «неприрываемого» плеера: при переключении режима или
+  // перемешивании меняется только порядок (`playable` — новый массив, но те же
+  // объекты из query-кэша). Если бы эффект ниже зависел от массива, он бы
+  // перезагрузил текущий трек — то есть остановил музыку.
+  const current = useMemo(
+    () => playable.find((t) => t.id === currentId),
+    [playable, currentId],
+  );
+
+  // Кто пойдёт следующим: последний трек очереди замыкается на первый.
+  const nextId = useMemo(() => {
+    if (playable.length === 0) return null;
+    const i = playable.findIndex((t) => t.id === currentId);
+    return playable[i < 0 ? 0 : (i + 1) % playable.length].id;
+  }, [playable, currentId]);
+
+  // Предзагрузка следующего трека. Ошибку глотаем: не вышло заготовить —
+  // трек просто скачается в момент перехода, как было раньше.
+  useEffect(() => {
+    // Заготавливаем только когда что-то уже играет: до первого тапа скачивать
+    // чужой блоб смысла нет.
+    if (currentId == null) return;
+    if (nextId == null || cacheRef.current.has(nextId) || nextId === currentId) return;
+    let cancelled = false;
+    fetchMusicAudioUrl(nextId)
+      .then((url) => {
+        const cache = cacheRef.current;
+        if (cancelled) {
+          if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
+          return;
+        }
+        // Трек успели переключить, пока грузилось: кэшем больше не пользуются.
+        if (currentIdRef.current !== nextId) {
+          if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
+          return;
+        }
+        cache.set(nextId, url);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps — currentIdRef вместо currentId
+  }, [nextId, currentId]);
+
+  // Смена трека: берём заготовленный блоб или тянем новый, старый освобождаем.
   useEffect(() => {
     if (currentId == null) {
       setSrc(null);
       revokeBlob();
       return;
     }
-    const track = playable.find((t) => t.id === currentId);
-    if (!track) {
+    if (!current) {
       setCurrentId(null);
       return;
     }
-    let cancelled = false;
-    setLoading(true);
     setTime(0);
     setDuration(0);
+    const prepared = cacheRef.current.get(current.id) ?? null;
+    if (prepared) {
+      // Заготовка есть — переключаемся сразу, без «паузы на загрузку».
+      cacheRef.current.delete(current.id);
+      revokeBlob();
+      blobRef.current = prepared;
+      setSrc(prepared);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
     // Мгновенно останавливаем предыдущий трек, пока грузится новый.
     setSrc(null);
-    fetchMusicAudioUrl(track.id)
+    fetchMusicAudioUrl(current.id)
       .then((url) => {
         if (cancelled) {
           if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
@@ -213,8 +277,8 @@ export function useMiniPlayer(
     return () => {
       cancelled = true;
     };
-    // `playable` стабилен, пока стабилен массив `tracks` из query-кэша.
-  }, [currentId, playable]);
+    // Зависимость — сам трек-объект, а не массив очереди (см. комментарий выше).
+  }, [currentId, current]);
 
   // Играть/пауза. Пауза — только `pause()`: позиция сохраняется.
   useEffect(() => {
@@ -229,8 +293,18 @@ export function useMiniPlayer(
     }
   }, [playing, src]);
 
-  // Не течём блоб-URL'ами при закрытии ленты/подборки.
-  useEffect(() => () => revokeBlob(), []);
+  // Не течём блоб-URL'ами при закрытии ленты/подборки — включая заготовки.
+  useEffect(
+    () => () => {
+      revokeBlob();
+      const cache = cacheRef.current;
+      cache.forEach((url) => {
+        if (typeof URL.revokeObjectURL === "function") URL.revokeObjectURL(url);
+      });
+      cache.clear();
+    },
+    [],
+  );
 
   const select = (id: number) => {
     haptic("light");
@@ -279,14 +353,24 @@ export function useMiniPlayer(
   };
 
   const onEnded = () => {
-    // Один трек в подборке — просто останавливаемся; иначе идём дальше.
-    if (playable.length > 1) step(1);
-    else setPlaying(false);
+    // GHG11(9): главное правило — НИКОГДА не прерывать воспроизведение.
+    // Дальше по очереди, а на последнем треке — на первый (плейлисты по кругу);
+    // если трек вообще один, крутим его же.
+    if (playable.length > 1) {
+      step(1);
+      return;
+    }
+    const el = audioRef.current;
+    if (el) {
+      el.currentTime = 0;
+      const p = el.play();
+      if (p && typeof p.catch === "function") p.catch(() => setPlaying(false));
+    }
+    setPlaying(true);
   };
 
   const active = currentId != null;
   const index = playable.findIndex((t) => t.id === currentId);
-  const current = index >= 0 ? playable[index] : undefined;
   const isCurrent = (id: number) => currentId === id;
   const fraction = duration > 0 ? Math.min(1, time / duration) : 0;
 
@@ -331,9 +415,12 @@ export type MiniPlayer = ReturnType<typeof useMiniPlayer>;
 export function MiniPlayerBar({
   player,
   className,
+  extras,
 }: {
   player: MiniPlayer;
   className?: string;
+  /** GHG11(9): доп. контролы под строкой трека (SHUFFLE, «лайкнутые», ❤️). */
+  extras?: ReactNode;
 }) {
   if (!player.active) return null;
   const canSwitch = player.playable.length > 1;
@@ -394,6 +481,9 @@ export function MiniPlayerBar({
           ✕
         </button>
       </div>
+
+      {/* GHG11(9): доп. ряд — режимы и лайк. Пока ничего не передали, ряд пуст. */}
+      {extras && <div className="mt-1.5 flex items-center gap-1.5">{extras}</div>}
 
       {/* Полоса прогресса: тап по ней — перемотка. */}
       <button

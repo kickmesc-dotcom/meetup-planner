@@ -666,7 +666,53 @@ export interface MusicMine {
   top: MusicTopTrack[];
 }
 
+/**
+ * GHG11(9): плейлист очереди плеера. `key` — устойчивый (`week:12`, `liked`),
+ * чтобы плеер не путал подборки между собой при рефетче.
+ */
+export interface MusicPlaylist {
+  key: string;
+  title: string;
+  created_at: string | null;
+  tracks: MusicWeekTrack[];
+}
+
+/** GHG11(9): очередь плеера — подборки подряд + набор для режима «лайкнутые». */
+export interface MusicQueue {
+  enabled: boolean;
+  playlists: MusicPlaylist[];
+  liked: MusicWeekTrack[];
+}
+
 export const fetchMyMusic = () => api<MusicMine>("/api/game/music/mine");
+
+/** GHG11(9): очередь для непрерываемого плеера (подборки + лайкнутые). */
+export const fetchMusicQueue = () => api<MusicQueue>("/api/game/music/queue");
+
+/** GHG11(9): личное уведомление внутри аппа (пока — лайки своих треков). */
+export interface AppNotification {
+  id: number;
+  kind: string;
+  text: string;
+  track_id: number | null;
+  created_at: string | null;
+  read: boolean;
+}
+
+export interface NotificationsFeed {
+  items: AppNotification[];
+  unread: number;
+}
+
+export const fetchNotifications = () =>
+  api<NotificationsFeed>("/api/me/notifications");
+
+/** Отметить прочитанными: конкретные `ids` или всё сразу. */
+export const readNotifications = (body: { ids?: number[]; all?: boolean }) =>
+  api<NotificationsFeed>("/api/me/notifications/read", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 /** Э17: поставить/снять лайк треку подборки (toggle на сервере). */
 export const likeMusicTrack = (trackId: number) =>

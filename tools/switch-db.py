@@ -238,8 +238,15 @@ def dsn_candidates() -> dict[str, str]:
 
     def remember(label: str, dsn: str) -> None:
         dsn = dsn.strip().strip("\"'")
-        if DSN_RE.match(dsn) and label not in out:
+        if not DSN_RE.match(dsn):
+            return
+        if label not in out:
             out[label] = dsn
+        # Короткое имя по endpoint — для ЛЮБОГО источника: база, приехавшая
+        # только из хранилища (env/DPAPI), иначе не отзывалась бы на `cool-union`.
+        short = dsn_label(dsn)
+        if short and short not in out:
+            out[short] = dsn
 
     # 1) то, что заведено в хранилище/окружении: current и (если есть) reserveN
     for suffix in ("", "1", "2", "3"):
@@ -257,9 +264,6 @@ def dsn_candidates() -> dict[str, str]:
                 seen.append(dsn)
     for idx, dsn in enumerate(seen, start=1):
         remember(f"dsn{idx}", dsn)
-        label = dsn_label(dsn)
-        if label:
-            remember(label, dsn)
     return out
 
 

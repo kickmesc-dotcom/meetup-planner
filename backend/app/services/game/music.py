@@ -38,11 +38,13 @@ from app.services.admin_config import (
     get_game_music_weekday,
 )
 from app.services.game.config import (
+    MUSIC_LIKED_LIMIT,
     MUSIC_MAX_TITLE,
     MUSIC_MAX_TRACKS,
     MUSIC_MAX_URL,
     MUSIC_MIN_TRACKS,
     MUSIC_PER_USER_WEEKLY,
+    MUSIC_QUEUE_PLAYLISTS,
     MUSIC_RETRY_HOURS,
     MUSIC_TOP_TRACKS_LIMIT,
     MUSIC_TOP_WINDOW_DAYS,
@@ -280,8 +282,71 @@ async def liked_track_ids(
     return {int(tid) for tid in rows.all()}
 
 
+async def queue_playlists(
+    session: AsyncSession, *, limit: int = MUSIC_QUEUE_PLAYLISTS
+) -> list[tuple[MusicSelection, list[MusicTrack]]]:
+    """Подборки в порядке ВОСПРОИЗВЕДЕНИЯ: свежая → предыдущие (GHG11(9)).
+
+    Порядок здесь — не «история для админки», а очередь плеера: он играет их
+    подряд, а после последней возвращается к первой (закольцовка на клиенте).
+    """
+    selections = await published_selections(session, limit=limit)
+    return [(sel, await selection_tracks(session, sel.id)) for sel in selections]
+
+
+async def liked_tracks(
+    session: AsyncSession, user_id: int, *, limit: int = MUSIC_LIKED_LIMIT
+) -> list[MusicTrack]:
+    """Опубликованные треки, которые участник лайкнул (свежие лайки первыми).
+
+    Отдельный режим плеера «только лайкнутые»: лайк живёт дольше подборки, так
+    что трек может быть из любой недели.
+    """
+    rows = await session.scalars(
+        select(MusicTrack)
+        .join(MusicTrackLike, MusicTrackLike.track_id == MusicTrack.id)
+        .where(
+            MusicTrackLike.user_id == user_id,
+            MusicTrack.status == STATUS_PUBLISHED,
+        )
+        .order_by(MusicTrackLike.created_at.desc(), MusicTrack.id.desc())
+        .limit(limit)
+    )
+    return list(rows)
+
+
+async def _notify_like(
+    session: AsyncSession,
+    *,
+    track: MusicTrack,
+    liker_id: int,
+    liker_name: str | None = None,
+) -> None:
+    """Уведомление автору трека внутри приложения (в чат не пишем).
+
+    Транзакция общая с лайком: коммитит `toggle_like`, поэтому уведомление
+    не может появиться без лайка и наоборот. Имя лайкающего приходит сверху
+    (роут уже знает его из `CurrentUser`) — иначе был бы лишний SELECT по `users`.
+    """
+    from app.services import notifications
+
+    who = liker_name or "Кто-то"
+    title = track.title or track.url or "твой трек"
+    await notifications.add(
+        session,
+        user_id=track.user_id,
+        kind=notifications.KIND_MUSIC_LIKE,
+        text=f"❤️ {who} лайкнул твой трек «{title}»",
+        payload={"track_id": track.id},
+    )
+
+
 async def toggle_like(
-    session: AsyncSession, *, user_id: int, track_id: int
+    session: AsyncSession,
+    *,
+    user_id: int,
+    track_id: int,
+    liker_name: str | None = None,
 ) -> LikeResult:
     """Поставить/снять лайк треку из ВЫПУЩЕННОЙ подборки.
 
@@ -307,6 +372,12 @@ async def toggle_like(
     else:
         session.add(MusicTrackLike(user_id=user_id, track_id=track_id))
         liked = True
+        # GHG11(9): автор узнаёт о лайке в приложении (колокольчик), а не в чате.
+        # Свой трек — не новость для себя: уведомление не создаём.
+        if track.user_id != user_id:
+            await _notify_like(
+                session, track=track, liker_id=user_id, liker_name=liker_name
+            )
     await session.commit()
     likes = await session.scalar(
         select(func.count())
