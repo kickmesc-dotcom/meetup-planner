@@ -159,15 +159,16 @@ export default function App() {
       <>
         {/* GHG11: заголовок ленты — ОДНОЙ строкой (раньше дублировался внутри
             FeedScreen). Сама лента ниже отдаёт строку управления. */}
-        <header className="flex items-center gap-2 overflow-hidden border-b border-tg-secondary-bg py-1.5 pl-4 pr-2">
+        <header className="flex items-center gap-2 overflow-hidden border-b border-tg-secondary-bg py-1.5 pl-4 pr-3">
           <span className="shrink-0 text-base font-medium">🏆 Лента</span>
           <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
             Кто что открыл и с кем что случилось.
           </span>
           {/* GHG11(9): личные уведомления (лайки своих треков) — в шапке ленты. */}
           <NotificationsBell />
-          {/* GHG11(12): тема — часть шапки: тот же центр строки и тот же отступ,
-              что у колокольчика (раньше висела абсолютом и «косo» сидела). */}
+          {/* GHG11(12): тема — часть шапки: тот же центр строки, что у
+              колокольчика, и тот же правый отступ `pr-3`, что у шапок встреч,
+              профиля и календаря (раньше висела абсолютом и «косо» сидела). */}
           <ThemeSwitcher />
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
