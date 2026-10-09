@@ -238,12 +238,30 @@ export const fetchGuestProfile = (userId: number) =>
   api<GuestProfile>(`/api/game/players/${userId}`);
 
 /**
+ * GHG11(12): состояние ЗАДАНИЯ на карточке ленты — считает сервер
+ * (`feed.task_state`), фронт только рисует.
+ *
+ * `open` — приём идёт (манющая зелёная подсветка); `empty` — закрыто и никто
+ * не поучаствовал (тускло + замок + крупное «поучаствовало 0»); `filled` —
+ * закрыто, но варианты внутри есть (жёлтое + замок + «не смотрено», после
+ * просмотра — «просмотрено» и затухание).
+ */
+export interface FeedTask {
+  state: "open" | "empty" | "filled";
+  closed: boolean;
+  participants: number;
+  seen: boolean;
+}
+
+/**
  * Э22: подробности записи ленты для раскрытия карточки.
  *
  * Состав зависит от `kind`: у ачивки — «за что дана», у голосового — условие и
  * окно, у подборки — треки с лайками. Поля необязательные: тип читается мягко.
  */
 export interface FeedDetail {
+  /** GHG11(12): состояние задания — есть только у заданий (голосовое, призыв). */
+  task?: FeedTask;
   code?: string;
   description?: string;
   points?: number;
@@ -267,6 +285,9 @@ export interface FeedDetail {
     closed?: boolean;
     closed_at?: string | null;
     answered_by_me: boolean;
+    /** GHG11(12): у призыва победитель один — 1 или 0. */
+    participants?: number;
+    winner_user_id?: number | null;
   };
   condition?: string;
   opened_at?: string | null;
@@ -465,6 +486,12 @@ export const hideFeedItem = (itemId: string) =>
   });
 export const unhideFeedItem = (itemId: string) =>
   api<{ ok: boolean }>("/api/game/feed/unhide", {
+    method: "POST",
+    body: JSON.stringify({ item_id: itemId }),
+  });
+/** GHG11(12): «я открыл это задание» — гасит бейдж непросмотренного у меня. */
+export const markFeedItemSeen = (itemId: string) =>
+  api<{ ok: boolean }>("/api/game/feed/seen", {
     method: "POST",
     body: JSON.stringify({ item_id: itemId }),
   });

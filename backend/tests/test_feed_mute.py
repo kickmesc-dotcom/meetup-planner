@@ -42,13 +42,16 @@ def quiet_feed(monkeypatch):
     async def empty(session, **kwargs):
         return []
 
-    async def no_attach(session, items, *, user_id):
+    async def no_attach(session, items, *, user_id, seen_ids=None):
         return None
 
     async def no_removed(session):
         return set()
 
     async def no_hidden(session, viewer_id):
+        return set()
+
+    async def no_seen(session, viewer_id):
         return set()
 
     async def no_badges(session):
@@ -68,6 +71,8 @@ def quiet_feed(monkeypatch):
     monkeypatch.setattr(feed, "_attach_details", no_attach)
     monkeypatch.setattr(feed_moderation, "deleted_item_ids", no_removed)
     monkeypatch.setattr(feed_moderation, "hidden_item_ids", no_hidden)
+    # GHG11(12): build_feed читает ещё и персональные «просмотрено».
+    monkeypatch.setattr(feed_moderation, "seen_item_ids", no_seen)
     monkeypatch.setattr(today_titles, "badge_map", no_badges)
     return monkeypatch
 

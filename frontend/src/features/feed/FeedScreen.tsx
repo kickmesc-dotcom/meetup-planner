@@ -19,6 +19,7 @@ import {
   fetchWorm,
   hideFeedItem,
   likeMusicTrack,
+  markFeedItemSeen,
   restoreFeedItem,
   runPhrase,
   transferWorm,
@@ -27,6 +28,7 @@ import {
   type FeedDetail,
   type FeedItem,
   type FeedParticipant,
+  type FeedTask,
 } from "@/api/game";
 import { ActivityResponse, OrphanActivities, VoiceTaskAction } from "./ActivityBlocks";
 import { useGlobalPlayer } from "@/components/GlobalPlayer";
@@ -799,6 +801,96 @@ const EXPANDABLE_KINDS = new Set([
   "music_game",
 ]);
 
+/** GHG11(12): сколько пикселей карточка уезжает влево, открывая плашку действий. */
+const SWIPE_W = 104;
+
+/** Русская форма числительного: 1 вариант / 2 варианта / 5 вариантов. */
+export function pluralRu(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+/**
+ * GHG11(12): вид карточки-задания в ленте.
+ *
+ *  - `open`   — «манящее» зелёное: приём идёт;
+ *  - `empty`  — закрыто без заявок: тускло, красновато, замок и «поучаствовало 0»;
+ *  - `filled` — закрыто, но внутри есть варианты: жёлтое + замок + «не смотрено»,
+ *    а после просмотра — «✓ просмотрено» и притухание.
+ *
+ * Классы отдаём готовыми, чтобы проверки читали состояние, а не угадывали цвета.
+ */
+export interface TaskVisual {
+  card: string;
+  badge: string;
+  /**
+   * Плашка-бейдж: тёмный «pill»-цвет + белый текст.
+   *
+   * Так требует DESIGN_SYSTEM §1.2: яркими `status-*` можно красить только
+   * большие заливки/обводки, а текст — на затемнённом `*-pill`, иначе на
+   * светлой теме зелёный/жёлтый текст нечитаемы (2:1).
+   */
+  badgeClass: string;
+  /** Тон плашки счёта: цвет состояния видно, а сам текст — темой (text-tg-text). */
+  countBg: string;
+  /** Замок — у ЛЮБОГО закрытого задания («внутрь уже не зайти»). */
+  lock: boolean;
+  /** Крупное «поучаствовало N» — только у закрытых. */
+  count: boolean;
+  /** Притушить содержимое (закрытое, что уже не манит). */
+  dim: boolean;
+}
+
+export function taskVisual(
+  task: FeedTask | undefined,
+  open = false,
+  seen = false,
+): TaskVisual | null {
+  if (!task) return null;
+  if (task.state === "open") {
+    return {
+      card: "bg-status-free/10 ring-1 ring-inset ring-status-free/40",
+      badge: "● идёт приём",
+      badgeClass: "bg-[color:var(--status-free-pill)] text-white",
+      countBg: "bg-status-free/15",
+      lock: false,
+      count: false,
+      dim: false,
+    };
+  }
+  if (task.state === "empty") {
+    return {
+      card: "bg-status-busy/[0.07] ring-1 ring-inset ring-status-busy/30",
+      badge: "без заявок",
+      badgeClass: "bg-[color:var(--status-busy-pill)] text-white",
+      countBg: "bg-status-busy/15",
+      lock: true,
+      count: true,
+      dim: true,
+    };
+  }
+  // `filled`: закрыто, но варианты внутри — самое интересное состояние.
+  const fresh = !seen;
+  return {
+    card: fresh
+      ? "bg-status-maybe/10 ring-1 ring-inset ring-status-maybe/45"
+      : "bg-tg-secondary-bg/30 ring-1 ring-inset ring-status-maybe/20",
+    badge: fresh ? "🆕 не смотрено" : "✓ просмотрено",
+    badgeClass: fresh
+      ? "bg-[color:var(--status-maybe-pill)] font-semibold text-white"
+      : "bg-tg-secondary-bg/70 text-tg-hint",
+    countBg: fresh ? "bg-status-maybe/15" : "bg-tg-secondary-bg/60",
+    lock: true,
+    count: true,
+    // Пока подробности раскрыты — читаем спокойно, тускнеет после сворачивания.
+    dim: !fresh && !open,
+  };
+}
+
 /** GHG11(8): id голосового задания у записи ленты (поле или из `voice:<id>`). */
 function voiceTaskId(item: FeedItem): number | null {
   if (typeof item.detail?.task_id === "number") return item.detail.task_id;
@@ -824,9 +916,22 @@ export function FeedRow({
   const when = formatWhen(item.at);
   const clickable = item.user_id !== null && item.user_id !== undefined;
   const [open, setOpen] = useState(false);
-  const [menu, setMenu] = useState(false);
   // GHG11(4): факт тапа по миниатюре — какую сдачу включить при раскрытии.
   const [playId, setPlayId] = useState<number | null>(null);
+  // GHG11(12): «я посмотрел варианты внутри» — локально сразу (без мигания
+  // бейджа), на сервере — фоном, чтобы пометка пережила перезаход.
+  const task = item.detail?.task;
+  const [seenLocal, setSeenLocal] = useState(false);
+  const isSeen = seenLocal || task?.seen === true;
+  // GHG11(12): iPhone-механика скрытия — плашка уезжает влево под пальцем.
+  const [dx, setDx] = useState(0);
+  const drag = useRef<{
+    x: number;
+    y: number;
+    base: number;
+    horiz: boolean | null;
+  } | null>(null);
+  const dragged = useRef(false);
   // GHG11(4): компактные миниатюры — голосовые сдачи, владельцы треков подборки
   // или участники раунда мьюзик-гейма.
   const stripParticipants: FeedParticipant[] =
@@ -838,17 +943,65 @@ export function FeedRow({
   // («event») подробностей не было — внутри интерфейс участия.
   const expandable =
     EXPANDABLE_KINDS.has(item.kind) || item.detail?.activity !== undefined;
-  // Музыка и голосовые — «плеер»: сворачиваем ОТДЕЛЬНОЙ кнопкой, чтобы тап
-  // по треку/аудио не закрывал панель во время прослушивания.
+  // Музыка и голосовые — «плеер»: тап по карточке их не сворачивает (чтобы
+  // случайно не закрыть панель во время прослушивания), но глазик работает.
   const playerLike = item.kind === "music" || item.kind === "voice";
+  const visual = taskVisual(task, open, isSeen);
+  const participants = task?.participants ?? 0;
 
   const invalidateFeed = () => qc.invalidateQueries({ queryKey: ["game-feed"] });
+
+  // GHG11(12): раскрыл закрытое задание с вариантами — считаем просмотренным.
+  useEffect(() => {
+    if (!open || !task || task.state !== "filled" || isSeen) return;
+    setSeenLocal(true);
+    void markFeedItemSeen(item.id).catch(() => {
+      // Сеть/сервер отвалились — не врём себе: в следующий раз спросим снова.
+      setSeenLocal(false);
+    });
+  }, [open, task, isSeen, item.id]);
+
+  const closeSwipe = () => {
+    if (dx !== 0) setDx(0);
+  };
+
+  const onSwipeStart = (e: TouchEvent) => {
+    const t = e.touches[0];
+    drag.current = { x: t.clientX, y: t.clientY, base: dx, horiz: null };
+    dragged.current = false;
+  };
+  const onSwipeMove = (e: TouchEvent) => {
+    const d = drag.current;
+    if (!d) return;
+    const t = e.touches[0];
+    const mx = t.clientX - d.x;
+    const my = t.clientY - d.y;
+    if (d.horiz === null) {
+      // Ждём, пока направление определится: вертикальный жест — это скролл/пулл,
+      // его лента обрабатывает сама, и мешать ему нельзя.
+      if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+      d.horiz = Math.abs(mx) > Math.abs(my) * 1.5;
+      if (!d.horiz) {
+        drag.current = null;
+        return;
+      }
+    }
+    dragged.current = true;
+    setDx(Math.max(-SWIPE_W, Math.min(0, d.base + mx)));
+  };
+  const onSwipeEnd = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.horiz) return;
+    // Протянул меньше трети — плашка возвращается назад (как в iOS).
+    setDx((v) => (v < -SWIPE_W / 3 ? -SWIPE_W : 0));
+  };
 
   const hide = useMutation({
     mutationFn: () => hideFeedItem(item.id),
     onSuccess: () => {
       haptic("medium");
-      setMenu(false);
+      setDx(0);
       void invalidateFeed();
       onModerated("Запись скрыта у тебя", () => unhideFeedItem(item.id));
     },
@@ -862,7 +1015,7 @@ export function FeedRow({
     mutationFn: () => deleteFeedItem(item.id),
     onSuccess: (res) => {
       haptic("medium");
-      setMenu(false);
+      setDx(0);
       void invalidateFeed();
       if (res?.hard) {
         // GHG11(3): источник стёрт из БД — откатывать нечего.
@@ -878,19 +1031,88 @@ export function FeedRow({
   });
 
   const toggle = () => {
+    // Тап по выдвинутой карточке — сначала закрываем плашку действий.
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
+    if (dx !== 0) {
+      closeSwipe();
+      return;
+    }
     if (!expandable || playerLike) return;
     haptic("light");
     setOpen((o) => !o);
   };
 
   return (
-    <div
-      onClick={toggle}
-      className={[
-        "rounded-2xl bg-tg-secondary-bg/50 p-3",
-        expandable && !playerLike ? "cursor-pointer active:scale-[0.99]" : "",
-      ].join(" ")}
-    >
+    // GHG11(12): iPhone-механика — карточка выезжает влево, из-под неё — плашка
+    // «скрыть» (минус); полноценное удаление из ленты — только админу.
+    <div data-testid="feed-row" className="relative overflow-hidden rounded-2xl">
+      <div
+        className={[
+          "absolute inset-y-0 right-0 flex items-stretch",
+          dx < 0 ? "" : "invisible",
+        ].join(" ")}
+      >
+        <button
+          type="button"
+          data-testid="feed-swipe-hide"
+          aria-label="Скрыть запись из ленты"
+          disabled={hide.isPending}
+          onClick={() => hide.mutate()}
+          className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-tg-secondary-bg text-[10px] font-medium text-tg-text disabled:opacity-50"
+        >
+          <span aria-hidden className="text-base leading-none">
+            ➖
+          </span>
+          скрыть
+        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            data-testid="feed-swipe-delete"
+            aria-label="Удалить запись из ленты для всех"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate()}
+            className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-status-busy text-[10px] font-medium text-white disabled:opacity-50"
+          >
+            <span aria-hidden className="text-base leading-none">
+              🗑
+            </span>
+            всем
+          </button>
+        )}
+      </div>
+
+      <div
+        onTouchStart={onSwipeStart}
+        onTouchMove={onSwipeMove}
+        onTouchEnd={onSwipeEnd}
+        onTouchCancel={onSwipeEnd}
+        onClick={toggle}
+        style={{ transform: `translateX(${dx}px)`, touchAction: "pan-y" }}
+        className={[
+          "relative rounded-2xl bg-tg-bg transition-transform duration-150",
+          expandable && !playerLike ? "cursor-pointer active:scale-[0.99]" : "",
+        ].join(" ")}
+      >
+        {/* Тон задания — отдельный слой ПОВЕРХ непрозрачного фона: если красить
+            сам фон полупрозрачным, сквозь карточку просвечивала бы плашка
+            действий. */}
+        <div
+          aria-hidden
+          className={[
+            "pointer-events-none absolute inset-0 rounded-2xl",
+            visual?.card ?? "bg-tg-secondary-bg/50",
+          ].join(" ")}
+        />
+        <div
+          className={[
+            "relative p-3",
+            visual?.dim ? "opacity-60" : "",
+          ].join(" ")}
+        >
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
           {item.avatar_url ? (
@@ -919,26 +1141,49 @@ export function FeedRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-xs text-tg-hint">
-            <span>{item.icon}</span>
-            <span className="font-medium">{item.title}</span>
-            <span className="ml-auto shrink-0">{when}</span>
-            {expandable && (
-              <span className="shrink-0 text-tg-hint">
-                {playerLike ? "▸" : open ? "▾" : "▸"}
+            <span className="shrink-0">{item.icon}</span>
+            <span className="truncate font-medium">{item.title}</span>
+            {/* GHG11(12): у закрытого задания замок видно всегда — «внутрь не
+                зайти», но варианты (если есть) никуда не делись. */}
+            {visual?.lock && (
+              <span
+                data-testid="feed-task-lock"
+                title="Задание закрыто"
+                aria-label="Задание закрыто"
+                className="shrink-0 opacity-80"
+              >
+                🔒
               </span>
             )}
-            <button
-              type="button"
-              aria-label="Действия с записью"
-              onClick={(e) => {
-                e.stopPropagation();
-                haptic("selection");
-                setMenu((m) => !m);
-              }}
-              className="shrink-0 rounded-md px-1 text-base leading-none text-tg-hint"
-            >
-              👁
-            </button>
+            {visual && (
+              <span
+                data-testid="feed-task-badge"
+                className={[
+                  "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] leading-none",
+                  visual.badgeClass,
+                ].join(" ")}
+              >
+                {visual.badge}
+              </span>
+            )}
+            <span className="ml-auto shrink-0">{when}</span>
+            {expandable && (
+              <button
+                type="button"
+                data-testid="feed-eye"
+                aria-label={open ? "Свернуть подробности" : "Развернуть подробности"}
+                aria-expanded={open}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  haptic("light");
+                  if (!open) setPlayId(null);
+                  setOpen((o) => !o);
+                }}
+                className="shrink-0 rounded-md px-1 text-base leading-none text-tg-hint active:scale-95"
+              >
+                👁
+              </button>
+            )}
           </div>
           {item.user_name && (
             <button
@@ -958,6 +1203,27 @@ export function FeedRow({
               // Тексты анонсов приходят с HTML-разметкой (<b>/<i>), как в чате.
               dangerouslySetInnerHTML={{ __html: item.text }}
             />
+          )}
+          {/* GHG11(12): крупно — сколько людей поучаствовало в задании. У
+              закрытого без заявок это честный «поучаствовало 0».
+              Цвет состояния несёт тон плашки, а текст остаётся темой — иначе
+              на светлой теме красный/жёлтый текст нечитаем. */}
+          {visual?.count && (
+            <div
+              data-testid="feed-task-count"
+              className={[
+                "mt-1.5 inline-flex w-fit items-baseline gap-1.5 rounded-lg px-2 py-0.5",
+                "text-lg font-semibold leading-tight tabular-nums text-tg-text",
+                visual.countBg,
+              ].join(" ")}
+            >
+              поучаствовало {participants}
+              {participants > 0 && (
+                <span className="ml-1.5 text-xs font-normal text-tg-hint">
+                  {pluralRu(participants, "вариант", "варианта", "вариантов")}
+                </span>
+              )}
+            </div>
           )}
           {/* GHG11(10): реакция бота на медиа — видно ЧТО было за медиа. */}
           {item.kind === "media" && typeof item.detail?.post_id === "number" && (
@@ -1011,32 +1277,6 @@ export function FeedRow({
             </button>
           )}
 
-          {/* GHG11: модерация — «скрыть у себя» всем, «удалить» админу. */}
-          {menu && (
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="mt-2 flex flex-wrap gap-1.5"
-            >
-              <button
-                type="button"
-                disabled={hide.isPending}
-                onClick={() => hide.mutate()}
-                className="rounded-lg bg-tg-secondary-bg px-2.5 py-1 text-[11px] font-medium text-tg-text disabled:opacity-50"
-              >
-                🙈 Скрыть у себя
-              </button>
-              {isAdmin && (
-                <button
-                  type="button"
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate()}
-                  className="rounded-lg bg-status-busy/15 px-2.5 py-1 text-[11px] font-medium text-status-busy disabled:opacity-50"
-                >
-                  🗑 Удалить
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -1051,6 +1291,8 @@ export function FeedRow({
           />
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

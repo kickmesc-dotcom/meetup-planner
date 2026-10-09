@@ -49,27 +49,47 @@ export default function WelcomeBanner({ users, meName, format, onHide }: Props) 
   };
 
   return (
-    // GHG11(11): `pr-16` + кнопка закрытия на `right-12` — правый верхний угол
-    // занят глобальным свитчером темы (оболочка приложения).
-    <header className="relative px-4 py-0 border-b border-tg-secondary-bg pr-16">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-label={open ? "Свернуть приветствие" : "Развернуть приветствие"}
-        /* min-h-11: сама строка была ~24px, и тап выше/ниже текста уходил в
-           никуда. Паддинги переехали из header сюда, поэтому высота баннера
-           не изменилась (DESIGN_SYSTEM §6: 44px). */
-        className="flex min-h-11 w-full items-center gap-1.5 text-left"
-      >
-        <span className="text-base font-medium truncate">Привет, {meName} 👋</span>
-        <span className="text-tg-hint shrink-0" aria-hidden>
-          {open ? "▾" : "▴"}
-        </span>
-        {!open && (
-          <span className="text-[11px] text-tg-hint shrink-0">звания</span>
-        )}
-      </button>
+    // GHG11(12): без `pr-16`/`right-12` — крестик снова обычный элемент строки.
+    // Свитчера темы здесь НЕТ намеренно: баннер можно закрыть (и тогда кнопка
+    // «пропадала» бы), поэтому тема живёт в постоянной панели календаря
+    // (NavBar / TimelineNavBar) и в шапках остальных вкладок.
+    <header className="px-4 py-0 border-b border-tg-secondary-bg">
+      <div className="flex min-h-11 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={open}
+          aria-label={open ? "Свернуть приветствие" : "Развернуть приветствие"}
+          /* min-h-11: сама строка была ~24px, и тап выше/ниже текста уходил в
+             никуда. Паддинги переехали из header сюда, поэтому высота баннера
+             не изменилась (DESIGN_SYSTEM §6: 44px). */
+          className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 text-left"
+        >
+          <span className="text-base font-medium truncate">Привет, {meName} 👋</span>
+          <span className="text-tg-hint shrink-0" aria-hidden>
+            {open ? "▾" : "▴"}
+          </span>
+          {!open && (
+            <span className="text-[11px] text-tg-hint shrink-0">звания</span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            haptic("warning");
+            // P4.1.c: подтверждение с подсказкой, где вернуть.
+            const ok = await showConfirm(
+              "Не показывать приветствие? Вернуть можно в настройках профиля (👤).",
+            );
+            if (ok) onHide();
+          }}
+          aria-label="Скрыть приветствие"
+          title="Не показывать в следующий раз"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-tg-hint transition-transform hover:text-tg-text active:scale-95"
+        >
+          ✕
+        </button>
+      </div>
 
       {open && (
         <>
@@ -138,22 +158,6 @@ export default function WelcomeBanner({ users, meName, format, onHide }: Props) 
         </>
       )}
 
-      <button
-        type="button"
-        onClick={async () => {
-          haptic("warning");
-          // P4.1.c: подтверждение с подсказкой, где вернуть.
-          const ok = await showConfirm(
-            "Не показывать приветствие? Вернуть можно в настройках профиля (👤).",
-          );
-          if (ok) onHide();
-        }}
-        aria-label="Скрыть приветствие"
-        title="Не показывать в следующий раз"
-        className="absolute top-2 right-12 min-h-11 min-w-11 rounded-md text-tg-hint hover:text-tg-text active:scale-95 transition-transform"
-      >
-        ✕
-      </button>
     </header>
   );
 }

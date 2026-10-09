@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useUI, type ZoomLevel } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 /**
  * GHG6 P3 CL13 + CL6.b + CL5: нижняя плашка управления для TimelineView.
@@ -144,7 +145,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
         </div>
       )}
 
-      <div className="flex justify-center">
+      <div className="flex items-center justify-center gap-2">
         <motion.button
           type="button"
           onClick={() => {
@@ -162,6 +163,9 @@ export default function TimelineNavBar({ isOnToday }: Props) {
         >
           📍 К сегодня
         </motion.button>
+        {/* GHG11(12): эта плашка — постоянный «верх» календаря в режиме
+            таймлайна (NavBar там не рисуется), поэтому тема живёт здесь. */}
+        <ThemeSwitcher />
       </div>
     </div>
   );

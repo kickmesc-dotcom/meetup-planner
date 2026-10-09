@@ -1872,6 +1872,32 @@ async def feed_unhide(
     return FeedItemActionOut(ok=True, hidden=False)
 
 
+@router.post("/game/feed/seen", response_model=FeedItemActionOut)
+async def feed_seen(
+    body: FeedItemActionIn, session: SessionDep, user: CurrentUser
+) -> FeedItemActionOut:
+    """GHG11(12): «я открыл закрытое задание и посмотрел варианты».
+
+    Персонально (как «скрыть у себя»): гасит бейдж «не смотрено» у карточки
+    задания только у того, кто развернул подробности, и притушивает её.
+    """
+    from app.services.game import feed_moderation
+
+    await feed_moderation.mark_seen(session, item_id=body.item_id, user_id=user.id)
+    return FeedItemActionOut(ok=True)
+
+
+@router.post("/game/feed/unseen", response_model=FeedItemActionOut)
+async def feed_unseen(
+    body: FeedItemActionIn, session: SessionDep, user: CurrentUser
+) -> FeedItemActionOut:
+    """Снять «просмотрено» — запись снова считается новой (обратный ход)."""
+    from app.services.game import feed_moderation
+
+    await feed_moderation.unmark_seen(session, item_id=body.item_id, user_id=user.id)
+    return FeedItemActionOut(ok=True)
+
+
 @router.post("/game/phrases", response_model=PhraseRunOut)
 async def game_phrase_run(session: SessionDep, user: CurrentUser) -> PhraseRunOut:
     """GHG11(3): админский «прогон фразы» из аппа — фраза уходит в ЛЕНТУ.

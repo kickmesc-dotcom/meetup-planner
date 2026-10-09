@@ -1,6 +1,7 @@
 import { isToday, startOfDay } from "date-fns";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { zoomTitle } from "./dateUtils";
 
 export default function NavBar() {
@@ -12,8 +13,9 @@ export default function NavBar() {
   const today = isToday(startOfDay(anchor));
 
   return (
-    // GHG11(11): `pr-12` — правый верхний угол занят свитчером темы из оболочки.
-    <div className="flex items-center gap-2 border-b border-tg-secondary-bg bg-tg-bg py-2 pl-3 pr-12">
+    // GHG11(12): свитчер темы — последним элементом строки (вместо абсолютного
+    // «в углу оболочки»): выравнивается по стрелкам и заголовку сам собой.
+    <div className="flex items-center gap-2 border-b border-tg-secondary-bg bg-tg-bg py-2 pl-3 pr-3">
       <button
         type="button"
         onClick={() => {
@@ -51,6 +53,7 @@ export default function NavBar() {
       >
         ›
       </button>
+      <ThemeSwitcher />
     </div>
   );
 }

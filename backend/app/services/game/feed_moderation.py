@@ -6,6 +6,8 @@
 * ``feed_delete`` — админ убрал запись из ленты ДЛЯ ВСЕХ (payload `item_id`);
 * ``feed_hide``   — участник скрыл запись ТОЛЬКО У СЕБЯ (payload `item_id` +
   `user_id`).
+* ``feed_seen``   — участник посмотрел, что внутри закрытого задания (payload
+  `item_id` + `user_id`) — снимает бейдж «не смотрено» в ленте.
 
 `item_id` — тот же строковый ключ, что отдаёт лента (`ach:12`, `journal:45`,
 `loser:3`, …). Удаление обратимо: повторная запись/`restore` снимает пометку,
@@ -33,6 +35,9 @@ log = structlog.get_logger()
 
 DELETE_KIND = "feed_delete"
 HIDE_KIND = "feed_hide"
+# GHG11(12): «я посмотрел варианты внутри задания» — персональная пометка, живёт
+# по тем же правилам, что «скрыто у себя» (у каждого своя, в `event_log`).
+SEEN_KIND = "feed_seen"
 
 
 async def _cascade_delete(session: AsyncSession, item_id: str) -> bool:
@@ -129,6 +134,54 @@ async def hidden_item_ids(session: AsyncSession, user_id: int) -> set[str]:
         )
     )
     return {str(x) for x in rows.all() if x}
+
+
+async def seen_item_ids(session: AsyncSession, user_id: int) -> set[str]:
+    """Ключи записей, которые ЭТОТ участник уже просмотрел внутри."""
+    rows = await session.scalars(
+        select(EventLog.payload["item_id"].as_string()).where(
+            EventLog.kind == SEEN_KIND,
+            EventLog.payload["user_id"].as_integer() == int(user_id),
+        )
+    )
+    return {str(x) for x in rows.all() if x}
+
+
+async def mark_seen(
+    session: AsyncSession, *, item_id: str, user_id: int
+) -> None:
+    """Пометить запись просмотренной у себя (идемпотентно).
+
+    Лента гасит бейдж «не смотрено» у закрытого задания с вариантами и после
+    этого притушивает карточку — но только у того, кто действительно открыл
+    подробности, а не у всего чата.
+    """
+    if item_id in await seen_item_ids(session, user_id):
+        return
+    session.add(
+        EventLog(
+            kind=SEEN_KIND,
+            actor_user_id=int(user_id),
+            payload={"item_id": item_id, "user_id": int(user_id)},
+        )
+    )
+    await session.commit()
+    log.info("game.feed_item_seen", item_id=item_id, user_id=user_id)
+
+
+async def unmark_seen(
+    session: AsyncSession, *, item_id: str, user_id: int
+) -> None:
+    """Снять «просмотрено» (обратный ход: запись снова считается новой)."""
+    await session.execute(
+        sa_delete(EventLog).where(
+            EventLog.kind == SEEN_KIND,
+            EventLog.payload["item_id"].as_string() == item_id,
+            EventLog.payload["user_id"].as_integer() == int(user_id),
+        )
+    )
+    await session.commit()
+    log.info("game.feed_item_unseen", item_id=item_id, user_id=user_id)
 
 
 async def delete_item(

@@ -119,6 +119,40 @@ FEED_KIND_ORDER: tuple[str, ...] = (
 # быстрый обзор «кто это», а не только у голосовых/музыки.
 _SINGLE_PARTICIPANT_KINDS = (FEED_LOSER, FEED_CHUKHAN, FEED_FEATURE)
 
+# GHG11(12): состояние ЗАДАНИЯ в ленте — то, по чему фронт красит карточку.
+#
+# `open`   — приём идёт (манющая зелёная подсветка);
+# `empty`  — закрыто и никто не поучаствовал (тускло + замок + «поучаствовало 0»);
+# `filled` — закрыто, но варианты внутри есть (жёлтое + замок + «не смотрено»,
+#            после просмотра — «просмотрено» и затухание).
+TASK_OPEN = "open"
+TASK_EMPTY = "empty"
+TASK_FILLED = "filled"
+
+
+def task_state(
+    *, closed: bool, participants: int, seen: bool = False
+) -> dict:
+    """Состояние задания для карточки ленты. Чистая функция.
+
+    Одним куском: `state` (см. константы выше), число поучаствовавших и признак
+    «я уже смотрел, что внутри». Фронт не пересчитывает правила — он только
+    рисует (как и с XP/уровнями).
+    """
+    count = max(0, int(participants))
+    if not closed:
+        state = TASK_OPEN
+    elif count > 0:
+        state = TASK_FILLED
+    else:
+        state = TASK_EMPTY
+    return {
+        "state": state,
+        "closed": bool(closed),
+        "participants": count,
+        "seen": bool(seen),
+    }
+
 # journal-виды, которые показываем в ленте (буфер ачивок не дублируем — ачивки
 # и так приходят из `user_achievements`).
 _JOURNAL_KINDS = (
@@ -175,6 +209,16 @@ async def build_feed(
     items.extend(await _media_items(session, user_id=user_id, depth=depth))
     items.extend(await _journal_items(session, user_id=user_id, depth=depth))
 
+    # GHG11(12): «просмотрено» — персональное, поэтому считаем один раз на
+    # смотрящего и дальше просто проставляем флаг у заданий.
+    from app.services.game import feed_moderation
+
+    seen_ids = (
+        await feed_moderation.seen_item_ids(session, viewer_id)
+        if viewer_id is not None
+        else set()
+    )
+
     if kinds:
         items = [it for it in items if it["kind"] in kinds]
 
@@ -190,8 +234,6 @@ async def build_feed(
         ]
 
     # GHG11: удалённые админом (для всех) и «скрытые у себя» (для смотрящего).
-    from app.services.game import feed_moderation
-
     removed = await feed_moderation.deleted_item_ids(session)
     if viewer_id is not None:
         removed |= await feed_moderation.hidden_item_ids(session, viewer_id)
@@ -211,7 +253,12 @@ async def build_feed(
     page = items[offset : offset + limit]
     # Э22: тяжёлые подробности — только для страницы. Лайки «мои» считаем по
     # смотрящему (`viewer_id`), а не по фильтру ленты (`user_id`).
-    await _attach_details(session, page, user_id=viewer_id if viewer_id is not None else user_id)
+    await _attach_details(
+        session,
+        page,
+        user_id=viewer_id if viewer_id is not None else user_id,
+        seen_ids=seen_ids,
+    )
     return page
 
 
@@ -284,6 +331,10 @@ def activity_detail(
     победителем, либо истекшим окном. Фронт по этому флагу сворачивает поле
     ввода/кнопки и пишет «задание закрыто» вместо того, чтобы давать отвечать
     в пустоту.
+
+    GHG11(12): у промпта победитель ровно один (первый подходящий ответ),
+    поэтому `participants` — 1 или 0. Этого хватает, чтобы отличить «закрыто и
+    никто не поучаствовал» от «закрыто, но внутри есть вариант».
     """
     options, needs_text = activity.split_activity_options(list(prompt.answers or []))
     moment = now or datetime.now(timezone.utc)
@@ -297,17 +348,27 @@ def activity_detail(
         "closed": prompt.closed_at is not None or expired,
         "closed_at": prompt.closed_at,
         "answered_by_me": user_id is not None and prompt.winner_user_id == user_id,
+        "participants": 1 if prompt.winner_user_id is not None else 0,
+        "winner_user_id": prompt.winner_user_id,
     }
 
 
 async def _attach_details(
-    session: AsyncSession, items: list[dict], *, user_id: int | None
+    session: AsyncSession,
+    items: list[dict],
+    *,
+    user_id: int | None,
+    seen_ids: set[str] | None = None,
 ) -> None:
     """Дотянуть подробности для раскрывающихся карточек ленты (Э22).
 
     Список сдач голосового и треки подборки — отдельные выборки, поэтому делаем
     их лишь для тех строк, что реально попали на экран, а не для всего источника.
+
+    `seen_ids` (GHG11(12)) — записи, которые смотрящий уже открывал: из них
+    получается флаг «просмотрено» у закрытых заданий с вариантами.
     """
+    seen = seen_ids or set()
     from app.services.game import music, voice
 
     # GHG11(8): задания-призывы нужны только если на странице есть их анонсы
@@ -425,7 +486,38 @@ async def _attach_details(
                 detail["activity"] = activity_detail(
                     prompt, user_id=user_id, now=activity_now
                 )
+        # GHG11(12): единое состояние ЗАДАНИЯ — по нему фронт красит карточку
+        # (зелёное «идёт», красное «пусто», жёлтое «внутри есть варианты»).
+        block = _task_block(
+            item=it, detail=detail, seen=row_id in seen
+        )
+        if block is not None:
+            detail["task"] = block
         it["detail"] = detail or None
+
+
+def _task_block(*, item: dict, detail: dict, seen: bool) -> dict | None:
+    """Состояние задания для записи ленты (или None — запись не задание).
+
+    «Задание» здесь — то, что бот ставит с дедлайном и что участник может
+    закрыть собой/своим вариантом:
+
+    * голосовое задание (`voice`) — участников столько, сколько сдач;
+    * анонс призыва (`event` + `activity`) — победитель один.
+
+    Чистая функция: читает уже собранный `detail` (никаких запросов в БД).
+    """
+    kind = item.get("kind")
+    if kind == FEED_VOICE:
+        closed = bool(detail.get("closed"))
+        participants = len(detail.get("submissions") or [])
+    elif kind == journal.KIND_EVENT and detail.get("activity"):
+        act = detail["activity"]
+        closed = bool(act.get("closed"))
+        participants = int(act.get("participants") or 0)
+    else:
+        return None
+    return task_state(closed=closed, participants=participants, seen=seen)
 
 
 async def _submission_avatars(
@@ -641,12 +733,17 @@ async def _voice_items(session: AsyncSession, *, depth: int) -> list[dict]:
             .limit(depth)
         )
     ).all()
+    # GHG11(12): «закрыто» = закрыто сводкой ИЛИ истекло окно приёма. Без второй
+    # половины карточка висела «идёт приём» на задании, которое уже нельзя сдать
+    # (задание джоб закрывает чуть позже дедлайна).
+    now = datetime.now(timezone.utc)
     out: list[dict] = []
     for task in rows:
         catalog = _VOICE_TASKS.get(task.code)
         title = catalog.title if catalog else task.code
         reward = int(task.reward or 0)
-        closed = task.closed_at is not None
+        expired = task.expires_at is not None and _as_utc(task.expires_at) <= now
+        closed = task.closed_at is not None or expired
         out.append(
             _item(
                 source="voice",
