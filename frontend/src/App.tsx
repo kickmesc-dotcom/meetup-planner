@@ -17,7 +17,9 @@ import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
 import { PlayerBar, PlayerProvider } from "./components/GlobalPlayer";
-import NotificationsBell from "./features/notifications/NotificationsBell";
+import NotificationsBell, {
+  NotificationsSheet,
+} from "./features/notifications/NotificationsBell";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
@@ -51,6 +53,10 @@ export default function App() {
   // Э19: гостевой профиль (клик по аватарке на календаре) — оверлей поверх вкладок.
   const guestUserId = useUI((s) => s.guestUserId);
   const closeGuest = useUI((s) => s.closeGuest);
+  // GHG11(16): уведомления — нижний шит; держим его здесь, вне шапки ленты:
+  // шапка обрезает переполнение (`overflow-hidden`), а шит должен накрывать весь
+  // экран, а не жить внутри её строки.
+  const showNotificationsSheet = useUI((s) => s.showNotificationsSheet);
 
   // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
   // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
@@ -174,6 +180,7 @@ export default function App() {
         <main className="flex-1 overflow-hidden flex flex-col">
           <FeedScreen meId={meData.id} />
         </main>
+        {showNotificationsSheet && <NotificationsSheet />}
       </>
     );
   } else if (tab === "profile") {

@@ -43,7 +43,6 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { fetchMe, fetchUiPrefs, fetchUsers } from "@/api/availability";
 import { apiPublicUrl, humanizeApiError } from "@/api/client";
 import MediaLightbox from "@/components/MediaLightbox";
-import { NotificationsList } from "@/features/notifications/NotificationsBell";
 
 /**
  * Э20: лента активности.
@@ -75,9 +74,6 @@ export default function FeedScreen({ meId }: { meId: number }) {
   // GHG11(4): переход из анонса фичи — раскрываем панель «Действия».
   const feedAnchor = useUI((s) => s.feedAnchor);
   const setFeedAnchor = useUI((s) => s.setFeedAnchor);
-  // GHG11(14): панель ЛИЧНЫХ уведомлений — своя, отдельно от фильтров ленты
-  // (её открывает колокольчик в шапке).
-  const notificationsOpen = useUI((s) => s.notificationsOpen);
   useEffect(() => {
     if (feedAnchor === "feed-actions") {
       setShowActions(true);
@@ -327,8 +323,8 @@ export default function FeedScreen({ meId }: { meId: number }) {
 
       </div>
 
-      {/* GHG11(14): уведомления — только по колокольчику в шапке. */}
-      {notificationsOpen && <NotificationsList />}
+      {/* GHG11(16): уведомления больше не занимают высоту ленты — они живут в
+          нижнем шите (см. NotificationsSheet в шапке ленты). */}
 
       {/* Шит автолоха (свой, гейтится по рангу). */}
       {showLoser && <LoserSheet />}

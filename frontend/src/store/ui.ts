@@ -152,16 +152,17 @@ interface UIState {
   setFeedAnchor: (a: string | null) => void;
 
   /**
-   * GHG11(14): панель личных уведомлений — своя, отдельная от фильтров.
+   * GHG11(14/16): личные уведомления — нижний шит (как лох, номинации, фильтр
+   * участников), а не панель в потоке ленты.
    *
    * GHG11(13) свалил фильтры, действия и уведомления в одну панель под
-   * колокольчиком, и фильтры стали «спрятанными за уведомлениями». Теперь у
-   * каждого входа свой: строка «Все события / Только мои / Фильтры / Действия»
-   * живёт в самой ленте, а колокольчик открывает только список уведомлений.
+   * колокольчиком (фильтры читались как часть уведомлений), GHG11(14) развёл их,
+   * но оставил ту же механику: колокольчик-тумблер выдвигал и вдвигал панель,
+   * врезанную между шапкой и лентой. Теперь колокольчик только ОТКРЫВАЕТ шит;
+   * сворачивания по нему нет — закрытие там, где его ищут в мобильном: подложка.
    */
-  notificationsOpen: boolean;
-  setNotificationsOpen: (v: boolean) => void;
-  toggleNotifications: () => void;
+  showNotificationsSheet: boolean;
+  setShowNotificationsSheet: (v: boolean) => void;
 
   /**
    * GHG11(4): подраздел админки, который надо открыть сразу при переходе из
@@ -263,9 +264,9 @@ export const useUI = create<UIState>((set, get) => ({
   feedAnchor: null,
   setFeedAnchor: (feedAnchor) => set({ feedAnchor }),
 
-  notificationsOpen: false,
-  setNotificationsOpen: (notificationsOpen) => set({ notificationsOpen }),
-  toggleNotifications: () => set({ notificationsOpen: !get().notificationsOpen }),
+  showNotificationsSheet: false,
+  setShowNotificationsSheet: (showNotificationsSheet) =>
+    set({ showNotificationsSheet }),
 
   pendingAdminSection: null,
   setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),

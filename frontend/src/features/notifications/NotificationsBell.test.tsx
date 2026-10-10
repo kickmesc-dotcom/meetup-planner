@@ -10,7 +10,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NotificationsBell, {
-  NotificationsList,
+  NotificationsSheet,
   notificationIcon,
   relativeTime,
 } from "./NotificationsBell";
@@ -56,7 +56,7 @@ const FEED: NotificationsFeed = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useUI.setState({ notificationsOpen: false });
+  useUI.setState({ showNotificationsSheet: false });
   vi.mocked(fetchNotifications).mockResolvedValue(FEED);
   vi.mocked(readNotifications).mockResolvedValue({
     unread: 0,
@@ -79,7 +79,7 @@ function mountSheet() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
-      <NotificationsList />
+      <NotificationsSheet />
     </QueryClientProvider>,
   );
 }
@@ -100,7 +100,7 @@ describe("форматирование уведомлений", () => {
   });
 });
 
-describe("NotificationsBell (GHG11(14): свой вход в уведомления)", () => {
+describe("NotificationsBell (GHG11(16): колокольчик только открывает шит)", () => {
   it("показывает бейдж с числом непрочитанных", async () => {
     mount();
     const badge = await screen.findByTestId("notifications-badge");
@@ -108,34 +108,43 @@ describe("NotificationsBell (GHG11(14): свой вход в уведомлен�
     expect(screen.getByTestId("notifications-bell").getAttribute("aria-label")).toBe(
       "Уведомления, непрочитанных: 2",
     );
+    expect(screen.getByTestId("notifications-bell").getAttribute("aria-haspopup")).toBe(
+      "dialog",
+    );
   });
 
-  it("клик открывает панель уведомлений, а не прячет ленту", async () => {
+  it("клик открывает нижний шит и НЕ сворачивает его повторным тапом", async () => {
     mount();
     await screen.findByTestId("notifications-badge");
     const bell = screen.getByTestId("notifications-bell");
-    expect(bell.getAttribute("aria-expanded")).toBe("false");
 
     await act(async () => {
       fireEvent.click(bell);
     });
+    expect(useUI.getState().showNotificationsSheet).toBe(true);
 
-    expect(useUI.getState().notificationsOpen).toBe(true);
+    // Механики «тот же колокольчик — тумблер» больше нет: вход не закрывает.
     fireEvent.click(bell);
-    expect(useUI.getState().notificationsOpen).toBe(false);
-    // Своего полноэкранного листа у колокольчика больше нет — ленту он не прячет.
-    expect(screen.queryByTestId("notifications-sheet")).toBeNull();
+    expect(useUI.getState().showNotificationsSheet).toBe(true);
   });
 
-  it("у панели есть свой выход — крестик", async () => {
-    useUI.setState({ notificationsOpen: true });
+  it("шит закрывается тапом по подложке", async () => {
+    useUI.setState({ showNotificationsSheet: true });
     mountSheet();
     await screen.findByTestId("notifications-list");
-    fireEvent.click(screen.getByTestId("notifications-close"));
-    expect(useUI.getState().notificationsOpen).toBe(false);
+    fireEvent.click(screen.getByTestId("sheet-backdrop"));
+    expect(useUI.getState().showNotificationsSheet).toBe(false);
   });
 
-  it("список в панели рисует тексты и отмечает прочитанными", async () => {
+  it("шит закрывается по Escape", async () => {
+    useUI.setState({ showNotificationsSheet: true });
+    mountSheet();
+    await screen.findByTestId("notifications-list");
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(useUI.getState().showNotificationsSheet).toBe(false);
+  });
+
+  it("список в шите рисует тексты и отмечает прочитанными", async () => {
     mountSheet();
     const rows = await screen.findAllByTestId("notification-row");
     expect(rows).toHaveLength(2);

@@ -12,6 +12,7 @@ export default function BottomSheet({ title, onClose, children }: Props) {
     <AnimatePresence>
       <motion.div
         key="backdrop"
+        data-testid="sheet-backdrop"
         className="fixed inset-0 bg-black/40 z-40"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -20,6 +21,9 @@ export default function BottomSheet({ title, onClose, children }: Props) {
       />
       <motion.div
         key="sheet"
+        data-testid="sheet"
+        role="dialog"
+        aria-label={title}
         className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-tg-bg p-4 pb-8 shadow-xl"
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
