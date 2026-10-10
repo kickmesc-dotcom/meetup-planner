@@ -152,15 +152,16 @@ interface UIState {
   setFeedAnchor: (a: string | null) => void;
 
   /**
-   * GHG11(13): панель управления лентой. Раньше строка «Все события / Только
-   * мои / Фильтры / Действия» висела всегда и съедала место, а колокольчик в
-   * шапке открывал пустой на весь экран лист уведомлений. Теперь колокольчик —
-   * это выдвижная панель: фильтры, действия и уведомления в одном месте, а
-   * сама лента получает максимум высоты.
+   * GHG11(14): панель личных уведомлений — своя, отдельная от фильтров.
+   *
+   * GHG11(13) свалил фильтры, действия и уведомления в одну панель под
+   * колокольчиком, и фильтры стали «спрятанными за уведомлениями». Теперь у
+   * каждого входа свой: строка «Все события / Только мои / Фильтры / Действия»
+   * живёт в самой ленте, а колокольчик открывает только список уведомлений.
    */
-  feedPanel: boolean;
-  setFeedPanel: (v: boolean) => void;
-  toggleFeedPanel: () => void;
+  notificationsOpen: boolean;
+  setNotificationsOpen: (v: boolean) => void;
+  toggleNotifications: () => void;
 
   /**
    * GHG11(4): подраздел админки, который надо открыть сразу при переходе из
@@ -262,9 +263,9 @@ export const useUI = create<UIState>((set, get) => ({
   feedAnchor: null,
   setFeedAnchor: (feedAnchor) => set({ feedAnchor }),
 
-  feedPanel: false,
-  setFeedPanel: (feedPanel) => set({ feedPanel }),
-  toggleFeedPanel: () => set({ feedPanel: !get().feedPanel }),
+  notificationsOpen: false,
+  setNotificationsOpen: (notificationsOpen) => set({ notificationsOpen }),
+  toggleNotifications: () => set({ notificationsOpen: !get().notificationsOpen }),
 
   pendingAdminSection: null,
   setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),

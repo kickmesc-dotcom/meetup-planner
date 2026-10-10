@@ -34,15 +34,31 @@ interface Props {
   bold?: boolean;
   children: React.ReactNode;
   title?: string;
+  /**
+   * GHG11(14): `sm` — компактная плашка для узких строк (строка топа в
+   * телефоне), где полноразмерная выдавливала XP и процент ачивок.
+   */
+  size?: "md" | "sm";
+  /** Классы вызывающего: нужны, чтобы плашка умела сжиматься в тесной строке. */
+  className?: string;
 }
 
-export default function RankPlaque({ hex, bold, children, title }: Props) {
+export default function RankPlaque({
+  hex,
+  bold,
+  children,
+  title,
+  size = "md",
+  className,
+}: Props) {
   return (
     <span
       title={title}
       className={[
-        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs leading-tight",
+        "inline-flex items-center gap-1 rounded-md leading-tight",
+        size === "sm" ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-xs",
         bold ? "font-bold" : "font-semibold",
+        className ?? "",
       ].join(" ")}
       style={{ background: hex, color: plaqueTextColor(hex) }}
     >

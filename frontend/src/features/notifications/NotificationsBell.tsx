@@ -6,9 +6,11 @@
  *
  * GHG11(13): раньше колокольчик раскрывался ПУСТЫМ листом на весь экран — и
  * когда лайков не было, выглядело это как «спрятали ленту и показали ничего».
- * Теперь колокольчик — это переключатель выдвижной панели ленты (`feedPanel`):
- * там же фильтры, действия и, ниже, список уведомлений. Панель ничего не
- * перекрывает — просто занимает свою высоту над лентой.
+ *
+ * GHG11(14): колокольчик — это ТОЛЬКО личные уведомления, свой вход со своим
+ * бейджем (`notificationsOpen`). Фильтры ленты больше не прячутся за ним: у них
+ * своя строка в самой ленте. Панель уведомлений ничего не перекрывает — просто
+ * занимает свою высоту над лентой.
  *
  * Прочитанными отмечаем при показе списка: бейдж — это «сколько нового».
  * Тексты собирает сервер, так что новые типы уведомлений появятся на фронте без
@@ -61,6 +63,7 @@ export function useNotifications() {
  */
 export function NotificationsList() {
   const qc = useQueryClient();
+  const setNotificationsOpen = useUI((s) => s.setNotificationsOpen);
   const notes = useNotifications();
   const markRead = useMutation({
     mutationFn: () => readNotifications({ all: true }),
@@ -82,6 +85,17 @@ export function NotificationsList() {
       <div className="flex items-center gap-1.5 text-[11px] font-medium text-tg-hint">
         <span aria-hidden>🔔</span>
         Уведомления
+        {/* GHG11(14): у панели свой вход — значит нужен и свой выход: тот же
+            колокольчик в шапке не всегда под рукой на длинной ленте. */}
+        <button
+          type="button"
+          data-testid="notifications-close"
+          aria-label="Закрыть уведомления"
+          onClick={() => setNotificationsOpen(false)}
+          className="ml-auto rounded-md px-1.5 text-[13px] leading-tight text-tg-hint"
+        >
+          ✕
+        </button>
       </div>
       {notes.isPending ? (
         <div className="mt-1 text-[11px] text-tg-hint">Загружаю…</div>
@@ -116,15 +130,15 @@ export function NotificationsList() {
 }
 
 /**
- * GHG11(13): колокольчик-переключатель панели ленты.
+ * GHG11(14): колокольчик — переключатель только панели уведомлений.
  *
- * Бейдж — по-прежнему «сколько непрочитанных», но клик не открывает отдельный
- * экран, а выдвигает панель (`feedPanel`) под шапкой: фильтры, действия и
- * уведомления. Иконка остаётся колокольчиком — единственный «личный» вход.
+ * Бейдж — по-прежнему «сколько непрочитанных». Клик выдвигает список
+ * уведомлений под шапкой (`notificationsOpen`); фильтры ленты живут отдельно и
+ * от колокольчика не зависят.
  */
 export default function NotificationsBell() {
-  const feedPanel = useUI((s) => s.feedPanel);
-  const toggleFeedPanel = useUI((s) => s.toggleFeedPanel);
+  const notificationsOpen = useUI((s) => s.notificationsOpen);
+  const toggleNotifications = useUI((s) => s.toggleNotifications);
   const notes = useNotifications();
   const unread = notes.data?.unread ?? 0;
 
@@ -132,16 +146,16 @@ export default function NotificationsBell() {
     <button
       type="button"
       data-testid="notifications-bell"
-      aria-expanded={feedPanel}
+      aria-expanded={notificationsOpen}
       aria-label={
         unread > 0
-          ? `Панель ленты, непрочитанных уведомлений: ${unread}`
-          : "Панель ленты: фильтры и уведомления"
+          ? `Уведомления, непрочитанных: ${unread}`
+          : "Уведомления"
       }
-      onClick={toggleFeedPanel}
+      onClick={toggleNotifications}
       className={[
         "relative shrink-0 rounded-full px-2 py-1 text-base transition-colors",
-        feedPanel ? "bg-tg-secondary-bg" : "",
+        notificationsOpen ? "bg-tg-secondary-bg" : "",
       ].join(" ")}
     >
       🔔

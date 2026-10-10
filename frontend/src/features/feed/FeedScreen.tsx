@@ -75,17 +75,15 @@ export default function FeedScreen({ meId }: { meId: number }) {
   // GHG11(4): переход из анонса фичи — раскрываем панель «Действия».
   const feedAnchor = useUI((s) => s.feedAnchor);
   const setFeedAnchor = useUI((s) => s.setFeedAnchor);
-  // GHG11(13): выдвижная панель ленты (колокольчик в шапке) — фильтры, действия
-  // и уведомления в одном месте.
-  const feedPanel = useUI((s) => s.feedPanel);
-  const setFeedPanel = useUI((s) => s.setFeedPanel);
+  // GHG11(14): панель ЛИЧНЫХ уведомлений — своя, отдельно от фильтров ленты
+  // (её открывает колокольчик в шапке).
+  const notificationsOpen = useUI((s) => s.notificationsOpen);
   useEffect(() => {
     if (feedAnchor === "feed-actions") {
       setShowActions(true);
-      setFeedPanel(true);
       setFeedAnchor(null);
     }
-  }, [feedAnchor, setFeedAnchor, setFeedPanel]);
+  }, [feedAnchor, setFeedAnchor]);
   const kindsParam = [...kinds].sort().join(",");
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -236,11 +234,10 @@ export default function FeedScreen({ meId }: { meId: number }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* GHG11(13): управление лентой — в выдвижной панели (колокольчик в
-          шапке): охват, фильтры, действия и уведомления. Свёрнутая панель не
-          съедает высоту — лента получает максимум. */}
-      {feedPanel && (
-      <div data-testid="feed-panel" className="border-b border-tg-secondary-bg">
+      {/* GHG11(14): управление лентой — своя строка в самой ленте: охват,
+          фильтры и действия. Раньше всё это пряталось за колокольчиком вместе
+          с уведомлениями, и фильтры выглядели частью личных уведомлений. */}
+      <div data-testid="feed-controls" className="border-b border-tg-secondary-bg">
       <div className="border-b border-tg-secondary-bg px-3 py-2">
         <div className="flex items-center gap-1.5">
           <ScopeButton
@@ -328,9 +325,10 @@ export default function FeedScreen({ meId }: { meId: number }) {
         />
       )}
 
-      <NotificationsList />
       </div>
-      )}
+
+      {/* GHG11(14): уведомления — только по колокольчику в шапке. */}
+      {notificationsOpen && <NotificationsList />}
 
       {/* Шит автолоха (свой, гейтится по рангу). */}
       {showLoser && <LoserSheet />}

@@ -56,7 +56,7 @@ const FEED: NotificationsFeed = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useUI.setState({ feedPanel: false });
+  useUI.setState({ notificationsOpen: false });
   vi.mocked(fetchNotifications).mockResolvedValue(FEED);
   vi.mocked(readNotifications).mockResolvedValue({
     unread: 0,
@@ -100,17 +100,17 @@ describe("форматирование уведомлений", () => {
   });
 });
 
-describe("NotificationsBell (GHG11(13): переключатель панели ленты)", () => {
+describe("NotificationsBell (GHG11(14): свой вход в уведомления)", () => {
   it("показывает бейдж с числом непрочитанных", async () => {
     mount();
     const badge = await screen.findByTestId("notifications-badge");
     expect(badge.textContent).toBe("2");
     expect(screen.getByTestId("notifications-bell").getAttribute("aria-label")).toBe(
-      "Панель ленты, непрочитанных уведомлений: 2",
+      "Уведомления, непрочитанных: 2",
     );
   });
 
-  it("клик выдвигает панель ленты, а не отдельный экран уведомлений", async () => {
+  it("клик открывает панель уведомлений, а не прячет ленту", async () => {
     mount();
     await screen.findByTestId("notifications-badge");
     const bell = screen.getByTestId("notifications-bell");
@@ -120,11 +120,19 @@ describe("NotificationsBell (GHG11(13): переключатель панели 
       fireEvent.click(bell);
     });
 
-    expect(useUI.getState().feedPanel).toBe(true);
+    expect(useUI.getState().notificationsOpen).toBe(true);
     fireEvent.click(bell);
-    expect(useUI.getState().feedPanel).toBe(false);
+    expect(useUI.getState().notificationsOpen).toBe(false);
     // Своего полноэкранного листа у колокольчика больше нет — ленту он не прячет.
     expect(screen.queryByTestId("notifications-sheet")).toBeNull();
+  });
+
+  it("у панели есть свой выход — крестик", async () => {
+    useUI.setState({ notificationsOpen: true });
+    mountSheet();
+    await screen.findByTestId("notifications-list");
+    fireEvent.click(screen.getByTestId("notifications-close"));
+    expect(useUI.getState().notificationsOpen).toBe(false);
   });
 
   it("список в панели рисует тексты и отмечает прочитанными", async () => {
