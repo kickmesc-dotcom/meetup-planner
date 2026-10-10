@@ -562,6 +562,19 @@ function MediaThumb({
   onOpen: () => void;
 }) {
   const [failed, setFailed] = useState(false);
+  // GHG11(13): превью у части старых постов нет вовсе (404) — тогда не
+  // предлагаем «открыть» его в пустой лайтбокс, а честно показываем иконку типа.
+  if (failed) {
+    return (
+      <div
+        data-testid="media-thumb"
+        title="Превью недоступно"
+        className="mt-1.5 flex h-20 w-20 items-center justify-center rounded-lg bg-tg-bg/60 text-xl opacity-70"
+      >
+        {mediaIcon(mediaType)}
+      </div>
+    );
+  }
   return (
     <button
       type="button"
@@ -572,18 +585,12 @@ function MediaThumb({
       }}
       className="mt-1.5 block h-20 w-20 overflow-hidden rounded-lg bg-tg-bg/60"
     >
-      {failed ? (
-        <span className="flex h-full w-full items-center justify-center text-xl">
-          {mediaIcon(mediaType)}
-        </span>
-      ) : (
-        <img
-          src={apiPublicUrl(`/api/media/${postId}`)}
-          alt=""
-          onError={() => setFailed(true)}
-          className="h-full w-full object-cover"
-        />
-      )}
+      <img
+        src={apiPublicUrl(`/api/media/${postId}`)}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-full w-full object-cover"
+      />
     </button>
   );
 }

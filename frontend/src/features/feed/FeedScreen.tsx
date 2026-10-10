@@ -1346,6 +1346,23 @@ function FeedMediaPreview({
   const [open, setOpen] = useState(false);
   const [failed, setFailed] = useState(false);
   const src = apiPublicUrl(`/api/media/${postId}`);
+  // GHG11(13): у части старых постов превью просто НЕ ХРАНИТСЯ (колонка
+  // появилась позже, а Telegram задним числом файл уже не отдаёт) — сервер
+  // честно отвечает 404. Раньше по такому тапу открывался пустой чёрный экран,
+  // а оператор видел «фотка туда никогда не попадает». Теперь недоступное превью
+  // не притворяется кликабельным: показываем иконку типа и ничего не открываем.
+  if (failed) {
+    return (
+      <div
+        data-testid="feed-media-thumb"
+        title="Превью недоступно"
+        aria-label="Превью медиа недоступно"
+        className="mt-1.5 flex h-16 w-16 items-center justify-center rounded-lg bg-tg-bg/60 text-lg opacity-70"
+      >
+        {mediaTypeIcon(mediaType)}
+      </div>
+    );
+  }
   return (
     <>
       <button
@@ -1358,18 +1375,12 @@ function FeedMediaPreview({
         }}
         className="mt-1.5 block h-16 w-16 overflow-hidden rounded-lg bg-tg-bg/60"
       >
-        {failed ? (
-          <span className="flex h-full w-full items-center justify-center text-lg">
-            {mediaTypeIcon(mediaType)}
-          </span>
-        ) : (
-          <img
-            src={src}
-            alt=""
-            onError={() => setFailed(true)}
-            className="h-full w-full object-cover"
-          />
-        )}
+        <img
+          src={src}
+          alt=""
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover"
+        />
       </button>
       {open && (
         <MediaLightbox
