@@ -93,4 +93,16 @@ describe("LeaderboardScreen: топ по рейтингу (GHG11(14))", () => {
     expect(plaques).toHaveLength(2);
     expect(plaques.some((p) => p.closest(".sm\\:hidden"))).toBe(true);
   });
+
+  it("GHG11(15): мобильный ранг переносится, а не режется многоточием", async () => {
+    mount();
+    await screen.findByText("Кравченко");
+    const mobile = screen
+      .getAllByText("Воин кринжа")
+      .find((p) => p.closest(".sm\\:hidden"));
+    expect(mobile).toBeTruthy();
+    // `truncate` (nowrap + ellipsis) на узком экране превращал звание в «Терп…».
+    expect(mobile!.className).not.toContain("truncate");
+    expect(mobile!.className).toContain("break-words");
+  });
 });

@@ -119,23 +119,37 @@ function RatingTop({ users }: { users: User[] }) {
                   {/* GHG11(14): на телефоне ранг уезжал целиком (`hidden sm:block`),
                       и уровень с опытом оставались без звания. Теперь ранг живёт во
                       второй строке компактной плашкой — рядом с XP, не вытесняя ни
-                      его, ни процент ачивок справа. */}
-                  <div className="flex min-w-0 items-center gap-1.5 text-2xs tabular-nums text-muted">
+                      его, ни процент ачивок справа.
+
+                      GHG11(15): на узких экранах плашка сжималась и превращалась в
+                      «Терп…». Строка теперь переносит элементы (`flex-wrap`), а за
+                      плашкой закреплена её собственная ширина: не влезает — целиком
+                      уезжает на новую строку, а `Ур. N` и `XP` остаются на месте.
+                      `truncate`/`min-w-0` оставлены только страховкой от переполнения
+                      на экстремально узких экранах (когда и одна строка мала). */}
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-2xs tabular-nums text-muted">
                     {r.rank_name && (
-                      <span className="flex min-w-0 shrink sm:hidden">
+                      <span className="flex min-w-0 max-w-full shrink-0 sm:hidden">
                         <RankPlaque
-                          className="min-w-0"
+                          className="min-w-0 max-w-full"
                           hex={r.hex}
                           bold={r.bold || r.supreme}
                           size="sm"
                           title={r.rank_name}
                         >
-                          <span className="min-w-0 truncate">{r.rank_name}</span>
+                          {/* Не многоточие, а перенос: даже на экране уже 320 px
+                              («Терпила средней руки» шире строки) звание остаётся
+                              читаемым целиком. */}
+                          <span className="min-w-0 break-words">{r.rank_name}</span>
                         </RankPlaque>
                       </span>
                     )}
-                    <span className="shrink-0">Ур. {r.level}</span>
-                    <span className="shrink-0 text-tg-text">{r.xp} XP</span>
+                    {/* Уровень и опыт — одна группа: если уж переносить, то вместе,
+                        иначе «Ур. 2» оставалось сверху, а «258 XP» уезжало вниз. */}
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span>Ур. {r.level}</span>
+                      <span className="text-tg-text">{r.xp} XP</span>
+                    </span>
                   </div>
                 </div>
                 {r.rank_name && (
