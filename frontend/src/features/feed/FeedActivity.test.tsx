@@ -131,7 +131,7 @@ describe("FeedDetailPanel: призыв из ленты (GHG11(8))", () => {
   });
 
   it("закрытое задание не даёт ни кнопок, ни поля ввода", () => {
-    renderInProvider(
+    const { container } = renderInProvider(
       <FeedDetailPanel
         item={closedItem()}
         playerLike={false}
@@ -142,8 +142,12 @@ describe("FeedDetailPanel: призыв из ленты (GHG11(8))", () => {
     );
     expect(screen.getByTestId("feed-activity-closed")).toBeTruthy();
     expect(screen.queryByPlaceholderText("Ответь прямо здесь…")).toBeNull();
-    expect(screen.queryByText("да")).toBeNull();
-    expect(screen.queryByText("нет")).toBeNull();
+    // GHG11(13): варианты ПОКАЗЫВАЕМ (оператор просил видеть, из чего выбирали,
+    // даже когда приём закрыт), но они неинтерактивны — кнопок нет.
+    expect(screen.getByTestId("feed-activity-options")).toBeTruthy();
+    expect(screen.getByText("да")).toBeTruthy();
+    expect(screen.getByText("нет")).toBeTruthy();
+    expect(container.querySelectorAll("button")).toHaveLength(0);
   });
 
   it("истёкшее окно закрывает задание даже без флага с сервера", () => {

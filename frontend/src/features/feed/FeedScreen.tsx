@@ -42,6 +42,8 @@ import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { fetchMe, fetchUiPrefs, fetchUsers } from "@/api/availability";
 import { apiPublicUrl, humanizeApiError } from "@/api/client";
+import MediaLightbox from "@/components/MediaLightbox";
+import { NotificationsList } from "@/features/notifications/NotificationsBell";
 
 /**
  * Э20: лента активности.
@@ -73,12 +75,17 @@ export default function FeedScreen({ meId }: { meId: number }) {
   // GHG11(4): переход из анонса фичи — раскрываем панель «Действия».
   const feedAnchor = useUI((s) => s.feedAnchor);
   const setFeedAnchor = useUI((s) => s.setFeedAnchor);
+  // GHG11(13): выдвижная панель ленты (колокольчик в шапке) — фильтры, действия
+  // и уведомления в одном месте.
+  const feedPanel = useUI((s) => s.feedPanel);
+  const setFeedPanel = useUI((s) => s.setFeedPanel);
   useEffect(() => {
     if (feedAnchor === "feed-actions") {
       setShowActions(true);
+      setFeedPanel(true);
       setFeedAnchor(null);
     }
-  }, [feedAnchor, setFeedAnchor]);
+  }, [feedAnchor, setFeedAnchor, setFeedPanel]);
   const kindsParam = [...kinds].sort().join(",");
 
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -229,8 +236,11 @@ export default function FeedScreen({ meId }: { meId: number }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* GHG11: компактная шапка — заголовок в одну строку, а строка управления
-          (охват + фильтры + действие) сразу под ним. Максимум места — ленте. */}
+      {/* GHG11(13): управление лентой — в выдвижной панели (колокольчик в
+          шапке): охват, фильтры, действия и уведомления. Свёрнутая панель не
+          съедает высоту — лента получает максимум. */}
+      {feedPanel && (
+      <div data-testid="feed-panel" className="border-b border-tg-secondary-bg">
       <div className="border-b border-tg-secondary-bg px-3 py-2">
         <div className="flex items-center gap-1.5">
           <ScopeButton
@@ -316,6 +326,10 @@ export default function FeedScreen({ meId }: { meId: number }) {
             setShowNominations(true);
           }}
         />
+      )}
+
+      <NotificationsList />
+      </div>
       )}
 
       {/* Шит автолоха (свой, гейтится по рангу). */}
@@ -801,8 +815,10 @@ const EXPANDABLE_KINDS = new Set([
   "music_game",
 ]);
 
-/** GHG11(12): сколько пикселей карточка уезжает влево, открывая плашку действий. */
-const SWIPE_W = 104;
+/** GHG11(12/13): ширина плашек, выезжающих из-под карточки при свайпе влево. */
+const SWIPE_HIDE_W = 52;
+/** GHG11(13): удаление — только админу, и подписано словами «Удалить (админ)». */
+const SWIPE_DELETE_W = 68;
 
 /** Русская форма числительного: 1 вариант / 2 варианта / 5 вариантов. */
 export function pluralRu(n: number, one: string, few: string, many: string): string {
@@ -914,6 +930,9 @@ export function FeedRow({
   compact: boolean;
 }) {
   const when = formatWhen(item.at);
+  // GHG11(13): у админа под карточкой ДВЕ плашки (скрыть + удалить), поэтому и
+  // сдвиг больше — иначе подпись «Удалить (админ)» осталась бы за краем.
+  const swipeW = isAdmin ? SWIPE_HIDE_W + SWIPE_DELETE_W : SWIPE_HIDE_W;
   const clickable = item.user_id !== null && item.user_id !== undefined;
   const [open, setOpen] = useState(false);
   // GHG11(4): факт тапа по миниатюре — какую сдачу включить при раскрытии.
@@ -987,14 +1006,14 @@ export function FeedRow({
       }
     }
     dragged.current = true;
-    setDx(Math.max(-SWIPE_W, Math.min(0, d.base + mx)));
+    setDx(Math.max(-swipeW, Math.min(0, d.base + mx)));
   };
   const onSwipeEnd = () => {
     const d = drag.current;
     drag.current = null;
     if (!d?.horiz) return;
     // Протянул меньше трети — плашка возвращается назад (как в iOS).
-    setDx((v) => (v < -SWIPE_W / 3 ? -SWIPE_W : 0));
+    setDx((v) => (v < -swipeW / 3 ? -swipeW : 0));
   };
 
   const hide = useMutation({
@@ -1060,8 +1079,7 @@ export function FeedRow({
           data-testid="feed-swipe-hide"
           aria-label="Скрыть запись из ленты"
           disabled={hide.isPending}
-          onClick={() => hide.mutate()}
-          className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-tg-secondary-bg text-[10px] font-medium text-tg-text disabled:opacity-50"
+          onClick={() => hide.mutate()}            className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-tg-secondary-bg text-[10px] font-medium text-tg-text disabled:opacity-50"
         >
           <span aria-hidden className="text-base leading-none">
             ➖
@@ -1072,15 +1090,13 @@ export function FeedRow({
           <button
             type="button"
             data-testid="feed-swipe-delete"
-            aria-label="Удалить запись из ленты для всех"
+            aria-label="Удалить запись из ленты для всех (админ)"
             disabled={remove.isPending}
             onClick={() => remove.mutate()}
-            className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-status-busy text-[10px] font-medium text-white disabled:opacity-50"
+            className="flex w-[68px] flex-col items-center justify-center gap-0.5 bg-status-busy px-0.5 text-center text-[10px] font-medium leading-tight text-white disabled:opacity-50"
           >
-            <span aria-hidden className="text-base leading-none">
-              🗑
-            </span>
-            всем
+            Удалить
+            <span className="text-[9px] font-normal opacity-90">(админ)</span>
           </button>
         )}
       </div>
@@ -1208,22 +1224,39 @@ export function FeedRow({
               закрытого без заявок это честный «поучаствовало 0».
               Цвет состояния несёт тон плашки, а текст остаётся темой — иначе
               на светлой теме красный/жёлтый текст нечитаем. */}
+          {/* GHG11(13): счёт поучаствовавших — тихая малозаметная плашка, а не
+              крупная вывеска. И это КНОПКА: раньше «поучаствовало 1» висело
+              без единого способа раскрыть сами варианты — теперь рядом явное
+              «смотреть ▸», которое разворачивает подробности. */}
           {visual?.count && (
-            <div
+            <button
+              type="button"
               data-testid="feed-task-count"
+              disabled={!expandable}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!expandable) return;
+                haptic("light");
+                if (!open) setPlayId(null);
+                setOpen((o) => !o);
+              }}
               className={[
-                "mt-1.5 inline-flex w-fit items-baseline gap-1.5 rounded-lg px-2 py-0.5",
-                "text-lg font-semibold leading-tight tabular-nums text-tg-text",
+                "mt-1 inline-flex w-fit items-center gap-1.5 rounded-md px-1.5 py-0.5",
+                "text-[11px] font-medium leading-tight tabular-nums text-tg-hint",
                 visual.countBg,
+                expandable ? "active:scale-[0.98]" : "",
               ].join(" ")}
             >
               поучаствовало {participants}
-              {participants > 0 && (
-                <span className="ml-1.5 text-xs font-normal text-tg-hint">
-                  {pluralRu(participants, "вариант", "варианта", "вариантов")}
+              {participants > 0
+                ? ` ${pluralRu(participants, "вариант", "варианта", "вариантов")}`
+                : ""}
+              {expandable && (
+                <span className="text-tg-link">
+                  {open ? "свернуть ▴" : "смотреть ▸"}
                 </span>
               )}
-            </div>
+            </button>
           )}
           {/* GHG11(10): реакция бота на медиа — видно ЧТО было за медиа. */}
           {item.kind === "media" && typeof item.detail?.post_id === "number" && (
@@ -1339,17 +1372,13 @@ function FeedMediaPreview({
         )}
       </button>
       {open && (
-        <div
-          data-testid="feed-media-lightbox"
-          onClick={(e) => {
-            e.stopPropagation();
+        <MediaLightbox
+          src={src}
+          alt=""
+          onClose={() => {
             setOpen(false);
           }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 p-4"
-        >
-          <img src={src} alt="" className="max-h-[80vh] max-w-full rounded-lg object-contain" />
-          <div className="mt-3 text-xs text-white/70">Нажми, чтобы закрыть</div>
-        </div>
+        />
       )}
     </>
   );
@@ -1589,15 +1618,23 @@ export function ParticipantsStrip({
               e.stopPropagation();
               onSelect?.(s);
             }}
-            className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-tg-secondary-bg text-xs font-semibold text-tg-text ring-1 ring-tg-hint/20"
+            className="relative h-8 w-8 shrink-0 rounded-full"
           >
-            {s.avatar_url ? (
-              <img src={s.avatar_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              (s.user_name ?? "?").slice(0, 1).toUpperCase()
-            )}
+            {/* GHG11(13): обрезаем ТОЛЬКО аватарку во внутреннем слое, а плашку
+                «+XP» рисуем поверх кнопки: раньше она жила внутри
+                `overflow-hidden` и её срезало до еле видного уголка. */}
+            <span className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-tg-secondary-bg text-xs font-semibold text-tg-text ring-1 ring-tg-hint/20">
+              {s.avatar_url ? (
+                <img src={s.avatar_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                (s.user_name ?? "?").slice(0, 1).toUpperCase()
+              )}
+            </span>
             {badge && (
-              <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-status-free px-1 text-[9px] font-bold leading-tight text-white">
+              <span
+                data-testid="participant-badge"
+                className="absolute -bottom-1 -right-1 z-10 rounded-full bg-status-free px-1 text-[9px] font-bold leading-tight text-white shadow-sm ring-1 ring-tg-bg"
+              >
                 {badge}
               </span>
             )}

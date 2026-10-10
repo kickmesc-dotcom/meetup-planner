@@ -10,9 +10,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NotificationsBell, {
+  NotificationsList,
   notificationIcon,
   relativeTime,
 } from "./NotificationsBell";
+import { useUI } from "@/store/ui";
 import {
   fetchNotifications,
   readNotifications,
@@ -54,6 +56,7 @@ const FEED: NotificationsFeed = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useUI.setState({ feedPanel: false });
   vi.mocked(fetchNotifications).mockResolvedValue(FEED);
   vi.mocked(readNotifications).mockResolvedValue({
     unread: 0,
@@ -68,6 +71,15 @@ function mount() {
   return render(
     <QueryClientProvider client={qc}>
       <NotificationsBell />
+    </QueryClientProvider>,
+  );
+}
+
+function mountSheet() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <NotificationsList />
     </QueryClientProvider>,
   );
 }
@@ -88,46 +100,49 @@ describe("форматирование уведомлений", () => {
   });
 });
 
-describe("NotificationsBell", () => {
+describe("NotificationsBell (GHG11(13): переключатель панели ленты)", () => {
   it("показывает бейдж с числом непрочитанных", async () => {
     mount();
     const badge = await screen.findByTestId("notifications-badge");
     expect(badge.textContent).toBe("2");
     expect(screen.getByTestId("notifications-bell").getAttribute("aria-label")).toBe(
-      "Уведомления, непрочитанных: 2",
+      "Панель ленты, непрочитанных уведомлений: 2",
     );
   });
 
-  it("открывает список текстов и отмечает прочитанными", async () => {
+  it("клик выдвигает панель ленты, а не отдельный экран уведомлений", async () => {
     mount();
     await screen.findByTestId("notifications-badge");
+    const bell = screen.getByTestId("notifications-bell");
+    expect(bell.getAttribute("aria-expanded")).toBe("false");
 
     await act(async () => {
-      fireEvent.click(screen.getByTestId("notifications-bell"));
+      fireEvent.click(bell);
     });
 
-    const rows = screen.getAllByTestId("notification-row");
+    expect(useUI.getState().feedPanel).toBe(true);
+    fireEvent.click(bell);
+    expect(useUI.getState().feedPanel).toBe(false);
+    // Своего полноэкранного листа у колокольчика больше нет — ленту он не прячет.
+    expect(screen.queryByTestId("notifications-sheet")).toBeNull();
+  });
+
+  it("список в панели рисует тексты и отмечает прочитанными", async () => {
+    mountSheet();
+    const rows = await screen.findAllByTestId("notification-row");
     expect(rows).toHaveLength(2);
-    expect(screen.getByTestId("notifications-sheet").textContent).toContain(
+    expect(screen.getByTestId("notifications-list").textContent).toContain(
       "Митян лайкнул твой трек «Гимн чата»",
     );
-    // Отметка «прочитано» происходит при открытии — бейдж исчезает.
     await waitFor(() => expect(readNotifications).toHaveBeenCalledWith({ all: true }));
-    await waitFor(() =>
-      expect(screen.queryByTestId("notifications-badge")).toBeNull(),
-    );
   });
 
   it("пустое состояние: никаких лайков — никаких строк", async () => {
     vi.mocked(fetchNotifications).mockResolvedValue({ unread: 0, items: [] });
-    mount();
-    await screen.findByTestId("notifications-bell");
-    expect(screen.queryByTestId("notifications-badge")).toBeNull();
-
-    fireEvent.click(screen.getByTestId("notifications-bell"));
-    expect(screen.getByTestId("notifications-sheet").textContent).toContain(
-      "Пока тихо",
-    );
+    mountSheet();
+    await screen.findByTestId("notifications-list");
+    expect(await screen.findByText(/Пока тихо/)).toBeTruthy();
+    expect(screen.queryByTestId("notification-row")).toBeNull();
     expect(readNotifications).not.toHaveBeenCalled(); // нечего отмечать
   });
 });

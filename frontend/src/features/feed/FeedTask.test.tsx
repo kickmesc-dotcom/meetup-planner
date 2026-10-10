@@ -232,12 +232,17 @@ describe("FeedRow: свайп влево — скрыть/удалить", () =>
     expect(screen.queryByTestId("feed-swipe-delete")).toBeNull();
   });
 
-  it("удаление из ленты доступно только админу", () => {
+  it("удаление из ленты доступно только админу и подписано словами", () => {
     renderRow(
       voiceItem({ state: "open", closed: false, participants: 0, seen: false }),
       true,
     );
-    expect(screen.getByTestId("feed-swipe-delete")).toBeTruthy();
+    const del = screen.getByTestId("feed-swipe-delete");
+    // GHG11(13): никаких абстрактных 🗑/«всем» — прямо пишем, что это удаление
+    // из ленты для всех и что оно админское.
+    expect(del.textContent).toContain("Удалить");
+    expect(del.textContent).toContain("админ");
+    expect(del.textContent).not.toContain("всем");
   });
 
   it("свайп влево вытягивает карточку и открывает плашку действий", () => {
@@ -254,9 +259,25 @@ describe("FeedRow: свайп влево — скрыть/удалить", () =>
     expect(sliding.style.transform).toMatch(/translateX\(-50px\)/);
     fireEvent.touchEnd(sliding);
     // Протянули больше трети — карточка «защёлкивается» в открытом виде.
-    expect(sliding.style.transform).toMatch(/translateX\(-104px\)/);
+    // GHG11(13): у обычного участника плашка одна (скрыть), поэтому сдвиг 52px;
+    // у админа туда же встаёт «Удалить (админ)» — сдвиг больше.
+    expect(sliding.style.transform).toMatch(/translateX\(-52px\)/);
 
     fireEvent.click(screen.getByTestId("feed-swipe-hide"));
+  });
+
+  it("у админа свайп уезжает дальше — под вторую плашку", () => {
+    const { container } = renderRow(
+      voiceItem({ state: "open", closed: false, participants: 0, seen: false }),
+      true,
+    );
+    const sliding = (container.querySelector('[data-testid="feed-row"]')!
+      .lastElementChild as HTMLElement);
+    fireEvent.touchStart(sliding, { touches: [{ clientX: 300, clientY: 100 }] });
+    fireEvent.touchMove(sliding, { touches: [{ clientX: 160, clientY: 104 }] });
+    fireEvent.touchEnd(sliding);
+    expect(sliding.style.transform).toMatch(/translateX\(-120px\)/);
+    fireEvent.click(screen.getByTestId("feed-swipe-delete"));
   });
 
   it("вертикальный жест (скролл/пулл) карточку не двигает", () => {

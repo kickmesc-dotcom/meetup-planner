@@ -103,13 +103,35 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
           ✅ Засчитано! Опыт уже в профиле.
         </div>
       ) : closed ? (
-        // GHG11(8.a): задание закрывается — поле ввода/кнопки тоже.
-        <div
-          className="rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs font-medium text-tg-hint"
-          data-testid="feed-activity-closed"
-        >
-          ⛔ Задание закрыто — приём ответов окончен.
-        </div>
+        <>
+          {/* GHG11(8.a): задание закрывается — поле ввода/кнопки тоже. */}
+          <div
+            className="rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs font-medium text-tg-hint"
+            data-testid="feed-activity-closed"
+          >
+            ⛔ Задание закрыто — приём ответов окончен.
+          </div>
+          {/* GHG11(13): но САМИ варианты показываем — оператор просил видеть, из
+              чего выбирали, даже когда приём уже закрыт (и слушать/смотреть
+              закрытые голосовые тоже можно). Кнопки здесь неактивны: это
+              справка, а не голосование. */}
+          {activity.options.length > 0 && (
+            <div
+              className="flex flex-wrap gap-1.5"
+              data-testid="feed-activity-options"
+            >
+              {activity.options.map((o) => (
+                <span
+                  key={o.label}
+                  className="rounded-full bg-tg-bg/50 px-3 py-1.5 text-xs font-medium text-tg-hint opacity-80"
+                >
+                  {o.label}
+                  {o.xp > 0 && <span className="ml-1">+{o.xp}</span>}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
       ) : (
         <>
           {activity.options.length > 0 && (

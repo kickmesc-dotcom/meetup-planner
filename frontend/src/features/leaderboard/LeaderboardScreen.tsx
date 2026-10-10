@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchLoserStats } from "@/api/meetings";
 import { fetchChukhanLeaderboard, type ChukhanLeaderRow } from "@/api/admin";
+import { fetchRanksChart } from "@/api/game";
 import type { User } from "@/types";
 import { ListSkeleton } from "@/components/Skeleton";
+import RankPlaque from "@/components/RankPlaque";
 
 interface Props {
   users: User[];
@@ -26,6 +28,9 @@ export default function LeaderboardScreen({ users }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      {/* GHG11(13): САМЫЙ верх — топ по рейтингу: уровень, опыт и процент
+          собранных ачивок. Чуханы и лохи — ниже, как привычный реестр званий. */}
+      <RatingTop users={users} />
       <Section
         icon="💩"
         title="Топ чуханов"
@@ -47,6 +52,96 @@ export default function LeaderboardScreen({ users }: Props) {
         loading={losers.isPending}
       />
     </div>
+  );
+}
+
+/**
+ * GHG11(13): верхний топ по рейтингу — «кто выше по уровню и опыту».
+ *
+ * Строка отвечает на три вопроса сразу: место, сколько опыта и насколько
+ * собрана коллекция ачивок. Значения — моношрифтом с tabular-nums (это цифры,
+ * а не текст), ранг показываем плашкой, как в профиле.
+ */
+function RatingTop({ users }: { users: User[] }) {
+  const ranks = useQuery({ queryKey: ["game", "ranks"], queryFn: fetchRanksChart });
+  const userById = Object.fromEntries(users.map((u) => [u.id, u] as const));
+  return (
+    <section
+      data-testid="rating-top"
+      className="rounded-xl bg-tg-secondary-bg border border-tg-hint/10 p-3"
+    >
+      <header className="flex items-center gap-2">
+        <span
+          aria-hidden
+          className="grid h-8 w-8 shrink-0 place-items-center bg-ink-stamp text-[17px] leading-none text-white"
+        >
+          🏆
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold uppercase leading-tight tracking-[0.08em]">
+            Топ по рейтингу
+          </h2>
+          <p className="truncate text-2xs text-muted">
+            Опыт, уровень и собранные ачивки
+          </p>
+        </div>
+      </header>
+
+      {ranks.isPending ? (
+        <div className="mt-3">
+          <ListSkeleton rows={4} />
+        </div>
+      ) : !ranks.data?.length ? (
+        <p className="mt-3 text-xs text-muted">Ещё никто не прокачался.</p>
+      ) : (
+        <ol className="mt-3 space-y-1.5">
+          {ranks.data.map((r, i) => {
+            const u = userById[r.user_id];
+            return (
+              <li key={r.user_id} className="flex items-center gap-2 px-1.5 py-1">
+                <span className="w-4 shrink-0 text-right font-mono text-2xs tabular-nums text-muted">
+                  {i + 1}
+                </span>
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full text-2xs font-medium text-white"
+                  style={{ background: u?.color_hex ?? "#888" }}
+                >
+                  {u?.avatar_url ? (
+                    <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    (u?.display_name[0] ?? "?")
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {u?.display_name ?? `id=${r.user_id}`}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-2xs tabular-nums text-muted">
+                    <span>Ур. {r.level}</span>
+                    <span className="text-tg-text">{r.xp} XP</span>
+                  </div>
+                </div>
+                {r.rank_name && (
+                  <span className="hidden shrink-0 sm:block">
+                    <RankPlaque hex={r.hex} bold={r.bold || r.supreme}>
+                      {r.rank_name}
+                    </RankPlaque>
+                  </span>
+                )}
+                <span
+                  title={`Собрано ачивок: ${r.achievements_collected ?? 0} из ${
+                    r.achievements_total ?? 0
+                  }`}
+                  className="shrink-0 rounded-md bg-tg-bg/60 px-1.5 py-0.5 text-2xs tabular-nums text-tg-text"
+                >
+                  🏅 {r.achievements_percent ?? 0}%
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </section>
   );
 }
 

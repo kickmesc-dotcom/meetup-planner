@@ -113,7 +113,7 @@ export default function ProfileScreen({ users, me }: Props) {
       <NavCard
         icon="🏆"
         title="Топы"
-        subtitle="Чуханы и лохи за всё время (в чате — /top)"
+        subtitle="Рейтинг по опыту, а ниже — чуханы и лохи"
         onClick={() => {
           haptic("selection");
           setInner("tops");

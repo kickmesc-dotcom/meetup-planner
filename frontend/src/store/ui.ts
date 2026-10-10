@@ -152,6 +152,17 @@ interface UIState {
   setFeedAnchor: (a: string | null) => void;
 
   /**
+   * GHG11(13): панель управления лентой. Раньше строка «Все события / Только
+   * мои / Фильтры / Действия» висела всегда и съедала место, а колокольчик в
+   * шапке открывал пустой на весь экран лист уведомлений. Теперь колокольчик —
+   * это выдвижная панель: фильтры, действия и уведомления в одном месте, а
+   * сама лента получает максимум высоты.
+   */
+  feedPanel: boolean;
+  setFeedPanel: (v: boolean) => void;
+  toggleFeedPanel: () => void;
+
+  /**
    * GHG11(4): подраздел админки, который надо открыть сразу при переходе из
    * анонса фичи ("loser"/"chukhan"/…). Потребляется `AdminScreen` и
    * очищается после применения.
@@ -250,6 +261,10 @@ export const useUI = create<UIState>((set, get) => ({
 
   feedAnchor: null,
   setFeedAnchor: (feedAnchor) => set({ feedAnchor }),
+
+  feedPanel: false,
+  setFeedPanel: (feedPanel) => set({ feedPanel }),
+  toggleFeedPanel: () => set({ feedPanel: !get().feedPanel }),
 
   pendingAdminSection: null,
   setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),

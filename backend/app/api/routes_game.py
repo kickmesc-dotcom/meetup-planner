@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, SessionDep
@@ -949,13 +949,30 @@ async def activity_feed(
 
 @router.get("/game/ranks", response_model=list[RankRowOut])
 async def ranks_chart(session: SessionDep, _: CurrentUser) -> list[RankRowOut]:
-    """Чарт рангов: у кого какой уровень и ранг (Э5.4)."""
+    """Чарт рангов: у кого какой уровень и ранг (Э5.4).
+
+    GHG11(13): сюда же добавлен процент собранных ачивок — по этой ручке
+    строится ВЕРХНИЙ топ в разделе «Топы»: уровень + опыт + коллекция в одной
+    строке. Считаем одним групповым SELECT (без N+1), как и остальные агрегаты.
+    """
     if not await is_game_enabled(session):
         return []
     profiles = (
         await session.scalars(select(GameProfile).order_by(GameProfile.xp.desc()))
     ).all()
     supreme = await achievements.supreme_holders(session)
+    # Сколько ачивок собрал каждый — одним запросом на всех.
+    collected_counts = {
+        int(uid): int(cnt)
+        for uid, cnt in (
+            await session.execute(
+                select(UserAchievement.user_id, func.count()).group_by(
+                    UserAchievement.user_id
+                )
+            )
+        ).all()
+    }
+    achievements_total = len(base_achievements())
     out: list[RankRowOut] = []
     for profile in profiles:
         prog = levels.progress_for_xp(profile.xp)
@@ -965,6 +982,10 @@ async def ranks_chart(session: SessionDep, _: CurrentUser) -> list[RankRowOut]:
             name = SUPREME_CHUKHAN_TITLE
         elif profile.custom_rank_title:
             name = profile.custom_rank_title
+        collected = collected_counts.get(profile.user_id, 0)
+        percent = (
+            round(collected * 100 / achievements_total) if achievements_total else 0
+        )
         out.append(
             RankRowOut(
                 user_id=profile.user_id,
@@ -974,6 +995,9 @@ async def ranks_chart(session: SessionDep, _: CurrentUser) -> list[RankRowOut]:
                 hex=prog.rank.hex,
                 bold=prog.rank.bold,
                 supreme=is_supreme,
+                achievements_percent=min(100, percent),
+                achievements_collected=collected,
+                achievements_total=achievements_total,
             )
         )
     return out

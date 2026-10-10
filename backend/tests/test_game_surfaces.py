@@ -19,6 +19,7 @@ import pytest
 from app.api import routes_game
 from app.db.models import GameProfile, UserAchievement
 from app.services.game import achievements, awards, levels, weekly, xp
+from app.services.game.achievements_catalog import base_achievements
 from app.services.game.config import SUPREME_CHUKHAN_TITLE, unlocks_between
 from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
@@ -355,6 +356,32 @@ async def test_ranks_chart_builds_rows_with_ranks(monkeypatch, session):
     assert rows[0].level == 10 and rows[0].supreme is True
     assert rows[0].rank_name == SUPREME_CHUKHAN_TITLE
     assert rows[1].level == 1
+
+
+@pytest.mark.asyncio
+async def test_ranks_chart_counts_achievements_percent(monkeypatch, session):
+    """GHG11(13): верхний «топ по рейтингу» — уровень, опыт и % ачивок.
+
+    Проценты считаются ОДНИМ групповым SELECT по всем участникам (без N+1), а
+    знаменатель — размер базового каталога ачивок.
+    """
+    async def _enabled(_session):  # noqa: ANN001
+        return True
+
+    monkeypatch.setattr(routes_game, "is_game_enabled", _enabled)
+    profiles = [GameProfile(user_id=1, xp=100), GameProfile(user_id=2, xp=0)]
+    session.scalars_queue = [profiles, []]  # профили + supreme_holders
+    # Групповой SELECT: (user_id, count) — у первого две ачивки, у второго — ни одной.
+    session.execute_queue = [[(1, 2)]]
+
+    rows = await routes_game.ranks_chart(session, _User())
+    total = len(base_achievements())
+    assert total > 0
+    assert rows[0].achievements_collected == 2
+    assert rows[0].achievements_total == total
+    assert rows[0].achievements_percent == round(2 * 100 / total)
+    assert rows[1].achievements_collected == 0
+    assert rows[1].achievements_percent == 0
 
 
 @pytest.mark.asyncio

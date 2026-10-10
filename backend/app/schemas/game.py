@@ -149,7 +149,11 @@ class AchievementStatOut(BaseModel):
 
 
 class RankRowOut(BaseModel):
-    """Строка чарта рангов: у кого какой уровень/ранг (Э5.4)."""
+    """Строка чарта рангов: у кого какой уровень/ранг (Э5.4).
+
+    GHG11(13): добавлен процент собранных ачивок — верхний «топ по рейтингу»
+    показывает уровень, опыт и коллекцию одной строкой.
+    """
 
     user_id: int
     xp: int
@@ -158,6 +162,9 @@ class RankRowOut(BaseModel):
     hex: str
     bold: bool = False
     supreme: bool = False
+    achievements_percent: int = 0
+    achievements_collected: int = 0
+    achievements_total: int = 0
 
 
 class GuestAchievementOut(BaseModel):

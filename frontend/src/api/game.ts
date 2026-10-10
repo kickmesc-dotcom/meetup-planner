@@ -126,6 +126,10 @@ export interface RankRow {
   hex: string;
   bold: boolean;
   supreme: boolean;
+  /** GHG11(13): процент собранных ачивок — для верхнего топа по рейтингу. */
+  achievements_percent?: number;
+  achievements_collected?: number;
+  achievements_total?: number;
 }
 
 export interface GameCustomizePatch {

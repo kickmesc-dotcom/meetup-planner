@@ -10,6 +10,7 @@ import {
 } from "@/api/game";
 import { fetchMe, fetchUiPrefs, updateUiPrefs } from "@/api/availability";
 import { apiPublicUrl } from "@/api/client";
+import MediaLightbox from "@/components/MediaLightbox";
 import RankPlaque from "@/components/RankPlaque";
 import { Spinner } from "@/components/Spinner";
 import ErrorState from "@/components/ErrorState";
@@ -31,8 +32,10 @@ import { haptic } from "@/tg/webapp";
  *     именно открыты, и сразу сравнить со своими;
  *  4. сворачиваемые истории «лоха дня» и «чухана недели» — разнострочно
  *     (чередование фона), чтобы длинный мелкий текст не сливался;
- *  5. внизу — малоакцентированный свитчер «не показывать события участника в
- *     моей ленте».
+ *  5. превью последней активности;
+ *  6. САМЫЙ низ — малоакцентированный свитчер «не показывать события участника
+ *     в моей ленте» (GHG11(13): раньше он стоял посреди карточки и мешал
+ *     читать профиль).
  */
 export default function GuestProfileScreen({
   userId,
@@ -134,14 +137,15 @@ export default function GuestProfileScreen({
               events={p.chukhan_history}
             />
 
-            {/* GHG11(7): персональный фильтр ленты — своя карточка не даёт
-                «сломать ленту» (галочку себя отключить нельзя). */}
+            {/* GHG11(10): превью последней активности. */}
+            <RecentActivity recent={p.recent ?? []} />
+
+            {/* GHG11(13): персональный фильтр ленты — в САМОМ низу профиля, а не
+                посреди карточки (своя карточка не даёт «сломать ленту»:
+                галочку себя отключить нельзя). */}
             {!isSelf && (
               <MuteFeedSwitch userId={p.user_id} name={p.name} onDone={() => qc.invalidateQueries({ queryKey: ["ui-prefs"] })} />
             )}
-
-            {/* GHG11(10): превью последней активности — в самом низу профиля. */}
-            <RecentActivity recent={p.recent ?? []} />
           </div>
         )}
       </div>
@@ -537,18 +541,11 @@ function RecentActivity({ recent }: { recent: GuestRecent[] }) {
       </div>
 
       {lightbox && (
-        <div
-          data-testid="media-lightbox"
-          onClick={() => setLightbox(null)}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/85 p-4"
-        >
-          <img
-            src={apiPublicUrl(`/api/media/${lightbox.postId}`)}
-            alt=""
-            className="max-h-[80vh] max-w-full rounded-lg object-contain"
-          />
-          <div className="mt-3 text-xs text-white/70">Нажми, чтобы закрыть</div>
-        </div>
+        <MediaLightbox
+          src={apiPublicUrl(`/api/media/${lightbox.postId}`)}
+          alt=""
+          onClose={() => setLightbox(null)}
+        />
       )}
     </section>
   );

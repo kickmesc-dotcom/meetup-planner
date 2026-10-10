@@ -192,7 +192,7 @@ function sectionTexts(container: HTMLElement): string[] {
 }
 
 describe("GuestProfileScreen: порядок блоков (GHG11(7))", () => {
-  it("плашка → 4 подблока → ачивки → истории → свитчер", async () => {
+  it("плашка → 4 подблока → ачивки → истории → превью → свитчер", async () => {
     const { container } = renderProfile();
     await screen.findByText("📊 Открыто ачивок");
     const texts = sectionTexts(container);
@@ -208,9 +208,12 @@ describe("GuestProfileScreen: порядок блоков (GHG11(7))", () => {
     expect(ach).toBeGreaterThan(stats);
     expect(loser).toBeGreaterThan(ach);
     expect(chukhan).toBeGreaterThan(loser);
+    // GHG11(10): превью последней активности — ниже историй.
+    expect(recent).toBeGreaterThan(chukhan);
+    // GHG11(13): а свитчер «не показывать события» — в САМОМ низу профиля,
+    // а не посреди карточки.
     expect(mute).toBeGreaterThan(chukhan);
-    // GHG11(10): превью последней активности — в самом низу профиля.
-    expect(recent).toBeGreaterThan(mute);
+    expect(mute).toBeGreaterThan(recent);
   });
 
   it("в плашке активное состояние с причиной", async () => {
