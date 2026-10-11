@@ -242,15 +242,15 @@ function NumberRow({
  * самой «нейро~» — дыра, которую просил починить оператор.
  */
 /**
- * GHG11(17): границы окна приёма вариантов (минуты). 0 — «как сейчас», то есть
- * окно из каталога задания; 1440 — сутки (см. `VOICE_WINDOW_MAX_MINUTES`).
+ * GHG11(17/18): границы окна приёма ответа (минуты). 0 — «как сейчас», то есть
+ * срок механики из её каталога; 1440 — сутки (см. `ACCEPT_WINDOW_MAX_MINUTES`).
  * Логика вынесена отдельно, чтобы зажим совпадал на фронте и на бэке.
  */
-export const VOICE_WINDOW_MAX_MINUTES = 1440;
+export const ACCEPT_WINDOW_MAX_MINUTES = 1440;
 
-export function clampVoiceWindow(minutes: number): number {
+export function clampAcceptWindow(minutes: number): number {
   if (!Number.isFinite(minutes)) return 0;
-  return Math.max(0, Math.min(VOICE_WINDOW_MAX_MINUTES, Math.round(minutes)));
+  return Math.max(0, Math.min(ACCEPT_WINDOW_MAX_MINUTES, Math.round(minutes)));
 }
 
 export function phraseToVariant(phrase: string): string {
@@ -1417,6 +1417,44 @@ export default function GameScreen({ users, onBack }: Props) {
               </button>
             </div>
 
+            {/* GHG11(17/18): окно приёма ответа — ОДНА настройка на все механики
+                с приёмом (случайные события-призывы и голосовые задания). Своим
+                числом на каждый режим доставки. */}
+            <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
+              <div className="text-xs font-semibold">Окно приёма ответа</div>
+              <div className="text-[11px] text-tg-hint">
+                Сколько принимаются ответы и варианты, минут — своим числом на
+                режим доставки. Действует и на случайные события-призывы, и на
+                голосовые задания. 0 = «как сейчас» (срок механики из её каталога:
+                у призыва 30–120 мин, у задания 180). В мини-аппе активность
+                приезжает в ленту и видна позже, поэтому там по умолчанию 480.
+              </div>
+              <NumberRow
+                label="в чате, мин"
+                value={social.data.accept_window_chat_minutes}
+                busy={socialMut.isPending}
+                onSave={(n) =>
+                  socialMut.mutate({ accept_window_chat_minutes: clampAcceptWindow(n) })
+                }
+              />
+              <NumberRow
+                label="чат + апп, мин"
+                value={social.data.accept_window_both_minutes}
+                busy={socialMut.isPending}
+                onSave={(n) =>
+                  socialMut.mutate({ accept_window_both_minutes: clampAcceptWindow(n) })
+                }
+              />
+              <NumberRow
+                label="в мини-аппе, мин"
+                value={social.data.accept_window_app_minutes}
+                busy={socialMut.isPending}
+                onSave={(n) =>
+                  socialMut.mutate({ accept_window_app_minutes: clampAcceptWindow(n) })
+                }
+              />
+            </div>
+
             {/* Э14: голосовые задания. Опрос по умолчанию выключен (по заданию). */}
             <div className="space-y-2 rounded-lg bg-tg-bg/40 p-2">
               <Toggle
@@ -1456,38 +1494,6 @@ export default function GameScreen({ users, onBack }: Props) {
                     voice_alt_mode_enabled: !social.data?.voice_alt_mode_enabled,
                   });
                 }}
-              />
-              {/* GHG11(17): глобальное окно приёма вариантов — своё на каждый
-                  режим доставки. 0 = «как сейчас» (окно из каталога задания). */}
-              <div className="text-[11px] text-tg-hint">
-                Сколько принимаются варианты, минут — своим числом на режим
-                доставки. 0 = «как сейчас» (окно задания из каталога, обычно 180). В
-                мини-аппе задание приезжает в ленту и видно позже, поэтому там по
-                умолчанию 480.
-              </div>
-              <NumberRow
-                label="в чате, мин"
-                value={social.data.voice_window_chat_minutes}
-                busy={socialMut.isPending}
-                onSave={(n) =>
-                  socialMut.mutate({ voice_window_chat_minutes: clampVoiceWindow(n) })
-                }
-              />
-              <NumberRow
-                label="чат + апп, мин"
-                value={social.data.voice_window_both_minutes}
-                busy={socialMut.isPending}
-                onSave={(n) =>
-                  socialMut.mutate({ voice_window_both_minutes: clampVoiceWindow(n) })
-                }
-              />
-              <NumberRow
-                label="в мини-аппе, мин"
-                value={social.data.voice_window_app_minutes}
-                busy={socialMut.isPending}
-                onSave={(n) =>
-                  socialMut.mutate({ voice_window_app_minutes: clampVoiceWindow(n) })
-                }
               />
               <div className="text-[11px] text-tg-hint">
                 Открытых заданий сейчас: {social.data.voice_open}. Задания ставятся

@@ -376,12 +376,13 @@ class GameSocialOut(BaseModel):
     # Э19+: альтернативный режим награды — с шансом 50/50 «только первому».
     voice_alt_mode_enabled: bool = False
     voice_open: int = 0
-    # GHG11(17): окно приёма вариантов задания — своим числом на КАЖДЫЙ режим
-    # доставки. 0 = «как сейчас» (окно из каталога задания); в мини-аппе дефолт
-    # 480 минут — задание из ленты человек видит позже, чем из чата.
-    voice_window_chat_minutes: int = 0
-    voice_window_both_minutes: int = 0
-    voice_window_app_minutes: int = 480
+    # GHG11(17/18): окно приёма ОТВЕТА — своим числом на КАЖДЫЙ режим доставки.
+    # Одно правило на все механики с приёмом (голосовые задания И случайные
+    # события-призывы). 0 = «как сейчас» (окно из каталога механики); в мини-аппе
+    # дефолт 480 минут — из ленты активность видят позже, чем из чата.
+    accept_window_chat_minutes: int = 0
+    accept_window_both_minutes: int = 0
+    accept_window_app_minutes: int = 480
     # Э20: режим вывода бота в основной чат — "normal" | "achievements" | "all".
     chat_output_mode: str = "normal"
 
@@ -421,10 +422,10 @@ class GameSocialIn(BaseModel):
     voice_poll_enabled: bool | None = None
     voice_min_gap_hours: int | None = Field(None, ge=1, le=720)
     voice_alt_mode_enabled: bool | None = None
-    # GHG11(17): потолок ручного окна — сутки (см. VOICE_WINDOW_MAX_MINUTES).
-    voice_window_chat_minutes: int | None = Field(None, ge=0, le=1440)
-    voice_window_both_minutes: int | None = Field(None, ge=0, le=1440)
-    voice_window_app_minutes: int | None = Field(None, ge=0, le=1440)
+    # GHG11(17/18): потолок ручного окна — сутки (см. ACCEPT_WINDOW_MAX_MINUTES).
+    accept_window_chat_minutes: int | None = Field(None, ge=0, le=1440)
+    accept_window_both_minutes: int | None = Field(None, ge=0, le=1440)
+    accept_window_app_minutes: int | None = Field(None, ge=0, le=1440)
     chat_output_mode: str | None = None
 
 

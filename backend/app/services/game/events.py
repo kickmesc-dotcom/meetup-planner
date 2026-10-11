@@ -29,13 +29,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.models import GamePrompt, User
 from app.services.admin_config import (
+    get_accept_window_minutes,
     get_game_events_chance_percent,
     get_game_events_enabled,
     get_game_events_max_per_day,
     get_game_events_min_gap_hours,
     get_game_events_min_per_day,
 )
-from app.services.game import activity, awards, journal
+from app.services.game import accept, activity, awards, delivery, journal
 from app.services.game.config import EVENTS_TZ_OFFSET_HOURS
 from app.services.game.events_catalog import (
     PROMPTS,
@@ -141,17 +142,22 @@ def build_followup_text(*, ttl_minutes: int) -> str:
     )
 
 
-def build_prompt_posts(prompt: Prompt) -> list[str]:
+def build_prompt_posts(prompt: Prompt, *, window_minutes: int | None = None) -> list[str]:
     """Тексты поста призыва: сам вопрос (+ поясняющий пост, если нужен).
 
     У вопросов (`needs_rules=True`, «маму любишь?», «признайся») правила
     неочевидны — фоллоу обязателен. У очевидных призывов («скинь мем»,
     «первый, кто напишет я») он избыточен и работает как спам, поэтому не шлём.
     Чистая функция: видно и тестируется без БД/Telegram.
+
+    GHG11(18): `window_minutes` — ФАКТИЧЕСКОЕ окно приёма, если режим доставки
+    переопределяет каталог (см. `accept.window_minutes_for`). Без него берём
+    срок из самого промпта — прежнее поведение не меняется.
     """
+    minutes = prompt.ttl_minutes if window_minutes is None else int(window_minutes)
     posts = [prompt.text]
     if getattr(prompt, "needs_rules", True):
-        posts.append(build_followup_text(ttl_minutes=prompt.ttl_minutes))
+        posts.append(build_followup_text(ttl_minutes=minutes))
     return posts
 
 
@@ -252,13 +258,24 @@ async def run_events_job(
         if chosen is None:
             return 0
 
+        # GHG11(18): сколько принимаем ответ — решает ГЛОБАЛЬНАЯ настройка
+        # режима доставки события (одно правило с голосовыми заданиями: в чате и
+        # «чат + апп» она 0, то есть как было — окно из каталога промпта; в
+        # мини-аппе по умолчанию 8 часов, потому что в ленте призыв видят позже).
+        # Одно и то же число уходит и в `expires_at`, и в поясняющий текст.
+        window_minutes = accept.window_minutes_for(
+            override_minutes=await get_accept_window_minutes(
+                session, await delivery.get_feature_mode(session, "events")
+            ),
+            default_minutes=chosen.ttl_minutes,
+        )
         session.add(
             GamePrompt(
                 chat_id=chat_id,
                 code=chosen.code,
                 text=chosen.text,
                 answers=serialize_answers(chosen),
-                expires_at=moment + timedelta(minutes=chosen.ttl_minutes),
+                expires_at=moment + timedelta(minutes=window_minutes),
             )
         )
         await session.commit()
@@ -267,7 +284,7 @@ async def run_events_job(
         # «выпадет» в чат ближайшим окном, а не посреди тишины. Второй текст —
         # обязательный поясняющий пост (правило оператора: вопрос ВСЕГДА с
         # фоллоу-постом), он формируется вместе с первым и не может отстать.
-        for body in build_prompt_posts(chosen):
+        for body in build_prompt_posts(chosen, window_minutes=window_minutes):
             await journal.announce(session, kind=journal.KIND_EVENT, text=body)
     log.info("game.event_posted", code=chosen.code)
     return 1

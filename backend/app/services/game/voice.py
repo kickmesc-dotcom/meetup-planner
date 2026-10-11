@@ -36,13 +36,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.models import EventLog, GameVoiceSubmission, GameVoiceTask, User
 from app.services.admin_config import (
+    get_accept_window_minutes,
     get_game_voice_alt_mode_enabled,
     get_game_voice_enabled,
     get_game_voice_min_gap_hours,
     get_game_voice_poll_enabled,
-    get_game_voice_window_minutes,
 )
-from app.services.game import awards, journal
+from app.services.game import accept, awards, journal
 from app.services.game.config import (
     VOICE_DAY_END_HOUR,
     VOICE_DAY_START_HOUR,
@@ -119,15 +119,16 @@ def pick_task_mode(
     return MODE_FIRST_ONLY if rng.randrange(100) < percent else MODE_ALL
 
 
-def window_minutes_for(*, override_minutes: int, task: VoiceTask) -> int:
-    """Сколько принимаются варианты: окно режима или окно каталога. Чистая.
+def task_window_minutes(task: VoiceTask, *, override_minutes: int) -> int:
+    """Сколько принимаются варианты этого задания: окно режима или каталога.
 
-    GHG11(17): `override_minutes` — глобальная настройка окна приёма для режима
-    доставки. 0 (или мусор) — «как сейчас»: берём окно задачи из каталога.
+    Тонкая обёртка над общим правилом (`accept.window_minutes_for`): механики
+    делят один код, но каждая подставляет окно своего каталога.
     """
-    if int(override_minutes) > 0:
-        return int(override_minutes)
-    return int(task.window_minutes)
+    return accept.window_minutes_for(
+        override_minutes=override_minutes,
+        default_minutes=task.window_minutes,
+    )
 
 
 def build_task_text(
@@ -145,7 +146,7 @@ def build_task_text(
     «участвуют все» и «награда только первому» (альтернативный режим-«рулетка»).
 
     GHG11(17): часы в тексте берём из ФАКТИЧЕСКОГО окна задания, а не из
-    каталога: при переопределении окна по режиму (см. `window_minutes_for`)
+    каталога: при переопределении окна по режиму (см. `task_window_minutes`)
     каталог и реальность разошлись бы — текст обещал бы не то, что стоит в
     `expires_at`.
     """
@@ -417,9 +418,9 @@ async def open_task(
     # GHG11(17): окно приёма сдач решает ГЛОБАЛЬНАЯ настройка режима (в чате и
     # «чат + апп» она 0 — то есть как было, окно из каталога; в мини-аппе по
     # умолчанию 8 часов). Одно и то же число уходит и в `expires_at`, и в текст.
-    window_minutes = window_minutes_for(
-        override_minutes=await get_game_voice_window_minutes(session, vmode),
-        task=task,
+    window_minutes = task_window_minutes(
+        task,
+        override_minutes=await get_accept_window_minutes(session, vmode),
     )
     expires_at = now + timedelta(minutes=window_minutes)
     text = build_task_text(
