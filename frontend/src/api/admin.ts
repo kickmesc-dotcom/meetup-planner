@@ -1426,6 +1426,14 @@ export interface GameSocialState {
   voice_alt_mode_enabled: boolean;
   /** Сколько заданий сейчас открыто (обычно 0 или 1). */
   voice_open: number;
+  /**
+   * GHG11(17): глобальное окно приёма вариантов — своим числом на каждый режим
+   * доставки фичи. 0 = «как сейчас» (окно из каталога задания); для мини-аппа
+   * по умолчанию 480 минут — из ленты задание видят позже, чем из чата.
+   */
+  voice_window_chat_minutes: number;
+  voice_window_both_minutes: number;
+  voice_window_app_minutes: number;
   /** Э20: режим вывода бота в основной чат — "normal" | "achievements" | "all". */
   chat_output_mode: string;
 }

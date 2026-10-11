@@ -62,6 +62,19 @@ export default function FeedScreen({ meId }: { meId: number }) {
   // действий свёрнуты и раскрываются по клику в шапке.
   const [showFilters, setShowFilters] = useState(false);
   const [showActions, setShowActions] = useState(false);
+  // GHG11(17): сам блок управления («Все события / Только мои / Фильтры /
+  // Действия») сворачивается в одну строку-сводку и разворачивается обратно.
+  // Раньше он занимал строку всегда — на телефоне это отбирало высоту у ленты,
+  // которую оператор листает постоянно.
+  const [controlsOpen, setControlsOpen] = useState(true);
+  const collapseControls = () => {
+    haptic("selection");
+    setControlsOpen(false);
+    // Заодно убираем раскрытые под блоком панели — свёрнутый заголовок не
+    // должен висеть над развёрнутыми чипами.
+    setShowFilters(false);
+    setShowActions(false);
+  };
   const [showNominations, setShowNominations] = useState(false);
   // GHG11(7): всплывающее окно фильтра «по участникам».
   const [showParticipants, setShowParticipants] = useState(false);
@@ -76,6 +89,9 @@ export default function FeedScreen({ meId }: { meId: number }) {
   const setFeedAnchor = useUI((s) => s.setFeedAnchor);
   useEffect(() => {
     if (feedAnchor === "feed-actions") {
+      // GHG11(17): переход из анонса обязан показать панель — значит сначала
+      // разворачиваем свёрнутый блок управления, потом уже «Действия».
+      setControlsOpen(true);
       setShowActions(true);
       setFeedAnchor(null);
     }
@@ -91,6 +107,14 @@ export default function FeedScreen({ meId }: { meId: number }) {
     staleTime: 5 * 60 * 1000,
   });
   const mutedCount = prefsQ.data?.muted_feed?.length ?? 0;
+  // GHG11(17): сводка для свёрнутого блока управления — чтобы после сворачивания
+  // было видно, ЧТО сейчас фильтруется, без разворота панели.
+  const controlsSummary = [
+    kinds.size > 0 ? `типов: ${kinds.size}` : "все типы",
+    mutedCount > 0 ? `скрыто участников: ${mutedCount}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const meQ = useQuery({ queryKey: ["me"], queryFn: fetchMe, staleTime: 5 * 60 * 1000 });
   const isAdmin = !!meQ.data?.is_admin;
 
@@ -234,6 +258,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
           фильтры и действия. Раньше всё это пряталось за колокольчиком вместе
           с уведомлениями, и фильтры выглядели частью личных уведомлений. */}
       <div data-testid="feed-controls" className="border-b border-tg-secondary-bg">
+      {controlsOpen ? (
       <div className="border-b border-tg-secondary-bg px-3 py-2">
         <div className="flex items-center gap-1.5">
           <ScopeButton
@@ -265,9 +290,33 @@ export default function FeedScreen({ meId }: { meId: number }) {
               label="Действия"
               open={showActions}
             />
+            <CollapseButton open onClick={collapseControls} />
           </div>
         </div>
       </div>
+      ) : (
+        <button
+          type="button"
+          data-testid="feed-controls-expand"
+          aria-expanded={false}
+          aria-label="Развернуть управление лентой"
+          onClick={() => {
+            haptic("selection");
+            setControlsOpen(true);
+          }}
+          className="flex w-full items-center gap-1.5 px-3 py-2 text-left active:bg-tg-secondary-bg/40"
+        >
+          <span aria-hidden className="shrink-0 text-[11px] text-tg-hint">
+            ▾
+          </span>
+          <span className="shrink-0 text-xs font-medium">
+            {scope === "mine" ? "Только мои" : "Все события"}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[11px] text-tg-hint">
+            {controlsSummary}
+          </span>
+        </button>
+      )}
 
       {/* Э21: фильтр по типу записи — чипы. Пусто = все типы. Свёрнут по клику. */}
       {showFilters && (
@@ -487,6 +536,27 @@ function KindChip({
       ].join(" ")}
     >
       {label}
+    </button>
+  );
+}
+
+/**
+ * GHG11(17): св/развернуть весь блок управления лентой.
+ *
+ * Иконка показывает ДЕЙСТВИЕ (▴ — свернуть), а не состояние: так стрелка не
+ * читается как «уже свёрнуто» и не спорит с `aria-expanded`.
+ */
+function CollapseButton({ onClick }: { open: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid="feed-controls-collapse"
+      aria-label="Свернуть управление лентой"
+      aria-expanded={true}
+      onClick={onClick}
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-tg-secondary-bg/70 text-[11px] leading-none text-tg-hint transition-transform active:scale-95"
+    >
+      <span aria-hidden>▴</span>
     </button>
   );
 }

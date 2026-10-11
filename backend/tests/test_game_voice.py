@@ -382,3 +382,127 @@ async def test_first_only_owner_resubmit_is_already(no_io):
         session, telegram_id=7, file_id="again", reply_to_message_id=55, at=NOW
     )
     assert res.status == voice.ALREADY
+
+
+# --------------------------------------------------------------------------
+# GHG11(17): глобальное окно приёма вариантов — своим числом на каждый режим
+# --------------------------------------------------------------------------
+
+
+def test_window_minutes_for_zero_means_catalog_default():
+    task = TASKS[0]
+    assert voice.window_minutes_for(override_minutes=0, task=task) == task.window_minutes
+    # Мусор/отрицательное из конфига — тоже каталог, а не «окно ноль секунд».
+    assert voice.window_minutes_for(override_minutes=-5, task=task) == task.window_minutes
+
+
+def test_window_minutes_for_override_wins():
+    task = TASKS[0]
+    assert voice.window_minutes_for(override_minutes=480, task=task) == 480
+
+
+def test_build_task_text_promises_the_actual_window():
+    """Текст обещает ровно то, что стоит в `expires_at` (регресс GHG11(17))."""
+    task = TASKS[0]
+    minutes = 480
+    text = voice.build_task_text(
+        task,
+        expires_at=NOW + timedelta(minutes=minutes),
+        bot_username=None,
+        window_minutes=minutes,
+    )
+    assert "Приём около 8 ч" in text
+    # Без явного окна — окно каталога (прежнее поведение не поехало).
+    default = voice.build_task_text(
+        task, expires_at=NOW + timedelta(minutes=task.window_minutes), bot_username=None
+    )
+    assert f"Приём около {max(1, round(task.window_minutes / 60))} ч" in default
+
+
+class _CfgRow:
+    def __init__(self, value: str) -> None:
+        self.value = value
+
+
+class _CfgSession:
+    """Фейк-сессия под `_get_value`: `session.get(AdminConfig, key)`."""
+
+    def __init__(self, values: dict[str, str] | None = None) -> None:
+        self.values = dict(values or {})
+
+    async def get(self, _model, key: str):
+        value = self.values.get(key)
+        return _CfgRow(value) if value is not None else None
+
+
+@pytest.mark.asyncio
+async def test_voice_window_defaults_by_delivery_mode():
+    """Чат и «чат + апп» — как были, мини-апп — восемь часов."""
+    from app.services.admin_config import (
+        GAME_VOICE_WINDOW_APP_KEY,
+        GAME_VOICE_WINDOW_BOTH_KEY,
+        GAME_VOICE_WINDOW_CHAT_KEY,
+        get_game_voice_window_minutes,
+    )
+
+    session = _CfgSession()
+    assert await get_game_voice_window_minutes(session, "chat") == 0
+    assert await get_game_voice_window_minutes(session, "both") == 0
+    assert await get_game_voice_window_minutes(session, "app") == 480
+
+    # Значение из конфига перебивает дефолт (все три режима настраиваются).
+    override = _CfgSession(
+        {
+            GAME_VOICE_WINDOW_CHAT_KEY: "90",
+            GAME_VOICE_WINDOW_BOTH_KEY: "120",
+            GAME_VOICE_WINDOW_APP_KEY: "60",
+        }
+    )
+    assert await get_game_voice_window_minutes(override, "chat") == 90
+    assert await get_game_voice_window_minutes(override, "both") == 120
+    assert await get_game_voice_window_minutes(override, "app") == 60
+
+    # Незнакомый режим (в т.ч. `off`) — «как сейчас», а не чужое окно.
+    assert await get_game_voice_window_minutes(session, "off") == 0
+    # Мусор в конфиге — дефолт режима, не падение.
+    junk = _CfgSession({GAME_VOICE_WINDOW_CHAT_KEY: "абв"})
+    assert await get_game_voice_window_minutes(junk, "chat") == 0
+
+
+@pytest.mark.asyncio
+async def test_set_voice_window_clamps_and_rejects_unknown_mode(monkeypatch):
+    from app.services import admin_config
+
+    written: dict[str, str] = {}
+
+    async def fake_set(_session, key: str, value: str) -> None:
+        written[key] = value
+
+    monkeypatch.setattr(admin_config, "_set_value", fake_set)
+    await admin_config.set_game_voice_window_minutes(None, "app", 99999)
+    assert written[admin_config.GAME_VOICE_WINDOW_APP_KEY] == "1440"
+    await admin_config.set_game_voice_window_minutes(None, "chat", -10)
+    assert written[admin_config.GAME_VOICE_WINDOW_CHAT_KEY] == "0"
+    with pytest.raises(ValueError):
+        await admin_config.set_game_voice_window_minutes(None, "off", 60)
+
+
+def test_social_payload_carries_and_bounds_voice_windows():
+    """Контракт ручки /admin/game/social: дефолты и границы окна приёма."""
+    from pydantic import ValidationError
+
+    from app.schemas.game import GameSocialIn, GameSocialOut
+
+    out = GameSocialOut()
+    assert (
+        out.voice_window_chat_minutes,
+        out.voice_window_both_minutes,
+        out.voice_window_app_minutes,
+    ) == (0, 0, 480)
+
+    body = GameSocialIn(voice_window_app_minutes=1440)
+    assert body.voice_window_app_minutes == 1440
+    with pytest.raises(ValidationError):
+        GameSocialIn(voice_window_app_minutes=1441)
+    with pytest.raises(ValidationError):
+        GameSocialIn(voice_window_chat_minutes=-1)

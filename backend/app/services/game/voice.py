@@ -40,6 +40,7 @@ from app.services.admin_config import (
     get_game_voice_enabled,
     get_game_voice_min_gap_hours,
     get_game_voice_poll_enabled,
+    get_game_voice_window_minutes,
 )
 from app.services.game import awards, journal
 from app.services.game.config import (
@@ -118,21 +119,39 @@ def pick_task_mode(
     return MODE_FIRST_ONLY if rng.randrange(100) < percent else MODE_ALL
 
 
+def window_minutes_for(*, override_minutes: int, task: VoiceTask) -> int:
+    """Сколько принимаются варианты: окно режима или окно каталога. Чистая.
+
+    GHG11(17): `override_minutes` — глобальная настройка окна приёма для режима
+    доставки. 0 (или мусор) — «как сейчас»: берём окно задачи из каталога.
+    """
+    if int(override_minutes) > 0:
+        return int(override_minutes)
+    return int(task.window_minutes)
+
+
 def build_task_text(
     task: VoiceTask,
     *,
     expires_at: datetime,
     bot_username: str | None,
     mode: str = MODE_ALL,
+    window_minutes: int | None = None,
 ) -> str:
     """Текст задания в чат. Чистая функция.
 
     Все числа (окно, награда, время) и УСЛОВИЯ награды подставляются здесь, чтобы
     текст в БД и в чате не разъезжались. Условия разные для двух режимов:
     «участвуют все» и «награда только первому» (альтернативный режим-«рулетка»).
+
+    GHG11(17): часы в тексте берём из ФАКТИЧЕСКОГО окна задания, а не из
+    каталога: при переопределении окна по режиму (см. `window_minutes_for`)
+    каталог и реальность разошлись бы — текст обещал бы не то, что стоит в
+    `expires_at`.
     """
     local_until = (expires_at.astimezone(timezone.utc) + timedelta(hours=VOICE_TZ_OFFSET_HOURS))
-    hours = max(1, round(task.window_minutes / 60))
+    minutes = window_minutes if window_minutes is not None else task.window_minutes
+    hours = max(1, round(int(minutes) / 60))
     dm = f"боту в личку @{bot_username}" if bot_username else "боту в личку"
     if mode == MODE_FIRST_ONLY:
         terms = "🥇 Награда — <b>только первому</b>: XP забирает тот, кто сдал раньше всех."
@@ -395,9 +414,20 @@ async def open_task(
     mode = pick_task_mode(
         enabled=await get_game_voice_alt_mode_enabled(session), rng=rng
     )
-    expires_at = now + timedelta(minutes=task.window_minutes)
+    # GHG11(17): окно приёма сдач решает ГЛОБАЛЬНАЯ настройка режима (в чате и
+    # «чат + апп» она 0 — то есть как было, окно из каталога; в мини-аппе по
+    # умолчанию 8 часов). Одно и то же число уходит и в `expires_at`, и в текст.
+    window_minutes = window_minutes_for(
+        override_minutes=await get_game_voice_window_minutes(session, vmode),
+        task=task,
+    )
+    expires_at = now + timedelta(minutes=window_minutes)
     text = build_task_text(
-        task, expires_at=expires_at, bot_username=_username(bot), mode=mode
+        task,
+        expires_at=expires_at,
+        bot_username=_username(bot),
+        mode=mode,
+        window_minutes=window_minutes,
     )
     tg_message_id: int | None = None
     if chat_ok and bot is not None:

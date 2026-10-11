@@ -165,6 +165,13 @@ interface UIState {
   setShowNotificationsSheet: (v: boolean) => void;
 
   /**
+   * GHG11(17): шит плеера. Живёт на месте, где раньше был колокольчик: выбор
+   * подборки недели / «всё подряд» / «случайно» / «только лайкнутые».
+   */
+  showPlayerSheet: boolean;
+  setShowPlayerSheet: (v: boolean) => void;
+
+  /**
    * GHG11(4): подраздел админки, который надо открыть сразу при переходе из
    * анонса фичи ("loser"/"chukhan"/…). Потребляется `AdminScreen` и
    * очищается после применения.
@@ -267,6 +274,9 @@ export const useUI = create<UIState>((set, get) => ({
   showNotificationsSheet: false,
   setShowNotificationsSheet: (showNotificationsSheet) =>
     set({ showNotificationsSheet }),
+
+  showPlayerSheet: false,
+  setShowPlayerSheet: (showPlayerSheet) => set({ showPlayerSheet }),
 
   pendingAdminSection: null,
   setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),

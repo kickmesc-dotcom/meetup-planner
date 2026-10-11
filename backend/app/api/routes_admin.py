@@ -4243,6 +4243,7 @@ async def _game_social_state(session) -> GameSocialOut:
         get_game_voice_enabled,
         get_game_voice_min_gap_hours,
         get_game_voice_poll_enabled,
+        get_game_voice_window_minutes,
     )
     from app.services.game import contraband as contraband_service
 
@@ -4316,6 +4317,9 @@ async def _game_social_state(session) -> GameSocialOut:
         voice_min_gap_hours=await get_game_voice_min_gap_hours(session),
         voice_alt_mode_enabled=await get_game_voice_alt_mode_enabled(session),
         voice_open=voice_open,
+        voice_window_chat_minutes=await get_game_voice_window_minutes(session, "chat"),
+        voice_window_both_minutes=await get_game_voice_window_minutes(session, "both"),
+        voice_window_app_minutes=await get_game_voice_window_minutes(session, "app"),
         chat_output_mode=await get_chat_output_mode(session),
     )
 
@@ -4368,6 +4372,7 @@ async def admin_game_social_put(
         set_game_voice_enabled,
         set_game_voice_min_gap_hours,
         set_game_voice_poll_enabled,
+        set_game_voice_window_minutes,
     )
 
     if body.digest_enabled is not None:
@@ -4428,6 +4433,18 @@ async def admin_game_social_put(
         await set_game_voice_min_gap_hours(session, body.voice_min_gap_hours)
     if body.voice_alt_mode_enabled is not None:
         await set_game_voice_alt_mode_enabled(session, body.voice_alt_mode_enabled)
+    if body.voice_window_chat_minutes is not None:
+        await set_game_voice_window_minutes(
+            session, "chat", body.voice_window_chat_minutes
+        )
+    if body.voice_window_both_minutes is not None:
+        await set_game_voice_window_minutes(
+            session, "both", body.voice_window_both_minutes
+        )
+    if body.voice_window_app_minutes is not None:
+        await set_game_voice_window_minutes(
+            session, "app", body.voice_window_app_minutes
+        )
     if body.chat_output_mode is not None:
         await set_chat_output_mode(session, body.chat_output_mode)
     log.info("admin.game_social_updated", by=user.id)

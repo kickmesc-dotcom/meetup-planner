@@ -22,8 +22,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   PLAYER_PERSIST_KEY,
+  PLAY_COUNTS_KEY,
   PlayerBar,
   PlayerProvider,
+  leastPlayedOrder,
   shuffledTracks,
   useGlobalPlayer,
 } from "./GlobalPlayer";
@@ -116,6 +118,14 @@ function Harness() {
       </button>
       <button type="button" aria-label="select-7" onClick={() => player.select(7)}>
         7
+      </button>
+      {/* GHG11(17): выбор источника звука — как из шита плеера. */}
+      <button
+        type="button"
+        aria-label="choose-week-1"
+        onClick={() => player.chooseSource("week:1")}
+      >
+        week:1
       </button>
       {/* Маркер загрузки очереди: без него тап может случиться раньше, чем
           приедут подборки (и тогда трека просто нет в очереди). */}
@@ -311,5 +321,52 @@ describe("PlayerBar: лайк трека", () => {
     });
     await screen.findByTestId("mini-player");
     expect(screen.getByTestId("player-like").textContent).toContain("5");
+  });
+});
+
+// --------------------------------------------------------------------------
+// GHG11(17): «реже повторяем» — продолжение после конца выбранной подборки
+// --------------------------------------------------------------------------
+describe("leastPlayedOrder: реже звучавшие — вперёд", () => {
+  const tracks = [AUDIO(1, "a"), AUDIO(2, "b"), AUDIO(3, "c")];
+
+  it("не звучавшие идут первыми и сохраняют исходный порядок", () => {
+    expect(leastPlayedOrder(tracks, {}).map((t) => t.id)).toEqual([1, 2, 3]);
+    expect(leastPlayedOrder(tracks, { 1: 0 }).map((t) => t.id)).toEqual([1, 2, 3]);
+  });
+
+  it("сортирует по числу прослушиваний, равные — устойчиво", () => {
+    expect(leastPlayedOrder(tracks, { 1: 9, 2: 1 }).map((t) => t.id)).toEqual([3, 2, 1]);
+    expect(leastPlayedOrder(tracks, { 1: 4, 2: 4, 3: 4 }).map((t) => t.id)).toEqual([
+      1, 2, 3,
+    ]);
+  });
+
+  it("не мутирует вход", () => {
+    leastPlayedOrder(tracks, { 1: 5 });
+    expect(tracks.map((t) => t.id)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("PlayerProvider: конец подборки продолжается «реже повторяемым»", () => {
+  it("после последнего трека недели идёт реже звучавший трек, а не зацикливание", async () => {
+    // Трек 3 играл много, треки 2 и 7 — ни разу: продолжение обязано начаться
+    // с них, а не вернуться на «Старая-а» (зацикливание одной подборки).
+    localStorage.setItem(PLAY_COUNTS_KEY, JSON.stringify({ 3: 7, 1: 3 }));
+    await mount();
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("choose-week-1"));
+    });
+    const bar = await screen.findByTestId("mini-player");
+    expect(bar.textContent).toContain("Старая-а");
+    // Подборка из одного трека: следующий — реже всего звучавший из остальных.
+    fireEvent.click(screen.getByLabelText("Следующий трек"));
+    expect(screen.getByTestId("mini-player").textContent).toContain("Неделя-1-б");
+  });
+
+  it("счётчик прослушиваний растёт и переживает перезапуск", async () => {
+    await startTrackOne();
+    const stored = JSON.parse(localStorage.getItem(PLAY_COUNTS_KEY) ?? "{}");
+    expect(stored[1]).toBe(1);
   });
 });

@@ -1849,6 +1849,19 @@ GAME_VOICE_ENABLED_KEY = "game.voice.enabled"
 GAME_VOICE_POLL_KEY = "game.voice.poll_enabled"
 GAME_VOICE_MIN_GAP_KEY = "game.voice.min_gap_hours"
 GAME_VOICE_ALT_MODE_KEY = "game.voice.alt_mode_enabled"
+# GHG11(17): глобальное окно приёма вариантов — своим числом на КАЖДЫЙ режим
+# доставки фичи (`delivery.MODES`). См. `VOICE_WINDOW_MINUTES_BY_MODE`: 0 в
+# значении = «как сейчас» (окно из каталога задания).
+GAME_VOICE_WINDOW_CHAT_KEY = "game.voice.window.chat_minutes"
+GAME_VOICE_WINDOW_BOTH_KEY = "game.voice.window.both_minutes"
+GAME_VOICE_WINDOW_APP_KEY = "game.voice.window.app_minutes"
+
+# Ключ конфига по режиму доставки. `off` окна не имеет — фича выключена.
+_VOICE_WINDOW_KEYS: dict[str, str] = {
+    "chat": GAME_VOICE_WINDOW_CHAT_KEY,
+    "both": GAME_VOICE_WINDOW_BOTH_KEY,
+    "app": GAME_VOICE_WINDOW_APP_KEY,
+}
 
 # Э15: музыкальная предложка (GHG8 H.7).
 GAME_MUSIC_ENABLED_KEY = "game.music.enabled"
@@ -2229,6 +2242,37 @@ async def get_game_voice_alt_mode_enabled(session: AsyncSession) -> bool:
 
 async def set_game_voice_alt_mode_enabled(session: AsyncSession, value: bool) -> None:
     await _set_value(session, GAME_VOICE_ALT_MODE_KEY, "true" if value else "false")
+
+
+async def get_game_voice_window_minutes(session: AsyncSession, mode: str) -> int:
+    """Сколько принимаются варианты задания в этом режиме доставки (минуты).
+
+    0 = «как сейчас»: вызывающий берёт окно из каталога задания. Незнакомый
+    режим (`off` и что угодно ещё) → 0, то есть тоже «как сейчас»: молча
+    вернуть чужое окно хуже, чем оставить поведение неизменным.
+    """
+    from app.services.game import config as game_config
+
+    key = _VOICE_WINDOW_KEYS.get(mode)
+    if key is None:
+        return 0
+    default = int(game_config.VOICE_WINDOW_MINUTES_BY_MODE.get(mode, 0))
+    return await _get_int(
+        session, key, default, hi=int(game_config.VOICE_WINDOW_MAX_MINUTES)
+    )
+
+
+async def set_game_voice_window_minutes(
+    session: AsyncSession, mode: str, minutes: int
+) -> None:
+    """Задать окно приёма для режима. Незнакомый режим — ошибка (не молчим)."""
+    from app.services.game import config as game_config
+
+    key = _VOICE_WINDOW_KEYS.get(mode)
+    if key is None:
+        raise ValueError(f"unknown delivery mode: {mode!r}")
+    value = max(0, min(int(game_config.VOICE_WINDOW_MAX_MINUTES), int(minutes)))
+    await _set_value(session, key, str(value))
 
 
 async def get_game_music_enabled(session: AsyncSession) -> bool:

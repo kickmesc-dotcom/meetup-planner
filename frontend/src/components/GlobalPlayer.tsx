@@ -44,6 +44,68 @@ import {
 /** Ключ в localStorage: «последний трек и позиция». */
 export const PLAYER_PERSIST_KEY = "ghg.player.v1";
 
+/**
+ * GHG11(17): ключ в localStorage: сколько раз проигран каждый трек.
+ *
+ * Нужно правилу «реже повторяем»: когда выбранная подборка кончилась, плеер
+ * не начинает сначала, а продолжает теми треками, которые звучали меньше всех.
+ * Счётчик живёт между сессиями — иначе после перезапуска мини-аппа статистика
+ * обнулялась бы и «редко звучащий» трек опять играл бы чаще.
+ */
+export const PLAY_COUNTS_KEY = "ghg.plays.v1";
+
+/** Ключ источника «все подборки». */
+export const SOURCE_ALL = "all";
+/** Ключ источника «только лайкнутые». */
+export const SOURCE_LIKED = "liked";
+
+/** Сколько раз играл каждый трек. Никогда не бросает (приватный режим/мусор). */
+export function readPlayCounts(): Record<number, number> {
+  try {
+    if (typeof localStorage === "undefined") return {};
+    const raw = localStorage.getItem(PLAY_COUNTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const out: Record<number, number> = {};
+    for (const [key, value] of Object.entries(parsed ?? {})) {
+      const id = Number(key);
+      const n = Number(value);
+      if (Number.isInteger(id) && Number.isFinite(n) && n > 0) out[id] = n;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Запомнить счётчики. Сбой хранилища не повод ронять плеер. */
+export function writePlayCounts(counts: Record<number, number>): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.setItem(PLAY_COUNTS_KEY, JSON.stringify(counts));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * GHG11(17): порядок «реже повторяем» — по возрастанию того, сколько трек уже
+ * играл. Чистая функция (тесты).
+ *
+ * Устойчивая сортировка: те, кто не звучал ни разу (счётчик 0/отсутствует),
+ * уходят вперёд и СОХРАНЯЮТ исходный порядок между собой — то есть в пределах
+ * одной «частоты» очередь остаётся предсказуемой, а не перемешивается сама.
+ */
+export function leastPlayedOrder(
+  tracks: MiniTrack[],
+  counts: Record<number, number>,
+): MiniTrack[] {
+  return tracks
+    .map((track, index) => ({ track, index, played: counts[track.id] ?? 0 }))
+    .sort((a, b) => (a.played - b.played) || (a.index - b.index))
+    .map((entry) => entry.track);
+}
+
 /** Лайк трека в терминах плеера: сколько всего и поставил ли его я. */
 export interface TrackLikeState {
   likes: number;
@@ -102,6 +164,18 @@ export type GlobalPlayer = MiniPlayer & {
   toggleShuffle: () => void;
   /** Сколько лайкнутых треков вообще есть — для подписи кнопки режима. */
   likedCount: number;
+  /**
+   * GHG11(17): что выбрано источником звука: `all` | `liked` | ключ подборки.
+   * Шит выбора подборки подсвечивает по нему текущую строку.
+   */
+  sourceKey: string;
+  /**
+   * GHG11(17): выбрать источник и сразу начать его играть.
+   *
+   * `opts.shuffle` — заодно переключить перемешивание (нужно кнопке «слушать
+   * всё случайно»): выбор источника и режим порядка — одно действие для человека.
+   */
+  chooseSource: (key: string, opts?: { shuffle?: boolean }) => void;
   /** Лайк текущего трека (или `null`, если трек вне подборок). */
   currentLikes: TrackLikeState | null;
   toggleLike: () => void;
@@ -139,6 +213,8 @@ const NOOP_PLAYER: GlobalPlayer = {
   shuffle: false,
   toggleShuffle: () => {},
   likedCount: 0,
+  sourceKey: SOURCE_ALL,
+  chooseSource: () => {},
   currentLikes: null,
   toggleLike: () => {},
   likePending: false,
@@ -189,24 +265,66 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   );
 
   const [likedMode, setLikedMode] = useState(false);
+  // GHG11(17): выбранная подборка («слушаю именно эту неделю»). `null` — все
+  // подборки подряд, как раньше. Когда выбранная подборка кончится, очередь не
+  // замкнётся на её первый трек, а продолжится «реже повторяемыми» (см. ниже).
+  const [weekKey, setWeekKey] = useState<string | null>(null);
   const [shuffle, setShuffle] = useState(false);
   const [seed, setSeed] = useState(1);
+  // GHG11(17): сколько раз играл каждый трек — между сессиями.
+  const [playCounts, setPlayCounts] = useState<Record<number, number>>(
+    readPlayCounts,
+  );
   // Треки, включённые точечно (например, из ленты): стоят впереди очереди.
   const [extra, setExtra] = useState<MiniTrack[]>([]);
   // Текущий трек «пришпиливаем» к очереди: смена режима не должна обрывать звук.
   const anchorRef = useRef<MiniTrack | null>(null);
   const [anchorId, setAnchorId] = useState<number | null>(null);
 
+  /** Все играбельные треки библиотеки (все подборки + лайкнутые, без дублей). */
+  const library = useMemo(() => {
+    const seen = new Set<number>();
+    const out: MiniTrack[] = [];
+    const push = (tracks: MiniTrack[]) => {
+      for (const track of tracks) {
+        if (seen.has(track.id)) continue;
+        seen.add(track.id);
+        out.push(track);
+      }
+    };
+    for (const pl of playlists) push(pl.tracks);
+    push(likedTracks);
+    if (out.length === 0) push(fallbackWeek);
+    return out;
+  }, [playlists, likedTracks, fallbackWeek]);
+
+  const chosenWeek = useMemo(
+    () => (weekKey ? playlists.find((pl) => pl.key === weekKey) ?? null : null),
+    [weekKey, playlists],
+  );
+
   const base = useMemo(() => {
-    const source = likedMode
-      ? likedTracks
-      : playlists.length > 0
-        ? playlists.flatMap((pl) => pl.tracks)
-        : fallbackWeek;
+    let source: MiniTrack[];
+    if (likedMode) {
+      source = likedTracks;
+    } else if (chosenWeek) {
+      // GHG11(17): играем выбранную подборку, а потом — «реже повторяемое» из
+      // остальной библиотеки. Так музыка не обрывается на конце подборки и не
+      // зацикливается на ней, пока вокруг полно других треков.
+      const own = new Set(chosenWeek.tracks.map((t) => t.id));
+      const tail = leastPlayedOrder(
+        library.filter((t) => !own.has(t.id)),
+        playCounts,
+      );
+      source = [...chosenWeek.tracks, ...tail];
+    } else {
+      source =
+        playlists.length > 0 ? playlists.flatMap((pl) => pl.tracks) : fallbackWeek;
+    }
     if (extra.length === 0) return source;
     const ids = new Set(source.map((t) => t.id));
     return [...extra.filter((t) => !ids.has(t.id)), ...source];
-  }, [likedMode, likedTracks, playlists, fallbackWeek, extra]);
+  }, [likedMode, likedTracks, chosenWeek, library, playCounts, playlists, fallbackWeek, extra]);
 
   /** Очередь воспроизведения: «пришпиленный» трек + режим + перемешивание. */
   const order = useMemo(() => {
@@ -231,6 +349,25 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setAnchorId(player.current.id);
     }
   }, [player.current]);
+
+  // GHG11(17): считаем сыгранное для правила «реже повторяем». Засчитываем РОВНО
+  // один раз на каждое начало трека и только когда звук реально пошёл: пауза и
+  // восстановление последнего трека из localStorage в статистику не попадают.
+  const countedRef = useRef<number | null>(null);
+  useEffect(() => {
+    const id = player.current?.id ?? null;
+    if (id == null) {
+      countedRef.current = null;
+      return;
+    }
+    if (!player.playing || countedRef.current === id) return;
+    countedRef.current = id;
+    setPlayCounts((prev) => {
+      const next = { ...prev, [id]: (prev[id] ?? 0) + 1 };
+      writePlayCounts(next);
+      return next;
+    });
+  }, [player.current, player.playing]);
 
   const playTrack = useCallback((track: MiniTrack, collection?: MiniTrack[]) => {
     haptic("light");
@@ -358,6 +495,66 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     return owner?.title ?? "Вне подборок";
   }, [currentId, likedMode, playlists]);
 
+  /**
+   * GHG11(17): что выберет слушатель — треки выбранного источника в том же
+   * порядке, в каком их сложит очередь (подборка → «реже повторяемое»).
+   */
+  const tracksForSource = useCallback(
+    (key: string): MiniTrack[] => {
+      if (key === SOURCE_LIKED) return likedTracks;
+      if (key === SOURCE_ALL) {
+        return playlists.length > 0
+          ? playlists.flatMap((pl) => pl.tracks)
+          : fallbackWeek;
+      }
+      const pl = playlists.find((p) => p.key === key);
+      if (!pl) return [];
+      const own = new Set(pl.tracks.map((t) => t.id));
+      return [
+        ...pl.tracks,
+        ...leastPlayedOrder(
+          library.filter((t) => !own.has(t.id)),
+          playCounts,
+        ),
+      ];
+    },
+    [likedTracks, playlists, fallbackWeek, library, playCounts],
+  );
+
+  /** Текущий источник звука — по нему шит выбора подсвечивает строку. */
+  const sourceKey = likedMode ? SOURCE_LIKED : chosenWeek ? chosenWeek.key : SOURCE_ALL;
+
+  /**
+   * GHG11(17): выбрать источник и сразу начать его играть.
+   *
+   * `opts.shuffle` — заодно переключить перемешивание: «слушать всё случайно»
+   * для человека одно действие, а не два (выбрать источник + потом найти тумблер).
+   */
+  const chooseSource = useCallback(
+    (key: string, opts?: { shuffle?: boolean }) => {
+      haptic("light");
+      setLikedMode(key === SOURCE_LIKED);
+      setWeekKey(key === SOURCE_ALL || key === SOURCE_LIKED ? null : key);
+      let nextSeed = seed;
+      if (opts?.shuffle !== undefined) {
+        setShuffle(opts.shuffle);
+        if (opts.shuffle) {
+          // Новая перестановка на каждое включение: «случайно» не должно дважды
+          // давать один и тот же порядок.
+          nextSeed = seed + 1;
+          setSeed(nextSeed);
+        }
+      }
+      const tracks = tracksForSource(key);
+      const first =
+        (opts?.shuffle ?? shuffle)
+          ? shuffledTracks(tracks, nextSeed)[0]
+          : tracks[0];
+      if (first) select(first.id);
+    },
+    [seed, shuffle, tracksForSource, select],
+  );
+
   const value = useMemo<GlobalPlayer>(
     () => ({
       ...player,
@@ -370,6 +567,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       shuffle,
       toggleShuffle,
       likedCount: likedTracks.length,
+      sourceKey,
+      chooseSource,
       currentLikes,
       toggleLike,
       likePending: likeMutation.isPending,
@@ -385,6 +584,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       shuffle,
       toggleShuffle,
       likedTracks.length,
+      sourceKey,
+      chooseSource,
       currentLikes,
       toggleLike,
       likeMutation.isPending,

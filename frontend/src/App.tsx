@@ -17,9 +17,8 @@ import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
 import { PlayerBar, PlayerProvider } from "./components/GlobalPlayer";
-import NotificationsBell, {
-  NotificationsSheet,
-} from "./features/notifications/NotificationsBell";
+import { NotificationsSheet } from "./features/notifications/NotificationsBell";
+import PlayerSheet, { PlayerButton } from "./features/player/PlayerSheet";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
@@ -53,6 +52,7 @@ export default function App() {
   // Э19: гостевой профиль (клик по аватарке на календаре) — оверлей поверх вкладок.
   const guestUserId = useUI((s) => s.guestUserId);
   const closeGuest = useUI((s) => s.closeGuest);
+  const showPlayerSheet = useUI((s) => s.showPlayerSheet);
   // GHG11(16): уведомления — нижний шит; держим его здесь, вне шапки ленты:
   // шапка обрезает переполнение (`overflow-hidden`), а шит должен накрывать весь
   // экран, а не жить внутри её строки.
@@ -170,8 +170,10 @@ export default function App() {
           <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
             Кто что открыл и с кем что случилось.
           </span>
-          {/* GHG11(9): личные уведомления (лайки своих треков) — в шапке ленты. */}
-          <NotificationsBell />
+          {/* GHG11(17): на месте колокольчика теперь плеер. Повод для 🔔 был
+              один — лайки своих треков, и он не стоил кнопки в шапке; вход в
+              музыку нужен постоянно. Уведомления живут внизу шита плеера. */}
+          <PlayerButton />
           {/* GHG11(12): тема — часть шапки: тот же центр строки, что у
               колокольчика, и тот же правый отступ `pr-3`, что у шапок встреч,
               профиля и календаря (раньше висела абсолютом и «косо» сидела). */}
@@ -181,6 +183,7 @@ export default function App() {
           <FeedScreen meId={meData.id} />
         </main>
         {showNotificationsSheet && <NotificationsSheet />}
+        {showPlayerSheet && <PlayerSheet />}
       </>
     );
   } else if (tab === "profile") {
