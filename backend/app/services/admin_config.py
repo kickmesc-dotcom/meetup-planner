@@ -260,12 +260,12 @@ async def _get_bool(session: AsyncSession, key: str, default: bool) -> bool:
 
 def _default_loser_reasons() -> list[str]:
     # Импортируем лениво, чтобы избежать цикла (loser → admin_config → loser).
-    from app.services.loser import LOSER_REASONS
+    from app._legacy.services.loser import LOSER_REASONS
     return list(LOSER_REASONS)
 
 
 async def get_loser_reasons(session: AsyncSession) -> list[str]:
-    """Возвращает кастомный список фраз лоха или дефолт из app.services.loser.
+    """Возвращает кастомный список фраз лоха или дефолт из app._legacy.services.loser.
 
     Дефолтный список НЕ сохраняем в БД при чтении — это позволяет добавлять
     новые фразы в код и они подхватятся, пока админ не начал кастомизацию.
@@ -295,7 +295,7 @@ async def set_loser_reasons(session: AsyncSession, reasons: list[str]) -> None:
     await _set_value(session, LOSER_REASONS_KEY, json.dumps(cleaned, ensure_ascii=False))
     # GHG6 E5: дроп счётчиков для фраз, которых больше нет в активном списке.
     # Lazy-импорт во избежание цикла admin_config ↔ phrase_weights.
-    from app.services.phrase_weights import LOSER_USE_COUNTS_KEY, cleanup_use_counts
+    from app._legacy.services.phrase_weights import LOSER_USE_COUNTS_KEY, cleanup_use_counts
     await cleanup_use_counts(session, LOSER_USE_COUNTS_KEY, cleaned)
 
 
@@ -823,7 +823,7 @@ async def set_chukhan_reasons(session: AsyncSession, reasons: list[str]) -> None
         session, CHUKHAN_REASONS_KEY, json.dumps(cleaned, ensure_ascii=False)
     )
     # GHG6 E5: дроп счётчиков для фраз, которых больше нет в активном списке.
-    from app.services.phrase_weights import CHUKHAN_USE_COUNTS_KEY, cleanup_use_counts
+    from app._legacy.services.phrase_weights import CHUKHAN_USE_COUNTS_KEY, cleanup_use_counts
     await cleanup_use_counts(session, CHUKHAN_USE_COUNTS_KEY, cleaned)
 
 
@@ -881,11 +881,11 @@ async def set_advice_enabled(session: AsyncSession, enabled: bool) -> None:
 
 
 async def get_advice_phrases(session: AsyncSession) -> list[str]:
-    """Кастомный пул советов или дефолт из app.services.advice.
+    """Кастомный пул советов или дефолт из app._legacy.services.advice.
 
     Дефолт НЕ пишем в БД при чтении — новые фразы из кода подхватятся, пока
     пользователь не начал кастомизацию (как loser_reasons)."""
-    from app.services.advice import DEFAULT_ADVICE_PHRASES
+    from app._legacy.services.advice import DEFAULT_ADVICE_PHRASES
 
     raw = await _get_value(session, ADVICE_LIST_KEY)
     if raw is None:
@@ -1201,7 +1201,7 @@ async def _set_pool(
     cleaned = _dedup_clean(phrases)
     await _set_value(session, key, json.dumps(cleaned, ensure_ascii=False))
     if use_counts_key is not None:
-        from app.services.phrase_weights import cleanup_use_counts
+        from app._legacy.services.phrase_weights import cleanup_use_counts
 
         await cleanup_use_counts(session, use_counts_key, cleaned)
 
@@ -1274,43 +1274,43 @@ async def set_worm_master_yes_cooldown_min(session: AsyncSession, minutes: int) 
 # Пулы фраз. use_counts ведём для всех, кроме nag и announce (одноразовые/честный
 # random — см. worm_master.py).
 async def get_worm_master_prefixes(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_MASTER_PREFIXES
+    from app._legacy.services.worm_master import DEFAULT_WORM_MASTER_PREFIXES
 
     return await _get_pool(session, WORM_MASTER_PREFIXES_KEY, DEFAULT_WORM_MASTER_PREFIXES)
 
 
 async def set_worm_master_prefixes(session: AsyncSession, phrases: list[str]) -> None:
-    from app.services.phrase_weights import WORM_MASTER_PREFIX_USE_COUNTS_KEY
+    from app._legacy.services.phrase_weights import WORM_MASTER_PREFIX_USE_COUNTS_KEY
 
     await _set_pool(session, WORM_MASTER_PREFIXES_KEY, phrases, WORM_MASTER_PREFIX_USE_COUNTS_KEY)
 
 
 async def get_worm_master_suffixes(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_MASTER_SUFFIXES
+    from app._legacy.services.worm_master import DEFAULT_WORM_MASTER_SUFFIXES
 
     return await _get_pool(session, WORM_MASTER_SUFFIXES_KEY, DEFAULT_WORM_MASTER_SUFFIXES)
 
 
 async def set_worm_master_suffixes(session: AsyncSession, phrases: list[str]) -> None:
-    from app.services.phrase_weights import WORM_MASTER_SUFFIX_USE_COUNTS_KEY
+    from app._legacy.services.phrase_weights import WORM_MASTER_SUFFIX_USE_COUNTS_KEY
 
     await _set_pool(session, WORM_MASTER_SUFFIXES_KEY, phrases, WORM_MASTER_SUFFIX_USE_COUNTS_KEY)
 
 
 async def get_worm_master_agrees(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_MASTER_AGREES
+    from app._legacy.services.worm_master import DEFAULT_WORM_MASTER_AGREES
 
     return await _get_pool(session, WORM_MASTER_AGREES_KEY, DEFAULT_WORM_MASTER_AGREES)
 
 
 async def set_worm_master_agrees(session: AsyncSession, phrases: list[str]) -> None:
-    from app.services.phrase_weights import WORM_MASTER_AGREE_USE_COUNTS_KEY
+    from app._legacy.services.phrase_weights import WORM_MASTER_AGREE_USE_COUNTS_KEY
 
     await _set_pool(session, WORM_MASTER_AGREES_KEY, phrases, WORM_MASTER_AGREE_USE_COUNTS_KEY)
 
 
 async def get_worm_master_nag(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_MASTER_NAG
+    from app._legacy.services.worm_master import DEFAULT_WORM_MASTER_NAG
 
     return await _get_pool(session, WORM_MASTER_NAG_KEY, DEFAULT_WORM_MASTER_NAG)
 
@@ -1320,13 +1320,13 @@ async def set_worm_master_nag(session: AsyncSession, phrases: list[str]) -> None
 
 
 async def get_worm_punish(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_PUNISH_PHRASES
+    from app._legacy.services.worm_master import DEFAULT_WORM_PUNISH_PHRASES
 
     return await _get_pool(session, WORM_PUNISH_KEY, DEFAULT_WORM_PUNISH_PHRASES)
 
 
 async def get_worm_punish_denied(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_PUNISH_DENIED
+    from app._legacy.services.worm_master import DEFAULT_WORM_PUNISH_DENIED
 
     return await _get_pool(session, WORM_PUNISH_DENIED_KEY, DEFAULT_WORM_PUNISH_DENIED)
 
@@ -1336,7 +1336,7 @@ async def set_worm_punish_denied(session: AsyncSession, phrases: list[str]) -> N
 
 
 async def get_worm_punish_denied_named(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_PUNISH_DENIED_NAMED
+    from app._legacy.services.worm_master import DEFAULT_WORM_PUNISH_DENIED_NAMED
 
     return await _get_pool(
         session, WORM_PUNISH_DENIED_NAMED_KEY, DEFAULT_WORM_PUNISH_DENIED_NAMED
@@ -1350,13 +1350,13 @@ async def set_worm_punish_denied_named(
 
 
 async def set_worm_punish(session: AsyncSession, phrases: list[str]) -> None:
-    from app.services.phrase_weights import WORM_PUNISH_USE_COUNTS_KEY
+    from app._legacy.services.phrase_weights import WORM_PUNISH_USE_COUNTS_KEY
 
     await _set_pool(session, WORM_PUNISH_KEY, phrases, WORM_PUNISH_USE_COUNTS_KEY)
 
 
 async def get_worm_announce_lines(session: AsyncSession) -> list[str]:
-    from app.services.worm_master import DEFAULT_WORM_ANNOUNCE_LINES
+    from app._legacy.services.worm_master import DEFAULT_WORM_ANNOUNCE_LINES
 
     return await _get_pool(session, WORM_ANNOUNCE_LINES_KEY, DEFAULT_WORM_ANNOUNCE_LINES)
 
@@ -1424,13 +1424,13 @@ async def set_bot_reactions_settings(
 # H.1: пул коротких реплик бота (reply/mention). use_counts ведём — чередуем, чтобы
 # одна и та же фраза подряд не повторялась.
 async def get_reply_phrases(session: AsyncSession) -> list[str]:
-    from app.services.random_phrases import DEFAULT_REPLY_PHRASES
+    from app._legacy.services.random_phrases import DEFAULT_REPLY_PHRASES
 
     return await _get_pool(session, BOT_REACT_REPLY_PHRASES_KEY, list(DEFAULT_REPLY_PHRASES))
 
 
 async def set_reply_phrases(session: AsyncSession, phrases: list[str]) -> None:
-    from app.services.phrase_weights import REPLY_USE_COUNTS_KEY
+    from app._legacy.services.phrase_weights import REPLY_USE_COUNTS_KEY
 
     await _set_pool(session, BOT_REACT_REPLY_PHRASES_KEY, phrases, REPLY_USE_COUNTS_KEY)
 
@@ -1474,7 +1474,7 @@ async def get_media_reactions_settings(session: AsyncSession) -> dict:
     single_mode = await _get_value(session, MEDIA_SINGLE_RESPONSE_MODE_KEY) or "random_one"
     if single_mode not in _MEDIA_VALID_SINGLE_MODES:
         single_mode = "random_one"
-    from app.services.media_reactions import clamp_wait_window
+    from app._legacy.services.media_reactions import clamp_wait_window
 
     return {
         "enabled": await _get_bool(session, MEDIA_ENABLED_KEY, True),
@@ -1513,7 +1513,7 @@ async def set_media_reactions_settings(
     if chance_pct is not None:
         await _set_value(session, MEDIA_CHANCE_PCT_KEY, str(max(0, min(100, chance_pct))))
     if wait_window_min is not None:
-        from app.services.media_reactions import clamp_wait_window
+        from app._legacy.services.media_reactions import clamp_wait_window
 
         await _set_value(
             session, MEDIA_WAIT_WINDOW_MIN_KEY, str(clamp_wait_window(wait_window_min))
@@ -1899,7 +1899,7 @@ _GAME_MUSIC_GAME_ENABLED_DEFAULT = False
 
 def _game_defaults() -> dict:
     """Дефолты из единственной точки тюнинга (ленивый импорт — цикл модулей)."""
-    from app.services.game import config as game_config
+    from app._legacy.services.game import config as game_config
 
     return {
         "digest_interval": game_config.DIGEST_DEFAULT_INTERVAL,
@@ -1948,7 +1948,7 @@ async def get_game_digest_enabled(session: AsyncSession) -> bool:
 
 
 async def get_game_digest_interval_hours(session: AsyncSession) -> int:
-    from app.services.game.config import DIGEST_INTERVALS
+    from app._legacy.services.game.config import DIGEST_INTERVALS
 
     value = await _get_int(session, GAME_DIGEST_INTERVAL_KEY, _game_defaults()["digest_interval"])
     return value if value in DIGEST_INTERVALS else _game_defaults()["digest_interval"]
@@ -2058,7 +2058,7 @@ async def get_activity_max_posts_per_day(session: AsyncSession) -> int:
 
 async def get_achievements_post_mode(session: AsyncSession) -> str:
     """Режим публикации ачивок: `instant` (как раньше) или `pool` (буфер+сводка)."""
-    from app.services.game.config import ACHIEVEMENT_POST_MODE, ACHIEVEMENT_POST_MODES
+    from app._legacy.services.game.config import ACHIEVEMENT_POST_MODE, ACHIEVEMENT_POST_MODES
 
     raw = await _get_value(session, GAME_ACHIEVEMENTS_POST_MODE_KEY)
     value = (raw or "").strip().lower()
@@ -2066,7 +2066,7 @@ async def get_achievements_post_mode(session: AsyncSession) -> str:
 
 
 async def set_achievements_post_mode(session: AsyncSession, mode: str) -> None:
-    from app.services.game.config import ACHIEVEMENT_POST_MODES
+    from app._legacy.services.game.config import ACHIEVEMENT_POST_MODES
 
     value = (mode or "").strip().lower()
     if value not in ACHIEVEMENT_POST_MODES:
@@ -2076,7 +2076,7 @@ async def set_achievements_post_mode(session: AsyncSession, mode: str) -> None:
 
 async def get_chat_output_mode(session: AsyncSession) -> str:
     """Э20: режим вывода бота в основной чат (normal/achievements/all)."""
-    from app.services.game.config import CHAT_OUTPUT_MODE, CHAT_OUTPUT_MODES
+    from app._legacy.services.game.config import CHAT_OUTPUT_MODE, CHAT_OUTPUT_MODES
 
     raw = await _get_value(session, GAME_CHAT_OUTPUT_MODE_KEY)
     value = (raw or "").strip().lower()
@@ -2084,7 +2084,7 @@ async def get_chat_output_mode(session: AsyncSession) -> str:
 
 
 async def set_chat_output_mode(session: AsyncSession, mode: str) -> None:
-    from app.services.game.config import CHAT_OUTPUT_MODES
+    from app._legacy.services.game.config import CHAT_OUTPUT_MODES
 
     value = (mode or "").strip().lower()
     if value not in CHAT_OUTPUT_MODES:
@@ -2093,7 +2093,7 @@ async def set_chat_output_mode(session: AsyncSession, mode: str) -> None:
 
 
 async def get_achievements_pool_interval_hours(session: AsyncSession) -> int:
-    from app.services.game.config import ACHIEVEMENTS_POOL_INTERVALS
+    from app._legacy.services.game.config import ACHIEVEMENTS_POOL_INTERVALS
 
     default = _game_defaults()["achievements_pool_interval"]
     value = await _get_int(session, GAME_ACHIEVEMENTS_POOL_INTERVAL_KEY, default, lo=1, hi=24)
@@ -2136,7 +2136,7 @@ async def set_achievements_pool_last_flush(session: AsyncSession, value: str) ->
 
 
 async def set_achievements_pool_interval_hours(session: AsyncSession, hours: int) -> None:
-    from app.services.game.config import ACHIEVEMENTS_POOL_INTERVALS
+    from app._legacy.services.game.config import ACHIEVEMENTS_POOL_INTERVALS
 
     default = _game_defaults()["achievements_pool_interval"]
     value = hours if hours in ACHIEVEMENTS_POOL_INTERVALS else default
@@ -2253,7 +2253,7 @@ async def get_accept_window_minutes(session: AsyncSession, mode: str) -> int:
     Незнакомый режим (`off` и что угодно ещё) → 0, то есть тоже «как сейчас»:
     молча вернуть чужое окно хуже, чем оставить поведение неизменным.
     """
-    from app.services.game import accept
+    from app._legacy.services.game import accept
 
     key = _ACCEPT_WINDOW_KEYS.get(mode)
     if key is None:
@@ -2270,7 +2270,7 @@ async def set_accept_window_minutes(
     session: AsyncSession, mode: str, minutes: int
 ) -> None:
     """Задать окно приёма для режима. Незнакомый режим — ошибка (не молчим)."""
-    from app.services.game import accept
+    from app._legacy.services.game import accept
 
     key = _ACCEPT_WINDOW_KEYS.get(mode)
     if key is None:
@@ -2374,7 +2374,7 @@ async def set_game_digest_enabled(session: AsyncSession, value: bool) -> None:
 
 async def set_game_digest_interval(session: AsyncSession, hours: int) -> None:
     """Интервал сводки. Чужие значения зажимаем к ближайшему допустимому."""
-    from app.services.game.config import DIGEST_INTERVALS
+    from app._legacy.services.game.config import DIGEST_INTERVALS
 
     allowed = sorted(DIGEST_INTERVALS)
     if hours in allowed:

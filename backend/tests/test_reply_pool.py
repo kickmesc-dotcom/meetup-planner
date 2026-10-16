@@ -15,13 +15,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app._legacy.services.phrase_meta import load_meta, set_flags, source_of
+from app._legacy.services.phrase_snapshot import apply_snapshot
+from app._legacy.services.phrase_weights import REPLY_USE_COUNTS_KEY, get_use_counts
+from app._legacy.services.random_phrases import DEFAULT_REPLY_PHRASES, compose_reply_phrase
 from app.api import routes_admin as ra
 from app.services import admin_config as ac
 from app.services.admin_config import get_reply_phrases, set_reply_phrases
-from app.services.phrase_meta import load_meta, set_flags, source_of
-from app.services.phrase_snapshot import apply_snapshot
-from app.services.phrase_weights import REPLY_USE_COUNTS_KEY, get_use_counts
-from app.services.random_phrases import DEFAULT_REPLY_PHRASES, compose_reply_phrase
 
 
 class _FakeRow:

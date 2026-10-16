@@ -6,8 +6,8 @@ WeeklyChukhan и проброс в историю проверяются вру�
 """
 from __future__ import annotations
 
+from app._legacy.services.chukhan import CHUKHAN_TAGLINES, _format_announcement
 from app.db.models import User
-from app.services.chukhan import CHUKHAN_TAGLINES, _format_announcement
 
 
 def _user() -> User:

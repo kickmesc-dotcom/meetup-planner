@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.services.game import donations
-from app.services.game.config import DONATION_AMOUNT
+from app._legacy.services.game import donations
+from app._legacy.services.game.config import DONATION_AMOUNT
 
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
 

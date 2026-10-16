@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 
-from app.services.advice import (
+from app._legacy.services.advice import (
     DEFAULT_ADVICE_PHRASES,
     ends_with_question,
     pick_advice,

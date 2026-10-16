@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.loser import (
+from app._legacy.services.loser import (
     MasterSycophancy,
     RollExtras,
     WormEvent,

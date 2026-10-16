@@ -11,13 +11,12 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api import routes_game
+from app._legacy.api import routes_game
 from app.bot import commands_catalog
 from app.db.models import GameHoliday
-from app.services.game import achievements_catalog as catalog
-from app.services.game import holidays, report
-from app.services.game.achievements import COUNTER_WORM_TAMER
-from app.services.game.config import MAX_LEVEL, XP_PER_LEVEL, XP_RULES
+from app._legacy.services.game import achievements_catalog as catalog
+from app._legacy.services.game import holidays, report
+from app._legacy.services.game.config import MAX_LEVEL, XP_PER_LEVEL, XP_RULES
 
 
 def _game(monkeypatch, enabled: bool) -> None:
@@ -148,9 +147,17 @@ async def test_ranks_chart_lists_everyone_with_medals(monkeypatch):
 
 # --- Э5.4: команды зарегистрированы в каталоге -------------------------------
 
-def test_game_commands_are_visible_in_group_help():
-    visible = {c.cmd for c in commands_catalog.visible_for("group", is_admin=False)}
-    assert {"rank", "ranks", "xp", "levels", "ach"} <= visible
+def test_game_commands_are_not_advertised():
+    """SemiTaskBot: игровые команды сняты с витрины (код при этом остаётся).
+
+    Иначе ребрендинг под рабочий бот остался бы только на бумаге: сотрудник
+    видел бы в /help ранги, опыт и ачивки.
+    """
+    game_cmds = {"rank", "ranks", "xp", "levels", "ach", "game"}
+    group = {c.cmd for c in commands_catalog.visible_for("group", is_admin=False)}
+    private = {c.cmd for c in commands_catalog.visible_for("private", is_admin=True)}
+    assert not (game_cmds & group), f"в групповой витрине: {sorted(game_cmds & group)}"
+    assert not (game_cmds & private), f"в личной витрине: {sorted(game_cmds & private)}"
 
 
 # --- /ach: полный список ачивок с описаниями ---------------------------------
@@ -221,7 +228,7 @@ async def test_ach_shows_rarity_percent(monkeypatch):
         return {}
 
     async def _rarity(*_a, **_k):
-        from app.services.game.achievements import AchievementStat
+        from app._legacy.services.game.achievements import AchievementStat
 
         return [AchievementStat("chin_up", 3, 6), AchievementStat("first_worm", 0, 6)]
 

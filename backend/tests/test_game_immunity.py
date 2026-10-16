@@ -14,15 +14,15 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.birthday_immunity import resolve_immune_pick
-from app.services.game import levels
-from app.services.game.immunity import (
+from app._legacy.services.birthday_immunity import resolve_immune_pick
+from app._legacy.services.game import levels
+from app._legacy.services.game.immunity import (
     immunity_level,
     immunity_reason,
     immunity_threshold_xp,
     rank_immune_reasons,
 )
-from app.services.immunity import BIRTHDAY, CHUKHAN_IMMUNITY, LOSER_IMMUNITY
+from app._legacy.services.immunity import BIRTHDAY, CHUKHAN_IMMUNITY, LOSER_IMMUNITY
 
 
 class _U:
@@ -122,7 +122,7 @@ def game_on(monkeypatch):
     async def _on(_session):
         return True
 
-    monkeypatch.setattr("app.services.game.immunity.is_game_enabled", _on)
+    monkeypatch.setattr("app._legacy.services.game.immunity.is_game_enabled", _on)
 
 
 @pytest.mark.asyncio
@@ -137,7 +137,7 @@ async def test_rank_immunity_empty_when_game_disabled(monkeypatch):
         async def execute(self, *_a, **_k):  # pragma: no cover — не должен зваться
             raise AssertionError("SQL не должен выполняться при выключенной игре")
 
-    monkeypatch.setattr("app.services.game.immunity.is_game_enabled", _off)
+    monkeypatch.setattr("app._legacy.services.game.immunity.is_game_enabled", _off)
     assert await rank_immune_reasons(_NoQuery(), kind="loser") == {}
     assert calls == ["checked"]
 

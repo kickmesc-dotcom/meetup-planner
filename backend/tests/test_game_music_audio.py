@@ -14,7 +14,7 @@ import io
 import pytest
 from fastapi import HTTPException
 
-from app.api import routes_game
+from app._legacy.api import routes_game
 from app.db.models import MusicTrack
 
 

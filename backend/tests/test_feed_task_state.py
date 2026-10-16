@@ -16,8 +16,8 @@ from datetime import UTC
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from app.services.game import feed
-from app.services.game import feed_moderation as fm
+from app._legacy.services.game import feed
+from app._legacy.services.game import feed_moderation as fm
 
 # --------------------------------------------------------------- состояние ---
 

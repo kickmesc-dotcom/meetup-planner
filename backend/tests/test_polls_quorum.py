@@ -29,7 +29,7 @@ from aiogram.exceptions import (
 )
 
 from app.db.models import GameNomination, Poll, PollOption
-from app.services.games_poll import handle_game_choice_closed
+from app._legacy.services.games_poll import handle_game_choice_closed
 from app.services.polls import force_close_poll
 
 
@@ -177,7 +177,7 @@ async def test_game_choice_closed_pins_when_pin_result_true():
     sess = _FakeSession()
 
     with (
-        patch("app.services.games_poll.pick_winner_option", new=AsyncMock(return_value=winner_opt)),
+        patch("app._legacy.services.games_poll.pick_winner_option", new=AsyncMock(return_value=winner_opt)),
         patch("app.services.admin_config.get_polls_pin_result", new=AsyncMock(return_value=True)),
         patch("app.bot.utils.pinning.pin_message_safely", new=AsyncMock(return_value=True)) as pin_mock,
     ):
@@ -203,7 +203,7 @@ async def test_game_choice_closed_no_pin_when_pin_result_false():
     sess = _FakeSession()
 
     with (
-        patch("app.services.games_poll.pick_winner_option", new=AsyncMock(return_value=winner_opt)),
+        patch("app._legacy.services.games_poll.pick_winner_option", new=AsyncMock(return_value=winner_opt)),
         patch("app.services.admin_config.get_polls_pin_result", new=AsyncMock(return_value=False)),
         patch("app.bot.utils.pinning.pin_message_safely", new=AsyncMock(return_value=True)) as pin_mock,
     ):
@@ -228,7 +228,7 @@ async def test_game_choice_closed_no_pin_on_send_failure():
     sess = _FakeSession()
 
     with (
-        patch("app.services.games_poll.pick_winner_option", new=AsyncMock(return_value=winner_opt)),
+        patch("app._legacy.services.games_poll.pick_winner_option", new=AsyncMock(return_value=winner_opt)),
         patch("app.services.admin_config.get_polls_pin_result", new=AsyncMock(return_value=True)),
         patch("app.bot.utils.pinning.pin_message_safely", new=AsyncMock(return_value=True)) as pin_mock,
     ):

@@ -10,8 +10,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.db.models import MusicTrack, MusicTrackLike
-from app.services.game import music
-from app.services.game.config import MUSIC_TOP_TRACKS_LIMIT, MUSIC_TOP_WINDOW_DAYS
+from app._legacy.services.game import music
+from app._legacy.services.game.config import MUSIC_TOP_TRACKS_LIMIT, MUSIC_TOP_WINDOW_DAYS
 
 NOW = datetime(2026, 9, 30, 12, 0, tzinfo=timezone.utc)
 

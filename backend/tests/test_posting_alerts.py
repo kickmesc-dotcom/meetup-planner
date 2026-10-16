@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.services.posting_alerts import (
+from app._legacy.services.posting_alerts import (
     CHUKHAN_OVERDUE_AFTER,
     is_chukhan_overdue,
     summarize,

@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.game import worm_transfer
-from app.services.game.achievements_catalog import get, group_of
+from app._legacy.services.game import worm_transfer
+from app._legacy.services.game.achievements_catalog import get, group_of
 
 
 @pytest.mark.parametrize(

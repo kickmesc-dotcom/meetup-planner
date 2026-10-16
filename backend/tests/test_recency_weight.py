@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import random
 
-from app.services.random_phrases import (
+from app._legacy.services.random_phrases import (
     RECENCY_QUARANTINE_HOURS_DEFAULT,
     RECENCY_QUARANTINE_WEIGHT_DEFAULT,
     _recency_weight,

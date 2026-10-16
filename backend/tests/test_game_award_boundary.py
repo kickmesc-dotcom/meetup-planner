@@ -24,7 +24,7 @@ import pytest
 
 from app.api.deps import resync_if_expired
 from app.db.models import XpGrant
-from app.services.game import xp
+from app._legacy.services.game import xp
 from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
 # --------------------------------------------------------------------------
@@ -139,9 +139,9 @@ async def test_award_calendar_resyncs_row_after_awards(monkeypatch):
     async def _availability(session, user_id):  # noqa: ANN001, ANN202
         calls.append(user_id)
 
-    # Подменяем атрибут ПАКЕТА: роут делает `from app.services.game import
+    # Подменяем атрибут ПАКЕТА: роут делает `from app._legacy.services.game import
     # awards`, и это резолвится через атрибут пакета, а не через sys.modules.
-    monkeypatch.setattr("app.services.game.awards", SimpleNamespace(availability=_availability))
+    monkeypatch.setattr("app._legacy.services.game.awards", SimpleNamespace(availability=_availability))
 
     row = object()
     monkeypatch.setattr(deps, "sa_inspect", _state_of({id(row): True}))
@@ -163,7 +163,7 @@ async def test_award_calendar_handles_missing_row_for_bulk(monkeypatch):
     async def _availability(session, user_id):  # noqa: ANN001, ANN202
         return None
 
-    monkeypatch.setattr("app.services.game.awards", SimpleNamespace(availability=_availability))
+    monkeypatch.setattr("app._legacy.services.game.awards", SimpleNamespace(availability=_availability))
 
     session = _ResyncSession()
     await routes_availability._award_calendar(session, 5)

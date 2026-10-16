@@ -18,10 +18,10 @@ from aiogram.exceptions import TelegramAPIError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
+from app._legacy.services.random_phrases import compose_random_phrase
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.models import Birthday, BirthdayNotification, User
-from app.services.random_phrases import compose_random_phrase
 
 log = structlog.get_logger()
 
@@ -94,7 +94,7 @@ async def _send_for(
         # GHG10 (2.7): сам день ДР = +100 XP (раз в год — окно в `xp_grants`).
         # Игровой сбой не роняет отправку поздравления (глотает `awards._guarded`).
         if kind == "on_day":
-            from app.services.game import awards
+            from app._legacy.services.game import awards
 
             await awards.birthday(session, user.id)
     except TelegramAPIError:

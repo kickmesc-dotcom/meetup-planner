@@ -23,7 +23,8 @@ from app.api import (
     routes_availability,
     routes_birthdays,
     routes_calendar,
-    routes_game,
+    routes_hr,
+    routes_hr_admin,
     routes_meetings,
     routes_meta,
     routes_polls,
@@ -37,9 +38,9 @@ from app.bot.scheduler import (
     run_scheduler_leadership,
     shutdown_scheduler,
 )
-from app.services.chukhan import retry_undelivered_chukhan
 from app.config import get_settings
 from app.db.base import get_sessionmaker
+from app.db.hr_seed import seed_hr
 from app.db.seed import seed_users
 # Импорт sync_all_avatars остается, но вызов ниже закомментирован
 from app.services.avatars import sync_all_avatars
@@ -93,7 +94,7 @@ async def _register_bot_metadata() -> None:
     try:
         await bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(
-                text="📅 Планер",
+                text="📋 Рабочий бот",
                 web_app=WebAppInfo(url=settings.mini_app_url),
             ),
             request_timeout=10
@@ -125,7 +126,6 @@ async def _set_webhook() -> None:
     )
     structlog.get_logger().info("webhook.set", url=url)
 
-
 async def _register_telegram_metadata_with_retry() -> None:
     """Background task: set webhook + commands + menu button, retrying on
     transient network failures so a flaky HF egress doesn't permanently
@@ -153,63 +153,6 @@ async def _register_telegram_metadata_with_retry() -> None:
         backoff = min(backoff * 2, 160)
     log.error("tg.registration_gave_up")
 
-
-async def _retry_undelivered_chukhan_on_startup() -> None:
-    """GHG7 P11: фоновое дотягивание недоставленного чухана текущей недели.
-
-    Лечит инцидент №1 (03.06): если понедельничный cron-ролл упал в окно
-    недоступности канала/Neon, пик остался в БД с `posted_at IS NULL` (P11.1).
-    Ближайший рестарт/redeploy Space добивает доставку без отдельного частого
-    job (Neon-бюджет). Каждая попытка изолирована try/except, чтобы лагающая
-    сеть HF не уронила startup. Ждём перед первой попыткой — на старте канал и
-    вебхук ещё могут лежать (см. webhook.set_failed в логах).
-    """
-    log = structlog.get_logger()
-    backoff = 30
-    for attempt in range(1, 6):  # ~30+60+120+240+480s ≈ 15 мин окно
-        await asyncio.sleep(backoff)
-        try:
-            delivered = await retry_undelivered_chukhan(get_bot())
-            if delivered:
-                log.info("chukhan.startup_retry_delivered", attempt=attempt)
-                return
-            # Нечего дотягивать (нет недоставленного пика) — выходим тихо.
-            return
-        except Exception as exc:  # noqa: BLE001
-            log.warning("chukhan.startup_retry_failed", attempt=attempt, error=str(exc))
-        backoff = min(backoff * 2, 480)
-
-
-async def _announce_worm_transfer_once() -> None:
-    """Э19: единоразовое инфо-уведомление о передаче червя после деплоя.
-
-    Флаг живёт в `admin_config` (переживает рестарт), поэтому объявляем ровно
-    один раз за всю жизнь проекта. Ждём немного — на старте канал/вебхук могут
-    ещё подниматься, и первая отправка могла бы упасть.
-    """
-    log = structlog.get_logger()
-    await asyncio.sleep(20)
-    try:
-        sm = get_sessionmaker()
-        async with sm() as session:
-            from app.services.admin_config import (
-                get_worm_transfer_announced,
-                set_worm_transfer_announced,
-            )
-
-            if await get_worm_transfer_announced(session):
-                return
-            from app.services.game import journal
-            from app.services.game.worm_transfer import TRANSFER_NOTICE_TEXT
-
-            # GHG11: фиче-гейт — в «только апп»/выкл инфо-уведомление в чат не уходит.
-            if await journal.send_now(TRANSFER_NOTICE_TEXT, feature="worm"):
-                await set_worm_transfer_announced(session, True)
-                log.info("game.worm_transfer_announced")
-    except Exception as exc:  # noqa: BLE001 — уведомление не стоит старта
-        log.warning("game.worm_transfer_announce_failed", error=str(exc))
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -219,6 +162,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     sm = get_sessionmaker()
     async with sm() as session:
         await seed_users(session)
+        # SemiTaskBot: начальные подразделения/чек-листы/ссылки/вопросы ОС.
+        # Идемпотентно (см. app/db/hr_seed.py): на боевой базе ничего не
+        # перезапишет, только снимает «пустой экран» у нового ресторана.
+        try:
+            await seed_hr(session)
+        except Exception as exc:  # noqa: BLE001 — сид не должен ронять старт
+            structlog.get_logger().warning("hr.seed_failed", error=str(exc))
         # P2: bootstrap proxy pool из env (PROXIES_BOOTSTRAP_JSON), если задан.
         try:
             from app.services.proxies import bootstrap_from_env
@@ -235,13 +185,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # 2. Сетевые операции (Telegram) уходят в фон с ретраями, чтобы лагающая
     # сеть HF не блокировала FastAPI startup и первый входящий webhook.
     tg_task = asyncio.create_task(_register_telegram_metadata_with_retry())
-
-    # GHG7 P11: фоновое дотягивание недоставленного чухана текущей недели
-    # (если cron-ролл упал в окно недоступности — см. инцидент 03.06).
-    chukhan_retry_task = asyncio.create_task(_retry_undelivered_chukhan_on_startup())
-
-    # Э19: единоразовое инфо-уведомление о фиче «передача червя».
-    worm_notice_task = asyncio.create_task(_announce_worm_transfer_once())
 
     # 3. GHG11(5): планировщик стартует НЕ безусловно, а через цикл лидерства.
     # Amvera и HF Space делят одну Neon, поэтому активный писатель ровно один:
@@ -263,7 +206,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
     # Завершение: гасим фоновые задачи, если они ещё бегут.
-    for _task in (tg_task, chukhan_retry_task, worm_notice_task):
+    for _task in (tg_task,):
         _task.cancel()
         try:
             await _task
@@ -287,7 +230,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    app = FastAPI(title="Meetup Planner", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="SemiTaskBot", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list or ["*"],
@@ -302,7 +245,9 @@ def create_app() -> FastAPI:
     app.include_router(routes_polls.router, prefix="/api")
     app.include_router(routes_birthdays.router, prefix="/api")
     app.include_router(routes_calendar.router, prefix="/api")
-    app.include_router(routes_game.router, prefix="/api")
+    # SemiTaskBot HR-ядро: ручки сотрудника и управляющий контур (АУП/админ).
+    app.include_router(routes_hr.router, prefix="/api")
+    app.include_router(routes_hr_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие
     # возможности есть). Регистрируется последним, поэтому его собственный

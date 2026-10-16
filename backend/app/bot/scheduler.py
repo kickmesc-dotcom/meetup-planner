@@ -23,13 +23,10 @@ from app.db.base import get_sessionmaker
 from app.services import scheduler_leader
 from app.services.admin_config import (
     get_autoloser_settings,
-    get_random_phrases_schedule,
     get_reminders_tick_minutes,
     get_scheduled_settings,
 )
 from app.services.birthdays import run_birthdays_job
-from app.services.chukhan import run_chukhan_job
-from app.services.random_phrases import run_random_phrases_job
 from app.services.reminders import run_due_reminders
 
 log = structlog.get_logger()
@@ -68,7 +65,6 @@ _TRANSIENT_DB_EXC_NAMES = frozenset(
     }
 )
 
-
 def _is_transient_db_error(exc: BaseException | None) -> bool:
     """True, если исключение (или его причина) — транзиентный сбой доступа к БД.
 
@@ -90,12 +86,10 @@ def _is_transient_db_error(exc: BaseException | None) -> bool:
         cur = cur.__cause__ or cur.__context__
     return False
 
-
 # GHG11(3): job_id → монотонное время старта. Watchdog находит задачи, которые
 # «провисли» (повисли в сетевом вызове и из-за max_instances=1 блокируют
 # следующий запуск), и аварийно схлопывает планировщик.
 _RUNNING_SINCE: dict[str, float] = {}
-
 
 def _logged_job(
     job_id: str,
@@ -162,13 +156,11 @@ def _logged_job(
 
 _scheduler: AsyncIOScheduler | None = None
 
-
 def get_scheduler() -> AsyncIOScheduler:
     global _scheduler
     if _scheduler is None:
         _scheduler = AsyncIOScheduler(timezone=get_settings().scheduler_tz)
     return _scheduler
-
 
 # --- IDs динамических job'ов, которыми управляют admin-настройки ---
 JOB_REMINDERS_TICK = "meeting_reminders_tick"
@@ -196,7 +188,7 @@ JOB_GAME_VOICE = "game_voice_tick"  # GHG10 Э14
 JOB_GAME_MUSIC = "game_music_weekly"  # GHG10 Э15
 JOB_GAME_MUSIC_GAME = "game_music_game_weekly"  # GHG10 Э16
 JOB_WATCHDOG = "scheduler_watchdog"  # GHG11(3): схлопывание зависших задач
-
+JOB_HR_TASKS = "hr_tasks_tick"  # SemiTaskBot: напоминания о сроке + эскалация просрочки
 
 def _env_int(name: str, default: int) -> int:
     import os
@@ -208,7 +200,6 @@ def _env_int(name: str, default: int) -> int:
     except ValueError:
         return default
 
-
 def _env_float(name: str, default: float) -> float:
     import os
     raw = os.getenv(name)
@@ -219,7 +210,6 @@ def _env_float(name: str, default: float) -> float:
     except ValueError:
         return default
 
-
 # H2 (30.09): сколько раз повторять прогон при транзиентном сбое БД и базовая
 # пауза (экспоненциально растёт: base, base×2, base×4…). Всего попыток, включая
 # первую. Дефолт: 3 попытки с паузами 2с/4с — суммарно ~6с ожидания, этого
@@ -229,7 +219,6 @@ _SCHEDULER_DB_RETRY_ATTEMPTS = max(1, _env_int("SCHEDULER_DB_RETRY_ATTEMPTS", 3)
 _SCHEDULER_DB_RETRY_BASE_DELAY_SEC = max(
     0.0, _env_float("SCHEDULER_DB_RETRY_BASE_DELAY_SEC", 2.0)
 )
-
 
 # --- GHG11(5): single-writer лидерство планировщика ------------------------
 # H1: Amvera и HF Space — один код против одной Neon. APScheduler в lifespan
@@ -252,11 +241,9 @@ SCHEDULER_LEADER_DISABLED = os.getenv("SCHEDULER_LEADER_DISABLED", "").strip().l
 LEADER_LEASE_TTL_SECONDS = max(30, _env_int("SCHEDULER_LEASE_TTL_SECONDS", 300))
 LEADER_RENEW_INTERVAL_SECONDS = max(10, _env_int("SCHEDULER_LEASE_RENEW_SECONDS", 60))
 
-
 def is_leader() -> bool:
     """Лидер ли этот инстанс (для диагностики/тестов)."""
     return _is_leader
-
 
 def _leadership_ok() -> bool:
     """Разрешено ли этому инстансу регистрировать/держать job'ы.
@@ -270,7 +257,6 @@ def _leadership_ok() -> bool:
         return True
     return _is_leader
 
-
 def arm_leader_gate() -> None:
     """Включить гейт лидерства СИНХРОННО (до первого тика цикла лидерства).
 
@@ -279,7 +265,6 @@ def arm_leader_gate() -> None:
     """
     global _LEADER_GATE_ENABLED
     _LEADER_GATE_ENABLED = True
-
 
 async def run_scheduler_leadership(bot: Bot) -> None:
     """Цикл лидерства: забрать/продлить лиз и поднять/погасить планировщик.
@@ -322,7 +307,6 @@ async def run_scheduler_leadership(bot: Bot) -> None:
 
         await asyncio.sleep(LEADER_RENEW_INTERVAL_SECONDS)
 
-
 async def release_scheduler_leadership() -> None:
     """Отпустить лиз при graceful shutdown, чтобы второй инстанс подхватил сразу."""
     global _is_leader
@@ -335,7 +319,6 @@ async def release_scheduler_leadership() -> None:
     except Exception as exc:  # noqa: BLE001 — на выходе уже не критично
         log.warning("scheduler.leader_release_failed", error=str(exc))
     _is_leader = False
-
 
 # GHG6 PX6 / GHG7 P8.4: онлайн-статус раз в час (было 10 мин). Каждый тик —
 # исходящий bot.get_me() к api.telegram.org; 600с давали 144 «пустых» запроса/
@@ -356,7 +339,6 @@ _AUTOLOSER_RETRY_DELAY = timedelta(minutes=5)
 # Сколько раз пытаемся вообще (включая первую попытку). После — status='expired'.
 _AUTOLOSER_MAX_ATTEMPTS = 12
 
-
 async def _autoloser_job(bot: Bot) -> None:
     """A6: автоматический roll лоха через services.loser.
 
@@ -365,11 +347,11 @@ async def _autoloser_job(bot: Bot) -> None:
     переустанавливается в `reload_dynamic_jobs` (для random-режима — на новое
     случайное время следующих суток).
     """
+    from app._legacy.services.loser import compose_loser_message, roll_loser
     from app.bot.dispatcher import get_bot  # noqa: F401  — keep cycle-safe pattern
     from app.config import get_settings as _gs
     from app.db.base import get_sessionmaker as _gsm
     from app.db.models import LoserOutbox
-    from app.services.loser import compose_loser_message, roll_loser
 
     settings = _gs()
     if not settings.group_chat_id:
@@ -389,7 +371,7 @@ async def _autoloser_job(bot: Bot) -> None:
         if days and now.weekday() not in days:
             log.info("autoloser.day_skipped", weekday=now.weekday(), days=days)
             return
-        from app.services.game import delivery as _delivery
+        from app._legacy.services.game import delivery as _delivery
 
         if await _delivery.get_feature_mode(session, "loser_auto") == _delivery.MODE_OFF:
             log.info("autoloser.feature_off")
@@ -428,7 +410,7 @@ async def _autoloser_job(bot: Bot) -> None:
             # GHG8 P3: оглашение «черновых» именинников (announce-режим
             # иммунитета). Best-effort: фейл не трогает outbox/roll.
             if extras is not None and getattr(extras, "immunity_skipped", None):
-                from app.services.birthday_immunity import announce_immunity_skips
+                from app._legacy.services.birthday_immunity import announce_immunity_skips
 
                 await announce_immunity_skips(
                     bot,
@@ -458,7 +440,7 @@ async def _autoloser_job(bot: Bot) -> None:
             # Э20: режим «всё в приложение» — пост в чат не шлём, но ролл
             # остаётся (календарь/лента/статистика его видят), а outbox сразу
             # помечаем sent, чтобы retry-job не крутился впустую.
-            from app.services.game import chat_mode
+            from app._legacy.services.game import chat_mode
 
             if await chat_mode.chat_all_silent(session):
                 outbox.status = "sent"
@@ -525,7 +507,6 @@ async def _autoloser_job(bot: Bot) -> None:
         except Exception:
             log.exception("autoloser.failed")
 
-
 async def _loser_outbox_retry_job(bot: Bot) -> None:
     """GHG7 P0.2.b.4: ретраит pending-записи `loser_outbox`.
 
@@ -543,10 +524,10 @@ async def _loser_outbox_retry_job(bot: Bot) -> None:
     """
     from sqlalchemy import select as _select
 
+    from app._legacy.services.loser import compose_loser_message
     from app.config import get_settings as _gs
     from app.db.base import get_sessionmaker as _gsm
     from app.db.models import LoserOutbox, LoserRoll, User
-    from app.services.loser import compose_loser_message
 
     settings = _gs()
     if not settings.group_chat_id:
@@ -597,7 +578,7 @@ async def _loser_outbox_retry_job(bot: Bot) -> None:
             )
 
             # Э20: режим «всё в приложение» — доставку в чат не повторяем.
-            from app.services.game import chat_mode
+            from app._legacy.services.game import chat_mode
 
             if await chat_mode.chat_all_silent(session):
                 outbox.status = "sent"
@@ -666,7 +647,6 @@ async def _loser_outbox_retry_job(bot: Bot) -> None:
 
         await session.commit()
 
-
 def _build_random_phrases_trigger(mode: str, param: dict, tz: str):
     """Собрать APScheduler-trigger из admin_config-настроек A3.
 
@@ -699,7 +679,6 @@ def _build_random_phrases_trigger(mode: str, param: dict, tz: str):
     hours = ",".join(str((6 + i * step) % 24) for i in range(n))
     return CronTrigger(hour=hours, minute=37, timezone=tz)
 
-
 def _parse_hhmm(s: str) -> tuple[int, int]:
     try:
         hh, mm = s.strip().split(":")
@@ -707,14 +686,12 @@ def _parse_hhmm(s: str) -> tuple[int, int]:
     except Exception:  # noqa: BLE001
         return 19, 37
 
-
 def _autoloser_days_csv(cfg: dict) -> str:
     """CSV дней недели для CronTrigger (0=пн..6=вс). Пусто → все дни."""
     days = cfg.get("days")
     if not days:
         return "mon-sun"
     return ",".join({0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}[d] for d in sorted(days))
-
 
 def _build_autoloser_trigger(cfg: dict, tz: str):
     """GHG11: три понятных режима автолоха.
@@ -767,7 +744,6 @@ def _build_autoloser_trigger(cfg: dict, tz: str):
         candidate = candidate + timedelta(days=1)
     return DateTrigger(run_date=candidate)
 
-
 async def reload_dynamic_jobs(bot: Bot) -> None:
     """Пересобрать все управляемые админкой job'ы под текущие admin-настройки.
 
@@ -785,7 +761,6 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     async with sm() as session:
         sched_cfg = await get_scheduled_settings(session)
         tick_minutes = sched_cfg["reminders"]["tick_minutes"]
-        rp_mode, rp_param = await get_random_phrases_schedule(session)
 
     # --- Reminders ---
     if sched_cfg["reminders"]["enabled"]:
@@ -806,72 +781,6 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_REMINDERS_TICK)
         log.info("scheduler.reminders_disabled")
-
-    # --- Random phrases ---
-    # Лишние fixed_times — отдельные job'ы. Чистим прошлые «extra» в любом случае.
-    for j in list(sched.get_jobs()):
-        if j.id.startswith(f"{JOB_RANDOM_PHRASES}:extra:"):
-            sched.remove_job(j.id)
-    if sched_cfg["phrases"]["enabled"]:
-        rp_trigger = _build_random_phrases_trigger(rp_mode, rp_param, settings.scheduler_tz)
-        sched.add_job(
-            _logged_job(JOB_RANDOM_PHRASES, run_random_phrases_job),
-            rp_trigger,
-            kwargs={"bot": bot},
-            id=JOB_RANDOM_PHRASES,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,  # GHG6 H4
-        )
-        if rp_mode == "fixed_times":
-            times = rp_param.get("times") or []
-            for i, t in enumerate(times[1:], start=1):
-                hh, mm = _parse_hhmm(t)
-                sched.add_job(
-                    _logged_job(f"{JOB_RANDOM_PHRASES}:extra:{i}", run_random_phrases_job),
-                    CronTrigger(hour=hh, minute=mm, timezone=settings.scheduler_tz),
-                    kwargs={"bot": bot},
-                    id=f"{JOB_RANDOM_PHRASES}:extra:{i}",
-                    replace_existing=True,
-                    max_instances=1,
-                    coalesce=True,
-                    misfire_grace_time=3600,  # GHG6 H4
-                )
-        log.info("scheduler.random_phrases_reloaded", mode=rp_mode, param=rp_param)
-    else:
-        _remove_job_if_exists(sched, JOB_RANDOM_PHRASES)
-        log.info("scheduler.random_phrases_disabled")
-
-    # --- Autoloser ---
-    autoloser_cfg = {
-        "enabled": sched_cfg["loser"]["enabled"],
-        "window_start_hour": sched_cfg["loser"]["window_start_hour"],
-        "window_end_hour": sched_cfg["loser"]["window_end_hour"],
-        "interval_hours": sched_cfg["loser"]["interval_hours"],
-        # GHG11: дни недели, режим (fixed/random/interval), слот и время fixed.
-        "days": sched_cfg["loser"].get("days") or [],
-        "mode": sched_cfg["loser"].get("mode") or "random",
-        "fixed_hour": sched_cfg["loser"].get("fixed_hour", 18),
-        "fixed_minute": sched_cfg["loser"].get("fixed_minute", 0),
-        "interval_slot": sched_cfg["loser"].get("interval_slot", "day"),
-        "interval_window": sched_cfg.get("intervals") or {},
-    }
-    if autoloser_cfg["enabled"]:
-        sched.add_job(
-            _logged_job(JOB_AUTOLOSER, _autoloser_job),
-            _build_autoloser_trigger(autoloser_cfg, settings.scheduler_tz),
-            kwargs={"bot": bot},
-            id=JOB_AUTOLOSER,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,  # GHG6 H4
-        )
-        log.info("scheduler.autoloser_enabled", cfg=autoloser_cfg)
-    else:
-        _remove_job_if_exists(sched, JOB_AUTOLOSER)
-        log.info("scheduler.autoloser_disabled")
 
     # --- Avatars sync (GHG6 AD6) ---
     if sched_cfg["avatars"]["enabled"]:
@@ -896,69 +805,6 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
     else:
         _remove_job_if_exists(sched, JOB_AVATAR_SYNC)
         log.info("scheduler.avatars_disabled")
-
-    # --- Chukhan weekly (GHG6 AD6) — день недели + рандомная минута в окне ---
-    chukhan_cfg = sched_cfg["chukhan"]
-    ws_h, ws_m = _parse_hhmm(chukhan_cfg["window_start"])
-    we_h, we_m = _parse_hhmm(chukhan_cfg["window_end"])
-    # Случайный час в окне (включая ws_h, исключая we_h), затем минута в окне для крайних случаев.
-    if we_h <= ws_h:
-        we_h = (ws_h + 1) % 24
-    import random as _rnd
-    chukhan_hour = _rnd.randint(ws_h, max(ws_h, we_h - 1))
-    chukhan_min = _rnd.randint(0, 59)
-    chukhan_dow = chukhan_cfg["weekday"]  # 0=Mon в нашей UI ↔ APScheduler dow=0=Mon
-    sched.add_job(
-        _logged_job(JOB_CHUKHAN_WEEKLY, run_chukhan_job),
-        CronTrigger(
-            day_of_week=str(chukhan_dow),
-            hour=chukhan_hour,
-            minute=chukhan_min,
-            timezone=settings.scheduler_tz,
-        ),
-        kwargs={"bot": bot},
-        id=JOB_CHUKHAN_WEEKLY,
-        replace_existing=True,
-        misfire_grace_time=3600,
-        coalesce=True,
-    )
-    log.info(
-        "scheduler.chukhan_reloaded",
-        dow=chukhan_dow,
-        hour=chukhan_hour,
-        minute=chukhan_min,
-    )
-
-    # --- E11.3: авто-zaebal раз в месяц (15-18 числа, default-off) ---
-    async with sm() as session:
-        from app.services.bot_pause import get_zaebal_settings
-        zaebal_cfg = await get_zaebal_settings(session)
-    if zaebal_cfg["auto_enabled"]:
-        async def _auto_zaebal() -> None:
-            from app.services.zaebal import run_auto_zaebal
-
-            sm2 = get_sessionmaker()
-            async with sm2() as session:
-                await run_auto_zaebal(session, bot)
-
-        sched.add_job(
-            _logged_job(JOB_AUTO_ZAEBAL, _auto_zaebal),
-            CronTrigger(
-                day="15-18",
-                hour=18,
-                minute=37,
-                timezone=settings.scheduler_tz,
-            ),
-            id=JOB_AUTO_ZAEBAL,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,  # GHG6 H4
-        )
-        log.info("scheduler.auto_zaebal_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_AUTO_ZAEBAL)
-        log.info("scheduler.auto_zaebal_disabled")
 
     # --- Birthdays — глобальный switch (точное время — внутри run_birthdays_job) ---
     if sched_cfg["birthdays"]["alerts_enabled"]:
@@ -1001,237 +847,13 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
         _remove_job_if_exists(sched, JOB_MEETING_FEEDBACK)
         log.info("scheduler.meeting_feedback_disabled")
 
-    # --- GHG10 (Э10): праздники — ежедневный обход.
-    # Регистрируем ТОЛЬКО при включённом рубильнике: когда игра выключена, в
-    # простое не должно быть ни одного лишнего тика (требование Э12.2).
-    from app.services.game.flags import is_game_enabled
-
-    # Один запрос на обе игровые job'ы: reload и так редкий, но два одинаковых
-    # `SELECT` подряд — бессмысленные round-trip'ы (см. заметку про кэш флага).
-    game_on = await is_game_enabled(session)
-
-    if game_on:
-        from app.services.game.holidays import run_holidays_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_HOLIDAYS, run_holidays_job),
-            CronTrigger(hour=9, minute=17, timezone=settings.scheduler_tz),
-            kwargs={"bot": bot},
-            id=JOB_GAME_HOLIDAYS,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-        log.info("scheduler.game_holidays_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_HOLIDAYS)
-        log.info("scheduler.game_holidays_disabled")
-
-    # --- GHG10 (Э6): недельный итог активности — «Рупор поколения» / «Read only».
-    # Понедельник 09:27 — после конца ISO-недели, рядом с утренними ДР/праздниками.
-    # Как и праздники, регистрируем ТОЛЬКО при включённом рубильнике.
-    if game_on:
-        from app.services.game.weekly import run_week_activity_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_WEEK_ACTIVITY, run_week_activity_job),
-            CronTrigger(
-                day_of_week="mon", hour=9, minute=27, timezone=settings.scheduler_tz
-            ),
-            kwargs={"bot": bot},
-            id=JOB_GAME_WEEK_ACTIVITY,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-        log.info("scheduler.game_week_activity_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_WEEK_ACTIVITY)
-        log.info("scheduler.game_week_activity_disabled")
-
-    # --- GHG10 (Э7): разбор мем-постов.
-    # Каждые 10 минут закрываем окно реакции и выносим 12-часовой вердикт. Две
-    # фазы в одном прогоне (см. `memes.resolve_due`), поэтому частота — компромисс:
-    # чаще = быстрее ачивка, реже = дешевле (в простое это один SELECT).
-    if game_on:
-        from app.services.game.memes import run_memes_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_MEMES, run_memes_job),
-            IntervalTrigger(minutes=10),
-            id=JOB_GAME_MEMES,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=600,
-        )
-        log.info("scheduler.game_memes_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_MEMES)
-        log.info("scheduler.game_memes_disabled")
-
-    # --- GHG10 (Э13): «поминальные» — раз в сутки.
-    # 10:05 — после утренних ДР/праздников, чтобы поминовение не толкалось с
-    # ними в одном сообщении. Само решение «кого поминать» принимает job
-    # (порог и интервал повтора читаются из конфига и меняются без деплоя).
-    if game_on:
-        from app.services.game.memorial import run_memorial_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_MEMORIAL, run_memorial_job),
-            CronTrigger(hour=10, minute=5, timezone=settings.scheduler_tz),
-            id=JOB_GAME_MEMORIAL,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=3600,
-        )
-        log.info("scheduler.game_memorial_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_MEMORIAL)
-        log.info("scheduler.game_memorial_disabled")
-
-    # --- GHG10 (Э13): случайные события.
-    # Тик — часовой, а «выпадать/не выпадать» решает сам job: пауза между
-    # событиями (`min_gap_hours`), суточный потолок и вероятность. Поэтому
-    # правка настроек в админке работает без пересоздания job'а.
-    if game_on:
-        from app.services.game.events import run_events_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_EVENTS, run_events_job),
-            IntervalTrigger(hours=1),
-            id=JOB_GAME_EVENTS,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=1800,
-        )
-        log.info("scheduler.game_events_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_EVENTS)
-        log.info("scheduler.game_events_disabled")
-
-    # --- GHG10 (Э13): отправка сводки.
-    # Режим сводки ВЫКЛЮЧЕН по умолчанию (см. `game.digest.enabled`), но job
-    # регистрируем всегда при включённой игре: включение режима не должно
-    # требовать рестарта контейнера. Пустой журнал = ноль работы.
-    if game_on:
-        from app.services.game.journal import run_digest_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_DIGEST, run_digest_job),
-            IntervalTrigger(minutes=30),
-            id=JOB_GAME_DIGEST,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=900,
-        )
-        log.info("scheduler.game_digest_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_DIGEST)
-        log.info("scheduler.game_digest_disabled")
-
-    # --- GHG10 (Э19): выплеск буфера ачивок.
-    # Режим буфера живёт в `game.achievements.post_mode`; job тикает часто, а
-    # решение «пора/не пора» принимает сам (ночь — только сбор, утренний слот,
-    # дневной шаг + защита от столкновения с критическими слотами), поэтому
-    # правки настроек работают без рестарта.
-    if game_on:
-        from app.services.game.journal import run_achievements_digest_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_ACHIEVEMENTS_FLUSH, run_achievements_digest_job),
-            IntervalTrigger(minutes=15),
-            id=JOB_GAME_ACHIEVEMENTS_FLUSH,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=600,
-        )
-        log.info("scheduler.game_achievements_flush_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_ACHIEVEMENTS_FLUSH)
-        log.info("scheduler.game_achievements_flush_disabled")
-
-    # --- GHG10 (Э14): голосовые задания. ---
-    # Job тикает часто, а решение «ставить ли задание» принимает сам: дневное
-    # окно, пауза ``game.voice.min_gap_hours`` и «нет открытого задания». Поэтому
-    # правка настроек в админке работает без пересоздания job'а.
-    if game_on:
-        from app.services.game.voice import run_voice_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_VOICE, run_voice_job),
-            IntervalTrigger(minutes=30),
-            kwargs={"bot": bot},
-            id=JOB_GAME_VOICE,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=900,
-        )
-        log.info("scheduler.game_voice_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_VOICE)
-        log.info("scheduler.game_voice_disabled")
-
-    # --- GHG10 (Э15): музыкальная предложка. ---
-    # Job тикает часто, а «пора ли публиковать» решает сам по расписанию из
-    # админки и последней попытке (в т.ч. повтор при недоборе через 3–6 ч).
-    if game_on:
-        from app.services.game.music import run_music_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_MUSIC, run_music_job),
-            IntervalTrigger(minutes=30),
-            kwargs={"bot": bot},
-            id=JOB_GAME_MUSIC,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=900,
-        )
-        log.info("scheduler.game_music_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_MUSIC)
-        log.info("scheduler.game_music_disabled")
-
-    # --- GHG10 (Э16): мьюзик-гейм «угадай, кто предложил трек». ---
-    # Авто-вызов — опция (по умолчанию выкл). Job тикает часто, а «пора ли» решает
-    # сам: расписание из админки, отсутствие открытого раунда и память о прошлых.
-    # Зависшие раунды (опрос не долетел) он же и закрывает.
-    if game_on:
-        from app.services.game.music_game import run_music_game_job
-
-        sched.add_job(
-            _logged_job(JOB_GAME_MUSIC_GAME, run_music_game_job),
-            IntervalTrigger(minutes=30),
-            kwargs={"bot": bot},
-            id=JOB_GAME_MUSIC_GAME,
-            replace_existing=True,
-            max_instances=1,
-            coalesce=True,
-            misfire_grace_time=900,
-        )
-        log.info("scheduler.game_music_game_enabled")
-    else:
-        _remove_job_if_exists(sched, JOB_GAME_MUSIC_GAME)
-        log.info("scheduler.game_music_game_disabled")
-
-
 def _remove_job_if_exists(sched: AsyncIOScheduler, job_id: str) -> None:
     if sched.get_job(job_id) is not None:
         sched.remove_job(job_id)
 
-
 # GHG11(3): сколько секунд задача может висеть до аварийного схлопывания.
 # 15 минут — с запасом больше самого долгого send (25с) и ретраев БД (~6с).
 STALE_JOB_SECONDS = _env_int("STALE_JOB_SECONDS", 900)
-
 
 async def collapse_stale_jobs(
     bot: Bot | None = None, *, max_seconds: int | None = None
@@ -1261,7 +883,6 @@ async def collapse_stale_jobs(
         await collapse_all_jobs(bot)
     return stale
 
-
 async def collapse_all_jobs(bot: Bot) -> int:
     """GHG11(3): МАСТЕР-схлопывание — пересобрать планировщик с нуля.
 
@@ -1288,7 +909,6 @@ async def collapse_all_jobs(bot: Bot) -> int:
     log.warning("scheduler.collapsed_all", jobs=count)
     return count
 
-
 async def _space_restart_job() -> None:
     """GHG8 G (антиспам): one-shot job рестарта Space. Делает решение+вызов HF
     (`run_space_restart_tick`), затем перевзводит следующий one-shot
@@ -1298,7 +918,6 @@ async def _space_restart_job() -> None:
 
     await run_space_restart_tick()
     await reschedule_space_restart()
-
 
 async def reschedule_proxy_health(bot: Bot) -> None:
     """GHG8 G (антиспам): регистрируем proxy_health-tick ТОЛЬКО в режиме
@@ -1335,7 +954,6 @@ async def reschedule_proxy_health(bot: Bot) -> None:
         misfire_grace_time=PROXY_HEALTH_INTERVAL_SEC,  # GHG6 H4
     )
     log.info("scheduler.proxy_health_armed", interval_sec=PROXY_HEALTH_INTERVAL_SEC)
-
 
 async def reschedule_space_restart() -> None:
     """GHG8 G: событийное планирование рестарта Space вместо 5-мин поллинга.
@@ -1384,7 +1002,6 @@ async def reschedule_space_restart() -> None:
         mode=schedule["mode"],
     )
 
-
 def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     settings = get_settings()
     sched = get_scheduler()
@@ -1395,107 +1012,12 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         log.info("scheduler.start_skipped_not_leader")
         return sched
 
-    # GHG6 AD6: chukhan/avatars/birthdays теперь регистрирует
+    # GHG6 AD6: avatars/birthdays регистрирует `reload_dynamic_jobs` —
+    # респектят master-toggles из admin_config.
     # `reload_dynamic_jobs` — респектят master-toggles из admin_config.
     # GHG8 G: proxy_health-tick теперь регистрируется условно — только в режиме
     # ALWAYS_ON (см. reschedule_proxy_health). Перевзвод после start (нужен
     # running sched + чтение режима из БД), рядом с reload_dynamic_jobs.
-
-    # GHG6 E11: фоновая проверка истечения паузы. Раз в 5 минут — пауза
-    # не требует точности до секунды. Этот job не отключается reload_dynamic_jobs
-    # и всегда крутится: иначе из автопаузы не выйти.
-    async def _auto_restore_tick() -> None:
-        from app.services.bot_pause import maybe_auto_restore
-
-        sm2 = get_sessionmaker()
-        async with sm2() as session:
-            await maybe_auto_restore(session)
-
-    sched.add_job(
-        _logged_job(JOB_BOT_PAUSE_AUTO_RESTORE, _auto_restore_tick),
-        # HOTFIX 2026-06-12: 5мин→12ч. Neon free-tier суспендится после 5мин
-        # простоя; тик каждые 5мин = БД никогда не спит = выжигание compute.
-        # Цена: выход из автопаузы теперь проверяется 2×/сутки (терпимо).
-        IntervalTrigger(hours=12, jitter=300),
-        id=JOB_BOT_PAUSE_AUTO_RESTORE,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=600,  # GHG6 H4: 10мин — пауза не требует секундной точности
-    )
-
-    # GHG7 P0.2.b.4: ретрай недоставленных автолох-постов. Тянем pending-записи
-    # из loser_outbox и пробуем отправить заново. Не зависит от admin-config —
-    # это infra-job, как proxy_health.
-    # GHG7 P8.5: интервал 1мин → 5мин. Шаг ретрая (_AUTOLOSER_RETRY_DELAY) и так
-    # 5 минут, поэтому ежеминутный тик 4 раза из 5 находил только записи с
-    # next_retry_at в будущем и слал «пустой» SELECT в Neon (минус бюджет
-    # compute) — а реальную попытку send делал всё равно раз в 5 мин. Согласуем
-    # интервал с шагом ретрая: один осмысленный тик на окно.
-    sched.add_job(
-        _logged_job(JOB_LOSER_OUTBOX_RETRY, _loser_outbox_retry_job),
-        # HOTFIX 2026-06-12: 5мин→12ч (тот же мотив, что у auto_restore выше —
-        # не будить Neon). Цена: ретрай недоставленных лох-постов раз в 12ч.
-        IntervalTrigger(hours=12, jitter=300),
-        kwargs={"bot": bot},
-        id=JOB_LOSER_OUTBOX_RETRY,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=300,  # GHG6 H4: 5 мин — таков же шаг ретрая
-    )
-
-    # GHG7 P11 (инцидент 03.06 #1): дотягиваем недоставленного чухана текущей
-    # недели. Cron-ролл понедельника мог упасть в окно недоступности канала/Neon
-    # (см. incidentlog.txt: connection reset, webhook.set_failed timeouts) —
-    # раньше пик при этом откатывался (rollback) и не повторялся до след. недели.
-    # Теперь announce_chukhan при фейле оставляет строку WeeklyChukhan с
-    # posted_at IS NULL, а этот job находит её и добивает доставку тем же юзером
-    # (идемпотентность pick_chukhan_for_week по week_start). Интервал 30 мин —
-    # компромисс с бюджетом Neon: в обычном случае один дешёвый SELECT, который
-    # ничего не находит (48/сутки vs 288 у loser_outbox). misfire_grace 30 мин —
-    # скип-окно не требует секундной точности.
-    async def _chukhan_retry_tick(*, bot: Bot) -> None:
-        from app.services.chukhan import retry_undelivered_chukhan
-
-        await retry_undelivered_chukhan(bot)
-
-    sched.add_job(
-        _logged_job(JOB_CHUKHAN_RETRY, _chukhan_retry_tick),
-        # GHG8 G (03.07): 30мин→2ч. Ретрай нужен лишь в окно после недельного
-        # ролла чухана (пн), 99% времени SELECT холостой (48→12/сутки в Neon).
-        # Недоставленного чухана добьём в пределах 2ч — некритично.
-        IntervalTrigger(hours=2, jitter=300),
-        kwargs={"bot": bot},
-        id=JOB_CHUKHAN_RETRY,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=7200,  # 2ч — скип чухана не критичен к секундам
-    )
-
-    # GHG8 P7: «мёртвый чат» — часовой тик проверки тишины. Master-toggle
-    # (`dead_chat.enabled`) и пауза бота проверяются ВНУТРИ job'а, поэтому он
-    # не участвует в reload_dynamic_jobs (как bot_pause_auto_restore). Дёшево
-    # для Neon: 3–4 point-SELECT по admin_config в час; пост — редкое событие
-    # (пороги от 24ч).
-    async def _dead_chat_tick(*, bot: Bot) -> None:
-        from app.services.dead_chat import run_dead_chat_job
-
-        await run_dead_chat_job(bot)
-
-    sched.add_job(
-        _logged_job(JOB_DEAD_CHAT, _dead_chat_tick),
-        # GHG8 G (03.07): 1ч→6ч. Порог тишины ≥24ч, поэтому часовой опрос
-        # избыточен (24→4 тика/сутки в Neon); тишину суток ловим с запасом.
-        IntervalTrigger(hours=6, jitter=600),
-        kwargs={"bot": bot},
-        id=JOB_DEAD_CHAT,
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True,
-        misfire_grace_time=3600,  # тишина суток не требует точности
-    )
 
     # GHG8 G (антиспам, заменил P14-поллинг): рестарт Space теперь событийный —
     # ОДИН DateTrigger на точное время следующего рестарта (`compute_next_fire`),
@@ -1526,6 +1048,29 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         misfire_grace_time=600,
     )
 
+    # SemiTaskBot: HR-тик — напоминания о приближающемся сроке поручения и
+    # автоэскалация просрочки руководителям. Включённость и окно напоминания
+    # читаются ИЗ БД внутри job'а (`services/hr_settings`), поэтому правка правил
+    # в админке действует сразу, без пересборки планировщика. Пятнадцать минут
+    # против наследных 12 часов: срок поручения измеряется минутами, а не
+    # неделями, поэтому компромисс с бюджетом Neon — сознательно в пользу
+    # актуальности (см. hr_settings.DEFAULT_TICK_MINUTES).
+    async def _hr_tasks_tick(*, bot: Bot) -> None:
+        from app.services.hr_reminders import run_hr_tick
+
+        await run_hr_tick(bot=bot)
+
+    sched.add_job(
+        _logged_job(JOB_HR_TASKS, _hr_tasks_tick),
+        IntervalTrigger(minutes=15, jitter=60),
+        kwargs={"bot": bot},
+        id=JOB_HR_TASKS,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=900,
+    )
+
     sched.start()
     log.info("scheduler.started", chukhan_cron=settings.chukhan_cron, tz=settings.scheduler_tz)
 
@@ -1541,7 +1086,6 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     _asyncio.create_task(reschedule_proxy_health(bot))
 
     return sched
-
 
 async def shutdown_scheduler() -> None:
     global _scheduler

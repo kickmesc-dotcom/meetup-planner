@@ -31,7 +31,7 @@ async def _award_calendar(
     сохранённом диапазоне. Поэтому `resync_if_expired` после наград — часть
     контракта, а не оптимизация.
     """
-    from app.services.game import awards
+    from app._legacy.services.game import awards
 
     await awards.availability(session, user_id)
     await resync_if_expired(session, row)

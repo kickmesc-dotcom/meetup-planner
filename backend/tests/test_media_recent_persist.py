@@ -16,8 +16,8 @@ import json
 
 import pytest
 
-from app.bot.handlers.media_reactions import _media_send_timeout
-from app.services.media_reactions import parse_recent_media
+from app._legacy.bot.handlers.media_reactions import _media_send_timeout
+from app._legacy.services.media_reactions import parse_recent_media
 
 
 # --- Q7.a: env-таймаут ---

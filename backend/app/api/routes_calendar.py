@@ -167,7 +167,7 @@ class WormCurrentOut(BaseModel):
 
 @router.get("/worm/current", response_model=WormCurrentOut)
 async def get_worm_current(session: SessionDep, _user: CurrentUser) -> WormCurrentOut:
-    from app.services.loser import get_current_worm
+    from app._legacy.services.loser import get_current_worm
 
     row = await get_current_worm(session)
     if row is None:
@@ -227,9 +227,9 @@ def pick_main_loser(stats: dict[int, int]) -> int | None:
 async def get_titles_current(
     session: SessionDep, _user: CurrentUser
 ) -> CurrentTitlesOut:
+    from app._legacy.services.chukhan import chukhan_stats, current_week_start
+    from app._legacy.services.loser import get_current_worm, loser_stats
     from app.db.models import Birthday
-    from app.services.chukhan import chukhan_stats, current_week_start
-    from app.services.loser import get_current_worm, loser_stats
 
     out = CurrentTitlesOut()
 
@@ -400,7 +400,7 @@ async def get_loser_reason(
     legacy/manual. Если корону всё-таки рисует фронт без записи на бэке
     (например клиент догнал кэш), отдаём 404 — попап не открыть.
     """
-    from app.services.loser import WORM_REASON_TEXT
+    from app._legacy.services.loser import WORM_REASON_TEXT
 
     # rolled_at в UTC, day — локальная дата клиента. Берём окно [day, day+1)
     # в UTC — для шестёрки одного TZ-пояса этого достаточно. Если когда-нибудь

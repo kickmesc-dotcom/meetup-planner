@@ -17,8 +17,8 @@ import pytest
 from app.db.models import ChatActivityDaily, UserAchievement
 from types import SimpleNamespace
 
-from app.services.game import achievements, awards
-from app.services.game.achievements_catalog import (
+from app._legacy.services.game import achievements, awards
+from app._legacy.services.game.achievements_catalog import (
     ANNIVERSARY_TIERS,
     CATALOG,
     KIND_COUNTER,
@@ -33,7 +33,7 @@ from app.services.game.achievements_catalog import (
     tier_codes,
     tiers_reached,
 )
-from app.services.game.holidays import holiday_announcement
+from app._legacy.services.game.holidays import holiday_announcement
 from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
 # --------------------------------------------------------------------------
@@ -788,7 +788,7 @@ async def test_punish_day3_after_three_punishes(session: _FakeSession):
 
 @pytest.mark.asyncio
 async def test_completionist_grants_on_full_collection(session: _FakeSession):
-    import app.services.game.achievements_catalog as catalog
+    import app._legacy.services.game.achievements_catalog as catalog
 
     # has(completionist) → None; коллекция — всё, кроме самого капстоуна.
     session.scalar_queue = [None]

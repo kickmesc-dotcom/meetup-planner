@@ -12,8 +12,8 @@ import random
 
 import pytest
 
-from app.bot.handlers import media_reactions as mr
-from app.services.media_reactions import roll_chance
+from app._legacy.bot.handlers import media_reactions as mr
+from app._legacy.services.media_reactions import roll_chance
 
 
 def test_classify_album_single_vs_collection():

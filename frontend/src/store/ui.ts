@@ -56,7 +56,19 @@ export function isMonthGridZoom(z: ZoomLevel): boolean {
 // приложение открывается по умолчанию (в софт-режимах там вся жизнь чата).
 // "meetings" теперь ОБЪЕДИНЯЕТ встречи и опросы (вкладки "polls" больше нет:
 // ими почти не пользовались, держим один раздел с переключателем внутри).
-export type Tab = "feed" | "calendar" | "meetings" | "profile" | "admin";
+// SemiTaskBot: рабочие вкладки встали перед сервисными. Сотрудник открывает
+// приложение, чтобы закрыть смену и посмотреть поручения, поэтому "tasks" и
+// "checklist" идут первыми, "feed" остаётся разделом событий (с новой
+// ролевой видимостью), "calendar" и "meetings" сохраняются как есть.
+export type Tab =
+  | "tasks"
+  | "checklist"
+  | "feed"
+  | "links"
+  | "calendar"
+  | "meetings"
+  | "profile"
+  | "admin";
 
 interface UIState {
   tab: Tab;
@@ -92,15 +104,23 @@ interface UIState {
    * и на какую дату открыто. Закрывается через setBirthdayPopover(null).
    */
   birthdayPopover: { userId: number; date: string; displayName: string } | null;
-  setBirthdayPopover: (v: { userId: number; date: string; displayName: string } | null) => void;
+  setBirthdayPopover: (
+    v: { userId: number; date: string; displayName: string } | null,
+  ) => void;
 
   /**
    * GHG7 P0.2.e: попап с причиной ролла по клику на корону 👑.
    * userId — кому корона, date — день (YYYY-MM-DD), displayName — имя для
    * заголовка. Закрывается через setLoserReasonPopover(null).
    */
-  loserReasonPopover: { userId: number; date: string; displayName: string } | null;
-  setLoserReasonPopover: (v: { userId: number; date: string; displayName: string } | null) => void;
+  loserReasonPopover: {
+    userId: number;
+    date: string;
+    displayName: string;
+  } | null;
+  setLoserReasonPopover: (
+    v: { userId: number; date: string; displayName: string } | null,
+  ) => void;
 
   /**
    * GHG8 P2.1.c: попап-история звания «🪱 Червь-пидор» по клику на бейдж под
@@ -210,8 +230,9 @@ function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
 }
 
 export const useUI = create<UIState>((set, get) => ({
-  // Э21: заходим сразу в ленту — она первая кнопка внизу экрана.
-  tab: "feed",
+  // SemiTaskBot: заходим сразу в «Мои задачи» — это первая кнопка внизу
+  // экрана и главный сценарий смены.
+  tab: "tasks",
   setTab: (tab) => set({ tab }),
 
   zoom: "week",

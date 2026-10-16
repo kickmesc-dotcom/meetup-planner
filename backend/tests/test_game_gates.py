@@ -9,10 +9,10 @@ from __future__ import annotations
 import pytest
 from fastapi import HTTPException
 
-from app.api import routes_game
+from app._legacy.api import routes_game
 from app.db.models import GameProfile
 from app.schemas.game import GameCustomizePatch, GameProfileOut
-from app.services.game import gates, levels
+from app._legacy.services.game import gates, levels
 
 
 class _Rows:

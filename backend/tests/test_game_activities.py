@@ -5,8 +5,8 @@
 """
 from __future__ import annotations
 
-from app.api.routes_game import _activity_options
-from app.services.game import events_catalog
+from app._legacy.api.routes_game import _activity_options
+from app._legacy.services.game import events_catalog
 
 
 def test_labeled_answers_become_buttons():

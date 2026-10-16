@@ -12,8 +12,8 @@ from types import SimpleNamespace
 import pytest
 
 from app.db.models import MusicGameRound, MusicTrack
-from app.services.game import music_game
-from app.services.game.config import (
+from app._legacy.services.game import music_game
+from app._legacy.services.game.config import (
     MUSIC_GAME_AUTHOR_REWARD,
     MUSIC_GAME_GUESS_REWARD,
     MUSIC_GAME_MAX_OPTIONS,

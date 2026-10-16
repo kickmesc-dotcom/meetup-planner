@@ -23,7 +23,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from aiogram.dispatcher.event.bases import SkipHandler
 
-import app.bot.handlers.bot_reactions as br
+import app._legacy.bot.handlers.bot_reactions as br
 
 
 class _Settings:

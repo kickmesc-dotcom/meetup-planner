@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import random
 
-from app.services.random_phrases import format_bot_reply
+from app._legacy.services.random_phrases import format_bot_reply
 
 
 def test_no_author_prefixes_in_reply():

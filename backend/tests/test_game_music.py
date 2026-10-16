@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 import pytest
 
 from app.db.models import MusicTrack
-from app.services.game import music
-from app.services.game.config import (
+from app._legacy.services.game import music
+from app._legacy.services.game.config import (
     MUSIC_MAX_TRACKS,
     MUSIC_MIN_TRACKS,
     MUSIC_PER_USER_WEEKLY,

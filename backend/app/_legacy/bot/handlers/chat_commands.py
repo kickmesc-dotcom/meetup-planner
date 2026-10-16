@@ -1,0 +1,954 @@
+"""P4: чат-команды для шестёрки.
+
+Все четыре команды доступны только участникам whitelist (WHITELIST_TG_IDS).
+Чужие вызовы игнорируются молча — не хотим, чтобы бот «отзывался» вне группы.
+
+Реролл чухана НЕ выносим в чат (по чеклисту) — остаётся в админке.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+import structlog
+from aiogram import Router
+from aiogram.filters import Command
+from aiogram.types import Message
+from sqlalchemy import and_, or_, select
+
+from app.config import get_settings
+from app.db.base import get_sessionmaker
+from app.db.models import Meeting, MeetingAttendance, User
+
+log = structlog.get_logger()
+router = Router()
+
+
+RSVP_EMOJI = {0: "❔", 1: "✅", 2: "🤔", 3: "🙅"}
+
+
+def _whitelist_set() -> set[int]:
+    return {tg_id for tg_id, _ in get_settings().whitelist_pairs}
+
+
+def _is_member(tg_id: int | None) -> bool:
+    if tg_id is None:
+        return False
+    return tg_id in _whitelist_set()
+
+
+# ---------------------- GHG10 Э5.4: /rank, /ranks, /xp ----------------------
+#
+# Отчёты живут в `services/game/report.py` (чистые форматтеры + по одному
+# SELECT), здесь только транспорт. Все три команды молчат, когда рубильник
+# выключен: игра, выключенная снаружи, не должна отвечать в чате вообще.
+
+
+async def _game_user_pk(session, tg_id: int) -> tuple[int, str] | None:
+    """PK и display_name участника по TG-id. None — такого в базе нет."""
+    row = (
+        await session.execute(
+            select(User.id, User.display_name).where(User.telegram_id == tg_id)
+        )
+    ).first()
+    if row is None:
+        return None
+    return int(row[0]), row[1]
+
+
+@router.message(Command("rank"))
+async def on_rank(message: Message) -> None:
+    """«Мой ранг»: ранг, шкала до следующего, дневной итог, что открыто."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            found = await _game_user_pk(session, message.from_user.id)
+            if found is None:
+                return
+            text = await report.my_rank_text(
+                session, user_id=found[0], display_name=found[1]
+            )
+    except Exception as exc:  # noqa: BLE001 — отчёт не стоит падения хендлера
+        log.warning("chat.rank_failed", error=str(exc))
+        return
+    if text is None:  # игра выключена
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.message(Command("ranks"))
+async def on_ranks(message: Message) -> None:
+    """Чарт рангов: все участники от большего опыта к меньшему."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            text = await report.ranks_chart_text(session)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("chat.ranks_failed", error=str(exc))
+        return
+    if text is None:
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
+@router.message(Command("xp"))
+async def on_xp(message: Message) -> None:
+    """Правила начисления опыта. Список статический — но рубильник уважаем."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.game import report
+    from app._legacy.services.game.flags import is_game_enabled
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            if not await is_game_enabled(session):
+                return
+    except Exception as exc:  # noqa: BLE001 — молчим, если игру не спросить
+        log.warning("chat.xp_failed", error=str(exc))
+        return
+    await message.answer(report.xp_rules_text(), parse_mode="HTML")
+
+
+@router.message(Command(commands=["ach", "achievements"]))
+async def on_ach(message: Message) -> None:
+    """Список всех ачивок с описаниями (и отметками того, что уже взято)."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            ref = await _game_user_pk(session, message.from_user.id)
+            # Нет в базе — всё равно показываем список (без личных отметок):
+            # справочник полезен и тем, кто ещё не попал в профиль.
+            text = await report.achievements_guide_text(
+                session, user_id=ref[0] if ref else None
+            )
+    except Exception as exc:  # noqa: BLE001 — справочник не стоит падения хендлера
+        log.warning("chat.ach_failed", error=str(exc))
+        return
+    if text is None:  # игра выключена
+        return
+    # Каталог растёт (юбилейные тиры + соц-механики), и одним сообщением лист
+    # уже не влезает в лимит Telegram — режем по границам разделов.
+    for chunk in report.chunk_text(text):
+        await message.answer(chunk, parse_mode="HTML")
+
+
+@router.message(Command(commands=["game", "manual"]))
+async def on_game_manual(message: Message) -> None:
+    """Мини-методичка «как всё работает» (Э13).
+
+    Текст собирается из тех же структур, что и сама игра, поэтому не может
+    разойтись с поведением. Игра выключена — молчим.
+    """
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            text = await report.game_manual_text(session)
+    except Exception as exc:  # noqa: BLE001 — методичка не стоит падения хендлера
+        log.warning("chat.game_manual_failed", error=str(exc))
+        return
+    if text is None:  # игра выключена
+        return
+    for chunk in report.chunk_text(text):
+        await message.answer(chunk, parse_mode="HTML")
+
+
+@router.message(Command("levels"))
+async def on_levels(message: Message) -> None:
+    """Своя подробная стата + левелы всех участников одним сообщением."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.game import report
+
+    try:
+        sm = get_sessionmaker()
+        async with sm() as session:
+            ref = await _game_user_pk(session, message.from_user.id)
+            if ref is None:
+                # Незнакомого не выкидываем совсем: чарт всё равно осмыслен.
+                text = await report.ranks_chart_text(session)
+            else:
+                text = await report.levels_text(
+                    session, user_id=ref[0], display_name=ref[1]
+                )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("chat.levels_failed", error=str(exc))
+        return
+    if text is None:
+        return
+    await message.answer(text, parse_mode="HTML")
+
+
+# ---------------------- C1: /phrase ----------------------
+
+@router.message(Command("phrase"))
+async def on_phrase(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.random_phrases import run_random_phrases_job
+    from app.bot.dispatcher import get_bot
+
+    try:
+        await run_random_phrases_job(get_bot())
+    except Exception:
+        log.exception("chat.phrase_failed", by=message.from_user.id)
+        await message.answer("⚠️ Не получилось сочинить фразу — посмотри логи.")
+
+
+# ---------------------- T3.4: /advice («магический шар») ----------------------
+
+@router.message(Command("advice"))
+async def on_advice(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    await reply_advice(message)
+
+
+async def reply_advice(message: Message) -> bool:
+    """Сгенерировать и отправить совет (reply на исходное сообщение).
+
+    Возвращает True если совет отправлен (или попытались), False если фича
+    выключена / пул пуст — вызывающий код (bot_reactions альт-триггер) по
+    этому решает, продолжать ли обычный сценарий. Уважает тогл
+    `advice.enabled`.
+    """
+    from app._legacy.services.advice import pick_advice
+    from app._legacy.services.phrase_meta import effective_pool
+    from app.services.admin_config import get_advice_enabled, get_advice_phrases
+    from app._legacy.services.game import delivery
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        # GHG11: режим фичи. off — заглушка, app — только в ленту, chat/both — в чат.
+        mode = await delivery.get_feature_mode(session, "advice")
+        if mode == delivery.MODE_OFF:
+            try:
+                await message.reply("🔮 Магический шар сейчас выключен.")
+            except Exception:  # noqa: BLE001
+                pass
+            return True
+        if not await get_advice_enabled(session):
+            return False
+        phrases = await get_advice_phrases(session)
+        # J.1: мягкое скрытие — hidden-советы не выпадают.
+        phrases = await effective_pool(session, "advice", phrases)
+        text = pick_advice(phrases)
+        if not text:
+            return False
+        feed_text = f"🔮 {text}"
+        if delivery.app_enabled(mode):
+            await delivery.record_feed_event(session, feature="advice", text=feed_text)
+        chat_ok = delivery.chat_enabled(mode)
+    if not chat_ok:
+        return True
+    try:
+        await message.reply(f"🔮 {text}", parse_mode="HTML")
+    except Exception:
+        log.exception("chat.advice_failed", by=message.from_user.id if message.from_user else None)
+    return True
+
+
+# ---------------------- T3.6 (в): /punish (только червь-господин) ----------------------
+
+def _extract_target_from_entities(message: Message) -> str | None:
+    """Цель наказания из сущностей сообщения (приоритетнее текстового разбора).
+
+    `mention` (@username) — берём как есть. `text_mention` (без username) —
+    отдаём display_name из профиля, чтобы хотя бы упомянуть человека текстом.
+    None если явных упоминаний нет — тогда вызывающий код пробует текст.
+    """
+    if not message.entities or not message.text:
+        return None
+    for ent in message.entities:
+        if ent.type == "mention":
+            return message.text[ent.offset : ent.offset + ent.length]
+        if ent.type == "text_mention" and ent.user:
+            return ent.user.full_name or (
+                f"@{ent.user.username}" if ent.user.username else None
+            )
+    return None
+
+
+async def _resolve_user_by_name(session, name: str) -> User | None:
+    """Терпимый поиск участника по display_name/username.
+
+    Точное совпадение без регистра → «начинается с» → «содержит» (как резолв
+    владельца в контрабанде): «Серж» должен находить «Серж-NEO».
+    """
+    base = (name or "").strip().lstrip("@")
+    if not base:
+        return None
+    for pattern in (base, f"{base}%", f"%{base}%"):
+        found = await session.scalar(
+            select(User)
+            .where(
+                or_(User.display_name.ilike(pattern), User.username.ilike(pattern))
+            )
+            .order_by(User.id.asc())
+            .limit(1)
+        )
+        if found is not None:
+            return found
+    return None
+
+
+@router.message(Command(commands=["worm", "червь"]))
+async def on_worm_transfer(message: Message) -> None:
+    """Э19: передача прав червя командой в чат с подтверждением хозяина.
+
+    /worm @участник — бот просит подтверждение; «да»/«нет» ловит обработчик
+    сообщений (`chat_capture`), там же идёт сам перолл и анонс.
+    """
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.loser import get_current_worm
+    from app._legacy.services.worm_master import extract_punish_target
+    from app.services.admin_config import is_worm_master_enabled
+    from app._legacy.services.game import worm_transfer
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            return
+        worm = await get_current_worm(session)
+        if worm is None or worm.user_id != caller.id:
+            await message.answer(
+                "🪱 Передать червя может только текущий червь-господин.",
+            )
+            return
+        target_raw = _extract_target_from_entities(message) or extract_punish_target(
+            message.text
+        )
+        if not target_raw:
+            await message.answer(
+                "🪱 Кому передаём? Использование: <code>/worm @недруг</code>",
+                parse_mode="HTML",
+            )
+            return
+        target_user = await _resolve_user_by_name(session, target_raw)
+        if target_user is None:
+            await message.answer(f"🪱 Не нашёл «{target_raw}» среди участников.")
+            return
+        if target_user.id == caller.id:
+            await message.answer("🪱 Ты и так господин — передавать самому себе нечего.")
+            return
+        ttl = worm_transfer.DEFAULT_TTL_MINUTES
+        sent = await message.answer(
+            f"🪱 <b>{caller.display_name}</b>, подтверди передачу прав червя: "
+            f"новым господином станет <b>{target_user.display_name}</b>.\n"
+            f"Ответь <b>да</b> или <b>нет</b> (реплаем на это сообщение или просто "
+            f"сообщением) в течение {ttl} минут.",
+            parse_mode="HTML",
+        )
+        await worm_transfer.create_pending(
+            session,
+            issuer_id=caller.id,
+            target_id=target_user.id,
+            chat_id=message.chat.id,
+            confirm_message_id=sent.message_id,
+            ttl_minutes=ttl,
+        )
+        await session.commit()
+
+
+@router.message(Command(commands=["punish", "наказать"]))
+async def on_punish(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    # Явная команда → отповедь не-господину (QOL). Хештег #punish (альт-триггер
+    # из bot_reactions) вызывает _handle_punish с deny_if_not_master=False, чтобы
+    # случайный тег в сообщении не спамил «ты мне не господин».
+    await _handle_punish(message, deny_if_not_master=True)
+
+
+async def _handle_punish(message: Message, *, deny_if_not_master: bool = False) -> bool:
+    """Червь-господин натравливает бота на недруга. Гейт жёстче whitelist:
+    вызвать может ТОЛЬКО текущий червь-господин, и только при включённых
+    `worm_master.enabled` + `worm_master.punish_enabled`.
+
+    `deny_if_not_master`: если True и вызвал НЕ господин — бот отвечает
+    отповедью («ты мне не господин, слушаюсь только его»). False (хештег) —
+    тихий no-op, как раньше. Отповедь даём только когда режим/тогл включены —
+    иначе выдали бы существование фичи тем, кому она недоступна.
+
+    Возвращает True, если что-то ответили (для альт-триггера #punish из
+    bot_reactions — чтобы тот понял, что сценарий отработал)."""
+    from app._legacy.services.loser import get_current_worm
+    from app._legacy.services.phrase_meta import effective_pool
+    from app._legacy.services.phrase_weights import (
+        WORM_PUNISH_USE_COUNTS_KEY,
+        get_use_counts,
+        increment_use_count,
+    )
+    from app._legacy.services.worm_master import choose, extract_punish_target, render
+    from app.services.admin_config import (
+        get_worm_punish,
+        is_worm_master_enabled,
+        is_worm_master_punish_enabled,
+    )
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return False
+        if not await is_worm_master_punish_enabled(session):
+            return False
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            return False
+        worm = await get_current_worm(session)
+        if worm is None or worm.user_id != caller.id:
+            if not deny_if_not_master:
+                # Хештег-триггер — тихо игнорируем (случайный #punish не спамит).
+                return False
+            # QOL: явная команда от не-господина → бот ставит на место.
+            master_name: str | None = None
+            if worm is not None:
+                master = await session.get(User, worm.user_id)
+                master_name = master.display_name if master else None
+            await _reply_punish_denied(message, session, master_name)
+            return True
+
+        # Цель: сначала сущности (@mention/text_mention), потом текстовый фолбэк.
+        target = _extract_target_from_entities(message) or extract_punish_target(
+            message.text
+        )
+        if not target:
+            await message.answer(
+                "⚔️ Кого карать-то? Использование: <code>/punish @недруг</code>",
+                parse_mode="HTML",
+            )
+            return True
+
+        # J.1: мягкое скрытие — hidden-фразы кары не выпадают.
+        pool = await effective_pool(
+            session, "worm_punish", await get_worm_punish(session)
+        )
+        counts = await get_use_counts(session, WORM_PUNISH_USE_COUNTS_KEY)
+        raw = choose(pool, counts)
+        if raw is None:
+            return False
+        await increment_use_count(session, WORM_PUNISH_USE_COUNTS_KEY, raw)
+
+        # Э19: определяем ЦЕЛЬ кары — для суточных ачивок («3 кары за сутки»,
+        # «наказать каждого за сутки») и шутки «попытаться наказать бота». Цель
+        # резолвим терпимо по display_name/username (как контрабанда владельца).
+        from app._legacy.bot.handlers.bot_reactions import _bot_identity
+
+        _, bot_username = await _bot_identity()
+        target_clean = target.strip().lstrip("@")
+        target_is_bot = bool(bot_username) and target_clean.lower() == bot_username.lower()
+        target_user_id: int | None = None
+        if not target_is_bot and target_clean:
+            for pattern in (target_clean, f"{target_clean}%", f"%{target_clean}%"):
+                found = await session.scalar(
+                    select(User.id)
+                    .where(
+                        or_(
+                            User.display_name.ilike(pattern),
+                            User.username.ilike(pattern),
+                        )
+                    )
+                    .order_by(User.id.asc())
+                    .limit(1)
+                )
+                if found is not None:
+                    target_user_id = int(found)
+                    break
+
+        # Э18/Э19: каждое применение кары → «Каратель» + юбилеи и суточные ачивки.
+        from app._legacy.services.game import awards as _game_awards
+
+        await _game_awards.punish(
+            session,
+            caller.id,
+            target_user_id=target_user_id,
+            target_is_bot=target_is_bot,
+        )
+        await session.commit()
+    # `username=target`: старые/кастомные пулы кары писали жертву как `{username}`
+    # (исторически фразы кары переиспользовали master-плейсхолдер). Раньше подста-
+    # новка шла только по `{target}`, поэтому в бою выходило буквальное «{username}».
+    # Отдаём оба имени, чтобы любой из плейсхолдеров подставил ЖЕРТВУ.
+    text = render(raw, target=target, username=target)
+    try:
+        await message.answer(f"⚔️ {text}", parse_mode="HTML")
+    except Exception:
+        log.exception("chat.punish_failed", by=message.from_user.id)
+    return True
+
+
+# ---------------------- T3.6.8: /отвали (только червь-господин) ----------------------
+
+@router.message(Command(commands=["отвали", "otvali"]))
+async def on_otvali(message: Message) -> None:
+    """Господин затыкает подхалима: /отвали → выключаем тумблер поддакивания
+    в админке (worm_master.yes_enabled=false). Пользователь потом вернёт его
+    руками в Mini App. Вызвать может ТОЛЬКО текущий червь-господин при включённом
+    режиме; для остальных — тихий no-op."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app._legacy.services.loser import get_current_worm
+    from app.services.admin_config import (
+        is_worm_master_enabled,
+        is_worm_master_yes_enabled,
+        set_worm_master_yes_enabled,
+    )
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        if not await is_worm_master_enabled(session):
+            return
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            return
+        worm = await get_current_worm(session)
+        if worm is None or worm.user_id != caller.id:
+            # Не господин — тихо игнорируем.
+            return
+        if not await is_worm_master_yes_enabled(session):
+            # Уже выключено — мягко подтвердим, чтобы команда не «молчала».
+            await message.reply("🤫 Я и так нем как рыба, мой господин.")
+            return
+        await set_worm_master_yes_enabled(session, False)
+    try:
+        await message.reply("🤫 Умолкаю, повелитель. Поддакивания выключены.")
+    except Exception:
+        log.exception("chat.otvali_failed", by=message.from_user.id)
+
+
+async def _reply_punish_denied(message: Message, session, master_name: str | None) -> None:
+    """QOL: отповедь не-господину, дёрнувшему /punish. Если червь назначен —
+    называем его по имени (named-пул), иначе безымянная отповедь.
+
+    Пулы берём из admin_config (редактируются в админке / снапшотом фраз), а не
+    из константы: правки оператора обязаны применяться.
+    """
+    import random
+
+    from app._legacy.services.phrase_meta import effective_pool
+    from app._legacy.services.worm_master import render
+    from app.services.admin_config import (
+        get_worm_punish_denied,
+        get_worm_punish_denied_named,
+    )
+
+    fallback = "Ты мне не господин. Я слушаюсь только червя-повелителя."
+    if master_name:
+        pool = await effective_pool(
+            session,
+            "worm_punish_denied_named",
+            await get_worm_punish_denied_named(session),
+        )
+        text = render(random.choice(pool), username=master_name) if pool else fallback
+    else:
+        pool = await effective_pool(
+            session, "worm_punish_denied", await get_worm_punish_denied(session)
+        )
+        text = random.choice(pool) if pool else fallback
+    try:
+        await message.reply(f"🪱 {text}", parse_mode="HTML")
+    except Exception:
+        log.exception("chat.punish_denied_failed", by=message.from_user.id)
+
+
+# ---------------------- C2: /loser ----------------------
+
+@router.message(Command("loser"))
+async def on_loser(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+
+    from app._legacy.services.loser import CooldownError, compose_loser_message, roll_loser
+    from app.bot.dispatcher import get_bot
+
+    settings = get_settings()
+    chat_id = settings.group_chat_id
+    bot = get_bot()
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        caller = await session.scalar(
+            select(User).where(User.telegram_id == message.from_user.id)
+        )
+        if caller is None:
+            log.warning("chat.loser_caller_not_in_db", tg_id=message.from_user.id)
+            return
+
+        # GHG10 Э8.1: ручная рулетка лоха — со 2 ранга (гейт молчит при
+        # выключенной игре и обходится «Серж нео»).
+        from app._legacy.services.game import delivery, gates
+
+        # GHG11: режим фичи «Лох-рулетка (ручная)».
+        _mode = await delivery.get_feature_mode(session, "loser_manual")
+        if _mode == delivery.MODE_OFF:
+            await message.answer("🤡 Лох-рулетка сейчас выключена.")
+            return
+        _chat_ok = delivery.chat_enabled(_mode)
+        _app_ok = delivery.app_enabled(_mode)
+
+        gate = await gates.check_feature(
+            session,
+            "loser_roulette",
+            user_id=caller.id,
+            telegram_id=caller.telegram_id,
+        )
+        if not gate.allowed:
+            await message.answer(gates.denial_message(gate), parse_mode="HTML")
+            return
+
+        async def _announce(roll, loser, extras=None):
+            target = chat_id if chat_id else message.chat.id
+            text = compose_loser_message(
+                loser_name=loser.display_name,
+                reason_text=roll.reason_text or "",
+                roller_name=caller.display_name,
+                extras=extras,
+                header_emoji="🤡",
+                header_label="Автолох",
+            )
+            # GHG11: в app/both дублируем в ленту (дуэльные роллы из неё обычно
+            # исключены, поэтому кладём явную активность).
+            if _app_ok:
+                await delivery.record_feed_event(
+                    session, feature="loser_manual", text=text, user_id=loser.id
+                )
+            if not _chat_ok:
+                return
+            # GHG8 P3: «мог бы стать %name%, но ДР» — перед основным постом.
+            if extras is not None and getattr(extras, "immunity_skipped", None):
+                from app._legacy.services.birthday_immunity import announce_immunity_skips
+
+                await announce_immunity_skips(
+                    bot, target, extras.immunity_skipped
+                )
+            await bot.send_message(chat_id=target, text=text, parse_mode="HTML")
+
+        try:
+            # GHG7 P9.1.a: /loser — это «автолох-дуэль» (🤡), НЕ «лох дня» (👑).
+            # source="duel" исключает ролл из статистики/титулов (P9.2).
+            await roll_loser(
+                session, rolled_by=caller, on_announce=_announce, source="duel"
+            )
+        except CooldownError as exc:
+            mins = int(exc.remaining.total_seconds() // 60)
+            await message.answer(f"⏳ Ещё рано — подожди ~{mins} мин.")
+        except Exception:
+            log.exception("chat.loser_failed", by=message.from_user.id)
+            await message.answer("⚠️ Не получилось.")
+
+
+# ---------------------- C3: /meetings ----------------------
+
+@router.message(Command("meetings"))
+async def on_meetings(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+
+    settings = get_settings()
+    tz = ZoneInfo(settings.scheduler_tz)
+    tz_label = "МСК" if settings.scheduler_tz == "Europe/Moscow" else settings.scheduler_tz
+    now = datetime.now(timezone.utc)
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        meetings = list((await session.scalars(
+            select(Meeting)
+            .where(and_(Meeting.starts_at >= now, Meeting.status != "cancelled"))
+            .order_by(Meeting.starts_at.asc())
+            .limit(5)
+        )).all())
+        if not meetings:
+            await message.answer("📭 Запланированных встреч нет.")
+            return
+
+        meeting_ids = [m.id for m in meetings]
+        attendance = list((await session.scalars(
+            select(MeetingAttendance).where(
+                MeetingAttendance.meeting_id.in_(meeting_ids)
+            )
+        )).all())
+        user_ids = {a.user_id for a in attendance}
+        users_by_id = {
+            u.id: u
+            for u in (await session.scalars(
+                select(User).where(User.id.in_(user_ids))
+            )).all()
+        }
+        att_by_meeting: dict[int, list[MeetingAttendance]] = {}
+        for a in attendance:
+            att_by_meeting.setdefault(a.meeting_id, []).append(a)
+
+    lines: list[str] = [f"📅 <b>Ближайшие встречи ({len(meetings)}):</b>"]
+    for m in meetings:
+        starts_local = m.starts_at.astimezone(tz).strftime("%a %d.%m %H:%M")
+        ends_local = m.ends_at.astimezone(tz).strftime("%H:%M")
+        lines.append("")
+        lines.append(f"<b>{m.title}</b>")
+        lines.append(f"  {starts_local}–{ends_local} {tz_label}")
+        if m.location:
+            lines.append(f"  📍 {m.location}")
+        rsvp_line_parts: list[str] = []
+        for a in att_by_meeting.get(m.id, []):
+            u = users_by_id.get(a.user_id)
+            name = u.display_name if u else f"#{a.user_id}"
+            rsvp_line_parts.append(f"{RSVP_EMOJI.get(a.rsvp, '❔')} {name}")
+        if rsvp_line_parts:
+            lines.append("  " + ", ".join(rsvp_line_parts))
+
+    await message.answer("\n".join(lines))
+
+
+# ---------------------- GHG8 P4.1.d: /top ----------------------
+
+@router.message(Command("top"))
+async def on_top(message: Message) -> None:
+    """Топы лохов/чуханов за всё время — текстовое зеркало экрана «Профиль →
+    Топы» в Mini App (P4.1.d: «команда /top ведёт туда же»)."""
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from sqlalchemy import func as _func
+
+    from app._legacy.services.loser import loser_stats
+    from app.db.models import WeeklyChukhan
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        loser_counts = await loser_stats(session)
+        chukhan_rows = (
+            await session.execute(
+                select(WeeklyChukhan.user_id, _func.count())
+                .where(WeeklyChukhan.posted_at.is_not(None))
+                .group_by(WeeklyChukhan.user_id)
+                .order_by(_func.count().desc())
+            )
+        ).all()
+        uids = set(loser_counts) | {int(uid) for uid, _ in chukhan_rows}
+        names = {
+            u.id: u.display_name
+            for u in (
+                await session.scalars(select(User).where(User.id.in_(uids)))
+            ).all()
+        } if uids else {}
+
+    def _block(title: str, pairs: list[tuple[int, int]], empty: str) -> list[str]:
+        out = [f"<b>{title}</b>"]
+        if not pairs:
+            out.append(f"  {empty}")
+            return out
+        medals = ("🥇", "🥈", "🥉")
+        for i, (uid, cnt) in enumerate(pairs):
+            mark = medals[i] if i < len(medals) else f"{i + 1}."
+            out.append(f"  {mark} {names.get(uid, f'#{uid}')} — {cnt}")
+        return out
+
+    loser_pairs = sorted(loser_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    chukhan_pairs = [(int(uid), int(cnt)) for uid, cnt in chukhan_rows]
+    lines = (
+        ["🏆 <b>Топы за всё время</b>", ""]
+        + _block("💩 Чуханы недели", chukhan_pairs, "пока никого")
+        + [""]
+        + _block("👑 Лохи дня", loser_pairs, "пока никого")
+    )
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
+# ---------------------- C4: /tasks ----------------------
+
+# Дублируем словарь меток из routes_admin, чтобы не тащить FastAPI-роутер в импортах.
+_JOB_LABELS: dict[str, str] = {
+    "chukhan_weekly": "💩 Чухан недели",
+    "meeting_reminders_tick": "⏰ Тик напоминаний",
+    "avatar_sync_daily": "🖼️ Синхронизация аватарок",
+    "random_phrases": "💬 Автопост рандомных фраз",
+    "autoloser": "🤡 Автолох",
+    "birthdays_daily": "🎂 Дни рождения",
+    "game_holidays_daily": "🎊 Праздники GHG10",
+}
+
+
+@router.message(Command("tasks"))
+async def on_tasks(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    from app.bot.scheduler import get_scheduler
+
+    settings = get_settings()
+    tz = ZoneInfo(settings.scheduler_tz)
+    sched = get_scheduler()
+    jobs = list(sched.get_jobs())
+    if not jobs:
+        await message.answer("🕳️ Запланированных задач нет.")
+        return
+
+    rows: list[tuple[datetime | None, str]] = []
+    for j in jobs:
+        # Скрываем «extra»-fixed-times, чтобы не засорять выдачу
+        if j.id.startswith("random_phrases:extra:"):
+            continue
+        label = _JOB_LABELS.get(j.id, j.id)
+        nxt = j.next_run_time
+        rows.append((nxt, label))
+
+    rows.sort(key=lambda r: (r[0] is None, r[0] or datetime.max.replace(tzinfo=timezone.utc)))
+
+    lines = ["📋 <b>Запланированные задачи:</b>", ""]
+    now = datetime.now(timezone.utc)
+    for nxt, label in rows:
+        if nxt is None:
+            lines.append(f"• {label} — <i>не запланировано</i>")
+            continue
+        local = nxt.astimezone(tz).strftime("%a %d.%m %H:%M")
+        delta = nxt - now
+        eta = _humanize_delta(delta)
+        lines.append(f"• {label} — {local} <i>({eta})</i>")
+
+    await message.answer("\n".join(lines))
+
+
+# ---------------------- E6: /nominate (+legacy /nominate_game) и /remove_nominated_game ----------------------
+
+# G1: команда переименована /nominate_game → /nominate; старая остаётся alias'ом
+# через `commands=[...]`, чтобы привычные вызовы не ломались. Ack-сообщение
+# теперь содержит текущий список (см. ниже).
+
+@router.message(Command(commands=["nominate", "nominate_game"]))
+async def on_nominate_game(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    if not message.text:
+        return
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer(
+            "🎮 Использование: <code>/nominate Название игры</code>",
+            parse_mode="HTML",
+        )
+        return
+    name = parts[1].strip()
+
+    from app._legacy.services.games import (
+        MAX_ACTIVE_NOMINATIONS,
+        NominationEmpty,
+        NominationLimitExceeded,
+        add_nomination,
+        list_active_nominations,
+    )
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        # Pre-snapshot чтобы понять статус (created / restored / already)
+        # без инвазивных правок сервиса. id-set'ы пересечём — три состояния
+        # покрываются однозначно.
+        before = await list_active_nominations(session)
+        before_ids = {r.id for r in before}
+        norm_target = name.strip().lower()
+        already_active = any(r.name.strip().lower() == norm_target for r in before)
+
+        try:
+            row = await add_nomination(
+                session, name=name, added_by_tg_id=message.from_user.id
+            )
+        except NominationEmpty:
+            await message.answer("⚠️ Имя не может быть пустым.")
+            return
+        except NominationLimitExceeded:
+            await message.answer(
+                f"⚠️ Уже {MAX_ACTIVE_NOMINATIONS} активных номинаций — "
+                f"сначала удали лишние через <code>/remove_nominated_game</code>.",
+                parse_mode="HTML",
+            )
+            return
+
+        after = await list_active_nominations(session)
+
+    if already_active:
+        status_line = f"ℹ️ <b>{row.name}</b> уже в списке номинаций"
+    elif row.id in before_ids:
+        # маловероятно (active=False но id остался) — на всякий случай
+        status_line = f"🎮 <b>{row.name}</b> уже в списке номинаций"
+    else:
+        # Свежая или восстановлена из soft-delete — в обоих случаях для
+        # пользователя это «появилась в активных».
+        # Различаем по before_ids: если id новый — created/restored.
+        restored = any(r.id == row.id for r in before) is False and len(after) <= len(before) + 1
+        # Простое сообщение: «добавлена». «Возвращена» — только если была удалена
+        # ранее (id присутствовал в БД до вызова — определить дёшево не можем без
+        # отдельного запроса, опускаем тонкость).
+        _ = restored
+        status_line = f"🎮 <b>{row.name}</b> добавлена в номинации"
+
+    total = len(after)
+    header = f"{status_line} ({total}/{MAX_ACTIVE_NOMINATIONS})"
+    if after:
+        names = ", ".join(f"<b>{r.name}</b>" for r in after)
+        body = f"\nТекущий список: {names}"
+    else:
+        body = ""
+    await message.answer(header + body, parse_mode="HTML")
+
+
+@router.message(Command(commands=["remove_nominated_game", "remove_nominated"]))
+async def on_remove_nominated_game(message: Message) -> None:
+    if not message.from_user or not _is_member(message.from_user.id):
+        return
+    if not message.text:
+        return
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2 or not parts[1].strip():
+        await message.answer(
+            "🗑 Использование: <code>/remove_nominated_game Название игры</code>",
+            parse_mode="HTML",
+        )
+        return
+    name = parts[1].strip()
+
+    from app._legacy.services.games import remove_nomination_by_name
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        row = await remove_nomination_by_name(session, name=name)
+    if row is None:
+        await message.answer("⚠️ Не нашёл такую игру в активных номинациях.")
+        return
+    await message.answer(f"🗑 Удалено: <b>{row.name}</b>", parse_mode="HTML")
+
+
+def _humanize_delta(delta: timedelta) -> str:
+    total = int(delta.total_seconds())
+    if total < 0:
+        return "скоро"
+    if total < 60:
+        return f"{total} c"
+    if total < 3600:
+        return f"{total // 60} мин"
+    if total < 86400:
+        h = total // 3600
+        return f"{h} ч"
+    d = total // 86400
+    return f"{d} дн"

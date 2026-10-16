@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.game import feed, music, voice
+from app._legacy.services.game import feed, music, voice
 
 
 def _voice_item() -> dict:

@@ -13,14 +13,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.services import admin_config as ac
-from app.services.phrase_meta import is_hidden, load_meta, source_of
-from app.services.phrase_snapshot import (
+from app._legacy.services.phrase_meta import is_hidden, load_meta, source_of
+from app._legacy.services.phrase_snapshot import (
     SNAPSHOT_FORMAT,
     SNAPSHOT_VERSION,
     apply_snapshot,
 )
-from app.services.phrase_weights import phrase_hash
+from app._legacy.services.phrase_weights import phrase_hash
+from app.services import admin_config as ac
 
 
 class _FakeRow:

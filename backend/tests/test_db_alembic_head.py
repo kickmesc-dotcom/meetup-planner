@@ -1,5 +1,9 @@
 """GHG10-ops: сверка head миграций В КОДЕ с `alembic_version` НА БАЗАХ.
 
+SemiTaskBot: источник DSN — `DB_HEAD_CHECK_DSNS` или `PROMT/semiCREDS.txt`
+(новый контур). Файл `leltokens2.txt` прошлого продукта больше НЕ читается:
+это чужие боевые базы, и сверять с ними наш head нельзя.
+
 Зачем отдельный тест. Партия может не добавлять миграций (`alembic_head` не
 меняется) и всё равно «не доехать» до базы — например, резерв остался на старой
 ревизии (так и было: `ep-rapid-butterfly` застрял на `0017`, пока прод был на
@@ -57,7 +61,12 @@ def _candidate_dsns() -> list[str]:
     env = (os.environ.get("DB_HEAD_CHECK_DSNS") or "").strip()
     if env:
         return [d.strip() for d in env.split(",") if d.strip()]
-    tokens = WORKSPACE / "leltokens2.txt"
+    # SemiTaskBot: рабочая папка больше НЕ читает `leltokens2.txt` — там боевые
+    # креды ПРЕДЫДУЩЕГО продукта, и сверка head с чужой базой давала ложный
+    # «дрейф» (а до этого — тянула DSN чужого прода). Источник для нового
+    # контура — `PROMT/semiCREDS.txt` (методичка `PROMT/SEMWORKER_SETUP.md`).
+    # Пока `DATABASE_URL` там не задан — список пуст, тест корректно skipped.
+    tokens = WORKSPACE / "PROMT" / "semiCREDS.txt"
     if not tokens.exists():
         return []
     found: list[str] = []

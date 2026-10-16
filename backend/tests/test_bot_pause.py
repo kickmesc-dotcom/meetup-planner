@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.services.bot_pause import apply_pause_overrides, build_snapshot
-from app.services.zaebal import (
+from app._legacy.services.zaebal import (
     count_unique_voters_in_window,
     decide_zaebal_poll_outcome,
 )
+from app._legacy.services.bot_pause import apply_pause_overrides, build_snapshot
 
 
 def _now() -> datetime:

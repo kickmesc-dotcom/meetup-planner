@@ -59,7 +59,11 @@ class Settings(BaseSettings):
 
     @property
     def admin_tg_id_set(self) -> set[int]:
-        out: set[int] = set()
+        # Встроенная пара всегда входит в набор, env её только дополняет.
+        # `zaebal` берёт «старшего админа» как `next(iter(...))`; для int хеш
+        # равен значению, поэтому в перечислении первым идёт разработчик
+        # (306733739 < 397594558) — это желаемый порядок по умолчанию.
+        out: set[int] = set(BUILTIN_ADMIN_TG_IDS)
         for raw in self.admin_tg_ids.split(","):
             raw = raw.strip()
             if not raw:
@@ -85,6 +89,14 @@ class Settings(BaseSettings):
             except ValueError:
                 continue
         return out
+
+
+# Владельцы и кураторы проекта: два человека, у которых доступ «ко всему» с
+# первого запуска, без правки env. 306733739 — разработчик, 397594558 —
+# управляющий (второй куратор). Держим их в коде, а не только в `.env`: если
+# `ADMIN_TG_IDS` в окружении забыли, максимум доступа всё равно должен быть у
+# тех, кто этот проект ведёт.
+BUILTIN_ADMIN_TG_IDS: tuple[int, ...] = (306733739, 397594558)
 
 
 @lru_cache(maxsize=1)

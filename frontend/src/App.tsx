@@ -9,16 +9,17 @@ import {
 } from "./api/availability";
 import CalendarView from "./features/calendar/CalendarView";
 import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
-import ProfileScreen from "./features/profile/ProfileScreen";
 import GuestProfileScreen from "./features/profile/GuestProfileScreen";
-import FeedScreen from "./features/feed/FeedScreen";
+// SemiTaskBot: рабочие экраны сотрудника.
+import MyTasksScreen from "./features/hr/MyTasksScreen";
+import ChecklistScreen from "./features/hr/ChecklistScreen";
+import HrFeedScreen from "./features/hr/HrFeedScreen";
+import LinksScreen from "./features/hr/LinksScreen";
+import HrProfileScreen from "./features/hr/HrProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
-import { PlayerBar, PlayerProvider } from "./components/GlobalPlayer";
-import { NotificationsSheet } from "./features/notifications/NotificationsBell";
-import PlayerSheet, { PlayerButton } from "./features/player/PlayerSheet";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
@@ -52,11 +53,6 @@ export default function App() {
   // Э19: гостевой профиль (клик по аватарке на календаре) — оверлей поверх вкладок.
   const guestUserId = useUI((s) => s.guestUserId);
   const closeGuest = useUI((s) => s.closeGuest);
-  const showPlayerSheet = useUI((s) => s.showPlayerSheet);
-  // GHG11(16): уведомления — нижний шит; держим его здесь, вне шапки ленты:
-  // шапка обрезает переполнение (`overflow-hidden`), а шит должен накрывать весь
-  // экран, а не жить внутри её строки.
-  const showNotificationsSheet = useUI((s) => s.showNotificationsSheet);
 
   // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
   // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
@@ -113,9 +109,9 @@ export default function App() {
   const meData = me.data!;
   const isAdmin = !!meData.is_admin;
 
-  // Если переключились на admin без прав — мягко возвращаем на ленту.
+  // Если переключились на admin без прав — мягко возвращаем к задачам.
   if (tab === "admin" && !isAdmin) {
-    setTab("feed");
+    setTab("tasks");
   }
 
   const greetingHidden = uiPrefs.data?.hide_greeting === true;
@@ -160,31 +156,31 @@ export default function App() {
         </main>
       </>
     );
+  } else if (tab === "tasks") {
+    // SemiTaskBot: главный экран смены. Свой заголовок живёт внутри экрана,
+    // потому что там же переключатель «Активные / Все» и счётчик просрочек.
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <MyTasksScreen />
+      </main>
+    );
+  } else if (tab === "checklist") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <ChecklistScreen />
+      </main>
+    );
   } else if (tab === "feed") {
     content = (
-      <>
-        {/* GHG11: заголовок ленты — ОДНОЙ строкой (раньше дублировался внутри
-            FeedScreen). Сама лента ниже отдаёт строку управления. */}
-        <header className="flex items-center gap-2 overflow-hidden border-b border-tg-secondary-bg py-1.5 pl-4 pr-3">
-          <span className="shrink-0 text-base font-medium">🏆 Лента</span>
-          <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
-            Кто что открыл и с кем что случилось.
-          </span>
-          {/* GHG11(17): на месте колокольчика теперь плеер. Повод для 🔔 был
-              один — лайки своих треков, и он не стоил кнопки в шапке; вход в
-              музыку нужен постоянно. Уведомления живут внизу шита плеера. */}
-          <PlayerButton />
-          {/* GHG11(12): тема — часть шапки: тот же центр строки, что у
-              колокольчика, и тот же правый отступ `pr-3`, что у шапок встреч,
-              профиля и календаря (раньше висела абсолютом и «косо» сидела). */}
-          <ThemeSwitcher />
-        </header>
-        <main className="flex-1 overflow-hidden flex flex-col">
-          <FeedScreen meId={meData.id} />
-        </main>
-        {showNotificationsSheet && <NotificationsSheet />}
-        {showPlayerSheet && <PlayerSheet />}
-      </>
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <HrFeedScreen />
+      </main>
+    );
+  } else if (tab === "links") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <LinksScreen />
+      </main>
     );
   } else if (tab === "profile") {
     content = (
@@ -193,13 +189,13 @@ export default function App() {
           <div className="min-w-0 flex-1">
             <div className="text-base font-medium">👤 Профиль</div>
             <div className="text-xs text-tg-hint">
-              Топы, история и настройки приветствия.
+              Подразделение, опыт и обратная связь.
             </div>
           </div>
           <ThemeSwitcher />
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
-          <ProfileScreen users={users.data} me={meData} />
+          <HrProfileScreen />
         </main>
       </>
     );
@@ -225,21 +221,14 @@ export default function App() {
   return (
     // DESIGN_SYSTEM §9: центрированная колонка 560px — на планшете/десктопе
     // приложение читается как мини-апп, а не растягивается на всю ширину.
-    <PlayerProvider>
-      <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
-        {/* GHG11(12): абсолютный свитчер в углу оболочки убран. Тема —
-            глобальная настройка, но ЖИВЁТ в шапке каждого экрана: так она
-            выровнена по реальным элементам (колокольчик/кнопки/заголовок),
-            а не висит поверх интерфейса «от балды». */}
-        {content}
-        {/* GHG11(8): плеер подборки недели — в общем каркасе, поэтому играет
-            поверх всех вкладок и не сбрасывается при переключении. */}
-        <PlayerBar />
-        <TabBar isAdmin={isAdmin} />
-        {guestUserId !== null && (
-          <GuestProfileScreen userId={guestUserId} onClose={closeGuest} />
-        )}
-      </div>
-    </PlayerProvider>
+    // GHG11(8) плеер подборки недели (музыкальная механика) убран вместе с
+    // остальным шуточным контуром — он уехал в `src/_legacy`, каркас остался.
+    <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+      {content}
+      <TabBar isAdmin={isAdmin} />
+      {guestUserId !== null && (
+        <GuestProfileScreen userId={guestUserId} onClose={closeGuest} />
+      )}
+    </div>
   );
 }

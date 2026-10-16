@@ -7,7 +7,7 @@ effective_pool/set_flags/bulk_set_flags/prune) ходят в admin_config —
 """
 from __future__ import annotations
 
-from app.services.phrase_meta import (
+from app._legacy.services.phrase_meta import (
     META_KEY,
     SOURCE_AI,
     SOURCE_IMPORT,
@@ -23,7 +23,7 @@ from app.services.phrase_meta import (
     update_entry,
     visible_phrases,
 )
-from app.services.phrase_weights import phrase_hash
+from app._legacy.services.phrase_weights import phrase_hash
 
 
 def test_meta_key_stable():

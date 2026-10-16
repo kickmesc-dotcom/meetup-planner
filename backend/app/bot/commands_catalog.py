@@ -34,72 +34,21 @@ class CommandSpec:
     hidden: bool = False
 
 
-# Порядок здесь = порядок в menu и в `/help`. Группируем по логике:
-# навигация → действия → инфо → служебные → админ.
+# SemiTaskBot: каталог рабочих команд ресторанного бота.
+#
+# Наследные шуточные команды (чухан/лох/червь/zaebal/музыка/ачивки) из каталога
+# УБРАНЫ — их брендинг в новом продукте недопустим. Сами обработчики при этом
+# остаются в коде: по решению владельца ничего не удаляем, только снимаем с
+# витрины (см. план переноса в `_legacy`).
+#
+# Порядок здесь = порядок в menu и в `/help`.
 COMMANDS: tuple[CommandSpec, ...] = (
-    # --- Навигация / Mini App ---
-    CommandSpec("start", "Открыть планер встреч", scope="private"),
-    # --- Просмотр ---
-    CommandSpec("next", "Ближайшая встреча с RSVP", scope="both"),
-    CommandSpec("meetings", "5 ближайших встреч + RSVP", scope="both"),
-    CommandSpec("chukhan", "Чухан недели", scope="both"),
-    CommandSpec("top", "Топы лохов и чуханов за всё время", scope="both"),
-    CommandSpec("tasks", "Запланированные задачи бота", scope="both"),
-    # --- Игра (GHG10 Э5.4) ---
-    CommandSpec("levels", "🎖 Моя стата и левелы участников", scope="both"),
-    CommandSpec("rank", "🏅 Мой ранг и сколько до следующего", scope="both"),
-    CommandSpec("ranks", "📊 Чарт рангов участников", scope="both"),
-    CommandSpec("ach", "🏆 Все ачивки с описаниями", scope="both"),
-    CommandSpec("xp", "⚡️ За что дают опыт", scope="both"),
-    CommandSpec("game", "📖 Как всё устроено: опыт, ранги, события", scope="both"),
-    CommandSpec(
-        "musicgame",
-        "🎵 Мьюзик-гейм: угадать, кто предложил трек (в группе)",
-        scope="both",
-        admin_only=True,
-    ),
-    # --- Действия ---
-    CommandSpec("loser", "Назначить лоха дня (ручная рулетка)", scope="both"),
-    CommandSpec("phrase", "Прогнать рандомную фразу", scope="both"),
-    CommandSpec("advice", "🔮 Случайный совет (или #совет / @бот …?)", scope="both"),
-    CommandSpec("punish", "⚔️ Натравить бота (только червь-господин)", scope="both"),
-    CommandSpec("nominate", "🎮 Добавить игру в номинации", scope="both"),
-    CommandSpec(
-        "remove_nominated_game",
-        "🗑 Удалить игру из номинаций",
-        scope="both",
-    ),
-    # --- Zaebal-цикл (E11) ---
-    CommandSpec(
-        "zaebal",
-        "Голос «бот заебал» — при кворуме включает паузу",
-        scope="both",
-    ),
-    CommandSpec(
-        "zaebal_vote",
-        "Запустить общий опрос «бот заебал?»",
-        scope="both",
-    ),
+    # --- Навигация ---
+    CommandSpec("start", "Открыть меню бота", scope="private"),
+    CommandSpec("menu", "Главное меню: чек-лист, задачи, ссылки", scope="private"),
     # --- Личное / служебное ---
     CommandSpec("whoami", "Мой Telegram ID", scope="private"),
-    # --- Админ ---
-    CommandSpec(
-        "forcechukhan",
-        "🔧 Перевыбрать чухана недели",
-        scope="both",
-        admin_only=True,
-    ),
-    CommandSpec(
-        "zaebal_undo",
-        "🔧 Снять активную zaebal-паузу",
-        scope="both",
-        admin_only=True,
-    ),
-    CommandSpec(
-        "help",
-        "Список доступных команд",
-        scope="both",
-    ),
+    CommandSpec("help", "Список доступных команд", scope="both"),
 )
 
 

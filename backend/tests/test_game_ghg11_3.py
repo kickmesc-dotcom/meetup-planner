@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.game import achievements_catalog as cat
-from app.services.game import feed_moderation as fm
+from app._legacy.services.game import achievements_catalog as cat
+from app._legacy.services.game import feed_moderation as fm
 
 # --- Каталог ачивок шара ---------------------------------------------------
 
@@ -129,7 +129,7 @@ class _VoiceSession:
 
 @pytest.mark.asyncio
 async def test_cascade_delete_voice_revokes_xp_all(monkeypatch):
-    from app.services.game import awards, voice
+    from app._legacy.services.game import awards, voice
 
     session = _VoiceSession(task=type("T", (), {"reward": 50})(), subs=[
         type("S", (), {"id": 1, "user_id": 5})(),
@@ -158,7 +158,7 @@ async def test_cascade_delete_voice_revokes_xp_all(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cascade_delete_voice_first_only_revokes_first(monkeypatch):
-    from app.services.game import awards, voice
+    from app._legacy.services.game import awards, voice
 
     session = _VoiceSession(task=type("T", (), {"reward": 30})(), subs=[
         type("S", (), {"id": 1, "user_id": 5})(),

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import random
 
-from app.services.random_phrases import dedup_chunks, _normalize_chunk
+from app._legacy.services.random_phrases import dedup_chunks, _normalize_chunk
 
 
 def test_normalize_collapses_whitespace_and_lowercases():

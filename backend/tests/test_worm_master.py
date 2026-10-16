@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from app.services.worm_master import (
+from app._legacy.services.worm_master import (
     DEFAULT_WORM_ANNOUNCE_LINES,
     DEFAULT_WORM_MASTER_AGREES,
     DEFAULT_WORM_MASTER_NAG,
@@ -53,7 +53,7 @@ def test_choose_does_not_substitute():
 
 
 def test_choose_weighted_prefers_unused():
-    from app.services.phrase_weights import phrase_hash
+    from app._legacy.services.phrase_weights import phrase_hash
 
     pool = ["часто", "редко"]
     # «часто» уже использована 100 раз → вес ~1/101, «редко» — вес 1.0.

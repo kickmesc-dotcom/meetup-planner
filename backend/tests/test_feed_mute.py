@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from app.services.game import feed, feed_moderation, today_titles
+from app._legacy.services.game import feed, feed_moderation, today_titles
 
 
 def _item(row_id: str, uid: int | None, at: datetime) -> dict:

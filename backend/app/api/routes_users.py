@@ -70,7 +70,7 @@ def _to_out(
 async def me(session: SessionDep, user: CurrentUser) -> UserOut:
     # GHG11(10): мини-апп при запуске зовёт `/me` — здесь и отмечаем «последний
     # заход». Best-effort и троттлинг внутри (см. services/game/presence).
-    from app.services.game import presence
+    from app._legacy.services.game import presence
 
     await presence.touch_last_app_seen(session, user.id)
     admin_ids = get_settings().admin_tg_id_set

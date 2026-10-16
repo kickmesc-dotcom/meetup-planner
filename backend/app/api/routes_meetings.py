@@ -35,7 +35,7 @@ from app.schemas.meetings import (
 )
 from app.services.auto_pick import find_best_slots
 from app.services.ical import make_token, render_calendar, verify_token
-from app.services.loser import (
+from app._legacy.services.loser import (
     CooldownError,
     delete_last_loser,
     compose_loser_message,
@@ -149,7 +149,7 @@ async def create_meeting(
     await schedule_meeting_reminders(session, meeting)
     # GHG10 (2.9): «инициировал встречу = +50 XP». Дискриминатор — id встречи,
     # поэтому лимит «раз в день» ограничивает награду за ОДНУ встречу, а не за день.
-    from app.services.game import awards
+    from app._legacy.services.game import awards
 
     await awards.meeting(session, user.id, meeting.id)
     # Игра не имеет права ломать ответ API — только сама не начислиться.
@@ -286,13 +286,13 @@ async def loser_roll_endpoint(
 ) -> LoserRollResponse:
     # GHG10 Э8.1: ручная рулетка лоха — со 2 ранга. Гейт молчит при выключенной
     # игре и обходится «Серж нео» (см. `services/game/gates.py`).
-    from app.services.game import gates
+    from app._legacy.services.game import gates
 
     await gates.require_feature(session, user, "loser_roulette")
     # GHG11: режим фичи «Лох-рулетка (ручная)». Раньше публичный /loser/roll
     # всегда слал в чат — в режиме «только апп» это была УТЕЧКА. Теперь:
     # off — не крутим вовсе; app — только лента; chat/both — чат (+ лента в both).
-    from app.services.game import delivery
+    from app._legacy.services.game import delivery
 
     loser_mode = await delivery.get_feature_mode(session, "loser_manual")
     if loser_mode == delivery.MODE_OFF:
@@ -320,7 +320,7 @@ async def loser_roll_endpoint(
                 and extras is not None
                 and getattr(extras, "immunity_skipped", None)
             ):
-                from app.services.birthday_immunity import announce_immunity_skips
+                from app._legacy.services.birthday_immunity import announce_immunity_skips
 
                 await announce_immunity_skips(
                     get_bot(),
@@ -372,7 +372,7 @@ async def loser_roll_endpoint(
         except Exception as exc:  # noqa: BLE001
             log.warning("loser.announce_unexpected", error=str(exc), **timings)
 
-    from app.services.game import achievements as _ach
+    from app._legacy.services.game import achievements as _ach
 
     had_truth = await _ach.has(session, user.id, "truth_seeker")
     try:

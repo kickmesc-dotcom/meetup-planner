@@ -10,14 +10,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.services import admin_config as ac
-from app.services.phrase_weights import (
+from app._legacy.services.phrase_weights import (
     get_use_counts,
     increment_use_count,
     phrase_hash,
     set_one_use_count,
     weighted_choice,
 )
+from app.services import admin_config as ac
 
 KEY = "loser_reasons.use_counts"
 

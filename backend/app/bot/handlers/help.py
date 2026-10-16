@@ -24,7 +24,7 @@ from aiogram.types import Message
 from app.bot.commands_catalog import CommandSpec, visible_for
 from app.config import get_settings
 from app.db.base import get_sessionmaker
-from app.services.bot_pause import get_active_pause
+from app._legacy.services.bot_pause import get_active_pause
 
 router = Router()
 

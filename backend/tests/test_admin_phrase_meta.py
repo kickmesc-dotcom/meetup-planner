@@ -19,9 +19,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
+from app._legacy.services.phrase_meta import SOURCE_AI, is_hidden, load_meta, source_of
 from app.api import routes_admin as ra
 from app.services import admin_config as ac
-from app.services.phrase_meta import SOURCE_AI, is_hidden, load_meta, source_of
 
 
 class _FakeRow:

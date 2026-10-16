@@ -11,7 +11,7 @@ import random
 
 import pytest
 
-from app.services.dead_chat import (
+from app._legacy.services.dead_chat import (
     DEFAULT_PHRASES,
     THRESHOLDS,
     _send_timeout,

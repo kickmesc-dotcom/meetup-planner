@@ -1,0 +1,655 @@
+"""HR-ядро SemiTaskBot (Этап 1 MVP).
+
+Модели под сценарии [mainPROMT.MD]: подразделения, профиль сотрудника с ролью,
+чек-листы адаптации/смены с фотоотчётом, поручения АУП со статусами и историей,
+«не успеваю» (проблемы), полезные ссылки и обратная связь по окончании смены.
+
+Модуль намеренно отделён от «наследного» `app.db.models.py`: так видно границу
+между переиспользованным движком meetup-planner и новым доменом, а большой
+файл моделей остаётся почти нетронутым. Регистрация таблиц для Alembic —
+через импорт в конце `app.db.models` (см. `app.db.models` → `hr_models`).
+
+Все статусы/роли — строки с CHECK-констрейнтом, а не PG-enum: правка набора
+значений тогда не требует `ALTER TYPE` и переносится между диалектами.
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.base import Base
+
+# --------------------------------------------------------------------------
+# Роли и состояния (единый источник правды для сервисов и API)
+# --------------------------------------------------------------------------
+
+ROLE_EMPLOYEE = "employee"
+ROLE_AUP = "aup"
+ROLE_ADMIN = "admin"
+ROLES: tuple[str, ...] = (ROLE_EMPLOYEE, ROLE_AUP, ROLE_ADMIN)
+
+# Опыт работы из шага 3 онбординга.
+EXPERIENCE_NEW = "new"
+EXPERIENCE_EXPERIENCED = "experienced"
+EXPERIENCES: tuple[str, ...] = (EXPERIENCE_NEW, EXPERIENCE_EXPERIENCED)
+
+# Состояние прохождения первичной настройки.
+ONBOARDING_NEW = "new"
+ONBOARDING_DEPARTMENT = "department"
+ONBOARDING_EXPERIENCE = "experience"
+ONBOARDING_DONE = "done"
+ONBOARDING_STATES: tuple[str, ...] = (
+    ONBOARDING_NEW,
+    ONBOARDING_DEPARTMENT,
+    ONBOARDING_EXPERIENCE,
+    ONBOARDING_DONE,
+)
+
+# Вид чек-листа: первый рабочий день / обычная смена.
+TEMPLATE_FIRST_DAY = "first_day"
+TEMPLATE_SHIFT = "shift"
+TEMPLATE_KINDS: tuple[str, ...] = (TEMPLATE_FIRST_DAY, TEMPLATE_SHIFT)
+
+# Прогон чек-листа.
+RUN_IN_PROGRESS = "in_progress"
+RUN_DONE = "done"
+RUN_STATUSES: tuple[str, ...] = (RUN_IN_PROGRESS, RUN_DONE)
+
+# Получатель поручения.
+TASK_SCOPE_DEPARTMENT = "department"
+TASK_SCOPE_EMPLOYEE = "employee"
+TASK_SCOPES: tuple[str, ...] = (TASK_SCOPE_DEPARTMENT, TASK_SCOPE_EMPLOYEE)
+
+# Статусы поручения (п.4.3 mainPROMT).
+TASK_NEW = "new"
+TASK_ACCEPTED = "accepted"
+TASK_IN_PROGRESS = "in_progress"
+TASK_DONE = "done"
+TASK_OVERDUE = "overdue"
+TASK_FAILED = "failed"
+TASK_STATUSES: tuple[str, ...] = (
+    TASK_NEW,
+    TASK_ACCEPTED,
+    TASK_IN_PROGRESS,
+    TASK_DONE,
+    TASK_OVERDUE,
+    TASK_FAILED,
+)
+
+PRIORITY_LOW = "low"
+PRIORITY_NORMAL = "normal"
+PRIORITY_HIGH = "high"
+PRIORITIES: tuple[str, ...] = (PRIORITY_LOW, PRIORITY_NORMAL, PRIORITY_HIGH)
+
+# Вид вопроса обратной связи.
+QUESTION_SCALE = "scale"
+QUESTION_CHOICE = "choice"
+QUESTION_TEXT = "text"
+QUESTION_KINDS: tuple[str, ...] = (QUESTION_SCALE, QUESTION_CHOICE, QUESTION_TEXT)
+
+
+def _in_list(column: str, values: tuple[str, ...]) -> str:
+    """`col IN ('a','b')` для CHECK-констрейнта (значения — из кода, не из ввода)."""
+    joined = ", ".join(f"'{v}'" for v in values)
+    return f"{column} IN ({joined})"
+
+
+# --------------------------------------------------------------------------
+# Подразделения
+# --------------------------------------------------------------------------
+
+
+class Department(Base):
+    """Подразделение (повар/официант/бармен/менеджер и любые новые).
+
+    Редактируется администратором из бота/мини-аппа без разработчика (шаг 2
+    mainPROMT). `slug` — устойчивый машинный код (для сидинга и условий),
+    `name`/`emoji` — то, что видит сотрудник.
+    """
+
+    __tablename__ = "departments"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_department_slug"),
+        Index("ix_departments_active_sort", "is_active", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    emoji: Mapped[str | None] = mapped_column(String(16))
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# --------------------------------------------------------------------------
+# Сотрудник
+# --------------------------------------------------------------------------
+
+
+class Employee(Base):
+    """HR-профиль сотрудника: 1:1 к `users` (личность/аватар живут там).
+
+    Отдельная таблица, а не новые колонки в `users`, чтобы не трогать
+    наследную модель и не ломать её сидинг. Строка создаётся лениво при первом
+    обращении (`ensure_employee`) — тогда же назначается роль по умолчанию.
+    """
+
+    __tablename__ = "employees"
+    __table_args__ = (
+        CheckConstraint(_in_list("role", ROLES), name="ck_employee_role"),
+        CheckConstraint(
+            _in_list("onboarding_state", ONBOARDING_STATES),
+            name="ck_employee_onboarding_state",
+        ),
+        CheckConstraint(
+            "experience IS NULL OR " + _in_list("experience", EXPERIENCES),
+            name="ck_employee_experience",
+        ),
+        Index("ix_employees_department", "department_id", "is_active"),
+        Index("ix_employees_demo", "is_demo"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    # Должность/обязанность (например «су-шеф») — по ней матчатся условные
+    # пункты чек-листа (`ChecklistItem.condition_position`).
+    position: Mapped[str | None] = mapped_column(Text)
+    # Плашка, которую сотрудник видит в боте и мини-аппе: должность или звание
+    # («Разработчик», «Управляющий»). Должность (`position`) отвечает за работу
+    # (условные пункты чек-листа), плашка — только за то, как человек подписан.
+    badge: Mapped[str | None] = mapped_column(Text)
+    badge_emoji: Mapped[str | None] = mapped_column(String(8))
+    # Тестовый пул: сотрудники-симуляторы с префиксом `[BOT]`. Их активность
+    # можно спрятать или снести одним переключателем (services/hr_demo.py).
+    is_demo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=ROLE_EMPLOYEE, server_default=ROLE_EMPLOYEE
+    )
+    experience: Mapped[str | None] = mapped_column(String(16))
+    onboarding_state: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=ONBOARDING_NEW, server_default=ONBOARDING_NEW
+    )
+    hire_date: Mapped[date | None] = mapped_column(Date)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# --------------------------------------------------------------------------
+# Чек-листы
+# --------------------------------------------------------------------------
+
+
+class ChecklistTemplate(Base):
+    """Шаблон чек-листа подразделения (первый день / обычная смена)."""
+
+    __tablename__ = "checklist_templates"
+    __table_args__ = (
+        CheckConstraint(_in_list("kind", TEMPLATE_KINDS), name="ck_checklist_template_kind"),
+        Index("ix_checklist_templates_dept", "department_id", "is_active", "kind"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    department_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=TEMPLATE_SHIFT, server_default=TEMPLATE_SHIFT
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ChecklistItem(Base):
+    """Пункт чек-листа (п.3 mainPROMT).
+
+    `requires_photo=True` — пункт нельзя закрыть без фото; `is_mandatory` — на
+    прогресс «выполнено всё» влияют только обязательные; `condition_position`
+    (опц.) — пункт показывается только сотрудникам с этой должностью (пример
+    mainPROMT: бракераж — только су-шеф).
+    """
+
+    __tablename__ = "checklist_items"
+    __table_args__ = (
+        Index("ix_checklist_items_template", "template_id", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    template_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("checklist_templates.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    requires_photo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    is_mandatory: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    # Показывать только сотрудникам с этой должностью (NULL — всем).
+    condition_position: Mapped[str | None] = mapped_column(Text)
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class ChecklistRun(Base):
+    """Прохождение чек-листа сотрудником за конкретную смену (дату)."""
+
+    __tablename__ = "checklist_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id", "template_id", "shift_date", name="uq_checklist_run_shift"
+        ),
+        CheckConstraint(_in_list("status", RUN_STATUSES), name="ck_checklist_run_status"),
+        Index("ix_checklist_runs_employee_date", "employee_id", "shift_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    template_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("checklist_templates.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    shift_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=RUN_IN_PROGRESS, server_default=RUN_IN_PROGRESS
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ChecklistCompletion(Base):
+    """Отметка пункта чек-листа: когда, кем, с фото и/или заметкой."""
+
+    __tablename__ = "checklist_completions"
+    __table_args__ = (
+        UniqueConstraint("run_id", "item_id", name="uq_checklist_completion_item"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("checklist_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    item_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("checklist_items.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    done_by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    done_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # TG file_id фотоотчёта (стабильнее протухающего file_path, как у аватарок).
+    photo_file_id: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+
+
+# --------------------------------------------------------------------------
+# Поручения АУП (задачи)
+# --------------------------------------------------------------------------
+
+
+class Task(Base):
+    """Поручение (п.4 mainPROMT).
+
+    Получатель — подразделение (`scope='department'`) либо конкретный сотрудник
+    (`scope='employee'`). Срок `due_at` опционален; просрочку проставляет
+    планировщик (`services.tasks.sweep_overdue`).
+    """
+
+    __tablename__ = "tasks"
+    __table_args__ = (
+        CheckConstraint(_in_list("scope", TASK_SCOPES), name="ck_task_scope"),
+        CheckConstraint(_in_list("status", TASK_STATUSES), name="ck_task_status"),
+        CheckConstraint(_in_list("priority", PRIORITIES), name="ck_task_priority"),
+        Index("ix_tasks_assignee_open", "assignee_employee_id", "status"),
+        Index("ix_tasks_department_open", "department_id", "status"),
+        Index("ix_tasks_due", "status", "due_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    expected_result: Mapped[str | None] = mapped_column(Text)
+    scope: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=TASK_SCOPE_EMPLOYEE, server_default=TASK_SCOPE_EMPLOYEE
+    )
+    # Заполнен при scope='department'.
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    # Заполнен при scope='employee'.
+    assignee_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    priority: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=PRIORITY_NORMAL, server_default=PRIORITY_NORMAL
+    )
+    requires_photo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    comment: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=TASK_NEW, server_default=TASK_NEW
+    )
+    created_by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TaskEvent(Base):
+    """История изменений поручения (аудит: кто, когда, из какого статуса в какой)."""
+
+    __tablename__ = "task_events"
+    __table_args__ = (Index("ix_task_events_task", "task_id", "at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    from_status: Mapped[str | None] = mapped_column(String(16))
+    to_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    comment: Mapped[str | None] = mapped_column(Text)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TaskIssue(Base):
+    """«Не успеваю / есть проблема» по поручению (п.4.5).
+
+    Причина из списка (`reason_code`) + свободный комментарий + желаемое время.
+    АУП видит проблему в списке и получает уведомление.
+    """
+
+    __tablename__ = "task_issues"
+    __table_args__ = (Index("ix_task_issues_task", "task_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    reason_code: Mapped[str | None] = mapped_column(String(32))
+    comment: Mapped[str | None] = mapped_column(Text)
+    eta_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class TaskPhoto(Base):
+    """Фотоотчёт по поручению (п.4.4).
+
+    Храним TG `file_id` (а не протухающий URL): мини-апп показывает фото через
+    прокси, бот может переслать его руководителю.
+    """
+
+    __tablename__ = "task_photos"
+    __table_args__ = (Index("ix_task_photos_task", "task_id", "created_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    file_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # Одобрение руководителем — заглушка под Этап 3 («подтверждение фотоотчётов»).
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Полезные ссылки (п.8)
+# --------------------------------------------------------------------------
+
+
+class UsefulLink(Base):
+    """Ссылка в разделе «Полезные ссылки» (График, Фудбук, …).
+
+    `department_id IS NULL` — видна всем; иначе только своему подразделению.
+    """
+
+    __tablename__ = "useful_links"
+    __table_args__ = (Index("ix_useful_links_active_sort", "is_active", "sort_order"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    emoji: Mapped[str | None] = mapped_column(String(16))
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="CASCADE")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+# --------------------------------------------------------------------------
+# Обратная связь по окончании смены (п.7)
+# --------------------------------------------------------------------------
+
+
+class FeedbackQuestion(Base):
+    """Вопрос формы обратной связи — настраивается администратором.
+
+    `kind`: `scale` (оценка 1..5), `choice` (вариант из `options`), `text`
+    (свободный ответ). `options` — JSONB-список строк для `choice`.
+    """
+
+    __tablename__ = "feedback_questions"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_feedback_question_code"),
+        CheckConstraint(_in_list("kind", QUESTION_KINDS), name="ck_feedback_question_kind"),
+        Index("ix_feedback_questions_active_sort", "is_active", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=QUESTION_SCALE, server_default=QUESTION_SCALE
+    )
+    options: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class FeedbackAnswer(Base):
+    """Ответ сотрудника на вопрос формы за смену (дату)."""
+
+    __tablename__ = "feedback_answers"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id", "shift_date", "question_id", name="uq_feedback_answer"
+        ),
+        Index("ix_feedback_answers_date", "shift_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    shift_date: Mapped[date] = mapped_column(Date, nullable=False)
+    question_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("feedback_questions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    value_scale: Mapped[int | None] = mapped_column(SmallInteger)
+    value_choice: Mapped[str | None] = mapped_column(Text)
+    value_text: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Скрытые ачивки сотрудника (личный прогресс)
+# --------------------------------------------------------------------------
+
+
+class EmployeeAchievement(Base):
+    """Выданная ачивка: `code` из каталога + когда получена.
+
+    Строка, а не колонка-счётчик: ачивки копятся историей, поэтому выдать их
+    можно ровно один раз (`unique(employee_id, code)`) и показать по порядку.
+    Пересчёт идёт на чтение профиля (`services/hr_achievements.py`), так что
+    рассинхрон «порог взят, а строки нет» невозможен — состояние выводится из
+    исходных данных.
+
+    Видимость ачивок в продукте — отдельное правило и живёт в сервисе: сейчас
+    блок в профиле видят только руководитель (`aup`) и администратор бота.
+    """
+
+    __tablename__ = "employee_achievements"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id", "code", name="uq_employee_achievement_code"
+        ),
+        Index(
+            "ix_employee_achievements_employee", "employee_id", "awarded_at"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("employees.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    awarded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

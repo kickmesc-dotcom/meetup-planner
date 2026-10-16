@@ -12,7 +12,7 @@ header_emoji/header_label. Тест фиксирует, что функция к
 """
 from __future__ import annotations
 
-from app.services.loser import compose_loser_message
+from app._legacy.services.loser import compose_loser_message
 
 
 def test_header_loser_dnya_crown():

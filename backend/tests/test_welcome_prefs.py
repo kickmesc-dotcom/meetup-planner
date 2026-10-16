@@ -11,8 +11,7 @@ from pydantic import ValidationError
 
 from app.api.routes_users import UiPrefsPatch
 from app.bot.commands_catalog import COMMANDS
-from app.services.admin_config import WELCOME_FORMATS, _WELCOME_FORMAT_DEFAULT
-
+from app.services.admin_config import _WELCOME_FORMAT_DEFAULT, WELCOME_FORMATS
 
 # --- P4.1.b: единый формат отображения ---
 
@@ -70,19 +69,18 @@ async def test_muted_feed_storage_roundtrip(monkeypatch):
     monkeypatch.setattr(ac, "_set_value", fake_set)
 
     assert await ac.get_ui_muted_feed(None, 777) == set()
-    await ac.set_ui_muted_feed(None, 777, {7, 3, 3})
+    await ac.set_ui_muted_feed(None, 777, {7, 3})
     assert store["ui.muted_feed:777"] == "3,7"
     assert await ac.get_ui_muted_feed(None, 777) == {3, 7}
 
     # Мусор в значении не роняет парсер.
     store["ui.muted_feed:778"] = "3, x, 5"
-    assert await ac.get_ui_muted_feed(None, 778) == {3, 5}
+    assert await ac.get_ui_muted_feed(None, 778) == {3, 5}# --- SemiTaskBot: /top снят с витрины ---
 
 
-# --- P4.1.d: /top в каталоге команд ---
-
-def test_top_command_in_catalog():
-    top = next((c for c in COMMANDS if c.cmd == "top"), None)
-    assert top is not None, "/top отсутствует в каталоге"
-    assert top.scope == "both"
-    assert not top.admin_only
+def test_top_command_is_not_in_catalog():
+    """Шуточные команды убраны из каталога вместе с остальной витриной лохов
+    и чуханов; обработчики остаются в коде до переноса в `_legacy`."""
+    assert next((c for c in COMMANDS if c.cmd == "top"), None) is None
+    for legacy in ("chukhan", "loser", "top"):
+        assert next((c for c in COMMANDS if c.cmd == legacy), None) is None

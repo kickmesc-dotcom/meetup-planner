@@ -14,8 +14,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routes_game import _answer_block_reason
-from app.services.game import activity, feed, journal
+from app._legacy.api.routes_game import _answer_block_reason
+from app._legacy.services.game import activity, feed, journal
 
 # Привязываемся к реальному «сейчас»: `_attach_details` считает «закрыто»
 # по фактическому времени, поэтому фиксированная дата в прошлом делала бы

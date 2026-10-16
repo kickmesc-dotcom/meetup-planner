@@ -64,8 +64,8 @@ from app.services.admin_config import (
     set_random_phrases_user_chance,
     set_reminders_tick_minutes,
 )
-from app.services.random_phrases import run_random_phrases_job
-from app.services.chukhan import announce_chukhan, current_week_start
+from app._legacy.services.random_phrases import run_random_phrases_job
+from app._legacy.services.chukhan import announce_chukhan, current_week_start
 
 log = structlog.get_logger()
 router = APIRouter(tags=["admin"])
@@ -82,7 +82,7 @@ async def _game_gate(session, user: User, feature: str) -> None:
     Вызывается после `_ensure_admin`. При выключенной игре проверки нет, а
     отладочные TG-id («Серж нео») её обходят — это забота `gates`.
     """
-    from app.services.game import gates
+    from app._legacy.services.game import gates
 
     await gates.require_feature(session, user, feature)
 
@@ -214,7 +214,7 @@ async def force_reroll(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_group_chat_id")
     # GHG10: «Переписал историю» — инициировал реролл чухана недели (разово).
     # Ошибки глотает `awards._guarded`.
-    from app.services.game import awards
+    from app._legacy.services.game import awards
 
     await awards.chukhan_reroll(session, user.id)
     # См. `resync_if_expired`: иначе сбой награды превращает уже выданного
@@ -530,7 +530,7 @@ async def get_rp_pool(session: SessionDep, user: CurrentUser) -> RandomPhrasesPo
     _ensure_admin(user)
     from datetime import timedelta as _td
     from app.db.models import ChatMessage as _CM
-    from app.services.random_phrases import _split_into_chunks
+    from app._legacy.services.random_phrases import _split_into_chunks
 
     lookback_days = await get_random_phrases_lookback_days(session)
     cutoff = datetime.now(timezone.utc) - _td(days=lookback_days)
@@ -1520,7 +1520,7 @@ async def admin_update_worm_master_pool(
 
 # --- T3.1: снапшот/экспорт базы причин-реакций ---
 
-from app.services.phrase_snapshot import (
+from app._legacy.services.phrase_snapshot import (
     _POOL_KEYS as _PH_POOL_KEYS,
     apply_snapshot as _apply_snapshot,
     build_snapshot as _build_snapshot,
@@ -1577,7 +1577,7 @@ async def admin_import_phrases_snapshot(
 
 # --- J.1: метаданные фраз (source/hidden) — для редакторов ---
 
-from app.services.phrase_meta import (
+from app._legacy.services.phrase_meta import (
     bulk_set_flags as _pm_bulk_set_flags,
     is_hidden as _pm_is_hidden,
     items_for as _pm_items_for,
@@ -1726,7 +1726,7 @@ async def admin_set_phrases_source_mode(
 
 # --- T3.3: алёрты «лох/чухан не запостился» ---
 
-from app.services.posting_alerts import get_posting_alerts as _get_posting_alerts
+from app._legacy.services.posting_alerts import get_posting_alerts as _get_posting_alerts
 
 
 @router.get("/admin/posting-alerts")
@@ -1751,7 +1751,7 @@ async def admin_posting_alerts_chukhan_retry(
     работает сам и его мы не трогаем."""
     _ensure_admin(user)
     from app.bot.dispatcher import get_bot
-    from app.services.chukhan import retry_undelivered_chukhan
+    from app._legacy.services.chukhan import retry_undelivered_chukhan
 
     delivered = await retry_undelivered_chukhan(get_bot())
     log.info("admin.posting_alerts_chukhan_retry", delivered=delivered, by=user.id)
@@ -1760,7 +1760,7 @@ async def admin_posting_alerts_chukhan_retry(
 
 # --- GHG7 P5: реакции бота на медиа (пулы фраз single/collection + эмодзи) ---
 
-from app.services.media_reactions import (
+from app._legacy.services.media_reactions import (
     get_single_phrases as _get_single_phrases,
     set_single_phrases as _set_single_phrases,
     get_collection_phrases as _get_collection_phrases,
@@ -1915,8 +1915,8 @@ async def admin_media_force_react(
     if not group_chat_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no_group_chat_id")
 
-    from app.bot.handlers.media_reactions import get_recent, react_now
-    from app.services.media_reactions import get_recent_media_persisted
+    from app._legacy.bot.handlers.media_reactions import get_recent, react_now
+    from app._legacy.services.media_reactions import get_recent_media_persisted
 
     recent = get_recent(group_chat_id, kind)  # type: ignore[arg-type]
     if recent is None:
@@ -1936,7 +1936,7 @@ async def admin_media_force_react(
 # мерджим прямо здесь. Лишних счётчиков «осиротевших» хешей в ответе нет —
 # UI рисует подпись только напротив актуальных фраз.
 
-from app.services.phrase_weights import (
+from app._legacy.services.phrase_weights import (
     CHUKHAN_USE_COUNTS_KEY,
     LOSER_USE_COUNTS_KEY,
     clear_use_counts,
@@ -2173,7 +2173,7 @@ async def admin_loser_roll_now(
     await _game_gate(session, user, "forced_loser_reroll")
     from app.bot.dispatcher import get_bot
     from app.config import get_settings as _gs
-    from app.services.loser import compose_loser_message, roll_loser
+    from app._legacy.services.loser import compose_loser_message, roll_loser
 
     settings = _gs()
     bot = get_bot()
@@ -2183,7 +2183,7 @@ async def admin_loser_roll_now(
             return
         # GHG8 P3: оглашение «черновых» именинников (announce-режим).
         if extras is not None and getattr(extras, "immunity_skipped", None):
-            from app.services.birthday_immunity import announce_immunity_skips
+            from app._legacy.services.birthday_immunity import announce_immunity_skips
 
             await announce_immunity_skips(
                 bot, settings.group_chat_id, extras.immunity_skipped
@@ -3355,7 +3355,7 @@ async def admin_pause_current(
     session: SessionDep, user: CurrentUser
 ) -> BotPauseOut:
     _ensure_admin(user)
-    from app.services.bot_pause import get_active_pause
+    from app._legacy.services.bot_pause import get_active_pause
 
     return _pause_to_out(await get_active_pause(session))
 
@@ -3365,7 +3365,7 @@ async def admin_pause_start(
     body: BotPauseStartIn, session: SessionDep, user: CurrentUser
 ) -> BotPauseOut:
     _ensure_admin(user)
-    from app.services.bot_pause import start_pause
+    from app._legacy.services.bot_pause import start_pause
 
     reason = body.reason or "manual_admin"
     try:
@@ -3385,7 +3385,7 @@ async def admin_pause_stop(
     session: SessionDep, user: CurrentUser
 ) -> BotPauseOut:
     _ensure_admin(user)
-    from app.services.bot_pause import stop_pause
+    from app._legacy.services.bot_pause import stop_pause
 
     pause = await stop_pause(session)
     return _pause_to_out(pause)
@@ -3396,7 +3396,7 @@ async def admin_zaebal_get(
     session: SessionDep, user: CurrentUser
 ) -> ZaebalSettingsIO:
     _ensure_admin(user)
-    from app.services.bot_pause import get_zaebal_settings
+    from app._legacy.services.bot_pause import get_zaebal_settings
 
     return ZaebalSettingsIO(**(await get_zaebal_settings(session)))
 
@@ -3407,7 +3407,7 @@ async def admin_zaebal_put(
 ) -> ZaebalSettingsIO:
     _ensure_admin(user)
     from app.bot.dispatcher import get_bot
-    from app.services.bot_pause import set_zaebal_settings
+    from app._legacy.services.bot_pause import set_zaebal_settings
 
     await set_zaebal_settings(session, body.model_dump())
     await reload_dynamic_jobs(get_bot())
@@ -3694,7 +3694,7 @@ async def admin_games_list(
     session: SessionDep, user: CurrentUser
 ) -> GameNominationsListOut:
     _ensure_admin(user)
-    from app.services.games import (
+    from app._legacy.services.games import (
         MAX_ACTIVE_NOMINATIONS,
         list_active_nominations,
     )
@@ -3721,7 +3721,7 @@ async def admin_games_create(
     body: GameNominationIn, session: SessionDep, user: CurrentUser
 ) -> GameNominationOut:
     _ensure_admin(user)
-    from app.services.games import (
+    from app._legacy.services.games import (
         NominationEmpty,
         NominationLimitExceeded,
         add_nomination,
@@ -3749,7 +3749,7 @@ async def admin_games_remove(
     nomination_id: int, session: SessionDep, user: CurrentUser
 ) -> Response:
     _ensure_admin(user)
-    from app.services.games import remove_nomination
+    from app._legacy.services.games import remove_nomination
 
     removed = await remove_nomination(session, nomination_id=nomination_id)
     if not removed:
@@ -3792,7 +3792,7 @@ async def admin_games_poll_create(
             status.HTTP_400_BAD_REQUEST, "group_chat_id_not_configured"
         )
     from app.bot.dispatcher import get_bot
-    from app.services.games_poll import GamesPollSendFailed, create_game_choice_poll
+    from app._legacy.services.games_poll import GamesPollSendFailed, create_game_choice_poll
 
     # G2: дефолт pin берём из admin_config, если в теле не указали.
     if body.pin is None:
@@ -4024,7 +4024,7 @@ async def _game_player(session, *, telegram_id: int | None, user_id: int | None)
     if user_id is not None:
         found = await session.get(User, user_id)
     elif telegram_id is not None:
-        from app.services.game.awards import user_id_for_tg
+        from app._legacy.services.game.awards import user_id_for_tg
 
         pk = await user_id_for_tg(session, telegram_id)
         found = await session.get(User, pk) if pk is not None else None
@@ -4037,8 +4037,8 @@ async def _game_player(session, *, telegram_id: int | None, user_id: int | None)
 
 async def _game_player_out(session, user: User) -> GamePlayerOut:
     """Карточка игрока одним запросом на ачивки и одним на накопители."""
-    from app.services.game import levels, xp
-    from app.services.game.achievements import collected_codes, progress
+    from app._legacy.services.game import levels, xp
+    from app._legacy.services.game.achievements import collected_codes, progress
 
     # Юзера могли экспайрить награды выше по стеку (`awards._guarded` делает
     # rollback). Перечитываем здесь, чтобы карточку можно было собрать всегда.
@@ -4065,8 +4065,8 @@ async def admin_game_get(session: SessionDep, user: CurrentUser) -> GameAdminOut
         get_game_debug_tg_ids,
         get_game_enabled,
     )
-    from app.services.game.achievements_catalog import all_achievements
-    from app.services.game.config import MAX_LEVEL
+    from app._legacy.services.game.achievements_catalog import all_achievements
+    from app._legacy.services.game.config import MAX_LEVEL
     from app.db.models import GameProfile
 
     return GameAdminOut(
@@ -4132,8 +4132,8 @@ async def admin_game_grant(
 ) -> GamePlayerOut:
     """Выдать ачивку по коду (через фасад — значит за рубильником и с анонсом)."""
     _ensure_admin(user)
-    from app.services.game import awards
-    from app.services.game.achievements_catalog import get as catalog_get
+    from app._legacy.services.game import awards
+    from app._legacy.services.game.achievements_catalog import get as catalog_get
 
     if catalog_get(body.code) is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown_achievement")
@@ -4245,7 +4245,7 @@ async def _game_social_state(session) -> GameSocialOut:
         get_game_voice_min_gap_hours,
         get_game_voice_poll_enabled,
     )
-    from app.services.game import contraband as contraband_service
+    from app._legacy.services.game import contraband as contraband_service
 
     custom = await get_game_contraband_words(session)
     words = await contraband_service.configured_words(session)
@@ -4257,7 +4257,7 @@ async def _game_social_state(session) -> GameSocialOut:
         if owner_id is None:
             unresolved.append(str(entry.get("owner") or entry.get("word")))
 
-    from app.services.game import journal as journal_service
+    from app._legacy.services.game import journal as journal_service
 
     pending = int(
         await session.scalar(
@@ -4461,7 +4461,7 @@ async def admin_game_social_flush(
     если оператор хочет проверить, как выглядит сводка.
     """
     _ensure_admin(user)
-    from app.services.game import journal
+    from app._legacy.services.game import journal
 
     sent = await journal.flush(session)
     sent += await journal.flush_achievements(session)
@@ -4480,7 +4480,7 @@ async def admin_game_observability(
     набежало (с разбивкой по источнику). Без похода в чат.
     """
     _ensure_admin(user)
-    from app.services.game import observability
+    from app._legacy.services.game import observability
 
     data = await observability.summary(session)
     return GameObservabilityOut(
@@ -4524,7 +4524,7 @@ async def _music_state(session) -> MusicStateOut:  # noqa: ANN001
         get_game_music_hour,
         get_game_music_weekday,
     )
-    from app.services.game import music
+    from app._legacy.services.game import music
 
     pool = await music.pool_tracks(session)
     history = await music.selections_history(session)
@@ -4613,7 +4613,7 @@ async def admin_game_music_remove_track(
 
 
 async def _delivery_state(session) -> DeliveryOut:  # noqa: ANN001
-    from app.services.game import delivery
+    from app._legacy.services.game import delivery
 
     mode_map = await delivery.get_mode_map(session)
     return DeliveryOut(
@@ -4655,7 +4655,7 @@ async def admin_delivery_put(
     оставляет остальные как есть — мастер отобразит `custom`.
     """
     _ensure_admin(user)
-    from app.services.game import delivery
+    from app._legacy.services.game import delivery
 
     if body.master_general is not None:
         await delivery.set_master_mode(
@@ -4680,7 +4680,7 @@ async def admin_delivery_apply_all(
 ) -> DeliveryOut:
     """Одним кликом перевести ВСЕ фичи (оба мастера) в один режим."""
     _ensure_admin(user)
-    from app.services.game import delivery
+    from app._legacy.services.game import delivery
 
     for module in delivery.MODULES:
         await delivery.set_master_mode(session, module, body.mode)
@@ -4767,7 +4767,7 @@ async def admin_game_prestige(
     """
     _ensure_admin(user)
     from app.db.models import GameProfile
-    from app.services.game.levels import xp_cap
+    from app._legacy.services.game.levels import xp_cap
 
     target = await _game_player(
         session, telegram_id=body.telegram_id, user_id=body.user_id

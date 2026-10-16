@@ -24,7 +24,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from app.services.random_phrases import (
+from app._legacy.services.random_phrases import (
     _glue_words,
     _split_into_chunks,
     _split_into_words,

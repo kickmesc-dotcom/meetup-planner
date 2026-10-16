@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 
-from app.services.media_reactions import (
+from app._legacy.services.media_reactions import (
     WAIT_WINDOW_MIN_BOUNDS,
     clamp_wait_window,
     filter_allowed_reactions,

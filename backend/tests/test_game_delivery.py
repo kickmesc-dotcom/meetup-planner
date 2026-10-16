@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.game import delivery, journal
+from app._legacy.services.game import delivery, journal
 
 
 class _StoreSession:

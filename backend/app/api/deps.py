@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.initdata import InitDataError, parse_and_verify
 from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
+from app.db.hr_models import Employee
 from app.db.models import User
 
 
@@ -83,3 +84,45 @@ async def current_user(
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+# ---------------------------------------------------------------------------
+# HR-ядро SemiTaskBot: профиль сотрудника и серверные проверки прав.
+#
+# Права НИКОГДА не выводятся из того, что прислал клиент: роль берётся из БД
+# (`employees.role`, с учётом супер-админа из env). Отсюда `require_aup` /
+# `require_admin` — единая точка входа для всех управляющих ручек (п.11
+# mainPROMT: «все права должны проверяться на стороне системы»).
+# ---------------------------------------------------------------------------
+
+
+async def current_employee(session: SessionDep, user: CurrentUser) -> Employee:
+    """HR-профиль текущего пользователя (создаётся лениво при первом заходе)."""
+    from app.services import hr_access
+
+    return await hr_access.ensure_employee(session, user)
+
+
+EmployeeDep = Annotated[Employee, Depends(current_employee)]
+
+
+async def require_aup(employee: EmployeeDep) -> Employee:
+    """Руководитель или администратор (создание поручений, отчёты)."""
+    from app.services import hr_access
+
+    if not hr_access.is_aup(employee):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="aup_required")
+    return employee
+
+
+async def require_admin(employee: EmployeeDep) -> Employee:
+    """Администратор бота (подразделения, чек-листы, ссылки, роли)."""
+    from app.services import hr_access
+
+    if not hr_access.is_admin(employee):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="admin_required")
+    return employee
+
+
+AupDep = Annotated[Employee, Depends(require_aup)]
+AdminDep = Annotated[Employee, Depends(require_admin)]

@@ -11,9 +11,10 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api import routes_admin, routes_game
+from app.api import routes_admin
+from app._legacy.api import routes_game
 from app.db.models import GameProfile
-from app.services.game import awards, donations
+from app._legacy.services.game import awards, donations
 
 
 class _Rows:

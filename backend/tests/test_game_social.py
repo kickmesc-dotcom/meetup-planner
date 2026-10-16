@@ -16,8 +16,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.game import contraband, events, journal, memorial, report
-from app.services.game.events_catalog import PROMPTS, PROMPTS_BY_CODE
+from app._legacy.services.game import contraband, events, journal, memorial, report
+from app._legacy.services.game.events_catalog import PROMPTS, PROMPTS_BY_CODE
 from tests.game_fakes import FakeResult, scalar_answer
 
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
@@ -304,7 +304,7 @@ def test_local_day_bounds_reset_at_local_midnight():
     суточный потолок событий считался по UTC-дате и расходился с живыми часами
     и бюджетом дня. Теперь границы дня — ОДНА функция на весь проект.
     """
-    from app.services.game import activity
+    from app._legacy.services.game import activity
 
     # 21:30 UTC 1 окт = 00:30 МСК 2 окт — это уже НОВЫЕ локальные сутки.
     night = datetime(2026, 10, 1, 21, 30, tzinfo=timezone.utc)
@@ -634,7 +634,7 @@ def test_memorial_threshold_default_matches_live_setting():
     значение, от которого отказались.
     """
     from app.services import admin_config
-    from app.services.game import config
+    from app._legacy.services.game import config
 
     assert config.MEMORIAL_SILENCE_DAYS == 10
     assert config.MEMORIAL_REPEAT_DAYS == 5
@@ -646,7 +646,7 @@ def test_memorial_threshold_default_matches_live_setting():
 
 
 def test_digest_defaults_are_off_and_sane():
-    from app.services.game import config
+    from app._legacy.services.game import config
 
     assert config.DIGEST_DEFAULT_INTERVAL in config.DIGEST_INTERVALS
     assert sorted(config.DIGEST_INTERVALS) == [1, 6, 12, 24]
@@ -682,7 +682,7 @@ async def test_digest_due_respects_interval(monkeypatch):
 
 
 def test_activity_live_hours_pure():
-    from app.services.game import activity
+    from app._legacy.services.game import activity
 
     night = datetime(2026, 9, 30, 0, 17, tzinfo=timezone.utc)  # 03:17 локально
     noon = datetime(2026, 9, 30, 9, 0, tzinfo=timezone.utc)  # 12:00 локально
@@ -697,7 +697,7 @@ def test_activity_live_hours_pure():
 @pytest.mark.asyncio
 async def test_activity_quiet_blocks_during_flood(monkeypatch):
     from app.services import admin_config
-    from app.services.game import activity
+    from app._legacy.services.game import activity
 
     async def _start(_s):
         return 10
@@ -799,7 +799,7 @@ async def test_queue_achievements_adds_pool_entries():
 
 @pytest.mark.asyncio
 async def test_achievements_digest_due_night_morning_and_slot(monkeypatch):
-    from app.services.game import activity
+    from app._legacy.services.game import activity
 
     async def _count(_s):
         return 3
@@ -903,7 +903,7 @@ async def test_flush_achievements_groups_by_user(monkeypatch):
 @pytest.mark.asyncio
 async def test_post_mode_pool_queues_instead_of_posting(monkeypatch):
     from app.services import admin_config
-    from app.services.game import achievements as ach_mod
+    from app._legacy.services.game import achievements as ach_mod
 
     queued: dict = {}
 
@@ -942,7 +942,7 @@ async def test_post_mode_pool_queues_instead_of_posting(monkeypatch):
 @pytest.mark.asyncio
 async def test_activity_budget_blocks_after_cap(monkeypatch):
     from app.services import admin_config
-    from app.services.game import activity
+    from app._legacy.services.game import activity
 
     async def _start(_s):
         return 0  # окно «на весь день» — проверяем именно бюджет
@@ -992,7 +992,7 @@ async def test_activity_budget_blocks_after_cap(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_observability_summary_shape():
-    from app.services.game import observability
+    from app._legacy.services.game import observability
 
     counts = iter([4, 2, 3, 5, 2])  # events, answered, voice, achievements, flushes
 
@@ -1022,8 +1022,8 @@ async def test_observability_summary_shape():
 async def test_post_mode_hybrid_day_instant_night_pool(monkeypatch):
     """Гибрид: днём (в живые часы) — сразу, ночью — в буфер на утреннюю сводку."""
     from app.services import admin_config
-    from app.services.game import achievements as ach_mod
-    from app.services.game import activity, journal
+    from app._legacy.services.game import achievements as ach_mod
+    from app._legacy.services.game import activity, journal
 
     async def _mode(_s):
         return "hybrid"
@@ -1082,6 +1082,6 @@ async def test_post_mode_hybrid_day_instant_night_pool(monkeypatch):
 
 
 def test_post_modes_include_hybrid():
-    from app.services.game import config
+    from app._legacy.services.game import config
 
     assert set(config.ACHIEVEMENT_POST_MODES) == {"instant", "pool", "hybrid"}

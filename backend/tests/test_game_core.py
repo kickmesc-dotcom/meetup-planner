@@ -11,8 +11,8 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from app.services.game import levels
-from app.services.game.config import (
+from app._legacy.services.game import levels
+from app._legacy.services.game.config import (
     ANNIVERSARY_TIERS,
     LEVEL_UNLOCKS,
     MAX_LEVEL,
@@ -22,8 +22,8 @@ from app.services.game.config import (
     tier_title,
     unlocks_for_level,
 )
-from app.services.game.flags import has_feature, required_level
-from app.services.game.xp import (
+from app._legacy.services.game.flags import has_feature, required_level
+from app._legacy.services.game.xp import (
     DailyBucket,
     award,
     idem_key,

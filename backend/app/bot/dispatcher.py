@@ -13,22 +13,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.client.telegram import TelegramAPIServer
 
-from app.bot.handlers import (
-    admin_chukhan,
-    bot_reactions,
-    chat_capture,
-    chat_commands,
-    help as help_handler,
-    media_reactions,
-    music,
-    music_game,
-    next_meeting,
-    poll_answer,
-    start,
-    voice_tasks,
-    whoami,
-    zaebal,
-)
+from app.bot.handlers import help as help_handler, hr_bot, next_meeting, poll_answer, whoami
 from app.config import get_settings
 
 log = logging.getLogger(__name__)
@@ -361,37 +346,14 @@ def get_dispatcher() -> Dispatcher:
     global _dispatcher
     if _dispatcher is None:
         _dispatcher = Dispatcher()
-        _dispatcher.include_router(start.router)
+        # SemiTaskBot: активны только роутеры рабочего контура. Шуточные
+        # хендлеры (чухан, лох, мемы, музыка, zaebal, ранги) перенесены в
+        # `app/_legacy/bot/handlers` и здесь НЕ подключаются — см. докапакет
+        # `app/_legacy`. Наследный `start.py` («кнопка Планера») тоже не
+        # подключён: его сценарий заменён онбордингом сотрудника.
+        _dispatcher.include_router(hr_bot.router)
         _dispatcher.include_router(whoami.router)
         _dispatcher.include_router(poll_answer.router)
-        _dispatcher.include_router(admin_chukhan.router)
         _dispatcher.include_router(next_meeting.router)
-        # GHG6 K: /help до chat_capture catch-all — Command-фильтр всё равно
-        # сработает первым, но порядок read-friendly.
         _dispatcher.include_router(help_handler.router)
-        _dispatcher.include_router(chat_commands.router)
-        # GHG6 E11: zaebal-команды — до catch-all chat_capture, иначе их «съест»
-        # сохранение текста (Command-фильтры всё равно сработают первыми, но
-        # для читаемости держим порядок).
-        _dispatcher.include_router(zaebal.router)
-        # GHG6 E9 / GHG7 P0.3.c: реакции бота — ДО chat_capture. Порядок
-        # роутеров ВАЖЕН: bot_reactions матчит `F.text` и в aiogram остановил
-        # бы пропагацию, поэтому on_message обязан завершаться `raise
-        # SkipHandler`, чтобы chat_capture ниже по цепочке всё же сохранил
-        # сообщение (см. bot_reactions.on_message).
-        _dispatcher.include_router(bot_reactions.router)
-        # GHG7 P5: медиа-реакции. Матчат контент-типы (photo/video/...), НЕ
-        # F.text, поэтому с bot_reactions/chat_capture не конфликтуют. on_media
-        # всё равно завершается raise SkipHandler (пропагация). Содержит и
-        # @message_reaction-роутер (приём живых реакций для wait_then_chance).
-        _dispatcher.include_router(media_reactions.router)
-        # Э14: голосовые задания — ПОСЛЕ media_reactions (тот матчит `F.voice`
-        # как медиа и заканчивается `raise SkipHandler`, поэтому апдейт доедет
-        # и сюда, а телеметрия мемов не сломается).
-        _dispatcher.include_router(voice_tasks.router)
-        # Э15: музыкальная предложка — только личка (аудио/ссылки от участников).
-        _dispatcher.include_router(music.router)
-        # Э16: ручной запуск мьюзик-гейма (команда в группе, только админ).
-        _dispatcher.include_router(music_game.router)
-        _dispatcher.include_router(chat_capture.router)
     return _dispatcher

@@ -15,15 +15,15 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.db.models import EventLog, GameVoiceSubmission, GameVoiceTask
-from app.services.game import voice
-from app.services.game.config import (
+from app._legacy.services.game import voice
+from app._legacy.services.game.config import (
     VOICE_DAY_END_HOUR,
     VOICE_DAY_START_HOUR,
     VOICE_POLL_REWARD,
     VOICE_REWARD,
     VOICE_TZ_OFFSET_HOURS,
 )
-from app.services.game.voice_catalog import TASKS
+from app._legacy.services.game.voice_catalog import TASKS
 
 NOW = datetime(2026, 9, 30, 12, 0, tzinfo=timezone.utc)
 

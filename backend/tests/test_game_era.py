@@ -20,9 +20,9 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy.dialects import postgresql
 
-from app.services.game import achievements
-from app.services.game.achievements import AchievementStat
-from app.services.game.config import ACHIEVEMENTS_ERA_START
+from app._legacy.services.game import achievements
+from app._legacy.services.game.achievements import AchievementStat
+from app._legacy.services.game.config import ACHIEVEMENTS_ERA_START
 
 _ERA_ISO = ACHIEVEMENTS_ERA_START.date().isoformat()
 

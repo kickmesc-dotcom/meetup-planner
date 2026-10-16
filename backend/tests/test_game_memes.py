@@ -12,8 +12,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.db.models import GameMediaPost
-from app.services.game import memes
-from app.services.game.config import MEME_ALL_REACTORS, MEME_REACTION_WINDOW_MIN
+from app._legacy.services.game import memes
+from app._legacy.services.game.config import MEME_ALL_REACTORS, MEME_REACTION_WINDOW_MIN
 
 NOW = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
 

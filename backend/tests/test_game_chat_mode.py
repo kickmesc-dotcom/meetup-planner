@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.game import chat_mode, journal
+from app._legacy.services.game import chat_mode, journal
 
 
 class _CfgSession:

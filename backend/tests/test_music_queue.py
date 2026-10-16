@@ -12,11 +12,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.api.routes_game import _music_playlist_title, _music_track_out
+from app._legacy.api.routes_game import _music_playlist_title, _music_track_out
 from app.api.routes_users import NotificationOut, _payload_track_id
 from app.db.models import AppNotification, MusicTrack, MusicTrackLike, User
 from app.services import notifications
-from app.services.game import music
+from app._legacy.services.game import music
 
 NOW = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)
 

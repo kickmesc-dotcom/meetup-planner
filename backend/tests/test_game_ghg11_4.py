@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from app.services.game import config
+from app._legacy.services.game import config
 
 
 def test_phrases_editors_renamed_to_shared_pools():

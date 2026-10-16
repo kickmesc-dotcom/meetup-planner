@@ -16,10 +16,10 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.services.game import accept, events, voice
-from app.services.game.config import ACCEPT_WINDOW_MAX_MINUTES
-from app.services.game.events_catalog import PROMPTS
-from app.services.game.voice_catalog import TASKS
+from app._legacy.services.game import accept, events, voice
+from app._legacy.services.game.config import ACCEPT_WINDOW_MAX_MINUTES
+from app._legacy.services.game.events_catalog import PROMPTS
+from app._legacy.services.game.voice_catalog import TASKS
 
 NOW = datetime(2026, 10, 12, 12, 0, tzinfo=timezone.utc)
 

@@ -16,11 +16,11 @@ from datetime import date, datetime, timezone
 
 import pytest
 
-from app.api import routes_game
+from app._legacy.api import routes_game
 from app.db.models import GameProfile, UserAchievement
-from app.services.game import achievements, awards, levels, weekly, xp
-from app.services.game.achievements_catalog import base_achievements
-from app.services.game.config import SUPREME_CHUKHAN_TITLE, unlocks_between
+from app._legacy.services.game import achievements, awards, levels, weekly, xp
+from app._legacy.services.game.achievements_catalog import base_achievements
+from app._legacy.services.game.config import SUPREME_CHUKHAN_TITLE, unlocks_between
 from tests.game_fakes import assert_single_column_pk_get, grant_lookup
 
 # --------------------------------------------------------------------------
@@ -448,7 +448,7 @@ def test_every_unlocked_feature_has_title_and_description():
     Иначе уведомление о новом ранге показывало бы игроку голый код/термин —
     ровно то, на что жаловался оператор («описать куда зайти, что нажать»).
     """
-    from app.services.game import config
+    from app._legacy.services.game import config
 
     for level, codes in config.LEVEL_UNLOCKS.items():
         for code in codes:
@@ -464,8 +464,8 @@ def test_supreme_chukhan_tier_is_reachable():
 
     Иначе «Идеальный червь» (100% ачивок) был бы заблокирован на годы.
     """
-    from app.services.game import config
-    from app.services.game import achievements_catalog as catalog
+    from app._legacy.services.game import config
+    from app._legacy.services.game import achievements_catalog as catalog
 
     assert 0 < config.SUPREME_CHUKHAN_LOSER_TIER < 100
     assert catalog.SUPREME_CHUKHAN_TIER == config.SUPREME_CHUKHAN_LOSER_TIER
@@ -476,7 +476,7 @@ def test_supreme_chukhan_tier_is_reachable():
 
 def test_level_up_notice_lists_features_for_the_whole_range():
     """Стакание: подъём на несколько рангов разом показывает ВСЕ способности."""
-    from app.services.game import config
+    from app._legacy.services.game import config
 
     codes = unlocks_between(1, 5)
     assert set(codes) == {

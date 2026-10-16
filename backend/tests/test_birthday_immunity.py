@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.birthday_immunity import (
+from app._legacy.services.birthday_immunity import (
     MAX_ANNOUNCE_REROLLS,
     format_immunity_announce,
     resolve_immune_pick,

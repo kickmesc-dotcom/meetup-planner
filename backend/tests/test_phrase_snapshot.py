@@ -6,7 +6,7 @@
 """
 from __future__ import annotations
 
-from app.services.phrase_snapshot import (
+from app._legacy.services.phrase_snapshot import (
     SNAPSHOT_FORMAT,
     SNAPSHOT_VERSION,
     _POOL_KEYS,

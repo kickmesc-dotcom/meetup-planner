@@ -12,13 +12,13 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from app.services.bot_pause import (
+from app._legacy.services.bot_pause import (
     CHAT_INITIATED_REASONS,
     VALID_REASONS,
     _format_absence_hours,
     should_announce_restore,
 )
-from app.services.zaebal import WELCOME_BACK_PHRASES, _welcome_back_phrase
+from app._legacy.services.zaebal import WELCOME_BACK_PHRASES, _welcome_back_phrase
 
 
 # --- фразы возвращения ---

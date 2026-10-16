@@ -138,7 +138,7 @@ async def create_poll_in_chat(
 
     # GHG10: «Агент ВЦИОМ-а» — третий созданный опрос (count по таблице `polls`).
     # Ошибки глотает `awards._guarded`: игра не может сломать создание опроса.
-    from app.services.game import awards
+    from app._legacy.services.game import awards
 
     await awards.poll_created(session, created_by.id)
 

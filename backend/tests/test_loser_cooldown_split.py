@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import patch
 
-from app.services.loser import COOLDOWN, CooldownError, time_until_next_roll
+from app._legacy.services.loser import COOLDOWN, CooldownError, time_until_next_roll
 
 
 class _FakeSession:
@@ -104,7 +104,7 @@ async def test_roll_loser_bypass_cooldown_skips_check() -> None:
     """`bypass_cooldown=True` не должен звать time_until_next_roll вообще —
     это поведение, на которое опирается autoloser-job (он крутится по своему
     расписанию и не должен ждать cooldown'а)."""
-    from app.services import loser as loser_mod
+    from app._legacy.services import loser as loser_mod
 
     called = {"n": 0}
 
