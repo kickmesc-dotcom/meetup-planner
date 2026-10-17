@@ -1,4 +1,10 @@
-# Прод на Neon + Cloudflare (Amvera не используется)
+# План Б: бэкенд на Cloudflare Containers
+
+> **Актуальная схема — `docs/PROD_DEPLOY.md`.** Сейчас API живёт на Amvera
+> (проект `meetup-planner`), фронт — на Pages, база — в Neon. Этот файл —
+> готовый путь переезда API на Cloudflare, если понадобится: он требует
+> Workers Paid ($5/мес), поэтому пока не задействован.
+
 
 Целевая схема:
 
