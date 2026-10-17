@@ -6,6 +6,9 @@ venv/
 .env
 .env.*
 !.env.example
+# Прод-адрес API для сборки фронта: это публичный URL, не секрет. Без него
+# сборка молча уедет на same-origin `/api`, которого на Pages нет.
+!frontend/.env.production
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
