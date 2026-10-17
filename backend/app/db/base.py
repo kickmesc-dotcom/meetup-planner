@@ -4,6 +4,7 @@ import os
 import ssl
 from collections.abc import AsyncIterator
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import structlog
 
@@ -22,15 +23,40 @@ class Base(DeclarativeBase):
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
 
+# Параметры DSN, которые понимает libpq/psycopg, но НЕ понимает asyncpg: он
+# падает на них с `TypeError: connect() got an unexpected keyword argument`.
+# Строка подключения из консоли Neon приходит именно такой
+# (`...?sslmode=require&channel_binding=require`), поэтому её нельзя подавать
+# в движок как есть — приложение не поднялось бы вообще.
+_LIBPQ_ONLY_PARAMS = frozenset(
+    {"sslmode", "channel_binding", "gssencmode", "target_session_attrs"}
+)
+
+
 def _normalize_url(url: str) -> str:
     """
     Превращает postgres:// в postgresql+asyncpg:// для совместимости со SQLAlchemy.
+
+    Заодно выбрасывает libpq-параметры, которых asyncpg не знает (`sslmode`,
+    `channel_binding` и родственные). Режим SSL наш код решает сам
+    (`_ssl_enabled_for`), поэтому потерять тут нечего — а без этой чистки
+    боевой DSN из консоли хостинга роняет контейнер на подключении.
     """
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://") :]
     if url.startswith("postgresql://") and "+asyncpg" not in url:
         url = "postgresql+asyncpg://" + url[len("postgresql://") :]
-    return url
+    if "?" not in url:
+        return url
+    parts = urlsplit(url)
+    if not parts.query:
+        return url
+    kept = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if key.lower() not in _LIBPQ_ONLY_PARAMS
+    ]
+    return urlunsplit(parts._replace(query=urlencode(kept)))
 
 def _ssl_enabled_for(url: str) -> bool:
     """Нужен ли SSL для этого DSN.

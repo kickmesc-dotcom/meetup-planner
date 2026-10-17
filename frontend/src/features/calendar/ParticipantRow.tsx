@@ -3,7 +3,7 @@ import { addDays, format, startOfDay } from "date-fns";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup } from "framer-motion";
 import type { AvailabilityRange, User } from "@/types";
-import type { BirthdayCalendarEntry, CalendarMark, CurrentTitles } from "@/api/birthdays";
+import type { BirthdayCalendarEntry } from "@/api/birthdays";
 import { confidenceFillForDay, rangeToPillRect, statusLabel } from "./dateUtils";
 import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
@@ -18,14 +18,6 @@ interface Props {
   windowSpan: number;
   /** ДР этого участника в окне (после фильтра по user_id в StripView). */
   birthdays?: BirthdayCalendarEntry[];
-  /** Отметки лох/чухан этого участника в окне. */
-  marks?: CalendarMark[];
-  /**
-   * GHG7 P2.1: актуальные звания (общие для всех участников). Per-user флаги
-   * вычисляются внутри по `user.id` → рисуются «шапкой» иконок над аватаркой.
-   * Заменяет прежний булев `isWorm` (червь теперь часть общего стека).
-   */
-  titles?: CurrentTitles | null;
   /**
    * GHG6 CL1: фикс-ширина одной ячейки в пикселях. Если задано — строка не
    * растягивается на flex-1, а имеет ширину windowSpan × cellWidth. Используется
@@ -53,18 +45,12 @@ export default function ParticipantRow({
   windowStart,
   windowSpan,
   birthdays = [],
-  marks = [],
-  titles = null,
   cellWidth,
   visibleStart,
   visibleEnd,
 }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
-  const setLoserReasonPopover = useUI((s) => s.setLoserReasonPopover);
-  const setShowWormHistory = useUI((s) => s.setShowWormHistory);
-  // Э19: клик по аватарке открывает чужой профиль «глазами гостя».
-  const openGuest = useUI((s) => s.openGuest);
   const qc = useQueryClient();
 
   // Тап по своему свободному дню. Раньше клетка закрашивалась только после
@@ -147,34 +133,8 @@ export default function ParticipantRow({
     });
   };
 
-  // GHG6 BD1/BD5: индексы по YYYY-MM-DD, чтобы не сканить массивы в каждой ячейке.
-  // GHG6 J: для loser-меток храним множество источников — в одном дне может быть
-  // несколько роллов, тогда рисуем несколько иконок.
-  // GHG7 P9.4.b: разделяем по семантике source:
-  //   auto/manual/legacy-null → 👑 «Лох дня» (официальный),
-  //   duel                    → 🤡 «Автолох» (ручная дуэль /loser + LoserSheet).
+  // GHG6 BD1/BD5: индекс ДР по YYYY-MM-DD, чтобы не сканить массив в каждой ячейке.
   const bdayByDate = new Map(birthdays.map((b) => [b.date, b]));
-  const chukhanByDate = new Set<string>();
-  const loserSourcesByDate = new Map<string, Set<string>>();
-  for (const m of marks) {
-    if (m.type === "chukhan") {
-      chukhanByDate.add(m.date);
-    } else if (m.type === "loser") {
-      const src = m.source ?? "manual";
-      const set = loserSourcesByDate.get(m.date) ?? new Set<string>();
-      set.add(src);
-      loserSourcesByDate.set(m.date, set);
-    }
-  }
-  const todayKey = format(startOfDay(new Date()), "yyyy-MM-dd");
-
-  // GHG7 P10.1.a: упрощение шапки (откат P2.1.b). В верхнем стеке оставляем
-  // ТОЛЬКО 💩 «чухан недели» — единственное «носимое» звание, уместное на
-  // макушке аватарки. ДР/лох-дня/главный-лох убраны из шапки (они и так видны
-  // событиями в ячейках календаря 🎂/👑). Червь 🪱 переехал ВНИЗ по центру
-  // (P10.1.c) — отдельная стилизация, не в этом стеке.
-  const isChukhan = !!titles && titles.chukhan_user_id === user.id;
-  const isWorm = !!titles && titles.worm_user_id === user.id;
 
   return (
     <div className="relative flex items-center border-b border-tg-secondary-bg/60">
@@ -183,24 +143,12 @@ export default function ParticipantRow({
           горизонтально не скроллится, поэтому sticky здесь — no-op. */}
       <div className="w-[60px] flex flex-col items-center py-1.5 shrink-0 sticky left-0 z-10 bg-tg-bg">
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => {
-              haptic("selection");
-              openGuest(user.id);
-            }}
-            aria-label={`Открыть профиль ${user.display_name}`}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden active:scale-95"
+          {/* SemiTaskBot: аватарка больше не «вход в чужой профиль» — вместе с
+              игровым контуром уехал и он (был витриной званий/лоха/чухана). */}
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-medium overflow-hidden"
             style={{ background: user.color_hex }}
-            title={(() => {
-              // GHG7 P10.1.d: title собираем из оставшихся званий — 💩 чухан / 🪱 червь.
-              const roles: string[] = [];
-              if (isChukhan) roles.push("Чухан недели");
-              if (isWorm) roles.push("Червь-пидор");
-              return roles.length > 0
-                ? `${user.display_name} — ${roles.join(", ")}`
-                : user.display_name;
-            })()}
+            title={user.display_name}
           >
             {user.avatar_url ? (
               <img
@@ -211,42 +159,7 @@ export default function ParticipantRow({
             ) : (
               initials(user.display_name)
             )}
-          </button>
-          {/* GHG7 P10.1.b: 💩 «чухан недели» — одиночная иконка СВЕРХУ по центру
-              (макушка), без стека. z-20 выше кружка (z-10 колонки).
-              GHG7 P11 (инцидент 03.06 #4): убрана фон-плашка `bg-tg-bg` — в тёмной
-              теме она рисовала чёрный непрозрачный круг под эмодзи и убивала
-              визуал. Читаемость поверх любого аватара держим лёгким
-              drop-shadow (как у 💩 в ячейках календаря — там фона нет вообще). */}
-          {isChukhan && (
-            <span
-              aria-label="Чухан недели"
-              title="Чухан недели"
-              className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.45))]"
-            >
-              💩
-            </span>
-          )}
-          {/* GHG7 P10.1.c: 🪱 «червь-пидор» — СНИЗУ по центру (под аватаркой).
-              Отделён от чухана, чтобы две роли не наезжали. Та же правка P11 —
-              без фон-плашки, читаемость через drop-shadow.
-              GHG8 P2.1.c: бейдж кликабелен — открывает попап-историю звания
-              (общую, не per-user — звание переходящее). */}
-          {isWorm && (
-            <button
-              type="button"
-              aria-label="Червь-пидор — история"
-              title="История звания «Червь-пидор»"
-              onClick={(e) => {
-                e.stopPropagation();
-                haptic("selection");
-                setShowWormHistory(true);
-              }}
-              className="absolute -bottom-1 left-1/2 -translate-x-1/2 z-20 text-[12px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.45))] active:scale-95"
-            >
-              🪱
-            </button>
-          )}
+          </div>
         </div>
         <div className="text-[10px] text-tg-hint truncate max-w-[60px] mt-0.5">
           {firstName(user.display_name)}
@@ -311,26 +224,6 @@ export default function ParticipantRow({
             const fill = cellWidth ? confidenceFillForDay(dayStart, ranges) : null;
             const isLast = i === windowSpan - 1;
             const bday = bdayByDate.get(dayKey);
-            // BD5: бейджи лох/чухан показываем только на прошедших днях, чтобы
-            // в будущем не светить будущие записи (их там и не должно быть, но
-            // на всякий случай защищаемся от часовых поясов и подмены даты).
-            const isPast = dayKey < todayKey;
-            const loserSources = isPast ? loserSourcesByDate.get(dayKey) : undefined;
-            // GHG7 P9.4.b: каждый источник → своя иконка. auto/manual/null → 👑,
-            // duel → 🤡. Порядок: сначала короны, потом клоуны (стабильный вид).
-            const loserIcons: string[] = [];
-            if (loserSources) {
-              for (const s of loserSources) {
-                if (s !== "duel") loserIcons.push("👑");
-              }
-              if (loserSources.has("duel")) loserIcons.push("🤡");
-            }
-            const loserCount = loserIcons.length;
-            const showChukhan = isPast && chukhanByDate.has(dayKey);
-            // GHG6 J4: при узких ячейках (cellWidth<40) несколько иконок рядом
-            // не помещаются — складываем в ×N. В legacy StripView без cellWidth
-            // — всегда рисуем подряд (там ширина ячейки растягивается на 1fr).
-            const compactLoser = loserCount > 1 && cellWidth !== undefined && cellWidth < 40;
             // GHG6 CL9: при partial=null (или fill отсутствует) фон рисуем
             // на самой кнопке (как было). При partial — кнопка прозрачная, а
             // фон уходит в отдельный pointer-events-none div поверх (под
@@ -404,61 +297,6 @@ export default function ParticipantRow({
                   >
                     🕓
                   </span>
-                )}
-                {/* GHG6 BD5/J4: «прошедшие» бейджи лох/чухан в углу ячейки.
-                    pointer-events-none — клик уходит на основную кнопку.
-                    GHG6 J: автолох + ручной ролл в один день — две короны
-                    подряд (👑👑), либо 👑×2 в узких ячейках. */}
-                {(loserCount > 0 || showChukhan) && (
-                  <div className="pointer-events-none absolute bottom-0.5 left-0.5 flex gap-0.5 text-[10px] leading-none">
-                    {/* GHG7 P0.2.e: 👑 — кликабельная, открывает попап с
-                        причиной ролла. pointer-events:auto точечно на
-                        корону; родительский div остаётся none, чтобы клик
-                        по фону ячейки уходил на основную кнопку. */}
-                    {loserCount > 0 && (
-                      compactLoser ? (
-                        <button
-                          type="button"
-                          aria-label={`Был лохом ${loserCount} раза — причина`}
-                          title="Показать причину"
-                          className="pointer-events-auto active:scale-95"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            haptic("selection");
-                            setLoserReasonPopover({
-                              userId: user.id,
-                              date: dayKey,
-                              displayName: user.display_name,
-                            });
-                          }}
-                        >
-                          {loserIcons[0]}×{loserCount}
-                        </button>
-                      ) : (
-                        loserIcons.map((icon, k) => (
-                          <button
-                            key={`loser-${k}`}
-                            type="button"
-                            aria-label="Был лохом — причина"
-                            title="Показать причину"
-                            className="pointer-events-auto active:scale-95"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              haptic("selection");
-                              setLoserReasonPopover({
-                                userId: user.id,
-                                date: dayKey,
-                                displayName: user.display_name,
-                              });
-                            }}
-                          >
-                            {icon}
-                          </button>
-                        ))
-                      )
-                    )}
-                    {showChukhan && <span aria-label="Был чуханом">💩</span>}
-                  </div>
                 )}
                 {/* GHG6 BD1+BD3: 🎂 живёт в ячейке участника-именинника. Иконка —
                     отдельная кнопка с pointer-events:auto и stopPropagation,

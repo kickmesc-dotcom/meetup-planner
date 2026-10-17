@@ -14,11 +14,8 @@
  * на телефонах — узкая колонка, центрированная модалка надёжнее.
  */
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { fetchBirthdayGreeting, postBirthdayGreeting } from "@/api/birthdays";
-import { donateXp } from "@/api/game";
-import { useGameFeatures } from "@/features/game/useGameFeatures";
-import { useServerCapabilities } from "@/features/game/useServerCapabilities";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
@@ -31,14 +28,6 @@ export default function BirthdayPopover() {
   const setPresetDate = useUI((s) => s.setPollSheetPresetDate);
   const setPresetQuestion = useUI((s) => s.setPollSheetPresetQuestion);
   const [greeting, setGreeting] = useState<string | null>(null);
-  // GHG10 Э11: донат опыта — только когда игра включена (иначе сервер отдаст
-  // `game_disabled`, а кнопка была бы обещанием, которого нет).
-  const game = useGameFeatures();
-  // GHG10-ops: донат — новая ручка, и живой бэкенд может её ещё не знать.
-  // Тогда показываем понятное состояние вместо 404 по нажатию.
-  const caps = useServerCapabilities();
-  const canDonate = caps.has("game.donate");
-  const queryClient = useQueryClient();
 
   const greetingMut = useMutation({
     mutationFn: () => {
@@ -67,26 +56,6 @@ export default function BirthdayPopover() {
         resp.signed
           ? "Запостил в чат с подписью от тебя ✍️"
           : "Запостил в чат от лица бота 🤖",
-      );
-    },
-    onError: (e) => {
-      haptic("error");
-      void showAlert(humanizeApiError(e));
-    },
-  });
-
-  // GHG10 Э11: «задонатить 100 XP имениннику, вычев их из своих». После успеха
-  // обновляем и профиль (баланс донора изменился), и карточку.
-  const donateMut = useMutation({
-    mutationFn: () => {
-      if (!popover) throw new Error("no_popover");
-      return donateXp(popover.userId);
-    },
-    onSuccess: (resp) => {
-      haptic("success");
-      void queryClient.invalidateQueries({ queryKey: ["game", "me"] });
-      void showAlert(
-        `🎁 Подарил ${resp.amount} XP — теперь у тебя ${resp.donor_xp} XP.`,
       );
     },
     onError: (e) => {
@@ -134,16 +103,6 @@ export default function BirthdayPopover() {
     );
     if (!ok) return;
     postMut.mutate(signed);
-  };
-
-  const onDonate = async () => {
-    if (donateMut.isPending) return;
-    haptic("selection");
-    const ok = await showConfirm(
-      `Подарить ${popover.displayName} 100 XP со своего счёта? Опыт перейдёт ему, у тебя убавится.`,
-    );
-    if (!ok) return;
-    donateMut.mutate();
   };
 
   return (
@@ -225,25 +184,6 @@ export default function BirthdayPopover() {
                   ✍️ Пост от своего имени
                 </button>
               </div>
-            </div>
-          )}
-
-          {game.enabled && canDonate && (
-            <button
-              type="button"
-              onClick={() => void onDonate()}
-              disabled={donateMut.isPending}
-              className="mt-1 rounded-lg bg-tg-secondary-bg text-tg-text py-2 px-3 text-sm font-medium active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
-            >
-              {donateMut.isPending && <Spinner size={14} />}
-              🎁 Задонатить 100 XP
-            </button>
-          )}
-
-          {game.enabled && !canDonate && (
-            <div className="mt-1 rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-[11px] text-tg-hint">
-              🎁 Донат опыта включится сам, когда бэкенд пересоберётся — эта сборка
-              сервера ещё не умеет дарить опыт.
             </div>
           )}
 

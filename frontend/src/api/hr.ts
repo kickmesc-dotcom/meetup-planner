@@ -428,3 +428,81 @@ export const setAdminTaskStatus = (
     method: "PATCH",
     body: JSON.stringify({ status, comment }),
   });
+
+// --------------------------------------------------------------------------
+// KPI смены (опыт за работу, нейтральные звания, сотрудник недели)
+// --------------------------------------------------------------------------
+
+export interface HrKpiCounts {
+  checklist_items: number;
+  shifts_done: number;
+  tasks_done: number;
+  tasks_on_time: number;
+}
+
+export interface HrKpiRank {
+  code: string;
+  title: string;
+  emoji: string;
+  threshold: number;
+}
+
+export interface HrKpiRules {
+  xp_checklist_item: number;
+  xp_shift_done: number;
+  xp_task: number;
+  xp_on_time: number;
+  min_xp_winner: number;
+}
+
+export interface HrKpiWinner {
+  employee_id: number;
+  display_name: string;
+  department: string | null;
+  xp: number;
+  tasks_done: number;
+}
+
+export interface HrMyKpi {
+  xp: number;
+  rank: HrKpiRank;
+  next_rank: HrKpiRank | null;
+  left: number;
+  percent: number;
+  week_xp: number;
+  week_counts: HrKpiCounts;
+  week_place: number | null;
+  week_total: number;
+  employee_of_week: HrKpiWinner | null;
+  rules: HrKpiRules;
+}
+
+export interface HrKpiLeaderRow {
+  place: number;
+  employee_id: number;
+  display_name: string;
+  department: string | null;
+  xp: number;
+  counts: HrKpiCounts;
+}
+
+export interface HrKpiAdmin {
+  week_start: string;
+  week_end: string;
+  rules: HrKpiRules;
+  leaderboard: HrKpiLeaderRow[];
+  employee_of_week: HrKpiWinner | null;
+}
+
+/** Своя карточка опыта — открыта всем сотрудникам. */
+export const fetchMyKpi = () => api<HrMyKpi>("/api/kpi");
+
+/** Рейтинг недели и веса опыта — ручка руководителя. */
+export const fetchKpiOverview = () => api<HrKpiAdmin>("/api/admin/kpi");
+
+/** Правка весов: только администратор, частичное обновление. */
+export const updateKpiRules = (body: Partial<HrKpiRules>) =>
+  api<HrKpiRules>("/api/admin/kpi/rules", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });

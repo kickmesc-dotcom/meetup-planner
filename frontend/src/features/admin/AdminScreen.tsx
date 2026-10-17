@@ -7,14 +7,11 @@ import {
 } from "@/api/admin";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
-import ChukhanScreen from "./ChukhanScreen";
-import LoserScreen from "./loser/LoserScreen";
 import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
 import RandomPhrasesScreen from "./RandomPhrasesScreen";
 import BotReactionsScreen from "./BotReactionsScreen";
 import MediaReactionsScreen from "./MediaReactionsScreen";
 import AdviceScreen from "./AdviceScreen";
-import WormMasterScreen from "./WormMasterScreen";
 import PhrasesSnapshotScreen from "./PhrasesSnapshotScreen";
 import PostingAlertsScreen from "./PostingAlertsScreen";
 import { fetchPostingAlerts } from "@/api/admin";
@@ -33,18 +30,16 @@ import SpaceRestartScreen from "./SpaceRestartScreen";
 import GameScreen from "./GameScreen";
 import AllFeaturesScreen from "./AllFeaturesScreen";
 import DeliveryScreen from "./DeliveryScreen";
+import KpiScreen from "./KpiScreen";
 import { useUI } from "@/store/ui";
 
 type Section =
   | "root"
-  | "chukhan"
-  | "loser"
   | "scheduled-pubs"
   | "rp"
   | "bot-reactions"
   | "media-reactions"
   | "advice"
-  | "worm-master"
   | "phrases-snapshot"
   | "posting-alerts"
   | "history"
@@ -60,18 +55,16 @@ type Section =
   | "game"
   | "all-features"
   | "delivery"
+  | "kpi"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
 const VALID_SECTIONS: Section[] = [
-  "chukhan",
-  "loser",
   "scheduled-pubs",
   "rp",
   "bot-reactions",
   "media-reactions",
   "advice",
-  "worm-master",
   "phrases-snapshot",
   "posting-alerts",
   "history",
@@ -87,6 +80,7 @@ const VALID_SECTIONS: Section[] = [
   "game",
   "all-features",
   "delivery",
+  "kpi",
   "space-restart",
 ];
 
@@ -141,14 +135,11 @@ export default function AdminScreen({ users }: Props) {
 
   const back = () => setSection("root");
 
-  if (section === "chukhan") return <ChukhanScreen users={users} onBack={back} />;
-  if (section === "loser") return <LoserScreen users={users} onBack={back} />;
   if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
   if (section === "rp") return <RandomPhrasesScreen onBack={back} />;
   if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
   if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
   if (section === "advice") return <AdviceScreen onBack={back} />;
-  if (section === "worm-master") return <WormMasterScreen onBack={back} />;
   if (section === "phrases-snapshot") return <PhrasesSnapshotScreen onBack={back} />;
   if (section === "posting-alerts") return <PostingAlertsScreen onBack={back} />;
   if (section === "history") return <HistoryScreen users={users} onBack={back} />;
@@ -165,6 +156,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "game") return <GameScreen users={users} onBack={back} />;
   if (section === "all-features") return <AllFeaturesScreen onBack={back} />;
   if (section === "delivery") return <DeliveryScreen onBack={back} />;
+  if (section === "kpi") return <KpiScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -390,23 +382,12 @@ export default function AdminScreen({ users }: Props) {
         />
       </SectionGroup>
 
-      <SectionGroup icon="🤡" title="Лох">
+      <SectionGroup icon="🏅" title="KPI смены">
         <Card
-          id="admin-phrase-editor"
-          icon="👑"
-          title="Лох дня"
-          subtitle="Автовыбор, реролл, шаблоны, история"
-          onClick={() => select("loser")}
-        />
-      </SectionGroup>
-
-      <SectionGroup icon="💩" title="Чухан">
-        <Card
-          id="admin-chukhan"
-          icon="⚖️"
-          title="Чухан недели"
-          subtitle="Веса, ре-ролл, история, шаблоны фраз"
-          onClick={() => select("chukhan")}
+          icon="🏅"
+          title="Опыт и сотрудник недели"
+          subtitle="Веса за пункты, смены и поручения · рейтинг недели"
+          onClick={() => select("kpi")}
         />
       </SectionGroup>
 
@@ -439,13 +420,6 @@ export default function AdminScreen({ users }: Props) {
           title="Магический шар"
           subtitle="/advice · #совет · @бот …?"
           onClick={() => select("advice")}
-        />
-        {/* GHG8 T3.6.6: режим «червь-господин» — подхалимаж/punish/анонс. */}
-        <Card
-          icon="🪱"
-          title="Червь-господин"
-          subtitle="Подхалимаж, /punish, анонс становления"
-          onClick={() => select("worm-master")}
         />
       </SectionGroup>
 

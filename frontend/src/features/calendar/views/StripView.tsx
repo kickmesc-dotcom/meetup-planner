@@ -1,6 +1,6 @@
 import { format, isToday, isWeekend, startOfDay } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
-import type { BirthdayCalendarEntry, CalendarMark, CurrentTitles } from "@/api/birthdays";
+import type { BirthdayCalendarEntry } from "@/api/birthdays";
 import { buildDaysWindow, ruWeekdayShort } from "../dateUtils";
 import ParticipantRow from "../ParticipantRow";
 
@@ -11,11 +11,6 @@ interface Props {
   meId: number;
   ranges: AvailabilityRange[];
   birthdays?: BirthdayCalendarEntry[];
-  marks?: CalendarMark[];
-  /** GHG7 P2.1.a: актуальные звания для иконок-«шапок» поверх аватарки. */
-  titles?: CurrentTitles | null;
-  /** GHG6 E6: даты (YYYY-MM-DD) с запланированной игрой — рисуем 🎮 в шапке дня. */
-  gameDates?: Set<string>;
   isPending: boolean;
 }
 
@@ -26,9 +21,6 @@ export default function StripView({
   meId,
   ranges,
   birthdays = [],
-  marks = [],
-  titles = null,
-  gameDates,
   isPending,
 }: Props) {
   const days = buildDaysWindow(startOfDay(windowStart), span);
@@ -65,14 +57,6 @@ export default function StripView({
               <div className="text-sm leading-none">
                 {showMonth ? format(d, "d.MM") : d.getDate()}
               </div>
-              {gameDates?.has(format(d, "yyyy-MM-dd")) && (
-                <div
-                  className="absolute top-0 right-0.5 text-[10px] leading-none"
-                  title="Запланированная игра"
-                >
-                  🎮
-                </div>
-              )}
               {today && (
                 <div className="absolute left-1/2 -translate-x-1/2 -bottom-px h-0.5 w-6 rounded-full bg-tg-link" />
               )}
@@ -90,8 +74,6 @@ export default function StripView({
             windowStart={windowStart}
             windowSpan={span}
             birthdays={birthdays.filter((b) => b.user_id === u.id)}
-            marks={marks.filter((m) => m.user_id === u.id)}
-            titles={titles}
           />
         ))}
         {isPending && (

@@ -13,6 +13,7 @@ import AchievementsCard from "@/features/hr/AchievementsCard";
 import Badge from "@/features/hr/Badge";
 import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
+import KpiCard from "@/features/hr/KpiCard";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 
@@ -133,6 +134,9 @@ export default function HrProfileScreen() {
           {ROLE_HINT[me.role]}
         </p>
       </section>
+
+      {/* Опыт за работу: открыт всем — это мотивация, а не надзор. */}
+      <KpiCard />
 
       {/* Скрытый личный прогресс: сервер сам решает, показывать ли блок
           (сейчас — руководителю и админу), см. `AchievementsCard`. */}

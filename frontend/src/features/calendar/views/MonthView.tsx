@@ -22,8 +22,6 @@ interface Props {
   ranges: AvailabilityRange[];
   users: User[];
   birthdays?: BirthdayCalendarEntry[];
-  /** GHG6 E6: даты (YYYY-MM-DD) с запланированной игрой — иконка 🎮 в углу дня. */
-  gameDates?: Set<string>;
 }
 
 export default function MonthView({
@@ -32,7 +30,6 @@ export default function MonthView({
   ranges,
   users,
   birthdays = [],
-  gameDates,
 }: Props) {
   const setZoom = useUI((s) => s.setZoom);
   const setAnchor = useUI((s) => s.setAnchorDate);
@@ -72,7 +69,6 @@ export default function MonthView({
           ranges={ranges}
           users={users}
           bdayIndex={bdayIndex}
-          gameDates={gameDates}
           onDayTap={onDayTap}
         />
       ))}
@@ -85,14 +81,12 @@ function MonthBlock({
   ranges,
   users,
   bdayIndex,
-  gameDates,
   onDayTap,
 }: {
   monthAnchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
   bdayIndex: Map<string, BirthdayCalendarEntry[]>;
-  gameDates?: Set<string>;
   onDayTap: (d: Date) => void;
 }) {
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
@@ -177,14 +171,6 @@ function MonthBlock({
                   {bdayList.length > 1 && (
                     <span className="ml-0.5 text-[8px]">×{bdayList.length}</span>
                   )}
-                </span>
-              )}
-              {gameDates?.has(dayKey) && (
-                <span
-                  aria-label="Запланированная игра"
-                  className="absolute bottom-0.5 left-0.5 text-[10px] leading-none pointer-events-none"
-                >
-                  🎮
                 </span>
               )}
               <div className="flex gap-0.5 mt-auto pb-0.5">

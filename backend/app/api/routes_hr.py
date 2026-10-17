@@ -34,6 +34,7 @@ from app.db.hr_models import (
 from app.db.models import User
 from app.schemas.hr_achievements import AchievementsOut
 from app.schemas.hr_achievements import to_out as _achievements_out
+from app.schemas.hr_kpi import MyKpiOut, to_my_out
 from app.services import (
     hr_access,
     hr_achievements,
@@ -41,6 +42,7 @@ from app.services import (
     hr_departments,
     hr_feed,
     hr_feedback,
+    hr_kpi,
     hr_links,
     hr_tasks,
 )
@@ -670,6 +672,18 @@ async def my_achievements(
     """
     view = await hr_achievements.view(session, employee)
     return _achievements_out(view)
+
+
+@router.get("/kpi", response_model=MyKpiOut)
+async def my_kpi(session: SessionDep, employee: EmployeeDep) -> MyKpiOut:
+    """Опыт за работу и звание — открыто всем, а не только руководителю.
+
+    В отличие от скрытых ачивок это мотивационный блок: сотрудник видит, за что
+    получил опыт (пункты, смены, поручения), сколько до следующего звания и где
+    он в недельном рейтинге. Никаких штрафов и «антизваний» здесь нет.
+    """
+    data = await hr_kpi.my_kpi(session, employee, hr_checklists.local_today())
+    return to_my_out(data)
 
 
 @router.get("/feed", response_model=FeedOut)

@@ -9,7 +9,6 @@ import {
 } from "./api/availability";
 import CalendarView from "./features/calendar/CalendarView";
 import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
-import GuestProfileScreen from "./features/profile/GuestProfileScreen";
 // SemiTaskBot: рабочие экраны сотрудника.
 import MyTasksScreen from "./features/hr/MyTasksScreen";
 import ChecklistScreen from "./features/hr/ChecklistScreen";
@@ -50,9 +49,6 @@ export default function App() {
   });
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
-  // Э19: гостевой профиль (клик по аватарке на календаре) — оверлей поверх вкладок.
-  const guestUserId = useUI((s) => s.guestUserId);
-  const closeGuest = useUI((s) => s.closeGuest);
 
   // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
   // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
@@ -226,9 +222,6 @@ export default function App() {
     <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
       {content}
       <TabBar isAdmin={isAdmin} />
-      {guestUserId !== null && (
-        <GuestProfileScreen userId={guestUserId} onClose={closeGuest} />
-      )}
     </div>
   );
 }

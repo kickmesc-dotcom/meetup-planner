@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { addDays, format, isToday, isWeekend, startOfDay } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
-import type { BirthdayCalendarEntry, CalendarMark, CurrentTitles } from "@/api/birthdays";
+import type { BirthdayCalendarEntry } from "@/api/birthdays";
 import { ruWeekdayShort } from "../dateUtils";
 import ParticipantRow from "../ParticipantRow";
 import { useUI } from "@/store/ui";
@@ -43,11 +43,6 @@ interface Props {
   anchor: Date;
   ranges: AvailabilityRange[];
   birthdays?: BirthdayCalendarEntry[];
-  marks?: CalendarMark[];
-  /** GHG7 P2.1.a: актуальные звания для иконок-«шапок» поверх аватарки. */
-  titles?: CurrentTitles | null;
-  /** GHG6 E6: даты (YYYY-MM-DD) с запланированной игрой — 🎮 в шапке дня. */
-  gameDates?: Set<string>;
   isPending: boolean;
 }
 
@@ -57,9 +52,6 @@ export default function TimelineView({
   anchor,
   ranges,
   birthdays = [],
-  marks = [],
-  titles = null,
-  gameDates,
   isPending,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -168,7 +160,6 @@ export default function TimelineView({
         <TimelineHeader
           days={days}
           cellWidth={cellWidth}
-          gameDates={gameDates}
           visibleStart={visibleStart}
           visibleEnd={visibleEnd}
         />
@@ -181,8 +172,6 @@ export default function TimelineView({
             windowStart={windowStart}
             windowSpan={span}
             birthdays={birthdays.filter((b) => b.user_id === u.id)}
-            marks={marks.filter((m) => m.user_id === u.id)}
-            titles={titles}
             cellWidth={cellWidth}
             visibleStart={visibleStart}
             visibleEnd={visibleEnd}
@@ -199,13 +188,11 @@ export default function TimelineView({
 function TimelineHeader({
   days,
   cellWidth,
-  gameDates,
   visibleStart,
   visibleEnd,
 }: {
   days: Date[];
   cellWidth: number;
-  gameDates?: Set<string>;
   /**
    * GHG6 CL2: индексы видимого диапазона дней (включительно, с учётом
    * OVERSCAN). Дни за пределами схлопываются в два grid-спейсера —
@@ -257,14 +244,6 @@ function TimelineHeader({
             <div className="text-sm leading-none">
               {showMonth ? format(d, "d.MM") : d.getDate()}
             </div>
-            {gameDates?.has(format(d, "yyyy-MM-dd")) && (
-              <div
-                className="absolute top-0 right-0.5 text-[10px] leading-none"
-                title="Запланированная игра"
-              >
-                🎮
-              </div>
-            )}
             {today && (
               <div className="absolute left-1/2 -translate-x-1/2 -bottom-px h-0.5 w-6 rounded-full bg-tg-link" />
             )}

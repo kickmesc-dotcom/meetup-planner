@@ -15,7 +15,6 @@ export default function ActionBar() {
   const [open, setOpen] = useState(true);
 
   const setShowAuto = useUI((s) => s.setShowAutoPickSheet);
-  const setShowLoser = useUI((s) => s.setShowLoserSheet);
   const setShowPoll = useUI((s) => s.setShowPollSheet);
 
   // Q: кнопка «Прогон фразы» — только админам (эндпоинт admin-only).
@@ -59,7 +58,7 @@ export default function ActionBar() {
     <div
       className={[
         "grid gap-2 border-t border-tg-secondary-bg bg-tg-bg p-2",
-        isAdmin ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3",
+        isAdmin ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2",
       ].join(" ")}
     >
       {/* H.2: симметрично приветствию — своей строкой, а не поверх кнопок. */}
@@ -83,10 +82,6 @@ export default function ActionBar() {
       <ActionBtn
         onClick={tap(() => setShowPoll(true))}
         label="📊 Опрос"
-      />
-      <ActionBtn
-        onClick={tap(() => setShowLoser(true))}
-        label="🤡 Автолох"
       />
       {isAdmin && (
         <ActionBtn

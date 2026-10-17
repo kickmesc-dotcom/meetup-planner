@@ -2,12 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDrag, usePinch } from "@use-gesture/react";
 import { fetchRanges } from "@/api/availability";
-import {
-  fetchBirthdaysInWindow,
-  fetchCalendarMarks,
-  fetchCurrentTitles,
-  fetchScheduledGames,
-} from "@/api/birthdays";
+import { fetchBirthdaysInWindow } from "@/api/birthdays";
 import { fetchCalendarTimelineFlag } from "@/api/admin";
 import type { User } from "@/types";
 import { useUI, isStripZoom, isMonthGridZoom } from "@/store/ui";
@@ -18,14 +13,11 @@ import ZoomController from "./ZoomController";
 import RangeEditorSheet from "../editor/RangeEditorSheet";
 import ActionBar from "../actions/ActionBar";
 import AutoPickSheet from "../actions/AutoPickSheet";
-import LoserSheet from "../actions/LoserSheet";
 import PollSheet from "../actions/PollSheet";
 import StripView from "./views/StripView";
 import TimelineView from "./views/TimelineView";
 import TimelineNavBar from "./views/TimelineNavBar";
 import BirthdayPopover from "./BirthdayPopover";
-import LoserReasonPopover from "./LoserReasonPopover";
-import WormHistoryPopover from "./WormHistoryPopover";
 import HoursView from "./views/HoursView";
 import MonthView from "./views/MonthView";
 import YearView from "./views/YearView";
@@ -41,7 +33,6 @@ export default function CalendarView({ users, meId }: Props) {
   const anchor = useUI((s) => s.anchorDate);
   const editingRangeId = useUI((s) => s.editingRangeId);
   const showAutoPick = useUI((s) => s.showAutoPickSheet);
-  const showLoser = useUI((s) => s.showLoserSheet);
   const showPoll = useUI((s) => s.showPollSheet);
   const zoomIn = useUI((s) => s.zoomIn);
   const zoomOut = useUI((s) => s.zoomOut);
@@ -88,31 +79,6 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
     queryKey: ["birthdays", win.start.toISOString(), win.end.toISOString()],
     queryFn: () => fetchBirthdaysInWindow(win.start, win.end),
     staleTime: 10_000,
-  });
-
-  // GHG6 BD4: отметки лох/чухан в окне. Используются для 👑/💩 на прошедших днях.
-  const marks = useQuery({
-    queryKey: ["calendar-marks", win.start.toISOString(), win.end.toISOString()],
-    queryFn: () => fetchCalendarMarks(win.start, win.end),
-    staleTime: 30_000,
-  });
-
-  // GHG7 P2.1.a: актуальные звания (червь, чухан недели, лох дня, главный лох,
-  // ДР сегодня) одним запросом — для иконок-«шапок» поверх аватарки. Не от
-  // окна, запрос «глобальный». 30s staleTime: звания меняются редко.
-  // Заменяет прежний отдельный ["worm-current"] — worm теперь приходит здесь.
-  const titles = useQuery({
-    queryKey: ["titles-current"],
-    queryFn: fetchCurrentTitles,
-    staleTime: 30_000,
-  });
-
-  // GHG6 E6: запланированные игры в окне — рисуем иконку 🎮 в углу дня.
-  // Окно совпадает с окном ranges, чтобы один и тот же refresh охватывал всё.
-  const games = useQuery({
-    queryKey: ["games-scheduled", win.start.toISOString(), win.end.toISOString()],
-    queryFn: () => fetchScheduledGames(win.start, win.end),
-    staleTime: 30_000,
   });
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,9 +157,6 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
 
   const data = ranges.data ?? [];
   const bdays = birthdays.data ?? [];
-  const calMarks = marks.data ?? [];
-  const titlesData = titles.data ?? null;
-  const gameDates = new Set((games.data ?? []).map((g) => g.date));
   const isPending = ranges.isPending;
 
   // GHG6 P3 CL13: при включённом timeline мы переиспользуем legacy YearView /
@@ -212,9 +175,6 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         anchor={anchor}
         ranges={data}
         birthdays={bdays}
-        marks={calMarks}
-        titles={titlesData}
-        gameDates={gameDates}
         isPending={isPending}
       />
     );
@@ -230,9 +190,6 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         meId={meId}
         ranges={data}
         birthdays={bdays}
-        marks={calMarks}
-        titles={titlesData}
-        gameDates={gameDates}
         isPending={isPending}
       />
     );
@@ -245,7 +202,6 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         ranges={data}
         users={users}
         birthdays={bdays}
-        gameDates={gameDates}
       />
     );
   } else if (zoom === "year") {
@@ -285,15 +241,10 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         />
       )}
       {showAutoPick && <AutoPickSheet />}
-      {showLoser && <LoserSheet />}
       {showPoll && <PollSheet users={users} />}
 
       {/* GHG6 BD2: глобальный поповер ДР; рендерится поверх всего календаря. */}
       <BirthdayPopover />
-      {/* GHG7 P0.2.e: попап причины ролла по клику на 👑. */}
-      <LoserReasonPopover />
-      {/* GHG8 P2.1.c: попап-история звания «Червь-пидор» по клику на 🪱. */}
-      <WormHistoryPopover />
     </div>
   );
 }

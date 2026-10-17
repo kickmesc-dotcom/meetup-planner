@@ -37,12 +37,20 @@ from app.db.hr_models import (
 from app.db.models import User
 from app.schemas.hr_achievements import AchievementsOut
 from app.schemas.hr_achievements import to_out as _achievements_out
+from app.schemas.hr_kpi import (
+    KpiAdminOut,
+    RulesOut,
+    RulesPatch,
+    to_leaderboard,
+    to_winner_out,
+)
 from app.services import (
     hr_achievements,
     hr_checklists,
     hr_demo,
     hr_departments,
     hr_feedback,
+    hr_kpi,
     hr_links,
     hr_notify,
     hr_settings,
@@ -947,6 +955,53 @@ async def put_hr_settings(
         demo_visible=body.demo_visible,
     )
     return HrSettingsOut(**updated)
+
+
+# --------------------------------------------------------------------------
+# KPI смены: правила, недельный рейтинг, сотрудник недели
+# --------------------------------------------------------------------------
+
+
+@router.get("/kpi", response_model=KpiAdminOut)
+async def kpi_overview(session: SessionDep, _: AupDep) -> KpiAdminOut:
+    """Рейтинг недели и текущие веса опыта.
+
+    Читает руководитель: номинация «сотрудник недели» — его рабочий инструмент,
+    а не развлечение. Тестовый пул `[BOT]` из рейтинга исключён, иначе
+    симуляторы забирали бы звание у живых людей.
+    """
+    rules = await hr_kpi.get_rules(session)
+    today = hr_checklists.local_today()
+    monday, sunday = hr_kpi.week_bounds(today)
+    board = [c for c in await hr_kpi.board(session, today, rules) if not c.is_demo]
+    return KpiAdminOut(
+        week_start=monday.isoformat(),
+        week_end=sunday.isoformat(),
+        rules=RulesOut(**rules.as_dict()),
+        leaderboard=to_leaderboard(board),
+        employee_of_week=to_winner_out(hr_kpi.pick_winner(board, rules)),
+    )
+
+
+@router.put("/kpi/rules", response_model=RulesOut)
+async def put_kpi_rules(
+    body: RulesPatch, session: SessionDep, _: AdminDep
+) -> RulesOut:
+    """Правка весов опыта без передеплоя.
+
+    Менять может только администратор: это баланс наград, и «подкрутить себе
+    опыт» из-под руководителя не должно быть возможно. Границы зажаты и в
+    схеме, и в сервисе.
+    """
+    rules = await hr_kpi.update_rules(
+        session,
+        xp_checklist_item=body.xp_checklist_item,
+        xp_shift_done=body.xp_shift_done,
+        xp_task=body.xp_task,
+        xp_on_time=body.xp_on_time,
+        min_xp_winner=body.min_xp_winner,
+    )
+    return RulesOut(**rules.as_dict())
 
 
 # --------------------------------------------------------------------------

@@ -23,8 +23,6 @@ const PARTICIPANT_COL_PX = 60;
  * участники как столбцы; drag по своему столбцу создаёт диапазон. */
 export default function HoursView({ day, users, meId, ranges }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
-  // Э19: аватарка в шапке — тоже вход в чужой профиль.
-  const openGuest = useUI((s) => s.openGuest);
   const qc = useQueryClient();
 
   // См. `ParticipantRow`: диапазон кладём в кэш сразу, иначе полоса появляется
@@ -82,14 +80,8 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
             key={`hdr-${u.id}`}
             className="sticky top-0 z-20 bg-tg-bg border-b border-tg-secondary-bg flex flex-col items-center py-1"
           >
-            <button
-              type="button"
-              onClick={() => {
-                haptic("selection");
-                openGuest(u.id);
-              }}
-              aria-label={`Открыть профиль ${u.display_name}`}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-medium overflow-hidden shrink-0 active:scale-95"
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-medium overflow-hidden shrink-0"
               style={{ background: u.color_hex }}
             >
               {u.avatar_url ? (
@@ -97,7 +89,7 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
               ) : (
                 u.display_name[0]?.toUpperCase()
               )}
-            </button>
+            </div>
             <div className="text-[9px] text-tg-hint truncate max-w-[64px] mt-0.5">
               {u.display_name.split(/\s+/)[0]}
             </div>
