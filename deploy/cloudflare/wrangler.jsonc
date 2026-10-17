@@ -1,0 +1,48 @@
+// Cloudflare Workers + Container для FastAPI-бэкенда SemiTaskBot.
+//
+// Почему контейнер, а не Python Workers: приложение построено на async
+// SQLAlchemy, а в Python Workers (Pyodide) async-ORM не работает — нет
+// greenlet. Контейнер запускает ровно тот же образ, что и раньше, поэтому
+// переписывать 47k строк API не нужно.
+//
+// Требуется план Workers Paid ($5/мес): Cloudflare Containers на Free
+// недоступны (проверено на этом аккаунте: 401 "requires the Workers Paid plan").
+//
+// Деплой (из backend/, после `wrangler login` или с CLOUDFLARE_API_TOKEN):
+//   npx wrangler deploy -c ../deploy/cloudflare/wrangler.jsonc
+//
+// Секреты (BOT_TOKEN, DATABASE_URL, TG_WEBHOOK_SECRET, …) не хранятся в этом
+// файле: их кладёт `wrangler secret put <NAME>` или `tools/cf-secrets.py`.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "semitask-api",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-08",
+  "observability": { "enabled": true },
+
+  "containers": [
+    {
+      // Образ собирается из backend/Dockerfile — тот же, что возил Amvera/HF.
+      // Uvicorn внутри слушает $PORT (по умолчанию 7860).
+      "class_name": "BackendContainer",
+      "image": "../../meetup-planner-main/backend/Dockerfile",
+      "max_instances": 1,
+      "instance_type": "basic"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [{ "name": "BACKEND", "class_name": "BackendContainer" }]
+  },
+
+  // SQLite-классы: состояние Durable Object (маршрутизация к контейнеру).
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["BackendContainer"] }],
+
+  "vars": {
+    // Публичный адрес API. После первого деплоя замените на выданный
+    // *.workers.dev (или свой домен) — от него зависят CORS и вебхук бота.
+    "PUBLIC_BASE_URL": "https://semitask-api.<account>.workers.dev",
+    "DB_SSL": "require",
+    "SCHEDULER_TZ": "Europe/Moscow"
+  }
+}
