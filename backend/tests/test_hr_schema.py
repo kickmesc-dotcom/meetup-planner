@@ -37,6 +37,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0030_hr_badges_demo.py",
     "0031_hr_achievements.py",
     "0032_hr_training_roles.py",
+    "0033_hr_issue_journal.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -56,6 +57,8 @@ HR_TABLES = {
     "feedback_answers",
     "employee_achievements",
     "employee_training_steps",
+    "hr_issues",
+    "hr_issue_events",
 }
 
 

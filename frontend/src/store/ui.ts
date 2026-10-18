@@ -60,6 +60,8 @@ export function isMonthGridZoom(z: ZoomLevel): boolean {
 // приложение, чтобы закрыть смену и посмотреть поручения, поэтому "tasks" и
 // "checklist" идут первыми, "feed" остаётся разделом событий (с новой
 // ролевой видимостью), "calendar" и "meetings" сохраняются как есть.
+// "issues" — журнал операционных проблем. В нижнюю полосу не встаёт (там уже
+// пять-шесть подписей), но и не спрятан: вход из «Мои задачи» и из профиля.
 export type Tab =
   | "tasks"
   | "checklist"
@@ -68,6 +70,7 @@ export type Tab =
   | "calendar"
   | "meetings"
   | "team"
+  | "issues"
   | "profile"
   | "admin";
 

@@ -99,6 +99,8 @@ def _engine(dsn: str):
 _TOUCHED = (
     "feedback_answers",
     "employee_achievements",
+    "hr_issue_events",
+    "hr_issues",
     "task_photos",
     "task_issues",
     "task_events",
@@ -486,3 +488,121 @@ async def test_employee_full_path_on_real_postgres(flow: Flow) -> None:
     assert r.status_code == 200, r.text
     boss_kinds = {item["kind"] for item in r.json()["items"]}
     assert "task_created" in boss_kinds
+
+
+async def test_issue_journal_on_real_postgres(flow: Flow) -> None:
+    """Журнал проблем: карточка переживает смену, права — на сервере."""
+    client = flow.client
+
+    # --- 1. Сотрудник заводит проблему, не привязанную к поручению ---------
+    flow.act_as(flow.employee_user)
+    r = await client.post(
+        "/api/issues",
+        json={
+            "title": "Не работает терминал на баре",
+            "description": "Перезагружали — не помогло",
+            "category": "equipment",
+            "zone": "бар",
+            "severity": "high",
+        },
+    )
+    assert r.status_code == 201, r.text
+    issue = r.json()
+    assert issue["status"] == "open"
+    assert issue["created_by_employee_id"] == flow.employee_id
+    assert issue["department_id"] == flow.department_id
+    assert issue["severity"] == "high"
+    assert issue["can_edit"] is True and issue["can_close"] is True
+    # Отдел автора виден сразу: журнал общий для смены.
+    assert [event["kind"] for event in issue["events"]] == ["created"]
+
+    # --- 2. Счётчики и видимость у руководителя ----------------------------
+    r = await client.get("/api/issues")
+    assert r.status_code == 200, r.text
+    listing = r.json()
+    assert listing["scope"] == "department"
+    assert listing["summary"]["total_open"] == 1
+    assert listing["summary"]["attention"] == 1
+    assert [item["id"] for item in listing["items"]] == [issue["id"]]
+
+    # Уведомление легло руководителю в колокольчик (в Telegram не шлём).
+    async with flow.session_factory() as session:
+        bell = await session.scalar(
+            text(
+                "select count(*) from app_notifications "
+                "where user_id = :uid and kind = 'issue_created'"
+            ),
+            {"uid": flow.manager_user.id},
+        )
+    assert bell == 1
+
+    # --- 3. Сотрудник не может назначить проблему на коллегу ----------------
+    r = await client.patch(
+        f"/api/issues/{issue['id']}",
+        json={"assignee_employee_id": flow.manager_id, "assignee_set": True},
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "assignee_forbidden"
+
+    # --- 4. Руководитель берёт в работу и закрывает ------------------------
+    flow.act_as(flow.manager_user)
+    r = await client.post(
+        f"/api/issues/{issue['id']}/status",
+        json={"status": "in_progress", "comment": "вызвал мастера"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "in_progress"
+
+    r = await client.post(
+        f"/api/issues/{issue['id']}/comments", json={"text": "мастер будет к 18:00"}
+    )
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["events"][-1]["kind"] == "comment"
+    assert detail["events"][-1]["comment"] == "мастер будет к 18:00"
+
+    r = await client.post(
+        f"/api/issues/{issue['id']}/status",
+        json={"status": "resolved", "comment": "терминал заменён"},
+    )
+    assert r.status_code == 200, r.text
+    resolved = r.json()
+    assert resolved["status"] == "resolved"
+    assert resolved["resolved_at"] is not None
+    # Карточка осталась в истории: закрытая не исчезает из журнала.
+    r = await client.get("/api/issues?include_closed=true")
+    assert r.status_code == 200, r.text
+    assert [item["id"] for item in r.json()["items"]] == [issue["id"]]
+
+    # --- 5. Сотрудник не переоткрывает, руководитель — может ---------------
+    flow.act_as(flow.employee_user)
+    r = await client.post(
+        f"/api/issues/{issue['id']}/status", json={"status": "open"}
+    )
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "forbidden"
+
+    flow.act_as(flow.manager_user)
+    r = await client.post(
+        f"/api/issues/{issue['id']}/status", json={"status": "open"}
+    )
+    assert r.status_code == 200, r.text
+    reopened = r.json()
+    assert reopened["status"] == "open"
+    assert reopened["resolved_at"] is None
+    assert [event["kind"] for event in reopened["events"]][-1] == "status"
+
+    # --- 6. Подделанные коды отклоняются -----------------------------------
+    r = await client.post(
+        "/api/issues", json={"title": "Тест", "category": "nonsense"}
+    )
+    assert r.status_code == 400
+    r = await client.post(
+        f"/api/issues/{issue['id']}/status", json={"status": "done"}
+    )
+    assert r.status_code == 400
+    # Чужой id не подтверждаем — 404, а не 403.
+    r = await client.get("/api/issues/999999")
+    assert r.status_code == 404
+
+

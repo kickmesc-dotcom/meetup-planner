@@ -25,6 +25,7 @@ from app.api import (
     routes_calendar,
     routes_hr,
     routes_hr_admin,
+    routes_issues,
     routes_meetings,
     routes_meta,
     routes_polls,
@@ -247,6 +248,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_calendar.router, prefix="/api")
     # SemiTaskBot HR-ядро: ручки сотрудника и управляющий контур (АУП/админ).
     app.include_router(routes_hr.router, prefix="/api")
+    # Журнал операционных проблем — отдельная сущность со своими правами.
+    app.include_router(routes_issues.router, prefix="/api")
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие

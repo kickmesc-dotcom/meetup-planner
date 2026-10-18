@@ -103,6 +103,49 @@ PRIORITY_NORMAL = "normal"
 PRIORITY_HIGH = "high"
 PRIORITIES: tuple[str, ...] = (PRIORITY_LOW, PRIORITY_NORMAL, PRIORITY_HIGH)
 
+# Журнал операционных проблем: карточка живёт отдельно от поручения и переживает
+# смену. Категория — «что сломалось», зона — «где», срочность — «насколько
+# горит». Наборы закрытые, чтобы журнал можно было считать и фильтровать.
+ISSUE_CATEGORY_EQUIPMENT = "equipment"
+ISSUE_CATEGORY_SUPPLIES = "supplies"
+ISSUE_CATEGORY_STAFFING = "staffing"
+ISSUE_CATEGORY_GUEST = "guest"
+ISSUE_CATEGORY_CLEANLINESS = "cleanliness"
+ISSUE_CATEGORY_SAFETY = "safety"
+ISSUE_CATEGORY_IT = "it"
+ISSUE_CATEGORY_OTHER = "other"
+ISSUE_CATEGORIES: tuple[str, ...] = (
+    ISSUE_CATEGORY_EQUIPMENT,
+    ISSUE_CATEGORY_SUPPLIES,
+    ISSUE_CATEGORY_STAFFING,
+    ISSUE_CATEGORY_GUEST,
+    ISSUE_CATEGORY_CLEANLINESS,
+    ISSUE_CATEGORY_SAFETY,
+    ISSUE_CATEGORY_IT,
+    ISSUE_CATEGORY_OTHER,
+)
+
+ISSUE_SEVERITY_LOW = "low"
+ISSUE_SEVERITY_NORMAL = "normal"
+ISSUE_SEVERITY_HIGH = "high"
+ISSUE_SEVERITY_CRITICAL = "critical"
+ISSUE_SEVERITIES: tuple[str, ...] = (
+    ISSUE_SEVERITY_LOW,
+    ISSUE_SEVERITY_NORMAL,
+    ISSUE_SEVERITY_HIGH,
+    ISSUE_SEVERITY_CRITICAL,
+)
+
+ISSUE_OPEN = "open"
+ISSUE_IN_PROGRESS = "in_progress"
+ISSUE_RESOLVED = "resolved"
+ISSUE_CANCELLED = "cancelled"
+ISSUE_STATUSES: tuple[str, ...] = (
+    ISSUE_OPEN,
+    ISSUE_IN_PROGRESS,
+    ISSUE_RESOLVED,
+    ISSUE_CANCELLED,
+)
 # Вид вопроса обратной связи.
 QUESTION_SCALE = "scale"
 QUESTION_CHOICE = "choice"
@@ -511,6 +554,108 @@ class TaskPhoto(Base):
     # Одобрение руководителем — заглушка под Этап 3 («подтверждение фотоотчётов»).
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Журнал операционных проблем
+# --------------------------------------------------------------------------
+
+
+class Issue(Base):
+    """Операционная проблема смены как отдельная карточка.
+
+    Отличие от `TaskIssue` (объяснение «не успеваю» по поручению): здесь нет
+    поручения, из которого всё началось. Проблема может висеть неделю — «течёт
+    кран», «не работает терминал», «гость жалуется на шум» — переходить между
+    сменами и людьми, обрастать комментариями и закрываться тогда, когда её
+    реально решили. `task_id` — необязательная ссылка на поручение, чтобы
+    журнал и задачи не разъезжались, если проблема пришла из задачи.
+
+    `shift_date` — смена, на которой проблему зафиксировали. Это не срок
+    решения: по нему журнал группируется в отчёте «что было в смене».
+    """
+
+    __tablename__ = "hr_issues"
+    __table_args__ = (
+        CheckConstraint(_in_list("category", ISSUE_CATEGORIES), name="ck_hr_issue_category"),
+        CheckConstraint(_in_list("severity", ISSUE_SEVERITIES), name="ck_hr_issue_severity"),
+        CheckConstraint(_in_list("status", ISSUE_STATUSES), name="ck_hr_issue_status"),
+        Index("ix_hr_issues_status", "status", "severity"),
+        Index("ix_hr_issues_department", "department_id", "status"),
+        Index("ix_hr_issues_assignee", "assignee_employee_id", "status"),
+        Index("ix_hr_issues_shift", "shift_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default=ISSUE_CATEGORY_OTHER,
+        server_default=ISSUE_CATEGORY_OTHER,
+    )
+    # Свободный текст: «зал», «кухня», «бар», «склад», «касса №2».
+    zone: Mapped[str | None] = mapped_column(String(64))
+    severity: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default=ISSUE_SEVERITY_NORMAL,
+        server_default=ISSUE_SEVERITY_NORMAL,
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=ISSUE_OPEN, server_default=ISSUE_OPEN
+    )
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    # Кто отвечает сейчас. Меняется по ходу жизни карточки.
+    assignee_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    created_by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    task_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("tasks.id", ondelete="SET NULL")
+    )
+    shift_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class IssueEvent(Base):
+    """История карточки: создание, смена статуса/ответственного, комментарии.
+
+    Отдельная таблица, а не поле «последний комментарий»: журнал нужен именно
+    затем, чтобы через смену было видно, кто и что с проблемой делал.
+    """
+
+    __tablename__ = "hr_issue_events"
+    __table_args__ = (Index("ix_hr_issue_events_issue", "issue_id", "at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    issue_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("hr_issues.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(16))
+    to_status: Mapped[str | None] = mapped_column(String(16))
+    by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    comment: Mapped[str | None] = mapped_column(Text)
+    at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 

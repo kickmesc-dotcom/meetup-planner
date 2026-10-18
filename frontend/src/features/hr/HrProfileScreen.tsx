@@ -323,6 +323,11 @@ export default function HrProfileScreen() {
           />
           <Jump icon="🔗" label="Ссылки" onClick={() => setTab("links")} />
           <Jump
+            icon="🛠"
+            label="Журнал проблем"
+            onClick={() => setTab("issues")}
+          />
+          <Jump
             icon="📝"
             label="Обратная связь"
             onClick={() => setShowFeedback(true)}

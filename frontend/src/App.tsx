@@ -15,6 +15,7 @@ import ChecklistScreen from "./features/hr/ChecklistScreen";
 import TeamScreen from "./features/hr/TeamScreen";
 import { fetchEmployee } from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
+import IssuesScreen from "./features/issues/IssuesScreen";
 import LinksScreen from "./features/hr/LinksScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
@@ -190,6 +191,13 @@ export default function App() {
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
         <TeamScreen canManage={!!hrMe.data?.is_staff} />
+      </main>
+    );
+  } else if (tab === "issues") {
+    // Журнал проблем: свой заголовок и возврат к задачам внутри экрана.
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <IssuesScreen />
       </main>
     );
   } else if (tab === "links") {

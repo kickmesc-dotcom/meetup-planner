@@ -14,6 +14,7 @@ import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
+import { useUI } from "@/store/ui";
 
 /**
  * SemiTaskBot: «Мои задачи» — главный экран смены.
@@ -80,6 +81,7 @@ function fmtDue(iso: string | null): string {
 
 export default function MyTasksScreen() {
   const qc = useQueryClient();
+  const setTab = useUI((s) => s.setTab);
   const [showClosed, setShowClosed] = useState(false);
   const [issueFor, setIssueFor] = useState<number | null>(null);
 
@@ -137,7 +139,7 @@ export default function MyTasksScreen() {
             ? "Активных поручений нет — смена закрыта."
             : `Активных: ${open.length}${overdue ? ` · просрочено: ${overdue}` : ""}`}
         </p>
-        <div className="mt-3 flex gap-1.5">
+        <div className="mt-3 flex items-center gap-1.5">
           {[
             { v: false, label: "Активные" },
             { v: true, label: "Все" },
@@ -159,6 +161,18 @@ export default function MyTasksScreen() {
               {o.label}
             </button>
           ))}
+          {/* Журнал проблем не в нижней полосе: проблем меньше, чем задач, и
+              заводить их бегут именно отсюда. */}
+          <button
+            type="button"
+            onClick={() => {
+              haptic("selection");
+              setTab("issues");
+            }}
+            className="ml-auto min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
+          >
+            🛠 Проблемы
+          </button>
         </div>
       </header>
 

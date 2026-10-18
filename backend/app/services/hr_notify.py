@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.hr_models import Employee, Task, TaskIssue
+from app.db.hr_models import Employee, Issue, Task, TaskIssue
 from app.services import notifications
 
 KIND_TASK_ASSIGNED = "task_assigned"
@@ -21,6 +21,9 @@ KIND_TASK_OVERDUE = "task_overdue"
 KIND_TASK_ISSUE = "task_issue"
 KIND_TASK_DONE = "task_done"
 KIND_CHECKLIST_DONE = "checklist_done"
+# Журнал операционных проблем (не поручения): тихое уведомление в колокольчик.
+KIND_ISSUE_CREATED = "issue_created"
+KIND_ISSUE_ASSIGNED = "issue_assigned"
 
 _TZ = UTC
 
@@ -66,6 +69,78 @@ def task_issue_text(task: Task, issue: TaskIssue) -> str:
 
 def checklist_done_text(template_title: str) -> str:
     return f"✅ Чек-лист «{template_title}» закрыт полностью."
+
+
+_ISSUE_CATEGORY_LABEL: dict[str, str] = {
+    "equipment": "оборудование",
+    "supplies": "расходники",
+    "staffing": "люди",
+    "guest": "гость",
+    "cleanliness": "чистота",
+    "safety": "безопасность",
+    "it": "техника/системы",
+    "other": "другое",
+}
+
+_ISSUE_SEVERITY_LABEL: dict[str, str] = {
+    "low": "не срочно",
+    "normal": "обычно",
+    "high": "срочно",
+    "critical": "авария",
+}
+
+
+def issue_short(issue: Issue) -> str:
+    return f"«{issue.title}»"
+
+
+def issue_created_text(issue: Issue, *, by_name: str | None = None) -> str:
+    """Строка для колокольчика: что произошло и где.
+
+    В Telegram журнал не дублируется: операционная проблема — не срочный алерт,
+    иначе телефон руководителя звенел бы из-за каждой закончившейся салфетки.
+    Срочное по-прежнему идёт отдельным алертом по поручению.
+    """
+    who = f"{by_name}: " if by_name else ""
+    labels = [
+        _ISSUE_CATEGORY_LABEL.get(issue.category, issue.category),
+        _ISSUE_SEVERITY_LABEL.get(issue.severity, issue.severity),
+    ]
+    if issue.zone:
+        labels.insert(0, issue.zone)
+    return f"🛠 {who}новая проблема {issue_short(issue)} ({' · '.join(labels)})"
+
+
+def issue_assigned_text(issue: Issue) -> str:
+    return f"🛠 Тебе передали проблему {issue_short(issue)} — посмотри в журнале."
+
+
+async def notify_issue_created(
+    session: AsyncSession,
+    issue: Issue,
+    recipients: list[Employee],
+    *,
+    by_name: str | None = None,
+) -> int:
+    return await notify(
+        session,
+        employees=recipients,
+        kind=KIND_ISSUE_CREATED,
+        text=issue_created_text(issue, by_name=by_name),
+        payload={"issue_id": issue.id},
+    )
+
+
+async def notify_issue_assigned(
+    session: AsyncSession, issue: Issue, recipient: Employee
+) -> int:
+    return await notify(
+        session,
+        employees=[recipient],
+        kind=KIND_ISSUE_ASSIGNED,
+        text=issue_assigned_text(issue),
+        payload={"issue_id": issue.id},
+    )
 
 
 async def notify(
