@@ -33,9 +33,9 @@ const SCOPE_TITLE: Record<HrFeed["scope"], string> = {
 };
 
 const SCOPE_HINT: Record<HrFeed["scope"], string> = {
-  self: "Здесь только твои отметки: чек-лист, поручения, фотоотчёты.",
-  department: "Действия сотрудников твоего подразделения и твои собственные.",
-  all: "Все действия предприятия. Фильтруй по сотруднику и подразделению.",
+  self: "Только твои отметки.",
+  department: "Действия твоего подразделения.",
+  all: "Всё предприятие.",
 };
 
 const KIND_ICON: Record<FeedKind, string> = {
@@ -144,9 +144,19 @@ export default function HrFeedScreen() {
                 value={departmentId ?? ""}
                 onChange={(e) => {
                   haptic("light");
-                  setDepartmentId(
-                    e.target.value ? Number(e.target.value) : null,
-                  );
+                  const next = e.target.value ? Number(e.target.value) : null;
+                  setDepartmentId(next);
+                  // Сотрудник из другого отдела больше не подходит: без этого
+                  // в списке оставались бы его записи, и отдел незаметно
+                  // превращался в фильтр по одному человеку.
+                  if (next !== null && employeeId !== null) {
+                    const chosen = filters.employees.find(
+                      (employee) => employee.id === employeeId,
+                    );
+                    if (chosen && chosen.department_id !== next) {
+                      setEmployeeId(null);
+                    }
+                  }
                 }}
                 className="min-h-9 min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text"
               >
@@ -179,10 +189,32 @@ export default function HrFeedScreen() {
                       {(e.position ?? e.badge)
                         ? ` · ${e.position ?? e.badge}`
                         : ""}
+                      {departmentId === null && e.department_id !== null
+                        ? ` · ${
+                            filters.departments.find(
+                              (d) => d.id === e.department_id,
+                            )?.name ?? "без отдела"
+                          }`
+                        : ""}
                     </option>
                   ))}
               </select>
             </div>
+
+            {(employeeId !== null || departmentId !== null || kinds.length > 0) && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  setEmployeeId(null);
+                  setDepartmentId(null);
+                  setKinds([]);
+                }}
+                className="min-h-7 rounded-full px-2.5 text-[11px] text-tg-link"
+              >
+                Сбросить фильтры
+              </button>
+            )}
 
             <div className="flex flex-wrap gap-1.5">
               {filters.kinds.map((k) => {
@@ -230,11 +262,10 @@ export default function HrFeedScreen() {
               📋
             </div>
             <div className="mt-2 text-sm font-medium text-tg-text">
-              Событий нет
+              Пока тихо
             </div>
             <div className="mt-1 text-xs text-tg-hint">
-              Как только появятся отметки чек-листа или движения по поручениям,
-              они окажутся здесь.
+              Здесь появятся отметки и поручения.
             </div>
           </div>
         )}
@@ -243,6 +274,10 @@ export default function HrFeedScreen() {
           <FeedRow
             key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}
             item={item}
+            departmentName={
+              filters?.departments.find((d) => d.id === item.department_id)?.name ??
+              null
+            }
           />
         ))}
       </div>
@@ -250,7 +285,13 @@ export default function HrFeedScreen() {
   );
 }
 
-function FeedRow({ item }: { item: HrFeedItem }) {
+function FeedRow({
+  item,
+  departmentName,
+}: {
+  item: HrFeedItem;
+  departmentName: string | null;
+}) {
   return (
     <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
       <div className="flex items-start gap-2">
@@ -269,6 +310,7 @@ function FeedRow({ item }: { item: HrFeedItem }) {
           </div>
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-tg-hint">
             <span>{fmtWhen(item.at)}</span>
+            {departmentName && <span>· {departmentName}</span>}
             <span>· {KIND_LABEL[item.kind]}</span>
           </div>
         </div>

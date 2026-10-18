@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /**
- * GHG11(11): глобальная тема светлая/тёмная (по умолчанию тёмная).
+ * GHG11(11) / MEGAPROMT3: глобальная тема светлая/тёмная (по умолчанию СВЕТЛАЯ).
  *
  * Проверяем обещания:
  *  - тема ставится ИНЛАЙН и с приоритетом `important` — иначе Telegram
  *    (у которого те же переменные инлайном, но без приоритета) перекрыл бы нас;
- *  - по умолчанию тёмная, выбор переживает перезапуск (localStorage);
+ *  - по умолчанию светлая, а явно выбранная тёмная переживает перезапуск;
  *  - свитчер меняет тему на противоположную.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -63,28 +63,40 @@ describe("applyTheme", () => {
 });
 
 describe("useTheme", () => {
-  it("по умолчанию тёмная", () => {
-    expect(useTheme.getState().theme).toBe("dark");
+  it("по умолчанию светлая", () => {
+    expect(useTheme.getState().theme).toBe("light");
   });
 
   it("переключатель меняет тему и запоминает выбор", () => {
     useTheme.getState().toggleTheme();
-    expect(useTheme.getState().theme).toBe("light");
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
-    expect(root.dataset.theme).toBe("light");
-
-    useTheme.getState().toggleTheme();
     expect(useTheme.getState().theme).toBe("dark");
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("dark");
+    expect(root.dataset.theme).toBe("dark");
+
+    useTheme.getState().toggleTheme();
+    expect(useTheme.getState().theme).toBe("light");
+    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe("light");
   });
 });
 
 describe("initTheme", () => {
-  it("без сохранённого выбора включает тёмную", () => {
+  it("без сохранённого выбора включает светлую", () => {
     expect(readStoredTheme()).toBeNull();
+    expect(initTheme()).toBe("light");
+    expect(useTheme.getState().theme).toBe("light");
+    expect(root.dataset.theme).toBe("light");
+    expect(root.style.getPropertyValue("--tg-theme-bg-color")).toBe(
+      THEME_PALETTE.light["--tg-theme-bg-color"],
+    );
+  });
+
+  it("уважает сохранённый тёмный выбор", () => {
+    localStorage.setItem(THEME_STORAGE_KEY, "dark");
     expect(initTheme()).toBe("dark");
     expect(useTheme.getState().theme).toBe("dark");
-    expect(root.dataset.theme).toBe("dark");
+    expect(root.style.getPropertyValue("--tg-theme-bg-color")).toBe(
+      THEME_PALETTE.dark["--tg-theme-bg-color"],
+    );
   });
 
   it("уважает сохранённый светлый выбор", () => {
@@ -99,6 +111,6 @@ describe("initTheme", () => {
   it("мусор в хранилище трактуется как «не выбрано»", () => {
     localStorage.setItem(THEME_STORAGE_KEY, "rainbow");
     expect(readStoredTheme()).toBeNull();
-    expect(initTheme()).toBe("dark");
+    expect(initTheme()).toBe("light");
   });
 });
