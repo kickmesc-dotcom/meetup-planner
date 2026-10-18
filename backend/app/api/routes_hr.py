@@ -547,7 +547,7 @@ async def task_done(
 async def task_issue(
     task_id: int, body: TaskIssueIn, session: SessionDep, employee: EmployeeDep
 ) -> TaskOut:
-    from app.services import hr_notify
+    from app.services import hr_notify, hr_reminders
 
     task = await _owned_task(session, employee, task_id)
     issue = await hr_tasks.add_issue(
@@ -558,9 +558,18 @@ async def task_issue(
         comment=body.comment,
         eta_at=body.eta_at,
     )
-    # Руководителя уведомляем в приложении: он видит проблему в списке.
+    # Руководителя уведомляем в приложении (видит проблему в списке) и в личке
+    # бота — с кнопками «решено / напомнить завтра / мьют»: ответить можно
+    # прямо в сообщении, не заходя в приложение.
     managers = await _managers(session)
     await hr_notify.notify_issue(session, task, issue, managers)
+    await hr_reminders.alert_managers(
+        session,
+        employees=managers,
+        kind=hr_notify.KIND_TASK_ISSUE,
+        text=hr_notify.task_issue_text(task, issue),
+        task_id=int(task.id),
+    )
     await session.commit()
     await session.refresh(task)
     return _task_out(task)

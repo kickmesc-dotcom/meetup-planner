@@ -32,7 +32,7 @@ from app.db.hr_models import (
     TaskEvent,
 )
 from app.db.models import User
-from app.services import hr_notify, hr_settings, hr_tasks
+from app.services import hr_alerts, hr_notify, hr_settings, hr_tasks
 
 log = structlog.get_logger()
 
@@ -137,16 +137,21 @@ async def _telegram_ids(session: AsyncSession, employees: list[Employee]) -> dic
     return {int(uid): int(tg) for uid, tg in rows.all()}
 
 
-async def send_dm(bot, telegram_id: int, text: str) -> bool:  # noqa: ANN001
+async def send_dm(  # noqa: ANN001
+    bot, telegram_id: int, text: str, keyboard=None
+) -> bool:
     """Best-effort личка. Сотрудник мог не начинать диалог с ботом — это норма.
 
     Никаких исключений наружу: не доставленное личное сообщение не должно
-    ломать тик планировщика.
+    ломать тик планировщика. `keyboard` (опц.) — кнопки управления алертом
+    прямо в сообщении (см. `hr_alerts.alert_keyboard`).
     """
     if bot is None or not telegram_id or not text:
         return False
     try:
-        await bot.send_message(chat_id=telegram_id, text=text, parse_mode="HTML")
+        await bot.send_message(
+            chat_id=telegram_id, text=text, parse_mode="HTML", reply_markup=keyboard
+        )
         return True
     except Exception as exc:  # noqa: BLE001
         log.info("hr.dm_failed", telegram_id=telegram_id, error=str(exc))
@@ -161,6 +166,7 @@ async def _deliver(
     kind: str,
     text: str,
     payload: dict | None = None,
+    keyboard=None,  # noqa: ANN001
 ) -> None:
     """Личное уведомление в приложении + best-effort личка в Telegram.
 
@@ -185,12 +191,48 @@ async def _deliver(
     for employee in recipients:
         tg_id = tg_map.get(employee.user_id)
         if tg_id:
-            await send_dm(bot, tg_id, text)
+            await send_dm(bot, tg_id, text, keyboard)
 
 
 # --------------------------------------------------------------------------
 # Тик
 # --------------------------------------------------------------------------
+
+
+def _safe_bot():  # noqa: ANN202 — Bot | None
+    """Бот для разовой отправки из API-ручки. Без него живём (только in-app)."""
+    try:
+        from app.bot.dispatcher import get_bot
+
+        return get_bot()
+    except Exception as exc:  # noqa: BLE001 — невалидный токен не должен ронять ручку
+        log.info("hr.bot_unavailable", error=str(exc))
+        return None
+
+
+async def alert_managers(
+    session: AsyncSession,
+    *,
+    employees: list[Employee],
+    kind: str,
+    text: str,
+    task_id: int,
+    bot=None,  # noqa: ANN001
+) -> None:
+    """Алерт руководителям с кнопками «решено / напомнить завтра / мьют».
+
+    Одна точка входа для всех «тревожных» событий (просрочка, проблема), чтобы
+    кнопки и тихие часы работали одинаково и не расползались по ручкам.
+    """
+    await _deliver(
+        session,
+        bot=bot if bot is not None else _safe_bot(),
+        employees=employees,
+        kind=kind,
+        text=text,
+        payload={"task_id": task_id},
+        keyboard=hr_alerts.alert_keyboard(int(task_id)),
+    )
 
 
 async def send_deadline_reminders(
@@ -256,11 +298,23 @@ async def escalate_overdue(
     bot=None,  # noqa: ANN001
     now: datetime | None = None,
 ) -> list[Task]:
-    """Пометить просроченные и уведомить руководителей. Возвращает задачи."""
+    """Пометить просроченные и уведомить руководителей. Возвращает задачи.
+
+    Поручения, по которым руководитель уже нажал «решено» или «напомнить
+    завтра», пропускаем: именно из-за отсутствия такого выхода бот и будил
+    управляющего повторно. Статус при этом не откатываем — задача остаётся
+    просроченной в отчётах и кабинете.
+    """
     moment = now or datetime.now(UTC)
     changed = await hr_tasks.sweep_overdue(session, now=moment)
     if not changed:
         return []
+    state_map = await hr_alerts.states(session, [int(t.id) for t in changed])
+    active = hr_alerts.filter_silenced(changed, state_map, moment)
+    if not active:
+        await session.commit()
+        return []
+    changed = active
     recipients_base = await managers(session)
     for task in changed:
         creator = (
@@ -276,6 +330,8 @@ async def escalate_overdue(
             kind=hr_notify.KIND_TASK_OVERDUE,
             text=hr_notify.task_overdue_text(task),
             payload={"task_id": task.id},
+            # Кнопки прямо в алерте: ответить можно, не заходя в приложение.
+            keyboard=hr_alerts.alert_keyboard(int(task.id)),
         )
     await session.commit()
     return changed

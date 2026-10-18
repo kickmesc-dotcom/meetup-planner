@@ -13,7 +13,14 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.client.telegram import TelegramAPIServer
 
-from app.bot.handlers import help as help_handler, hr_bot, next_meeting, poll_answer, whoami
+from app.bot.handlers import (
+    help as help_handler,
+    hr_alerts,
+    hr_bot,
+    next_meeting,
+    poll_answer,
+    whoami,
+)
 from app.config import get_settings
 
 log = logging.getLogger(__name__)
@@ -352,6 +359,9 @@ def get_dispatcher() -> Dispatcher:
         # `app/_legacy`. Наследный `start.py` («кнопка Планера») тоже не
         # подключён: его сценарий заменён онбордингом сотрудника.
         _dispatcher.include_router(hr_bot.router)
+        # Кнопки под алертами руководителя («решено», «напомнить завтра», мьют).
+        # Свой префикс `hra:` — с кнопками сценария сотрудника (`hr:`) не спорит.
+        _dispatcher.include_router(hr_alerts.router)
         _dispatcher.include_router(whoami.router)
         _dispatcher.include_router(poll_answer.router)
         _dispatcher.include_router(next_meeting.router)
