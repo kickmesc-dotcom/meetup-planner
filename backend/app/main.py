@@ -30,6 +30,7 @@ from app.api import (
     routes_meetings,
     routes_meta,
     routes_polls,
+    routes_standards,
     routes_users,
 )
 from app.bot import webhook as bot_webhook
@@ -251,6 +252,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_hr.router, prefix="/api")
     # Журнал операционных проблем — отдельная сущность со своими правами.
     app.include_router(routes_issues.router, prefix="/api")
+    # База стандартов и проверка знаний (сотрудник + наполнение АУП/админом).
+    app.include_router(routes_standards.router, prefix="/api")
     app.include_router(routes_handovers.router, prefix="/api")
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")

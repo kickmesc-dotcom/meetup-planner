@@ -23,7 +23,6 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.hr_models import (
-    MODE_EACH,
     MODE_ONE_OF,
     MODE_PARTS,
     PRIORITY_NORMAL,
@@ -33,7 +32,9 @@ from app.db.hr_models import (
     TASK_IN_PROGRESS,
     TASK_MODES,
     TASK_NEW,
+    TASK_ON_REVIEW,
     TASK_OVERDUE,
+    TASK_REWORK,
     TASK_SCOPE_DEPARTMENT,
     TASK_SCOPE_EMPLOYEE,
     TASK_STATUSES,
@@ -51,16 +52,41 @@ class TaskError(Exception):
 
 
 # Открытые статусы — те, что ещё «в работе» и могут уйти в просрочку.
-OPEN_STATUSES: frozenset[str] = frozenset({TASK_NEW, TASK_ACCEPTED, TASK_IN_PROGRESS})
+# `on_review` сюда не входит: работа сдана, ждём руководителя — просрочка тут
+# его, а не исполнителя (для этого есть очередь приёмки). `rework` — наоборот:
+# руководитель вернул, значит задача снова на человеке.
+OPEN_STATUSES: frozenset[str] = frozenset(
+    {TASK_NEW, TASK_ACCEPTED, TASK_IN_PROGRESS, TASK_REWORK}
+)
 
 # Кто в кого может переходить. Сотрудник закрывает задачу, руководитель может
 # вернуть её в работу (`failed` → `in_progress`) — это и есть «требуется
 # внимание руководителя».
 _TRANSITIONS: dict[str, frozenset[str]] = {
-    TASK_NEW: frozenset({TASK_ACCEPTED, TASK_IN_PROGRESS, TASK_DONE, TASK_OVERDUE, TASK_FAILED}),
-    TASK_ACCEPTED: frozenset({TASK_IN_PROGRESS, TASK_DONE, TASK_OVERDUE, TASK_FAILED}),
-    TASK_IN_PROGRESS: frozenset({TASK_DONE, TASK_OVERDUE, TASK_FAILED}),
-    TASK_OVERDUE: frozenset({TASK_IN_PROGRESS, TASK_DONE, TASK_FAILED}),
+    TASK_NEW: frozenset(
+        {
+            TASK_ACCEPTED,
+            TASK_IN_PROGRESS,
+            TASK_ON_REVIEW,
+            TASK_DONE,
+            TASK_OVERDUE,
+            TASK_FAILED,
+        }
+    ),
+    TASK_ACCEPTED: frozenset(
+        {TASK_IN_PROGRESS, TASK_ON_REVIEW, TASK_DONE, TASK_OVERDUE, TASK_FAILED}
+    ),
+    TASK_IN_PROGRESS: frozenset(
+        {TASK_ON_REVIEW, TASK_DONE, TASK_OVERDUE, TASK_FAILED}
+    ),
+    # Сдано на проверку: принимаем (`done`) или возвращаем на доработку.
+    TASK_ON_REVIEW: frozenset({TASK_DONE, TASK_REWORK, TASK_FAILED}),
+    TASK_REWORK: frozenset(
+        {TASK_IN_PROGRESS, TASK_ON_REVIEW, TASK_DONE, TASK_FAILED}
+    ),
+    TASK_OVERDUE: frozenset(
+        {TASK_IN_PROGRESS, TASK_ON_REVIEW, TASK_DONE, TASK_FAILED}
+    ),
     TASK_DONE: frozenset(),
     TASK_FAILED: frozenset({TASK_IN_PROGRESS, TASK_DONE}),
 }
@@ -84,6 +110,8 @@ def aggregate_status(mode: str, statuses: list[str]) -> str:
             return TASK_DONE
         if statuses and all(status == TASK_FAILED for status in statuses):
             return TASK_FAILED
+        if all(status == TASK_REWORK for status in statuses):
+            return TASK_IN_PROGRESS
     else:
         if all(status == TASK_DONE for status in statuses):
             return TASK_DONE
@@ -91,14 +119,25 @@ def aggregate_status(mode: str, statuses: list[str]) -> str:
             return TASK_FAILED
         if all(status == TASK_NEW for status in statuses):
             return TASK_NEW
-        # Кто-то уже отметился (взял, закрыл свою часть или не успел) —
-        # поручение в работе, даже если остальные ещё не открывали его.
-        if any(status == TASK_IN_PROGRESS for status in statuses) or any(
-            status in {TASK_DONE, TASK_FAILED} for status in statuses
-        ):
+        if any(status == TASK_IN_PROGRESS for status in statuses):
+            return TASK_IN_PROGRESS
+        # Кто-то сдал работу и ждёт приёмки — это важнее, чем «часть людей ещё
+        # не начинала»: руководителю надо принять или вернуть.
+        if any(status == TASK_ON_REVIEW for status in statuses):
+            return TASK_ON_REVIEW
+        # Часть работы закрыта, остальные ещё не открывали — поручение в работе.
+        if any(status in {TASK_DONE, TASK_FAILED} for status in statuses):
             return TASK_IN_PROGRESS
     if any(status == TASK_IN_PROGRESS for status in statuses):
         return TASK_IN_PROGRESS
+    if any(status == TASK_ON_REVIEW for status in statuses):
+        # Работа сдана и ждёт приёмки — руководителю это должно быть видно
+        # раньше, чем «часть людей ещё не открывала поручение».
+        return TASK_ON_REVIEW
+    # Руководитель вернул работу — это не «новое» поручение: сотрудник должен
+    # увидеть, что дело в доработке, а не что задача только появилась.
+    if any(status == TASK_REWORK for status in statuses):
+        return TASK_REWORK
     if any(status == TASK_ACCEPTED for status in statuses):
         return TASK_ACCEPTED
     if all(status == TASK_OVERDUE for status in statuses):
@@ -147,6 +186,7 @@ async def create_task(
     mode: str = MODE_ONE_OF,
     shift_date: date | None = None,
     parts: dict[int, str] | None = None,
+    requires_review: bool = False,
 ) -> Task:
     clean_title = title.strip()
     if not clean_title:
@@ -178,6 +218,7 @@ async def create_task(
         status=TASK_NEW,
         mode=mode,
         shift_date=shift_date,
+        requires_review=requires_review,
         created_by_employee_id=creator.id,
     )
     session.add(task)
@@ -369,6 +410,88 @@ async def list_all(
 # --------------------------------------------------------------------------
 
 
+async def submit_work(
+    session: AsyncSession,
+    task: Task,
+    employee: Employee,
+    *,
+    comment: str | None = None,
+    now: datetime | None = None,
+) -> Task:
+    """Сотрудник сдаёт работу: на проверку или сразу закрывает.
+
+    Разница только в `requires_review`: без проверки поведение прежнее (как было
+    до MEGAPROMT2), с проверкой работа уходит руководителю и закрыть её отметкой
+    исполнителя нельзя.
+    """
+    target = TASK_ON_REVIEW if task.requires_review else TASK_DONE
+    return await change_status(
+        session, task, target, by=employee, comment=comment, now=now
+    )
+
+
+async def pending_reviews(
+    session: AsyncSession, *, department_id: int | None = None
+) -> list[tuple[Task, TaskAssignment]]:
+    """Что ждёт приёмки руководителя: поручения со строками `on_review`."""
+    stmt = (
+        select(TaskAssignment, Task)
+        .join(Task, Task.id == TaskAssignment.task_id)
+        .where(TaskAssignment.status == TASK_ON_REVIEW)
+        .order_by(Task.due_at.is_(None), Task.due_at, TaskAssignment.id)
+    )
+    if department_id is not None:
+        stmt = stmt.where(Task.department_id == department_id)
+    rows = await session.execute(stmt)
+    return [(task, assignment) for assignment, task in rows.all()]
+
+
+async def review(
+    session: AsyncSession,
+    task: Task,
+    *,
+    manager: Employee,
+    approve: bool,
+    employee_id: int | None = None,
+    comment: str | None = None,
+    now: datetime | None = None,
+) -> list[TaskAssignment]:
+    """Принять работу или вернуть на доработку.
+
+    Событие приёмки пишется на ИМЯ ИСПОЛНИТЕЛЯ — иначе опыт за закрытое
+    поручение получил бы руководитель, который всего лишь нажал «принять».
+    """
+    rows = await assignments_of(session, task.id)
+    targets = [
+        row
+        for row in rows
+        if row.status == TASK_ON_REVIEW
+        and (employee_id is None or row.employee_id == employee_id)
+    ]
+    if not targets:
+        raise TaskError("nothing_to_review")
+
+    moment = now or datetime.now(UTC)
+    for assignment in targets:
+        assignment.status = TASK_DONE if approve else TASK_REWORK
+        assignment.done_at = moment if approve else None
+        session.add(
+            TaskEvent(
+                task_id=task.id,
+                from_status=TASK_ON_REVIEW,
+                to_status=assignment.status,
+                by_employee_id=(
+                    assignment.employee_id if approve else manager.id
+                ),
+                comment=f"review_{'accept' if approve else 'rework'}"
+                + (f":{comment}" if comment else ""),
+            )
+        )
+    await session.flush()
+    await sync_task_status(session, task, by=manager, now=moment)
+    return targets
+
+
 async def set_assignment_status(
     session: AsyncSession,
     task: Task,
@@ -509,9 +632,10 @@ async def add_photo(
     if task.requires_photo and task.status != TASK_DONE:
         assignment = await assignment_of(session, task.id, employee.id)
         current = assignment.status if assignment is not None else task.status
-        if can_transition(current, TASK_DONE):
+        target = TASK_ON_REVIEW if task.requires_review else TASK_DONE
+        if can_transition(current, target):
             await change_status(
-                session, task, TASK_DONE, by=employee, comment="photo_report", now=now
+                session, task, target, by=employee, comment="photo_report", now=now
             )
     return photo
 

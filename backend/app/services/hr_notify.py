@@ -20,6 +20,9 @@ KIND_TASK_DEADLINE = "task_deadline"
 KIND_TASK_OVERDUE = "task_overdue"
 KIND_TASK_ISSUE = "task_issue"
 KIND_TASK_DONE = "task_done"
+# Проверка руководителем: работа сдана → приёмка → принято/возврат.
+KIND_TASK_SUBMITTED = "task_submitted"
+KIND_TASK_REVIEWED = "task_reviewed"
 KIND_CHECKLIST_DONE = "checklist_done"
 # Журнал операционных проблем (не поручения): тихое уведомление в колокольчик.
 KIND_ISSUE_CREATED = "issue_created"
@@ -68,6 +71,24 @@ def task_issue_text(task: Task, issue: TaskIssue) -> str:
         lines.append(f"Комментарий: {issue.comment}")
     if issue.eta_at is not None:
         lines.append(f"Планирует выполнить к {fmt_due(issue.eta_at)}")
+    return "\n".join(lines)
+
+
+def task_submitted_text(task: Task, *, employee_name: str | None = None) -> str:
+    who = f"{employee_name} " if employee_name else ""
+    return (
+        f"🔍 {who}сдал(а) работу по {task_short(task)} — нужна приёмка. "
+        "Открой приёмку в кабинете, чтобы принять или вернуть."
+    )
+
+
+def task_reviewed_text(task: Task, *, approved: bool, comment: str | None) -> str:
+    if approved:
+        lines = [f"✅ Работа по {task_short(task)} принята."]
+    else:
+        lines = [f"↩️ Работу по {task_short(task)} вернули на доработку."]
+    if comment:
+        lines.append(f"Комментарий: {comment}")
     return "\n".join(lines)
 
 
@@ -256,6 +277,39 @@ async def notify_task_assigned(
         kind=KIND_TASK_ASSIGNED,
         text=text,
         payload={"task_id": task.id},
+    )
+
+
+async def notify_task_submitted(
+    session: AsyncSession,
+    task: Task,
+    recipients: list[Employee],
+    *,
+    employee_name: str | None = None,
+) -> int:
+    return await notify(
+        session,
+        employees=recipients,
+        kind=KIND_TASK_SUBMITTED,
+        text=task_submitted_text(task, employee_name=employee_name),
+        payload={"task_id": task.id},
+    )
+
+
+async def notify_task_reviewed(
+    session: AsyncSession,
+    task: Task,
+    recipients: list[Employee],
+    *,
+    approved: bool,
+    comment: str | None = None,
+) -> int:
+    return await notify(
+        session,
+        employees=recipients,
+        kind=KIND_TASK_REVIEWED,
+        text=task_reviewed_text(task, approved=approved, comment=comment),
+        payload={"task_id": task.id, "approved": approved},
     )
 
 

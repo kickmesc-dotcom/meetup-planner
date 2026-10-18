@@ -72,6 +72,10 @@ export type Tab =
   | "team"
   | "issues"
   | "handovers"
+  /** База стандартов и тесты по инструкциям. */
+  | "standards"
+  /** Очередь приёмки работ руководителя. */
+  | "review"
   | "profile"
   | "admin";
 

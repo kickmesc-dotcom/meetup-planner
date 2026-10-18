@@ -226,6 +226,9 @@ class TaskIn(BaseModel):
     shift_date: date | None = None
     # Текст части каждому исполнителю — только для режима `parts`.
     parts: dict[int, str] | None = None
+    # Проверка руководителем: сотрудник сдаёт работу, руководитель принимает
+    # или возвращает на доработку (MEGAPROMT2).
+    requires_review: bool = False
 
 
 class TaskStatusIn(BaseModel):
@@ -292,6 +295,7 @@ class TaskAdminOut(BaseModel):
     assignee_ids: list[int]
     mode: str = MODE_ONE_OF
     shift_date: date | None = None
+    requires_review: bool = False
     progress_done: int = 0
     progress_total: int = 0
     assignments: list[TaskAssignmentOut] = []
@@ -688,6 +692,7 @@ async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
         assignee_ids=[e.id for e in assignees],
         mode=task.mode,
         shift_date=task.shift_date,
+        requires_review=bool(task.requires_review),
         progress_done=sum(1 for row in rows if row.status == TASK_DONE),
         progress_total=len(rows),
         assignments=[
@@ -747,6 +752,7 @@ async def create_task(
             mode=body.mode,
             shift_date=body.shift_date,
             parts=body.parts,
+            requires_review=body.requires_review,
         )
     except hr_tasks.TaskError as exc:
         await session.rollback()

@@ -22,17 +22,24 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.hr_models import (
+    DEFAULT_PASS_PERCENT,
     ONBOARDING_DONE,
     QUESTION_CHOICE,
     QUESTION_SCALE,
     QUESTION_TEXT,
     ROLE_ADMIN,
+    STANDARD_CATEGORY_DISHES,
+    STANDARD_CATEGORY_EQUIPMENT,
+    STANDARD_CATEGORY_SAFETY,
+    STANDARD_CATEGORY_SERVICE,
     TEMPLATE_SHIFT,
     ChecklistItem,
     ChecklistTemplate,
     Department,
     Employee,
     FeedbackQuestion,
+    Standard,
+    StandardQuestion,
     UsefulLink,
 )
 from app.db.models import User
@@ -195,6 +202,134 @@ async def seed_links(session: AsyncSession) -> int:
     return len(_LINKS)
 
 
+# Стартовая база стандартов: (заголовок, категория, инструкция, вопросы).
+# Тексты намеренно короткие и про быт смены: их пишет не разработчик, а
+# руководитель, а сид лишь показывает, как это выглядит и работает.
+_STANDARDS: tuple[dict, ...] = (
+    {
+        "title": "Гигиена рук перед сменой",
+        "emoji": "🧼",
+        "category": STANDARD_CATEGORY_SAFETY,
+        "summary": "Когда мыть руки и сколько по времени",
+        "body": (
+            "1. Мойте руки до начала работы, после туалета, после денег и мусора.\n"
+            "2. Намыливайте не меньше 20–30 секунд: ладони, между пальцами, \n"
+            "   большие пальцы, под ногтями.\n"
+            "3. Сушите одноразовым полотенцем, не об общий фартук.\n"
+            "4. Перчатки — не замена мытью: их меняют после каждого перехода \n"
+            "   между зонами (сырое → готовое)."
+        ),
+        "questions": (
+            (
+                "Сколько секунд нужно намыливать руки?",
+                ("5–10 секунд", "Не меньше 20–30 секунд", "Достаточно сполоснуть"),
+                1,
+            ),
+            (
+                "Когда нужно менять перчатки?",
+                (
+                    "Раз в смену",
+                    "После перехода между зонами и загрязнения",
+                    "Только если порвались",
+                ),
+                1,
+            ),
+        ),
+    },
+    {
+        "title": "Маркировка и сроки заготовок",
+        "emoji": "🏷",
+        "category": STANDARD_CATEGORY_DISHES,
+        "summary": "Что писать на этикетке и когда списывать",
+        "body": (
+            "1. На каждой заготовке — название, дата и время изготовления, \n"
+            "   срок годности, кто сделал.\n"
+            "2. Просроченное списываем сразу: не «докладываем» к свежему.\n"
+            "3. Заготовка без маркировки считается просроченной.\n"
+            "4. Проверка маркировок — обязательный пункт чек-листа смены."
+        ),
+        "questions": (
+            (
+                "Что делать с заготовкой без этикетки?",
+                ("Использовать первой", "Считать просроченной и списать", "Спросить у коллеги"),
+                1,
+            ),
+            (
+                "Что обязательно указать на этикетке?",
+                (
+                    "Только название",
+                    "Название, дату и время изготовления, срок годности и автора",
+                    "Название и цену",
+                ),
+                1,
+            ),
+        ),
+    },
+    {
+        "title": "Гость недоволен блюдом",
+        "emoji": "🙋",
+        "category": STANDARD_CATEGORY_SERVICE,
+        "summary": "Как разговаривать и что фиксировать",
+        "body": (
+            "1. Выслушайте до конца, не спорьте и не оправдывайтесь.\n"
+            "2. Скажите, что решите вопрос, и назовите срок («сейчас заменю»).\n"
+            "3. Решение принимает менеджер смены: заменяем блюдо или убираем из \n"
+            "   счёта — по правилам заведения.\n"
+            "4. Заведите карточку в журнале проблем: категория «Гость», зона и \n"
+            "   срочность. Без записи проблема повторится завтра."
+        ),
+        "questions": (
+            (
+                "Что сделать первым делом, когда гость недоволен?",
+                (
+                    "Объяснить, что блюдо приготовлено правильно",
+                    "Выслушать до конца и назвать срок решения",
+                    "Позвать другого официанта",
+                ),
+                1,
+            ),
+            (
+                "Куда записать разбор ситуации с гостем?",
+                ("Никуда, вопрос решён", "В журнал проблем карточкой", "В личные заметки"),
+                1,
+            ),
+        ),
+    },
+    {
+        "title": "Нож и оборудование: безопасность",
+        "emoji": "🔪",
+        "category": STANDARD_CATEGORY_EQUIPMENT,
+        "summary": "Что проверить до работы и как себя вести",
+        "body": (
+            "1. Нож режет только на доске, лезвием от себя, не оставляйте его в \n"
+            "   раковине.\n"
+            "2. Перед включением оборудования проверьте шнур, кнопку стоп и \n"
+            "   что кожух на месте.\n"
+            "3. Не работайте с неисправным: сразу заводите карточку в журнале \n"
+            "   проблем и сообщайте менеджеру.\n"
+            "4. О порезе или травме немедленно говорите старшему смены — \n"
+            "   журнал травм обязателен, даже если «не страшно»."
+        ),
+        "questions": (
+            (
+                "Нашли неисправный аппарат. Что делать?",
+                (
+                    "Починить самому по-быстрому",
+                    "Не включать, завести карточку в журнале и сказать менеджеру",
+                    "Отложить до конца смены",
+                ),
+                1,
+            ),
+            (
+                "Порезался ножом. Что обязательно помимо обработки раны?",
+                ("Ничего, если порез небольшой", "Сообщить старшему смены и зафиксировать", "Уйти домой"),
+                1,
+            ),
+        ),
+    },
+)
+
+
 async def seed_owners(session: AsyncSession) -> int:
     """Завести/дополнить профили владельцев проекта (плашка + роль `admin`).
 
@@ -242,10 +377,52 @@ async def seed_owners(session: AsyncSession) -> int:
     return len(OWNERS)
 
 
+async def seed_standards(session: AsyncSession) -> int:
+    """Стартовая база стандартов: инструкция + короткий тест на каждую.
+
+    Как и остальной сид — только чтобы новый ресторан не открывал пустой
+    экран; содержимое правит руководитель. Если стандарты уже есть, блок
+    пропускается целиком (`count > 0`), поэтому переписанные тексты не
+    затираются.
+    """
+    existing = await session.scalar(select(func.count()).select_from(Standard))
+    if existing:
+        return int(existing)
+
+    for index, item in enumerate(_STANDARDS):
+        standard = Standard(
+            title=item["title"],
+            emoji=item["emoji"],
+            category=item["category"],
+            summary=item["summary"],
+            body=item["body"],
+            department_id=None,
+            pass_percent=DEFAULT_PASS_PERCENT,
+            sort_order=index,
+            is_active=True,
+        )
+        session.add(standard)
+        await session.flush()
+        for order, (text, options, correct) in enumerate(item["questions"]):
+            session.add(
+                StandardQuestion(
+                    standard_id=standard.id,
+                    text=text,
+                    options=list(options),
+                    correct_index=correct,
+                    sort_order=order,
+                )
+            )
+    await session.flush()
+    log.info("hr.seed_standards", count=len(_STANDARDS))
+    return len(_STANDARDS)
+
+
 async def seed_hr(session: AsyncSession) -> None:
-    """Один вход для lifespan: владельцы → подразделения → вопросы → ссылки."""
+    """Один вход для lifespan: владельцы → подразделения → вопросы → ссылки → стандарты."""
     await seed_owners(session)
     await seed_departments(session)
     await seed_feedback_questions(session)
     await seed_links(session)
+    await seed_standards(session)
     await session.commit()

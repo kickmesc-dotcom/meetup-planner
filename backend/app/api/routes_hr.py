@@ -149,6 +149,9 @@ class TaskOut(BaseModel):
     # говорит, закрыл ли конкретный человек свою часть.
     mode: str = "one_of"
     shift_date: date | None = None
+    # Поручение с проверкой: отметка «выполнено» отправляет работу
+    # руководителю (`on_review`), а не закрывает её.
+    requires_review: bool = False
     my_status: str | None = None
     progress_done: int = 0
     progress_total: int = 0
@@ -257,6 +260,7 @@ def _task_out(
         is_overdue=hr_tasks.is_overdue(task),
         mode=task.mode,
         shift_date=task.shift_date,
+        requires_review=bool(task.requires_review),
         my_status=my_status,
         my_part=my_part,
         progress_done=progress[0],
@@ -591,10 +595,12 @@ async def task_start(
 async def task_done(
     task_id: int, session: SessionDep, employee: EmployeeDep
 ) -> TaskOut:
-    """Отметить выполненной. Для задач с обязательным фото сервер откажет —
-    их закрывает загрузка фото (`/tasks/{id}/photo`)."""
-    from app.db.hr_models import TASK_DONE
+    """Сдать работу. Для задач с обязательным фото сервер откажет — их
+    закрывает загрузка фото (`/tasks/{id}/photo`).
 
+    Если поручение с проверкой, работа уходит руководителю (`on_review`) и
+    остаётся открытой, пока он не примет её или не вернёт на доработку.
+    """
     task = await _owned_task(session, employee, task_id)
     if task.requires_photo:
         photos = await hr_tasks.photos_of(session, task.id)
@@ -602,7 +608,99 @@ async def task_done(
             raise HTTPException(
                 status.HTTP_400_BAD_REQUEST, detail="photo_report_required"
             )
-    return await _transition(session, employee, task_id, TASK_DONE)
+    from app.db.hr_models import TASK_ON_REVIEW
+    from app.services import hr_notify
+
+    try:
+        await hr_tasks.submit_work(session, task, employee)
+    except hr_tasks.TaskError as exc:
+        await session.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if task.requires_review and task.status == TASK_ON_REVIEW:
+        user = await session.get(User, employee.user_id)
+        await hr_notify.notify_task_submitted(
+            session,
+            task,
+            await _managers(session),
+            employee_name=user.display_name if user else None,
+        )
+    await session.commit()
+    await session.refresh(task)
+    return (await _task_views(session, [task], employee))[0]
+
+
+class TaskReviewIn(BaseModel):
+    approve: bool
+    # Принять одного исполнителя в групповом поручении; `None` — всех, кто
+    # сдал (обычный случай: руководитель смотрит работу целиком).
+    employee_id: int | None = None
+    comment: str | None = None
+
+
+@router.post("/tasks/{task_id}/review", response_model=TaskOut)
+async def task_review(
+    task_id: int,
+    body: TaskReviewIn,
+    session: SessionDep,
+    employee: EmployeeDep,
+) -> TaskOut:
+    """Принять работу или вернуть на доработку. Только АУП.
+
+    Сотрудник не может принять сам себя: `review` пишет событие приёмки на
+    исполнителя и закрывает задачу, поэтому права проверяются до вызова.
+    """
+    if not hr_access.is_aup(employee):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="aup_required")
+    task = await hr_tasks.get_task(session, task_id)
+    if task is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="task_not_found")
+    try:
+        reviewed = await hr_tasks.review(
+            session,
+            task,
+            manager=employee,
+            approve=body.approve,
+            employee_id=body.employee_id,
+            comment=body.comment,
+        )
+    except hr_tasks.TaskError as exc:
+        await session.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    # Автору работы — в колокольчик: принято или что именно переделать.
+    from app.services import hr_notify
+
+    workers = await session.scalars(
+        select(Employee).where(
+            Employee.id.in_([row.employee_id for row in reviewed])
+        )
+    )
+    await hr_notify.notify_task_reviewed(
+        session,
+        task,
+        list(workers.all()),
+        approved=body.approve,
+        comment=body.comment,
+    )
+    await session.commit()
+    await session.refresh(task)
+    return (await _task_views(session, [task], employee))[0]
+
+
+@router.get("/tasks/review-queue", response_model=list[TaskOut])
+async def review_queue(
+    session: SessionDep, employee: EmployeeDep
+) -> list[TaskOut]:
+    """Что ждёт приёмки руководителя (пусто для сотрудника)."""
+    if not hr_access.is_aup(employee):
+        return []
+    rows = await hr_tasks.pending_reviews(
+        session,
+        department_id=(
+            None if hr_access.is_admin(employee) else employee.department_id
+        ),
+    )
+    unique: dict[int, Task] = {task.id: task for task, _ in rows}
+    return await _task_views(session, list(unique.values()), employee)
 
 
 @router.post("/tasks/{task_id}/issue", response_model=TaskOut)

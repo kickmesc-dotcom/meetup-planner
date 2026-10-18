@@ -33,6 +33,8 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   new: "Новое",
   accepted: "Принято",
   in_progress: "В работе",
+  on_review: "На проверке",
+  rework: "На доработке",
   done: "Выполнено",
   overdue: "Просрочено",
   failed: "Не выполнено",
@@ -42,6 +44,8 @@ const STATUS_CLASS: Record<TaskStatus, string> = {
   new: "bg-tg-link/15 text-tg-link",
   accepted: "bg-tg-link/15 text-tg-link",
   in_progress: "bg-status-maybe/20 text-status-maybe",
+  on_review: "bg-tg-link/15 text-tg-link",
+  rework: "bg-status-busy/20 text-status-busy",
   done: "bg-status-free/20 text-status-free",
   overdue: "bg-status-busy/20 text-status-busy",
   failed: "bg-status-busy/20 text-status-busy",
@@ -128,7 +132,8 @@ export default function MyTasksScreen() {
 
   const tasks = tasksQ.data ?? [];
   // «Активные» считаем по своему статусу: в режиме «каждый сам» задача ещё
-  // открыта для коллег, хотя я свою часть уже закрыл.
+  // открыта для коллег, хотя я свою часть уже закрыл. `on_review` тоже
+  // активна: работа сдана, но пока не принята — это ещё не закрыто.
   const open = tasks.filter((t) => {
     const status = ownStatus(t);
     return status !== "done" && status !== "failed";
@@ -149,6 +154,32 @@ export default function MyTasksScreen() {
                   demo={meQ.data.is_demo}
                 />
               </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setTab("standards");
+              }}
+              className="min-h-8 min-w-8 rounded-lg bg-tg-secondary-bg text-base leading-none"
+              aria-label="База стандартов"
+              title="База стандартов"
+            >
+              📚
+            </button>
+            {meQ.data?.is_aup && (
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  setTab("review");
+                }}
+                className="min-h-8 min-w-8 rounded-lg bg-tg-secondary-bg text-base leading-none"
+                aria-label="Приёмка работ"
+                title="Приёмка работ"
+              >
+                🔍
+              </button>
             )}
             {/* Конец смены начинается здесь: сдача того, что осталось. */}
             <button
@@ -294,6 +325,7 @@ function TaskCard({
           <span>приоритет: {PRIORITY_LABEL[task.priority]}</span>
         )}
         {task.requires_photo && <span>📷 нужен фотоотчёт</span>}
+        {task.requires_review && <span>🔍 с приёмкой</span>}
         {task.is_overdue && !closed && (
           <span className="text-status-busy">просрочено</span>
         )}
@@ -323,21 +355,35 @@ function TaskCard({
         </p>
       )}
 
-      {!closed && (
+      {!closed && status === "on_review" && (
+        <div className="mt-3 rounded-lg bg-tg-bg/60 px-2.5 py-2 text-[11px] text-tg-hint">
+          Работа сдана — ждёт приёмки руководителя.
+        </div>
+      )}
+
+      {!closed && status !== "on_review" && (
         <div className="mt-3 flex flex-wrap gap-2">
           {status === "new" && (
             <ActionButton disabled={busy} onClick={() => onAction("accept")}>
               Принять
             </ActionButton>
           )}
-          {(status === "new" || status === "accepted") && (
+          {(status === "new" ||
+            status === "accepted" ||
+            status === "rework") && (
             <ActionButton disabled={busy} onClick={() => onAction("start")}>
-              Начать
+              {status === "rework" ? "Взять в работу" : "Начать"}
             </ActionButton>
           )}
-          {(status === "in_progress" || status === "overdue") && (
+          {(status === "in_progress" ||
+            status === "overdue" ||
+            status === "rework") && (
             <ActionButton disabled={busy} onClick={() => onAction("done")}>
-              {task.requires_photo ? "Отметить (фото — в чат)" : "Выполнено"}
+              {task.requires_photo
+                ? "Отметить (фото — в чат)"
+                : task.requires_review
+                  ? "Сдать на проверку"
+                  : "Выполнено"}
             </ActionButton>
           )}
           <ActionButton disabled={busy} variant="ghost" onClick={onToggleIssue}>
@@ -345,6 +391,7 @@ function TaskCard({
           </ActionButton>
         </div>
       )}
+
 
       {closed && task.done_at && (
         <div className="mt-2 text-[11px] text-tg-hint">

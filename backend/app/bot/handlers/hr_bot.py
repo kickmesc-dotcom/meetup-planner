@@ -45,6 +45,7 @@ from app.db.hr_models import (
     TASK_ACCEPTED,
     TASK_DONE,
     TASK_IN_PROGRESS,
+    TASK_ON_REVIEW,
     TASK_SCOPE_DEPARTMENT,
     TEMPLATE_FIRST_DAY,
     ChecklistItem,
@@ -720,6 +721,9 @@ def _status_emoji(status: str) -> str:
         "new": "🆕",
         "accepted": "👌",
         "in_progress": "🔄",
+        # Сдано руководителю / возвращено на доработку (MEGAPROMT2).
+        "on_review": "🔍",
+        "rework": "↩️",
         "done": "✅",
         "overdue": "⏰",
         "failed": "⚠️",
@@ -780,11 +784,21 @@ def _task_kb(task) -> InlineKeyboardMarkup:  # noqa: ANN001
             ]
         )
     if not task.requires_photo and task.status != TASK_DONE:
+        # С проверкой работа не закрывается кнопкой: она уходит руководителю
+        # (`on_review`) и ждёт приёмки. Без проверки — прежнее поведение.
         rows.append(
             [
                 InlineKeyboardButton(
-                    text="✅ Отметить выполненной",
-                    callback_data=f"{CB}:tst:{task.id}:{TASK_DONE}",
+                    text=(
+                        "📤 Сдать на проверку"
+                        if task.requires_review
+                        else "✅ Отметить выполненной"
+                    ),
+                    callback_data=(
+                        f"{CB}:tst:{task.id}:{TASK_ON_REVIEW}"
+                        if task.requires_review
+                        else f"{CB}:tst:{task.id}:{TASK_DONE}"
+                    ),
                 )
             ]
         )
@@ -873,7 +887,7 @@ async def on_task_status(callback: CallbackQuery) -> None:
         if task is None:
             await callback.answer("Поручение не найдено", show_alert=True)
             return
-        if to_status == TASK_DONE and task.requires_photo:
+        if to_status in {TASK_DONE, TASK_ON_REVIEW} and task.requires_photo:
             photos = await hr_tasks.photos_of(session, task_id)
             if not photos:
                 await callback.answer(
@@ -881,7 +895,14 @@ async def on_task_status(callback: CallbackQuery) -> None:
                 )
                 return
         try:
-            await hr_tasks.change_status(session, task, to_status, by=employee)
+            if to_status in {TASK_DONE, TASK_ON_REVIEW} and task.requires_review:
+                # Старые кнопки в истории чата вели в `done` — на поручении с
+                # проверкой это теперь сдача, а не закрытие.
+                await hr_tasks.submit_work(session, task, employee)
+            else:
+                await hr_tasks.change_status(
+                    session, task, to_status, by=employee
+                )
         except hr_tasks.TaskError as exc:
             await callback.answer(f"Так нельзя: {exc}", show_alert=True)
             return

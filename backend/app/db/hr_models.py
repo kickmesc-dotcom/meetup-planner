@@ -82,7 +82,12 @@ TASK_SCOPE_DEPARTMENT = "department"
 TASK_SCOPE_EMPLOYEE = "employee"
 TASK_SCOPES: tuple[str, ...] = (TASK_SCOPE_DEPARTMENT, TASK_SCOPE_EMPLOYEE)
 
-# Статусы поручения (п.4.3 mainPROMT).
+# Статусы поручения (п.4.3 mainPROMT) + проверка руководителем (MEGAPROMT2):
+# `on_review` — сотрудник сдал работу, `rework` — руководитель вернул на
+# доработку. Оба статуса появляются только у поручений с `requires_review`.
+TASK_ON_REVIEW = "on_review"
+TASK_REWORK = "rework"
+
 TASK_NEW = "new"
 TASK_ACCEPTED = "accepted"
 TASK_IN_PROGRESS = "in_progress"
@@ -93,6 +98,8 @@ TASK_STATUSES: tuple[str, ...] = (
     TASK_NEW,
     TASK_ACCEPTED,
     TASK_IN_PROGRESS,
+    TASK_ON_REVIEW,
+    TASK_REWORK,
     TASK_DONE,
     TASK_OVERDUE,
     TASK_FAILED,
@@ -144,6 +151,25 @@ ISSUE_SEVERITIES: tuple[str, ...] = (
     ISSUE_SEVERITY_HIGH,
     ISSUE_SEVERITY_CRITICAL,
 )
+
+# База стандартов: инструкция + короткий тест по ней. Уроки обучения
+# (`services/hr_training.py`) знакомят с приложением, стандарты — с работой:
+# как мыть руки, как подать блюдо, что делать с гостем-жалобой.
+STANDARD_CATEGORY_DISHES = "dishes"
+STANDARD_CATEGORY_EQUIPMENT = "equipment"
+STANDARD_CATEGORY_SAFETY = "safety"
+STANDARD_CATEGORY_SERVICE = "service"
+STANDARD_CATEGORY_OTHER = "other"
+STANDARD_CATEGORIES: tuple[str, ...] = (
+    STANDARD_CATEGORY_DISHES,
+    STANDARD_CATEGORY_EQUIPMENT,
+    STANDARD_CATEGORY_SAFETY,
+    STANDARD_CATEGORY_SERVICE,
+    STANDARD_CATEGORY_OTHER,
+)
+
+# Порог сдачи теста: по умолчанию 80% правильных ответов.
+DEFAULT_PASS_PERCENT = 80
 
 ISSUE_OPEN = "open"
 ISSUE_IN_PROGRESS = "in_progress"
@@ -488,6 +514,12 @@ class Task(Base):
     # Смена, на которую выдано поручение. `None` — «на общих основаниях»
     # (задача на неделю, а не на конкретную смену).
     shift_date: Mapped[date | None] = mapped_column(Date)
+    # Поручение с проверкой: сотрудник сдаёт работу (`on_review`), а принимает
+    # руководитель (`done` / `rework`). По умолчанию выключено — старые и
+    # простые поручения закрываются отметкой исполнителя, как раньше.
+    requires_review: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     # Заполнен при scope='department'.
     department_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
@@ -801,6 +833,108 @@ class HandoverItem(Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False)
     # Срок/зона/срочность одной строкой — чтобы снимок читался без живых таблиц.
     meta: Mapped[str | None] = mapped_column(String(128))
+
+
+# --------------------------------------------------------------------------
+# База стандартов
+# --------------------------------------------------------------------------
+
+
+class Standard(Base):
+    """Инструкция по работе: что делать и как правильно.
+
+    Свободный текст (`body`) вместо файлов-вложений: стандарт пишет
+    руководитель прямо в приложении, и он должен читаться с телефона. Тест —
+    отдельные строки (`StandardQuestion`), чтобы правка одного вопроса не
+    задевала остальные.
+    """
+
+    __tablename__ = "standards"
+    __table_args__ = (
+        CheckConstraint(_in_list("category", STANDARD_CATEGORIES), name="ck_standard_category"),
+        Index("ix_standards_active_sort", "is_active", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    emoji: Mapped[str | None] = mapped_column(String(16))
+    category: Mapped[str] = mapped_column(
+        String(32), nullable=False, default=STANDARD_CATEGORY_OTHER,
+        server_default=STANDARD_CATEGORY_OTHER,
+    )
+    summary: Mapped[str | None] = mapped_column(Text)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # `NULL` — стандарт общий для всех подразделений.
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    pass_percent: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=DEFAULT_PASS_PERCENT,
+        server_default=str(DEFAULT_PASS_PERCENT),
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class StandardQuestion(Base):
+    """Вопрос теста к стандарту. `options` — варианты, `correct_index` — верный."""
+
+    __tablename__ = "standard_questions"
+    __table_args__ = (Index("ix_standard_questions_standard", "standard_id", "sort_order"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    standard_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("standards.id", ondelete="CASCADE"), nullable=False
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    correct_index: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+
+
+class StandardCheck(Base):
+    """Результат прохождения теста: фиксируем историей, а не последним баллом.
+
+    Пересдавать можно — в обучении это нормально; в профиле показываем
+    последнюю попытку, а предыдущие остаются для разбора.
+    """
+
+    __tablename__ = "standard_checks"
+    __table_args__ = (
+        Index("ix_standard_checks_employee", "employee_id", "at"),
+        Index("ix_standard_checks_standard", "standard_id", "passed"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    standard_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("standards.id", ondelete="CASCADE"), nullable=False
+    )
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    total: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    correct: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    percent: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    answers: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 # --------------------------------------------------------------------------

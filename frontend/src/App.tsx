@@ -17,6 +17,8 @@ import { fetchEmployee } from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
 import IssuesScreen from "./features/issues/IssuesScreen";
 import HandoversScreen from "./features/handovers/HandoversScreen";
+import StandardsScreen from "./features/hr/StandardsScreen";
+import ReviewScreen from "./features/hr/ReviewScreen";
 import LinksScreen from "./features/hr/LinksScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
@@ -125,6 +127,9 @@ export default function App() {
   if (tab === "team" && !canManage) {
     setTab("tasks");
   }
+  if (tab === "review" && !canManage) {
+    setTab("tasks");
+  }
 
   const greetingHidden = uiPrefs.data?.hide_greeting === true;
 
@@ -207,6 +212,20 @@ export default function App() {
         <HandoversScreen />
       </main>
     );
+  } else if (tab === "standards") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <StandardsScreen />
+      </main>
+    );
+  } else if (tab === "review") {
+    // Приёмка — только для АУП: сотруднику сервер всё равно вернёт пустой
+    // список, а вкладку незачем даже показывать.
+    content = canManage ? (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <ReviewScreen />
+      </main>
+    ) : null;
   } else if (tab === "links") {
 
     content = (

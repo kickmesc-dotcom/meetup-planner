@@ -68,7 +68,16 @@ export interface HrChecklist {
 }
 
 export type TaskStatus =
-  "new" | "accepted" | "in_progress" | "done" | "overdue" | "failed";
+  | "new"
+  | "accepted"
+  | "in_progress"
+  /** Сдано руководителю: работа ждёт приёмки. */
+  | "on_review"
+  /** Руководитель вернул на доработку. */
+  | "rework"
+  | "done"
+  | "overdue"
+  | "failed";
 
 export type TaskMode = "one_of" | "each" | "parts";
 
@@ -94,6 +103,8 @@ export interface HrTask {
   mode: TaskMode;
   /** Смена, на которую выдано поручение (null — без привязки). */
   shift_date: string | null;
+  /** Поручение с проверкой: «Выполнено» отправляет работу руководителю. */
+  requires_review: boolean;
   /** Мой личный статус: что сделал именно я. */
   my_status: TaskStatus | null;
   /** Моя часть работы — только в режиме `parts`. */
@@ -236,6 +247,19 @@ export const fetchTasks = (includeClosed = false, shiftDate?: string) => {
 };
 
 export type TaskAction = "accept" | "start" | "done";
+
+/** Приёмка работы руководителем: принять или вернуть на доработку. */
+export const reviewTask = (
+  taskId: number,
+  body: { approve: boolean; employee_id?: number | null; comment?: string | null },
+) =>
+  api<HrTask>(`/api/tasks/${taskId}/review`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/** Очередь приёмки: поручения, которые сдали исполнители. */
+export const fetchReviewQueue = () => api<HrTask[]>("/api/tasks/review-queue");
 
 // --- Тестовый пул `[BOT]` (админ) ---
 //
@@ -405,6 +429,8 @@ export interface HrAdminTask {
   assignee_ids: number[];
   mode: TaskMode;
   shift_date: string | null;
+  /** Проверка руководителем: работа уходит в `on_review`. */
+  requires_review: boolean;
   progress_done: number;
   progress_total: number;
   assignments: HrAdminTaskAssignment[];
@@ -492,6 +518,8 @@ export const createAdminTask = (body: {
   priority?: string;
   requires_photo?: boolean;
   comment?: string | null;
+  /** Проверка руководителем: работа уходит в `on_review`. */
+  requires_review?: boolean;
   /** Режим группового поручения и смена, на которую оно выдано. */
   mode?: TaskMode;
   shift_date?: string | null;
@@ -673,4 +701,109 @@ export const muteNotifications = (hours: number) =>
   api<HrSettings>("/api/admin/notifications/mute", {
     method: "POST",
     body: JSON.stringify({ hours }),
+  });
+
+// --------------------------------------------------------------------------
+// База стандартов и проверка знаний
+// --------------------------------------------------------------------------
+
+/**
+ * Стандарт в списке. Правильные ответы сервер наружу не отдаёт: оценка идёт
+ * на сервере, иначе тест превращается в «подсмотри ключ в network».
+ */
+export type StandardCategory =
+  | "dishes"
+  | "equipment"
+  | "safety"
+  | "service"
+  | "other";
+
+export interface HrStandard {
+  id: number;
+  title: string;
+  emoji: string | null;
+  category: StandardCategory;
+  summary: string | null;
+  department_id: number | null;
+  department_name: string | null;
+  pass_percent: number;
+  is_active: boolean;
+  questions_count: number;
+  /** Сдал ли я этот тест хотя бы раз. */
+  passed: boolean;
+  /** Процент последней попытки. */
+  last_percent: number | null;
+}
+
+export interface HrStandardQuestion {
+  id: number;
+  text: string;
+  options: string[];
+}
+
+export interface HrStandardDetail extends HrStandard {
+  body: string;
+  questions: HrStandardQuestion[];
+}
+
+export interface HrStandardsResponse {
+  items: HrStandard[];
+  passed: number;
+  total: number;
+  attempts: number;
+}
+
+export interface HrCheckResult {
+  standard_id: number;
+  total: number;
+  correct: number;
+  percent: number;
+  passed: boolean;
+  pass_percent: number;
+  at: string;
+  /** Номера вопросов, где ответ неверный — по ним и стоит перечитать стандарт. */
+  wrong_indexes: number[];
+}
+
+export const STANDARD_CATEGORY_LABEL: Record<StandardCategory, string> = {
+  dishes: "блюда",
+  equipment: "оборудование",
+  safety: "безопасность",
+  service: "сервис",
+  other: "другое",
+};
+
+export const fetchStandards = () =>
+  api<HrStandardsResponse>("/api/standards");
+
+export const fetchStandard = (id: number) =>
+  api<HrStandardDetail>(`/api/standards/${id}`);
+
+/** Сдать тест. Ответы сверяются на сервере — клиент не знает ключа. */
+export const submitStandardCheck = (id: number, answers: number[]) =>
+  api<HrCheckResult>(`/api/standards/${id}/check`, {
+    method: "POST",
+    body: JSON.stringify({ answers }),
+  });
+
+export interface StandardDraft {
+  title: string;
+  body: string;
+  category: StandardCategory;
+  emoji?: string | null;
+  summary?: string | null;
+  department_id?: number | null;
+  pass_percent?: number;
+  questions: {
+    text: string;
+    options: string[];
+    correct_index: number;
+  }[];
+}
+
+/** Завести стандарт (руководитель/админ). */
+export const createStandard = (body: StandardDraft) =>
+  api<HrStandardDetail>("/api/admin/standards", {
+    method: "POST",
+    body: JSON.stringify(body),
   });
