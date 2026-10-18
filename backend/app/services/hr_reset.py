@@ -214,13 +214,16 @@ def _issue_filter(scope: ResetScope, demo_ids: set[int]):
         else:
             conditions.append(
                 or_(
-                    Issue.employee_id == scope.employee_id,
+                    Issue.created_by_employee_id == scope.employee_id,
                     Issue.assignee_employee_id == scope.employee_id,
                 )
             )
     if demo_ids:
         conditions.append(
-            or_(Issue.employee_id.is_(None), Issue.employee_id.notin_(demo_ids))
+            or_(
+                Issue.created_by_employee_id.is_(None),
+                Issue.created_by_employee_id.notin_(demo_ids),
+            )
         )
     return conditions
 
