@@ -75,6 +75,18 @@ backend/.venv/Scripts/python.exe tools/deploy-hf.py status   # что на хо�
 Значения никогда не печатаются. `PUBLIC_BASE_URL` всегда проставляется равным
 адресу Space — от него зависят CORS и вебхук.
 
+### Чтобы Space не уснул
+
+Бесплатный Space засыпает через 48 часов без запросов, и вместе с ним замолкает
+бот. Держит его живым `deploy/cloudflare/keepalive/` — cron-Worker, который раз
+в 30 минут дёргает `/healthz`:
+
+```bash
+cd deploy/cloudflare/keepalive
+CLOUDFLARE_API_TOKEN=… npx wrangler@4 deploy -c wrangler.jsonc
+curl https://semitask-keepalive.esw1337.workers.dev/   # проверка вручную
+```
+
 Если HF недоступен из Telegram-сети, хост можно переключить на другой
 бесплатный docker-хостинг: код уезжает тем же `mirror` (Dockerfile уже
 портативный), меняется только адрес в `frontend/.env.production` и вебхук.

@@ -1,0 +1,19 @@
+// Пингер бесплатного Hugging Face Space (см. worker.js): раз в 30 минут
+// дёргает /healthz, чтобы контейнер не уходил в сон и бот не замолкал.
+//
+// Деплой:
+//   cd deploy/cloudflare/keepalive
+//   CLOUDFLARE_API_TOKEN=… npx wrangler@4 deploy -c wrangler.jsonc
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "semitask-keepalive",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-08",
+  "observability": { "enabled": true },
+  "vars": {
+    "TARGET_URL": "https://fryesw-meetup-planner-backend.hf.space/healthz"
+  },
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  }
+}
