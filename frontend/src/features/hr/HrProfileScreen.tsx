@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  fetchAdminEmployees,
   fetchDepartments,
   fetchEmployee,
   fetchTraining,
@@ -8,6 +9,8 @@ import {
   switchMyRole,
   type HrEmployee,
 } from "@/api/hr";
+import { startSimulation } from "@/api/simulation";
+import { useSimulation } from "@/store/simulation";
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -62,6 +65,29 @@ export default function HrProfileScreen() {
   // Обучение — этап онбординга и всегда доступный справочник.
   const [showTraining, setShowTraining] = useState(false);
   const trainingQ = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
+  const staff = !!(meQ.data?.is_admin || meQ.data?.is_staff);
+  const employeesQ = useQuery({
+    queryKey: ["admin-employees"],
+    queryFn: fetchAdminEmployees,
+    enabled: staff,
+  });
+  const [simulationTarget, setSimulationTarget] = useState<number | null>(null);
+  const [simulationMode, setSimulationMode] = useState<"new" | "as_is">("new");
+  const simulationStart = useMutation({
+    mutationFn: () =>
+      startSimulation(simulationTarget ?? 0, simulationMode),
+    onSuccess: (data) => {
+      haptic("success");
+      useSimulation.getState().start({
+        sessionId: data.id,
+        subjectName: data.subject_name,
+        departmentName: data.department_name,
+        mode: data.mode,
+      });
+      void qc.invalidateQueries();
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
   // Админ может примерить любую роль, не теряя кабинет (`is_staff`).
   const roleSwitch = useMutation({
     mutationFn: (role: HrEmployee["role"]) => switchMyRole(role),
@@ -219,6 +245,65 @@ export default function HrProfileScreen() {
               );
             })}
           </div>
+        </section>
+      )}
+
+      {(me.is_admin || me.is_staff) && (
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+          <h2 className="text-sm font-semibold text-tg-text">🧪 Режим проверки</h2>
+          <p className="mt-1 text-[11px] text-tg-hint">
+            Открой приложение глазами сотрудника. Тестовые задачи и смены
+            удалятся при выходе — настоящие данные не изменятся.
+          </p>
+          <select
+            aria-label="Кого проверяем"
+            value={simulationTarget ?? ""}
+            onChange={(event) =>
+              setSimulationTarget(
+                event.target.value ? Number(event.target.value) : null,
+              )
+            }
+            className="mt-2 min-h-10 w-full rounded-lg bg-tg-bg px-2 text-xs text-tg-text"
+          >
+            <option value="">Выбери сотрудника</option>
+            {(employeesQ.data ?? []).map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.display_name}
+                {person.department_name ? ` · ${person.department_name}` : ""}
+              </option>
+            ))}
+          </select>
+          <div className="mt-2 flex gap-1.5">
+            {(
+              [
+                { v: "new" as const, label: "Как новичок" },
+                { v: "as_is" as const, label: "Как сейчас" },
+              ]
+            ).map((option) => (
+              <button
+                key={option.v}
+                type="button"
+                aria-pressed={simulationMode === option.v}
+                onClick={() => setSimulationMode(option.v)}
+                className={[
+                  "min-h-9 flex-1 rounded-full px-3 text-xs transition-colors",
+                  simulationMode === option.v
+                    ? "bg-tg-button text-tg-button-text"
+                    : "bg-tg-bg/60 text-tg-text",
+                ].join(" ")}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={simulationTarget === null || simulationStart.isPending}
+            onClick={() => simulationStart.mutate()}
+            className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+          >
+            {simulationStart.isPending ? "Открываем…" : "Открыть как сотрудник"}
+          </button>
         </section>
       )}
 

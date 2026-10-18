@@ -271,9 +271,19 @@ async def notify(
 
     `employees` — HR-профили; в уведомление пишем `users.id` (employee.user_id).
     Возвращаем, сколько строк добавлено.
+
+    Сеанс проверки (`hr_simulation`) не шлёт уведомлений вообще: тестовое
+    действие не должно дёргать телефон реального руководителя. Теневые
+    профили отсекаем и вне сеанса (например, из планировщика).
     """
+    from app.services import hr_simulation
+
+    if hr_simulation.current() is not None:
+        return 0
     count = 0
     for employee in employees:
+        if employee.is_simulation:
+            continue
         await notifications.add(
             session,
             user_id=employee.user_id,

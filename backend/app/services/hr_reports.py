@@ -290,7 +290,10 @@ async def _scope_employees(
         await session.execute(
             select(Employee, User)
             .join(User, User.id == Employee.user_id)
-            .where(Employee.is_active.is_(True))
+            .where(
+                Employee.is_active.is_(True),
+                Employee.is_simulation.is_(False),
+            )
             .order_by(Employee.id)
         )
     ).all()

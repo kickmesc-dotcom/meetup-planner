@@ -142,11 +142,46 @@ CurrentUser = Annotated[User, Depends(current_user)]
 # ---------------------------------------------------------------------------
 
 
-async def current_employee(session: SessionDep, user: CurrentUser) -> Employee:
-    """HR-профиль текущего пользователя (создаётся лениво при первом заходе)."""
-    from app.services import hr_access
+async def current_employee(
+    session: SessionDep,
+    user: CurrentUser,
+    x_simulation_session: Annotated[str | None, Header()] = None,
+) -> AsyncIterator[Employee]:
+    """HR-профиль текущего пользователя.
 
-    return await hr_access.ensure_employee(session, user)
+    Без заголовка — настоящий профиль (создаётся лениво). С заголовком
+    `X-Simulation-Session` — теневой профиль сеанса проверки: все чтения и
+    записи идут от его имени, а настоящий сотрудник остаётся нетронутым.
+    """
+    from app.services import hr_access, hr_simulation
+
+    if x_simulation_session:
+        try:
+            session_id = int(x_simulation_session)
+        except ValueError as exc:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="simulation_bad_header"
+            ) from exc
+        try:
+            context = await hr_simulation.resolve(
+                session, user=user, session_id=session_id
+            )
+        except hr_access.HrAccessError as exc:
+            code = str(exc)
+            status_code = (
+                status.HTTP_409_CONFLICT
+                if code == "simulation_inactive"
+                else status.HTTP_403_FORBIDDEN
+            )
+            raise HTTPException(status_code, detail=code) from exc
+        token = hr_simulation.activate(context)
+        try:
+            yield context.shadow
+        finally:
+            hr_simulation.deactivate(token)
+        return
+
+    yield await hr_access.ensure_employee(session, user)
 
 
 EmployeeDep = Annotated[Employee, Depends(current_employee)]

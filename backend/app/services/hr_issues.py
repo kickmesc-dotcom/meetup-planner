@@ -24,9 +24,9 @@
 
 from __future__ import annotations
 
-import structlog
 from datetime import UTC, date, datetime
 
+import structlog
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -491,6 +491,16 @@ async def list_issues(
     condition = visible_filter(employee)
     if condition is not None:
         stmt = stmt.where(condition)
+    # Проблемы сеанса проверки не попадают в реальный журнал.
+    if not employee.is_simulation:
+        stmt = stmt.where(
+            or_(
+                Issue.created_by_employee_id.is_(None),
+                Issue.created_by_employee_id.notin_(
+                    select(Employee.id).where(Employee.is_simulation.is_(True))
+                ),
+            )
+        )
 
     if statuses:
         unknown = [s for s in statuses if s not in ISSUE_STATUSES]
@@ -547,6 +557,15 @@ async def summary(session: AsyncSession, employee: Employee) -> dict[str, int]:
     stmt = select(Issue.status, func.count()).select_from(Issue).group_by(Issue.status)
     if condition is not None:
         stmt = stmt.where(condition)
+    if not employee.is_simulation:
+        stmt = stmt.where(
+            or_(
+                Issue.created_by_employee_id.is_(None),
+                Issue.created_by_employee_id.notin_(
+                    select(Employee.id).where(Employee.is_simulation.is_(True))
+                ),
+            )
+        )
     rows = await session.execute(stmt)
     counts = {str(status): int(count) for status, count in rows.all()}
 
@@ -573,6 +592,15 @@ async def summary(session: AsyncSession, employee: Employee) -> dict[str, int]:
     )
     if condition is not None:
         attention_stmt = attention_stmt.where(condition)
+    if not employee.is_simulation:
+        attention_stmt = attention_stmt.where(
+            or_(
+                Issue.created_by_employee_id.is_(None),
+                Issue.created_by_employee_id.notin_(
+                    select(Employee.id).where(Employee.is_simulation.is_(True))
+                ),
+            )
+        )
     attention = int(await session.scalar(attention_stmt) or 0)
 
     return {

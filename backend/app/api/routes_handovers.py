@@ -336,6 +336,14 @@ async def create_handover(
     user: CurrentUser,
     employee: EmployeeDep,
 ) -> HandoverOut:
+    from app.services import hr_simulation
+
+    if hr_simulation.current() is not None:
+        # Передача смены адресована живому коллеге: из сеанса проверки её
+        # отправить нельзя, иначе тест разбудил бы реального человека.
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="simulation_self_only"
+        )
     try:
         handover = await hr_handovers.create_handover(
             session,

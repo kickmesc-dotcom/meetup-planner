@@ -22,11 +22,14 @@ import ReviewScreen from "./features/hr/ReviewScreen";
 import ReportsScreen from "./features/hr/ReportsScreen";
 import LinksScreen from "./features/hr/LinksScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
+import OnboardingScreen from "./features/hr/OnboardingScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
 import ThemeSwitcher from "./components/ThemeSwitcher";
+import SimulationBanner from "./components/SimulationBanner";
+import { useSimulation } from "./store/simulation";
 import { useUI } from "./store/ui";
 import { getStartParam, haptic } from "./tg/webapp";
 
@@ -64,6 +67,7 @@ export default function App() {
   });
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
+  const simulationId = useSimulation((s) => s.sessionId);
 
   // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
   // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
@@ -118,8 +122,20 @@ export default function App() {
   }
 
   const meData = me.data!;
-  const isAdmin = !!meData.is_admin;
+  // В режиме проверки админка скрыта: смотрим ровно глазами сотрудника.
+  const isAdmin = !!meData.is_admin && !simulationId;
   const canManage = !!(hrMe.data?.is_aup || hrMe.data?.is_staff);
+
+  // Онбординг — первая точка входа, а не форма внутри профиля.
+  const onboarding = !!hrMe.data && hrMe.data.onboarding_state !== "done";
+  if (onboarding) {
+    return (
+      <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+        <SimulationBanner />
+        <OnboardingScreen employee={hrMe.data!} />
+      </div>
+    );
+  }
 
   // Если переключились на admin без прав — мягко возвращаем к задачам.
   if (tab === "admin" && !isAdmin) {
@@ -284,6 +300,7 @@ export default function App() {
     // GHG11(8) плеер подборки недели (музыкальная механика) убран вместе с
     // остальным шуточным контуром — он уехал в `src/_legacy`, каркас остался.
     <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+      <SimulationBanner />
       {content}
       <TabBar isAdmin={isAdmin} canManage={canManage} />
     </div>

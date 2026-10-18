@@ -95,6 +95,7 @@ def _engine(dsn: str):  # noqa: ANN202 — AsyncEngine
 # Те же таблицы, что чистит `test_hr_flow_pg.py`: база выделенная, поэтому
 # teardown не зависит от того, где именно упал тест.
 _TOUCHED = (
+    "hr_simulation_sessions",
     "feedback_answers",
     "employee_achievements",
     "hr_handover_items",

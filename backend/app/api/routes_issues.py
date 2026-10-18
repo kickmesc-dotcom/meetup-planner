@@ -27,7 +27,7 @@ from app.db.hr_models import (
     Issue,
 )
 from app.db.models import User
-from app.services import hr_issues, hr_notify
+from app.services import hr_issues, hr_notify, hr_simulation
 
 router = APIRouter(tags=["issues"])
 
@@ -241,6 +241,13 @@ async def _visible_issue(
     # существующие карточки.
     if issue is None or not hr_issues.can_view(viewer, issue):
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="issue_not_found")
+    # Сеанс проверки трогает только свои карточки: иначе тень с ролью админа
+    # правила бы настоящий журнал отдела.
+    if hr_simulation.current() is not None and not (
+        issue.created_by_employee_id == viewer.id
+        or issue.assignee_employee_id == viewer.id
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="issue_not_found")
     return issue
 
 
@@ -388,7 +395,13 @@ async def create_issue(
         await session.rollback()
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    await _notify_new_issue(session, issue, employee)
+    if hr_simulation.current() is not None:
+        # Проблема сеанса — личная: она не попадает в журнал отдела и никого
+        # не уведомляет. Иначе проверка интерфейса будила бы живых людей.
+        issue.department_id = None
+        issue.assignee_employee_id = employee.id
+    else:
+        await _notify_new_issue(session, issue, employee)
     await session.commit()
     await session.refresh(issue)
     return await _detail(session, issue, employee)

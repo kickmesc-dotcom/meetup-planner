@@ -277,6 +277,7 @@ class Employee(Base):
         ),
         Index("ix_employees_department", "department_id", "is_active"),
         Index("ix_employees_demo", "is_demo"),
+        Index("ix_employees_simulation", "is_simulation"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -300,6 +301,12 @@ class Employee(Base):
     # Тестовый пул: сотрудники-симуляторы с префиксом `[BOT]`. Их активность
     # можно спрятать или снести одним переключателем (services/hr_demo.py).
     is_demo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    # Теневой профиль режима проверки (`hr_simulation_sessions`): копия
+    # сотрудника для безопасного прохождения сценариев. Все действия такого
+    # профиля невидимы остальным и удаляются при выходе из режима.
+    is_simulation: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
     role: Mapped[str] = mapped_column(
@@ -1055,6 +1062,76 @@ class FeedbackAnswer(Base):
 # --------------------------------------------------------------------------
 # Скрытые ачивки сотрудника (личный прогресс)
 # --------------------------------------------------------------------------
+
+
+# --------------------------------------------------------------------------
+# Режим проверки (имитация сотрудника)
+# --------------------------------------------------------------------------
+
+SIM_ACTIVE = "active"
+SIM_ENDED = "ended"
+SIM_FAILED = "failed"
+SIM_STATUSES: tuple[str, ...] = (SIM_ACTIVE, SIM_ENDED, SIM_FAILED)
+SIM_MODE_NEW = "new"
+SIM_MODE_AS_IS = "as_is"
+SIM_MODES: tuple[str, ...] = (SIM_MODE_NEW, SIM_MODE_AS_IS)
+
+
+class SimulationSession(Base):
+    """Сеанс проверки приложения глазами сотрудника.
+
+    Зачем отдельная таблица, а не просто «переключить employee_id в клиенте»:
+    приложению нужен теневой профиль (`employees.is_simulation`), к которому
+    привязаны все тестовые задачи, смены, проблемы и уведомления. Сеанс — это
+    аудит-запись: кто проверял, кого, в каком режиме и когда закончил. Она
+    остаётся после очистки, а тестовые данные — нет.
+
+    `shadow_employee_id` — тот самый теневой профиль. У него отдельный
+    `users`-row с отрицательным Telegram ID, поэтому личные сообщения никогда
+    не уйдут реальному человеку.
+    """
+
+    __tablename__ = "hr_simulation_sessions"
+    __table_args__ = (
+        CheckConstraint(_in_list("status", SIM_STATUSES), name="ck_sim_status"),
+        CheckConstraint(_in_list("mode", SIM_MODES), name="ck_sim_mode"),
+        Index("ix_sim_sessions_actor", "actor_employee_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    actor_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    subject_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    shadow_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    # Снимок на момент старта: после очистки теневого профиля аудит всё равно
+    # должен отвечать «кого и в каком виде проверяли».
+    subject_name: Mapped[str | None] = mapped_column(Text)
+    subject_department_name: Mapped[str | None] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=SIM_MODE_NEW, server_default=SIM_MODE_NEW
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=SIM_ACTIVE, server_default=SIM_ACTIVE
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cleanup_error: Mapped[str | None] = mapped_column(Text)
+    tasks_cleaned: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    runs_cleaned: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
+    issues_cleaned: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, default=0, server_default="0"
+    )
 
 
 class EmployeeAchievement(Base):

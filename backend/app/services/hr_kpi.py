@@ -452,7 +452,10 @@ async def board(
         select(Employee.id, Employee.is_demo, Department.name, User.display_name)
         .join(User, User.id == Employee.user_id)
         .outerjoin(Department, Department.id == Employee.department_id)
-        .where(Employee.is_active.is_(True))
+        .where(
+            Employee.is_active.is_(True),
+            Employee.is_simulation.is_(False),
+        )
     )
     rows = (await session.execute(people)).all()
     if not rows:

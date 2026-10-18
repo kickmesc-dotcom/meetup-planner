@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   TASK_MODE_LABEL,
+  fetchChecklist,
   fetchEmployee,
   fetchTasks,
   reportTaskIssue,
@@ -107,6 +108,13 @@ export default function MyTasksScreen() {
     queryKey: ["hr-tasks", showClosed],
     queryFn: () => fetchTasks(showClosed),
   });
+  // Личная панель отвечает «что делать сейчас», поэтому прогресс смены
+  // подтягивается сюда же: без него главный экран не знал, открыта ли смена.
+  const checklistQ = useQuery({
+    queryKey: ["hr-checklist"],
+    queryFn: () => fetchChecklist(),
+    staleTime: 30_000,
+  });
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["hr-tasks"] });
@@ -131,6 +139,15 @@ export default function MyTasksScreen() {
     );
 
   const tasks = tasksQ.data ?? [];
+  const checklist = checklistQ.data;
+  const firstName = (meQ.data?.display_name ?? "")
+    .replace("[BOT]", "")
+    .trim()
+    .split(" ")[0];
+  const shiftPercent =
+    checklist && checklist.total > 0
+      ? Math.round((100 * checklist.done) / checklist.total)
+      : 0;
   // «Активные» считаем по своему статусу: в режиме «каждый сам» задача ещё
   // открыта для коллег, хотя я свою часть уже закрыл. `on_review` тоже
   // активна: работа сдана, но пока не принята — это ещё не закрыто.
@@ -144,7 +161,10 @@ export default function MyTasksScreen() {
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">Мои задачи</h1>          <span className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold text-tg-text">
+            {firstName ? `Привет, ${firstName}` : "Мои задачи"}
+          </h1>
+          <span className="flex items-center gap-2">
             {meQ.data && (
               <span className="flex items-center gap-1.5 text-xs text-tg-hint">
                 <span className="truncate">{meQ.data.display_name}</span>
@@ -197,9 +217,10 @@ export default function MyTasksScreen() {
           </span>
         </div>
         <p className="mt-1 text-xs text-tg-hint">
-          {open.length === 0
-            ? "Активных поручений нет — смена закрыта."
-            : `Активных: ${open.length}${overdue ? ` · просрочено: ${overdue}` : ""}`}
+          Что нужно сделать сегодня
+          {open.length > 0
+            ? ` · задач ${open.length}${overdue ? `, просрочено ${overdue}` : ""}`
+            : ""}
         </p>
         <div className="mt-3 flex items-center gap-1.5">
           {[
@@ -239,6 +260,33 @@ export default function MyTasksScreen() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+        {checklist && checklist.total > 0 && (
+          <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium text-tg-text">Смена сегодня</span>
+              <span className="text-[11px] tabular-nums text-tg-hint">
+                {checklist.done}/{checklist.total}
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-tg-bg">
+              <div
+                className="h-full rounded-full bg-tg-link"
+                style={{ width: `${shiftPercent}%` }}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setTab("checklist");
+              }}
+              className="mt-2 min-h-8 rounded-full bg-tg-bg px-3 text-xs text-tg-link"
+            >
+              {checklist.status === "done" ? "Смена закрыта" : "Открыть чек-лист"}
+            </button>
+          </section>
+        )}
+
         {tasksQ.isLoading && (
           <>
             <CardSkeleton />
@@ -247,17 +295,26 @@ export default function MyTasksScreen() {
         )}
 
         {!tasksQ.isLoading && tasks.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center text-center">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
             <div className="text-4xl" aria-hidden>
-              🎯
+              ✅
             </div>
             <div className="mt-2 text-sm font-medium text-tg-text">
-              Поручений нет
+              На сегодня всё
             </div>
             <div className="mt-1 text-xs text-tg-hint">
-              Как только руководитель поставит задачу, она появится здесь и
-              придёт в чат.
+              Загляни в события смены.
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setTab("feed");
+              }}
+              className="mt-3 min-h-9 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-link"
+            >
+              События
+            </button>
           </div>
         )}
 

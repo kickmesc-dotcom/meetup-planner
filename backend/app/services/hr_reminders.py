@@ -26,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -226,7 +226,9 @@ async def send_dm(  # noqa: ANN001
     ломать тик планировщика. `keyboard` (опц.) — кнопки управления алертом
     прямо в сообщении (см. `hr_alerts.alert_keyboard`).
     """
-    if bot is None or not telegram_id or not text:
+    # Отрицательный ID — теневой профиль проверки: Telegram такое не принимает,
+    # а реальному человеку сообщение не предназначено.
+    if bot is None or not telegram_id or telegram_id <= 0 or not text:
         return False
     try:
         await bot.send_message(
@@ -315,6 +317,11 @@ async def alert_managers(
     )
 
 
+def _simulation_employee_ids():
+    """Подзапрос теневых профилей: их задачи не тревожат реальный контур."""
+    return select(Employee.id).where(Employee.is_simulation.is_(True))
+
+
 async def send_deadline_reminders(
     session: AsyncSession,
     *,
@@ -337,6 +344,12 @@ async def send_deadline_reminders(
             Task.due_at > moment,
             Task.due_at <= horizon,
             Task.status.in_(tuple(hr_tasks.OPEN_STATUSES)),
+            # Задачи сеанса проверки живут только до выхода: напоминать о них
+            # настоящим людям нельзя, а тень всё равно не прочитает DM.
+            or_(
+                Task.assignee_employee_id.is_(None),
+                Task.assignee_employee_id.notin_(_simulation_employee_ids()),
+            ),
         )
         .order_by(Task.due_at)
         .limit(BATCH_LIMIT)
@@ -464,6 +477,10 @@ async def escalation_plan(
     # Тестовый пул исключаем ВСЕГДА, даже когда он виден в интерфейсе: иначе
     # админы получали бы алерты про [BOT]-задачи, которые никогда не закроют.
     demo_ids = await hr_demo.demo_employee_ids(session)
+    sim_ids = {
+        int(v)
+        for v in (await session.scalars(_simulation_employee_ids())).all()
+    }
     tasks = [
         task
         for task in (
@@ -472,6 +489,7 @@ async def escalation_plan(
             )
         ).all()
         if task.assignee_employee_id not in demo_ids
+        and task.assignee_employee_id not in sim_ids
     ]
     if not tasks:
         return EscalationPlan(

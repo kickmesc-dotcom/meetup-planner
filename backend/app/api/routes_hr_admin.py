@@ -59,6 +59,7 @@ from app.services import (
     hr_notify,
     hr_ops,
     hr_settings,
+    hr_simulation,
     hr_tasks,
 )
 
@@ -735,6 +736,15 @@ async def create_task(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_priority")
     if body.mode not in TASK_MODES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_mode")
+    # Режим проверки — песочница. Поручение другому человеку или отделу было бы
+    # реальным внешним действием, поэтому разрешаем только «себе».
+    if hr_simulation.current() is not None and (
+        body.scope != "employee"
+        or body.assignee_employee_id != int(employee.id)
+    ):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="simulation_self_only"
+        )
     try:
         task = await hr_tasks.create_task(
             session,
@@ -772,6 +782,14 @@ async def set_task_status(
     task = await hr_tasks.get_task(session, task_id)
     if task is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="task_not_found")
+    # В сеансе проверки меняем статус только у своих тестовых задач.
+    if hr_simulation.current() is not None and not (
+        task.assignee_employee_id == employee.id
+        or task.created_by_employee_id == employee.id
+    ):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="simulation_self_only"
+        )
     try:
         await hr_tasks.change_status(
             session, task, body.status, by=employee, comment=body.comment
@@ -825,7 +843,8 @@ async def admin_employees(
     )
     out: list[EmployeeAdminOut] = []
     for employee, user, department in rows.all():
-        if int(employee.id) in hidden:
+        # Теневые профили режима проверки не выбираются как адресаты.
+        if employee.is_simulation or int(employee.id) in hidden:
             continue
         if employee.is_demo and not include_demo:
             continue

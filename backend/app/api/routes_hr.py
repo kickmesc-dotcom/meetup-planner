@@ -86,6 +86,9 @@ class EmployeeOut(BaseModel):
 class OnboardingIn(BaseModel):
     department_id: int | None = None
     experience: Literal["new", "experienced"] | None = None
+    # «Я уже запомнил»: закрыть знакомство без прохождения уроков. Рабочие
+    # чек-листы и поручения при этом остаются обязательными.
+    finish: bool = False
 
 
 class DepartmentOut(BaseModel):
@@ -213,11 +216,17 @@ async def _department_name(
 async def _employee_out(
     session: AsyncSession, employee: Employee, user: User
 ) -> EmployeeOut:
+    # В режиме проверки `employee` — теневой профиль со своим пользователем,
+    # а `user` остаётся реальным админом. Имя и telegram_id берём у владельца
+    # профиля, иначе сотрудник видит в «Профиле» имя проверяющего.
+    owner = user
+    if int(employee.user_id) != int(user.id):
+        owner = await session.get(User, employee.user_id) or user
     return EmployeeOut(
         id=employee.id,
         user_id=employee.user_id,
-        display_name=user.display_name,
-        telegram_id=user.telegram_id,
+        display_name=owner.display_name,
+        telegram_id=owner.telegram_id,
         badge=employee.badge,
         badge_emoji=employee.badge_emoji,
         is_demo=employee.is_demo,
@@ -352,7 +361,7 @@ async def onboarding(
     Состояние двигаем вперёд: выбрал подразделение → ждём опыт; выбрал опыт →
     настройка завершена. Оба поля можно прислать одним запросом.
     """
-    if body.department_id is None and body.experience is None:
+    if body.department_id is None and body.experience is None and not body.finish:
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="nothing_to_update"
         )
@@ -376,6 +385,13 @@ async def onboarding(
     if employee.department_id is not None and employee.experience is not None:
         if employee.onboarding_state != ONBOARDING_DONE:
             employee.onboarding_state = ONBOARDING_TRAINING
+
+    if body.finish:
+        if employee.department_id is None or employee.experience is None:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="profile_incomplete"
+            )
+        employee.onboarding_state = ONBOARDING_DONE
 
     await session.commit()
     await session.refresh(employee)
@@ -651,6 +667,11 @@ async def task_review(
     """
     if not hr_access.is_aup(employee):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="aup_required")
+    from app.services import hr_simulation
+
+    if hr_simulation.current() is not None:
+        # Приёмка меняет настоящие задачи — в сеансе проверки это запрещено.
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="simulation_self_only")
     task = await hr_tasks.get_task(session, task_id)
     if task is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="task_not_found")
@@ -891,7 +912,10 @@ async def feed_filters(session: SessionDep, employee: EmployeeDep) -> FeedFilter
                 User.display_name,
             )
             .join(User, User.id == Employee.user_id)
-            .where(Employee.is_active.is_(True))
+            .where(
+                Employee.is_active.is_(True),
+                Employee.is_simulation.is_(False),
+            )
             .order_by(User.display_name)
         )
         if allowed is not None:

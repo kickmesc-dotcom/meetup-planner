@@ -33,7 +33,7 @@ from app.db.hr_models import (
     TaskIssue,
 )
 from app.db.models import User
-from app.services import hr_access, hr_demo, hr_settings, hr_tasks
+from app.services import hr_access, hr_demo, hr_settings, hr_simulation, hr_tasks
 
 STATUS_DONE = "done"
 STATUS_LATE = "late"
@@ -174,6 +174,13 @@ async def build_dashboard(
         return department_id == allowed_department
 
     hidden = await hr_demo.hidden_employee_ids(session)
+    # Теневые профили проверки не показываем реальным людям. Сам сеанс видит
+    # свой профиль (он и так один в области «свои действия»).
+    simulation_hidden = (
+        set()
+        if viewer.is_simulation
+        else await hr_simulation.hidden_employee_ids(session)
+    )
 
     departments = list(
         (
@@ -198,7 +205,9 @@ async def build_dashboard(
     people = [
         (employee, user)
         for employee, user in rows
-        if int(employee.id) not in hidden and in_scope_department(employee.department_id)
+        if int(employee.id) not in hidden
+        and int(employee.id) not in simulation_hidden
+        and in_scope_department(employee.department_id)
     ]
     employee_ids = [int(e.id) for e, _ in people]
     employee_by_id = {int(e.id): e for e, _ in people}

@@ -108,6 +108,11 @@ class FeedItem:
 
 def viewer_scope(viewer: Employee) -> str:
     """Какая область доступна смотрящему."""
+    # Теневой профиль проверки живёт в своём сеансе: даже если у проверяемого
+    # роль руководителя, лента показывает только действия сеанса, а не
+    # реальную жизнь отдела.
+    if viewer.is_simulation:
+        return SCOPE_SELF
     if hr_access.is_admin(viewer):
         return SCOPE_ALL
     if hr_access.is_aup(viewer):
@@ -149,7 +154,10 @@ async def allowed_employee_ids(
     if scope == SCOPE_SELF:
         return {viewer.id}
     rows = await session.scalars(
-        select(Employee.id).where(Employee.department_id == viewer.department_id)
+        select(Employee.id).where(
+            Employee.department_id == viewer.department_id,
+            Employee.is_simulation.is_(False),
+        )
     )
     ids = {int(i) for i in rows.all()}
     ids.add(viewer.id)
@@ -418,6 +426,10 @@ async def build_feed(
     # Тестовый пул `[BOT]` прячется целиком, когда админ выключил его видимость:
     # исключаем ПОСЛЕ расчёта области, чтобы спрятанное не всплыло через фильтр.
     excluded = await hr_demo.hidden_employee_ids(session)
+    if not viewer.is_simulation:
+        from app.services import hr_simulation
+
+        excluded = excluded | await hr_simulation.hidden_employee_ids(session)
     items = await collect_items(
         session,
         employee_ids=allowed,

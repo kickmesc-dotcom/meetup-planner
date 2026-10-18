@@ -180,6 +180,8 @@ export const fetchEmployee = () => api<HrEmployee>("/api/me/employee");
 export const submitOnboarding = (body: {
   department_id?: number | null;
   experience?: "new" | "experienced" | null;
+  /** «Я уже запомнил»: закрыть знакомство без уроков. */
+  finish?: boolean;
 }) =>
   api<HrEmployee>("/api/me/onboarding", {
     method: "POST",
@@ -403,11 +405,16 @@ export interface HrAdminEmployee {
   display_name: string;
   telegram_id: number;
   department_id: number | null;
+  department_name: string | null;
+  department_emoji: string | null;
   position: string | null;
+  badge: string | null;
+  badge_emoji: string | null;
   role: "employee" | "aup" | "admin";
   experience: string | null;
   onboarding_state: string;
   is_active: boolean;
+  is_demo: boolean;
 }
 
 export interface HrAdminTaskAssignment {

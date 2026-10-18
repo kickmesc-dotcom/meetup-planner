@@ -1,4 +1,5 @@
 import { getInitData } from "@/tg/webapp";
+import { useSimulation } from "@/store/simulation";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
@@ -121,6 +122,10 @@ export async function api<T>(
   const initData = getInitData();
   const headers = new Headers(init.headers);
   headers.set("Authorization", `tma ${initData}`);
+  // Режим проверки: сервер подменяет профиль на теневой. Без заголовка это
+  // обычный запрос настоящего пользователя.
+  const simulationId = useSimulation.getState().sessionId;
+  if (simulationId) headers.set("X-Simulation-Session", String(simulationId));
   if (init.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -135,6 +140,17 @@ export async function api<T>(
       detail = body.detail ?? detail;
     } catch {
       // ignore
+    }
+    // Сеанс проверки мог закончиться, пока приложение было свёрнуто (сервер
+    // перезапустили, базу подменили). Заголовок с мёртвым ID вешал бы все
+    // запросы в 409, поэтому забываем сеанс и повторяем уже как себя.
+    if (
+      simulationId &&
+      res.status === 409 &&
+      (detail === "simulation_inactive" || detail === "simulation_not_found")
+    ) {
+      useSimulation.getState().clear();
+      return api<T>(path, init);
     }
     throw new ApiError(res.status, detail);
   }

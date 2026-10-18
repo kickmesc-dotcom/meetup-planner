@@ -5,7 +5,6 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-import httpx
 import structlog
 from aiogram.types import (
     BotCommand,
@@ -32,6 +31,7 @@ from app.api import (
     routes_polls,
     routes_reports,
     routes_reset,
+    routes_simulation,
     routes_standards,
     routes_users,
 )
@@ -47,8 +47,7 @@ from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_seed import seed_hr
 from app.db.seed import seed_users
-# Импорт sync_all_avatars остается, но вызов ниже закомментирован
-from app.services.avatars import sync_all_avatars
+
 
 def _configure_logging(level: str) -> None:
     logging.basicConfig(level=level.upper())
@@ -85,8 +84,16 @@ async def _register_bot_metadata() -> bool:
     ]
     try:
         # Устанавливаем команды с коротким таймаутом
-        await bot.set_my_commands(private_cmds, scope=BotCommandScopeAllPrivateChats(), request_timeout=10)
-        await bot.set_my_commands(group_cmds, scope=BotCommandScopeAllGroupChats(), request_timeout=10)
+        await bot.set_my_commands(
+            private_cmds,
+            scope=BotCommandScopeAllPrivateChats(),
+            request_timeout=10,
+        )
+        await bot.set_my_commands(
+            group_cmds,
+            scope=BotCommandScopeAllGroupChats(),
+            request_timeout=10,
+        )
         # GHG7 P1.3: чтобы в нашем основном чате Telegram не дописывал
         # `@gunghogunsbot` к каждой команде в autocomplete, ставим
         # команды дополнительно прицельно на `group_chat_id` через
@@ -276,6 +283,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_reports.router, prefix="/api/admin")
     # Сброс текущей работы: предпросмотр + подтверждение словом.
     app.include_router(routes_reset.router, prefix="/api/admin")
+    # Режим проверки: теневой профиль, вход/выход, чистая история.
+    app.include_router(routes_simulation.router, prefix="/api/admin")
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие
