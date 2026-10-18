@@ -70,6 +70,8 @@ export interface HrChecklist {
 export type TaskStatus =
   "new" | "accepted" | "in_progress" | "done" | "overdue" | "failed";
 
+export type TaskMode = "one_of" | "each" | "parts";
+
 export interface HrTask {
   id: number;
   title: string;
@@ -82,12 +84,29 @@ export interface HrTask {
   priority: "low" | "normal" | "high";
   requires_photo: boolean;
   comment: string | null;
+  /** Агрегат по всем исполнителям — в групповом поручении это не «мой» статус. */
   status: TaskStatus;
   created_by_employee_id: number | null;
   created_at: string;
   done_at: string | null;
   is_overdue: boolean;
+  /** Режим группового поручения: один за всех / каждый сам / части работы. */
+  mode: TaskMode;
+  /** Смена, на которую выдано поручение (null — без привязки). */
+  shift_date: string | null;
+  /** Мой личный статус: что сделал именно я. */
+  my_status: TaskStatus | null;
+  /** Моя часть работы — только в режиме `parts`. */
+  my_part: string | null;
+  progress_done: number;
+  progress_total: number;
 }
+
+export const TASK_MODE_LABEL: Record<TaskMode, string> = {
+  one_of: "один за всех",
+  each: "каждый сам",
+  parts: "части работы",
+};
 
 export interface HrLink {
   id: number;
@@ -208,10 +227,13 @@ export const completeChecklistItem = (body: {
 
 // --- Поручения ---
 
-export const fetchTasks = (includeClosed = false) =>
-  api<HrTask[]>(
-    `/api/tasks?include_closed=${includeClosed ? "true" : "false"}`,
-  );
+export const fetchTasks = (includeClosed = false, shiftDate?: string) => {
+  const params = new URLSearchParams({
+    include_closed: includeClosed ? "true" : "false",
+  });
+  if (shiftDate) params.set("shift_date", shiftDate);
+  return api<HrTask[]>(`/api/tasks?${params.toString()}`);
+};
 
 export type TaskAction = "accept" | "start" | "done";
 
@@ -358,6 +380,14 @@ export interface HrAdminEmployee {
   is_active: boolean;
 }
 
+export interface HrAdminTaskAssignment {
+  employee_id: number;
+  display_name: string;
+  status: TaskStatus;
+  part: string | null;
+  done_at: string | null;
+}
+
 export interface HrAdminTask {
   id: number;
   title: string;
@@ -373,6 +403,11 @@ export interface HrAdminTask {
   done_at: string | null;
   is_overdue: boolean;
   assignee_ids: number[];
+  mode: TaskMode;
+  shift_date: string | null;
+  progress_done: number;
+  progress_total: number;
+  assignments: HrAdminTaskAssignment[];
 }
 
 export interface HrSettings {
@@ -441,7 +476,10 @@ export const fetchEmployeeAchievements = (employeeId: number) =>
 export const fetchAdminEmployees = () =>
   api<HrAdminEmployee[]>("/api/admin/employees");
 
-export const fetchAdminTasks = () => api<HrAdminTask[]>("/api/admin/tasks");
+export const fetchAdminTasks = (shiftDate?: string) =>
+  api<HrAdminTask[]>(
+    `/api/admin/tasks${shiftDate ? `?shift_date=${shiftDate}` : ""}`,
+  );
 
 export const createAdminTask = (body: {
   title: string;
@@ -454,6 +492,11 @@ export const createAdminTask = (body: {
   priority?: string;
   requires_photo?: boolean;
   comment?: string | null;
+  /** Режим группового поручения и смена, на которую оно выдано. */
+  mode?: TaskMode;
+  shift_date?: string | null;
+  /** Текст части каждому исполнителю (только для режима `parts`). */
+  parts?: Record<number, string> | null;
 }) =>
   api<HrAdminTask>("/api/admin/tasks", {
     method: "POST",

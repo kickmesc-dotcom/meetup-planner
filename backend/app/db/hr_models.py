@@ -103,6 +103,15 @@ PRIORITY_NORMAL = "normal"
 PRIORITY_HIGH = "high"
 PRIORITIES: tuple[str, ...] = (PRIORITY_LOW, PRIORITY_NORMAL, PRIORITY_HIGH)
 
+# Режим группового поручения (п.4 mainPROMT). До него поручение на
+# подразделение жило одной строкой: «подразделение видит и кто-то закрывает».
+# Это ломало два живых сценария: «каждый моет своё» (нужны отметки каждого) и
+# «части работы» (у каждого свой кусок).
+MODE_ONE_OF = "one_of"
+MODE_EACH = "each"
+MODE_PARTS = "parts"
+TASK_MODES: tuple[str, ...] = (MODE_ONE_OF, MODE_EACH, MODE_PARTS)
+
 # Журнал операционных проблем: карточка живёт отдельно от поручения и переживает
 # смену. Категория — «что сломалось», зона — «где», срочность — «насколько
 # горит». Наборы закрытые, чтобы журнал можно было считать и фильтровать.
@@ -457,9 +466,11 @@ class Task(Base):
         CheckConstraint(_in_list("scope", TASK_SCOPES), name="ck_task_scope"),
         CheckConstraint(_in_list("status", TASK_STATUSES), name="ck_task_status"),
         CheckConstraint(_in_list("priority", PRIORITIES), name="ck_task_priority"),
+        CheckConstraint(_in_list("mode", TASK_MODES), name="ck_task_mode"),
         Index("ix_tasks_assignee_open", "assignee_employee_id", "status"),
         Index("ix_tasks_department_open", "department_id", "status"),
         Index("ix_tasks_due", "status", "due_at"),
+        Index("ix_tasks_shift", "shift_date"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -469,6 +480,14 @@ class Task(Base):
     scope: Mapped[str] = mapped_column(
         String(16), nullable=False, default=TASK_SCOPE_EMPLOYEE, server_default=TASK_SCOPE_EMPLOYEE
     )
+    # `one_of` — «один за всех» (закрывает любой), `each` — «каждый сам»,
+    # `parts` — «части работы» (у каждого своя часть в `task_assignments`).
+    mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=MODE_ONE_OF, server_default=MODE_ONE_OF
+    )
+    # Смена, на которую выдано поручение. `None` — «на общих основаниях»
+    # (задача на неделю, а не на конкретную смену).
+    shift_date: Mapped[date | None] = mapped_column(Date)
     # Заполнен при scope='department'.
     department_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
@@ -496,6 +515,43 @@ class Task(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TaskAssignment(Base):
+    """Состояние поручения у конкретного исполнителя.
+
+    Одна строка на человека — то, чего не хватало групповым поручениям: «каждый
+    сам» и «части работы» требуют отметки каждого, а не одной галочки на всех.
+    Для режима `one_of` строки тоже есть (кто взял и кто закрыл), но решает
+    любой первый — агрегат в `Task.status` закрывается сразу.
+    """
+
+    __tablename__ = "task_assignments"
+    __table_args__ = (
+        UniqueConstraint("task_id", "employee_id", name="uq_task_assignment"),
+        CheckConstraint(_in_list("status", TASK_STATUSES), name="ck_task_assignment_status"),
+        Index("ix_task_assignments_employee", "employee_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=TASK_NEW, server_default=TASK_NEW
+    )
+    # Текст части для режима `parts`: «мойка холодильника», «витрина».
+    part: Mapped[str | None] = mapped_column(Text)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

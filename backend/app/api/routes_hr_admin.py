@@ -22,9 +22,12 @@ from sqlalchemy import Select, or_, select
 
 from app.api.deps import AdminDep, AupDep, SessionDep
 from app.db.hr_models import (
+    MODE_ONE_OF,
     PRIORITIES,
     QUESTION_KINDS,
     ROLES,
+    TASK_DONE,
+    TASK_MODES,
     TEMPLATE_KINDS,
     ChecklistItem,
     ChecklistTemplate,
@@ -217,6 +220,12 @@ class TaskIn(BaseModel):
     priority: str = "normal"
     requires_photo: bool = False
     comment: str | None = None
+    # Групповое поручение: режим («один за всех / каждый сам / части работы»)
+    # и смена, на которую оно выдано.
+    mode: str = MODE_ONE_OF
+    shift_date: date | None = None
+    # Текст части каждому исполнителю — только для режима `parts`.
+    parts: dict[int, str] | None = None
 
 
 class TaskStatusIn(BaseModel):
@@ -258,6 +267,14 @@ class EmployeePatch(BaseModel):
     is_active: bool | None = None
 
 
+class TaskAssignmentOut(BaseModel):
+    employee_id: int
+    display_name: str
+    status: str
+    part: str | None
+    done_at: datetime | None
+
+
 class TaskAdminOut(BaseModel):
     id: int
     title: str
@@ -273,6 +290,11 @@ class TaskAdminOut(BaseModel):
     done_at: datetime | None
     is_overdue: bool
     assignee_ids: list[int]
+    mode: str = MODE_ONE_OF
+    shift_date: date | None = None
+    progress_done: int = 0
+    progress_total: int = 0
+    assignments: list[TaskAssignmentOut] = []
 
 
 class ReportOut(BaseModel):
@@ -633,8 +655,22 @@ async def patch_question(
 # --------------------------------------------------------------------------
 
 
+async def _employee_names(session, ids: set[int]) -> dict[int, str]:  # noqa: ANN001
+    """Имена исполнителей: в админских списках нужен человек, а не id."""
+    if not ids:
+        return {}
+    rows = await session.execute(
+        select(Employee.id, User.display_name)
+        .join(User, User.id == Employee.user_id)
+        .where(Employee.id.in_(ids))
+    )
+    return {int(employee_id): str(name) for employee_id, name in rows.all()}
+
+
 async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
     assignees = await hr_tasks.assignees(session, task)
+    rows = await hr_tasks.assignments_of(session, task.id)
+    names = await _employee_names(session, {row.employee_id for row in rows})
     return TaskAdminOut(
         id=task.id,
         title=task.title,
@@ -650,12 +686,29 @@ async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
         done_at=task.done_at,
         is_overdue=hr_tasks.is_overdue(task),
         assignee_ids=[e.id for e in assignees],
+        mode=task.mode,
+        shift_date=task.shift_date,
+        progress_done=sum(1 for row in rows if row.status == TASK_DONE),
+        progress_total=len(rows),
+        assignments=[
+            TaskAssignmentOut(
+                employee_id=row.employee_id,
+                display_name=names.get(row.employee_id, "—"),
+                status=row.status,
+                part=row.part,
+                done_at=row.done_at,
+            )
+            for row in rows
+        ],
     )
 
 
 @router.get("/tasks", response_model=list[TaskAdminOut])
 async def admin_tasks(
-    session: SessionDep, _: AupDep, status_filter: str | None = None
+    session: SessionDep,
+    _: AupDep,
+    status_filter: str | None = None,
+    shift_date: date | None = None,
 ) -> list[TaskAdminOut]:
     statuses = [status_filter] if status_filter else None
     # Тестовый пул `[BOT]` прячется тем же тумблером, что и лента: иначе его
@@ -664,6 +717,8 @@ async def admin_tasks(
     rows = await hr_tasks.list_all(
         session, statuses=statuses, exclude_employee_ids=hidden
     )
+    if shift_date is not None:
+        rows = [task for task in rows if task.shift_date == shift_date]
     return [await _task_admin_out(session, t) for t in rows]
 
 
@@ -673,6 +728,8 @@ async def create_task(
 ) -> TaskAdminOut:
     if body.priority not in PRIORITIES:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_priority")
+    if body.mode not in TASK_MODES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_mode")
     try:
         task = await hr_tasks.create_task(
             session,
@@ -687,6 +744,9 @@ async def create_task(
             priority=body.priority,
             requires_photo=body.requires_photo,
             comment=body.comment,
+            mode=body.mode,
+            shift_date=body.shift_date,
+            parts=body.parts,
         )
     except hr_tasks.TaskError as exc:
         await session.rollback()

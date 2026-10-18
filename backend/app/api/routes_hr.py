@@ -24,12 +24,14 @@ from app.db.hr_models import (
     ONBOARDING_DONE,
     ONBOARDING_EXPERIENCE,
     ONBOARDING_TRAINING,
+    TASK_DONE,
     TEMPLATE_SHIFT,
     ChecklistItem,
     Department,
     Employee,
     FeedbackQuestion,
     Task,
+    TaskAssignment,
     UsefulLink,
 )
 from app.db.models import User
@@ -142,6 +144,15 @@ class TaskOut(BaseModel):
     created_at: datetime
     done_at: datetime | None
     is_overdue: bool
+    # Групповые поручения: режим, смена и ЛИЧНЫЙ статус сотрудника. Общий
+    # `status` — агрегат по всем исполнителям, поэтому в «каждый сам» он не
+    # говорит, закрыл ли конкретный человек свою часть.
+    mode: str = "one_of"
+    shift_date: date | None = None
+    my_status: str | None = None
+    progress_done: int = 0
+    progress_total: int = 0
+    my_part: str | None = None
 
 
 class TaskIssueIn(BaseModel):
@@ -220,7 +231,13 @@ async def _employee_out(
     )
 
 
-def _task_out(task: Task) -> TaskOut:
+def _task_out(
+    task: Task,
+    *,
+    my_status: str | None = None,
+    my_part: str | None = None,
+    progress: tuple[int, int] = (0, 0),
+) -> TaskOut:
     return TaskOut(
         id=task.id,
         title=task.title,
@@ -238,7 +255,48 @@ def _task_out(task: Task) -> TaskOut:
         created_at=task.created_at,
         done_at=task.done_at,
         is_overdue=hr_tasks.is_overdue(task),
+        mode=task.mode,
+        shift_date=task.shift_date,
+        my_status=my_status,
+        my_part=my_part,
+        progress_done=progress[0],
+        progress_total=progress[1],
     )
+
+
+async def _task_views(
+    session: AsyncSession, rows: list[Task], employee: Employee
+) -> list[TaskOut]:
+    """Поручения со личным статусом и прогрессом — одним запросом на список."""
+    if not rows:
+        return []
+    assignments = await session.scalars(
+        select(TaskAssignment).where(
+            TaskAssignment.task_id.in_([task.id for task in rows])
+        )
+    )
+    mine: dict[int, TaskAssignment] = {}
+    totals: dict[int, int] = {}
+    done: dict[int, int] = {}
+    for assignment in assignments.all():
+        totals[assignment.task_id] = totals.get(assignment.task_id, 0) + 1
+        if assignment.status == TASK_DONE:
+            done[assignment.task_id] = done.get(assignment.task_id, 0) + 1
+        if assignment.employee_id == employee.id:
+            mine[assignment.task_id] = assignment
+
+    out: list[TaskOut] = []
+    for task in rows:
+        own = mine.get(task.id)
+        out.append(
+            _task_out(
+                task,
+                my_status=own.status if own is not None else None,
+                my_part=own.part if own is not None else None,
+                progress=(done.get(task.id, 0), totals.get(task.id, 0)),
+            )
+        )
+    return out
 
 
 def _checklist_out(view: hr_checklists.ChecklistView) -> ChecklistOut:
@@ -473,11 +531,15 @@ async def my_tasks(
     session: SessionDep,
     employee: EmployeeDep,
     include_closed: bool = False,
+    shift_date: date | None = None,
 ) -> list[TaskOut]:
+    """Мои поручения. `shift_date` — только поручения конкретной смены."""
     rows = await hr_tasks.list_for_employee(
         session, employee, include_closed=include_closed
     )
-    return [_task_out(t) for t in rows]
+    if shift_date is not None:
+        rows = [task for task in rows if task.shift_date == shift_date]
+    return await _task_views(session, rows, employee)
 
 
 async def _owned_task(
@@ -504,7 +566,7 @@ async def _transition(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await session.commit()
     await session.refresh(task)
-    return _task_out(task)
+    return (await _task_views(session, [task], employee))[0]
 
 
 @router.post("/tasks/{task_id}/accept", response_model=TaskOut)
@@ -572,7 +634,7 @@ async def task_issue(
     )
     await session.commit()
     await session.refresh(task)
-    return _task_out(task)
+    return (await _task_views(session, [task], employee))[0]
 
 
 @router.post("/tasks/{task_id}/photo", response_model=TaskOut)
@@ -589,7 +651,7 @@ async def task_photo(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await session.commit()
     await session.refresh(task)
-    return _task_out(task)
+    return (await _task_views(session, [task], employee))[0]
 
 
 async def _managers(session: AsyncSession) -> list[Employee]:

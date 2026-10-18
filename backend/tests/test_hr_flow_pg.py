@@ -720,3 +720,111 @@ async def test_handover_on_real_postgres(flow: Flow) -> None:
     rejected = r.json()
     assert rejected["status"] == "rejected"
     assert rejected["reject_reason"] == "Не мой отдел, передай бармену"
+
+
+async def test_group_task_modes_on_real_postgres(flow: Flow) -> None:
+    """Групповое поручение: режимы, смена, личные отметки и один опыт за работу."""
+    from app.services import hr_checklists
+
+    client = flow.client
+    today = hr_checklists.local_today().isoformat()
+
+    # --- 1. Руководитель выдаёт поручение на смену в режиме «каждый сам» ----
+    flow.act_as(flow.manager_user)
+    r = await client.post(
+        "/api/admin/tasks",
+        json={
+            "title": "Помыть витрину",
+            "scope": "department",
+            "department_id": flow.department_id,
+            "mode": "each",
+            "shift_date": today,
+        },
+    )
+    assert r.status_code == 200, r.text
+    task = r.json()
+    assert task["mode"] == "each"
+    assert task["shift_date"] == today
+    # В подразделении двое: сотрудник и сам руководитель.
+    assert task["progress_total"] == 2
+    assert task["progress_done"] == 0
+    assert {a["status"] for a in task["assignments"]} == {"new"}
+
+    # --- 2. Сотрудник видит свой личный статус, а не только общий ----------
+    flow.act_as(flow.employee_user)
+    r = await client.get(f"/api/tasks?shift_date={today}")
+    assert r.status_code == 200, r.text
+    mine = r.json()
+    assert [t["id"] for t in mine] == [task["id"]]
+    assert mine[0]["my_status"] == "new"
+    assert mine[0]["progress_total"] == 2
+    # Другой смены — ничего лишнего.
+    r = await client.get("/api/tasks?shift_date=2000-01-01")
+    assert r.json() == []
+
+    # --- 3. Отметка одного исполнителя не закрывает общее поручение --------
+    for action in ("accept", "start", "done"):
+        r = await client.post(f"/api/tasks/{task['id']}/{action}")
+        assert r.status_code == 200, r.text
+    after = r.json()
+    assert after["my_status"] == "done"
+    assert after["progress_done"] == 1
+    assert after["status"] == "in_progress", "второй ещё не отметился"
+    assert after["is_overdue"] is False
+
+    # --- 4. Руководитель закрывает свою часть — задача закрыта целиком -----
+    flow.act_as(flow.manager_user)
+    r = await client.get(f"/api/tasks?shift_date={today}")
+    assert r.json()[0]["my_status"] == "new"
+    r = await client.post(f"/api/tasks/{task['id']}/start")
+    assert r.status_code == 200, r.text
+    r = await client.post(f"/api/tasks/{task['id']}/done")
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "done"
+
+    # --- 5. Опыт за работу не задваивается агрегатом -----------------------
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/kpi")
+    assert r.status_code == 200, r.text
+    assert r.json()["week_counts"]["tasks_done"] == 1, (
+        "агрегат задачи не должен начислять второй опыт за ту же работу"
+    )
+
+    # --- 6. Админский список: прогресс по смене -----------------------------
+    flow.act_as(flow.manager_user)
+    r = await client.get(f"/api/admin/tasks?shift_date={today}")
+    assert r.status_code == 200, r.text
+    admin_rows = r.json()
+    assert [t["id"] for t in admin_rows] == [task["id"]]
+    assert admin_rows[0]["progress_done"] == admin_rows[0]["progress_total"] == 2
+    assert all(a["display_name"] != "—" for a in admin_rows[0]["assignments"])
+
+    # Поручение «части работы» требует текста части и отвергает чужой режим.
+    r = await client.post(
+        "/api/admin/tasks",
+        json={
+            "title": "Разобрать поставку",
+            "scope": "department",
+            "department_id": flow.department_id,
+            "mode": "parts",
+            "shift_date": today,
+            "parts": {flow.employee_id: "овощи", flow.manager_id: "молочка"},
+        },
+    )
+    assert r.status_code == 200, r.text
+    parts_task = r.json()
+    labels = {a["employee_id"]: a["part"] for a in parts_task["assignments"]}
+    assert labels[flow.employee_id] == "овощи"
+    assert labels[flow.manager_id] == "молочка"
+
+    flow.act_as(flow.employee_user)
+    r = await client.get(f"/api/tasks?shift_date={today}")
+    own = next(t for t in r.json() if t["id"] == parts_task["id"])
+    assert own["my_part"] == "овощи", "исполнитель видит свою часть работы"
+
+    r = await client.post(
+        "/api/admin/tasks",
+        json={"title": "Кривой режим", "scope": "department",
+              "department_id": flow.department_id, "mode": "nonsense"},
+    )
+    assert r.status_code == 400

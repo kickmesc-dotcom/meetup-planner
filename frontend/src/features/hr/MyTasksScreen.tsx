@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  TASK_MODE_LABEL,
   fetchEmployee,
   fetchTasks,
   reportTaskIssue,
@@ -45,6 +46,18 @@ const STATUS_CLASS: Record<TaskStatus, string> = {
   overdue: "bg-status-busy/20 text-status-busy",
   failed: "bg-status-busy/20 text-status-busy",
 };
+
+/** Личный статус: в групповом поручении агрегат не отвечает «сделал ли я». */
+function ownStatus(task: HrTask): TaskStatus {
+  return task.my_status ?? task.status;
+}
+
+/** «смена 14.05» из ISO-даты смены. */
+function fmtShift(iso: string | null): string | null {
+  if (!iso) return null;
+  const [y, m, d] = iso.split("-");
+  return y && m && d ? `${d}.${m}` : null;
+}
 
 const PRIORITY_LABEL: Record<HrTask["priority"], string> = {
   low: "низкий",
@@ -114,9 +127,12 @@ export default function MyTasksScreen() {
     );
 
   const tasks = tasksQ.data ?? [];
-  const open = tasks.filter(
-    (t) => t.status !== "done" && t.status !== "failed",
-  );
+  // «Активные» считаем по своему статусу: в режиме «каждый сам» задача ещё
+  // открыта для коллег, хотя я свою часть уже закрыл.
+  const open = tasks.filter((t) => {
+    const status = ownStatus(t);
+    return status !== "done" && status !== "failed";
+  });
   const overdue = open.filter((t) => t.is_overdue).length;
 
   return (
@@ -251,7 +267,10 @@ function TaskCard({
   onAction: (a: TaskAction) => void;
   onIssued: () => void;
 }) {
-  const closed = task.status === "done" || task.status === "failed";
+  const status = ownStatus(task);
+  const closed = status === "done" || status === "failed";
+  const shift = fmtShift(task.shift_date);
+  const group = task.progress_total > 1;
   return (
     <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
       <div className="flex items-start justify-between gap-2">
@@ -261,15 +280,16 @@ function TaskCard({
         <span
           className={[
             "shrink-0 rounded-full px-2 py-0.5 text-[11px]",
-            STATUS_CLASS[task.status],
+            STATUS_CLASS[status],
           ].join(" ")}
         >
-          {STATUS_LABEL[task.status]}
+          {STATUS_LABEL[status]}
         </span>
       </div>
 
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-tg-hint">
         <span>⏰ {fmtDue(task.due_at)}</span>
+        {shift && <span>🗓 смена {shift}</span>}
         {task.priority !== "normal" && (
           <span>приоритет: {PRIORITY_LABEL[task.priority]}</span>
         )}
@@ -278,6 +298,18 @@ function TaskCard({
           <span className="text-status-busy">просрочено</span>
         )}
       </div>
+
+      {group && (
+        <div className="mt-1.5 text-[11px] text-tg-hint">
+          👥 {TASK_MODE_LABEL[task.mode]} · сделали {task.progress_done} из{" "}
+          {task.progress_total}
+        </div>
+      )}
+      {task.my_part && (
+        <div className="mt-1 text-[11px] text-tg-text/90">
+          Моя часть: {task.my_part}
+        </div>
+      )}
 
       {task.description && (
         <p className="mt-2 text-xs text-tg-text/90 whitespace-pre-wrap break-words">
@@ -293,17 +325,17 @@ function TaskCard({
 
       {!closed && (
         <div className="mt-3 flex flex-wrap gap-2">
-          {task.status === "new" && (
+          {status === "new" && (
             <ActionButton disabled={busy} onClick={() => onAction("accept")}>
               Принять
             </ActionButton>
           )}
-          {(task.status === "new" || task.status === "accepted") && (
+          {(status === "new" || status === "accepted") && (
             <ActionButton disabled={busy} onClick={() => onAction("start")}>
               Начать
             </ActionButton>
           )}
-          {task.status === "in_progress" && (
+          {(status === "in_progress" || status === "overdue") && (
             <ActionButton disabled={busy} onClick={() => onAction("done")}>
               {task.requires_photo ? "Отметить (фото — в чат)" : "Выполнено"}
             </ActionButton>
