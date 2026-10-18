@@ -45,6 +45,8 @@ class StandardOut(BaseModel):
     department_id: int | None
     department_name: str | None
     pass_percent: int
+    # Обязательный стандарт попадает в пробелы отчёта смены.
+    is_required: bool = False
     is_active: bool
     questions_count: int
     # Мой прогресс по этому стандарту.
@@ -95,6 +97,7 @@ class StandardIn(BaseModel):
     summary: str | None = None
     department_id: int | None = None
     pass_percent: int = DEFAULT_PASS_PERCENT
+    is_required: bool = False
     sort_order: int = 0
     questions: list[QuestionIn] = []
 
@@ -131,6 +134,7 @@ async def _standard_out(
         department_id=standard.department_id,
         department_name=names.get(standard.department_id or -1),
         pass_percent=standard.pass_percent,
+        is_required=standard.is_required,
         is_active=standard.is_active,
         questions_count=len(questions),
         passed=bool(attempt and attempt.passed),
@@ -273,6 +277,7 @@ async def _create_standard(
             summary=body.summary,
             department_id=body.department_id,
             pass_percent=body.pass_percent,
+            is_required=body.is_required,
             sort_order=body.sort_order,
             questions=[
                 (q.text, list(q.options), q.correct_index) for q in body.questions

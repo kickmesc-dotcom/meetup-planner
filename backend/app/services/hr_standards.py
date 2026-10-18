@@ -218,6 +218,7 @@ async def create_standard(
     summary: str | None = None,
     department_id: int | None = None,
     pass_percent: int = DEFAULT_PASS_PERCENT,
+    is_required: bool = False,
     sort_order: int = 0,
     questions: list[tuple[str, list[str], int]] | None = None,
 ) -> Standard:
@@ -244,6 +245,7 @@ async def create_standard(
         summary=(summary or "").strip() or None,
         department_id=department_id,
         pass_percent=min(max(pass_percent, MIN_PASS_PERCENT), MAX_PASS_PERCENT),
+        is_required=is_required,
         sort_order=sort_order,
         is_active=True,
     )

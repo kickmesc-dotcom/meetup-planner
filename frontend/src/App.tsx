@@ -19,6 +19,7 @@ import IssuesScreen from "./features/issues/IssuesScreen";
 import HandoversScreen from "./features/handovers/HandoversScreen";
 import StandardsScreen from "./features/hr/StandardsScreen";
 import ReviewScreen from "./features/hr/ReviewScreen";
+import ReportsScreen from "./features/hr/ReportsScreen";
 import LinksScreen from "./features/hr/LinksScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
@@ -224,6 +225,14 @@ export default function App() {
     content = canManage ? (
       <main className="flex-1 overflow-hidden flex flex-col">
         <ReviewScreen />
+      </main>
+    ) : null;
+  } else if (tab === "reports") {
+    // Отчёт смены — только руководителю: сотруднику сервер всё равно вернёт
+    // 403, а вкладку незачем показывать.
+    content = canManage ? (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <ReportsScreen />
       </main>
     ) : null;
   } else if (tab === "links") {

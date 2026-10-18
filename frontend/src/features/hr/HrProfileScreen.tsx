@@ -338,11 +338,18 @@ export default function HrProfileScreen() {
             onClick={() => setTab("standards")}
           />
           {(me.is_aup || me.is_staff) && (
-            <Jump
-              icon="🔍"
-              label="Приёмка"
-              onClick={() => setTab("review")}
-            />
+            <>
+              <Jump
+                icon="🔍"
+                label="Приёмка"
+                onClick={() => setTab("review")}
+              />
+              <Jump
+                icon="📊"
+                label="Отчёт смены"
+                onClick={() => setTab("reports")}
+              />
+            </>
           )}
           <Jump
             icon="📝"

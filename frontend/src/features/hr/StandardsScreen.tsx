@@ -381,6 +381,8 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
   const [emoji, setEmoji] = useState("");
   const [summary, setSummary] = useState("");
   const [passPercent, setPassPercent] = useState(80);
+  // Обязательный стандарт попадает в пробелы отчёта смены — по умолчанию нет.
+  const [isRequired, setIsRequired] = useState(false);
   const [questions, setQuestions] = useState<DraftQuestion[]>([EMPTY_QUESTION()]);
 
   const save = useMutation({
@@ -392,6 +394,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         emoji: emoji.trim() || null,
         summary: summary.trim() || null,
         pass_percent: passPercent,
+        is_required: isRequired,
         questions: questions
           .map((q) => ({
             text: q.text.trim(),
@@ -497,6 +500,18 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setPassPercent(Number(e.target.value))}
           className="mt-1 w-full"
         />
+      </label>
+
+      <label className="mt-2 flex items-start gap-2 text-[11px] text-tg-hint">
+        <input
+          type="checkbox"
+          checked={isRequired}
+          onChange={(e) => setIsRequired(e.target.checked)}
+          className="mt-0.5"
+        />
+        <span>
+          Обязательный: не сдавшие попадут в пробелы отчёта смены.
+        </span>
       </label>
 
       <div className="mt-3 space-y-2">

@@ -42,6 +42,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0035_task_modes_assignments.py",
     "0036_standards.py",
     "0037_task_review.py",
+    "0038_standard_required.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).

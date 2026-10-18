@@ -60,6 +60,7 @@ from app.services import (
     hr_feed,
     hr_links,
     hr_pending,
+    hr_reports,
     hr_settings,
     hr_tasks,
 )
@@ -973,6 +974,37 @@ async def on_task_issue_request(callback: CallbackQuery) -> None:
 # ==========================================================================
 # 5. Полезные ссылки
 # ==========================================================================
+
+
+@router.message(F.chat.type == "private", Command("report"))
+async def on_report(message: Message) -> None:
+    """`/report` — короткая сводка смены для руководителя.
+
+    Сотруднику команда не нужна и в каталоге она видна всем, поэтому вместо
+    «нет доступа» объясняем, у кого отчёт есть.
+    """
+    if message.from_user is None:
+        return
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, message.from_user.id)
+        if ctx is None:
+            await message.answer("Сначала открой меню: /start")
+            return
+        _user, employee = ctx
+        if not hr_access.is_aup(employee):
+            await message.answer("📊 Отчёт смены доступен руководителю.")
+            return
+        report = await hr_reports.build_shift_report(session, viewer=employee)
+    await message.answer(
+        hr_reports.format_telegram(report),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [_app_button("📊 Отчёт в приложении")],
+                [InlineKeyboardButton(text="⬅️ В меню", callback_data=f"{CB}:menu")],
+            ]
+        ),
+    )
 
 
 @router.callback_query(F.data == f"{CB}:links")

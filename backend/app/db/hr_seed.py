@@ -209,6 +209,8 @@ _STANDARDS: tuple[dict, ...] = (
     {
         "title": "Гигиена рук перед сменой",
         "emoji": "🧼",
+        # Санитарный стандарт — обязательный: его пробел виден в отчёте смены.
+        "is_required": True,
         "category": STANDARD_CATEGORY_SAFETY,
         "summary": "Когда мыть руки и сколько по времени",
         "body": (
@@ -239,6 +241,7 @@ _STANDARDS: tuple[dict, ...] = (
     {
         "title": "Маркировка и сроки заготовок",
         "emoji": "🏷",
+        "is_required": True,
         "category": STANDARD_CATEGORY_DISHES,
         "summary": "Что писать на этикетке и когда списывать",
         "body": (
@@ -398,6 +401,7 @@ async def seed_standards(session: AsyncSession) -> int:
             body=item["body"],
             department_id=None,
             pass_percent=DEFAULT_PASS_PERCENT,
+            is_required=bool(item.get("is_required", False)),
             sort_order=index,
             is_active=True,
         )

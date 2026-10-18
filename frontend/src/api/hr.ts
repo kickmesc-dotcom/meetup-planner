@@ -1,4 +1,6 @@
-import { api } from "./client";
+import { getInitData } from "@/tg/webapp";
+
+import { api, apiPublicUrl } from "./client";
 
 /**
  * SemiTaskBot: типы и вызовы HR-ядра.
@@ -727,6 +729,8 @@ export interface HrStandard {
   department_id: number | null;
   department_name: string | null;
   pass_percent: number;
+  /** Обязательный стандарт попадает в пробелы отчёта смены. */
+  is_required: boolean;
   is_active: boolean;
   questions_count: number;
   /** Сдал ли я этот тест хотя бы раз. */
@@ -794,6 +798,7 @@ export interface StandardDraft {
   summary?: string | null;
   department_id?: number | null;
   pass_percent?: number;
+  is_required?: boolean;
   questions: {
     text: string;
     options: string[];
@@ -807,3 +812,123 @@ export const createStandard = (body: StandardDraft) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+// --------------------------------------------------------------------------
+// Отчёты смены и пробелы по стандартам
+// --------------------------------------------------------------------------
+
+export interface HrPersonRef {
+  employee_id: number;
+  display_name: string;
+  department_id: number | null;
+}
+
+export interface HrStandardCoverage {
+  standard_id: number;
+  title: string;
+  emoji: string | null;
+  department_id: number | null;
+  department_name: string | null;
+  required: boolean;
+  passed: number;
+  total: number;
+  /** Кто из отдела ещё не сдал — имена приходят с сервера. */
+  missing: HrPersonRef[];
+}
+
+export interface HrDepartmentRow {
+  department_id: number;
+  name: string;
+  emoji: string | null;
+  employees: number;
+  shifts_started: number;
+  shifts_done: number;
+  tasks_shift: number;
+  tasks_done: number;
+  tasks_on_review: number;
+  tasks_overdue: number;
+  issues_open: number;
+  required_gaps: number;
+}
+
+export interface HrShiftReport {
+  work_date: string;
+  scope: "all" | "department";
+  department_id: number | null;
+  departments: HrDepartmentRow[];
+  employees_total: number;
+  shifts_started: number;
+  shifts_done: number;
+  tasks_shift: number;
+  tasks_done: number;
+  tasks_on_review: number;
+  tasks_overdue: number;
+  tasks_failed: number;
+  tasks_open: number;
+  issues_open: number;
+  issues_new: number;
+  standards: HrStandardCoverage[];
+  required_gaps: number;
+}
+
+export interface ReportParams {
+  /** Дата смены `YYYY-MM-DD`; без неё сервер берёт сегодня. */
+  on?: string;
+  department_id?: number | null;
+}
+
+function reportQuery(params: ReportParams): string {
+  const qs = new URLSearchParams();
+  if (params.on) qs.set("on", params.on);
+  if (params.department_id != null) qs.set("department_id", String(params.department_id));
+  const tail = qs.toString();
+  return tail ? `?${tail}` : "";
+}
+
+/** Срез смены на дату: люди, чек-листы, поручения, проблемы и стандарты. */
+export const fetchShiftReport = (params: ReportParams = {}) =>
+  api<HrShiftReport>(`/api/admin/reports/shift${reportQuery(params)}`);
+
+/** Пробелы по стандартам: кто не сдал инструкцию. */
+export const fetchStandardGaps = (
+  params: ReportParams & { required_only?: boolean } = {},
+) => {
+  const tail = reportQuery(params);
+  const glue = tail ? "&" : "?";
+  const required = params.required_only === false ? "false" : "true";
+  return api<HrStandardCoverage[]>(
+    `/api/admin/reports/standards${tail}${glue}required_only=${required}`,
+  );
+};
+
+/**
+ * Скачать CSV смены.
+ *
+ * `api()` не годится: он парсит JSON. Но и просто `<a href>` не сработает —
+ * сервер проверяет подпись `initData` в заголовке. Поэтому тянем файл
+ * запросом с `tma`-заголовком и отдаём браузеру blob. Имя файла сервер уже
+ * положил в `Content-Disposition`; запасное имя — на случай, если WebView его
+ * не отдал.
+ */
+export async function downloadShiftCsv(params: ReportParams = {}): Promise<string> {
+  const url = apiPublicUrl(`/api/admin/reports/shift.csv${reportQuery(params)}`);
+  const res = await fetch(url, {
+    headers: { Authorization: `tma ${getInitData()}` },
+  });
+  if (!res.ok) {
+    throw new Error(`csv_failed:${res.status}`);
+  }
+  const blob = await res.blob();
+  const href = URL.createObjectURL(blob);
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  const filename = match?.[1] ?? `shift-${params.on ?? "today"}.csv`;
+  const link = document.createElement("a");
+  link.href = href;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
+  return filename;
+}

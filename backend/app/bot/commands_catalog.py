@@ -48,6 +48,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("menu", "Главное меню: чек-лист, задачи, ссылки", scope="private"),
     # --- Личное / служебное ---
     CommandSpec("whoami", "Мой Telegram ID", scope="private"),
+    # Сводка смены: в каталоге видна всем, но обработчик отвечает только АУП.
+    CommandSpec("report", "Отчёт смены (руководителю)", scope="private"),
     CommandSpec("help", "Список доступных команд", scope="both"),
 )
 

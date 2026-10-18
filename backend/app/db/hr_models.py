@@ -872,6 +872,11 @@ class Standard(Base):
         SmallInteger, nullable=False, default=DEFAULT_PASS_PERCENT,
         server_default=str(DEFAULT_PASS_PERCENT),
     )
+    # Обязательный стандарт попадает в пробелы отчёта: «кто ещё не сдал».
+    # Необязательный остаётся справочником и в отчёт не тянется.
+    is_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
