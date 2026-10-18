@@ -60,9 +60,17 @@ def _configure_logging(level: str) -> None:
         ],
     )
 
-async def _register_bot_metadata() -> None:
+async def _register_bot_metadata() -> bool:
+    """Команды и кнопка меню. Возвращает `True`, если команды встали.
+
+    Результат важен вызывающему: раньше исключение проглатывалось, попытка
+    считалась успешной, и при живом вебхуке цикл выходил из первой итерации —
+    из-за этого в меню Telegram неделями висел старый список команд, хотя в
+    каталоге уже были новые.
+    """
     settings = get_settings()
     bot = get_bot()
+    commands_ok = True
     # GHG6 K2-bis: список команд берём из единого каталога commands_catalog.py.
     # Описания в Telegram-menu и в /help теперь не расходятся.
     from app.bot.commands_catalog import bot_commands_for_scope
@@ -94,6 +102,7 @@ async def _register_bot_metadata() -> None:
                 request_timeout=10,
             )
     except Exception as exc:  # noqa: BLE001
+        commands_ok = False
         structlog.get_logger().warning("bot.set_commands_failed", error=str(exc))
 
     try:
@@ -106,6 +115,9 @@ async def _register_bot_metadata() -> None:
         )
     except Exception as exc:  # noqa: BLE001
         structlog.get_logger().warning("bot.set_menu_button_failed", error=str(exc))
+
+    return commands_ok
+
 
 async def _set_webhook() -> None:
     settings = get_settings()
@@ -141,6 +153,7 @@ async def _register_telegram_metadata_with_retry() -> None:
     backoff = 5
     for attempt in range(1, 7):  # ~5+10+20+40+80+160s ≈ 5min total
         webhook_ok = False
+        metadata_ok = False
         try:
             await _set_webhook()
             webhook_ok = True
@@ -148,11 +161,13 @@ async def _register_telegram_metadata_with_retry() -> None:
             log.warning("webhook.set_failed", attempt=attempt, error=str(exc))
 
         try:
-            await _register_bot_metadata()
+            metadata_ok = await _register_bot_metadata()
         except Exception as exc:  # noqa: BLE001
             log.warning("bot.metadata_failed", attempt=attempt, error=str(exc))
 
-        if webhook_ok:
+        # Выходим, только когда получилось и то, и другое: иначе старый список
+        # команд останется в меню до следующего перезапуска.
+        if webhook_ok and metadata_ok:
             return
         await asyncio.sleep(backoff)
         backoff = min(backoff * 2, 160)
