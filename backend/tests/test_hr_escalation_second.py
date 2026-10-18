@@ -118,6 +118,45 @@ def test_defaults_are_on_and_visible():
 # --------------------------------------------------------------------------
 
 
+def _candidate(
+    *, task_id: int = 1, title: str = "Задача", reason: str = "waiting", hours_left: int = 2
+) -> hr_reminders.EscalationCandidate:
+    return hr_reminders.EscalationCandidate(
+        task_id=task_id,
+        title=title,
+        due_at=NOW - timedelta(hours=5),
+        overdue_since=NOW - timedelta(hours=5),
+        hours_overdue=5,
+        hours_left=hours_left,
+        ready=reason == "ready",
+        reason=reason,
+    )
+
+
+def test_dry_run_shows_ready_and_waiting():
+    plan = hr_reminders.EscalationPlan(
+        enabled=True,
+        hours=4,
+        admins=2,
+        items=[
+            _candidate(task_id=1, title="Пора", reason="ready"),
+            _candidate(task_id=2, title="Подождём", hours_left=2),
+        ],
+    )
+    text = hr_reminders.format_plan(plan)
+    assert "к отправке сейчас: <b>1</b>" in text
+    assert "«Пора»" in text
+    assert "«Подождём» — через 2 ч" in text
+    assert "Ничего не отправлено" in text
+
+
+def test_dry_run_says_when_disabled_or_nobody_to_send():
+    disabled = hr_reminders.EscalationPlan(enabled=False, hours=4, admins=2, items=[])
+    assert "выключена" in hr_reminders.format_plan(disabled)
+    lonely = hr_reminders.EscalationPlan(enabled=True, hours=4, admins=0, items=[])
+    assert "некому" in hr_reminders.format_plan(lonely)
+
+
 def test_text_names_the_task_and_the_wait():
     task = Task(title="Заменить фильтр", due_at=NOW - timedelta(hours=6))
     text = hr_notify.task_second_escalation_text(task, hours=4)

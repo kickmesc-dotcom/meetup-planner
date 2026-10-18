@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  executeReset,
   fetchDashboard,
   fetchHrSettings,
+  fetchResetPreview,
   muteNotifications,
   updateHrSettings,
   type HrDashboardEmployee,
@@ -13,7 +15,7 @@ import { humanizeApiError } from "@/api/client";
 import DepartmentTag from "@/components/DepartmentTag";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
-import { haptic, showAlert } from "@/tg/webapp";
+import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
  * Кабинет управляющего.
@@ -207,7 +209,12 @@ export default function TeamScreen({
                     {showSettings ? "▾" : "▸"}
                   </span>
                 </button>
-                {showSettings && <WorkHoursPanel />}
+                {showSettings && (
+                  <>
+                    <WorkHoursPanel />
+                    <DangerZone />
+                  </>
+                )}
               </section>
             )}
           </>
@@ -457,6 +464,72 @@ function WorkHoursPanel() {
         Ночью уведомления не уходят в чат, но копятся в приложении — утренний
         разбор не потеряется.
       </p>
+    </div>
+  );
+}
+
+function DangerZone() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+
+  /**
+   * Два подтверждения подряд: первое — цифры, второе — необратимость.
+   * Токен привязан к цифрам, поэтому если между шагами что-то изменилось,
+   * сервер откажет, а не удалит больше показанного.
+   */
+  const run = async () => {
+    haptic("medium");
+    setBusy(true);
+    try {
+      const preview = await fetchResetPreview();
+      const counts = preview.counts;
+      if (!counts.tasks && !counts.issues) {
+        await showAlert("Сбрасывать нечего — всё уже закрыто.");
+        return;
+      }
+      const first = await showConfirm(
+        `Удалить ${counts.tasks} поручений и ${counts.issues} проблем?\n\n${preview.scope}.`,
+      );
+      if (!first) return;
+      const second = await showConfirm(
+        "Точно? Действие необратимо. Завершённые поручения и история останутся.",
+      );
+      if (!second) return;
+      const done = await executeReset(preview.token, "СБРОС");
+      haptic("success");
+      await qc.invalidateQueries();
+      await showAlert(
+        `Удалено: поручений ${done.tasks ?? 0}, проблем ${done.issues ?? 0}.`,
+      );
+    } catch (error) {
+      const text = String(error);
+      await showAlert(
+        text.includes("reset_preview_stale")
+          ? "Данные изменились, пока ты подтверждал. Открой сброс заново."
+          : humanizeApiError(error),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-lg border border-status-busy/30 bg-status-busy/5 p-2">
+      <div className="text-[11px] font-medium text-status-busy">
+        Опасная зона
+      </div>
+      <p className="mt-0.5 text-[10px] text-tg-hint">
+        Убирает незакрытые поручения и открытые проблемы. Завершённые задачи,
+        KPI и история сдач остаются; тестовый пул сбрасывается отдельно.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void run()}
+        className="mt-2 min-h-9 w-full rounded-lg bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
+      >
+        {busy ? "Считаем…" : "🧹 Сбросить текущую работу"}
+      </button>
     </div>
   );
 }

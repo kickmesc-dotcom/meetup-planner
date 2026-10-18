@@ -60,7 +60,9 @@ from app.services import (
     hr_feed,
     hr_links,
     hr_pending,
+    hr_reminders,
     hr_reports,
+    hr_reset,
     hr_settings,
     hr_tasks,
 )
@@ -186,6 +188,21 @@ def main_menu_kb(employee: Employee) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton(
                     text="🗂 Лента и отчёты", callback_data=f"{CB}:feed"
+                )
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🔭 Эскалации: прогноз", callback_data=f"{CB}:escalations"
+                )
+            ]
+        )
+        # Опасная кнопка с двумя подтверждениями — ниже в обработчиках.
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="🧹 Сброс текущей работы", callback_data=f"{CB}:reset"
                 )
             ]
         )
@@ -1004,6 +1021,143 @@ async def on_report(message: Message) -> None:
                 [InlineKeyboardButton(text="⬅️ В меню", callback_data=f"{CB}:menu")],
             ]
         ),
+    )
+
+
+@router.callback_query(F.data == f"{CB}:escalations")
+async def on_escalations(callback: CallbackQuery) -> None:
+    """Сухой прогон второй ступени прямо в чате. Ничего не отправляет."""
+    if callback.from_user is None:
+        return
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, callback.from_user.id)
+        if ctx is None:
+            await callback.answer("Нет доступа", show_alert=True)
+            return
+        _user, employee = ctx
+        if not hr_access.is_aup(employee):
+            await callback.answer("Недоступно", show_alert=True)
+            return
+        plan = await hr_reminders.escalation_plan(session)
+    await callback.answer()
+    await _answer(
+        callback,
+        hr_reminders.format_plan(plan),
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⬅️ В меню", callback_data=f"{CB}:menu")],
+            ]
+        ),
+    )
+
+
+@router.message(F.chat.type == "private", Command("escalations"))
+async def on_escalations_cmd(message: Message) -> None:
+    """`/escalations` — тот же прогноз без меню (для админов)."""
+    if message.from_user is None:
+        return
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, message.from_user.id)
+        if ctx is None:
+            await message.answer("Сначала открой меню: /start")
+            return
+        _user, employee = ctx
+        if not hr_access.is_admin(employee):
+            await message.answer("🔭 Прогноз эскалаций доступен администратору.")
+            return
+        plan = await hr_reminders.escalation_plan(session)
+    await message.answer(
+        hr_reminders.format_plan(plan),
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="⬅️ В меню", callback_data=f"{CB}:menu")],
+            ]
+        ),
+    )
+
+
+@router.callback_query(F.data == f"{CB}:reset")
+async def on_reset_preview(callback: CallbackQuery) -> None:
+    """Первое подтверждение: показываем сухой счёт и кнопку «Подтвердить»."""
+    if callback.from_user is None:
+        return
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, callback.from_user.id)
+        if ctx is None:
+            await callback.answer("Нет доступа", show_alert=True)
+            return
+        _user, employee = ctx
+        if not hr_access.is_aup(employee):
+            await callback.answer("Недоступно", show_alert=True)
+            return
+        view = await hr_reset.preview(session, employee)
+    await callback.answer()
+    if view.counts.tasks == 0 and view.counts.issues == 0:
+        await _answer(
+            callback,
+            hr_reset.preview_text(view),
+            InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="⬅️ В меню", callback_data=f"{CB}:menu")],
+                ]
+            ),
+        )
+        return
+    await _answer(
+        callback,
+        hr_reset.preview_text(view),
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="✅ Подтвердить сброс", callback_data=f"{CB}:reset:do"
+                    )
+                ],
+                [InlineKeyboardButton(text="Отмена", callback_data=f"{CB}:menu")],
+            ]
+        ),
+    )
+
+
+@router.callback_query(F.data == f"{CB}:reset:do")
+async def on_reset_execute(callback: CallbackQuery) -> None:
+    """Второе подтверждение: тот же человек нажал ещё раз — удаляем."""
+    if callback.from_user is None:
+        return
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, callback.from_user.id)
+        if ctx is None:
+            await callback.answer("Нет доступа", show_alert=True)
+            return
+        _user, employee = ctx
+        if not hr_access.is_aup(employee):
+            await callback.answer("Недоступно", show_alert=True)
+            return
+        view = await hr_reset.preview(session, employee)
+        try:
+            counts = await hr_reset.execute(
+                session,
+                employee,
+                token=view.token,
+                confirm=hr_reset.CONFIRM_WORD,
+            )
+        except hr_access.HrAccessError:
+            await callback.answer("Данные изменились — попробуй ещё раз", show_alert=True)
+            return
+    await callback.answer()
+    await _answer(
+        callback,
+        (
+            "🧹 <b>Готово</b>\n\n"
+            f"Удалено поручений: <b>{counts.tasks}</b>\n"
+            f"Удалено проблем: <b>{counts.issues}</b>\n"
+            f"Уведомлений по ним: {counts.notifications}"
+        ),
+        _back_kb(),
     )
 
 

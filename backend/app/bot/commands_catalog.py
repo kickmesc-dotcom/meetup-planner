@@ -50,6 +50,8 @@ COMMANDS: tuple[CommandSpec, ...] = (
     CommandSpec("whoami", "Мой Telegram ID", scope="private"),
     # Сводка смены: в каталоге видна всем, но обработчик отвечает только АУП.
     CommandSpec("report", "Отчёт смены (руководителю)", scope="private"),
+    # Прогноз второй ступени: обработчик пускает только админа.
+    CommandSpec("escalations", "Эскалации: что уйдёт админам", scope="private"),
     CommandSpec("help", "Список доступных команд", scope="both"),
 )
 

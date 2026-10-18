@@ -65,7 +65,9 @@ def task_overdue_text(task: Task) -> str:
     )
 
 
-def task_second_escalation_text(task: Task, *, hours: int) -> str:
+def second_escalation_text(
+    title: str, due_at: datetime | None, *, hours: int
+) -> str:
     """Текст для админов: не «ещё раз то же», а «руководитель не отреагировал».
 
     В сообщении есть срок и название поручения — по ним админ найдёт задачу
@@ -73,10 +75,14 @@ def task_second_escalation_text(task: Task, *, hours: int) -> str:
     сам знает, кто в отделе отвечает.
     """
     return (
-        f"🚨 Поручение {task_short(task)} просрочено больше {hours} ч, "
-        f"реакции руководителя нет (срок {fmt_due(task.due_at)}). "
+        f"🚨 Поручение «{title}» просрочено больше {hours} ч, "
+        f"реакции руководителя нет (срок {fmt_due(due_at)}). "
         "Нужно вмешательство."
     )
+
+
+def task_second_escalation_text(task: Task, *, hours: int) -> str:
+    return second_escalation_text(task.title, task.due_at, hours=hours)
 
 
 def task_issue_text(task: Task, issue: TaskIssue) -> str:

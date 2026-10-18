@@ -31,6 +31,7 @@ from app.api import (
     routes_meta,
     routes_polls,
     routes_reports,
+    routes_reset,
     routes_standards,
     routes_users,
 )
@@ -258,6 +259,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_handovers.router, prefix="/api")
     # Отчёты смены и стандартов для руководителя (+CSV).
     app.include_router(routes_reports.router, prefix="/api/admin")
+    # Сброс текущей работы: предпросмотр + подтверждение словом.
+    app.include_router(routes_reset.router, prefix="/api/admin")
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие

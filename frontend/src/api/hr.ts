@@ -917,6 +917,32 @@ export const fetchStandardGaps = (
   );
 };
 
+// --------------------------------------------------------------------------
+// Сброс текущей работы (двойное подтверждение)
+// --------------------------------------------------------------------------
+
+export interface HrResetPreview {
+  scope: string;
+  is_admin: boolean;
+  department_id: number | null;
+  counts: Record<string, number>;
+  notes: string[];
+  /** Подписанный токен предпросмотра; без него execute не сработает. */
+  token: string;
+  expires_in_seconds: number;
+}
+
+/** Сухой счёт: что исчезнет. Ничего не удаляет. */
+export const fetchResetPreview = () =>
+  api<HrResetPreview>("/api/admin/reset/preview");
+
+/** Второй шаг: удалить показанное. Слово подтверждения проверяет сервер. */
+export const executeReset = (token: string, confirm: string) =>
+  api<Record<string, number>>("/api/admin/reset/execute", {
+    method: "POST",
+    body: JSON.stringify({ token, confirm }),
+  });
+
 /**
  * Скачать CSV смены.
  *

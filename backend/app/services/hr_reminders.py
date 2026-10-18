@@ -20,6 +20,8 @@
 
 from __future__ import annotations
 
+import math
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -392,39 +394,57 @@ async def _second_escalated_at(
     return {int(task_id): at for task_id, at in rows if at is not None}
 
 
-async def escalate_to_admins(
-    session: AsyncSession,
-    *,
-    bot=None,  # noqa: ANN001
-    now: datetime | None = None,
-) -> list[Task]:
-    """Вторая ступень: напомнить админам о просрочке без реакции руководителя.
+@dataclass(frozen=True)
+class EscalationCandidate:
+    """Судьба одной просроченной задачи на второй ступени.
 
-    Читаем все задачи в `overdue` (а не только свежие): ступень срабатывает по
-    таймеру, а не по моменту перехода. Отсчёт — от последнего события
-    «стало просрочено», поэтому ручной возврат в работу и повторная просрочка
-    начинают отсчёт заново.
-
-    Молчание руководителя уважаем: если он нажал «решено» или «напомнить
-    завтра» (`hr_alerts`), задача затихает до указанного момента — второй
-    ступенью его решение не отменяем.
+    `reason` — почему она ещё не улетела админам: `ready` (уже пора),
+    `waiting` (ждём порог), `sent` (писали в этом цикле), `silenced`
+    (руководитель сказал «решено»/«завтра»), `demo` (тестовый пул).
     """
-    if not await hr_settings.get_escalation_enabled(session):
-        return []
-    if not await hr_settings.get_second_escalation_enabled(session):
-        return []
-    recipients = await admins(session)
-    if not recipients:
-        # Без админов не отправляем и НЕ ставим маркер: когда админ появится,
-        # просрочка всё ещё должна до него дойти.
-        return []
 
+    task_id: int
+    title: str
+    due_at: datetime | None
+    overdue_since: datetime | None
+    hours_overdue: int
+    hours_left: int
+    ready: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class EscalationPlan:
+    """Сухой прогон: что случится на следующем тике."""
+
+    enabled: bool
+    hours: int
+    admins: int
+    items: list[EscalationCandidate]
+
+    @property
+    def ready(self) -> list[EscalationCandidate]:
+        return [item for item in self.items if item.ready]
+
+
+async def escalation_plan(
+    session: AsyncSession, *, now: datetime | None = None
+) -> EscalationPlan:
+    """Посчитать вторую ступень, НИЧЕГО не отправляя и не записывая.
+
+    Это тот же код, что реально шлёт уведомления: сначала строим список с
+    причинами, потом отправляем только `ready`. Иначе «сухой прогон» врал бы.
+    """
     moment = now or datetime.now(UTC)
     hours = await hr_settings.get_second_escalation_hours(session)
+    enabled = await hr_settings.get_escalation_enabled(
+        session
+    ) and await hr_settings.get_second_escalation_enabled(session)
+    admin_list = await admins(session)
+
     # Тестовый пул исключаем ВСЕГДА, даже когда он виден в интерфейсе: иначе
     # админы получали бы алерты про [BOT]-задачи, которые никогда не закроют.
     demo_ids = await hr_demo.demo_employee_ids(session)
-
     tasks = [
         task
         for task in (
@@ -435,36 +455,146 @@ async def escalate_to_admins(
         if task.assignee_employee_id not in demo_ids
     ]
     if not tasks:
-        return []
+        return EscalationPlan(
+            enabled=enabled, hours=hours, admins=len(admin_list), items=[]
+        )
+
     ids = [int(task.id) for task in tasks]
     since_map = await _overdue_since(session, ids)
     sent_map = await _second_escalated_at(session, ids)
     state_map = await hr_alerts.states(session, ids)
 
-    due = [
-        task
-        for task in tasks
-        if second_escalation_due(
-            status=task.status,
-            overdue_since=since_map.get(int(task.id)),
-            now=moment,
-            hours=hours,
-            already_sent=marker_covers_cycle(
-                sent_map.get(int(task.id)), since_map.get(int(task.id))
-            ),
+    items: list[EscalationCandidate] = []
+    for task in tasks:
+        since = since_map.get(int(task.id))
+        elapsed = (moment - _aware(since)) if since else timedelta(0)
+        elapsed_hours = elapsed.total_seconds() / 3600
+        left = max(0, math.ceil(hours - elapsed_hours))
+        silenced = (state_map.get(int(task.id)) or hr_alerts.AlertState()).silenced(moment)
+        if marker_covers_cycle(sent_map.get(int(task.id)), since):
+            reason = "sent"
+        elif silenced:
+            reason = "silenced"
+        elif since is None:
+            reason = "unknown"
+        elif second_escalation_due(
+            status=task.status, overdue_since=since, now=moment, hours=hours
+        ):
+            reason = "ready"
+        else:
+            reason = "waiting"
+        items.append(
+            EscalationCandidate(
+                task_id=int(task.id),
+                title=task.title,
+                due_at=task.due_at,
+                overdue_since=since,
+                hours_overdue=int(elapsed_hours),
+                hours_left=left,
+                ready=reason == "ready" and enabled and bool(admin_list),
+                reason=reason,
+            )
         )
-    ]
-    due = hr_alerts.filter_silenced(due, state_map, moment)
+
+    return EscalationPlan(
+        enabled=enabled, hours=hours, admins=len(admin_list), items=items
+    )
+
+
+def format_plan(plan: EscalationPlan, *, limit: int = 5) -> str:
+    """Текст сухого прогона для бота: готовые сверху, ожидающие — с таймером."""
+    lines = ["🔭 <b>Вторая ступень: сухой прогон</b>", ""]
+    if not plan.enabled:
+        lines.append("Вторая ступень выключена в настройках.")
+        return "\n".join(lines)
+    if plan.admins == 0:
+        lines.append("Нет активных администраторов — отправлять некому.")
+        return "\n".join(lines)
+
+    ready = plan.ready
+    waiting = [item for item in plan.items if item.reason == "waiting"]
+    lines.append(
+        f"Порог: {plan.hours} ч · админов: {plan.admins} · "
+        f"к отправке сейчас: <b>{len(ready)}</b>"
+    )
+    for item in ready[:limit]:
+        lines.append(f"🚨 «{item.title}» — просрочено {item.hours_overdue} ч, пора")
+    if len(ready) > limit:
+        lines.append(f"…и ещё {len(ready) - limit}")
+
+    if waiting:
+        lines.append("")
+        lines.append("<b>Ждут порога</b>")
+        waiting.sort(key=lambda item: item.hours_left)
+        for item in waiting[:limit]:
+            lines.append(
+                f"⏳ «{item.title}» — через {item.hours_left} ч "
+                f"(просрочено {item.hours_overdue} ч)"
+            )
+        if len(waiting) > limit:
+            lines.append(f"…и ещё {len(waiting) - limit}")
+
+    if not plan.items:
+        lines.append("Просроченных задач вне тестового пула нет.")
+    else:
+        parked = len(plan.items) - len(ready) - len(waiting)
+        if parked:
+            lines.append("")
+            lines.append(
+                f"Не побеспокоят: {parked} (уже отправлено / решено / отложено / без даты)"
+            )
+    lines.append("")
+    lines.append("Ничего не отправлено — это только прогноз.")
+    return "\n".join(lines)
+
+
+async def escalate_to_admins(
+    session: AsyncSession,
+    *,
+    bot=None,  # noqa: ANN001
+    now: datetime | None = None,
+) -> list[Task]:
+    """Вторая ступень: напомнить админам о просрочке без реакции руководителя.
+
+    Считает тот же `escalation_plan`, что показывает сухой прогон, и отправляет
+    только готовые пункты. Читаем все задачи в `overdue` (а не только свежие):
+    ступень срабатывает по таймеру, а не по моменту перехода.
+
+    Молчание руководителя уважаем: если он нажал «решено» или «напомнить
+    завтра» (`hr_alerts`), задача затихает до указанного момента — второй
+    ступенью его решение не отменяем.
+    """
+    plan = await escalation_plan(session, now=now)
+    if not plan.enabled or plan.admins == 0:
+        # Без админов не отправляем и НЕ ставим маркер: когда админ появится,
+        # просрочка всё ещё должна до него дойти.
+        return []
+    due = plan.ready
     if not due:
         return []
 
-    for task in due:
+    recipients = await admins(session)
+    tasks_by_id = {
+        int(task.id): task
+        for task in (
+            await session.scalars(
+                select(Task).where(Task.id.in_([item.task_id for item in due]))
+            )
+        ).all()
+    }
+
+    for item in due:
+        task = tasks_by_id.get(item.task_id)
+        if task is None:
+            continue
         await _deliver(
             session,
             bot=bot,
             employees=recipients,
             kind=hr_notify.KIND_TASK_ESCALATED,
-            text=hr_notify.task_second_escalation_text(task, hours=hours),
+            text=hr_notify.second_escalation_text(
+                item.title, item.due_at, hours=plan.hours
+            ),
             payload={"task_id": task.id},
             keyboard=hr_alerts.alert_keyboard(int(task.id)),
         )
@@ -478,7 +608,7 @@ async def escalate_to_admins(
             )
         )
     await session.commit()
-    return due
+    return [tasks_by_id[item.task_id] for item in due if item.task_id in tasks_by_id]
 
 
 async def escalate_overdue(
