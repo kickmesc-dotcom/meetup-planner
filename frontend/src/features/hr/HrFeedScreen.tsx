@@ -176,6 +176,9 @@ export default function HrFeedScreen() {
                   .map((e) => (
                     <option key={e.id} value={e.id}>
                       {e.display_name}
+                      {(e.position ?? e.badge)
+                        ? ` · ${e.position ?? e.badge}`
+                        : ""}
                     </option>
                   ))}
               </select>

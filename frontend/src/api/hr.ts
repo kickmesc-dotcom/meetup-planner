@@ -373,6 +373,10 @@ export const fetchHrFeed = (
 export interface HrFeedFilterEmployee {
   id: number;
   display_name: string;
+  /** Должность: в одном отделе бывает два одинаковых имени. */
+  position: string | null;
+  /** Плашка владельца («Разработчик», «Управляющий») — если должности нет. */
+  badge: string | null;
   department_id: number | null;
 }
 
@@ -445,6 +449,8 @@ export interface HrSettings {
   /** Вторая ступень: молчание руководителя дольше порога — пинг админам. */
   escalation_second_enabled: boolean;
   escalation_second_hours: number;
+  /** Повторять пинг админам в каждой смене, пока задача висит. */
+  escalation_second_repeat: boolean;
   tick_minutes: number;
   /** Один тумблер тестового пула `[BOT]`. */
   demo_visible: boolean;
@@ -635,6 +641,8 @@ export interface HrDashboardEmployee {
   department_id: number | null;
   department_name: string | null;
   department_emoji: string | null;
+  /** Должность из HR-профиля; показывается компактно рядом с именем. */
+  position: string | null;
   role: "employee" | "aup" | "admin";
   badge: string | null;
   badge_emoji: string | null;

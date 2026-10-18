@@ -1007,6 +1007,8 @@ class HrSettingsOut(BaseModel):
     # Вторая ступень: молчание руководителя дольше N часов → пинг админам.
     escalation_second_enabled: bool = True
     escalation_second_hours: int = 4
+    # Повтор в каждой смене, пока задача висит (строгий режим).
+    escalation_second_repeat: bool = False
     tick_minutes: int
     # Один тумблер тестового пула `[BOT]`: показывать его следы или нет.
     demo_visible: bool
@@ -1026,6 +1028,7 @@ class HrSettingsPatch(BaseModel):
     escalation_enabled: bool | None = None
     escalation_second_enabled: bool | None = None
     escalation_second_hours: int | None = Field(None, ge=1, le=72)
+    escalation_second_repeat: bool | None = None
     tick_minutes: int | None = Field(None, ge=5, le=24 * 60)
     demo_visible: bool | None = None
     work_open: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -1069,6 +1072,7 @@ async def put_hr_settings(
         escalation_enabled=body.escalation_enabled,
         escalation_second_enabled=body.escalation_second_enabled,
         escalation_second_hours=body.escalation_second_hours,
+        escalation_second_repeat=body.escalation_second_repeat,
         tick_minutes=body.tick_minutes,
         demo_visible=body.demo_visible,
         work_open=body.work_open,

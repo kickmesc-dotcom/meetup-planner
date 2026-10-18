@@ -44,6 +44,7 @@ from app.db.hr_models import (
 )
 from app.db.models import User
 from app.db.seed import color_for_user
+from app.services import display_names
 
 log = structlog.get_logger()
 
@@ -52,7 +53,7 @@ log = structlog.get_logger()
 # как эти два человека ПОДПИСАНЫ (плашка) и что они уже прошли знакомство.
 # (tg_id, отображаемое имя, эмодзи плашки, текст плашки)
 OWNERS: tuple[tuple[int, str, str, str], ...] = (
-    (306733739, "Разработчик", "🛠", "Разработчик"),
+    (306733739, "Серж-NEO", "🛠", "Разработчик"),
     (397594558, "Дмитрий", "🧭", "Управляющий"),
 )
 
@@ -325,7 +326,11 @@ _STANDARDS: tuple[dict, ...] = (
             ),
             (
                 "Порезался ножом. Что обязательно помимо обработки раны?",
-                ("Ничего, если порез небольшой", "Сообщить старшему смены и зафиксировать", "Уйти домой"),
+                (
+                    "Ничего, если порез небольшой",
+                    "Сообщить старшему смены и зафиксировать",
+                    "Уйти домой",
+                ),
                 1,
             ),
         ),
@@ -340,9 +345,17 @@ async def seed_owners(session: AsyncSession) -> int:
     не трогаем (его может править бот), а у HR-профиля дописываем только плашку,
     роль и «знакомство пройдено». Без этого владелец попадал бы в поток
     первого запуска с вопросом «какое у тебя подразделение».
+
+    Единственное исключение — ИСПОРЧЕННОЕ имя (U+FFFD в строке): такое нельзя
+    восстановить декодированием, поэтому подставляем каноническое. Иначе в
+    списках сотрудников и фильтрах ленты висели бы «ромбики» вместо имён
+    разработчика и управляющего.
     """
     for tg_id, name, emoji, badge in OWNERS:
         user = await session.scalar(select(User).where(User.telegram_id == tg_id))
+        if user is not None and display_names.is_corrupted(user.display_name):
+            user.display_name = name
+            log.info("hr.seed_owner_name_repaired", telegram_id=tg_id)
         if user is None:
             # Владельца может не быть в whitelist из env — тогда заводим его
             # здесь: без строки в `users` HR-профиль создать не на что.

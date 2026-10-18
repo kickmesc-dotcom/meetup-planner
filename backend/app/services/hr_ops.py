@@ -56,6 +56,10 @@ class EmployeeStatus:
     department_id: int | None
     department_name: str | None
     department_emoji: str | None
+    # Должность из HR-профиля («повар», «су-шеф»). В карточке сотрудника
+    # показывается компактно рядом с именем: руководителю важно видеть, кто
+    # есть кто, не открывая профиль.
+    position: str | None
     role: str
     badge: str | None
     badge_emoji: str | None
@@ -299,7 +303,11 @@ async def build_dashboard(
     employees: list[EmployeeStatus] = []
     for employee, user in people:
         done, total = runs.get(int(employee.id), (0, 0))
-        department = department_by_id.get(int(employee.department_id)) if employee.department_id else None
+        department = (
+            department_by_id.get(int(employee.department_id))
+            if employee.department_id
+            else None
+        )
         employees.append(
             EmployeeStatus(
                 employee_id=int(employee.id),
@@ -308,6 +316,7 @@ async def build_dashboard(
                 department_id=int(employee.department_id) if employee.department_id else None,
                 department_name=department.name if department else None,
                 department_emoji=department.emoji if department else None,
+                position=employee.position,
                 role=employee.role,
                 badge=employee.badge,
                 badge_emoji=employee.badge_emoji,
@@ -360,7 +369,11 @@ async def build_dashboard(
     for task in open_tasks:
         if not hr_tasks.is_overdue(task):
             continue
-        assignee = employee_by_id.get(int(task.assignee_employee_id)) if task.assignee_employee_id else None
+        assignee = (
+            employee_by_id.get(int(task.assignee_employee_id))
+            if task.assignee_employee_id
+            else None
+        )
         attention.append(
             Attention(
                 kind=KIND_OVERDUE,
@@ -369,7 +382,11 @@ async def build_dashboard(
                 + (f" — {name_by_id.get(int(assignee.id), '')}" if assignee else ""),
                 task_id=int(task.id),
                 employee_id=int(assignee.id) if assignee else None,
-                department_id=int(assignee.department_id) if assignee and assignee.department_id else None,
+                department_id=(
+                    int(assignee.department_id)
+                    if assignee and assignee.department_id
+                    else None
+                ),
             )
         )
     for issue, task in issues:
@@ -382,7 +399,9 @@ async def build_dashboard(
                 text=f"Проблема по «{task.title}»: {reason}",
                 task_id=int(task.id),
                 employee_id=int(author.id) if author else None,
-                department_id=int(author.department_id) if author and author.department_id else None,
+                department_id=(
+                    int(author.department_id) if author and author.department_id else None
+                ),
             )
         )
     for employee in employees:

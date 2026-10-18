@@ -286,6 +286,11 @@ function EmployeeRow({ employee }: { employee: HrDashboardEmployee }) {
       <div className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-xs text-tg-text">
           {employee.display_name}
+          {(employee.position ?? employee.badge) && (
+            <span className="text-tg-hint">
+              {" "}· {employee.position ?? employee.badge}
+            </span>
+          )}
         </span>
         <DepartmentTag
           name={employee.department_name}
@@ -422,6 +427,18 @@ function WorkHoursPanel() {
               </option>
               ))}
           </select>
+        </label>
+        <label className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-tg-text">
+          <span>Напоминать в каждой смене</span>
+          <input
+            type="checkbox"
+            checked={data.escalation_second_repeat}
+            disabled={!data.escalation_second_enabled || save.isPending}
+            onChange={(event) =>
+              save.mutate({ escalation_second_repeat: event.target.checked })
+            }
+            className="h-4 w-4"
+          />
         </label>
       </div>
 

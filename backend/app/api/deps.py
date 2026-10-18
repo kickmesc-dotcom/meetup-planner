@@ -4,7 +4,8 @@ from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy import inspect as sa_inspect, select
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.initdata import InitDataError, InitDataPayload, parse_and_verify
@@ -12,6 +13,7 @@ from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
 from app.db.models import User
+from app.services import display_names
 
 
 async def db_session() -> AsyncIterator[AsyncSession]:
@@ -43,7 +45,7 @@ async def resync_if_expired(session: AsyncSession, *objects: object) -> None:
             await session.refresh(obj)
 
 
-async def _create_user(session: AsyncSession, payload: "InitDataPayload") -> User:
+async def _create_user(session: AsyncSession, payload: InitDataPayload) -> User:
     """Завести `users`-строку для нового человека из Telegram.
 
     Имя берём из подписанных данных (имя + фамилия), иначе username, иначе
@@ -51,12 +53,16 @@ async def _create_user(session: AsyncSession, payload: "InitDataPayload") -> Use
     аватарка-инициалы не мигала разными цветами между заходами.
     """
     from app.db.seed import color_for_user
+    from app.services.display_names import compose_display_name
 
-    parts = [p for p in (payload.first_name, payload.last_name) if p]
-    display_name = " ".join(parts).strip() or (payload.username or f"Сотрудник {payload.user_id}")
     user = User(
         telegram_id=payload.user_id,
-        display_name=display_name[:120],
+        display_name=compose_display_name(
+            payload.first_name,
+            payload.last_name,
+            payload.username,
+            fallback_id=payload.user_id,
+        ),
         username=payload.username,
         color_hex=color_for_user(payload.user_id),
     )
@@ -98,6 +104,21 @@ async def current_user(
         # участников — теперь знакомиться может любой, а админские права
         # выдаются отдельно (`services.hr_access.default_role_for`).
         user = await _create_user(session, payload)
+
+    # Битое имя лечим по подписанным данным Telegram: U+FFFD восстановить
+    # нельзя, а свежие `first_name`/`last_name` приходят в каждом initData.
+    # Чистое имя не трогаем — его человек мог поправить сам.
+    if display_names.is_corrupted(user.display_name):
+        healed = display_names.compose_display_name(
+            payload.first_name,
+            payload.last_name,
+            payload.username,
+            fallback_id=payload.user_id,
+        )
+        if not display_names.is_corrupted(healed):
+            user.display_name = healed
+            await session.commit()
+            await session.refresh(user)
 
     # Lazy-update username if Telegram changed it.
     if payload.username and payload.username != user.username:

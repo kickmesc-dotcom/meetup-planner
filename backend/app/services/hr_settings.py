@@ -29,6 +29,10 @@ KEY_ESCALATION_ENABLED = "hr.escalation.enabled"
 # «погромче то же самое».
 KEY_ESCALATION_SECOND_ENABLED = "hr.escalation.second.enabled"
 KEY_ESCALATION_SECOND_HOURS = "hr.escalation.second.hours"
+# Повтор второй ступени: пока задача висит, админы получают напоминание
+# заново в каждой смене (раз в сутки), а не один раз за цикл просрочки.
+# По умолчанию выключено: это «строгий» режим, включаемый осознанно.
+KEY_ESCALATION_SECOND_REPEAT = "hr.escalation.second.repeat"
 KEY_TICK_MINUTES = "hr.tick.minutes"
 # Один тумблер для тестового пула `[BOT]`: скрыть его следы из ленты, списков и
 # отчётов, не удаляя данные. Полное удаление — отдельная операция
@@ -55,6 +59,7 @@ DEFAULT_ESCALATION_ENABLED = True
 # ещё есть время доделать работу сегодня.
 DEFAULT_ESCALATION_SECOND_ENABLED = True
 DEFAULT_ESCALATION_SECOND_HOURS = 4
+DEFAULT_ESCALATION_SECOND_REPEAT = False
 DEFAULT_TICK_MINUTES = 15
 # Пул заведён для показа/тестов, поэтому по умолчанию он ВИДЕН: скрывать его —
 # осознанное действие перед показом боевой картины.
@@ -150,6 +155,13 @@ async def get_second_escalation_hours(session: AsyncSession) -> int:
         await _get_int(
             session, KEY_ESCALATION_SECOND_HOURS, DEFAULT_ESCALATION_SECOND_HOURS
         )
+    )
+
+
+async def get_second_escalation_repeat(session: AsyncSession) -> bool:
+    """Повторять ли вторую ступень в каждой смене, пока задача висит."""
+    return await _get_bool(
+        session, KEY_ESCALATION_SECOND_REPEAT, DEFAULT_ESCALATION_SECOND_REPEAT
     )
 
 
@@ -300,6 +312,7 @@ async def snapshot(session: AsyncSession) -> dict[str, int | bool | str | None]:
         "escalation_enabled": await get_escalation_enabled(session),
         "escalation_second_enabled": await get_second_escalation_enabled(session),
         "escalation_second_hours": await get_second_escalation_hours(session),
+        "escalation_second_repeat": await get_second_escalation_repeat(session),
         "tick_minutes": await get_tick_minutes(session),
         "demo_visible": await get_demo_visible(session),
         **(await work_hours_snapshot(session)),
@@ -314,6 +327,7 @@ async def update(
     escalation_enabled: bool | None = None,
     escalation_second_enabled: bool | None = None,
     escalation_second_hours: int | None = None,
+    escalation_second_repeat: bool | None = None,
     tick_minutes: int | None = None,
     demo_visible: bool | None = None,
     work_open: str | None = None,
@@ -344,6 +358,12 @@ async def update(
             session,
             KEY_ESCALATION_SECOND_HOURS,
             str(clamp_second_hours(escalation_second_hours)),
+        )
+    if escalation_second_repeat is not None:
+        await _set(
+            session,
+            KEY_ESCALATION_SECOND_REPEAT,
+            "true" if escalation_second_repeat else "false",
         )
     if tick_minutes is not None:
         await _set(session, KEY_TICK_MINUTES, str(clamp_tick_minutes(tick_minutes)))

@@ -96,6 +96,42 @@ def test_marker_without_overdue_event_still_blocks():
     assert hr_reminders.marker_covers_cycle(NOW, None) is True
 
 
+def test_repeat_per_shift_pings_again_next_shift():
+    """Строгий режим: маркер прошлой смены не закрывает висящую задачу.
+
+    Иначе задача, о которой админам написали вчера, сегодня снова молчит —
+    именно этого строгий режим и не должен допускать. Внутри одной смены
+    повторной отправки нет: тик (раз в 15 минут) не спамит.
+    """
+    since = NOW - timedelta(days=2)
+    yesterday = NOW - timedelta(days=1)
+    assert hr_reminders.marker_covers_cycle(yesterday, since) is True
+    assert (
+        hr_reminders.marker_covers_cycle(
+            yesterday, since, repeat_per_shift=True, now=NOW
+        )
+        is False
+    )
+    assert (
+        hr_reminders.marker_covers_cycle(
+            NOW - timedelta(minutes=5), since, repeat_per_shift=True, now=NOW
+        )
+        is True
+    )
+
+
+def test_repeat_per_shift_still_respects_new_cycle():
+    """Внутри смены старый маркер до новой просрочки не защищает."""
+    since = NOW - timedelta(hours=2)
+    old_marker = NOW - timedelta(hours=5)
+    assert (
+        hr_reminders.marker_covers_cycle(
+            old_marker, since, repeat_per_shift=True, now=NOW
+        )
+        is False
+    )
+
+
 # --------------------------------------------------------------------------
 # Настройки
 # --------------------------------------------------------------------------
@@ -111,6 +147,8 @@ def test_defaults_are_on_and_visible():
     """Вторая ступень включена по умолчанию и порог — 4 часа."""
     assert hr_settings.DEFAULT_ESCALATION_SECOND_ENABLED is True
     assert hr_settings.DEFAULT_ESCALATION_SECOND_HOURS == 4
+    # Повтор по сменам — осознанно включаемый режим, а не поведение по умолчанию.
+    assert hr_settings.DEFAULT_ESCALATION_SECOND_REPEAT is False
 
 
 # --------------------------------------------------------------------------
@@ -148,6 +186,13 @@ def test_dry_run_shows_ready_and_waiting():
     assert "«Пора»" in text
     assert "«Подождём» — через 2 ч" in text
     assert "Ничего не отправлено" in text
+
+
+def test_dry_run_marks_repeat_mode():
+    plan = hr_reminders.EscalationPlan(
+        enabled=True, hours=4, admins=2, items=[], repeat_per_shift=True
+    )
+    assert "в каждой смене" in hr_reminders.format_plan(plan)
 
 
 def test_dry_run_says_when_disabled_or_nobody_to_send():

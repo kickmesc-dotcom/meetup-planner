@@ -848,6 +848,11 @@ class FeedOut(BaseModel):
 class FeedFilterEmployee(BaseModel):
     id: int
     display_name: str
+    # Должность — чтобы в фильтре было видно, кто есть кто: в одном отделе
+    # могут быть два «Александра», и выбирать наугад нельзя. У владельцев
+    # должности нет, зато есть плашка (`badge`), поэтому отдаём и её.
+    position: str | None = None
+    badge: str | None = None
     department_id: int | None
 
 
@@ -878,7 +883,13 @@ async def feed_filters(session: SessionDep, employee: EmployeeDep) -> FeedFilter
     if can_filter:
         allowed = await hr_feed.allowed_employee_ids(session, employee)
         stmt = (
-            select(Employee.id, Employee.department_id, User.display_name)
+            select(
+                Employee.id,
+                Employee.department_id,
+                Employee.position,
+                Employee.badge,
+                User.display_name,
+            )
             .join(User, User.id == Employee.user_id)
             .where(Employee.is_active.is_(True))
             .order_by(User.display_name)
@@ -887,8 +898,14 @@ async def feed_filters(session: SessionDep, employee: EmployeeDep) -> FeedFilter
             stmt = stmt.where(Employee.id.in_(allowed))
         rows = await session.execute(stmt)
         employees = [
-            FeedFilterEmployee(id=int(eid), display_name=str(name), department_id=did)
-            for eid, did, name in rows.all()
+            FeedFilterEmployee(
+                id=int(eid),
+                display_name=str(name),
+                position=position,
+                badge=badge,
+                department_id=did,
+            )
+            for eid, did, position, badge, name in rows.all()
         ]
         # Подразделения: управляющий видит все, руководитель — только своё.
         # Срез считает hr_feed (та же функция, что и для самой ленты), а не

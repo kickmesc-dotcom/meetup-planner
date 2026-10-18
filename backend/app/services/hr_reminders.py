@@ -23,11 +23,13 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db.hr_models import (
     TASK_OVERDUE,
     Employee,
@@ -111,16 +113,30 @@ def second_escalation_due(
 
 
 def marker_covers_cycle(
-    marker_at: datetime | None, overdue_since: datetime | None
+    marker_at: datetime | None,
+    overdue_since: datetime | None,
+    *,
+    repeat_per_shift: bool = False,
+    now: datetime | None = None,
 ) -> bool:
     """Закрывает ли старый маркер текущий цикл просрочки.
 
     Маркер — событие «админам уже писали». Если задача успела вернуться в
     работу и снова просрочилась, событие просрочки новее маркера — значит это
     другой цикл, и писать админам снова нужно.
+
+    `repeat_per_shift` — строгий режим: пока задача висит, в каждой новой смене
+    (то есть на следующий календарный день ресторана) админы получают
+    напоминание заново. Маркер прошлой смены тогда цикл НЕ закрывает. Внутри
+    одной смены повторной отправки нет — тик не спамит.
     """
     if marker_at is None:
         return False
+    if repeat_per_shift:
+        moment = _aware(now or datetime.now(UTC))
+        tz = ZoneInfo(get_settings().scheduler_tz)
+        if _aware(marker_at).astimezone(tz).date() != moment.astimezone(tz).date():
+            return False
     if overdue_since is None:
         return True
     return _aware(marker_at) >= _aware(overdue_since)
@@ -421,6 +437,8 @@ class EscalationPlan:
     hours: int
     admins: int
     items: list[EscalationCandidate]
+    # Повтор в каждой смене, пока задача висит (а не раз за цикл).
+    repeat_per_shift: bool = False
 
     @property
     def ready(self) -> list[EscalationCandidate]:
@@ -437,6 +455,7 @@ async def escalation_plan(
     """
     moment = now or datetime.now(UTC)
     hours = await hr_settings.get_second_escalation_hours(session)
+    repeat = await hr_settings.get_second_escalation_repeat(session)
     enabled = await hr_settings.get_escalation_enabled(
         session
     ) and await hr_settings.get_second_escalation_enabled(session)
@@ -456,7 +475,11 @@ async def escalation_plan(
     ]
     if not tasks:
         return EscalationPlan(
-            enabled=enabled, hours=hours, admins=len(admin_list), items=[]
+            enabled=enabled,
+            hours=hours,
+            admins=len(admin_list),
+            items=[],
+            repeat_per_shift=repeat,
         )
 
     ids = [int(task.id) for task in tasks]
@@ -471,7 +494,12 @@ async def escalation_plan(
         elapsed_hours = elapsed.total_seconds() / 3600
         left = max(0, math.ceil(hours - elapsed_hours))
         silenced = (state_map.get(int(task.id)) or hr_alerts.AlertState()).silenced(moment)
-        if marker_covers_cycle(sent_map.get(int(task.id)), since):
+        if marker_covers_cycle(
+            sent_map.get(int(task.id)),
+            since,
+            repeat_per_shift=repeat,
+            now=moment,
+        ):
             reason = "sent"
         elif silenced:
             reason = "silenced"
@@ -497,7 +525,11 @@ async def escalation_plan(
         )
 
     return EscalationPlan(
-        enabled=enabled, hours=hours, admins=len(admin_list), items=items
+        enabled=enabled,
+        hours=hours,
+        admins=len(admin_list),
+        items=items,
+        repeat_per_shift=repeat,
     )
 
 
@@ -517,6 +549,8 @@ def format_plan(plan: EscalationPlan, *, limit: int = 5) -> str:
         f"Порог: {plan.hours} ч · админов: {plan.admins} · "
         f"к отправке сейчас: <b>{len(ready)}</b>"
     )
+    if plan.repeat_per_shift:
+        lines.append("Повтор: в каждой смене, пока задача висит.")
     for item in ready[:limit]:
         lines.append(f"🚨 «{item.title}» — просрочено {item.hours_overdue} ч, пора")
     if len(ready) > limit:
