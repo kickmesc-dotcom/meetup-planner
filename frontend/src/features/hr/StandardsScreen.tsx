@@ -7,6 +7,7 @@ import {
   fetchStandard,
   fetchStandards,
   submitStandardCheck,
+  updateStandard,
   type HrCheckResult,
   type HrStandard,
   type StandardCategory,
@@ -217,9 +218,22 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
   const qc = useQueryClient();
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [result, setResult] = useState<HrCheckResult | null>(null);
+  const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const detailQ = useQuery({
     queryKey: ["hr-standard", id],
     queryFn: () => fetchStandard(id),
+  });
+
+  // Обязательность — то, что попадает в отчёт смены; меняется одним тапом.
+  const toggleRequired = useMutation({
+    mutationFn: (next: boolean) => updateStandard(id, { is_required: next }),
+    onSuccess: () => {
+      haptic("success");
+      void qc.invalidateQueries({ queryKey: ["hr-standard", id] });
+      void qc.invalidateQueries({ queryKey: ["hr-standards"] });
+      void qc.invalidateQueries({ queryKey: ["hr-shift-report"] });
+    },
+    onError: (e) => void showAlert(humanizeApiError(e)),
   });
 
   const check = useMutation({
@@ -276,6 +290,32 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               {standard.body}
             </p>
           </article>
+        )}
+
+        {standard && meQ.data?.is_aup && (
+          <button
+            type="button"
+            disabled={toggleRequired.isPending}
+            onClick={() => {
+              haptic("light");
+              toggleRequired.mutate(!standard.is_required);
+            }}
+            className={[
+              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs disabled:opacity-50",
+              standard.is_required
+                ? "bg-status-busy/15 text-status-busy"
+                : "bg-tg-secondary-bg/60 text-tg-hint",
+            ].join(" ")}
+          >
+            <span>
+              {standard.is_required
+                ? "Обязательный: не сдавшие попадают в отчёт смены"
+                : "Сделать обязательным для отчёта смены"}
+            </span>
+            <span aria-hidden className="ml-2 shrink-0 text-base">
+              {standard.is_required ? "☑" : "☐"}
+            </span>
+          </button>
         )}
 
         {standard && questions.length === 0 && (

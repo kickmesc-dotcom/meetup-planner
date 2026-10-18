@@ -54,8 +54,14 @@ export default function ReportsScreen() {
   });
 
   const report = reportQ.data;
+  const requiredStandards = (report?.standards ?? []).filter(
+    (standard) => standard.required,
+  );
+  // «Только пробелы» = обязательные, которые сдал не каждый. Снятая галочка
+  // показывает всю базу — так видно и справочные стандарты без пробела.
   const standards = (report?.standards ?? []).filter(
-    (standard) => !onlyGaps || standard.passed < standard.total,
+    (standard) =>
+      !onlyGaps || (standard.required && standard.passed < standard.total),
   );
 
   const download = async () => {
@@ -211,7 +217,7 @@ export default function ReportsScreen() {
               </div>
               {standards.length === 0 ? (
                 <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
-                  {report.standards.length === 0
+                  {requiredStandards.length === 0
                     ? "Обязательных стандартов пока нет — отметь их в базе стандартов."
                     : "Все обязательные стандарты сданы ✅"}
                 </div>

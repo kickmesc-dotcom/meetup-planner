@@ -813,6 +813,19 @@ export const createStandard = (body: StandardDraft) =>
     body: JSON.stringify(body),
   });
 
+export interface StandardPatch {
+  is_required?: boolean;
+  is_active?: boolean;
+  pass_percent?: number;
+}
+
+/** Отметить стандарт обязательным или снять — без переписывания текста. */
+export const updateStandard = (id: number, patch: StandardPatch) =>
+  api<HrStandard>(`/api/admin/standards/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+
 // --------------------------------------------------------------------------
 // Отчёты смены и пробелы по стандартам
 // --------------------------------------------------------------------------

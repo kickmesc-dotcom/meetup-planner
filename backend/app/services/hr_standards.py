@@ -255,6 +255,32 @@ async def create_standard(
     return standard
 
 
+async def update_standard(
+    session: AsyncSession,
+    standard: Standard,
+    *,
+    is_required: bool | None = None,
+    is_active: bool | None = None,
+    pass_percent: int | None = None,
+) -> Standard:
+    """Точечная правка признаков без переписывания текста и вопросов.
+
+    Обязательность и порог меняются чаще всего — отдельная ручка избавляет от
+    повторной отправки всей инструкции и теста (и от риска потерять вопросы при
+    частичном апдейте). Коммитит вызывающий.
+    """
+    if is_required is not None:
+        standard.is_required = is_required
+    if is_active is not None:
+        standard.is_active = is_active
+    if pass_percent is not None:
+        standard.pass_percent = min(
+            max(pass_percent, MIN_PASS_PERCENT), MAX_PASS_PERCENT
+        )
+    await session.flush()
+    return standard
+
+
 async def replace_questions(
     session: AsyncSession,
     standard_id: int,

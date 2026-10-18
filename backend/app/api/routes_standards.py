@@ -245,6 +245,52 @@ class AdminStandardOut(StandardOut):
     correct_indexes: list[int]
 
 
+class StandardPatch(BaseModel):
+    """Точечная правка: обязательность и порог меняются чаще всего."""
+
+    is_required: bool | None = None
+    is_active: bool | None = None
+    pass_percent: int | None = Field(
+        None,
+        ge=hr_standards.MIN_PASS_PERCENT,
+        le=hr_standards.MAX_PASS_PERCENT,
+    )
+
+
+@router.patch(
+    "/admin/standards/{standard_id}", response_model=StandardOut
+)
+async def patch_standard(
+    standard_id: int,
+    body: StandardPatch,
+    session: SessionDep,
+    employee: EmployeeDep,
+) -> StandardOut:
+    """Отметить стандарт обязательным (или снять) без переписывания текста."""
+    from app.services import hr_access
+
+    if not hr_access.is_aup(employee):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="aup_required")
+    standard = await hr_standards.get_standard(session, standard_id)
+    if standard is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="standard_not_found")
+
+    await hr_standards.update_standard(
+        session,
+        standard,
+        is_required=body.is_required,
+        is_active=body.is_active,
+        pass_percent=body.pass_percent,
+    )
+    await session.commit()
+    await session.refresh(standard)
+
+    names = await _dept_names(
+        session, {standard.department_id} if standard.department_id else set()
+    )
+    return await _standard_out(session, standard, employee=employee, names=names)
+
+
 @router.post(
     "/admin/standards", response_model=AdminStandardOut, status_code=201
 )
