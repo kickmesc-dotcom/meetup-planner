@@ -35,9 +35,11 @@ try:
 except Exception:  # noqa: BLE001 — печать не имеет права ронять диагностику
     pass
 
+# Боевой хост один: FastAPI на Hugging Face Space (cpu-basic, бесплатно),
+# Cloudflare держит фронт (Pages) и R2. Amvera из проекта убрана — её адрес
+# больше не проверяем, иначе «расхождение» показывал бы выключенный хост.
 HOSTS: dict[str, str] = {
-    "amvera (боевой)": "https://meetup-planner-youmakemefry.waw0.amvera.tech",
-    "hf (запасной)": "https://fryesw-meetup-planner-backend.hf.space",
+    "hf (боевой)": "https://fryesw-meetup-planner-backend.hf.space",
 }
 
 TIMEOUT = 30

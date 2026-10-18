@@ -1,6 +1,7 @@
 # Деплой: Cloudflare + Neon (Amvera больше не используется)
 
-Целевая схема — вся инфраструктура Cloudflare, база в Neon:
+Действующая схема — как у оригинального meetup-planner: Cloudflare на краю,
+бесплатный docker-хост для FastAPI, база в Neon.
 
 ```
 Telegram Mini App
@@ -9,11 +10,17 @@ Telegram Mini App
 Cloudflare Pages ── статика React/Vite ── https://semitaskbot.pages.dev
       │ HTTPS, VITE_API_BASE
       ▼
-Cloudflare Worker (semitask-api) ──► Container: FastAPI + APScheduler
+Hugging Face Space (docker, cpu-basic, бесплатно) ── FastAPI + APScheduler
       │ asyncpg + SSL
       ├──► Neon Postgres
       └──► R2 (медиа)
 ```
+
+Почему API не на Cloudflare: Containers доступны только на плане Workers Paid,
+а Python Workers (Pyodide) не тянут async SQLAlchemy — там нет `greenlet`, на
+котором стоит вся ORM. Поэтому Python-хост остаётся внешним и бесплатным, ровно
+как в оригинале; Cloudflare отвечает за фронт, медиа и (при необходимости)
+прокси до `api.telegram.org`.
 
 Amvera из проекта убрана: конфиги `backend/amvera.y*ml` и диагностика удалены,
 `docs/PROD_DEPLOY.md` заменён этим файлом.
@@ -46,52 +53,39 @@ npx wrangler@4 pages deploy dist --project-name=semitaskbot --branch=main
 `VITE_API_BASE` вшивается в бандл из `frontend/.env.production`. Значение
 обязательно: без него фронт стучится в `/api` на самом Pages, где API нет.
 
-## 3. API: важное ограничение
+## 3. API на Hugging Face Space
 
-FastAPI-приложение — async SQLAlchemy + asyncpg + APScheduler + aiogram.
+Space: `fryesw/meetup-planner-backend` → https://fryesw-meetup-planner-backend.hf.space
+(cpu-basic, бесплатно; в `backend/README.md` уже есть HF-frontmatter, а
+`backend/Dockerfile` слушает `$PORT=7860` и сам гоняет `alembic upgrade head`).
 
-* **Python Workers (Pyodide)** — FastAPI работает, но `greenlet` (на нём стоит
-  async SQLAlchemy) недоступен; DB-слой не поедет. Переписать 47k строк ради
-  смены рантайма — не тот обмен.
-* **Pages Functions** — только JS/TS, Python ASGI туда не ставится.
-* **Containers** — запускают существующий `backend/Dockerfile` без правок, но
-  требуют план **Workers Paid ($5/мес)**. На Free API отвечает `401 … requires
-  the Workers Paid plan`.
-
-Поэтому в репозитории лежит готовый контейнерный конфиг
-(`deploy/cloudflare/wrangler.jsonc` + `worker.js`), а не полурабочая портация.
-
-### Если план Workers Paid есть
+Всё делает один скрипт:
 
 ```bash
-cd deploy/cloudflare
-npm install
-npx wrangler@4 deploy -c wrangler.jsonc
-
-# секреты (значения — из backend/.env, в git их нет)
-npx wrangler@4 secret put BOT_TOKEN       -c wrangler.jsonc
-npx wrangler@4 secret put DATABASE_URL    -c wrangler.jsonc
-npx wrangler@4 secret put TG_WEBHOOK_SECRET -c wrangler.jsonc
-npx wrangler@4 secret put MINI_APP_URL    -c wrangler.jsonc
-npx wrangler@4 secret put GROUP_CHAT_ID   -c wrangler.jsonc
+cd meetup-planner-main
+backend/.venv/Scripts/python.exe tools/deploy-hf.py env      # секреты из backend/.env + DPAPI
+backend/.venv/Scripts/python.exe tools/deploy-hf.py mirror   # код → репозиторий Space
+backend/.venv/Scripts/python.exe tools/deploy-hf.py wait     # дождаться RUNNING и свежего кода
+backend/.venv/Scripts/python.exe tools/deploy-hf.py status   # что на хосте сейчас
+# или одной командой: all
 ```
 
-После первого деплоя подставить выданный `*.workers.dev` в:
+`env` берёт `BOT_TOKEN`, `TG_WEBHOOK_SECRET`, `DATABASE_URL`, `MINI_APP_URL`,
+`ADMIN_TG_IDS`, `GROUP_CHAT_ID`, `WHITELIST_*`, `CORS_ORIGINS`, `SCHEDULER_TZ`.
+Значения никогда не печатаются. `PUBLIC_BASE_URL` всегда проставляется равным
+адресу Space — от него зависят CORS и вебхук.
 
-* `deploy/cloudflare/wrangler.jsonc` → `vars.PUBLIC_BASE_URL`;
-* `frontend/.env.production` → `VITE_API_BASE`;
-* вебхук бота (`/tg/webhook`, см. ниже).
+Если HF недоступен из Telegram-сети, хост можно переключить на другой
+бесплатный docker-хостинг: код уезжает тем же `mirror` (Dockerfile уже
+портативный), меняется только адрес в `frontend/.env.production` и вебхук.
 
-### Если плана нет
+### Альтернатива: всё-таки Cloudflare
 
-Честный выбор один из двух:
-
-1. подключить Workers Paid — тогда деплой занимает минуты и ничего не надо
-   переписывать;
-2. портировать API на Worker (TypeScript + `@neondatabase/serverless` по HTTP).
-   Это не «переезд», а новый слой: Mini App дергает ~170 путей, бот и
-   планировщик живут отдельно. Делать это надо поэтапно и с тестами на каждый
-   перенесённый путь, а не одним коммитом.
+* **Workers Paid ($5/мес)** — `deploy/cloudflare/wrangler.jsonc` + `worker.js`
+  запускают тот же `backend/Dockerfile` в Container без переписывания кода.
+* **Порт API на Worker (TS + `@neondatabase/serverless`)** — бесплатно и без
+  внешних хостов, но это новый слой: Mini App дергает ~170 путей, плюс бот и
+  планировщик. Делать поэтапно и с тестами на каждый путь.
 
 ## 4. База
 
