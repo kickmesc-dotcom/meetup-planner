@@ -563,13 +563,33 @@ async def sweep_overdue(
         # Строки исполнителей тоже уходят в просрочку: иначе в «каждый сам»
         # задача числилась бы просроченной, а у людей висели бы свежие отметки.
         assignments = await assignments_of(session, task.id)
-        for assignment in assignments:
-            if assignment.status in OPEN_STATUSES:
-                assignment.status = TASK_OVERDUE
         if assignments:
+            for assignment in assignments:
+                if assignment.status in OPEN_STATUSES:
+                    assignment.status = TASK_OVERDUE
+            previous = task.status
             await sync_task_status(session, task, now=moment)
-            if task.status not in OPEN_STATUSES:
+            if task.status == TASK_DONE:
+                # Пока шёл тик, все отметились — просрочки нет.
                 continue
+            if task.status != TASK_OVERDUE:
+                # Агрегат не дал просрочку (например, часть работы сделана), но
+                # срок прошёл — фиксируем явно, иначе руководитель не узнает.
+                session.add(
+                    TaskEvent(
+                        task_id=task.id,
+                        from_status=previous,
+                        to_status=TASK_OVERDUE,
+                        by_employee_id=None,
+                        comment="auto_overdue",
+                    )
+                )
+                task.status = TASK_OVERDUE
+            if previous != TASK_OVERDUE:
+                # Задача стала просроченной именно сейчас — по ней и уведомляем.
+                changed.append(task)
+            continue
+
         previous = task.status
         task.status = TASK_OVERDUE
         session.add(
