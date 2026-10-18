@@ -16,6 +16,7 @@ import TeamScreen from "./features/hr/TeamScreen";
 import { fetchEmployee } from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
 import IssuesScreen from "./features/issues/IssuesScreen";
+import HandoversScreen from "./features/handovers/HandoversScreen";
 import LinksScreen from "./features/hr/LinksScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
@@ -198,6 +199,12 @@ export default function App() {
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
         <IssuesScreen />
+      </main>
+    );
+  } else if (tab === "handovers") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <HandoversScreen />
       </main>
     );
   } else if (tab === "links") {

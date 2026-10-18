@@ -71,6 +71,7 @@ export type Tab =
   | "meetings"
   | "team"
   | "issues"
+  | "handovers"
   | "profile"
   | "admin";
 

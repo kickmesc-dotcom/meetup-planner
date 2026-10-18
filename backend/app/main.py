@@ -23,6 +23,7 @@ from app.api import (
     routes_availability,
     routes_birthdays,
     routes_calendar,
+    routes_handovers,
     routes_hr,
     routes_hr_admin,
     routes_issues,
@@ -250,6 +251,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_hr.router, prefix="/api")
     # Журнал операционных проблем — отдельная сущность со своими правами.
     app.include_router(routes_issues.router, prefix="/api")
+    app.include_router(routes_handovers.router, prefix="/api")
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие

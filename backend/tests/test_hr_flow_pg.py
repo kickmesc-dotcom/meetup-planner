@@ -99,6 +99,8 @@ def _engine(dsn: str):
 _TOUCHED = (
     "feedback_answers",
     "employee_achievements",
+    "hr_handover_items",
+    "hr_handovers",
     "hr_issue_events",
     "hr_issues",
     "task_photos",
@@ -606,3 +608,115 @@ async def test_issue_journal_on_real_postgres(flow: Flow) -> None:
     assert r.status_code == 404
 
 
+async def test_handover_on_real_postgres(flow: Flow) -> None:
+    """Передача смены: снимок открытых хвостов и подтверждение принимающим."""
+    client = flow.client
+
+    # --- 1. Руководитель ставит открытое поручение -------------------------
+    flow.act_as(flow.manager_user)
+    r = await client.post(
+        "/api/admin/tasks",
+        json={
+            "title": "Сверить остатки на складе",
+            "scope": "employee",
+            "assignee_employee_id": flow.employee_id,
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    # --- 2. Сотрудник видит, что уйдёт в сдачу -----------------------------
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/handovers/preview")
+    assert r.status_code == 200, r.text
+    preview = r.json()
+    assert preview["tasks"] == 1 and preview["issues"] == 0, preview
+    assert preview["items"][0]["title"] == "Сверить остатки на складе"
+
+    r = await client.get("/api/handovers/colleagues")
+    assert r.status_code == 200, r.text
+    assert [c["id"] for c in r.json()] == [flow.manager_id]
+
+    r = await client.post(
+        "/api/handovers/{0}/accept".format(999999), json={}
+    )
+    assert r.status_code == 404, "чужую сдачу нельзя даже подтвердить"
+
+    # Себе сдать нельзя.
+    r = await client.post(
+        "/api/handovers", json={"to_employee_id": flow.employee_id}
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "handover_to_self"
+
+    # --- 3. Сдача следующему -----------------------------------------------
+    r = await client.post(
+        "/api/handovers",
+        json={
+            "to_employee_id": flow.manager_id,
+            "note": "Склад закрыт, ключ у охраны",
+        },
+    )
+    assert r.status_code == 201, r.text
+    card = r.json()
+    assert card["status"] == "sent"
+    assert card["items_count"] == 1
+    assert card["from_employee_id"] == flow.employee_id
+    assert card["to_employee_id"] == flow.manager_id
+    assert card["can_accept"] is False, "сдающий не подтверждает сам себе"
+    assert card["note"] == "Склад закрыт, ключ у охраны"
+
+    # Входящая у принимающего и уведомление в колокольчике.
+    flow.act_as(flow.manager_user)
+    r = await client.get("/api/handovers?box=incoming")
+    assert r.status_code == 200, r.text
+    inbox = r.json()
+    assert [item["id"] for item in inbox["items"]] == [card["id"]]
+    assert inbox["summary"]["pending"] == 1
+    assert inbox["items"][0]["can_accept"] is True
+
+    async with flow.session_factory() as session:
+        bell = await session.scalar(
+            text(
+                "select count(*) from app_notifications "
+                "where user_id = :uid and kind = 'handover_sent'"
+            ),
+            {"uid": flow.manager_user.id},
+        )
+    assert bell == 1
+
+    # --- 4. Подтверждение принимающим --------------------------------------
+    r = await client.post(f"/api/handovers/{card['id']}/accept", json={})
+    assert r.status_code == 200, r.text
+    accepted = r.json()
+    assert accepted["status"] == "accepted"
+    assert accepted["accepted_by_employee_id"] == flow.manager_id
+    assert accepted["accepted_at"] is not None
+    # Повторно принять уже нечего.
+    r = await client.post(f"/api/handovers/{card['id']}/accept", json={})
+    assert r.status_code == 400
+
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/handovers?box=outgoing")
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["status"] == "accepted"
+
+    # --- 5. Возврат с причиной ---------------------------------------------
+    r = await client.post(
+        "/api/handovers", json={"to_employee_id": flow.manager_id}
+    )
+    assert r.status_code == 201, r.text
+    second = r.json()
+
+    flow.act_as(flow.manager_user)
+    r = await client.post(
+        f"/api/handovers/{second['id']}/reject", json={"reason": ""}
+    )
+    assert r.status_code == 422, "пустая причина не проходит валидацию"
+    r = await client.post(
+        f"/api/handovers/{second['id']}/reject",
+        json={"reason": "Не мой отдел, передай бармену"},
+    )
+    assert r.status_code == 200, r.text
+    rejected = r.json()
+    assert rejected["status"] == "rejected"
+    assert rejected["reject_reason"] == "Не мой отдел, передай бармену"

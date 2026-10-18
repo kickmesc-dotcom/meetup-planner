@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.hr_models import Employee, Issue, Task, TaskIssue
+from app.db.hr_models import Employee, Handover, Issue, Task, TaskIssue
 from app.services import notifications
 
 KIND_TASK_ASSIGNED = "task_assigned"
@@ -24,6 +24,10 @@ KIND_CHECKLIST_DONE = "checklist_done"
 # Журнал операционных проблем (не поручения): тихое уведомление в колокольчик.
 KIND_ISSUE_CREATED = "issue_created"
 KIND_ISSUE_ASSIGNED = "issue_assigned"
+# Передача смены: отправлена / принята / возвращена.
+KIND_HANDOVER_SENT = "handover_sent"
+KIND_HANDOVER_ACCEPTED = "handover_accepted"
+KIND_HANDOVER_REJECTED = "handover_rejected"
 
 _TZ = UTC
 
@@ -140,6 +144,75 @@ async def notify_issue_assigned(
         kind=KIND_ISSUE_ASSIGNED,
         text=issue_assigned_text(issue),
         payload={"issue_id": issue.id},
+    )
+
+
+def handover_sent_text(handover: Handover, *, items: int, by_name: str) -> str:
+    tail = f"Открытых пунктов: {items}." if items else "Открытых пунктов нет."
+    return (
+        f"🌙 {by_name} передаёт тебе смену {handover.shift_date:%d.%m}. {tail} "
+        "Открой журнал передачи, чтобы принять или вернуть с причиной."
+    )
+
+
+def handover_accepted_text(handover: Handover, *, by_name: str) -> str:
+    return f"✅ {by_name} принял(а) передачу смены {handover.shift_date:%d.%m}."
+
+
+def handover_rejected_text(handover: Handover, *, by_name: str) -> str:
+    reason = handover.reject_reason or "без причины"
+    return (
+        f"↩️ {by_name} вернул(а) передачу смены {handover.shift_date:%d.%m}: "
+        f"{reason}"
+    )
+
+
+async def notify_handover_sent(
+    session: AsyncSession,
+    handover: Handover,
+    recipient: Employee,
+    *,
+    items: int,
+    by_name: str,
+) -> int:
+    return await notify(
+        session,
+        employees=[recipient],
+        kind=KIND_HANDOVER_SENT,
+        text=handover_sent_text(handover, items=items, by_name=by_name),
+        payload={"handover_id": handover.id},
+    )
+
+
+async def notify_handover_accepted(
+    session: AsyncSession,
+    handover: Handover,
+    recipient: Employee,
+    *,
+    by_name: str,
+) -> int:
+    return await notify(
+        session,
+        employees=[recipient],
+        kind=KIND_HANDOVER_ACCEPTED,
+        text=handover_accepted_text(handover, by_name=by_name),
+        payload={"handover_id": handover.id},
+    )
+
+
+async def notify_handover_rejected(
+    session: AsyncSession,
+    handover: Handover,
+    recipient: Employee,
+    *,
+    by_name: str,
+) -> int:
+    return await notify(
+        session,
+        employees=[recipient],
+        kind=KIND_HANDOVER_REJECTED,
+        text=handover_rejected_text(handover, by_name=by_name),
+        payload={"handover_id": handover.id},
     )
 
 

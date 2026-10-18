@@ -146,6 +146,23 @@ ISSUE_STATUSES: tuple[str, ...] = (
     ISSUE_RESOLVED,
     ISSUE_CANCELLED,
 )
+
+# Передача смены: сдающий фиксирует, что не закрыто, и передаёт карточку
+# принимающему. Подтверждение — отдельный статус, а не «галочка» в UI: без него
+# никто не знает, увидел ли следующий человек чужие хвосты.
+HANDOVER_SENT = "sent"
+HANDOVER_ACCEPTED = "accepted"
+HANDOVER_REJECTED = "rejected"
+HANDOVER_STATUSES: tuple[str, ...] = (
+    HANDOVER_SENT,
+    HANDOVER_ACCEPTED,
+    HANDOVER_REJECTED,
+)
+
+# Что попадает в сдачу: поручение или операционная проблема.
+HANDOVER_ITEM_TASK = "task"
+HANDOVER_ITEM_ISSUE = "issue"
+HANDOVER_ITEM_KINDS: tuple[str, ...] = (HANDOVER_ITEM_TASK, HANDOVER_ITEM_ISSUE)
 # Вид вопроса обратной связи.
 QUESTION_SCALE = "scale"
 QUESTION_CHOICE = "choice"
@@ -658,6 +675,76 @@ class IssueEvent(Base):
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# --------------------------------------------------------------------------
+# Передача смены
+# --------------------------------------------------------------------------
+
+
+class Handover(Base):
+    """Сдача смены: кто, кому и что оставил открытым.
+
+    `hr_handover_items` хранит СНИМОК на момент передачи: через сутки задача уже
+    может быть закрыта, но в истории сдачи должно остаться, что именно висело
+    на смене и кто это принял. Поэтому название и статус копируются, а `ref_id`
+    остаётся ссылкой на живую задачу/проблему.
+    """
+
+    __tablename__ = "hr_handovers"
+    __table_args__ = (
+        CheckConstraint(_in_list("status", HANDOVER_STATUSES), name="ck_hr_handover_status"),
+        Index("ix_hr_handovers_to", "to_employee_id", "status"),
+        Index("ix_hr_handovers_from", "from_employee_id", "created_at"),
+        Index("ix_hr_handovers_shift", "shift_date"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    from_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    to_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    # Кто подтвердил приём — фиксируется отдельно от `to_employee_id`, потому
+    # что карточку могла принять и замена.
+    accepted_by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=HANDOVER_SENT, server_default=HANDOVER_SENT
+    )
+    note: Mapped[str | None] = mapped_column(Text)
+    reject_reason: Mapped[str | None] = mapped_column(Text)
+    shift_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class HandoverItem(Base):
+    """Снимок одного открытого пункта, который передали следующей смене."""
+
+    __tablename__ = "hr_handover_items"
+    __table_args__ = (
+        CheckConstraint(_in_list("kind", HANDOVER_ITEM_KINDS), name="ck_hr_handover_item_kind"),
+        Index("ix_hr_handover_items_handover", "handover_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    handover_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("hr_handovers.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    ref_id: Mapped[int | None] = mapped_column(BigInteger)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Срок/зона/срочность одной строкой — чтобы снимок читался без живых таблиц.
+    meta: Mapped[str | None] = mapped_column(String(128))
 
 
 # --------------------------------------------------------------------------

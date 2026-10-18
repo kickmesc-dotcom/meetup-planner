@@ -123,16 +123,31 @@ export default function MyTasksScreen() {
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">Мои задачи</h1>          {meQ.data && (
-            <span className="flex items-center gap-1.5 text-xs text-tg-hint">
-              <span className="truncate">{meQ.data.display_name}</span>
-              <Badge
-                text={meQ.data.badge}
-                emoji={meQ.data.badge_emoji}
-                demo={meQ.data.is_demo}
-              />
-            </span>
-          )}
+          <h1 className="text-lg font-semibold text-tg-text">Мои задачи</h1>          <span className="flex items-center gap-2">
+            {meQ.data && (
+              <span className="flex items-center gap-1.5 text-xs text-tg-hint">
+                <span className="truncate">{meQ.data.display_name}</span>
+                <Badge
+                  text={meQ.data.badge}
+                  emoji={meQ.data.badge_emoji}
+                  demo={meQ.data.is_demo}
+                />
+              </span>
+            )}
+            {/* Конец смены начинается здесь: сдача того, что осталось. */}
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setTab("handovers");
+              }}
+              className="min-h-8 min-w-8 rounded-lg bg-tg-secondary-bg text-base leading-none"
+              aria-label="Передача смены"
+              title="Передача смены"
+            >
+              🌙
+            </button>
+          </span>
         </div>
         <p className="mt-1 text-xs text-tg-hint">
           {open.length === 0
