@@ -421,7 +421,9 @@ async def escalate_to_admins(
 
     moment = now or datetime.now(UTC)
     hours = await hr_settings.get_second_escalation_hours(session)
-    hidden = await hr_demo.hidden_employee_ids(session)
+    # Тестовый пул исключаем ВСЕГДА, даже когда он виден в интерфейсе: иначе
+    # админы получали бы алерты про [BOT]-задачи, которые никогда не закроют.
+    demo_ids = await hr_demo.demo_employee_ids(session)
 
     tasks = [
         task
@@ -430,7 +432,7 @@ async def escalate_to_admins(
                 select(Task).where(Task.status == TASK_OVERDUE).limit(BATCH_LIMIT)
             )
         ).all()
-        if task.assignee_employee_id not in hidden
+        if task.assignee_employee_id not in demo_ids
     ]
     if not tasks:
         return []
