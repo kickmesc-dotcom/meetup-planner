@@ -442,6 +442,9 @@ export interface HrSettings {
   reminders_enabled: boolean;
   remind_before_minutes: number;
   escalation_enabled: boolean;
+  /** Вторая ступень: молчание руководителя дольше порога — пинг админам. */
+  escalation_second_enabled: boolean;
+  escalation_second_hours: number;
   tick_minutes: number;
   /** Один тумблер тестового пула `[BOT]`. */
   demo_visible: boolean;

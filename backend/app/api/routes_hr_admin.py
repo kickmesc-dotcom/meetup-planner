@@ -1004,6 +1004,9 @@ class HrSettingsOut(BaseModel):
     reminders_enabled: bool
     remind_before_minutes: int
     escalation_enabled: bool
+    # Вторая ступень: молчание руководителя дольше N часов → пинг админам.
+    escalation_second_enabled: bool = True
+    escalation_second_hours: int = 4
     tick_minutes: int
     # Один тумблер тестового пула `[BOT]`: показывать его следы или нет.
     demo_visible: bool
@@ -1021,6 +1024,8 @@ class HrSettingsPatch(BaseModel):
     reminders_enabled: bool | None = None
     remind_before_minutes: int | None = Field(None, ge=5, le=24 * 60)
     escalation_enabled: bool | None = None
+    escalation_second_enabled: bool | None = None
+    escalation_second_hours: int | None = Field(None, ge=1, le=72)
     tick_minutes: int | None = Field(None, ge=5, le=24 * 60)
     demo_visible: bool | None = None
     work_open: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -1062,6 +1067,8 @@ async def put_hr_settings(
         reminders_enabled=body.reminders_enabled,
         remind_before_minutes=body.remind_before_minutes,
         escalation_enabled=body.escalation_enabled,
+        escalation_second_enabled=body.escalation_second_enabled,
+        escalation_second_hours=body.escalation_second_hours,
         tick_minutes=body.tick_minutes,
         demo_visible=body.demo_visible,
         work_open=body.work_open,

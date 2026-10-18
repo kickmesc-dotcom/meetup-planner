@@ -385,6 +385,40 @@ function WorkHoursPanel() {
       </label>
 
       <div className="rounded-lg bg-tg-bg/50 p-2">
+        <label className="flex items-center justify-between text-[11px] text-tg-text">
+          <span>Вторая ступень: пинг админам</span>
+          <input
+            type="checkbox"
+            checked={data.escalation_second_enabled}
+            onChange={(event) =>
+              save.mutate({ escalation_second_enabled: event.target.checked })
+            }
+            className="h-4 w-4"
+          />
+        </label>
+        <label className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-tg-hint">
+          <span>Если руководитель молчит</span>
+          <select
+            value={data.escalation_second_hours}
+            disabled={!data.escalation_second_enabled || save.isPending}
+            onChange={(event) =>
+              save.mutate({ escalation_second_hours: Number(event.target.value) })
+            }
+            className="min-h-9 rounded-lg border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text disabled:opacity-50"
+            aria-label="Порог второй ступени, часы"
+          >
+            {[...new Set([1, 2, 4, 8, 12, 24, 48, data.escalation_second_hours])]
+              .sort((a, b) => a - b)
+              .map((hours) => (
+              <option key={hours} value={hours}>
+                {hours} ч
+              </option>
+              ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="rounded-lg bg-tg-bg/50 p-2">
         <div className="text-[11px] text-tg-hint">
           {data.muted_until
             ? `Мьют до ${formatDateTime(data.muted_until)}`

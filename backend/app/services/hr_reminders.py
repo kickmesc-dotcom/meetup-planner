@@ -23,21 +23,25 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.hr_models import (
+    TASK_OVERDUE,
     Employee,
     Task,
     TaskEvent,
 )
 from app.db.models import User
-from app.services import hr_alerts, hr_notify, hr_settings, hr_tasks
+from app.services import hr_alerts, hr_demo, hr_notify, hr_settings, hr_tasks
 
 log = structlog.get_logger()
 
 # Комментарий события-маркера «напоминание отправлено».
 REMINDER_EVENT_COMMENT = "reminder_sent"
+# Маркер «вторая ступень отправлена»: отдельная колонка не нужна, история
+# задачи и так пишется. Повторный тик видит маркер и не спамит.
+SECOND_EVENT_COMMENT = "second_escalation_sent"
 
 # Сколько задач максимум берём за один тик — защита от лавины после простоя.
 BATCH_LIMIT = 200
@@ -77,6 +81,64 @@ def unique_employees(employees: list[Employee]) -> list[Employee]:
         seen.add(employee.id)
         out.append(employee)
     return out
+
+
+def _aware(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def second_escalation_due(
+    *,
+    status: str,
+    overdue_since: datetime | None,
+    now: datetime,
+    hours: int,
+    already_sent: bool = False,
+) -> bool:
+    """Пора ли поднимать просрочку на вторую ступень (чистое правило).
+
+    Условия: задача всё ещё `overdue` (любой другой статус — это реакция),
+    известен момент просрочки, прошло не меньше `hours` и по задаче ещё не
+    писали админам. `hours` зажимается снизу: нулевой порог превратил бы
+    вторую ступень в дубль первой.
+    """
+    if already_sent or status != TASK_OVERDUE or overdue_since is None:
+        return False
+    elapsed = _aware(now) - _aware(overdue_since)
+    return elapsed >= timedelta(hours=max(1, hours))
+
+
+def marker_covers_cycle(
+    marker_at: datetime | None, overdue_since: datetime | None
+) -> bool:
+    """Закрывает ли старый маркер текущий цикл просрочки.
+
+    Маркер — событие «админам уже писали». Если задача успела вернуться в
+    работу и снова просрочилась, событие просрочки новее маркера — значит это
+    другой цикл, и писать админам снова нужно.
+    """
+    if marker_at is None:
+        return False
+    if overdue_since is None:
+        return True
+    return _aware(marker_at) >= _aware(overdue_since)
+
+
+async def admins(session: AsyncSession) -> list[Employee]:
+    """Только администраторы бота — адресаты второй ступени.
+
+    Руководителей здесь нет: они уже получили первый алерт, второй нужен
+    именно тому, кто выше.
+    """
+    from app.db.hr_models import ROLE_ADMIN
+
+    rows = await session.scalars(
+        select(Employee).where(
+            Employee.is_active.is_(True),
+            Employee.role == ROLE_ADMIN,
+        )
+    )
+    return list(rows.all())
 
 
 def escalation_recipients(
@@ -292,6 +354,131 @@ async def send_deadline_reminders(
     return sent
 
 
+async def _overdue_since(
+    session: AsyncSession, task_ids: list[int]
+) -> dict[int, datetime]:
+    """Когда каждая задача стала просроченной (по событиям, без новой колонки)."""
+    if not task_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(TaskEvent.task_id, func.max(TaskEvent.at))
+            .where(
+                TaskEvent.task_id.in_(task_ids),
+                TaskEvent.to_status == TASK_OVERDUE,
+            )
+            .group_by(TaskEvent.task_id)
+        )
+    ).all()
+    return {int(task_id): at for task_id, at in rows if at is not None}
+
+
+async def _second_escalated_at(
+    session: AsyncSession, task_ids: list[int]
+) -> dict[int, datetime]:
+    """Когда по задаче последний раз писали админам (маркер-событие)."""
+    if not task_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(TaskEvent.task_id, func.max(TaskEvent.at))
+            .where(
+                TaskEvent.task_id.in_(task_ids),
+                TaskEvent.comment == SECOND_EVENT_COMMENT,
+            )
+            .group_by(TaskEvent.task_id)
+        )
+    ).all()
+    return {int(task_id): at for task_id, at in rows if at is not None}
+
+
+async def escalate_to_admins(
+    session: AsyncSession,
+    *,
+    bot=None,  # noqa: ANN001
+    now: datetime | None = None,
+) -> list[Task]:
+    """Вторая ступень: напомнить админам о просрочке без реакции руководителя.
+
+    Читаем все задачи в `overdue` (а не только свежие): ступень срабатывает по
+    таймеру, а не по моменту перехода. Отсчёт — от последнего события
+    «стало просрочено», поэтому ручной возврат в работу и повторная просрочка
+    начинают отсчёт заново.
+
+    Молчание руководителя уважаем: если он нажал «решено» или «напомнить
+    завтра» (`hr_alerts`), задача затихает до указанного момента — второй
+    ступенью его решение не отменяем.
+    """
+    if not await hr_settings.get_escalation_enabled(session):
+        return []
+    if not await hr_settings.get_second_escalation_enabled(session):
+        return []
+    recipients = await admins(session)
+    if not recipients:
+        # Без админов не отправляем и НЕ ставим маркер: когда админ появится,
+        # просрочка всё ещё должна до него дойти.
+        return []
+
+    moment = now or datetime.now(UTC)
+    hours = await hr_settings.get_second_escalation_hours(session)
+    hidden = await hr_demo.hidden_employee_ids(session)
+
+    tasks = [
+        task
+        for task in (
+            await session.scalars(
+                select(Task).where(Task.status == TASK_OVERDUE).limit(BATCH_LIMIT)
+            )
+        ).all()
+        if task.assignee_employee_id not in hidden
+    ]
+    if not tasks:
+        return []
+    ids = [int(task.id) for task in tasks]
+    since_map = await _overdue_since(session, ids)
+    sent_map = await _second_escalated_at(session, ids)
+    state_map = await hr_alerts.states(session, ids)
+
+    due = [
+        task
+        for task in tasks
+        if second_escalation_due(
+            status=task.status,
+            overdue_since=since_map.get(int(task.id)),
+            now=moment,
+            hours=hours,
+            already_sent=marker_covers_cycle(
+                sent_map.get(int(task.id)), since_map.get(int(task.id))
+            ),
+        )
+    ]
+    due = hr_alerts.filter_silenced(due, state_map, moment)
+    if not due:
+        return []
+
+    for task in due:
+        await _deliver(
+            session,
+            bot=bot,
+            employees=recipients,
+            kind=hr_notify.KIND_TASK_ESCALATED,
+            text=hr_notify.task_second_escalation_text(task, hours=hours),
+            payload={"task_id": task.id},
+            keyboard=hr_alerts.alert_keyboard(int(task.id)),
+        )
+        session.add(
+            TaskEvent(
+                task_id=task.id,
+                from_status=TASK_OVERDUE,
+                to_status=TASK_OVERDUE,
+                by_employee_id=None,
+                comment=SECOND_EVENT_COMMENT,
+            )
+        )
+    await session.commit()
+    return due
+
+
 async def escalate_overdue(
     session: AsyncSession,
     *,
@@ -344,6 +531,7 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
     sm = get_sessionmaker()
     reminders = 0
     escalated = 0
+    escalated_second = 0
     try:
         async with sm() as session:
             if await hr_settings.get_reminders_enabled(session):
@@ -352,8 +540,22 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
                 )
             if await hr_settings.get_escalation_enabled(session):
                 escalated = len(await escalate_overdue(session, bot=bot, now=now))
+                # Вторая ступень идёт после первой: только что просроченные
+                # задачи не должны сразу пинговать админов.
+                escalated_second = len(
+                    await escalate_to_admins(session, bot=bot, now=now)
+                )
     except Exception as exc:  # noqa: BLE001 — job не имеет права падать
         log.warning("hr.tick_failed", error=str(exc))
-    if reminders or escalated:
-        log.info("hr.tick_done", reminders=reminders, escalated=escalated)
-    return {"reminders": reminders, "escalated": escalated}
+    if reminders or escalated or escalated_second:
+        log.info(
+            "hr.tick_done",
+            reminders=reminders,
+            escalated=escalated,
+            escalated_second=escalated_second,
+        )
+    return {
+        "reminders": reminders,
+        "escalated": escalated,
+        "escalated_second": escalated_second,
+    }

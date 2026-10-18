@@ -24,6 +24,11 @@ from app.services import hr_worktime
 KEY_REMINDERS_ENABLED = "hr.reminders.enabled"
 KEY_REMIND_BEFORE_MINUTES = "hr.reminders.before_minutes"
 KEY_ESCALATION_ENABLED = "hr.escalation.enabled"
+# Вторая ступень: если руководитель не снял просрочку за N часов, о задаче
+# узнают админы. Отдельный ключ, потому что это другой получатель, а не
+# «погромче то же самое».
+KEY_ESCALATION_SECOND_ENABLED = "hr.escalation.second.enabled"
+KEY_ESCALATION_SECOND_HOURS = "hr.escalation.second.hours"
 KEY_TICK_MINUTES = "hr.tick.minutes"
 # Один тумблер для тестового пула `[BOT]`: скрыть его следы из ленты, списков и
 # отчётов, не удаляя данные. Полное удаление — отдельная операция
@@ -45,6 +50,11 @@ KEY_NOTIFY_MUTED_UNTIL = "hr.notify.muted_until"
 DEFAULT_REMINDERS_ENABLED = True
 DEFAULT_REMIND_BEFORE_MINUTES = 60
 DEFAULT_ESCALATION_ENABLED = True
+# По умолчанию вторая ступень включена: именно она отвечает на «руководитель
+# молчит». Четыре часа — середина смены: уже не «только что просрочили», но
+# ещё есть время доделать работу сегодня.
+DEFAULT_ESCALATION_SECOND_ENABLED = True
+DEFAULT_ESCALATION_SECOND_HOURS = 4
 DEFAULT_TICK_MINUTES = 15
 # Пул заведён для показа/тестов, поэтому по умолчанию он ВИДЕН: скрывать его —
 # осознанное действие перед показом боевой картины.
@@ -62,6 +72,9 @@ MAX_MUTE_HOURS = 24 * 30
 _MAX_BEFORE_MINUTES = 24 * 60
 _MIN_TICK_MINUTES = 5
 _MAX_TICK_MINUTES = 24 * 60
+# Порог второй ступени: от часа («уже час никто не шевелится») до трёх суток.
+_MIN_SECOND_HOURS = 1
+_MAX_SECOND_HOURS = 72
 
 
 async def _get(session: AsyncSession, key: str) -> str | None:
@@ -107,6 +120,11 @@ def clamp_tick_minutes(value: int) -> int:
     return max(_MIN_TICK_MINUTES, min(_MAX_TICK_MINUTES, value))
 
 
+def clamp_second_hours(value: int) -> int:
+    """Через сколько часов молчания руководителя пинговать админов."""
+    return max(_MIN_SECOND_HOURS, min(_MAX_SECOND_HOURS, value))
+
+
 async def get_reminders_enabled(session: AsyncSession) -> bool:
     return await _get_bool(session, KEY_REMINDERS_ENABLED, DEFAULT_REMINDERS_ENABLED)
 
@@ -119,6 +137,20 @@ async def get_remind_before_minutes(session: AsyncSession) -> int:
 
 async def get_escalation_enabled(session: AsyncSession) -> bool:
     return await _get_bool(session, KEY_ESCALATION_ENABLED, DEFAULT_ESCALATION_ENABLED)
+
+
+async def get_second_escalation_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(
+        session, KEY_ESCALATION_SECOND_ENABLED, DEFAULT_ESCALATION_SECOND_ENABLED
+    )
+
+
+async def get_second_escalation_hours(session: AsyncSession) -> int:
+    return clamp_second_hours(
+        await _get_int(
+            session, KEY_ESCALATION_SECOND_HOURS, DEFAULT_ESCALATION_SECOND_HOURS
+        )
+    )
 
 
 async def get_tick_minutes(session: AsyncSession) -> int:
@@ -266,6 +298,8 @@ async def snapshot(session: AsyncSession) -> dict[str, int | bool | str | None]:
         "reminders_enabled": await get_reminders_enabled(session),
         "remind_before_minutes": await get_remind_before_minutes(session),
         "escalation_enabled": await get_escalation_enabled(session),
+        "escalation_second_enabled": await get_second_escalation_enabled(session),
+        "escalation_second_hours": await get_second_escalation_hours(session),
         "tick_minutes": await get_tick_minutes(session),
         "demo_visible": await get_demo_visible(session),
         **(await work_hours_snapshot(session)),
@@ -278,6 +312,8 @@ async def update(
     reminders_enabled: bool | None = None,
     remind_before_minutes: int | None = None,
     escalation_enabled: bool | None = None,
+    escalation_second_enabled: bool | None = None,
+    escalation_second_hours: int | None = None,
     tick_minutes: int | None = None,
     demo_visible: bool | None = None,
     work_open: str | None = None,
@@ -297,6 +333,18 @@ async def update(
         )
     if escalation_enabled is not None:
         await _set(session, KEY_ESCALATION_ENABLED, "true" if escalation_enabled else "false")
+    if escalation_second_enabled is not None:
+        await _set(
+            session,
+            KEY_ESCALATION_SECOND_ENABLED,
+            "true" if escalation_second_enabled else "false",
+        )
+    if escalation_second_hours is not None:
+        await _set(
+            session,
+            KEY_ESCALATION_SECOND_HOURS,
+            str(clamp_second_hours(escalation_second_hours)),
+        )
     if tick_minutes is not None:
         await _set(session, KEY_TICK_MINUTES, str(clamp_tick_minutes(tick_minutes)))
     if demo_visible is not None:

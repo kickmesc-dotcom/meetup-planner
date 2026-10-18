@@ -18,6 +18,8 @@ from app.services import notifications
 KIND_TASK_ASSIGNED = "task_assigned"
 KIND_TASK_DEADLINE = "task_deadline"
 KIND_TASK_OVERDUE = "task_overdue"
+# Вторая ступень эскалации: руководитель молчит дольше порога — пишем админам.
+KIND_TASK_ESCALATED = "task_escalated"
 KIND_TASK_ISSUE = "task_issue"
 KIND_TASK_DONE = "task_done"
 # Проверка руководителем: работа сдана → приёмка → принято/возврат.
@@ -60,6 +62,20 @@ def task_overdue_text(task: Task) -> str:
     return (
         f"⏰ Просрочено поручение {task_short(task)} (срок {fmt_due(task.due_at)}). "
         "Требуется внимание руководителя."
+    )
+
+
+def task_second_escalation_text(task: Task, *, hours: int) -> str:
+    """Текст для админов: не «ещё раз то же», а «руководитель не отреагировал».
+
+    В сообщении есть срок и название поручения — по ним админ найдёт задачу
+    без перехода в приложение. Про руководителя пишем нейтрально: получатель
+    сам знает, кто в отделе отвечает.
+    """
+    return (
+        f"🚨 Поручение {task_short(task)} просрочено больше {hours} ч, "
+        f"реакции руководителя нет (срок {fmt_due(task.due_at)}). "
+        "Нужно вмешательство."
     )
 
 
