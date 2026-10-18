@@ -55,11 +55,15 @@ EXPERIENCES: tuple[str, ...] = (EXPERIENCE_NEW, EXPERIENCE_EXPERIENCED)
 ONBOARDING_NEW = "new"
 ONBOARDING_DEPARTMENT = "department"
 ONBOARDING_EXPERIENCE = "experience"
+# Этап обучения пользованию приложением: короткие уроки, которые человек
+# проходит после выбора подразделения и опыта (см. `services/hr_training.py`).
+ONBOARDING_TRAINING = "training"
 ONBOARDING_DONE = "done"
 ONBOARDING_STATES: tuple[str, ...] = (
     ONBOARDING_NEW,
     ONBOARDING_DEPARTMENT,
     ONBOARDING_EXPERIENCE,
+    ONBOARDING_TRAINING,
     ONBOARDING_DONE,
 )
 
@@ -205,6 +209,12 @@ class Employee(Base):
     )
     role: Mapped[str] = mapped_column(
         String(16), nullable=False, default=ROLE_EMPLOYEE, server_default=ROLE_EMPLOYEE
+    )
+    # Роль меняли руками (`/api/admin/me/role` или админский PATCH). Тогда
+    # `ensure_employee` не повышает её обратно по env-списку — это и позволяет
+    # управляющему временно «стать сотрудником» и вернуться.
+    role_locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
     experience: Mapped[str | None] = mapped_column(String(16))
     onboarding_state: Mapped[str] = mapped_column(
@@ -651,5 +661,38 @@ class EmployeeAchievement(Base):
     )
     code: Mapped[str] = mapped_column(String(64), nullable=False)
     awarded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Обучение пользованию приложением (шаг онбординга)
+# --------------------------------------------------------------------------
+
+
+class EmployeeTrainingStep(Base):
+    """Пройденный урок знакомства с приложением.
+
+    Каталог уроков живёт в коде (`services/hr_training.py`): это текст, который
+    меняется вместе с интерфейсом. В БД храним только факт прохождения, чтобы
+    прогресс не сбрасывался и не дублировался (`unique(employee_id, code)`).
+    """
+
+    __tablename__ = "employee_training_steps"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id", "code", name="uq_employee_training_step_code"
+        ),
+        Index("ix_employee_training_steps_employee", "employee_id", "completed_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("employees.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

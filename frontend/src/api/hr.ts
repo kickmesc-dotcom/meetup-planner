@@ -22,9 +22,11 @@ export interface HrEmployee {
   badge_emoji: string | null;
   role: "employee" | "aup" | "admin";
   experience: "new" | "experienced" | null;
-  onboarding_state: "new" | "department" | "experience" | "done";
+  onboarding_state: "new" | "department" | "experience" | "training" | "done";
   is_aup: boolean;
   is_admin: boolean;
+  /** Прописанный доступ в админку: переживает смену собственной роли. */
+  is_staff: boolean;
   is_active: boolean;
   /** Тестовый пул `[BOT]` — помечается в интерфейсе. */
   is_demo: boolean;
@@ -153,6 +155,35 @@ export const submitOnboarding = (body: {
   });
 
 export const fetchDepartments = () => api<HrDepartment[]>("/api/departments");
+
+// --- Обучение пользованию приложением (этап онбординга) ---
+
+export interface HrTrainingLesson {
+  code: string;
+  title: string;
+  emoji: string;
+  minutes: number;
+  summary: string;
+  steps: string[];
+  done: boolean;
+}
+
+export interface HrTraining {
+  lessons: HrTrainingLesson[];
+  done: number;
+  total: number;
+  percent: number;
+  complete: boolean;
+  onboarding_state: HrEmployee["onboarding_state"];
+  next_code: string | null;
+}
+
+export const fetchTraining = () => api<HrTraining>("/api/me/training");
+
+export const completeTrainingLesson = (code: string) =>
+  api<HrTraining>(`/api/me/training/${encodeURIComponent(code)}`, {
+    method: "POST",
+  });
 
 // --- Чек-лист смены ---
 
@@ -351,6 +382,16 @@ export interface HrSettings {
   tick_minutes: number;
   /** Один тумблер тестового пула `[BOT]`. */
   demo_visible: boolean;
+  /** Рабочие часы ресторана (HH:MM) — на них равняются смены и уведомления. */
+  work_open: string;
+  work_close: string;
+  notify_only_work_hours: boolean;
+  notify_lead_minutes: number;
+  notify_tail_minutes: number;
+  /** До какого момента глушим Telegram-алерты (ISO) или `null`. */
+  muted_until: string | null;
+  /** Можно ли слать прямо сейчас (расчёт по часам и мьюту). */
+  notifications_allowed: boolean;
 }
 
 export const fetchHrSettings = () => api<HrSettings>("/api/admin/settings/hr");
@@ -505,4 +546,88 @@ export const updateKpiRules = (body: Partial<HrKpiRules>) =>
   api<HrKpiRules>("/api/admin/kpi/rules", {
     method: "PUT",
     body: JSON.stringify(body),
+  });
+
+// --------------------------------------------------------------------------
+// Кабинет управляющего: сводка по смене, роли, мьют уведомлений
+// --------------------------------------------------------------------------
+
+export interface HrDashboardEmployee {
+  employee_id: number;
+  display_name: string;
+  telegram_id: number;
+  department_id: number | null;
+  department_name: string | null;
+  department_emoji: string | null;
+  role: "employee" | "aup" | "admin";
+  badge: string | null;
+  badge_emoji: string | null;
+  checklist_done: number;
+  checklist_total: number;
+  tasks_open: number;
+  tasks_overdue: number;
+  has_run: boolean;
+  last_activity_at: string | null;
+  status: "done" | "late" | "in_progress" | "idle";
+}
+
+export interface HrDashboardDepartment {
+  department_id: number;
+  name: string;
+  emoji: string | null;
+  employees: number;
+  started: number;
+  done: number;
+  open_tasks: number;
+  overdue_tasks: number;
+  open_issues: number;
+}
+
+export interface HrDashboardAttention {
+  kind: "overdue" | "issue" | "late_shift";
+  severity: "high" | "medium";
+  text: string;
+  task_id: number | null;
+  employee_id: number | null;
+  department_id: number | null;
+}
+
+export interface HrDashboardActivity {
+  at: string;
+  kind: string;
+  text: string;
+  employee_id: number | null;
+  display_name: string | null;
+}
+
+export interface HrDashboard {
+  work_date: string;
+  scope: "all" | "department";
+  departments: HrDashboardDepartment[];
+  employees: HrDashboardEmployee[];
+  attention: HrDashboardAttention[];
+  activity: HrDashboardActivity[];
+  total_employees: number;
+  shifts_started: number;
+  shifts_done: number;
+  tasks_open: number;
+  tasks_overdue: number;
+  open_issues: number;
+}
+
+/** Сводка смены. Область видимости считает сервер по роли. */
+export const fetchDashboard = () => api<HrDashboard>("/api/admin/dashboard");
+
+/** Сменить собственную роль (админ смотрит приложение глазами другой роли). */
+export const switchMyRole = (role: HrEmployee["role"]) =>
+  api<HrAdminEmployee>("/api/admin/me/role", {
+    method: "POST",
+    body: JSON.stringify({ role }),
+  });
+
+/** Мьют алертов: часы вперёд, `0` — снять. */
+export const muteNotifications = (hours: number) =>
+  api<HrSettings>("/api/admin/notifications/mute", {
+    method: "POST",
+    body: JSON.stringify({ hours }),
   });

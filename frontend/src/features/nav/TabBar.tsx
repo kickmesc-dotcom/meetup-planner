@@ -23,12 +23,32 @@ const BASE_ITEMS: Item[] = [
   { id: "profile", label: "Профиль", icon: "👤" },
 ];
 
+// Руководителю важнее команда, чем справочник ссылок: «Ссылки» у него
+// остаются в профиле, а на их месте — сводка смены по отделу.
+const MANAGER_ITEMS: Item[] = [
+  { id: "tasks", label: "Задачи", icon: "✅" },
+  { id: "checklist", label: "Смена", icon: "🕒" },
+  { id: "feed", label: "События", icon: "📋" },
+  { id: "team", label: "Команда", icon: "👀" },
+  { id: "profile", label: "Профиль", icon: "👤" },
+];
+
 const ADMIN_ITEM: Item = { id: "admin", label: "Админ", icon: "⚙️" };
 
-export default function TabBar({ isAdmin }: { isAdmin: boolean }) {
+export default function TabBar({
+  isAdmin,
+  canManage = false,
+}: {
+  isAdmin: boolean;
+  /** Руководитель или прописанный админ — видит сводку по команде. */
+  canManage?: boolean;
+}) {
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
-  const items = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
+  const items = [
+    ...(canManage ? MANAGER_ITEMS : BASE_ITEMS),
+    ...(isAdmin ? [ADMIN_ITEM] : []),
+  ];
 
   return (
     <nav

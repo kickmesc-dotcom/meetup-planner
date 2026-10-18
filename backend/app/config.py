@@ -75,6 +75,19 @@ class Settings(BaseSettings):
         return out
 
     @property
+    def staff_tg_id_set(self) -> set[int]:
+        """Кому доступна админка Mini App.
+
+        Mini App открыт всем, кто пришёл из Telegram, но управление — только
+        «шестёрке»: участникам `WHITELIST_TG_IDS` (они же прописаны в чате) и
+        владельцам из `ADMIN_TG_IDS`/`BUILTIN_ADMIN_TG_IDS`. Раньше whitelist
+        был пропуском в приложение целиком — теперь он пропуск в админку.
+        """
+        out: set[int] = set(self.admin_tg_id_set)
+        out.update(tg_id for tg_id, _ in self.whitelist_pairs)
+        return out
+
+    @property
     def chukhan_weight_map(self) -> dict[int, float]:
         """`CHUKHAN_WEIGHTS` is a comma list of `tg_id:weight` pairs.
         Empty/missing weights default to 1.0 in the service."""

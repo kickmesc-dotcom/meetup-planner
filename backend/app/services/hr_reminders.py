@@ -162,7 +162,13 @@ async def _deliver(
     text: str,
     payload: dict | None = None,
 ) -> None:
-    """Личное уведомление в приложении + best-effort личка в Telegram."""
+    """Личное уведомление в приложении + best-effort личка в Telegram.
+
+    В чат пишем только в рабочее окно и вне ручного мьюта
+    (`hr_settings.notifications_allowed`). Уведомление в приложении создаётся
+    всегда: оно не звонит в 03:41 и не теряется, если человек откроет Mini App
+    утром.
+    """
     recipients = unique_employees(employees)
     if not recipients:
         return
@@ -170,6 +176,10 @@ async def _deliver(
         session, employees=recipients, kind=kind, text=text, payload=payload
     )
     if bot is None:
+        return
+    allowed, reason = await hr_settings.notifications_allowed(session)
+    if not allowed:
+        log.info("hr.dm_suppressed", reason=reason, kind=kind, recipients=len(recipients))
         return
     tg_map = await _telegram_ids(session, recipients)
     for employee in recipients:

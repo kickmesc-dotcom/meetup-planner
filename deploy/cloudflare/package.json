@@ -1,0 +1,9 @@
+{
+  "name": "semitask-api-worker",
+  "private": true,
+  "type": "module",
+  "description": "Тонкий Worker поверх контейнера FastAPI (Cloudflare Containers).",
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.20"
+  }
+}

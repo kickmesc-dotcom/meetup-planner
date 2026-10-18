@@ -12,6 +12,8 @@ import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
 // SemiTaskBot: рабочие экраны сотрудника.
 import MyTasksScreen from "./features/hr/MyTasksScreen";
 import ChecklistScreen from "./features/hr/ChecklistScreen";
+import TeamScreen from "./features/hr/TeamScreen";
+import { fetchEmployee } from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
 import LinksScreen from "./features/hr/LinksScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
@@ -27,6 +29,14 @@ export default function App() {
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: fetchMe });
   const users = useQuery({ queryKey: ["users"], queryFn: fetchUsers });
+  // HR-профиль нужен не только экрану профиля: от его роли зависит, есть ли
+  // вкладка «Команда» (руководитель) и кабинет (прописанный админ).
+  const hrMe = useQuery({
+    queryKey: ["hr-employee"],
+    queryFn: fetchEmployee,
+    retry: false,
+    staleTime: 60_000,
+  });
   const uiPrefs = useQuery({ queryKey: ["ui-prefs"], queryFn: fetchUiPrefs });
   const hideGreeting = useMutation({
     mutationFn: () => updateUiPrefs({ hide_greeting: true }),
@@ -104,9 +114,13 @@ export default function App() {
 
   const meData = me.data!;
   const isAdmin = !!meData.is_admin;
+  const canManage = !!(hrMe.data?.is_aup || hrMe.data?.is_staff);
 
   // Если переключились на admin без прав — мягко возвращаем к задачам.
   if (tab === "admin" && !isAdmin) {
+    setTab("tasks");
+  }
+  if (tab === "team" && !canManage) {
     setTab("tasks");
   }
 
@@ -172,7 +186,14 @@ export default function App() {
         <HrFeedScreen />
       </main>
     );
+  } else if (tab === "team") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <TeamScreen canManage={!!hrMe.data?.is_staff} />
+      </main>
+    );
   } else if (tab === "links") {
+
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
         <LinksScreen />
@@ -221,7 +242,7 @@ export default function App() {
     // остальным шуточным контуром — он уехал в `src/_legacy`, каркас остался.
     <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
       {content}
-      <TabBar isAdmin={isAdmin} />
+      <TabBar isAdmin={isAdmin} canManage={canManage} />
     </div>
   );
 }

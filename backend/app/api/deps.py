@@ -7,7 +7,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import inspect as sa_inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.initdata import InitDataError, parse_and_verify
+from app.auth.initdata import InitDataError, InitDataPayload, parse_and_verify
 from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
@@ -43,6 +43,29 @@ async def resync_if_expired(session: AsyncSession, *objects: object) -> None:
             await session.refresh(obj)
 
 
+async def _create_user(session: AsyncSession, payload: "InitDataPayload") -> User:
+    """Завести `users`-строку для нового человека из Telegram.
+
+    Имя берём из подписанных данных (имя + фамилия), иначе username, иначе
+    нейтральное «Сотрудник». Цвет — детерминированно из общей палитры, чтобы
+    аватарка-инициалы не мигала разными цветами между заходами.
+    """
+    from app.db.seed import color_for_user
+
+    parts = [p for p in (payload.first_name, payload.last_name) if p]
+    display_name = " ".join(parts).strip() or (payload.username or f"Сотрудник {payload.user_id}")
+    user = User(
+        telegram_id=payload.user_id,
+        display_name=display_name[:120],
+        username=payload.username,
+        color_hex=color_for_user(payload.user_id),
+    )
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
 def _strip_tma_prefix(authorization: str) -> str:
     if authorization.lower().startswith("tma "):
         return authorization[4:].strip()
@@ -69,10 +92,12 @@ async def current_user(
 
     user = await session.scalar(select(User).where(User.telegram_id == payload.user_id))
     if user is None:
-        raise HTTPException(
-            status.HTTP_403_FORBIDDEN,
-            detail="not_in_whitelist",
-        )
+        # Mini App открыт всем: `initData` уже проверен подписью бота, значит
+        # человек реально пришёл из Telegram. Раньше здесь стоял 403
+        # `not_in_whitelist`, и приложением могли пользоваться только шесть
+        # участников — теперь знакомиться может любой, а админские права
+        # выдаются отдельно (`services.hr_access.default_role_for`).
+        user = await _create_user(session, payload)
 
     # Lazy-update username if Telegram changed it.
     if payload.username and payload.username != user.username:
@@ -115,11 +140,16 @@ async def require_aup(employee: EmployeeDep) -> Employee:
     return employee
 
 
-async def require_admin(employee: EmployeeDep) -> Employee:
-    """Администратор бота (подразделения, чек-листы, ссылки, роли)."""
+async def require_admin(employee: EmployeeDep, user: CurrentUser) -> Employee:
+    """Админка: роль `admin` или прописанный доступ (шестёрка/владельцы).
+
+    Второе условие нужно для честного «примерить роль сотрудника»: управляющий
+    снимает себе `admin`, видит задачи как все, но кабинет и переключатель ролей
+    остаются под рукой — иначе вернуть себе права было бы нечем.
+    """
     from app.services import hr_access
 
-    if not hr_access.is_admin(employee):
+    if not hr_access.is_admin(employee) and not hr_access.is_staff(employee, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="admin_required")
     return employee
 

@@ -5,8 +5,11 @@
 // greenlet. Контейнер запускает ровно тот же образ, что и раньше, поэтому
 // переписывать 47k строк API не нужно.
 //
-// Требуется план Workers Paid ($5/мес): Cloudflare Containers на Free
-// недоступны (проверено на этом аккаунте: 401 "requires the Workers Paid plan").
+// ВАЖНО: Cloudflare Containers доступны только на плане Workers Paid
+// (проверено на этом аккаунте: 401 "requires the Workers Paid plan"). На Free
+// тот же FastAPI в Python Workers не поедет: нет greenlet, на котором стоит
+// async SQLAlchemy. Поэтому либо Workers Paid, либо отдельная портация API на
+// TypeScript (см. docs/DEPLOY_CLOUDFLARE.md, раздел «Если плана нет»).
 //
 // Деплой (из backend/, после `wrangler login` или с CLOUDFLARE_API_TOKEN):
 //   npx wrangler deploy -c ../deploy/cloudflare/wrangler.jsonc
@@ -25,7 +28,8 @@
       // Образ собирается из backend/Dockerfile — тот же, что возил Amvera/HF.
       // Uvicorn внутри слушает $PORT (по умолчанию 7860).
       "class_name": "BackendContainer",
-      "image": "../../meetup-planner-main/backend/Dockerfile",
+      // Путь считается от этого файла: deploy/cloudflare → корень репо.
+      "image": "../../backend/Dockerfile",
       "max_instances": 1,
       "instance_type": "basic"
     }

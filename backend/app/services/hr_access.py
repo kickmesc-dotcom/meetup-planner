@@ -49,8 +49,13 @@ def role_rank(role: str) -> int:
 
 
 def default_role_for(telegram_id: int) -> str:
-    """Роль по умолчанию при создании профиля: админ из env — сразу `admin`."""
-    if telegram_id in get_settings().admin_tg_id_set:
+    """Роль по умолчанию при создании профиля.
+
+    `admin` — владельцы (`ADMIN_TG_IDS`) и «шестёрка» (`WHITELIST_TG_IDS`):
+    их же пропуск в админку. Остальные приходят сотрудниками — Mini App
+    открыт всем, но управление остаётся за прописанными людьми.
+    """
+    if telegram_id in get_settings().staff_tg_id_set:
         return ROLE_ADMIN
     return ROLE_EMPLOYEE
 
@@ -70,10 +75,14 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
     employee = await get_employee(session, user.id)
     if employee is not None:
         # Админ из env должен получить права, даже если строка создана раньше
-        # (человека добавили в ADMIN_TG_IDS уже после первого захода).
+        # (человека добавили в ADMIN_TG_IDS уже после первого захода). Но
+        # `role_locked` сильнее env: если роль меняли руками (в том числе
+        # управляющий снял себе роль, чтобы посмотреть приложение глазами
+        # сотрудника), автоматическое повышение её не откатит.
         if (
-            user.telegram_id in get_settings().admin_tg_id_set
+            user.telegram_id in get_settings().staff_tg_id_set
             and employee.role != ROLE_ADMIN
+            and not employee.role_locked
         ):
             employee.role = ROLE_ADMIN
             await session.flush()
@@ -103,12 +112,29 @@ def is_admin(employee: Employee | None) -> bool:
     return employee is not None and role_rank(employee.role) >= role_rank(ROLE_ADMIN)
 
 
+def is_staff(employee: Employee | None, user: User | None) -> bool:
+    """Прописанный доступ в админку (шестёрка / владельцы), независимо от роли.
+
+    Нужен ровно для одного сценария: администратор временно снимает себе роль,
+    чтобы увидеть приложение глазами сотрудника, но кабинет управления у него
+    остаётся — иначе вернуть роль было бы нечем.
+    """
+    if user is None:
+        return False
+    return user.telegram_id in get_settings().staff_tg_id_set
+
+
 def onboarding_finished(employee: Employee) -> bool:
     return employee.onboarding_state == ONBOARDING_DONE
 
 
 def set_role(employee: Employee, role: str) -> None:
-    """Сменить роль с валидацией (используется админским API)."""
+    """Сменить роль с валидацией (используется админским API).
+
+    Ставит `role_locked`, чтобы `ensure_employee` не вернул env-админу роль
+    назад на следующем запросе: ручной выбор должен жить.
+    """
     if role not in _ROLE_RANK:
         raise HrAccessError(f"unknown_role:{role}")
     employee.role = role
+    employee.role_locked = True

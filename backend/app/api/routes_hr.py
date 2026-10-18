@@ -23,6 +23,7 @@ from app.db.hr_models import (
     EXPERIENCES,
     ONBOARDING_DONE,
     ONBOARDING_EXPERIENCE,
+    ONBOARDING_TRAINING,
     TEMPLATE_SHIFT,
     ChecklistItem,
     Department,
@@ -45,6 +46,7 @@ from app.services import (
     hr_kpi,
     hr_links,
     hr_tasks,
+    hr_training,
 )
 
 router = APIRouter(tags=["hr"])
@@ -71,6 +73,9 @@ class EmployeeOut(BaseModel):
     onboarding_state: str
     is_aup: bool
     is_admin: bool
+    # Прописанный доступ в админку (шестёрка/владельцы). Переживает смену
+    # собственной роли: снял admin — кабинет всё равно доступен.
+    is_staff: bool = False
     is_active: bool
     # Тестовый пул `[BOT]`: клиент показывает пометку и может спрятать его.
     is_demo: bool = False
@@ -210,6 +215,7 @@ async def _employee_out(
         onboarding_state=employee.onboarding_state,
         is_aup=hr_access.is_aup(employee),
         is_admin=hr_access.is_admin(employee),
+        is_staff=hr_access.is_staff(employee, user),
         is_active=employee.is_active,
     )
 
@@ -301,15 +307,98 @@ async def onboarding(
         if body.experience not in EXPERIENCES:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_experience")
         employee.experience = body.experience
-        if employee.department_id is not None:
-            employee.onboarding_state = ONBOARDING_DONE
 
+    # После опыта идёт этап обучения приложению: он закрывается прохождением
+    # уроков (`/me/training`), а не этой ручкой. Уже прошедшим обучение
+    # (state=done) повторный онбординг его не откатывает.
     if employee.department_id is not None and employee.experience is not None:
-        employee.onboarding_state = ONBOARDING_DONE
+        if employee.onboarding_state != ONBOARDING_DONE:
+            employee.onboarding_state = ONBOARDING_TRAINING
 
     await session.commit()
     await session.refresh(employee)
     return await _employee_out(session, employee, user)
+
+
+# --------------------------------------------------------------------------
+# Обучение пользованию приложением (этап онбординга)
+# --------------------------------------------------------------------------
+
+
+class LessonOut(BaseModel):
+    code: str
+    title: str
+    emoji: str
+    minutes: int
+    summary: str
+    steps: list[str]
+    done: bool
+
+
+class TrainingOut(BaseModel):
+    """Курс знакомства: уроки, прогресс и что делать дальше."""
+
+    lessons: list[LessonOut]
+    done: int
+    total: int
+    percent: int
+    complete: bool
+    onboarding_state: str
+    next_code: str | None = None
+
+
+def _training_out(
+    progress: hr_training.TrainingProgress, state: str
+) -> TrainingOut:
+    done = set(progress.done)
+    next_lesson = next(
+        (code for code in hr_training.MANDATORY_CODES if code not in done), None
+    )
+    return TrainingOut(
+        lessons=[
+            LessonOut(
+                code=lesson.code,
+                title=lesson.title,
+                emoji=lesson.emoji,
+                minutes=lesson.minutes,
+                summary=lesson.summary,
+                steps=list(lesson.steps),
+                done=lesson.code in done,
+            )
+            for lesson in hr_training.LESSONS
+        ],
+        done=len(progress.done),
+        total=progress.total,
+        percent=progress.percent,
+        complete=progress.complete,
+        onboarding_state=state,
+        next_code=next_lesson,
+    )
+
+
+@router.get("/me/training", response_model=TrainingOut)
+async def my_training(session: SessionDep, employee: EmployeeDep) -> TrainingOut:
+    progress = await hr_training.progress(session, employee)
+    return _training_out(progress, employee.onboarding_state)
+
+
+@router.post("/me/training/{code}", response_model=TrainingOut)
+async def complete_training_lesson(
+    code: str, session: SessionDep, employee: EmployeeDep
+) -> TrainingOut:
+    """Отметить урок пройденным. Последний урок закрывает онбординг.
+
+    Идемпотентно: повторный тап возвращает тот же прогресс, а не 409.
+    """
+    try:
+        progress = await hr_training.complete(session, employee, code)
+    except hr_training.TrainingError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    if progress.complete and employee.onboarding_state != ONBOARDING_DONE:
+        employee.onboarding_state = ONBOARDING_DONE
+    await session.commit()
+    await session.refresh(employee)
+    return _training_out(progress, employee.onboarding_state)
 
 
 @router.get("/departments", response_model=list[DepartmentOut])

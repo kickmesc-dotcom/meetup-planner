@@ -36,6 +36,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0029_hr_core.py",
     "0030_hr_badges_demo.py",
     "0031_hr_achievements.py",
+    "0032_hr_training_roles.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -54,6 +55,7 @@ HR_TABLES = {
     "feedback_questions",
     "feedback_answers",
     "employee_achievements",
+    "employee_training_steps",
 }
 
 
@@ -71,6 +73,21 @@ class _CapturingOp:
         self.tables[name] = columns
 
     def create_index(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def drop_index(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def drop_constraint(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def create_check_constraint(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def drop_table(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def drop_column(self, *_a: Any, **_kw: Any) -> None:
         return None
 
     def add_column(self, table: str, column: sa.Column, *_a: Any, **_kw: Any) -> None:

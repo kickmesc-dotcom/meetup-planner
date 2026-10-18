@@ -45,6 +45,7 @@ from app.schemas.hr_kpi import (
     to_winner_out,
 )
 from app.services import (
+    hr_access,
     hr_achievements,
     hr_checklists,
     hr_demo,
@@ -53,6 +54,7 @@ from app.services import (
     hr_kpi,
     hr_links,
     hr_notify,
+    hr_ops,
     hr_settings,
     hr_tasks,
 )
@@ -228,6 +230,10 @@ class EmployeeAdminOut(BaseModel):
     display_name: str
     telegram_id: int
     department_id: int | None
+    # Подразделение рядом с именем: в списках из 60 человек без тега не видно,
+    # кто из какого отдела. Пусто, если отдел еще не выбран.
+    department_name: str | None = None
+    department_emoji: str | None = None
     position: str | None
     badge: str | None = None
     badge_emoji: str | None = None
@@ -712,13 +718,17 @@ async def set_task_status(
     return await _task_admin_out(session, task)
 
 
-def _employee_admin_out(employee: Employee, user: User) -> EmployeeAdminOut:
+def _employee_admin_out(
+    employee: Employee, user: User, department: Department | None = None
+) -> EmployeeAdminOut:
     return EmployeeAdminOut(
         id=employee.id,
         user_id=employee.user_id,
         display_name=user.display_name,
         telegram_id=user.telegram_id,
         department_id=employee.department_id,
+        department_name=department.name if department else None,
+        department_emoji=department.emoji if department else None,
         position=employee.position,
         badge=employee.badge,
         badge_emoji=employee.badge_emoji,
@@ -742,15 +752,18 @@ async def admin_employees(
     """
     hidden = await hr_demo.hidden_employee_ids(session)
     rows = await session.execute(
-        select(Employee, User).join(User, User.id == Employee.user_id).order_by(Employee.id)
+        select(Employee, User, Department)
+        .join(User, User.id == Employee.user_id)
+        .outerjoin(Department, Department.id == Employee.department_id)
+        .order_by(Employee.id)
     )
     out: list[EmployeeAdminOut] = []
-    for employee, user in rows.all():
+    for employee, user, department in rows.all():
         if int(employee.id) in hidden:
             continue
         if employee.is_demo and not include_demo:
             continue
-        out.append(_employee_admin_out(employee, user))
+        out.append(_employee_admin_out(employee, user, department))
     return out
 
 
@@ -768,7 +781,9 @@ async def patch_employee(
     if body.role is not None:
         if body.role not in ROLES:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_role")
-        employee.role = body.role
+        # `set_role` ставит `role_locked`: иначе env-админу роль вернут
+        # автоматически на следующем запросе (`ensure_employee`).
+        hr_access.set_role(employee, body.role)
     if body.clear_department:
         employee.department_id = None
     elif body.department_id is not None:
@@ -791,7 +806,12 @@ async def patch_employee(
         employee.is_active = body.is_active
     await session.commit()
     await session.refresh(employee)
-    return _employee_admin_out(employee, user)
+    department = (
+        await session.get(Department, employee.department_id)
+        if employee.department_id
+        else None
+    )
+    return _employee_admin_out(employee, user, department)
 
 
 @router.get(
@@ -921,6 +941,14 @@ class HrSettingsOut(BaseModel):
     tick_minutes: int
     # Один тумблер тестового пула `[BOT]`: показывать его следы или нет.
     demo_visible: bool
+    # Рабочие часы ресторана: на них равняются все смены и уведомления.
+    work_open: str = "10:00"
+    work_close: str = "23:00"
+    notify_only_work_hours: bool = True
+    notify_lead_minutes: int = 60
+    notify_tail_minutes: int = 60
+    muted_until: str | None = None
+    notifications_allowed: bool = True
 
 
 class HrSettingsPatch(BaseModel):
@@ -929,6 +957,23 @@ class HrSettingsPatch(BaseModel):
     escalation_enabled: bool | None = None
     tick_minutes: int | None = Field(None, ge=5, le=24 * 60)
     demo_visible: bool | None = None
+    work_open: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    work_close: str | None = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    notify_only_work_hours: bool | None = None
+    notify_lead_minutes: int | None = Field(None, ge=0, le=12 * 60)
+    notify_tail_minutes: int | None = Field(None, ge=0, le=12 * 60)
+
+
+class RoleSwitchIn(BaseModel):
+    """Смена собственной роли: управляющий смотрит приложение глазами роли."""
+
+    role: str
+
+
+class MuteIn(BaseModel):
+    """Мьют уведомлений: часы вперёд. `0` — снять мьют."""
+
+    hours: int
 
 
 @router.get("/settings/hr", response_model=HrSettingsOut)
@@ -953,8 +998,75 @@ async def put_hr_settings(
         escalation_enabled=body.escalation_enabled,
         tick_minutes=body.tick_minutes,
         demo_visible=body.demo_visible,
+        work_open=body.work_open,
+        work_close=body.work_close,
+        notify_only_work_hours=body.notify_only_work_hours,
+        notify_lead_minutes=body.notify_lead_minutes,
+        notify_tail_minutes=body.notify_tail_minutes,
     )
     return HrSettingsOut(**updated)
+
+
+# --------------------------------------------------------------------------
+# Кабинет управляющего: сводка по смене, роли и мьют уведомлений
+# --------------------------------------------------------------------------
+
+
+@router.get("/dashboard", response_model=hr_ops.Dashboard)
+async def manager_dashboard(
+    session: SessionDep, employee: AupDep
+) -> hr_ops.Dashboard:
+    """Оперативная сводка: отделы, люди, просрочки и проблемы.
+
+    Руководитель видит своё подразделение, администратор — всё. Никаких
+    «передай id отдела»: область видимости выводится из роли на сервере.
+    """
+    return await hr_ops.build_dashboard(session, viewer=employee)
+
+
+@router.post("/me/role", response_model=EmployeeAdminOut)
+async def switch_my_role(
+    body: RoleSwitchIn, session: SessionDep, employee: AdminDep
+) -> EmployeeAdminOut:
+    """Сменить собственную роль, чтобы посмотреть приложение с другой стороны.
+
+    Доступна только тем, у кого есть прописанный доступ в админку: сняв себе
+    `admin`, человек не теряет кабинет и может вернуть роль обратно. Само
+    понижение не выкидывает из аккаунта и не трогает историю.
+    """
+    if body.role not in ROLES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_role")
+    try:
+        hr_access.set_role(employee, body.role)
+    except hr_access.HrAccessError as exc:  # pragma: no cover - защита на будущее
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.commit()
+    await session.refresh(employee)
+    user = await session.get(User, employee.user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="user_not_found")
+    department = (
+        await session.get(Department, employee.department_id)
+        if employee.department_id
+        else None
+    )
+    return _employee_admin_out(employee, user, department)
+
+
+@router.post("/notifications/mute", response_model=HrSettingsOut)
+async def mute_notifications(
+    body: MuteIn, session: SessionDep, _: AupDep
+) -> HrSettingsOut:
+    """Заглушить алерты на 24ч / 3 суток / неделю / месяц (или снять мьют).
+
+    Глушит только доставку в Telegram; уведомления в приложении продолжают
+    копиться, чтобы утренний разбор не потерялся.
+    """
+    if body.hours <= 0:
+        await hr_settings.clear_mute(session)
+    else:
+        await hr_settings.mute_for_hours(session, body.hours)
+    return HrSettingsOut(**await hr_settings.snapshot(session))
 
 
 # --------------------------------------------------------------------------

@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchDepartments,
   fetchEmployee,
+  fetchTraining,
   submitOnboarding,
+  switchMyRole,
   type HrEmployee,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
@@ -14,6 +16,7 @@ import Badge from "@/features/hr/Badge";
 import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
 import KpiCard from "@/features/hr/KpiCard";
+import TrainingScreen from "@/features/hr/TrainingScreen";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 
@@ -56,6 +59,20 @@ export default function HrProfileScreen() {
   const [showFeedback, setShowFeedback] = useState(false);
   // Тестовый пул `[BOT]` — админский экран: показываем только администратору.
   const [showDemo, setShowDemo] = useState(false);
+  // Обучение — этап онбординга и всегда доступный справочник.
+  const [showTraining, setShowTraining] = useState(false);
+  const trainingQ = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
+  // Админ может примерить любую роль, не теряя кабинет (`is_staff`).
+  const roleSwitch = useMutation({
+    mutationFn: (role: HrEmployee["role"]) => switchMyRole(role),
+    onSuccess: () => {
+      haptic("success");
+      void qc.invalidateQueries({ queryKey: ["hr-employee"] });
+      void qc.invalidateQueries({ queryKey: ["me"] });
+      void qc.invalidateQueries({ queryKey: ["hr-dashboard"] });
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
 
   const save = useMutation({
     mutationFn: (body: {
@@ -137,6 +154,73 @@ export default function HrProfileScreen() {
 
       {/* Опыт за работу: открыт всем — это мотивация, а не надзор. */}
       <KpiCard />
+
+      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-tg-text">🎓 Обучение</h2>
+          <span className="text-[11px] tabular-nums text-tg-hint">
+            {trainingQ.data
+              ? `${trainingQ.data.done}/${trainingQ.data.total}`
+              : "…"}
+          </span>
+        </div>
+        <p className="mt-1 text-[11px] text-tg-hint">
+          Семь коротких уроков: чек-лист, фотоотчёт, проблемы, уведомления.
+          Проходить можно в любом порядке.
+        </p>
+        <button
+          type="button"
+          onClick={() => {
+            haptic("light");
+            setShowTraining(true);
+          }}
+          className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text"
+        >
+          {trainingQ.data?.complete
+            ? "Открыть курс"
+            : trainingQ.data
+              ? `Продолжить (${
+                  trainingQ.data.lessons.find((l) => !l.done)?.title ?? "курс"
+                })`
+              : "Открыть курс"}
+        </button>
+      </section>
+
+      {(me.is_admin || me.is_staff) && (
+        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+          <h2 className="text-sm font-semibold text-tg-text">Примерить роль</h2>
+          <p className="mt-1 text-[11px] text-tg-hint">
+            Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ в
+            админку остаётся — вернуть себя можно этой же кнопкой.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {([
+              { v: "employee", label: "Сотрудник" },
+              { v: "aup", label: "Руководитель" },
+              { v: "admin", label: "Администратор" },
+            ] as const).map((option) => {
+              const active = me.role === option.v;
+              return (
+                <button
+                  key={option.v}
+                  type="button"
+                  aria-pressed={active}
+                  disabled={roleSwitch.isPending || active}
+                  onClick={() => roleSwitch.mutate(option.v)}
+                  className={[
+                    "min-h-9 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
+                    active
+                      ? "bg-tg-button text-tg-button-text"
+                      : "bg-tg-bg/60 text-tg-text",
+                  ].join(" ")}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Скрытый личный прогресс: сервер сам решает, показывать ли блок
           (сейчас — руководителю и админу), см. `AchievementsCard`. */}
@@ -247,6 +331,9 @@ export default function HrProfileScreen() {
               чтобы подписи оставались читаемыми, но вход сохранён. */}
           <Jump icon="📅" label="График" onClick={() => setTab("calendar")} />
           <Jump icon="🤝" label="Встречи" onClick={() => setTab("meetings")} />
+          {(me.is_aup || me.is_staff) && (
+            <Jump icon="👀" label="Команда" onClick={() => setTab("team")} />
+          )}
           {me.is_admin && (
             <Jump
               icon="🧪"
@@ -280,6 +367,12 @@ export default function HrProfileScreen() {
 
       {showFeedback && (
         <FeedbackScreen onClose={() => setShowFeedback(false)} />
+      )}
+
+      {showTraining && (
+        <div className="fixed inset-0 z-40 mx-auto flex w-full max-w-[560px] bg-tg-bg">
+          <TrainingScreen onClose={() => setShowTraining(false)} />
+        </div>
       )}
     </div>
   );

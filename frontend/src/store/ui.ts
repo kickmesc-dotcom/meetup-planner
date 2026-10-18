@@ -67,6 +67,7 @@ export type Tab =
   | "links"
   | "calendar"
   | "meetings"
+  | "team"
   | "profile"
   | "admin";
 
