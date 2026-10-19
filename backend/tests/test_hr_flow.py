@@ -31,6 +31,7 @@ from app.db.hr_models import (  # noqa: E402
     Department,
     Employee,
     Task,
+    TaskReminder,
 )
 from app.services import hr_feed, hr_pending, hr_reminders, hr_settings  # noqa: E402
 
@@ -155,6 +156,24 @@ def test_reminder_skips_expired_and_closed():
     assert not hr_reminders.reminder_due(_task(TASK_DONE, now + timedelta(minutes=5)), now, 60)
     # Без срока напоминать не о чем.
     assert not hr_reminders.reminder_due(_task(TASK_IN_PROGRESS, None), now, 60)
+
+
+def test_planned_reminder_respects_manual_move():
+    """«Передвинуть» в админке важнее расчёта планировщика."""
+    now = datetime(2026, 10, 16, 12, 0, tzinfo=UTC)
+    due = now + timedelta(hours=2)
+    moved = TaskReminder(task_id=1, remind_at=now + timedelta(minutes=20))
+    assert hr_reminders.planned_reminder_at(due, 60, moved) == now + timedelta(
+        minutes=20
+    )
+    assert hr_reminders.planned_reminder_at(due, 60) == due - timedelta(minutes=60)
+
+
+def test_planned_reminder_honours_skip_and_empty_due():
+    now = datetime(2026, 10, 16, 12, 0, tzinfo=UTC)
+    skipped = TaskReminder(task_id=1, skip=True)
+    assert hr_reminders.planned_reminder_at(now + timedelta(hours=1), 60, skipped) is None
+    assert hr_reminders.planned_reminder_at(None, 60) is None
 
 
 def test_unique_employees_keeps_order():

@@ -3,11 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import {
   cancelNotification,
+  fetchEmployeesPool,
   fetchNotificationsCenter,
   muteAllNotifications,
+  postponePendingNotification,
+  resetPendingNotification,
   sendNotification,
+  skipPendingNotification,
 } from "@/api/hrOps";
-import { fetchEmployeesPool } from "@/api/hrOps";
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
@@ -40,6 +43,8 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
 
   const [target, setTarget] = useState<number | null>(null);
   const [text, setText] = useState("");
+  /** По какому поручению сейчас выбираем, на сколько сдвинуть напоминание. */
+  const [moving, setMoving] = useState<number | null>(null);
 
   const refresh = () =>
     void qc.invalidateQueries({ queryKey: ["admin", "notifications"] });
@@ -55,6 +60,38 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
 
   const drop = useMutation({
     mutationFn: (id: number) => cancelNotification(id),
+    onSuccess: () => {
+      haptic("success");
+      refresh();
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+
+  const move = useMutation({
+    mutationFn: (input: { taskId: number; minutes: number }) =>
+      postponePendingNotification(input.taskId, input.minutes),
+    onSuccess: () => {
+      haptic("success");
+      setMoving(null);
+      refresh();
+    },
+    onError: (error) => {
+      setMoving(null);
+      void showAlert(humanizeApiError(error));
+    },
+  });
+
+  const skip = useMutation({
+    mutationFn: (taskId: number) => skipPendingNotification(taskId),
+    onSuccess: () => {
+      haptic("success");
+      refresh();
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+
+  const restore = useMutation({
+    mutationFn: (taskId: number) => resetPendingNotification(taskId),
     onSuccess: () => {
       haptic("success");
       refresh();
@@ -210,13 +247,120 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                     {item.kind === "deadline"
                       ? "напоминание о сроке"
                       : "вторая ступень"}
+                    {item.moved && (
+                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-0.5 text-[10px] text-tg-link">
+                        перенесено вручную
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 text-[11px] text-tg-hint">
                     {formatMoment(item.at)} · «{item.task_title}»
                   </div>
+                  {item.kind === "deadline" && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {moving === item.task_id ? (
+                        <>
+                          {[
+                            { label: "+15 мин", minutes: 15 },
+                            { label: "+1 ч", minutes: 60 },
+                            { label: "+3 ч", minutes: 180 },
+                          ].map((option) => (
+                            <button
+                              key={option.minutes}
+                              type="button"
+                              disabled={move.isPending}
+                              onClick={() => {
+                                haptic("selection");
+                                move.mutate({
+                                  taskId: item.task_id,
+                                  minutes: option.minutes,
+                                });
+                              }}
+                              className="min-h-8 rounded-full bg-tg-link/15 px-2.5 text-[11px] text-tg-link disabled:opacity-50"
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setMoving(null)}
+                            className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-hint"
+                          >
+                            Отмена
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={move.isPending || skip.isPending}
+                          onClick={() => {
+                            haptic("selection");
+                            setMoving(item.task_id);
+                          }}
+                          className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-text disabled:opacity-50"
+                        >
+                          Передвинуть
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        disabled={skip.isPending}
+                        onClick={() => {
+                          haptic("medium");
+                          void (async () => {
+                            const ok = await showConfirm(
+                              `Выключить напоминание по «${item.task_title}»?\n\nВернуть можно здесь же, в «Выключено».`,
+                            );
+                            if (ok) skip.mutate(item.task_id);
+                          })();
+                        }}
+                        className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-status-busy disabled:opacity-50"
+                      >
+                        Выключить
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {(q.data.disabled ?? []).length > 0 && (
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold text-tg-text">
+                  Выключено ({q.data.disabled.length})
+                </h2>
+                <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+                  {q.data.disabled.map((item) => (
+                    <div
+                      key={`off-${item.task_id}-${item.employee_id}`}
+                      className="flex items-start gap-2 px-3 py-2.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-tg-text">
+                          <span className="font-medium">{item.display_name}</span>{" "}
+                          · «{item.task_title}»
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-tg-hint">
+                          Напоминание о сроке не уйдёт. Вторая ступень после
+                          просрочки работает отдельно.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={restore.isPending}
+                        onClick={() => {
+                          haptic("selection");
+                          restore.mutate(item.task_id);
+                        }}
+                        className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-link disabled:opacity-50"
+                      >
+                        Вернуть
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="space-y-2">

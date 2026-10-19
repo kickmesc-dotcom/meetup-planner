@@ -76,6 +76,14 @@ class PendingNotificationOut(BaseModel):
     task_title: str
     employee_id: int
     display_name: str
+    moved: bool = False
+
+
+class DisabledReminderOut(BaseModel):
+    task_id: int
+    task_title: str
+    employee_id: int
+    display_name: str
 
 
 class NotificationsOut(BaseModel):
@@ -83,6 +91,17 @@ class NotificationsOut(BaseModel):
     pending: list[PendingNotificationOut]
     muted_until: datetime | None
     scheduled_enabled: bool
+    disabled: list[DisabledReminderOut] = []
+
+
+class PostponeIn(BaseModel):
+    """На сколько сдвинуть напоминание вперёд (5 минут … 7 дней)."""
+
+    minutes: int = Field(ge=5, le=7 * 24 * 60)
+
+
+class ReminderMovedOut(BaseModel):
+    at: datetime
 
 
 class NotificationSendIn(BaseModel):
@@ -204,7 +223,7 @@ async def notifications(
     employee: AupDep,
     limit: int = hr_admin_ops.NOTIFICATION_LIMIT,
 ) -> NotificationsOut:
-    items, pending, muted_until = await hr_admin_ops.notification_feed(
+    items, pending, muted_until, disabled = await hr_admin_ops.notification_feed(
         session, employee, limit=limit
     )
     return NotificationsOut(
@@ -212,7 +231,48 @@ async def notifications(
         pending=[PendingNotificationOut(**item.__dict__) for item in pending],
         muted_until=muted_until,
         scheduled_enabled=True,
+        disabled=[DisabledReminderOut(**item.__dict__) for item in disabled],
     )
+
+
+@router.post(
+    "/notifications/pending/{task_id}/postpone", response_model=ReminderMovedOut
+)
+async def postpone_pending_notification(
+    task_id: int, body: PostponeIn, session: SessionDep, employee: AupDep
+) -> ReminderMovedOut:
+    """Передвинуть напоминание о сроке, не меняя срок поручения."""
+    try:
+        at = await hr_admin_ops.postpone_pending(
+            session, employee, task_id, minutes=body.minutes
+        )
+    except hr_admin_ops.AdminOpsError as exc:
+        raise _ops_error(exc) from exc
+    return ReminderMovedOut(at=at)
+
+
+@router.post("/notifications/pending/{task_id}/skip")
+async def skip_pending_notification(
+    task_id: int, session: SessionDep, employee: AupDep
+) -> dict[str, bool]:
+    """Выключить напоминание о сроке по этому поручению."""
+    try:
+        await hr_admin_ops.skip_pending(session, employee, task_id)
+    except hr_admin_ops.AdminOpsError as exc:
+        raise _ops_error(exc) from exc
+    return {"skipped": True}
+
+
+@router.post("/notifications/pending/{task_id}/reset")
+async def reset_pending_notification(
+    task_id: int, session: SessionDep, employee: AupDep
+) -> dict[str, bool]:
+    """Вернуть напоминание к обычному расчёту планировщика."""
+    try:
+        await hr_admin_ops.reset_pending(session, employee, task_id)
+    except hr_admin_ops.AdminOpsError as exc:
+        raise _ops_error(exc) from exc
+    return {"reset": True}
 
 
 @router.post("/notifications/{notification_id}/cancel")

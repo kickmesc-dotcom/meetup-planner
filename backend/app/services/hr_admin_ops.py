@@ -45,6 +45,7 @@ from app.db.hr_models import (
     TaskEvent,
     TaskIssue,
     TaskPhoto,
+    TaskReminder,
 )
 from app.db.models import AppNotification, User
 from app.services import hr_access, hr_settings, hr_tasks
@@ -101,6 +102,18 @@ class PendingNotification:
     kind: str
     at: datetime
     text: str
+    task_id: int
+    task_title: str
+    employee_id: int
+    display_name: str
+    # Время сдвинули вручную (админка), а не посчитал планировщик.
+    moved: bool = False
+
+
+@dataclass(frozen=True)
+class DisabledReminder:
+    """Напоминание, выключенное вручную: его можно вернуть одной кнопкой."""
+
     task_id: int
     task_title: str
     employee_id: int
@@ -258,12 +271,18 @@ def _schedule_of(task: Task, before_minutes: int) -> datetime | None:
 
 async def notification_feed(
     session: AsyncSession, viewer: Employee, *, limit: int = NOTIFICATION_LIMIT
-) -> tuple[list[NotificationItem], list[PendingNotification], datetime | None]:
+) -> tuple[
+    list[NotificationItem],
+    list[PendingNotification],
+    datetime | None,
+    list[DisabledReminder],
+]:
     """Уже отправленные уведомления + те, что ещё сработают.
 
     Третье значение — до какого момента глушатся алерты в Telegram
     (`hr.notify.muted_until`): админка показывает это в одном месте с самими
-    уведомлениями, а не в отдельной настройке.
+    уведомлениями, а не в отдельной настройке. Четвёртое — напоминания,
+    выключенные вручную, чтобы их можно было вернуть.
     """
     dept_people: set[int] | None = None
     if not _is_all(viewer):
@@ -349,31 +368,65 @@ async def notification_feed(
     scoped_tasks = await _scoped_task_ids(session, viewer)
     if scoped_tasks is not None:
         if not scoped_tasks:
-            return items, [], await _muted_until(session)
+            return items, [], await _muted_until(session), []
         task_stmt = task_stmt.where(Task.id.in_(scoped_tasks))
 
+    task_rows = (await session.execute(task_stmt)).all()
+    rules: dict[int, TaskReminder] = {}
+    if task_rows:
+        for rule in (
+            await session.scalars(
+                select(TaskReminder).where(
+                    TaskReminder.task_id.in_([int(row[0]) for row in task_rows])
+                )
+            )
+        ).all():
+            rules[int(rule.task_id)] = rule
+
     pending: list[PendingNotification] = []
-    for task_id, title, due_at, _mode, _dept, employee_id, name in (
-        await session.execute(task_stmt)
-    ).all():
-        due = due_at
-        if due.tzinfo is None:
-            due = due.replace(tzinfo=UTC)
-        remind_at = due - timedelta(minutes=before_minutes)
-        escalation_at = due + timedelta(seconds=seconds)
-        if remind_at > now:
-            pending.append(
-                PendingNotification(
-                    kind="deadline",
-                    at=remind_at,
-                    text=f"Напоминание за {before_minutes} мин до срока",
+    disabled: list[DisabledReminder] = []
+    for task_id, title, due_at, _mode, _dept, employee_id, name in task_rows:
+        rule = rules.get(int(task_id))
+        if rule is not None and rule.skip:
+            disabled.append(
+                DisabledReminder(
                     task_id=int(task_id),
                     task_title=str(title),
                     employee_id=int(employee_id),
                     display_name=str(name),
                 )
             )
-        elif escalation_at > now:
+            continue
+        due = due_at
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=UTC)
+        moved = rule is not None and rule.remind_at is not None
+        remind_at = (
+            rule.remind_at
+            if moved and rule is not None and rule.remind_at is not None
+            else due - timedelta(minutes=before_minutes)
+        )
+        if remind_at.tzinfo is None:
+            remind_at = remind_at.replace(tzinfo=UTC)
+        escalation_at = due + timedelta(seconds=seconds)
+        if remind_at > now:
+            pending.append(
+                PendingNotification(
+                    kind="deadline",
+                    at=remind_at,
+                    text=(
+                        "Перенесённое напоминание о сроке"
+                        if moved
+                        else f"Напоминание за {before_minutes} мин до срока"
+                    ),
+                    task_id=int(task_id),
+                    task_title=str(title),
+                    employee_id=int(employee_id),
+                    display_name=str(name),
+                    moved=moved,
+                )
+            )
+        elif not moved and escalation_at > now:
             pending.append(
                 PendingNotification(
                     kind="escalation",
@@ -386,12 +439,98 @@ async def notification_feed(
                 )
             )
     pending.sort(key=lambda item: item.at)
-    return items, pending[:PENDING_LIMIT], await _muted_until(session)
+    return items, pending[:PENDING_LIMIT], await _muted_until(session), disabled
 
 
 async def _muted_until(session: AsyncSession) -> datetime | None:
     """До какого момента заглушены Telegram-алерты (или `None`)."""
     return await hr_settings.get_muted_until(session)
+
+
+async def _task_for_reminder(
+    session: AsyncSession, viewer: Employee, task_id: int
+) -> Task:
+    """Поручение в области видимости, по которому ещё можно напомнить."""
+    task = await session.get(Task, task_id)
+    if task is None or task.status in (TASK_DONE, TASK_FAILED):
+        raise AdminOpsError("task_not_found")
+    scoped = await _scoped_task_ids(session, viewer)
+    if scoped is not None and int(task_id) not in scoped:
+        raise AdminOpsError("task_not_found")
+    if task.due_at is not None:
+        due = task.due_at if task.due_at.tzinfo else task.due_at.replace(tzinfo=UTC)
+        if due <= _now():
+            raise AdminOpsError("task_overdue")
+    return task
+
+
+async def _rule_of(
+    session: AsyncSession, task_id: int, *, create: bool
+) -> TaskReminder | None:
+    rule = await session.scalar(
+        select(TaskReminder).where(TaskReminder.task_id == int(task_id))
+    )
+    if rule is None and create:
+        rule = TaskReminder(task_id=int(task_id), skip=False)
+        session.add(rule)
+        await session.flush()
+    return rule
+
+
+async def postpone_pending(
+    session: AsyncSession, viewer: Employee, task_id: int, *, minutes: int
+) -> datetime:
+    """Передвинуть напоминание по поручению, не меняя сам срок.
+
+    `minutes` — на сколько сдвинуть от текущего плана. Позже дедлайна не
+    переносим: напоминание после срока уже бесполезно. Если задача уже
+    просрочена, менять нечего — это работа эскалации, а не напоминания.
+    """
+    span = max(5, min(int(minutes), 7 * 24 * 60))
+    task = await _task_for_reminder(session, viewer, task_id)
+    settings = await hr_settings.snapshot(session)
+    before = int(settings.get("remind_before_minutes") or 60)
+    now = _now()
+    if task.due_at is None:
+        target = now + timedelta(minutes=span)
+    else:
+        due = task.due_at if task.due_at.tzinfo else task.due_at.replace(tzinfo=UTC)
+        default_at = due - timedelta(minutes=before)
+        target = max(now, default_at) + timedelta(minutes=span)
+        if target > due - timedelta(minutes=1):
+            raise AdminOpsError("too_late")
+    rule = await _rule_of(session, int(task_id), create=True)
+    assert rule is not None
+    rule.remind_at = target
+    rule.skip = False
+    rule.updated_by_id = int(viewer.id)
+    await session.commit()
+    return target
+
+
+async def skip_pending(session: AsyncSession, viewer: Employee, task_id: int) -> None:
+    """Выключить напоминание о сроке по поручению.
+
+    Вторая ступень — отдельный сценарий (срок уже прошёл), её этот выключатель
+    не трогает: иначе «убрать напоминание» незаметно отключало бы эскалацию
+    руководителям.
+    """
+    await _task_for_reminder(session, viewer, task_id)
+    rule = await _rule_of(session, int(task_id), create=True)
+    assert rule is not None
+    rule.skip = True
+    rule.remind_at = None
+    rule.updated_by_id = int(viewer.id)
+    await session.commit()
+
+
+async def reset_pending(session: AsyncSession, viewer: Employee, task_id: int) -> None:
+    """Вернуть напоминание к расчёту планировщика."""
+    await _task_for_reminder(session, viewer, task_id)
+    await session.execute(
+        delete(TaskReminder).where(TaskReminder.task_id == int(task_id))
+    )
+    await session.commit()
 
 
 async def cancel_notification(session: AsyncSession, notification_id: int) -> bool:
@@ -770,6 +909,7 @@ __all__ = [
     "FIRED_TRASH",
     "TRASH_DAYS",
     "AdminOpsError",
+    "DisabledReminder",
     "EmployeeCard",
     "JournalItem",
     "NotificationItem",
@@ -782,10 +922,13 @@ __all__ = [
     "force_done",
     "journal",
     "notification_feed",
+    "postpone_pending",
     "purge_due",
+    "reset_pending",
     "reset_progress",
     "restore",
     "send_notification",
+    "skip_pending",
     "trash_size",
     "update_profile",
 ]

@@ -35,6 +35,7 @@ from app.db.hr_models import (
     Employee,
     Task,
     TaskEvent,
+    TaskReminder,
 )
 from app.db.models import User
 from app.services import hr_alerts, hr_demo, hr_notify, hr_settings, hr_tasks
@@ -89,6 +90,24 @@ def unique_employees(employees: list[Employee]) -> list[Employee]:
 
 def _aware(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
+
+
+def planned_reminder_at(
+    due_at: datetime | None, before_minutes: int, override: TaskReminder | None = None
+) -> datetime | None:
+    """Когда по правилам должно уйти напоминание (с учётом ручной правки).
+
+    Админка может передвинуть напоминание (`remind_at`) или выключить его
+    (`skip`). Здесь одна точка правды: её используют и лента «запланировано»,
+    и сам планировщик — иначе экран обещал бы одно, а чат присылал другое.
+    """
+    if override is not None and override.skip:
+        return None
+    if override is not None and override.remind_at is not None:
+        return _aware(override.remind_at)
+    if due_at is None:
+        return None
+    return _aware(due_at) - timedelta(minutes=max(0, int(before_minutes)))
 
 
 def second_escalation_due(
@@ -342,7 +361,18 @@ async def send_deadline_reminders(
         .where(
             Task.due_at.is_not(None),
             Task.due_at > moment,
-            Task.due_at <= horizon,
+            # Обычное окно или ручной перенос, даже если он выходит за окно:
+            # иначе «передвинуть на час» тихо не сработало бы.
+            or_(
+                Task.due_at <= horizon,
+                Task.id.in_(
+                    select(TaskReminder.task_id).where(
+                        TaskReminder.remind_at.is_not(None),
+                        TaskReminder.remind_at <= horizon,
+                        TaskReminder.skip.is_(False),
+                    )
+                ),
+            ),
             Task.status.in_(tuple(hr_tasks.OPEN_STATUSES)),
             # Задачи сеанса проверки живут только до выхода: напоминать о них
             # настоящим людям нельзя, а тень всё равно не прочитает DM.
@@ -355,10 +385,23 @@ async def send_deadline_reminders(
         .limit(BATCH_LIMIT)
     )
     candidates = list(rows.all())
+    rules: dict[int, TaskReminder] = {}
+    if candidates:
+        for rule in (
+            await session.scalars(
+                select(TaskReminder).where(
+                    TaskReminder.task_id.in_([int(task.id) for task in candidates])
+                )
+            )
+        ).all():
+            rules[int(rule.task_id)] = rule
     already = await _reminded_task_ids(session, [t.id for t in candidates])
     sent: list[Task] = []
     for task in candidates:
         if task.id in already:
+            continue
+        planned = planned_reminder_at(task.due_at, window, rules.get(int(task.id)))
+        if planned is None or planned > moment:
             continue
         recipients = await hr_tasks.assignees(session, task)
         await _deliver(

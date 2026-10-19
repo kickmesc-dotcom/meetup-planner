@@ -635,6 +635,39 @@ class TaskEvent(Base):
     )
 
 
+class TaskReminder(Base):
+    """Ручная правка запланированного напоминания (админка).
+
+    Планировщик считает время напоминания сам: `due_at` минус настройка «за
+    сколько минут». Иногда это время нужно сдвинуть или выключить, не трогая
+    срок поручения — тогда здесь лежит правило, которое сильнее расчёта.
+
+    `skip` — по задаче не напоминать, `remind_at` — своё время отправки.
+    Одна строка на задачу; удаление строки возвращает расчёт по умолчанию.
+    """
+
+    __tablename__ = "task_reminders"
+    __table_args__ = (UniqueConstraint("task_id", name="uq_task_reminders_task"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    task_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    remind_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    skip: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    updated_by_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class TaskIssue(Base):
     """«Не успеваю / есть проблема» по поручению (п.4.5).
 

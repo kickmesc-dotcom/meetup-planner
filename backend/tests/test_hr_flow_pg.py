@@ -939,6 +939,40 @@ async def test_admin_ops_on_real_postgres(flow: Flow) -> None:
     assert planned, feed["pending"]
     assert planned[0]["kind"] == "deadline"
     assert planned[0]["at"] < due.isoformat(), "напоминание идёт до срока"
+    assert planned[0]["moved"] is False
+
+    # 2a. «Передвинуть»: время сдвигается, срок поручения не меняется.
+    was_at = datetime.fromisoformat(planned[0]["at"])
+    r = await client.post(
+        f"/api/admin/notifications/pending/{task_id}/postpone",
+        json={"minutes": 30},
+    )
+    assert r.status_code == 200, r.text
+    moved_at = datetime.fromisoformat(r.json()["at"])
+    assert moved_at > was_at
+
+    r = await client.get("/api/admin/notifications")
+    moved = [item for item in r.json()["pending"] if item["task_id"] == task_id]
+    assert moved and moved[0]["moved"] is True
+    assert datetime.fromisoformat(moved[0]["at"]) == moved_at
+
+    # 2b. «Выключить»: из «запланировано» уходит в «выключено» и возвращается.
+    r = await client.post(
+        f"/api/admin/notifications/pending/{task_id}/skip"
+    )
+    assert r.status_code == 200, r.text
+    r = await client.get("/api/admin/notifications")
+    assert not [item for item in r.json()["pending"] if item["task_id"] == task_id]
+    assert any(item["task_id"] == task_id for item in r.json()["disabled"])
+
+    r = await client.post(
+        f"/api/admin/notifications/pending/{task_id}/reset"
+    )
+    assert r.status_code == 200, r.text
+    r = await client.get("/api/admin/notifications")
+    back = [item for item in r.json()["pending"] if item["task_id"] == task_id]
+    assert back and back[0]["moved"] is False
+    assert not [item for item in r.json()["disabled"] if item["task_id"] == task_id]
 
     # 3. Журнал: человекопонятная строка создания поручения.
     r = await client.get("/api/admin/journal")

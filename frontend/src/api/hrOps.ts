@@ -46,6 +46,16 @@ export interface HrPendingNotification {
   task_title: string;
   employee_id: number;
   display_name: string;
+  /** Время сдвинули вручную, а не посчитал планировщик. */
+  moved: boolean;
+}
+
+/** Напоминание, выключенное вручную (можно вернуть). */
+export interface HrDisabledReminder {
+  task_id: number;
+  task_title: string;
+  employee_id: number;
+  display_name: string;
 }
 
 export interface HrNotificationsFeed {
@@ -54,6 +64,7 @@ export interface HrNotificationsFeed {
   /** До какого момента заглушены алерты в Telegram (null — не заглушено). */
   muted_until: string | null;
   scheduled_enabled: boolean;
+  disabled: HrDisabledReminder[];
 }
 
 export const fetchNotificationsCenter = () =>
@@ -68,6 +79,25 @@ export const sendNotification = (employeeId: number, text: string) =>
   api<HrNotificationItem>("/api/admin/notifications/send", {
     method: "POST",
     body: JSON.stringify({ employee_id: employeeId, text }),
+  });
+
+/** Передвинуть напоминание по поручению на `minutes` вперёд. */
+export const postponePendingNotification = (taskId: number, minutes: number) =>
+  api<{ at: string }>(`/api/admin/notifications/pending/${taskId}/postpone`, {
+    method: "POST",
+    body: JSON.stringify({ minutes }),
+  });
+
+/** Выключить напоминание по поручению (вторая ступень живёт отдельно). */
+export const skipPendingNotification = (taskId: number) =>
+  api<{ skipped: boolean }>(`/api/admin/notifications/pending/${taskId}/skip`, {
+    method: "POST",
+  });
+
+/** Вернуть напоминание к обычному расчёту планировщика. */
+export const resetPendingNotification = (taskId: number) =>
+  api<{ reset: boolean }>(`/api/admin/notifications/pending/${taskId}/reset`, {
+    method: "POST",
   });
 
 /** Мьют всех алертов: `hours = 0` снимает запрет. */
