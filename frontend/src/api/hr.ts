@@ -25,6 +25,8 @@ export interface HrEmployee {
   role: "employee" | "aup" | "admin";
   experience: "new" | "experienced" | null;
   onboarding_state: "new" | "department" | "experience" | "training" | "done";
+  /** «Учимся вместе»: обучение продолжается в рабочих сменах. */
+  learning_mode: boolean;
   is_aup: boolean;
   is_admin: boolean;
   /** Прописанный доступ в админку: переживает смену собственной роли. */
@@ -182,6 +184,8 @@ export const submitOnboarding = (body: {
   experience?: "new" | "experienced" | null;
   /** «Я уже запомнил»: закрыть знакомство без уроков. */
   finish?: boolean;
+  /** Выбор режима на следующие смены: «Повторим вместе» / обычный режим. */
+  learning_mode?: boolean;
 }) =>
   api<HrEmployee>("/api/me/onboarding", {
     method: "POST",
@@ -200,10 +204,21 @@ export interface HrTrainingLesson {
   summary: string;
   steps: string[];
   done: boolean;
+  /** Уровень программы: 1 — знакомство, 2 — задачи, 3 — самому. */
+  level: number;
+}
+
+export interface HrTrainingLevel {
+  level: number;
+  title: string;
+  hint: string;
+  done: number;
+  total: number;
 }
 
 export interface HrTraining {
   lessons: HrTrainingLesson[];
+  levels: HrTrainingLevel[];
   done: number;
   total: number;
   percent: number;

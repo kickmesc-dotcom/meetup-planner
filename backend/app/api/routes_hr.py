@@ -73,6 +73,9 @@ class EmployeeOut(BaseModel):
     role: str
     experience: str | None
     onboarding_state: str
+    # «Учимся вместе»: продолжать обучение в следующих сменах. Флаг не отменяет
+    # обязательные чек-листы и поручения — только обучающее сопровождение.
+    learning_mode: bool = False
     is_aup: bool
     is_admin: bool
     # Прописанный доступ в админку (шестёрка/владельцы). Переживает смену
@@ -89,6 +92,10 @@ class OnboardingIn(BaseModel):
     # «Я уже запомнил»: закрыть знакомство без прохождения уроков. Рабочие
     # чек-листы и поручения при этом остаются обязательными.
     finish: bool = False
+    # Выбор режима на следующие смены: «Повторим вместе» (true) — обучение
+    # продолжается в рабочем сценарии, «Я уже запомнил» (false) — обычный
+    # рабочий режим. Меняется и отдельно, из профиля.
+    learning_mode: bool | None = None
 
 
 class DepartmentOut(BaseModel):
@@ -236,6 +243,7 @@ async def _employee_out(
         role=employee.role,
         experience=employee.experience,
         onboarding_state=employee.onboarding_state,
+        learning_mode=bool(employee.learning_mode),
         is_aup=hr_access.is_aup(employee),
         is_admin=hr_access.is_admin(employee),
         is_staff=hr_access.is_staff(employee, user),
@@ -361,7 +369,12 @@ async def onboarding(
     Состояние двигаем вперёд: выбрал подразделение → ждём опыт; выбрал опыт →
     настройка завершена. Оба поля можно прислать одним запросом.
     """
-    if body.department_id is None and body.experience is None and not body.finish:
+    if (
+        body.department_id is None
+        and body.experience is None
+        and not body.finish
+        and body.learning_mode is None
+    ):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST, detail="nothing_to_update"
         )
@@ -385,6 +398,9 @@ async def onboarding(
     if employee.department_id is not None and employee.experience is not None:
         if employee.onboarding_state != ONBOARDING_DONE:
             employee.onboarding_state = ONBOARDING_TRAINING
+
+    if body.learning_mode is not None:
+        employee.learning_mode = body.learning_mode
 
     if body.finish:
         if employee.department_id is None or employee.experience is None:
@@ -411,12 +427,24 @@ class LessonOut(BaseModel):
     summary: str
     steps: list[str]
     done: bool
+    level: int
+
+
+class TrainingLevelOut(BaseModel):
+    """Уровень программы: сколько уроков и сколько из них пройдено."""
+
+    level: int
+    title: str
+    hint: str
+    done: int
+    total: int
 
 
 class TrainingOut(BaseModel):
     """Курс знакомства: уроки, прогресс и что делать дальше."""
 
     lessons: list[LessonOut]
+    levels: list[TrainingLevelOut]
     done: int
     total: int
     percent: int
@@ -442,8 +470,19 @@ def _training_out(
                 summary=lesson.summary,
                 steps=list(lesson.steps),
                 done=lesson.code in done,
+                level=lesson.level,
             )
             for lesson in hr_training.LESSONS
+        ],
+        levels=[
+            TrainingLevelOut(
+                level=item.level,
+                title=item.title,
+                hint=item.hint,
+                done=level_done,
+                total=level_total,
+            )
+            for item, level_done, level_total in hr_training.level_progress(done)
         ],
         done=len(progress.done),
         total=progress.total,
@@ -464,16 +503,16 @@ async def my_training(session: SessionDep, employee: EmployeeDep) -> TrainingOut
 async def complete_training_lesson(
     code: str, session: SessionDep, employee: EmployeeDep
 ) -> TrainingOut:
-    """Отметить урок пройденным. Последний урок закрывает онбординг.
+    """Отметить урок пройденным. Идемпотентно: повторный тап не даёт 409.
 
-    Идемпотентно: повторный тап возвращает тот же прогресс, а не 409.
+    Последний урок НЕ закрывает онбординг сам: сотрудник выбирает, продолжаем
+    ли учиться вместе или переходим в обычный режим (`/me/onboarding`). Иначе
+    экран выбора «Повторим вместе / Я уже запомнил» проскакивал бы незамеченным.
     """
     try:
         progress = await hr_training.complete(session, employee, code)
     except hr_training.TrainingError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    if progress.complete and employee.onboarding_state != ONBOARDING_DONE:
-        employee.onboarding_state = ONBOARDING_DONE
     await session.commit()
     await session.refresh(employee)
     return _training_out(progress, employee.onboarding_state)

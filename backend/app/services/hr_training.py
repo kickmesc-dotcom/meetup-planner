@@ -33,6 +33,11 @@ class Lesson:
     minutes: int
     summary: str
     steps: tuple[str, ...]
+    # Уровень погружения (1..3). Уроки не «галочки», а шаги программы
+    # адаптации: сначала базовое действие, потом рабочие задачи, потом
+    # самостоятельная работа. Уровень показывается в курсе и влияет только
+    # на порядок подачи — обязательность уроков от него не зависит.
+    level: int = 1
 
 
 # Порядок = порядок знакомства. Первые уроки про то, что человек делает
@@ -40,6 +45,7 @@ class Lesson:
 LESSONS: tuple[Lesson, ...] = (
     Lesson(
         code="shift_start",
+        level=1,
         title="Начать смену",
         emoji="🕒",
         minutes=1,
@@ -52,6 +58,7 @@ LESSONS: tuple[Lesson, ...] = (
     ),
     Lesson(
         code="photo_report",
+        level=1,
         title="Фотоотчёт",
         emoji="📷",
         minutes=1,
@@ -64,6 +71,7 @@ LESSONS: tuple[Lesson, ...] = (
     ),
     Lesson(
         code="my_tasks",
+        level=2,
         title="Мои задачи",
         emoji="✅",
         minutes=1,
@@ -76,6 +84,7 @@ LESSONS: tuple[Lesson, ...] = (
     ),
     Lesson(
         code="report_problem",
+        level=2,
         title="Сообщить о проблеме",
         emoji="⚠️",
         minutes=1,
@@ -88,6 +97,7 @@ LESSONS: tuple[Lesson, ...] = (
     ),
     Lesson(
         code="team_feed",
+        level=3,
         title="События смены",
         emoji="📋",
         minutes=1,
@@ -100,6 +110,7 @@ LESSONS: tuple[Lesson, ...] = (
     ),
     Lesson(
         code="links_standards",
+        level=3,
         title="Ссылки и стандарты",
         emoji="🔗",
         minutes=1,
@@ -111,6 +122,7 @@ LESSONS: tuple[Lesson, ...] = (
     ),
     Lesson(
         code="quiet_hours",
+        level=3,
         title="Уведомления и тихие часы",
         emoji="🔔",
         minutes=1,
@@ -128,6 +140,43 @@ MANDATORY_CODES: tuple[str, ...] = tuple(lesson.code for lesson in LESSONS)
 
 
 @dataclass(frozen=True)
+class TrainingLevel:
+    """Уровень программы: заголовок и что на нём осваивают."""
+
+    level: int
+    title: str
+    hint: str
+
+
+# Заголовки уровней правит администрация вместе с программой адаптации;
+# в коде они лежат рядом с уроками, чтобы не расходиться с содержанием.
+LEVELS: tuple[TrainingLevel, ...] = (
+    TrainingLevel(
+        level=1,
+        title="Знакомство",
+        hint="Базовые действия и главные правила.",
+    ),
+    TrainingLevel(
+        level=2,
+        title="Основные задачи",
+        hint="Рабочие инструменты и первые проверки.",
+    ),
+    TrainingLevel(
+        level=3,
+        title="Самостоятельная работа",
+        hint="Что делать в нестандартных ситуациях.",
+    ),
+)
+
+LEVEL_BY_NUMBER: dict[int, TrainingLevel] = {item.level: item for item in LEVELS}
+
+
+def level_of(code: str) -> int:
+    lesson = LESSON_BY_CODE.get(code)
+    return lesson.level if lesson else LEVELS[0].level
+
+
+@dataclass(frozen=True)
 class TrainingProgress:
     done: tuple[str, ...]
     total: int
@@ -136,6 +185,16 @@ class TrainingProgress:
 
     def status(self) -> str:
         return "done" if self.complete else "in_progress"
+
+
+def level_progress(codes: set[str]) -> tuple[tuple[TrainingLevel, int, int], ...]:
+    """(уровень, пройдено, всего) — по каждому уровню, в порядке программы."""
+    out: list[tuple[TrainingLevel, int, int]] = []
+    for level in LEVELS:
+        codes_here = [c for c in MANDATORY_CODES if level_of(c) == level.level]
+        done = sum(1 for c in codes_here if c in codes)
+        out.append((level, done, len(codes_here)))
+    return tuple(out)
 
 
 def progress_from_codes(codes: set[str]) -> TrainingProgress:

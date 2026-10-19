@@ -322,6 +322,12 @@ class Employee(Base):
     onboarding_state: Mapped[str] = mapped_column(
         String(16), nullable=False, default=ONBOARDING_NEW, server_default=ONBOARDING_NEW
     )
+    # «Учимся вместе»: сотрудник выбрал продолжать обучение в следующих сменах.
+    # Флаг ничего не блокирует — обязательные чек-листы, поручения и
+    # уведомления работают одинаково в обоих режимах.
+    learning_mode: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     hire_date: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"

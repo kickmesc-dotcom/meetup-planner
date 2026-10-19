@@ -313,7 +313,10 @@ async def collect_items(
             # Комментарий-маркер напоминания — служебный, в ленту не идёт.
             if comment in {"reminder_sent", "auto_overdue"}:
                 continue
-            if comment == "created":
+            # При создании в комментарии лежит режим (`created:employee`,
+            # `created:group`): без префикса событие «поручение создано» вообще
+            # выпадало из ленты.
+            if comment and comment.startswith("created"):
                 kind = KIND_TASK_CREATED
                 text = f"создал(а) поручение «{title}»"
             else:

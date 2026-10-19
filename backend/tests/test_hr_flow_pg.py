@@ -58,6 +58,7 @@ from app.api import deps  # noqa: E402
 from app.db.base import _normalize_url, _ssl_enabled_for  # noqa: E402
 from app.db.hr_models import (  # noqa: E402
     ONBOARDING_DONE,
+    ONBOARDING_TRAINING,
     ROLE_AUP,
     ROLE_EMPLOYEE,
     TASK_DONE,
@@ -327,6 +328,24 @@ async def flow() -> AsyncIterator[Flow]:
         await engine.dispose()
 
 
+async def _onboard_employee(flow: Flow) -> None:
+    """Провести сотрудника через онбординг: без отдела он вне смены.
+
+    Сид намеренно создаёт «пустого» новичка (его проверяет первый сценарий),
+    поэтому сценариям про отдел нужно сначала выполнить те же два шага, что и
+    человек в приложении, — иначе он не попадёт в групповое поручение и
+    проблема останется без отдела.
+    """
+    flow.act_as(flow.employee_user)
+    r = await flow.client.post(
+        "/api/me/onboarding",
+        json={"department_id": flow.department_id, "experience": "new"},
+    )
+    assert r.status_code == 200, r.text
+    r = await flow.client.post("/api/me/onboarding", json={"finish": True})
+    assert r.status_code == 200, r.text
+
+
 async def test_employee_full_path_on_real_postgres(flow: Flow) -> None:
     """Онбординг → чек-лист → поручение с фото → скрытая ачивка → лента."""
     client = flow.client
@@ -347,7 +366,25 @@ async def test_employee_full_path_on_real_postgres(flow: Flow) -> None:
     me = r.json()
     assert me["department_id"] == flow.department_id
     assert me["experience"] == "new"
+    # После опыта идёт знакомство с приложением: его закрывает сам сотрудник —
+    # либо уроками («Повторим вместе»), либо кнопкой «Я уже запомнил».
+    assert me["onboarding_state"] == ONBOARDING_TRAINING
+    assert me["learning_mode"] is False
+
+    # «Повторим вместе»: знакомство закрыто, обучение продолжаем в смене.
+    r = await client.post(
+        "/api/me/onboarding",
+        json={"finish": True, "learning_mode": True},
+    )
+    assert r.status_code == 200, r.text
+    me = r.json()
     assert me["onboarding_state"] == ONBOARDING_DONE
+    assert me["learning_mode"] is True
+
+    # Обратно в обычный режим можно вернуться из профиля — одним флагом.
+    r = await client.post("/api/me/onboarding", json={"learning_mode": False})
+    assert r.status_code == 200, r.text
+    assert r.json()["learning_mode"] is False
 
     # --- 3. Чек-лист смены: пункты подразделения, прогресс пустой ----------
     r = await client.get("/api/checklist")
@@ -495,6 +532,7 @@ async def test_employee_full_path_on_real_postgres(flow: Flow) -> None:
 async def test_issue_journal_on_real_postgres(flow: Flow) -> None:
     """Журнал проблем: карточка переживает смену, права — на сервере."""
     client = flow.client
+    await _onboard_employee(flow)
 
     # --- 1. Сотрудник заводит проблему, не привязанную к поручению ---------
     flow.act_as(flow.employee_user)
@@ -727,6 +765,7 @@ async def test_group_task_modes_on_real_postgres(flow: Flow) -> None:
     from app.services import hr_checklists
 
     client = flow.client
+    await _onboard_employee(flow)
     today = hr_checklists.local_today().isoformat()
 
     # --- 1. Руководитель выдаёт поручение на смену в режиме «каждый сам» ----
@@ -822,6 +861,9 @@ async def test_group_task_modes_on_real_postgres(flow: Flow) -> None:
     own = next(t for t in r.json() if t["id"] == parts_task["id"])
     assert own["my_part"] == "овощи", "исполнитель видит свою часть работы"
 
+    # Кривой режим проверяет автор поручения: у сотрудника ручка отклонится
+    # раньше — на правах (403), и до валидации `mode` дело не дойдёт.
+    flow.act_as(flow.manager_user)
     r = await client.post(
         "/api/admin/tasks",
         json={"title": "Кривой режим", "scope": "department",

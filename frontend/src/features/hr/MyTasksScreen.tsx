@@ -12,6 +12,7 @@ import {
   type TaskStatus,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import { fetchIssues } from "@/api/issues";
 import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -115,6 +116,13 @@ export default function MyTasksScreen() {
     queryFn: () => fetchChecklist(),
     staleTime: 30_000,
   });
+  // Значимые проблемы и напоминания — четвёртый пункт личной панели: открытые
+  // карточки журнала, которые сейчас висят (свои или по подразделению).
+  const issuesQ = useQuery({
+    queryKey: ["hr-issues", "panel"],
+    queryFn: () => fetchIssues({ statuses: ["open", "in_progress"], limit: 1 }),
+    staleTime: 60_000,
+  });
 
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["hr-tasks"] });
@@ -140,6 +148,9 @@ export default function MyTasksScreen() {
 
   const tasks = tasksQ.data ?? [];
   const checklist = checklistQ.data;
+  const issues = issuesQ.data?.summary;
+  const openIssues = issues?.total_open ?? 0;
+  const urgentIssues = issues?.attention ?? 0;
   const firstName = (meQ.data?.display_name ?? "")
     .replace("[BOT]", "")
     .trim()
@@ -285,6 +296,31 @@ export default function MyTasksScreen() {
               {checklist.status === "done" ? "Смена закрыта" : "Открыть чек-лист"}
             </button>
           </section>
+        )}
+
+        {/* Проблемы, которые сейчас висят: личная панель не должна говорить
+            «всё сделано», если рядом лежит просроченная карточка. */}
+        {openIssues > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic("selection");
+              setTab("issues");
+            }}
+            className="w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-left"
+          >
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium text-tg-text">🛠 Проблемы</span>
+              <span className="text-[11px] tabular-nums text-tg-hint">
+                открыто {openIssues}
+              </span>
+            </div>
+            <p className="mt-1 text-[11px] text-tg-hint">
+              {urgentIssues > 0
+                ? `${urgentIssues} ждут внимания: срок или повтор.`
+                : "Все в работе — открой журнал, если нужен статус."}
+            </p>
+          </button>
         )}
 
         {tasksQ.isLoading && (

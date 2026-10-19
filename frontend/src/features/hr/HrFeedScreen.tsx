@@ -56,6 +56,35 @@ const KIND_LABEL: Record<FeedKind, string> = {
   task_issue: "Проблема",
 };
 
+/** Заголовок дня для группировки: «Сегодня», «Вчера» или дата. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Без даты";
+  const today = new Date();
+  const startOf = (x: Date) =>
+    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diffDays = Math.round((startOf(today) - startOf(d)) / 86_400_000);
+  if (diffDays === 0) return "Сегодня";
+  if (diffDays === 1) return "Вчера";
+  return d.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    ...(d.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
+  });
+}
+
+/** Складывает отсортированные записи в группы по календарным дням. */
+function groupByDay(items: HrFeedItem[]): { label: string; items: HrFeedItem[] }[] {
+  const groups: { label: string; items: HrFeedItem[] }[] = [];
+  for (const item of items) {
+    const label = dayLabel(item.at);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(item);
+    else groups.push({ label, items: [item] });
+  }
+  return groups;
+}
+
 function fmtWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -81,6 +110,9 @@ export default function HrFeedScreen() {
   const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [kinds, setKinds] = useState<FeedKind[]>([]);
+  // Поиск по списку нужен, когда в предприятии десятки людей: прокручивать
+  // <select> в мини-аппе неудобно.
+  const [search, setSearch] = useState("");
 
   const filtersQ = useQuery({
     queryKey: ["hr-feed-filters"],
@@ -120,6 +152,18 @@ export default function HrFeedScreen() {
   const filters = filtersQ.data;
   const canFilter = feed?.can_filter === true;
   const items = feed?.items ?? [];
+  const needle = search.trim().toLowerCase();
+  // Выбранный человек остаётся в списке даже при поиске: иначе <select>
+  // показал бы пустое значение и фильтр выглядел бы сброшенным.
+  const visibleEmployees = (filters?.employees ?? []).filter(
+    (employee) =>
+      (departmentId === null || employee.department_id === departmentId) &&
+      (needle === "" ||
+        employee.id === employeeId ||
+        employee.display_name.toLowerCase().includes(needle) ||
+        (employee.position ?? "").toLowerCase().includes(needle) ||
+        (employee.badge ?? "").toLowerCase().includes(needle)),
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -168,6 +212,14 @@ export default function HrFeedScreen() {
                   </option>
                 ))}
               </select>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Поиск по имени или должности"
+                aria-label="Поиск сотрудника"
+                className="min-h-9 w-full rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text placeholder:text-tg-hint"
+              />
               <select
                 aria-label="Фильтр по сотруднику"
                 value={employeeId ?? ""}
@@ -178,12 +230,12 @@ export default function HrFeedScreen() {
                 className="min-h-9 min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text"
               >
                 <option value="">Все сотрудники</option>
-                {filters.employees
-                  .filter(
-                    (e) =>
-                      departmentId === null || e.department_id === departmentId,
-                  )
-                  .map((e) => (
+                {visibleEmployees.length === 0 && (
+                  <option value="" disabled>
+                    Никого не нашли
+                  </option>
+                )}
+                {visibleEmployees.map((e) => (
                     <option key={e.id} value={e.id}>
                       {e.display_name}
                       {(e.position ?? e.badge)
@@ -253,7 +305,7 @@ export default function HrFeedScreen() {
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {feedQ.isLoading && <ListSkeleton rows={8} />}
 
         {!feedQ.isLoading && items.length === 0 && (
@@ -270,15 +322,24 @@ export default function HrFeedScreen() {
           </div>
         )}
 
-        {items.map((item, i) => (
-          <FeedRow
-            key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}
-            item={item}
-            departmentName={
-              filters?.departments.find((d) => d.id === item.department_id)?.name ??
-              null
-            }
-          />
+        {groupByDay(items).map((group) => (
+          <section key={group.label}>
+            <h2 className="sticky top-0 z-10 -mx-4 bg-tg-bg/95 px-4 py-1 text-[11px] font-medium text-tg-hint backdrop-blur">
+              {group.label}
+            </h2>
+            <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+              {group.items.map((item, i) => (
+                <FeedRow
+                  key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}
+                  item={item}
+                  departmentName={
+                    filters?.departments.find((d) => d.id === item.department_id)
+                      ?.name ?? null
+                  }
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>
@@ -293,7 +354,7 @@ function FeedRow({
   departmentName: string | null;
 }) {
   return (
-    <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <article className="px-3 py-2.5">
       <div className="flex items-start gap-2">
         <span className="text-base" aria-hidden>
           {KIND_ICON[item.kind]}

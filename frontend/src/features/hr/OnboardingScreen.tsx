@@ -59,8 +59,11 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
     },
   });
 
+  // «Повторим вместе» (true) — знакомство закрыто, обучение продолжается в
+  // рабочих сменах; «Я уже запомнил» (false) — обычный рабочий режим.
   const finish = useMutation({
-    mutationFn: () => submitOnboarding({ finish: true }),
+    mutationFn: (learningMode: boolean) =>
+      submitOnboarding({ finish: true, learning_mode: learningMode }),
     onSuccess: (data) => {
       haptic("success");
       qc.setQueryData(["hr-employee"], data);
@@ -230,23 +233,29 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
               </p>
             </div>
             <div className="min-h-[320px] flex-1">
-              <TrainingScreen />
+              <TrainingScreen
+                onFinish={(learningMode) => finish.mutate(learningMode)}
+                finishing={finish.isPending}
+              />
             </div>
-            <div className="space-y-2 px-5 pt-3">
-              <button
-                type="button"
-                disabled={finish.isPending}
-                onClick={() => finish.mutate()}
-                className="min-h-12 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-              >
-                {trainingDone ? "Начать смену" : "Я уже запомнил"}
-              </button>
-              {!trainingDone && (
+            {/* Кто не хочет уроков сейчас — закрывает знакомство кнопкой; кто
+                прошёл курс — выбирает режим в самом курсе («Повторим вместе» /
+                «Я уже запомнил»), поэтому вторая кнопка не дублируется. */}
+            {!trainingDone && (
+              <div className="space-y-2 px-5 pt-3">
+                <button
+                  type="button"
+                  disabled={finish.isPending}
+                  onClick={() => finish.mutate(false)}
+                  className="min-h-12 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                >
+                  Я уже запомнил
+                </button>
                 <p className="pb-2 text-center text-[11px] text-tg-hint">
                   Обязательные чек-листы и задачи это не отменяет.
                 </p>
-              )}
-            </div>
+              </div>
+            )}
           </section>
         )}
       </div>

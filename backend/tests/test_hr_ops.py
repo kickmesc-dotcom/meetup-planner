@@ -141,6 +141,27 @@ def test_training_catalog_has_app_usage_lessons():
         assert lesson.steps and lesson.summary
 
 
+def test_training_lessons_are_split_into_levels():
+    """Уровни (MEGAPROMT3, п. 4.1) — структура, а не просто счётчик галочек."""
+    numbers = [item.level for item in hr_training.LEVELS]
+    assert numbers == [1, 2, 3]
+    assert all(item.title and item.hint for item in hr_training.LEVELS)
+    # У каждого урока есть уровень из каталога, и на каждом уровне есть уроки.
+    for lesson in hr_training.LESSONS:
+        assert lesson.level in numbers
+    per_level = hr_training.level_progress(set())
+    assert len(per_level) == len(hr_training.LEVELS)
+    assert all(total > 0 for _item, _done, total in per_level)
+    assert all(done == 0 for _item, done, _total in per_level)
+
+    # Прогресс считается по уровням, а не одним процентом.
+    first_two = {lesson.code for lesson in hr_training.LESSONS if lesson.level <= 2}
+    per_level = hr_training.level_progress(first_two)
+    assert per_level[0][1] == per_level[0][2] > 0
+    assert per_level[2][1] == 0
+    assert sum(done for _item, done, _total in per_level) == len(first_two)
+
+
 # --- Доступ ---------------------------------------------------------------
 
 

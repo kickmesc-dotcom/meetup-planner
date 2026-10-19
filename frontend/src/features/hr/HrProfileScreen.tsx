@@ -100,6 +100,18 @@ export default function HrProfileScreen() {
     onError: (error) => void showAlert(humanizeApiError(error)),
   });
 
+  // Переключатель режима после первого курса: «учимся вместе» или обычный
+  // рабочий режим. Включить обучение обратно можно в любой момент — оно
+  // сопровождение, а не замена обязанностей.
+  const learningMode = useMutation({
+    mutationFn: (enabled: boolean) => submitOnboarding({ learning_mode: enabled }),
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["hr-employee"], data);
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+
   const save = useMutation({
     mutationFn: (body: {
       department_id?: number | null;
@@ -191,9 +203,25 @@ export default function HrProfileScreen() {
           </span>
         </div>
         <p className="mt-1 text-[11px] text-tg-hint">
-          Семь коротких уроков: чек-лист, фотоотчёт, проблемы, уведомления.
-          Проходить можно в любом порядке.
+          Три уровня от знакомства до самостоятельной работы — по одному действию
+          на урок.
         </p>
+        <button
+          type="button"
+          disabled={learningMode.isPending}
+          aria-pressed={me.learning_mode}
+          onClick={() => learningMode.mutate(!me.learning_mode)}
+          className={[
+            "mt-2 min-h-9 w-full rounded-lg px-3 text-xs transition-colors disabled:opacity-50",
+            me.learning_mode
+              ? "bg-tg-button text-tg-button-text"
+              : "bg-tg-bg/60 text-tg-text",
+          ].join(" ")}
+        >
+          {me.learning_mode
+            ? "Учимся вместе · выключить"
+            : "Продолжаем учиться вместе"}
+        </button>
         <button
           type="button"
           onClick={() => {

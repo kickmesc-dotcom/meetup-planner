@@ -429,9 +429,18 @@ async def _grouped(
     since: date | None,
     until: date | None,
 ) -> dict[int, int]:
-    """`employee_id -> count` за окно — по одной строке на человека."""
+    """`employee_id -> count` за окно — по одной строке на человека.
+
+    Событие может быть без автора (`by_employee_id is NULL`, например
+    системное закрытие по сроку). Такая строка не принадлежит никому и в
+    рейтинг не попадает — раньше `int(None)` роняло весь `/api/me/kpi`.
+    """
     rows = await session.execute(_window(stmt, column, since, until))
-    return {int(emp_id): int(cnt) for emp_id, cnt in rows.all()}
+    return {
+        int(emp_id): int(cnt)
+        for emp_id, cnt in rows.all()
+        if emp_id is not None
+    }
 
 
 async def board(

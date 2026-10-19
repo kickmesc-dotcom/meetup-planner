@@ -16,8 +16,21 @@ import { haptic, showAlert } from "@/tg/webapp";
  *
  * Один экран = одно действие: раскрыл урок, прочитал три шага, нажал «Понятно».
  * Прогресс хранит сервер, поэтому курс можно прервать и вернуться.
+ *
+ * Уроки сгруппированы по уровням погружения (знакомство → основные задачи →
+ * самостоятельная работа): новичок видит, что освоил и что впереди, вместо
+ * плоского списка из семи пунктов.
  */
-export default function TrainingScreen({ onClose }: { onClose?: () => void }) {
+export default function TrainingScreen({
+  onClose,
+  onFinish,
+  finishing = false,
+}: {
+  onClose?: () => void;
+  /** Выбор режима после первого этапа: «Повторим вместе» / «Я уже запомнил». */
+  onFinish?: (learningMode: boolean) => void;
+  finishing?: boolean;
+}) {
   const qc = useQueryClient();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const training = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
@@ -27,25 +40,38 @@ export default function TrainingScreen({ onClose }: { onClose?: () => void }) {
     onSuccess: (data: HrTraining) => {
       haptic("success");
       qc.setQueryData(["hr-training"], data);
-      // Последний урок закрывает онбординг — обновляем профиль, чтобы
-      // приглашение «закончим знакомство» исчезло без перезагрузки.
+      // Последний урок НЕ закрывает онбординг: сотрудник сам выбирает, учимся
+      // дальше вместе или переходим в обычный режим (см. блок ниже).
       void qc.invalidateQueries({ queryKey: ["hr-employee"] });
       if (data.complete) {
-        void showAlert("Курс пройден. Смена начнётся с чек-листа.");
+        void showAlert("Курс пройден. Осталось выбрать, как продолжим.");
       }
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
   });
 
   const lessons = training.data?.lessons ?? [];
-  const sorted = useMemo(
-    () => [...lessons].sort((a, b) => Number(a.done) - Number(b.done)),
-    [lessons],
-  );
+  const levels = training.data?.levels ?? [];
+
+  // Внутри уровня незакрытые уроки идут первыми: следующий шаг всегда сверху.
+  const byLevel = useMemo(() => {
+    const groups = new Map<number, HrTrainingLesson[]>();
+    for (const lesson of lessons) {
+      const list = groups.get(lesson.level) ?? [];
+      list.push(lesson);
+      groups.set(lesson.level, list);
+    }
+    for (const list of groups.values()) {
+      list.sort((a, b) => Number(a.done) - Number(b.done));
+    }
+    return groups;
+  }, [lessons]);
 
   if (training.isError) {
     return <ErrorState error={training.error} onRetry={() => void training.refetch()} />;
   }
+
+  const done = training.data?.complete === true;
 
   return (
     <div className="flex h-full flex-col">
@@ -66,7 +92,7 @@ export default function TrainingScreen({ onClose }: { onClose?: () => void }) {
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">🎓 Обучение</div>
           <div className="text-[11px] text-tg-hint">
-            Семь коротких уроков — по одному действию на экран.
+            Три уровня, по одному действию на экран.
           </div>
         </div>
         {training.data && (
@@ -86,6 +112,44 @@ export default function TrainingScreen({ onClose }: { onClose?: () => void }) {
 
         {training.data && (
           <>
+            {done && onFinish && (
+              <section className="rounded-xl bg-status-free/10 p-3">
+                <div className="text-sm font-semibold text-tg-text">
+                  Отлично, первый этап пройден.
+                </div>
+                <p className="mt-1 text-xs text-tg-hint">
+                  Теперь решим, как продолжим в следующую смену.
+                </p>
+                <div className="mt-3 space-y-2">
+                  <button
+                    type="button"
+                    disabled={finishing}
+                    onClick={() => {
+                      haptic("medium");
+                      onFinish(true);
+                    }}
+                    className="min-h-11 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                  >
+                    Повторим вместе
+                  </button>
+                  <button
+                    type="button"
+                    disabled={finishing}
+                    onClick={() => {
+                      haptic("light");
+                      onFinish(false);
+                    }}
+                    className="min-h-11 w-full rounded-xl bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
+                  >
+                    Я уже запомнил
+                  </button>
+                </div>
+                <p className="mt-2 text-[11px] text-tg-hint">
+                  Обязательные чек-листы и поручения остаются в любом режиме.
+                </p>
+              </section>
+            )}
+
             <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-tg-bg/60">
                 <div
@@ -98,24 +162,37 @@ export default function TrainingScreen({ onClose }: { onClose?: () => void }) {
                 />
               </div>
               <div className="mt-2 text-[11px] text-tg-hint">
-                {training.data.complete
+                {done
                   ? "Готово. Можно возвращаться к смене."
                   : `Осталось ${training.data.total - training.data.done}. Уроки можно проходить в любом порядке.`}
               </div>
             </div>
 
-            {sorted.map((lesson) => (
-              <LessonCard
-                key={lesson.code}
-                lesson={lesson}
-                open={openCode === lesson.code}
-                onToggle={() => {
-                  haptic("selection");
-                  setOpenCode((cur) => (cur === lesson.code ? null : lesson.code));
-                }}
-                busy={complete.isPending}
-                onComplete={() => complete.mutate(lesson.code)}
-              />
+            {levels.map((level) => (
+              <section key={level.level} className="space-y-2">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="text-sm font-semibold text-tg-text">
+                    Уровень {level.level} · {level.title}
+                  </div>
+                  <span className="shrink-0 text-[11px] tabular-nums text-tg-hint">
+                    {level.done}/{level.total}
+                  </span>
+                </div>
+                <p className="text-[11px] text-tg-hint">{level.hint}</p>
+                {(byLevel.get(level.level) ?? []).map((lesson) => (
+                  <LessonCard
+                    key={lesson.code}
+                    lesson={lesson}
+                    open={openCode === lesson.code}
+                    onToggle={() => {
+                      haptic("selection");
+                      setOpenCode((cur) => (cur === lesson.code ? null : lesson.code));
+                    }}
+                    busy={complete.isPending}
+                    onComplete={() => complete.mutate(lesson.code)}
+                  />
+                ))}
+              </section>
             ))}
           </>
         )}

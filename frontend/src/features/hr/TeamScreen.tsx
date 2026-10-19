@@ -47,12 +47,25 @@ export default function TeamScreen({
     refetchInterval: 60_000,
   });
   const [showSettings, setShowSettings] = useState(false);
+  // Поиск по фамилии, должности или отделу: в смену важно быстро найти
+  // конкретного человека, а не листать весь штат.
+  const [search, setSearch] = useState("");
 
   if (dashboard.isError) {
     return (
       <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />
     );
   }
+
+  const needle = search.trim().toLowerCase();
+  const employees = (dashboard.data?.employees ?? []).filter(
+    (employee) =>
+      needle === "" ||
+      employee.display_name.toLowerCase().includes(needle) ||
+      (employee.position ?? "").toLowerCase().includes(needle) ||
+      (employee.badge ?? "").toLowerCase().includes(needle) ||
+      (employee.department_name ?? "").toLowerCase().includes(needle),
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -159,11 +172,25 @@ export default function TeamScreen({
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-tg-text">Сотрудники</h2>
                 <span className="text-[11px] tabular-nums text-tg-hint">
-                  {dashboard.data.employees.length}
+                  {employees.length}
+                  {needle ? ` из ${dashboard.data.employees.length}` : ""}
                 </span>
               </div>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Найти человека или должность"
+                aria-label="Поиск по сотрудникам"
+                className="mt-2 min-h-9 w-full rounded-lg bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+              />
               <div className="mt-2 space-y-1.5">
-                {dashboard.data.employees.map((employee) => (
+                {employees.length === 0 && (
+                  <div className="text-xs text-tg-hint">
+                    {needle ? "Никого не нашли." : "Сотрудников пока нет."}
+                  </div>
+                )}
+                {employees.map((employee) => (
                   <EmployeeRow key={employee.employee_id} employee={employee} />
                 ))}
               </div>
