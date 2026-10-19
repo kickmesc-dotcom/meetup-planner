@@ -33,7 +33,14 @@ from app.db.hr_models import (
     TaskIssue,
 )
 from app.db.models import User
-from app.services import hr_access, hr_demo, hr_settings, hr_simulation, hr_tasks
+from app.services import (
+    hr_access,
+    hr_admin_ops,
+    hr_demo,
+    hr_settings,
+    hr_simulation,
+    hr_tasks,
+)
 
 STATUS_DONE = "done"
 STATUS_LATE = "late"
@@ -428,26 +435,39 @@ async def build_dashboard(
                 )
             )
 
+    # «Последние действия» — про людей, а не про планировщик: системные строки
+    # (`auto_overdue`, `reminder_sent`) живут в админском журнале
+    # (`services/hr_admin_ops.journal`), здесь от них только шум.
     activity_rows = (
         await session.execute(
-            select(TaskEvent, User.display_name)
+            select(TaskEvent, User.display_name, Task.title)
+            .join(Task, Task.id == TaskEvent.task_id)
             .outerjoin(Employee, Employee.id == TaskEvent.by_employee_id)
             .outerjoin(User, User.id == Employee.user_id)
-            .order_by(TaskEvent.at.desc())
-            .limit(12)
+            .order_by(TaskEvent.at.desc(), TaskEvent.id.desc())
+            .limit(30)
         )
     ).all()
-    activity = [
-        ActivityItem(
-            at=event.at,
-            kind=event.to_status,
-            text=event.comment or f"статус → {event.to_status}",
-            employee_id=int(event.by_employee_id) if event.by_employee_id else None,
-            display_name=name,
+    activity: list[ActivityItem] = []
+    for event, name, title in activity_rows:
+        if event.by_employee_id is None:
+            continue
+        if int(event.by_employee_id) not in employee_by_id:
+            continue
+        text, is_system = hr_admin_ops.action_text(event.to_status, event.comment)
+        if is_system:
+            continue
+        activity.append(
+            ActivityItem(
+                at=event.at,
+                kind=event.to_status,
+                text=f"{text}: «{title}»",
+                employee_id=int(event.by_employee_id),
+                display_name=name,
+            )
         )
-        for event, name in activity_rows
-        if event.by_employee_id is None or int(event.by_employee_id) in employee_by_id
-    ]
+        if len(activity) >= 12:
+            break
 
     return Dashboard(
         work_date=today,

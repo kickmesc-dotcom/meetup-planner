@@ -332,6 +332,15 @@ class Employee(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Увольнение (`services/hr_admin_ops`): с этого момента доступ в мини-апп и
+    # к боту закрыт (`hr_access.ensure_employee`). Данные при этом НЕ удаляются —
+    # руководитель выбирает: корзина на 30 дней или удаление сразу.
+    fired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Когда корзина истечёт: планировщик сносит такого сотрудника сам.
+    purge_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # `trash` — лежит в корзине, `purge` — данные уже удалены (остаётся только
+    # строка-надгробие, чтобы доступ не восстановился случайно).
+    fired_mode: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

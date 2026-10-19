@@ -31,6 +31,9 @@ import GameScreen from "./GameScreen";
 import AllFeaturesScreen from "./AllFeaturesScreen";
 import DeliveryScreen from "./DeliveryScreen";
 import KpiScreen from "./KpiScreen";
+import JournalScreen from "./JournalScreen";
+import NotificationsScreen from "./NotificationsScreen";
+import EmployeesScreen from "./EmployeesScreen";
 import { useUI } from "@/store/ui";
 
 type Section =
@@ -56,6 +59,9 @@ type Section =
   | "all-features"
   | "delivery"
   | "kpi"
+  | "journal"
+  | "notifications"
+  | "employees"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -81,6 +87,9 @@ const VALID_SECTIONS: Section[] = [
   "all-features",
   "delivery",
   "kpi",
+  "journal",
+  "notifications",
+  "employees",
   "space-restart",
 ];
 
@@ -157,6 +166,11 @@ export default function AdminScreen({ users }: Props) {
   if (section === "all-features") return <AllFeaturesScreen onBack={back} />;
   if (section === "delivery") return <DeliveryScreen onBack={back} />;
   if (section === "kpi") return <KpiScreen onBack={back} />;
+  if (section === "journal") return <JournalScreen onBack={back} />;
+  if (section === "notifications") {
+    return <NotificationsScreen onBack={back} />;
+  }
+  if (section === "employees") return <EmployeesScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");
@@ -184,6 +198,30 @@ export default function AdminScreen({ users }: Props) {
           title="Вид ленты"
           subtitle="Компактный (миниатюры участников) / классический"
           onClick={() => select("feed-settings")}
+        />
+      </SectionGroup>
+
+      {/* Управление сменой живёт рядом: люди, их уведомления и журнал событий.
+          Раньше системные строки планировщика торчали в кабинете руководителя,
+          а уволить человека было нечем. */}
+      <SectionGroup icon="🧑🍳" title="Смена и люди">
+        <Card
+          icon="🗂"
+          title="Журнал событий"
+          subtitle="Поручения человеческим языком, включая автоматику"
+          onClick={() => select("journal")}
+        />
+        <Card
+          icon="🔔"
+          title="Уведомления сотрудников"
+          subtitle="Что ушло и что запланировано; мьют всех алертов"
+          onClick={() => select("notifications")}
+        />
+        <Card
+          icon="🧑🍳"
+          title="Пул сотрудников"
+          subtitle="Имя, должность, прогресс, увольнение и корзина"
+          onClick={() => select("employees")}
         />
       </SectionGroup>
 

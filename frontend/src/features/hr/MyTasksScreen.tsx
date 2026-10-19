@@ -223,7 +223,7 @@ export default function MyTasksScreen() {
               aria-label="Передача смены"
               title="Передача смены"
             >
-              🌙
+              📤
             </button>
           </span>
         </div>

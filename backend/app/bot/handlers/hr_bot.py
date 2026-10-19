@@ -98,7 +98,14 @@ async def _load(
     user = await session.scalar(select(User).where(User.telegram_id == telegram_id))
     if user is None:
         return None
-    employee = await hr_access.ensure_employee(session, user)
+    try:
+        employee = await hr_access.ensure_employee(session, user)
+    except hr_access.HrAccessError:
+        # Уволенный сотрудник: бот тоже закрыт, пока не вернут из корзины.
+        # Возвращаем `None` — вызывающие уже умеют объяснить, что доступа нет.
+        log.info("hr.bot_access_denied", telegram_id=telegram_id)
+        await session.rollback()
+        return None
     await session.commit()
     return user, employee
 

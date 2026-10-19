@@ -74,6 +74,10 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
     """
     employee = await get_employee(session, user.id)
     if employee is not None:
+        # Уволенный не работает в приложении и не пишет боту: доступ закрыт,
+        # пока его не вернут из корзины (`services/hr_admin_ops.restore`).
+        if employee.fired_at is not None:
+            raise HrAccessError("employee_fired")
         # Админ из env должен получить права, даже если строка создана раньше
         # (человека добавили в ADMIN_TG_IDS уже после первого захода). Но
         # `role_locked` сильнее env: если роль меняли руками (в том числе
@@ -101,6 +105,11 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
 
 def is_employee(employee: Employee | None) -> bool:
     return employee is not None
+
+
+def is_fired(employee: Employee | None) -> bool:
+    """Уволен ли сотрудник (данные при этом могут ещё лежать в корзине)."""
+    return employee is not None and employee.fired_at is not None
 
 
 def is_aup(employee: Employee | None) -> bool:

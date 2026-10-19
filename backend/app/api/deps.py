@@ -181,7 +181,14 @@ async def current_employee(
             hr_simulation.deactivate(token)
         return
 
-    yield await hr_access.ensure_employee(session, user)
+    try:
+        yield await hr_access.ensure_employee(session, user)
+    except hr_access.HrAccessError as exc:
+        # Уволенный сотрудник: доступ закрыт, пока его не вернут из корзины.
+        # Отдаём 403 с кодом, чтобы приложение показало человеческий текст.
+        if str(exc) == "employee_fired":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+        raise
 
 
 EmployeeDep = Annotated[Employee, Depends(current_employee)]

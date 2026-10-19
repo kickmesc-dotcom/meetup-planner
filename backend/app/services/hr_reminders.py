@@ -716,8 +716,14 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
     reminders = 0
     escalated = 0
     escalated_second = 0
+    purged = 0
     try:
         async with sm() as session:
+            # Корзина уволенных: через 30 дней данные сносим сами, чтобы
+            # обещание «автоудалится» не зависело от чьей-то памяти.
+            from app.services import hr_admin_ops
+
+            purged = await hr_admin_ops.purge_due(session, now=now)
             if await hr_settings.get_reminders_enabled(session):
                 reminders = len(
                     await send_deadline_reminders(session, bot=bot, now=now)
@@ -731,15 +737,17 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
                 )
     except Exception as exc:  # noqa: BLE001 — job не имеет права падать
         log.warning("hr.tick_failed", error=str(exc))
-    if reminders or escalated or escalated_second:
+    if reminders or escalated or escalated_second or purged:
         log.info(
             "hr.tick_done",
             reminders=reminders,
             escalated=escalated,
             escalated_second=escalated_second,
+            purged=purged,
         )
     return {
         "reminders": reminders,
         "escalated": escalated,
         "escalated_second": escalated_second,
+        "purged": purged,
     }

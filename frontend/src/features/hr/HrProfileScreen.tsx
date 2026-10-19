@@ -440,8 +440,10 @@ export default function HrProfileScreen() {
             label="Журнал проблем"
             onClick={() => setTab("issues")}
           />
+          {/* Луна в приложении означает тему — передача смены помечена отправкой,
+              чтобы два разных действия не выглядели одним и тем же. */}
           <Jump
-            icon="🌙"
+            icon="📤"
             label="Передача смены"
             onClick={() => setTab("handovers")}
           />

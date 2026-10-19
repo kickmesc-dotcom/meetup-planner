@@ -103,7 +103,7 @@ export default function HandoversScreen() {
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-semibold text-tg-text">
-              🌙 Передача смены
+              📤 Передача смены
             </h1>
             <p className="mt-0.5 text-xs text-tg-hint">
               {summary
@@ -161,7 +161,7 @@ export default function HandoversScreen() {
         {!handoversQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
             <div className="text-4xl" aria-hidden>
-              🌙
+              📤
             </div>
             <div className="mt-2 text-sm font-medium text-tg-text">
               Передач пока нет

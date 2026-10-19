@@ -142,7 +142,11 @@ export default function TeamScreen({
                       className="flex gap-2 text-xs text-tg-text"
                     >
                       <span aria-hidden>
-                        {item.kind === "overdue" ? "⏰" : item.kind === "issue" ? "⚠️" : "🌙"}
+                        {item.kind === "overdue"
+                          ? "⏰"
+                          : item.kind === "issue"
+                            ? "⚠️"
+                            : "📤"}
                       </span>
                       <span className="min-w-0">{item.text}</span>
                     </li>
@@ -528,7 +532,13 @@ function DangerZone() {
       const preview = await fetchResetPreview();
       const counts = preview.counts;
       if (!counts.tasks && !counts.issues) {
-        await showAlert("Сбрасывать нечего — всё уже закрыто.");
+        // Объясняем, почему нечего: обычно открытое висит в тестовом пуле,
+        // а его эта кнопка не трогает (см. `hr_reset`).
+        await showAlert(
+          ["Сбрасывать нечего — всё уже закрыто.", ...preview.notes].join(
+            "\n\n",
+          ),
+        );
         return;
       }
       const first = await showConfirm(

@@ -25,6 +25,7 @@ from app.api import (
     routes_handovers,
     routes_hr,
     routes_hr_admin,
+    routes_hr_ops_admin,
     routes_issues,
     routes_meetings,
     routes_meta,
@@ -286,6 +287,8 @@ def create_app() -> FastAPI:
     # Режим проверки: теневой профиль, вход/выход, чистая история.
     app.include_router(routes_simulation.router, prefix="/api/admin")
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
+    # Журнал событий, центр уведомлений и пул сотрудников (увольнение/корзина).
+    app.include_router(routes_hr_ops_admin.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие
     # возможности есть). Регистрируется последним, поэтому его собственный

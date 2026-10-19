@@ -45,7 +45,7 @@ os.environ.setdefault("ADMIN_TG_IDS", "")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/db")
 
 import httpx  # noqa: E402
-from sqlalchemy import text  # noqa: E402
+from sqlalchemy import select, text  # noqa: E402
 from sqlalchemy.ext.asyncio import (  # noqa: E402
     AsyncSession,
     async_sessionmaker,
@@ -528,6 +528,21 @@ async def test_employee_full_path_on_real_postgres(flow: Flow) -> None:
     boss_kinds = {item["kind"] for item in r.json()["items"]}
     assert "task_created" in boss_kinds
 
+    # --- 7б. Фильтр по конкретному человеку не подмешивает чужие действия ----
+    # Симптом из живого приложения: выбрал одного сотрудника — в ленте остались
+    # дела другого. Фильтр обязан сузить область и на сервере, а не только в UI.
+    r = await client.get(f"/api/feed?employee_id={flow.employee_id}")
+    assert r.status_code == 200, r.text
+    filtered = r.json()["items"]
+    assert filtered, "у сотрудника есть записи — фильтр не должен их терять"
+    assert {item["employee_id"] for item in filtered} == {flow.employee_id}
+
+    r = await client.get(f"/api/feed?employee_id={flow.manager_id}")
+    assert r.status_code == 200, r.text
+    only_boss = r.json()["items"]
+    assert only_boss
+    assert {item["employee_id"] for item in only_boss} == {flow.manager_id}
+
 
 async def test_issue_journal_on_real_postgres(flow: Flow) -> None:
     """Журнал проблем: карточка переживает смену, права — на сервере."""
@@ -870,3 +885,152 @@ async def test_group_task_modes_on_real_postgres(flow: Flow) -> None:
               "department_id": flow.department_id, "mode": "nonsense"},
     )
     assert r.status_code == 400
+
+
+async def test_admin_ops_on_real_postgres(flow: Flow) -> None:
+    """Админские операции: журнал, центр уведомлений и увольнение с корзиной.
+
+    Проверяем ровно то, что болит в живом приложении: системные строки видны
+    только в админском журнале, «последние действия» руководителя без них,
+    запланированное напоминание видно заранее, пул сотрудников правится, а
+    увольнение закрывает доступ и возвращается из корзины.
+    """
+    from app.db.hr_models import (
+        ROLE_ADMIN,
+        TASK_DONE,
+        TASK_FAILED,
+        TASK_NEW,
+        TaskAssignment,
+    )
+
+    client = flow.client
+    await _onboard_employee(flow)
+
+    # 0. Руководителю выдаём админскую роль: увольнение и центр уведомлений —
+    #    админские операции, а сид заводит только сотрудника и АУП.
+    async with flow.session_factory() as session:
+        manager = await session.get(Employee, flow.manager_id)
+        assert manager is not None
+        manager.role = ROLE_ADMIN
+        await session.commit()
+
+    # 1. Поручение со сроком в будущем: по нему должно быть видно напоминание.
+    flow.act_as(flow.manager_user)
+    due = datetime.now(UTC) + timedelta(hours=4)
+    r = await client.post(
+        "/api/admin/tasks",
+        json={
+            "title": "Проверить срок годности",
+            "scope": "employee",
+            "assignee_employee_id": flow.employee_id,
+            "due_at": due.isoformat(),
+        },
+    )
+    assert r.status_code == 200, r.text
+    task_id = r.json()["id"]
+
+    # 2. Центр уведомлений: запланированное напоминание по этой задаче.
+    r = await client.get("/api/admin/notifications")
+    assert r.status_code == 200, r.text
+    feed = r.json()
+    planned = [
+        item for item in feed["pending"] if item["task_id"] == task_id
+    ]
+    assert planned, feed["pending"]
+    assert planned[0]["kind"] == "deadline"
+    assert planned[0]["at"] < due.isoformat(), "напоминание идёт до срока"
+
+    # 3. Журнал: человекопонятная строка создания поручения.
+    r = await client.get("/api/admin/journal")
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    created = [item for item in items if item["task_id"] == task_id]
+    assert created, items[:5]
+    assert any("поручение" in item["text"] for item in created)
+    assert all(":" not in item["text"][:9] for item in created), (
+        "в журнале не должно быть сырых кодов вроде created:employee"
+    )
+
+    # 4. «Последние действия» руководителя — без системных строк.
+    r = await client.get("/api/admin/dashboard")
+    assert r.status_code == 200, r.text
+    activity = r.json()["activity"]
+    assert activity, "действие человека должно остаться в сводке"
+    assert all("авто" not in item["text"] for item in activity)
+    assert all(item["display_name"] for item in activity)
+
+    # 5. Пул сотрудников: переименование и обнуление прогресса.
+    r = await client.patch(
+        f"/api/admin/employees/{flow.employee_id}",
+        json={"position": "Су-шеф", "badge": "Стажёр"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["position"] == "Су-шеф"
+    assert r.json()["badge"] == "Стажёр"
+
+    r = await client.post(
+        f"/api/admin/employees/{flow.employee_id}/reset-progress"
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["onboarding_state"] == "new"
+    assert r.json()["learning_mode"] is False
+
+    # 6. Зачесть проваленное поручение выполненных вручную.
+    async with flow.session_factory() as session:
+        assignment = await session.scalar(
+            select(TaskAssignment).where(
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.employee_id == flow.employee_id,
+            )
+        )
+        assert assignment is not None and assignment.status == TASK_NEW
+        assignment.status = TASK_FAILED
+        await session.commit()
+
+    r = await client.post(
+        f"/api/admin/tasks/{task_id}/force-done",
+        json={"employee_id": flow.employee_id, "comment": "сделал под контролем"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == TASK_DONE
+
+    # 7. Увольнение в корзину: доступ закрыт, но данные на месте.
+    r = await client.post(
+        f"/api/admin/employees/{flow.employee_id}/fire", json={"mode": "trash"}
+    )
+    assert r.status_code == 200, r.text
+    fired = r.json()
+    assert fired["fired_at"] is not None and fired["purge_after"] is not None
+
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/me/employee")
+    assert r.status_code == 403, r.text
+    assert r.json()["detail"] == "employee_fired"
+
+    flow.act_as(flow.manager_user)
+    r = await client.get("/api/admin/employees-pool")
+    assert r.status_code == 200, r.text
+    cards = {card["employee_id"]: card for card in r.json()["items"]}
+    assert cards[flow.employee_id]["is_active"] is False
+
+    r = await client.post(
+        f"/api/admin/employees/{flow.employee_id}/restore"
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["fired_at"] is None
+
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/me/employee")
+    assert r.status_code == 200, r.text
+
+    # 8. Удаление сразу: восстановить уже нельзя.
+    flow.act_as(flow.manager_user)
+    r = await client.post(
+        f"/api/admin/employees/{flow.employee_id}/fire", json={"mode": "purge"}
+    )
+    assert r.status_code == 200, r.text
+    r = await client.post(
+        f"/api/admin/employees/{flow.employee_id}/restore"
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "already_purged"

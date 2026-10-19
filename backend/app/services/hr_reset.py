@@ -306,6 +306,38 @@ async def preview(session: AsyncSession, employee: Employee) -> ResetPreview:
     ]
     if scope.department_id is None and not scope.is_admin:
         notes.append("Отдел не назначен — убираем только твои поручения.")
+    # «Сбрасывать нечего» без объяснения выглядит как поломка: чаще всего
+    # открытые дела висят именно в тестовом пуле, а его эта кнопка по
+    # устройству не трогает. Показываем это цифрами, а не догадками.
+    demo_ids = await _demo_ids(session)
+    if demo_ids:
+        demo_tasks = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(Task)
+                .where(
+                    Task.status != TASK_DONE,
+                    Task.assignee_employee_id.in_(demo_ids),
+                )
+            )
+            or 0
+        )
+        demo_issues = int(
+            await session.scalar(
+                select(func.count())
+                .select_from(Issue)
+                .where(
+                    Issue.status.in_(OPEN_ISSUE_STATUSES),
+                    Issue.created_by_employee_id.in_(demo_ids),
+                )
+            )
+            or 0
+        )
+        if demo_tasks or demo_issues:
+            notes.append(
+                f"В тестовом пуле [BOT] осталось {demo_tasks} поручений и "
+                f"{demo_issues} проблем — это отдельная кнопка, здесь не считается."
+            )
     return ResetPreview(
         scope=scope, counts=counts, token=make_token(scope, counts), notes=notes
     )
