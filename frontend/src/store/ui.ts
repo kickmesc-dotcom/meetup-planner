@@ -65,6 +65,8 @@ export function isMonthGridZoom(z: ZoomLevel): boolean {
 export type Tab =
   | "tasks"
   | "checklist"
+  /** Табель смен: неделя своего отдела, управляющему — все отделы. */
+  | "shifts"
   | "feed"
   | "links"
   | "calendar"

@@ -26,6 +26,8 @@ class PlanDayOut(BaseModel):
     day: date
     is_training: bool
     explicit: bool
+    # Статус смены в табеле (`None` — смены нет).
+    shift_status: str | None = None
 
 
 class EmployeePlanOut(BaseModel):
@@ -40,6 +42,8 @@ class EmployeePlanOut(BaseModel):
     rate_type: str
     training_days: int
     hire_date: date | None
+    # В табеле есть смены: учебные считаются по факту.
+    has_shifts: bool
     days: list[PlanDayOut]
 
 
@@ -83,8 +87,14 @@ def _plan_out(plan: hr_training_plan.EmployeePlan) -> EmployeePlanOut:
         rate_type=plan.rate_type,
         training_days=plan.training_days,
         hire_date=plan.hire_date,
+        has_shifts=plan.has_shifts,
         days=[
-            PlanDayOut(day=item.day, is_training=item.is_training, explicit=item.explicit)
+            PlanDayOut(
+                day=item.day,
+                is_training=item.is_training,
+                explicit=item.explicit,
+                shift_status=item.shift_status,
+            )
             for item in plan.days
         ],
     )

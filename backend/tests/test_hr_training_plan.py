@@ -71,6 +71,33 @@ def test_manual_day_beats_default_rule() -> None:
     ]
 
 
+def test_timesheet_beats_calendar() -> None:
+    """Заполненный табель сильнее календаря: день без смены — не учебный."""
+    employee = _employee(hire_date=TODAY, training_days=3)
+    marks = {
+        TODAY: plan.ShiftMark(status="worked", is_training=True),
+        TODAY + timedelta(days=1): plan.ShiftMark(status="sick", is_training=False),
+    }
+    days = plan.build_days(
+        employee, start=TODAY, days=3, overrides={}, marks=marks
+    )
+    assert [(item.is_training, item.shift_status) for item in days] == [
+        (True, "worked"),
+        (False, "sick"),
+        (False, None),
+    ]
+
+
+def test_manual_rule_beats_timesheet() -> None:
+    employee = _employee(hire_date=TODAY, training_days=3)
+    marks = {TODAY: plan.ShiftMark(status="worked", is_training=False)}
+    days = plan.build_days(
+        employee, start=TODAY, days=1, overrides={TODAY: True}, marks=marks
+    )
+    assert days[0].is_training is True and days[0].explicit is True
+    assert days[0].shift_status == "worked"
+
+
 def test_horizon_and_training_days_are_clamped() -> None:
     assert plan.clamp_horizon(0) == 1
     assert plan.clamp_horizon(9999) == plan.MAX_HORIZON_DAYS

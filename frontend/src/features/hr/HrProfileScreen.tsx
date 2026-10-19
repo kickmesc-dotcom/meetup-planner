@@ -429,6 +429,7 @@ export default function HrProfileScreen() {
             label="Чек-лист смены"
             onClick={() => setTab("checklist")}
           />
+          <Jump icon="🗓" label="Табель смен" onClick={() => setTab("shifts")} />
           <Jump
             icon="📋"
             label="События смены"

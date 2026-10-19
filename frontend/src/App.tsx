@@ -12,6 +12,7 @@ import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
 // SemiTaskBot: рабочие экраны сотрудника.
 import MyTasksScreen from "./features/hr/MyTasksScreen";
 import ChecklistScreen from "./features/hr/ChecklistScreen";
+import ShiftsScreen from "./features/shifts/ShiftsScreen";
 import TeamScreen from "./features/hr/TeamScreen";
 import { fetchEmployee } from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
@@ -202,6 +203,13 @@ export default function App() {
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
         <ChecklistScreen />
+      </main>
+    );
+  } else if (tab === "shifts") {
+    // Табель: сотрудник видит свой отдел, управляющий — все (правит на сервере).
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <ShiftsScreen />
       </main>
     );
   } else if (tab === "feed") {

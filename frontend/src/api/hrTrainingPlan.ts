@@ -15,6 +15,8 @@ export interface HrPlanDay {
   is_training: boolean;
   /** День задан вручную, а не выведен из «первых N смен». */
   explicit: boolean;
+  /** Статус смены в табеле (`null` — смены нет). */
+  shift_status: string | null;
 }
 
 export interface HrEmployeePlan {
@@ -29,6 +31,8 @@ export interface HrEmployeePlan {
   rate_type: HrRateType;
   training_days: number;
   hire_date: string | null;
+  /** В табеле есть смены — учебные считаются по факту, а не по календарю. */
+  has_shifts: boolean;
   days: HrPlanDay[];
 }
 

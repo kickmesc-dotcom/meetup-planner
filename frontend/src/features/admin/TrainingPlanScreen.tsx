@@ -85,9 +85,10 @@ export default function TrainingPlanScreen({ onBack }: { onBack: () => void }) {
       onBack={onBack}
     >
       <p className="text-[11px] text-tg-hint">
-        По умолчанию учебные — первые смены после даты найма. Любой день можно
-        переключить вручную и вернуть обратно. Обязательные чек-листы и поручения
-        работают в любом режиме.
+        Учебные смены считаются по табелю: первые N отработанных смен. Больничный
+        или пропуск учебную не съедает, перенесённая смена остаётся в счёте. Пока
+        табель пуст, работает старый расчёт по дате найма. Любой день можно
+        переключить вручную.
       </p>
 
       {q.isLoading && <ListSkeleton rows={5} />}
@@ -194,6 +195,7 @@ function PlanCard({
               · учебных {trainingCount} из {plan.days.length}
             </span>
             {explicit.length > 0 && <span>· {explicit.length} вручную</span>}
+            {!plan.has_shifts && <span>· табель пуст</span>}
           </div>
         </div>
         <span className="shrink-0 pt-0.5 text-xs text-tg-hint">{open ? "▾" : "▸"}</span>
@@ -224,7 +226,7 @@ function PlanCard({
 
           <div>
             <div className="text-[11px] font-medium text-tg-hint">
-              Учебных смен после найма
+              Учебных смен по табелю
             </div>
             <div className="mt-1 flex items-center gap-2">
               <button
@@ -249,9 +251,11 @@ function PlanCard({
                 +
               </button>
               <span className="text-[10px] text-tg-hint">
-                {plan.hire_date
-                  ? `с ${formatDate(plan.hire_date)}`
-                  : "дата найма не задана — пока включено «учимся вместе»"}
+                {plan.has_shifts
+                  ? "считаем отработанные смены"
+                  : plan.hire_date
+                    ? `табель пуст · с ${formatDate(plan.hire_date)}`
+                    : "табель пуст · включено «учимся вместе»"}
               </span>
             </div>
           </div>
@@ -280,6 +284,11 @@ function PlanCard({
                 >
                   <div className="uppercase">{weekday(item.day)}</div>
                   <div className="text-sm tabular-nums">{dayNumber(item.day)}</div>
+                  {item.shift_status && (
+                    <div className="text-[9px] opacity-70">
+                      {SHIFT_CHAR[item.shift_status] ?? "·"}
+                    </div>
+                  )}
                   {item.explicit && (
                     <span
                       className="absolute right-1 top-0.5 text-[9px]"
@@ -292,7 +301,9 @@ function PlanCard({
               ))}
             </div>
             <div className="mt-1 text-[10px] text-tg-hint">
-              Синее — учебная смена, серое — обычная. Точка — день задан вручную.
+              Синее — учебная смена, серое — обычная. Точка — день задан вручную,
+              буква — статус в табеле (Р работа, П план, Б больничный, Н не пришёл,
+              В выходной, О отпуск).
             </div>
           </div>
 
@@ -324,6 +335,15 @@ function PlanCard({
     </section>
   );
 }
+
+const SHIFT_CHAR: Record<string, string> = {
+  planned: "П",
+  worked: "Р",
+  sick: "Б",
+  absent: "Н",
+  dayoff: "В",
+  vacation: "О",
+};
 
 function parseDay(day: string): Date {
   return new Date(`${day}T00:00:00`);

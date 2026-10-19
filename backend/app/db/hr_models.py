@@ -15,7 +15,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     BigInteger,
@@ -29,6 +29,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -66,6 +67,41 @@ ONBOARDING_STATES: tuple[str, ...] = (
     ONBOARDING_TRAINING,
     ONBOARDING_DONE,
 )
+
+# Табель смен: что случилось в этот день. `planned` — смена стоит в графике,
+# `worked` — человек отработал, остальное — объяснение пропуска. Учебные смены
+# считаются по фактически отработанным (`worked`), а не по календарю.
+SHIFT_PLANNED = "planned"
+SHIFT_WORKED = "worked"
+SHIFT_SICK = "sick"
+SHIFT_ABSENT = "absent"
+SHIFT_DAYOFF = "dayoff"
+SHIFT_VACATION = "vacation"
+SHIFT_STATUSES: tuple[str, ...] = (
+    SHIFT_PLANNED,
+    SHIFT_WORKED,
+    SHIFT_SICK,
+    SHIFT_ABSENT,
+    SHIFT_DAYOFF,
+    SHIFT_VACATION,
+)
+SHIFT_LABELS: dict[str, str] = {
+    SHIFT_PLANNED: "Запланирована",
+    SHIFT_WORKED: "Отработана",
+    SHIFT_SICK: "Больничный",
+    SHIFT_ABSENT: "Не пришёл",
+    SHIFT_DAYOFF: "Выходной",
+    SHIFT_VACATION: "Отпуск",
+}
+# Короткие метки для сетки табеля: одна буква не ломает узкую колонку.
+SHIFT_SHORT: dict[str, str] = {
+    SHIFT_PLANNED: "П",
+    SHIFT_WORKED: "Р",
+    SHIFT_SICK: "Б",
+    SHIFT_ABSENT: "Н",
+    SHIFT_DAYOFF: "В",
+    SHIFT_VACATION: "О",
+}
 
 # Ставка сотрудника: полная или частичная. На расписание обучения не влияет —
 # это отдельная строка в карточке, которую видит управляющий.
@@ -273,6 +309,7 @@ class Employee(Base):
     __tablename__ = "employees"
     __table_args__ = (
         CheckConstraint(_in_list("role", ROLES), name="ck_employee_role"),
+        CheckConstraint(_in_list("rate_type", RATES), name="ck_employee_rate"),
         CheckConstraint(
             _in_list("onboarding_state", ONBOARDING_STATES),
             name="ck_employee_onboarding_state",
@@ -281,7 +318,6 @@ class Employee(Base):
             "experience IS NULL OR " + _in_list("experience", EXPERIENCES),
             name="ck_employee_experience",
         ),
-        CheckConstraint(_in_list("rate_type", RATES), name="ck_employee_rate"),
         Index("ix_employees_department", "department_id", "is_active"),
         Index("ix_employees_demo", "is_demo"),
         Index("ix_employees_simulation", "is_simulation"),
@@ -358,6 +394,52 @@ class Employee(Base):
     # `trash` — лежит в корзине, `purge` — данные уже удалены (остаётся только
     # строка-надгробие, чтобы доступ не восстановился случайно).
     fired_mode: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class HrShift(Base):
+    """Табель: одна смена сотрудника в конкретный день.
+
+    Строка заводится, когда управляющий ставит смену в график (`planned`), и
+    дальше живёт своей жизнью: отработана, больничный, не пришёл, выходной,
+    отпуск. `starts_at`/`ends_at` — необязательные часы (смена может пересекать
+    полночь), `note` — короткое пояснение, `moved_from` — с какой даты смену
+    перенесли, чтобы в табеле не терялась история.
+
+    Уникальность `(employee_id, day)` не даёт двум сменам слипнуться в один
+    день; перенос — это update даты с проверкой занятости, а не вторая строка.
+    """
+
+    __tablename__ = "hr_shifts"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "day", name="uq_hr_shift_day"),
+        CheckConstraint(_in_list("status", SHIFT_STATUSES), name="ck_hr_shift_status"),
+        Index("ix_hr_shifts_day", "day"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=SHIFT_PLANNED, server_default=SHIFT_PLANNED
+    )
+    starts_at: Mapped[time | None] = mapped_column(Time)
+    ends_at: Mapped[time | None] = mapped_column(Time)
+    note: Mapped[str | None] = mapped_column(Text)
+    moved_from: Mapped[date | None] = mapped_column(Date)
+    created_by_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

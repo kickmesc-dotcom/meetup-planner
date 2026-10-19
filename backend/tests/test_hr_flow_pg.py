@@ -113,6 +113,7 @@ _TOUCHED = (
     "checklist_items",
     "checklist_templates",
     "app_notifications",
+    "hr_shifts",
     "employee_training_days",
     "departments",
     "employees",
@@ -1142,3 +1143,123 @@ async def test_training_plan_on_real_postgres(flow: Flow) -> None:
     flow.act_as(flow.employee_user)
     r = await client.get("/api/me/training")
     assert r.json()["today_training"] is True
+
+
+async def test_shifts_timesheet_and_training_by_work(flow: Flow) -> None:
+    """Табель: сетка по отделам, перенос и учебные смены по факту работы.
+
+    Учебные смены больше не считаются календарём: больничный и пропуск не
+    съедают учебную, а перенесённая отработанная смена остаётся в счёте.
+    """
+    client = flow.client
+    await _onboard_employee(flow)
+    today = date.today()
+
+    async with flow.session_factory() as session:
+        employee = await session.get(Employee, flow.employee_id)
+        assert employee is not None
+        employee.hire_date = today - timedelta(days=10)
+        employee.training_days = 2
+        await session.commit()
+
+    # Второе подразделение: управляющий должен видеть все отделы.
+    async with flow.session_factory() as session:
+        other_dept = Department(name="Тестовый бар", slug="test-bar-shifts")
+        session.add(other_dept)
+        await session.flush()
+        other_user = _make_user(810_000_777, "Тест Бармен")
+        session.add(other_user)
+        await session.flush()
+        session.add(
+            Employee(
+                user_id=other_user.id,
+                role=ROLE_EMPLOYEE,
+                department_id=other_dept.id,
+            )
+        )
+        await session.commit()
+
+    flow.act_as(flow.manager_user)
+    first_worked = today - timedelta(days=3)
+    sick_day = today - timedelta(days=2)
+    second_worked = today - timedelta(days=1)
+    future_shift = today + timedelta(days=1)
+
+    for day in (first_worked, second_worked):
+        r = await client.put(
+            f"/api/shifts/{flow.employee_id}/{day.isoformat()}",
+            json={"status": "worked", "starts_at": "10:00", "ends_at": "22:00"},
+        )
+        assert r.status_code == 200, r.text
+    r = await client.put(
+        f"/api/shifts/{flow.employee_id}/{sick_day.isoformat()}",
+        json={"status": "sick", "note": "температура"},
+    )
+    assert r.status_code == 200, r.text
+    r = await client.put(
+        f"/api/shifts/{flow.employee_id}/{future_shift.isoformat()}",
+        json={"status": "planned", "starts_at": "10:00"},
+    )
+    assert r.status_code == 200, r.text
+
+    start = today - timedelta(days=4)
+    r = await client.get(f"/api/shifts?start={start.isoformat()}&days=7")
+    assert r.status_code == 200, r.text
+    week = r.json()
+    assert week["can_edit"] is True
+    assert any(
+        person["department_name"] == "Тестовый бар" for person in week["people"]
+    )
+
+    r = await client.get(
+        f"/api/shifts?start={start.isoformat()}&days=7"
+        f"&department_id={flow.department_id}"
+    )
+    filtered = r.json()
+    assert all(
+        person["department_id"] == flow.department_id
+        for person in filtered["people"]
+    )
+
+    rows = {
+        (item["employee_id"], item["day"]): item for item in week["shifts"]
+    }
+    assert rows[(flow.employee_id, first_worked.isoformat())]["is_training"] is True
+    assert rows[(flow.employee_id, sick_day.isoformat())]["is_training"] is False
+    assert rows[(flow.employee_id, second_worked.isoformat())]["is_training"] is True
+    assert rows[(flow.employee_id, future_shift.isoformat())]["is_training"] is False
+    assert rows[(flow.employee_id, second_worked.isoformat())]["starts_at"] == "10:00"
+
+    # Перенос: вчерашняя смена → сегодня, история сохраняется.
+    shift_id = rows[(flow.employee_id, second_worked.isoformat())]["id"]
+    r = await client.post(
+        f"/api/shifts/{shift_id}/move", json={"day": today.isoformat()}
+    )
+    assert r.status_code == 200, r.text
+    moved = r.json()
+    assert moved["day"] == today.isoformat()
+    assert moved["moved_from"] == second_worked.isoformat()
+    assert moved["is_training"] is True
+
+    # План читает табель: planned на завтра — третья смена, уже обычная.
+    r = await client.get("/api/admin/training-plan")
+    plan = {item["employee_id"]: item for item in r.json()["items"]}[flow.employee_id]
+    assert plan["has_shifts"] is True
+    tomorrow = {item["day"]: item for item in plan["days"]}[future_shift.isoformat()]
+    assert tomorrow["is_training"] is False
+    assert tomorrow["shift_status"] == "planned"
+
+    # Сотрудник видит коллег своего отдела, но править не может.
+    flow.act_as(flow.employee_user)
+    r = await client.get(f"/api/shifts?start={start.isoformat()}&days=7")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["can_edit"] is False
+    assert all(
+        person["department_id"] == flow.department_id for person in body["people"]
+    )
+    r = await client.put(
+        f"/api/shifts/{flow.employee_id}/{today.isoformat()}",
+        json={"status": "worked"},
+    )
+    assert r.status_code == 403

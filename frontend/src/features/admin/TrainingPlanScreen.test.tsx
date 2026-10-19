@@ -53,9 +53,20 @@ const plan: HrTrainingPlan = {
       rate_type: "full",
       training_days: 2,
       hire_date: "2026-10-19",
+      has_shifts: true,
       days: [
-        { day: "2026-10-19", is_training: true, explicit: false },
-        { day: "2026-10-20", is_training: true, explicit: true },
+        {
+          day: "2026-10-19",
+          is_training: true,
+          explicit: false,
+          shift_status: "worked",
+        },
+        {
+          day: "2026-10-20",
+          is_training: true,
+          explicit: true,
+          shift_status: "planned",
+        },
       ],
     },
   ],
@@ -81,6 +92,7 @@ beforeEach(() => {
     day: "2026-10-19",
     is_training: false,
     explicit: true,
+    shift_status: "worked",
   });
   clearMock.mockResolvedValue({ cleared: true });
 });
