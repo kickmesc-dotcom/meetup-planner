@@ -34,6 +34,7 @@ import KpiScreen from "./KpiScreen";
 import JournalScreen from "./JournalScreen";
 import NotificationsScreen from "./NotificationsScreen";
 import EmployeesScreen from "./EmployeesScreen";
+import TrainingPlanScreen from "./TrainingPlanScreen";
 import { useUI } from "@/store/ui";
 
 type Section =
@@ -62,6 +63,7 @@ type Section =
   | "journal"
   | "notifications"
   | "employees"
+  | "training-plan"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -90,6 +92,7 @@ const VALID_SECTIONS: Section[] = [
   "journal",
   "notifications",
   "employees",
+  "training-plan",
   "space-restart",
 ];
 
@@ -171,6 +174,9 @@ export default function AdminScreen({ users }: Props) {
     return <NotificationsScreen onBack={back} />;
   }
   if (section === "employees") return <EmployeesScreen onBack={back} />;
+  if (section === "training-plan") {
+    return <TrainingPlanScreen onBack={back} />;
+  }
 
   const select = (s: Section) => {
     haptic("selection");
@@ -222,6 +228,12 @@ export default function AdminScreen({ users }: Props) {
           title="Пул сотрудников"
           subtitle="Имя, должность, прогресс, увольнение и корзина"
           onClick={() => select("employees")}
+        />
+        <Card
+          icon="🎓"
+          title="Обучение и ставка"
+          subtitle="Учебные и обычные смены по дням, полная/частичная ставка"
+          onClick={() => select("training-plan")}
         />
       </SectionGroup>
 

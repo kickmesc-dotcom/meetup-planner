@@ -34,7 +34,7 @@ import os
 import ssl
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -113,6 +113,7 @@ _TOUCHED = (
     "checklist_items",
     "checklist_templates",
     "app_notifications",
+    "employee_training_days",
     "departments",
     "employees",
     "users",
@@ -1068,3 +1069,76 @@ async def test_admin_ops_on_real_postgres(flow: Flow) -> None:
     )
     assert r.status_code == 400
     assert r.json()["detail"] == "already_purged"
+
+
+async def test_training_plan_on_real_postgres(flow: Flow) -> None:
+    """Расписание учебных смен и ставка: правка, точечный день и сегодняшний флаг.
+
+    Проверяем то, ради чего план заводили: учебные смены идут по дням, а не
+    одним флагом на профиль; управляющий может переключить конкретный день и
+    вернуть правило, а сотрудник видит «сегодня учебная смена» в своём экране.
+    """
+    client = flow.client
+    await _onboard_employee(flow)
+
+    today = date.today()
+    async with flow.session_factory() as session:
+        employee = await session.get(Employee, flow.employee_id)
+        assert employee is not None
+        employee.hire_date = today
+        employee.training_days = 3
+        employee.rate_type = "full"
+        await session.commit()
+
+    flow.act_as(flow.manager_user)
+    r = await client.get("/api/admin/training-plan")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["start"] == today.isoformat()
+    plan = {item["employee_id"]: item for item in body["items"]}[flow.employee_id]
+    assert plan["rate_type"] == "full"
+    assert plan["training_days"] == 3
+    assert len(plan["days"]) == 14
+    by_day = {item["day"]: item for item in plan["days"]}
+    assert by_day[today.isoformat()]["is_training"] is True
+    assert by_day[today.isoformat()]["explicit"] is False
+    assert by_day[(today + timedelta(days=2)).isoformat()]["is_training"] is True
+    assert by_day[(today + timedelta(days=3)).isoformat()]["is_training"] is False
+
+    # Ставка и число первых учебных смен.
+    r = await client.patch(
+        f"/api/admin/training-plan/{flow.employee_id}",
+        json={"rate_type": "partial", "training_days": 2},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["rate_type"] == "partial"
+    assert r.json()["training_days"] == 2
+
+    # Точечное исключение сильнее правила.
+    r = await client.put(
+        f"/api/admin/training-plan/{flow.employee_id}/days/{today.isoformat()}",
+        json={"is_training": False},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["explicit"] is True
+
+    r = await client.get("/api/admin/training-plan")
+    plan = {item["employee_id"]: item for item in r.json()["items"]}[flow.employee_id]
+    day = {item["day"]: item for item in plan["days"]}[today.isoformat()]
+    assert day["is_training"] is False and day["explicit"] is True
+
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/me/training")
+    assert r.status_code == 200, r.text
+    assert r.json()["today_training"] is False
+    assert r.json()["rate_type"] == "partial"
+
+    # Убрать правило — день снова считается по «первым N сменам».
+    flow.act_as(flow.manager_user)
+    r = await client.delete(
+        f"/api/admin/training-plan/{flow.employee_id}/days/{today.isoformat()}"
+    )
+    assert r.status_code == 200, r.text
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/me/training")
+    assert r.json()["today_training"] is True

@@ -49,6 +49,7 @@ from app.services import (
     hr_links,
     hr_tasks,
     hr_training,
+    hr_training_plan,
 )
 
 router = APIRouter(tags=["hr"])
@@ -451,10 +452,18 @@ class TrainingOut(BaseModel):
     complete: bool
     onboarding_state: str
     next_code: str | None = None
+    # Сегодняшняя смена по расписанию обучения (учебная / обычная).
+    today_training: bool = False
+    # Ставка: `full` или `partial` — видна и сотруднику, и управляющему.
+    rate_type: str = "full"
 
 
 def _training_out(
-    progress: hr_training.TrainingProgress, state: str
+    progress: hr_training.TrainingProgress,
+    state: str,
+    *,
+    today_training: bool = False,
+    rate_type: str = "full",
 ) -> TrainingOut:
     done = set(progress.done)
     next_lesson = next(
@@ -490,13 +499,26 @@ def _training_out(
         complete=progress.complete,
         onboarding_state=state,
         next_code=next_lesson,
+        today_training=today_training,
+        rate_type=rate_type,
+    )
+
+
+async def _training_payload(
+    session: AsyncSession, employee: Employee
+) -> TrainingOut:
+    progress = await hr_training.progress(session, employee)
+    return _training_out(
+        progress,
+        employee.onboarding_state,
+        today_training=await hr_training_plan.today_is_training(session, employee),
+        rate_type=str(employee.rate_type or "full"),
     )
 
 
 @router.get("/me/training", response_model=TrainingOut)
 async def my_training(session: SessionDep, employee: EmployeeDep) -> TrainingOut:
-    progress = await hr_training.progress(session, employee)
-    return _training_out(progress, employee.onboarding_state)
+    return await _training_payload(session, employee)
 
 
 @router.post("/me/training/{code}", response_model=TrainingOut)
@@ -510,12 +532,12 @@ async def complete_training_lesson(
     экран выбора «Повторим вместе / Я уже запомнил» проскакивал бы незамеченным.
     """
     try:
-        progress = await hr_training.complete(session, employee, code)
+        await hr_training.complete(session, employee, code)
     except hr_training.TrainingError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     await session.commit()
     await session.refresh(employee)
-    return _training_out(progress, employee.onboarding_state)
+    return await _training_payload(session, employee)
 
 
 @router.get("/departments", response_model=list[DepartmentOut])

@@ -26,6 +26,7 @@ from app.api import (
     routes_hr,
     routes_hr_admin,
     routes_hr_ops_admin,
+    routes_hr_training_plan,
     routes_issues,
     routes_meetings,
     routes_meta,
@@ -289,6 +290,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_hr_admin.router, prefix="/api/admin")
     # Журнал событий, центр уведомлений и пул сотрудников (увольнение/корзина).
     app.include_router(routes_hr_ops_admin.router, prefix="/api/admin")
+    # Расписание обучения новичков: учебные/обычные смены и ставка.
+    app.include_router(routes_hr_training_plan.router, prefix="/api/admin")
     app.include_router(routes_admin.router, prefix="/api")
     # GHG10-ops: `/api/meta` — паспорт контейнера (отпечаток кода, БД, какие
     # возможности есть). Регистрируется последним, поэтому его собственный

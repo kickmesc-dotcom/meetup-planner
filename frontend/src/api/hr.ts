@@ -225,6 +225,10 @@ export interface HrTraining {
   complete: boolean;
   onboarding_state: HrEmployee["onboarding_state"];
   next_code: string | null;
+  /** Сегодняшняя смена по расписанию обучения (учебная / обычная). */
+  today_training: boolean;
+  /** Ставка: полная или частичная. */
+  rate_type: "full" | "partial";
 }
 
 export const fetchTraining = () => api<HrTraining>("/api/me/training");

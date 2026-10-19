@@ -112,6 +112,20 @@ export default function TrainingScreen({
 
         {training.data && (
           <>
+            {training.data.today_training && (
+              <section className="rounded-xl bg-tg-link/10 p-3">
+                <div className="text-sm font-semibold text-tg-text">
+                  Сегодня учебная смена
+                </div>
+                <p className="mt-1 text-xs text-tg-hint">
+                  Идём по программе вместе. Обязательные чек-листы и поручения
+                  работают как обычно.{" "}
+                  {training.data.rate_type === "partial"
+                    ? "Ставка частичная."
+                    : "Ставка полная."}
+                </p>
+              </section>
+            )}
             {done && onFinish && (
               <section className="rounded-xl bg-status-free/10 p-3">
                 <div className="text-sm font-semibold text-tg-text">

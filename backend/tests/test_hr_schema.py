@@ -47,12 +47,14 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0040_learning_mode.py",
     "0041_employee_lifecycle.py",
     "0042_task_reminders.py",
+    "0043_training_plan.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
 HR_TABLES = {
     "departments",
     "employees",
+    "employee_training_days",
     "checklist_templates",
     "checklist_items",
     "checklist_runs",

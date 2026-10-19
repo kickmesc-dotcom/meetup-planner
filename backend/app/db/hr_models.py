@@ -67,6 +67,12 @@ ONBOARDING_STATES: tuple[str, ...] = (
     ONBOARDING_DONE,
 )
 
+# Ставка сотрудника: полная или частичная. На расписание обучения не влияет —
+# это отдельная строка в карточке, которую видит управляющий.
+RATE_FULL = "full"
+RATE_PARTIAL = "partial"
+RATES: tuple[str, ...] = (RATE_FULL, RATE_PARTIAL)
+
 # Вид чек-листа: первый рабочий день / обычная смена.
 TEMPLATE_FIRST_DAY = "first_day"
 TEMPLATE_SHIFT = "shift"
@@ -275,6 +281,7 @@ class Employee(Base):
             "experience IS NULL OR " + _in_list("experience", EXPERIENCES),
             name="ck_employee_experience",
         ),
+        CheckConstraint(_in_list("rate_type", RATES), name="ck_employee_rate"),
         Index("ix_employees_department", "department_id", "is_active"),
         Index("ix_employees_demo", "is_demo"),
         Index("ix_employees_simulation", "is_simulation"),
@@ -328,6 +335,16 @@ class Employee(Base):
     learning_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # Ставка: полная или частичная (`RATES`). Видна управляющему в расписании
+    # обучения и самому сотруднику в профиле.
+    rate_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, default=RATE_FULL, server_default=RATE_FULL
+    )
+    # Сколько первых смен после `hire_date` считаются учебными. Точечные
+    # исключения («сделать учебной четвёртую смену») — в `EmployeeTrainingDay`.
+    training_days: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=3, server_default="3"
+    )
     hire_date: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
@@ -343,6 +360,39 @@ class Employee(Base):
     fired_mode: Mapped[str | None] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class EmployeeTrainingDay(Base):
+    """Точечная правка расписания: «эта смена учебная / обычная».
+
+    По умолчанию учебные — первые `Employee.training_days` дней после
+    `hire_date`. Строка здесь сильнее правила: управляющий может сделать
+    учебной четвёртую смену или вернуть обычную третью, не меняя план целиком.
+    Удаление строки возвращает расчёт по умолчанию.
+    """
+
+    __tablename__ = "employee_training_days"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "day", name="uq_employee_training_day"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    is_training: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    set_by_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
