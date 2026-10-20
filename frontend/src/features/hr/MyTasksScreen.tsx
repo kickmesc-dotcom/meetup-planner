@@ -15,6 +15,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
+import Icon from "@/components/Icon";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import { fetchIssues } from "@/api/issues";
 import Badge from "@/features/hr/Badge";
@@ -206,7 +207,7 @@ export default function MyTasksScreen() {
               aria-label="База стандартов"
               title="База стандартов"
             >
-              📚
+              <Icon name="book" size={18} />
             </button>
             {meQ.data?.is_aup && (
               <button
@@ -219,7 +220,7 @@ export default function MyTasksScreen() {
                 aria-label="Приёмка работ"
                 title="Приёмка работ"
               >
-                🔍
+                <Icon name="search" size={18} />
               </button>
             )}
             {/* Конец смены начинается здесь: сдача того, что осталось. */}
@@ -233,7 +234,7 @@ export default function MyTasksScreen() {
               aria-label="Передача смены"
               title="Передача смены"
             >
-              📤
+              <Icon name="send" size={18} />
             </button>
           </span>
         </div>

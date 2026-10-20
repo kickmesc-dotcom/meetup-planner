@@ -107,7 +107,10 @@ describe("ChecklistScreen", () => {
     });
 
     renderScreen();
-    fireEvent.click(await screen.findByText("🚪 Первый зал"));
+    // VISUAL_AUDIT P1.4: дверь теперь SVG-иконка, текст остался.
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Первый зал/ }),
+    );
     expect(await screen.findByText(item.title)).toBeTruthy();
     expect(choose).toHaveBeenCalledWith(1);
     expect(screen.getByText(/Сегодня работаешь:/)).toBeTruthy();

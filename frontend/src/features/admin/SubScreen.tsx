@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
 
 interface Props {
@@ -18,10 +19,10 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
             haptic("light");
             onBack();
           }}
-          className="min-h-11 min-w-11 rounded-md bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
+          className="grid min-h-11 min-w-11 place-items-center rounded-md bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
           aria-label="Назад"
         >
-          ←
+          <Icon name="back" size={20} />
         </button>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{title}</div>

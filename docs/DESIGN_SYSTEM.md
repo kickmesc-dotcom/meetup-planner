@@ -222,6 +222,7 @@ is what caused the audit's consistency findings.
 | `Switch` | `components/Checkbox.tsx` | on/off toggle (`h-6 w-11`), haptic on change |
 | `Toggle` | `components/Checkbox.tsx` | labelled toggle with active highlight (`.tgl-tg`) |
 | `Checkbox` | `components/Checkbox.tsx` | `.chk-tg` |
+| `Icon` | `components/Icon.tsx` | the only UI icon set: `currentColor`, 1.8px stroke, 24×24; names from `IconName` |
 | `Card` | `components/Card.tsx` | icon tile + title + subtitle + optional badge + chevron |
 | `ScreenHeader` | `components/ScreenHeader.tsx` | back button + title + optional subtitle |
 | `ErrorState` | `components/ErrorState.tsx` | icon + humanized message + retry |
@@ -239,6 +240,14 @@ must not be resized per context, decorated, or given a gradient/shadow.
 
 Where it appears: the звания blocks in `WelcomeBanner`, and the header of each standings
 section in `LeaderboardScreen`. Nowhere else.
+
+### 8.1.a Icons
+
+UI chrome uses `Icon` (SVG), never an emoji: navigation, headers, admin cards,
+empty states and controls. Emoji stay only in content — statuses (⏰ 📷), feed
+texts and game phrasing — where they carry meaning, not layout. Icons are
+decorative (`aria-hidden`); the accessible name comes from the button's
+`aria-label` or visible text.
 
 ### 8.2 Scoreboard fill
 

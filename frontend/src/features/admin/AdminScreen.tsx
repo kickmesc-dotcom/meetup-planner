@@ -21,6 +21,7 @@ import ProxyScreen from "./ProxyScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
+import Icon, { type IconName } from "@/components/Icon";
 import { useUI } from "@/store/ui";
 
 /**
@@ -136,118 +137,118 @@ export default function AdminScreen({ users }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      <SectionGroup icon="🧑‍🍳" title="Смена и люди">
+      <SectionGroup icon="team" title="Смена и люди">
         <Card
-          icon="🚨"
+          icon="alert"
           title="Требует внимания"
           subtitle="Просроченные поручения и открытые проблемы"
           onClick={() => select("attention")}
           badge={attentionCount}
         />
         <Card
-          icon="📝"
+          icon="clipboard"
           title="Поручения"
           subtitle="Создать, назначить, срок с точностью до секунды"
           onClick={() => select("admin-tasks")}
         />
         <Card
-          icon="🔔"
+          icon="bell"
           title="Уведомления сотрудников"
           subtitle="Что ушло и что запланировано; мьют всех алертов"
           onClick={() => select("notifications")}
         />
         <Card
-          icon="🧑‍🍳"
+          icon="team"
           title="Пул сотрудников"
           subtitle="Имя, должность, прогресс, увольнение и корзина"
           onClick={() => select("employees")}
         />
         <Card
-          icon="🗒"
+          icon="checklist"
           title="Чек-листы"
           subtitle="Пункты по залам, закрытие смены, фотоотчёт"
           onClick={() => select("checklists")}
         />
         <Card
-          icon="🎓"
+          icon="book"
           title="Обучение и ставка"
           subtitle="Учебные и обычные смены по дням, полная/частичная ставка"
           onClick={() => select("training-plan")}
         />
         <Card
-          icon="🗂"
+          icon="book"
           title="Журнал событий"
           subtitle="Поручения человеческим языком, включая автоматику"
           onClick={() => select("journal")}
         />
         <Card
-          icon="📰"
+          icon="layout"
           title="Вид ленты"
           subtitle="Компактный (миниатюры участников) / классический"
           onClick={() => select("feed-settings")}
         />
       </SectionGroup>
 
-      <SectionGroup icon="🏅" title="Опыт и результат">
+      <SectionGroup icon="award" title="Опыт и результат">
         <Card
-          icon="🏅"
+          icon="award"
           title="Опыт и сотрудник недели"
           subtitle="Сколько стоит работа · рейтинг недели"
           onClick={() => select("kpi")}
         />
       </SectionGroup>
 
-      <SectionGroup icon="📅" title="Календарь">
+      <SectionGroup icon="calendar" title="Календарь">
         <Card
-          icon="🆕"
+          icon="calendar"
           title="Вид календаря"
           subtitle="Новый таймлайн / legacy-вид"
           onClick={() => select("calendar-settings")}
         />
         <Card
-          icon="⚙️"
+          icon="cake"
           title="Дни рождения и праздники"
           subtitle="Даты, поздравления и напоминания"
           onClick={() => select("birthdays")}
         />
         <Card
-          icon="🕒"
+          icon="clock"
           title="Пресеты времени"
           subtitle="Слоты для опросов / авто-подбора (12-15, 15-18 …)"
           onClick={() => select("poll-presets")}
         />
       </SectionGroup>
 
-      <SectionGroup icon="✍️" title="Тексты">
+      <SectionGroup icon="edit" title="Тексты">
         <Card
-          icon="✍️"
+          icon="edit"
           title="Тексты приложения"
           subtitle="Приветствие, подсказки и пустые состояния"
           onClick={() => select("texts")}
         />
       </SectionGroup>
 
-      <SectionGroup icon="⚙️" title="Система">
+      <SectionGroup icon="admin" title="Система">
         <Card
-          icon="🎛"
+          icon="repeat"
           title="Интервалы напоминаний"
           subtitle="Как часто проверять очередь напоминаний"
           onClick={() => select("intervals")}
         />
         <Card
-          icon="📋"
+          icon="clipboard"
           title="Запланированные задачи"
           subtitle="APScheduler-job'ы: ✎ изменить, ⏭ пропустить"
           onClick={() => select("jobs")}
         />
         <Card
-          icon="🌐"
+          icon="globe"
           title="Прокси"
           subtitle="Пул прокси, индикаторы, авто-фолбэк"
           onClick={() => select("proxy")}
         />
         <Card
-          icon="🔄"
+          icon="refresh"
           title="Рестарт Space"
           subtitle="Кнопка + расписание, если сеть зависла"
           onClick={() => select("space-restart")}
@@ -262,14 +263,14 @@ function SectionGroup({
   title,
   children,
 }: {
-  icon: string;
+  icon: IconName;
   title: string;
   children: ReactNode;
 }) {
   return (
     <section className="border-t border-tg-hint/15 pt-3 first:border-t-0 first:pt-0">
       <div className="flex items-center gap-2 mb-2 px-1">
-        <span className="text-base">{icon}</span>
+        <Icon name={icon} size={18} className="text-tg-hint" />
         <span className="text-xs font-semibold uppercase tracking-wide text-tg-hint">
           {title}
         </span>
@@ -286,7 +287,7 @@ function Card({
   onClick,
   badge,
 }: {
-  icon: string;
+  icon: IconName;
   title: string;
   subtitle: string;
   onClick: () => void;
@@ -299,8 +300,8 @@ function Card({
       onClick={onClick}
       className="w-full text-left rounded-xl bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
     >
-      <div className="w-10 h-10 rounded-lg bg-tg-bg/60 flex items-center justify-center text-2xl shrink-0">
-        {icon}
+      <div className="w-10 h-10 rounded-lg bg-tg-bg/60 flex items-center justify-center text-tg-text shrink-0">
+        <Icon name={icon} size={22} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-tg-text">{title}</div>

@@ -14,6 +14,7 @@
  * VISUAL_AUDIT P0.2: видимая плашка остаётся 28px, но нажимаемая область —
  * 44×44 (`-my-2` компенсирует рост, чтобы шапки не разъезжались).
  */
+import Icon from "@/components/Icon";
 import { useTheme } from "@/store/theme";
 import { haptic, syncWebAppChrome } from "@/tg/webapp";
 
@@ -42,11 +43,8 @@ export default function ThemeSwitcher({ className }: { className?: string }) {
         className ?? "",
       ].join(" ")}
     >
-      <span
-        aria-hidden
-        className="grid h-7 w-7 place-items-center rounded-full bg-tg-secondary-bg/70 text-[13px] leading-none text-tg-hint"
-      >
-        {dark ? "🌙" : "☀️"}
+      <span className="grid h-7 w-7 place-items-center rounded-full bg-tg-secondary-bg/70 text-tg-hint">
+        <Icon name={dark ? "moon" : "sun"} size={15} />
       </span>
     </button>
   );

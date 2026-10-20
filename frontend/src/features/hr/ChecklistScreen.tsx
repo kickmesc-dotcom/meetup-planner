@@ -11,6 +11,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
+import Icon from "@/components/Icon";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
 import ProgressBar from "@/components/ProgressBar";
@@ -120,8 +121,9 @@ export default function ChecklistScreen() {
         </div>
         {kind === "shift" && data?.hall_name && !showingHallPicker && (
           <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-tg-secondary-bg/50 px-3 py-1.5">
-            <span className="text-xs text-tg-text">
-              🚪 Сегодня работаешь: <b>{data.hall_name}</b>
+            <span className="flex items-center gap-1.5 text-xs text-tg-text">
+              <Icon name="door" size={16} />
+              Сегодня работаешь: <b>{data.hall_name}</b>
             </span>
             <button
               type="button"
@@ -247,7 +249,10 @@ function HallPicker({
               : "bg-tg-secondary-bg/60 text-tg-text",
           ].join(" ")}
         >
-          <span>🚪 {hall.name}</span>
+          <span className="flex items-center gap-2">
+            <Icon name="door" size={18} />
+            {hall.name}
+          </span>
           <span className="text-xs opacity-70">
             {hall.id === selectedId ? "выбран" : "выбрать"}
           </span>
@@ -260,9 +265,7 @@ function HallPicker({
 function EmptyState({ title, kind }: { title: string; kind: ChecklistKind }) {
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
-      <div className="text-4xl" aria-hidden>
-        🗒
-      </div>
+      <Icon name="checklist" size={36} className="text-tg-hint" />
       <div className="mt-2 text-sm font-medium text-tg-text">{title}</div>
       <div className="mt-1 text-xs text-tg-hint">
         Попроси руководителя назначить шаблон{" "}

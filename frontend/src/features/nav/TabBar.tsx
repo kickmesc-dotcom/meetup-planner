@@ -1,11 +1,13 @@
 import { motion } from "framer-motion";
+import Icon, { type IconName } from "@/components/Icon";
 import { useUI, type Tab } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 
 interface Item {
   id: Tab;
   label: string;
-  icon: string;
+  /** VISUAL_AUDIT P1.4: единый SVG-набор вместо эмодзи. */
+  icon: IconName;
 }
 
 // SemiTaskBot: порядок вкладок = порядок рабочего дня. Сначала задачи и
@@ -17,25 +19,25 @@ interface Item {
 // нечитаемы. «График» и «Встречи» НЕ удалены — они открываются из профиля
 // (раздел «Быстрые переходы»), поэтому функциональность никуда не пропала.
 const BASE_ITEMS: Item[] = [
-  { id: "tasks", label: "Задачи", icon: "✅" },
-  { id: "checklist", label: "Смена", icon: "🕒" },
-  { id: "shifts", label: "Табель", icon: "🗓" },
-  { id: "feed", label: "События", icon: "📋" },
-  { id: "profile", label: "Профиль", icon: "👤" },
+  { id: "tasks", label: "Задачи", icon: "tasks" },
+  { id: "checklist", label: "Смена", icon: "shift" },
+  { id: "shifts", label: "Табель", icon: "calendar" },
+  { id: "feed", label: "События", icon: "feed" },
+  { id: "profile", label: "Профиль", icon: "profile" },
 ];
 
 // Руководителю важнее команда, чем справочник ссылок: «Ссылки» у него
 // остаются в профиле, а на их месте — сводка смены по отделу.
 const MANAGER_ITEMS: Item[] = [
-  { id: "tasks", label: "Задачи", icon: "✅" },
-  { id: "checklist", label: "Смена", icon: "🕒" },
-  { id: "shifts", label: "Табель", icon: "🗓" },
-  { id: "feed", label: "События", icon: "📋" },
-  { id: "team", label: "Команда", icon: "👀" },
-  { id: "profile", label: "Профиль", icon: "👤" },
+  { id: "tasks", label: "Задачи", icon: "tasks" },
+  { id: "checklist", label: "Смена", icon: "shift" },
+  { id: "shifts", label: "Табель", icon: "calendar" },
+  { id: "feed", label: "События", icon: "feed" },
+  { id: "team", label: "Команда", icon: "team" },
+  { id: "profile", label: "Профиль", icon: "profile" },
 ];
 
-const ADMIN_ITEM: Item = { id: "admin", label: "Админ", icon: "⚙️" };
+const ADMIN_ITEM: Item = { id: "admin", label: "Админ", icon: "admin" };
 
 export default function TabBar({
   isAdmin,
@@ -82,9 +84,7 @@ export default function TabBar({
             )}
             {/* Иконка декоративная — рядом есть подпись, поэтому её не должно
                 быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
-            <span className="text-lg leading-none" aria-hidden>
-              {it.icon}
-            </span>
+            <Icon name={it.icon} size={22} />
             <span className="mt-0.5">{it.label}</span>
           </button>
         );
