@@ -4,6 +4,7 @@ import {
   TASK_MODE_LABEL,
   fetchChecklist,
   fetchEmployee,
+  attachTaskPhoto,
   fetchTasks,
   reportTaskIssue,
   runTaskAction,
@@ -12,6 +13,8 @@ import {
   type TaskStatus,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import type { MediaItem } from "@/api/media";
+import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import { fetchIssues } from "@/api/issues";
 import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
@@ -87,6 +90,9 @@ function fmtDue(iso: string | null): string {
   const time = d.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    // Секунды показываем только когда они реально заданы: в обычном
+    // «до 18:00» они не мешают, а точный срок не теряет информацию.
+    ...(d.getSeconds() ? { second: "2-digit" as const } : {}),
   });
   const today = new Date();
   const dayOf = (x: Date) =>
@@ -417,7 +423,11 @@ function TaskCard({
         {task.priority !== "normal" && (
           <span>приоритет: {PRIORITY_LABEL[task.priority]}</span>
         )}
-        {task.requires_photo && <span>📷 нужен фотоотчёт</span>}
+        {task.requires_photo && (
+          <span>
+            📷 {(task.photos?.length ?? 0) > 0 ? "фото есть" : "нужен фотоотчёт"}
+          </span>
+        )}
         {task.requires_review && <span>🔍 с приёмкой</span>}
         {task.is_overdue && !closed && (
           <span className="text-status-busy">просрочено</span>
@@ -448,6 +458,8 @@ function TaskCard({
         </p>
       )}
 
+      <TaskPhotos task={task} closed={closed} />
+
       {!closed && status === "on_review" && (
         <div className="mt-3 rounded-lg bg-tg-bg/60 px-2.5 py-2 text-[11px] text-tg-hint">
           Работа сдана — ждёт приёмки руководителя.
@@ -472,11 +484,7 @@ function TaskCard({
             status === "overdue" ||
             status === "rework") && (
             <ActionButton disabled={busy} onClick={() => onAction("done")}>
-              {task.requires_photo
-                ? "Отметить (фото — в чат)"
-                : task.requires_review
-                  ? "Сдать на проверку"
-                  : "Выполнено"}
+              {task.requires_review ? "Сдать на проверку" : "Выполнено"}
             </ActionButton>
           )}
           <ActionButton disabled={busy} variant="ghost" onClick={onToggleIssue}>
@@ -494,6 +502,50 @@ function TaskCard({
 
       {issueOpen && <IssueForm taskId={task.id} onDone={onIssued} />}
     </article>
+  );
+}
+
+/**
+ * Фотоотчёт в карточке поручения.
+ *
+ * Если требуется снимок, а его ещё нет — вместо бесполезной кнопки
+ * «Выполнено» (сервер всё равно ответит `photo_report_required`) показываем
+ * камеру: снимок сам закроет поручение. Загруженные фото видны сразу.
+ */
+function TaskPhotos({ task, closed }: { task: HrTask; closed: boolean }) {
+  const qc = useQueryClient();
+  const photos = task.photos ?? [];
+  const needsPhoto = task.requires_photo && photos.length === 0 && !closed;
+
+  const attach = useMutation({
+    mutationFn: (media: MediaItem) => attachTaskPhoto(task.id, media.id),
+    onSuccess: () => {
+      haptic("success");
+      void qc.invalidateQueries({ queryKey: ["hr-tasks"] });
+      void qc.invalidateQueries({ queryKey: ["hr-feed"] });
+    },
+    onError: (e) => void showAlert(humanizeApiError(e)),
+  });
+
+  return (
+    <>
+      <PhotoThumbs photos={photos} />
+      {!closed && (
+        <div className="mt-2">
+          {needsPhoto && (
+            <div className="mb-1 text-[11px] text-tg-hint">
+              📷 Фотоотчёт: сними или выбери фото — поручение закроется само.
+            </div>
+          )}
+          <PhotoAttach
+            compact
+            label="Добавить фото"
+            disabled={attach.isPending}
+            onUploaded={(media) => attach.mutate(media)}
+          />
+        </div>
+      )}
+    </>
   );
 }
 

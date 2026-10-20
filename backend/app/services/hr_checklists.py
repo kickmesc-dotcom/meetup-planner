@@ -220,6 +220,7 @@ async def complete_item(
     run: ChecklistRun,
     item: ChecklistItem,
     photo_file_id: str | None = None,
+    photo_media_id: int | None = None,
     note: str | None = None,
     now: datetime | None = None,
 ) -> ChecklistCompletion:
@@ -242,21 +243,29 @@ async def complete_item(
         )
     )
     if existing is None:
-        if item.requires_photo and not photo_file_id:
+        if item.requires_photo and not (photo_file_id or photo_media_id):
             raise ChecklistError("photo_required")
         existing = ChecklistCompletion(
             run_id=run.id,
             item_id=item.id,
             done_by_employee_id=employee.id,
             photo_file_id=photo_file_id,
+            photo_media_id=photo_media_id,
             note=note,
         )
         session.add(existing)
     else:
-        if item.requires_photo and not (photo_file_id or existing.photo_file_id):
+        if item.requires_photo and not (
+            photo_file_id
+            or photo_media_id
+            or existing.photo_file_id
+            or existing.photo_media_id
+        ):
             raise ChecklistError("photo_required")
         if photo_file_id:
             existing.photo_file_id = photo_file_id
+        if photo_media_id:
+            existing.photo_media_id = photo_media_id
         if note:
             existing.note = note
 
@@ -304,6 +313,26 @@ class ChecklistItemView:
     done_at: datetime | None
     photo_file_id: str | None
     note: str | None
+    # Подписанная ссылка на снимок, загруженный в приложении (None — фото нет
+    # или оно пришло из старого потока и ещё не закешировано).
+    photo_url: str | None = None
+
+
+def _completion_photo_url(completion: ChecklistCompletion | None) -> str | None:
+    """Ссылка на фото пункта: блоб из приложения или ленивый кеш Telegram."""
+    if completion is None:
+        return None
+    from app.services import hr_media
+
+    if completion.photo_media_id is not None:
+        return hr_media.url_for(int(completion.photo_media_id))
+    if completion.photo_file_id:
+        # Старый поток: фото есть только в Telegram. Ленивый роут скачает его
+        # и закеширует, поэтому в приложении оно тоже станет видимым.
+        return f"/api/media/checklist/{int(completion.id)}?s=" + hr_media.sign(
+            "checklist_photo", int(completion.id)
+        )
+    return None
 
 
 @dataclass(frozen=True)
@@ -361,6 +390,7 @@ async def build_view(
             photo_file_id=completions[item.id].photo_file_id
             if item.id in completions
             else None,
+            photo_url=_completion_photo_url(completions.get(item.id)),
             note=completions[item.id].note if item.id in completions else None,
         )
         for item in items

@@ -69,6 +69,8 @@ export type Tab =
   | "shifts"
   | "feed"
   | "links"
+  /** Материалы смены: график, меню, методички (снимок Google Sheets). */
+  | "materials"
   | "calendar"
   | "meetings"
   | "team"

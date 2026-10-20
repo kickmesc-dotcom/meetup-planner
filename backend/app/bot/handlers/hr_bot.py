@@ -59,6 +59,7 @@ from app.services import (
     hr_departments,
     hr_feed,
     hr_links,
+    hr_media,
     hr_pending,
     hr_reminders,
     hr_reports,
@@ -1277,6 +1278,31 @@ async def on_photo(message: Message) -> None:
     """Фото в личке: закрываем ожидание — пункт чек-листа или фотоотчёт."""
     if message.from_user is None or not message.photo:
         return
+    # Самый крупный размер — полноценный снимок, а не превью.
+    await _accept_private_media(message, message.photo[-1].file_id)
+
+
+@router.message(F.chat.type == "private", F.document)
+async def on_photo_document(message: Message) -> None:
+    """Снимок, отправленный файлом («без сжатия»), тоже считается фотоотчётом.
+
+    iPhone и Android умеют присылать фото как документ (`image/heic`, `image/jpeg`).
+    Раньше такой апдейт не матчился ни одним хендлером: бот молчал, и выглядело
+    это как «фото вообще не работают». Теперь это тот же путь, что и F.photo.
+    """
+    document = message.document
+    if message.from_user is None or document is None:
+        return
+    mime = (document.mime_type or "").lower()
+    if not mime.startswith("image/"):
+        raise SkipHandler()
+    await _accept_private_media(message, document.file_id)
+
+
+async def _accept_private_media(message: Message, file_id: str) -> None:
+    """Общий приём снимка: pending (чек-лист/поручение) → запись + кеш байтов."""
+    if message.from_user is None:
+        return
     sm = get_sessionmaker()
     async with sm() as session:
         pending = await hr_pending.get_pending(session, message.from_user.id)
@@ -1288,8 +1314,6 @@ async def on_photo(message: Message) -> None:
         if ctx is None:
             return
         _user, employee = ctx
-        # Берём самый крупный размер — это полноценный снимок, а не превью.
-        file_id = message.photo[-1].file_id
 
         if pending.kind == hr_pending.KIND_TASK_PHOTO:
             task = await hr_tasks.get_task(session, pending.target_id)
@@ -1297,9 +1321,14 @@ async def on_photo(message: Message) -> None:
                 await hr_pending.clear_pending(session, message.from_user.id)
                 await message.answer("Поручение не найдено.")
                 return
-            await hr_tasks.add_photo(
+            photo = await hr_tasks.add_photo(
                 session, task, employee=employee, file_id=file_id
             )
+            # Кешируем байты, чтобы фото открывалось в приложении, даже когда
+            # Telegram недоступен. Сбой сети не мешает приёму отчёта.
+            blob = await hr_media.cache_telegram_photo(session, file_id)
+            if blob is not None:
+                photo.media_id = blob.id
             await session.commit()
             await hr_pending.clear_pending(session, message.from_user.id)
             done = task.status == TASK_DONE
@@ -1323,12 +1352,16 @@ async def on_photo(message: Message) -> None:
             run = await hr_checklists.get_or_create_run(
                 session, employee, template, hr_checklists.local_today()
             )
+            # Кешируем снимок в блоб: пункт остаётся видимым в приложении и
+            # без доступа к Bot API (см. `services/hr_media`).
+            blob = await hr_media.cache_telegram_photo(session, file_id)
             await hr_checklists.complete_item(
                 session,
                 employee=employee,
                 run=run,
                 item=item,
                 photo_file_id=file_id,
+                photo_media_id=blob.id if blob is not None else None,
             )
             await session.commit()
             await hr_pending.clear_pending(session, message.from_user.id)

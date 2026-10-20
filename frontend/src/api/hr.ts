@@ -46,6 +46,15 @@ export interface HrDepartment {
 
 export type ChecklistKind = "first_day" | "shift";
 
+/** Снимок к отчёту: ссылка уже подписана сервером и годится для `<img>`. */
+export interface HrPhoto {
+  id: number;
+  url: string;
+  width?: number | null;
+  height?: number | null;
+  created_at?: string | null;
+}
+
 export interface HrChecklistItem {
   id: number;
   title: string;
@@ -55,6 +64,8 @@ export interface HrChecklistItem {
   done: boolean;
   done_at: string | null;
   photo_file_id: string | null;
+  /** Фото, загруженное в приложении (или подтянутое из Telegram). */
+  photo_url?: string | null;
   note: string | null;
 }
 
@@ -115,6 +126,8 @@ export interface HrTask {
   my_part: string | null;
   progress_done: number;
   progress_total: number;
+  /** Фотоотчёты: превью показываются прямо в карточке. */
+  photos?: HrPhoto[];
 }
 
 export const TASK_MODE_LABEL: Record<TaskMode, string> = {
@@ -238,6 +251,10 @@ export const completeTrainingLesson = (code: string) =>
     method: "POST",
   });
 
+/** Сбросить свой курс и пройти его заново (отдел и опыт остаются). */
+export const resetTraining = () =>
+  api<HrTraining>("/api/me/training/reset", { method: "POST" });
+
 // --- Чек-лист смены ---
 
 export const fetchChecklist = (
@@ -252,6 +269,8 @@ export const fetchChecklist = (
 export const completeChecklistItem = (body: {
   item_id: number;
   photo_file_id?: string | null;
+  /** ID снимка, загруженного в приложении (`POST /api/media`). */
+  media_id?: number | null;
   note?: string | null;
 }) =>
   api<HrChecklist>("/api/checklist/complete", {
@@ -355,6 +374,16 @@ export const sendTaskPhoto = (taskId: number, fileId: string) =>
   api<HrTask>(`/api/tasks/${taskId}/photo`, {
     method: "POST",
     body: JSON.stringify({ file_id: fileId }),
+  });
+
+/**
+ * Фотоотчёт снимком из приложения: сначала `POST /api/media`, потом связать
+ * с поручением. Отдельная ручка не нужна — сервер различает `media_id`.
+ */
+export const attachTaskPhoto = (taskId: number, mediaId: number) =>
+  api<HrTask>(`/api/tasks/${taskId}/photo`, {
+    method: "POST",
+    body: JSON.stringify({ media_id: mediaId }),
   });
 
 // --- Ссылки и обратная связь ---
@@ -466,6 +495,8 @@ export interface HrAdminTask {
   progress_done: number;
   progress_total: number;
   assignments: HrAdminTaskAssignment[];
+  /** Фотоотчёты — руководитель видит их при приёмке работы. */
+  photos?: HrPhoto[];
 }
 
 export interface HrSettings {

@@ -22,6 +22,7 @@ import StandardsScreen from "./features/hr/StandardsScreen";
 import ReviewScreen from "./features/hr/ReviewScreen";
 import ReportsScreen from "./features/hr/ReportsScreen";
 import LinksScreen from "./features/hr/LinksScreen";
+import MaterialsScreen from "./features/hr/MaterialsScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
 import OnboardingScreen from "./features/hr/OnboardingScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
@@ -259,6 +260,12 @@ export default function App() {
         <ReportsScreen />
       </main>
     ) : null;
+  } else if (tab === "materials") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <MaterialsScreen />
+      </main>
+    );
   } else if (tab === "links") {
 
     content = (

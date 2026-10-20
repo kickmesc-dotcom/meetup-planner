@@ -32,6 +32,7 @@ from app.db.hr_models import (
     FeedbackQuestion,
     Task,
     TaskAssignment,
+    TaskPhoto,
     UsefulLink,
 )
 from app.db.models import User
@@ -47,6 +48,7 @@ from app.services import (
     hr_feedback,
     hr_kpi,
     hr_links,
+    hr_media,
     hr_tasks,
     hr_training,
     hr_training_plan,
@@ -107,6 +109,16 @@ class DepartmentOut(BaseModel):
     sort_order: int
 
 
+class PhotoOut(BaseModel):
+    """Фотоотчёт в виде, пригодном для `<img>`: готовая ссылка и размеры."""
+
+    id: int
+    url: str
+    width: int | None = None
+    height: int | None = None
+    created_at: datetime | None = None
+
+
 class ChecklistItemOut(BaseModel):
     id: int
     title: str
@@ -116,6 +128,8 @@ class ChecklistItemOut(BaseModel):
     done: bool
     done_at: datetime | None
     photo_file_id: str | None
+    # Готовая ссылка на фото пункта (из приложения или кеша Telegram).
+    photo_url: str | None = None
     note: str | None
 
 
@@ -134,7 +148,9 @@ class ChecklistOut(BaseModel):
 
 class CompleteIn(BaseModel):
     item_id: int
+    # Фото из чата (старый путь) либо загруженное в приложении.
     photo_file_id: str | None = None
+    media_id: int | None = None
     note: str | None = None
 
 
@@ -167,6 +183,8 @@ class TaskOut(BaseModel):
     progress_done: int = 0
     progress_total: int = 0
     my_part: str | None = None
+    # Снимки к поручению: приложение показывает их превью прямо в карточке.
+    photos: list[PhotoOut] = []
 
 
 class TaskIssueIn(BaseModel):
@@ -176,7 +194,10 @@ class TaskIssueIn(BaseModel):
 
 
 class TaskPhotoIn(BaseModel):
-    file_id: str = Field(min_length=1)
+    """Фотоотчёт: id загруженного снимка (приложение) или TG file_id (бот)."""
+
+    file_id: str | None = None
+    media_id: int | None = None
 
 
 class LinkOut(BaseModel):
@@ -258,6 +279,7 @@ def _task_out(
     my_status: str | None = None,
     my_part: str | None = None,
     progress: tuple[int, int] = (0, 0),
+    photos: list[PhotoOut] | None = None,
 ) -> TaskOut:
     return TaskOut(
         id=task.id,
@@ -283,6 +305,7 @@ def _task_out(
         my_part=my_part,
         progress_done=progress[0],
         progress_total=progress[1],
+        photos=photos or [],
     )
 
 
@@ -307,6 +330,7 @@ async def _task_views(
         if assignment.employee_id == employee.id:
             mine[assignment.task_id] = assignment
 
+    photos = await _photos_by_task(session, [int(task.id) for task in rows])
     out: list[TaskOut] = []
     for task in rows:
         own = mine.get(task.id)
@@ -316,8 +340,60 @@ async def _task_views(
                 my_status=own.status if own is not None else None,
                 my_part=own.part if own is not None else None,
                 progress=(done.get(task.id, 0), totals.get(task.id, 0)),
+                photos=photos.get(int(task.id), []),
             )
         )
+    return out
+
+
+async def photos_by_task(
+    session: AsyncSession, task_ids: list[int]
+) -> dict[int, list[PhotoOut]]:
+    """Фото по списку поручений — одним запросом, чтобы список не тормозил."""
+    return await _photos_by_task(session, task_ids)
+
+
+async def _photos_by_task(
+    session: AsyncSession, task_ids: list[int]
+) -> dict[int, list[PhotoOut]]:
+    if not task_ids:
+        return {}
+    photos = list(
+        (
+            await session.scalars(
+                select(TaskPhoto)
+                .where(TaskPhoto.task_id.in_(task_ids))
+                .order_by(TaskPhoto.created_at, TaskPhoto.id)
+            )
+        ).all()
+    )
+    blobs = {}
+    media_ids = [p.media_id for p in photos if p.media_id is not None]
+    if media_ids:
+        from app.db.hr_models import MediaBlob
+
+        for blob in (
+            await session.scalars(select(MediaBlob).where(MediaBlob.id.in_(media_ids)))
+        ).all():
+            blobs[int(blob.id)] = blob
+    out: dict[int, list[PhotoOut]] = {}
+    for photo in photos:
+        if photo.media_id is not None and int(photo.media_id) in blobs:
+            blob = blobs[int(photo.media_id)]
+            item = PhotoOut(
+                id=int(photo.id),
+                url=hr_media.url_for(int(blob.id)),
+                width=blob.width,
+                height=blob.height,
+                created_at=photo.created_at,
+            )
+        else:
+            item = PhotoOut(
+                id=int(photo.id),
+                url=hr_media.photo_url(int(photo.id)),
+                created_at=photo.created_at,
+            )
+        out.setdefault(int(photo.task_id), []).append(item)
     return out
 
 
@@ -342,6 +418,7 @@ def _checklist_out(view: hr_checklists.ChecklistView) -> ChecklistOut:
                 done=item.done,
                 done_at=item.done_at,
                 photo_file_id=item.photo_file_id,
+                photo_url=item.photo_url,
                 note=item.note,
             )
             for item in view.items
@@ -521,6 +598,24 @@ async def my_training(session: SessionDep, employee: EmployeeDep) -> TrainingOut
     return await _training_payload(session, employee)
 
 
+@router.post("/me/training/reset", response_model=TrainingOut)
+async def reset_my_training(
+    session: SessionDep, employee: EmployeeDep
+) -> TrainingOut:
+    """Пройти курс знакомства заново.
+
+    Объявлена ДО `/me/training/{code}`: иначе FastAPI разобрал бы `reset` как
+    код урока и вернул 404 `unknown_lesson:reset` — ровно та ошибка, которую
+    легко не заметить без живого запроса.
+
+    Доступно себе в любой момент (в том числе разработчику — проверить сценарий
+    «как у новичка»): снимаются только отметки уроков, отдел и опыт остаются.
+    """
+    await hr_training.reset(session, employee)
+    await session.refresh(employee)
+    return await _training_payload(session, employee)
+
+
 @router.post("/me/training/{code}", response_model=TrainingOut)
 async def complete_training_lesson(
     code: str, session: SessionDep, employee: EmployeeDep
@@ -589,6 +684,7 @@ async def checklist_complete(
             run=run,
             item=item,
             photo_file_id=body.photo_file_id,
+            photo_media_id=body.media_id,
             note=body.note,
         )
     except hr_checklists.ChecklistError as exc:
@@ -822,9 +918,17 @@ async def task_photo(
     task_id: int, body: TaskPhotoIn, session: SessionDep, employee: EmployeeDep
 ) -> TaskOut:
     task = await _owned_task(session, employee, task_id)
+    if body.media_id is None and not body.file_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="photo_required"
+        )
     try:
         await hr_tasks.add_photo(
-            session, task, employee=employee, file_id=body.file_id
+            session,
+            task,
+            employee=employee,
+            file_id=body.file_id,
+            media_id=body.media_id,
         )
     except hr_tasks.TaskError as exc:
         await session.rollback()

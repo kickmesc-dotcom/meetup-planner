@@ -28,6 +28,8 @@ from app.api import (
     routes_hr_ops_admin,
     routes_hr_training_plan,
     routes_issues,
+    routes_materials,
+    routes_media,
     routes_meetings,
     routes_meta,
     routes_polls,
@@ -277,6 +279,11 @@ def create_app() -> FastAPI:
     app.include_router(routes_calendar.router, prefix="/api")
     # SemiTaskBot HR-ядро: ручки сотрудника и управляющий контур (АУП/админ).
     app.include_router(routes_hr.router, prefix="/api")
+    # Фотоотчёты: загрузка снимка из мини-аппа и публичная выдача по подписи.
+    # Отдельный роутер, потому что выдача работает без tma-заголовка (`<img>`).
+    app.include_router(routes_media.router, prefix="/api")
+    # Материалы смены: снимок Google Sheets из БД (устойчиво к блокировкам).
+    app.include_router(routes_materials.router, prefix="/api")
     # Журнал операционных проблем — отдельная сущность со своими правами.
     app.include_router(routes_issues.router, prefix="/api")
     # База стандартов и проверка знаний (сотрудник + наполнение АУП/админом).

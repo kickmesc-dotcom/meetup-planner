@@ -1,7 +1,40 @@
 import { getInitData } from "@/tg/webapp";
 import { useSimulation } from "@/store/simulation";
 
-const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+const ENV_API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+const API_BASE_KEY = "buff.api_base";
+
+/**
+ * Адрес API можно переключить на лету (без пересборки).
+ *
+ * Зачем: в России основной домен может стать недоступен — провайдер, блокировка
+ * Cloudflare или лежащий хостинг. Резервный контур (другой домен/свой сервер)
+ * поднимается заранее, а сотрудник вводит его в профиле («Сервер»), и приложение
+ * продолжает работать. Это дешевле, чем выпускать новый билд в момент аварии.
+ */
+export function getApiBase(): string {
+  try {
+    const saved = localStorage.getItem(API_BASE_KEY);
+    if (saved && /^https?:\/\//.test(saved)) return saved.replace(/\/+$/, "");
+  } catch {
+    // приватный режим/запрет storage — работаем на адресе из сборки
+  }
+  return ENV_API_BASE;
+}
+
+/** Сохранить адрес API. `null` — вернуть адрес из сборки. */
+export function setApiBase(value: string | null): void {
+  try {
+    if (!value) localStorage.removeItem(API_BASE_KEY);
+    else localStorage.setItem(API_BASE_KEY, value.replace(/\/+$/, ""));
+  } catch {
+    // ignore
+  }
+}
+
+export function apiBaseLabel(): string {
+  return getApiBase() || "текущий сайт";
+}
 
 /**
  * GHG11(10): абсолютный URL публичного `<img>`-ресурса (аватарка/превью медиа).
@@ -9,7 +42,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
  * тег `<img>` работает с обычным URL — и в dev через VITE_API_BASE, и в проде.
  */
 export function apiPublicUrl(path: string): string {
-  return path.startsWith("http") ? path : `${API_BASE}${path}`;
+  return path.startsWith("http") ? path : `${getApiBase()}${path}`;
 }
 
 export class ApiError extends Error {
@@ -112,6 +145,16 @@ export function humanizeApiError(e: unknown): string {
       return "Управляющего увольняет только администратор.";
     }
     if (d === "already_done") return "Поручение уже зачтено.";
+    // Фото: сервер отвечает кодами, текст — здесь, чтобы человек понимал,
+    // что делать дальше (особенно с HEIC из галереи iPhone).
+    if (d === "not_an_image") {
+      return "Это не изображение или формат не поддерживается. Нужен JPEG, PNG или WebP.";
+    }
+    if (d === "file_too_large") {
+      return "Фото больше 8 МБ — выбери снимок поменьше.";
+    }
+    if (d === "empty_file") return "Файл пустой — выбери другой снимок.";
+    if (d === "media_not_found") return "Фото не найдено — приложи его заново.";
     if (d === "assignment_not_found") {
       return "У этого поручения нет такого исполнителя.";
     }
@@ -144,11 +187,17 @@ export async function api<T>(
   // обычный запрос настоящего пользователя.
   const simulationId = useSimulation.getState().sessionId;
   if (simulationId) headers.set("X-Simulation-Session", String(simulationId));
-  if (init.body && !headers.has("Content-Type")) {
+  // FormData сам ставит boundary: если перезаписать заголовок JSON'ом,
+  // multipart-загрузка фото ломается на разборе тела.
+  if (
+    init.body &&
+    !headers.has("Content-Type") &&
+    !(init.body instanceof FormData)
+  ) {
     headers.set("Content-Type", "application/json");
   }
 
-  const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+  const url = path.startsWith("http") ? path : `${getApiBase()}${path}`;
   const res = await fetch(url, { ...init, headers });
 
   if (!res.ok) {

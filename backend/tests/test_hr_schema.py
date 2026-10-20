@@ -49,6 +49,8 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0042_task_reminders.py",
     "0043_training_plan.py",
     "0044_shifts.py",
+    "0045_media.py",
+    "0046_materials.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -66,6 +68,8 @@ HR_TABLES = {
     "task_reminders",
     "task_issues",
     "task_photos",
+    "media_blobs",
+    "sheet_sources",
     "useful_links",
     "feedback_questions",
     "feedback_answers",
@@ -103,6 +107,18 @@ class _CapturingOp:
         return None
 
     def drop_constraint(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def create_foreign_key(self, *_a: Any, **_kw: Any) -> None:
+        # Тест сверяет только таблицы и колонки; FK на диалектах разный.
+        return None
+
+    def alter_column(self, *_a: Any, **_kw: Any) -> None:
+        # Смена nullability колонок не влияет на набор колонок.
+        return None
+
+    def bulk_insert(self, *_a: Any, **_kw: Any) -> None:
+        # Сид-данные (например, источники материалов) схему не меняют.
         return None
 
     def create_check_constraint(self, *_a: Any, **_kw: Any) -> None:

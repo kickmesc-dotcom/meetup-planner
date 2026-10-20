@@ -14,11 +14,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.hr_models import Employee, EmployeeTrainingStep
+from app.db.hr_models import ONBOARDING_TRAINING, Employee, EmployeeTrainingStep
 
 
 class TrainingError(Exception):
@@ -64,7 +64,7 @@ LESSONS: tuple[Lesson, ...] = (
         minutes=1,
         summary="Пункты с камерой нельзя закрыть без фото — так видно, что сделано.",
         steps=(
-            "Напротив пункта с 📷 нажми «Фото».",
+            "Напротив пункта с 📷 нажми «📷 Снять отчёт» — откроется камера.",
             "Сними рабочую зону так, чтобы было понятно, что проверял.",
             "Отправь — пункт закроется сам, отдельная галочка не нужна.",
         ),
@@ -218,6 +218,24 @@ async def completed_codes(session: AsyncSession, employee_id: int) -> set[str]:
 
 async def progress(session: AsyncSession, employee: Employee) -> TrainingProgress:
     return progress_from_codes(await completed_codes(session, employee.id))
+
+
+async def reset(session: AsyncSession, employee: Employee) -> TrainingProgress:
+    """Начать курс заново: снять все уроки и вернуть онбординг в обучение.
+
+    Нужно и разработчику (проверить сценарий «как у новичка»), и сотруднику,
+    который хочет повторить материал. Отдел и опыт не трогаем: иначе человек
+    провалился бы назад в вопросы первого запуска и получил бы другой чек-лист.
+    """
+    await session.execute(
+        delete(EmployeeTrainingStep).where(
+            EmployeeTrainingStep.employee_id == employee.id
+        )
+    )
+    employee.onboarding_state = ONBOARDING_TRAINING
+    employee.learning_mode = False
+    await session.commit()
+    return progress_from_codes(set())
 
 
 async def complete(

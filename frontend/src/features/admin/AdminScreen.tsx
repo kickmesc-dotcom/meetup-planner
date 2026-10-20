@@ -35,6 +35,7 @@ import JournalScreen from "./JournalScreen";
 import NotificationsScreen from "./NotificationsScreen";
 import EmployeesScreen from "./EmployeesScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
+import AdminTasksScreen from "./AdminTasksScreen";
 import { useUI } from "@/store/ui";
 
 type Section =
@@ -64,6 +65,7 @@ type Section =
   | "notifications"
   | "employees"
   | "training-plan"
+  | "admin-tasks"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -93,6 +95,7 @@ const VALID_SECTIONS: Section[] = [
   "notifications",
   "employees",
   "training-plan",
+  "admin-tasks",
   "space-restart",
 ];
 
@@ -174,6 +177,7 @@ export default function AdminScreen({ users }: Props) {
     return <NotificationsScreen onBack={back} />;
   }
   if (section === "employees") return <EmployeesScreen onBack={back} />;
+  if (section === "admin-tasks") return <AdminTasksScreen onBack={back} />;
   if (section === "training-plan") {
     return <TrainingPlanScreen onBack={back} />;
   }
@@ -234,6 +238,12 @@ export default function AdminScreen({ users }: Props) {
           title="Обучение и ставка"
           subtitle="Учебные и обычные смены по дням, полная/частичная ставка"
           onClick={() => select("training-plan")}
+        />
+        <Card
+          icon="📝"
+          title="Поручения"
+          subtitle="Создать в приложении · срок с точностью до секунды"
+          onClick={() => select("admin-tasks")}
         />
       </SectionGroup>
 

@@ -620,13 +620,29 @@ async def add_photo(
     task: Task,
     *,
     employee: Employee,
-    file_id: str,
+    file_id: str | None = None,
+    media_id: int | None = None,
     now: datetime | None = None,
 ) -> TaskPhoto:
-    """Фотоотчёт. Если он требовался — поручение закрывается (п.4.4)."""
-    if not file_id:
+    """Фотоотчёт. Если он требовался — поручение закрывается (п.4.4).
+
+    Снимок приходит либо из чата (`file_id`), либо из приложения (`media_id` —
+    строка в `media_blobs`). Второй путь не зависит от Telegram, поэтому фото
+    открывается в приложении и после блокировок/рестартов.
+    """
+    if not file_id and media_id is None:
         raise TaskError("empty_file_id")
-    photo = TaskPhoto(task_id=task.id, employee_id=employee.id, file_id=file_id)
+    if media_id is not None:
+        from app.db.hr_models import MediaBlob
+
+        if await session.get(MediaBlob, media_id) is None:
+            raise TaskError("media_not_found")
+    photo = TaskPhoto(
+        task_id=task.id,
+        employee_id=employee.id,
+        file_id=file_id,
+        media_id=media_id,
+    )
     session.add(photo)
     await session.flush()
     if task.requires_photo and task.status != TASK_DONE:

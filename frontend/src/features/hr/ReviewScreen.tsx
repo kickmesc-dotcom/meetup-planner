@@ -8,6 +8,7 @@ import {
   type HrAdminTaskAssignment,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -111,6 +112,7 @@ function fmtDue(iso: string | null): string {
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    ...(d.getSeconds() ? { second: "2-digit" as const } : {}),
   });
 }
 
@@ -152,6 +154,7 @@ function ReviewCard({
 
       {expanded && (
         <div className="mt-3 space-y-2">
+          <PhotoThumbs photos={task.photos ?? []} size={96} />
           {waiting.map((assignment) => (
             <ReviewRow
               key={assignment.employee_id}

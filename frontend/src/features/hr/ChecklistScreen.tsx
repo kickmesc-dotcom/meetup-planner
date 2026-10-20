@@ -7,6 +7,8 @@ import {
   type HrChecklistItem,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import type { MediaItem } from "@/api/media";
+import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
 import ProgressBar from "@/components/ProgressBar";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -16,10 +18,9 @@ import { haptic, showAlert } from "@/tg/webapp";
  * SemiTaskBot: «Чек-лист смены».
  *
  * Два режима: первый день (`first_day`) и обычная смена (`shift`). Пункты,
- * требующие фото, закрываются ТОЛЬКО фотографией — прислать её можно в чат с
- * ботом (там есть кнопка «📷 Фотоотчёт»). Мини-апп намеренно не умеет
- * подменять фото текстом: сервер отклонит такое закрытие, и мы показываем
- * объяснение вместо тихой попытки.
+ * требующие фото, закрываются ТОЛЬКО фотографией — и теперь снять её можно
+ * здесь же, в приложении: камера или галерея, без перехода в чат с ботом.
+ * Фото из чата тоже продолжает работать — сервер принимает оба пути.
  */
 export default function ChecklistScreen() {
   const qc = useQueryClient();
@@ -36,6 +37,7 @@ export default function ChecklistScreen() {
       item_id: number;
       note?: string | null;
       photo_file_id?: string;
+      media_id?: number | null;
     }) => completeChecklistItem(body),
     onSuccess: (data) => {
       haptic("success");
@@ -129,6 +131,9 @@ export default function ChecklistScreen() {
               if (item.done) return;
               complete.mutate({ item_id: item.id });
             }}
+            onPhoto={(media: MediaItem) =>
+              complete.mutate({ item_id: item.id, media_id: media.id })
+            }
             onSaveNote={(note) => complete.mutate({ item_id: item.id, note })}
           />
         ))}
@@ -149,6 +154,7 @@ function ItemRow({
   noteOpen,
   onToggle,
   onToggleNote,
+  onPhoto,
   onSaveNote,
 }: {
   item: HrChecklistItem;
@@ -156,6 +162,7 @@ function ItemRow({
   noteOpen: boolean;
   onToggle: () => void;
   onToggleNote: () => void;
+  onPhoto: (media: MediaItem) => void;
   onSaveNote: (note: string) => void;
 }) {
   const [note, setNote] = useState(item.note ?? "");
@@ -172,16 +179,11 @@ function ItemRow({
         <button
           type="button"
           aria-pressed={item.done}
-          disabled={busy || item.done}
-          onClick={() => {
-            if (photoBlocks) {
-              void showAlert(
-                "Пункт закрывается фотографией: нажми «📷 Фотоотчёт» в чате с ботом и пришли фото.",
-              );
-              return;
-            }
-            onToggle();
-          }}
+          aria-label={
+            photoBlocks ? "Пункт закрывается фотоотчётом" : "Отметить пункт"
+          }
+          disabled={busy || item.done || photoBlocks}
+          onClick={onToggle}
           className={[
             "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm",
             item.done
@@ -211,9 +213,26 @@ function ItemRow({
           )}
           {item.requires_photo && (
             <div className="mt-1 text-[11px] text-tg-hint">
-              📷 нужен фотоотчёт
+              📷 {item.done ? "фотоотчёт приложен" : "нужен фотоотчёт: снимок с камеры или из галереи"}
             </div>
           )}
+          {!item.done && photoBlocks && (
+            <div className="mt-2">
+              <PhotoAttach
+                compact
+                label="Снять отчёт"
+                disabled={busy}
+                onUploaded={onPhoto}
+              />
+            </div>
+          )}
+          <PhotoThumbs
+            photos={
+              item.photo_url
+                ? [{ id: item.id, url: item.photo_url }]
+                : []
+            }
+          />
           {item.done_at && (
             <div className="mt-1 text-[11px] text-tg-hint">
               закрыто в{" "}

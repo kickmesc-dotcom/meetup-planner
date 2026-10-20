@@ -3,6 +3,7 @@ import { fetchEmployee, fetchLinks } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic, WebApp } from "@/tg/webapp";
+import { useUI } from "@/store/ui";
 
 /**
  * SemiTaskBot: «Полезные ссылки».
@@ -12,6 +13,7 @@ import { haptic, WebApp } from "@/tg/webapp";
  * своего подразделения — отбор делает сервер, клиент просто рисует список.
  */
 export default function LinksScreen() {
+  const setTab = useUI((s) => s.setTab);
   const linksQ = useQuery({ queryKey: ["hr-links"], queryFn: fetchLinks });
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
 
@@ -34,6 +36,31 @@ export default function LinksScreen() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+        {/* Таблицы (график, меню, бар) живут отдельно: они обновляются с сервера
+            и не зависят от доступности Google у сотрудника. */}
+        <button
+          type="button"
+          onClick={() => {
+            haptic("light");
+            setTab("materials");
+          }}
+          className="block w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl" aria-hidden>
+              📚
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-tg-text">
+                Материалы смены
+              </span>
+              <span className="block text-[11px] text-tg-hint">
+                График, меню и методички — открываются без Google
+              </span>
+            </span>
+          </div>
+        </button>
+
         {linksQ.isLoading && <ListSkeleton rows={6} />}
 
         {!linksQ.isLoading && links.length === 0 && (

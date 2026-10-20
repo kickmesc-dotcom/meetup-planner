@@ -11,7 +11,7 @@ import {
 } from "@/api/hr";
 import { startSimulation } from "@/api/simulation";
 import { useSimulation } from "@/store/simulation";
-import { humanizeApiError } from "@/api/client";
+import { getApiBase, humanizeApiError, setApiBase } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import AchievementsCard from "@/features/hr/AchievementsCard";
@@ -435,6 +435,7 @@ export default function HrProfileScreen() {
             label="События смены"
             onClick={() => setTab("feed")}
           />
+          <Jump icon="📚" label="Материалы" onClick={() => setTab("materials")} />
           <Jump icon="🔗" label="Ссылки" onClick={() => setTab("links")} />
           <Jump
             icon="🛠"
@@ -492,8 +493,8 @@ export default function HrProfileScreen() {
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <h2 className="text-sm font-semibold text-tg-text">Пиши боту в чат</h2>
         <p className="mt-1 text-[11px] text-tg-hint">
-          Фотоотчёты и «не успеваю» принимает бот в чате: там же кнопки «📷
-          Фотоотчёт», «📝 Обратная связь» и «ℹ️ Помощь».
+          Фотоотчёт можно снять прямо в пункте с 📷 (камера или галерея), а
+          «не успеваю» — в карточке задачи. Чат с ботом тоже работает.
         </p>
         <button
           type="button"
@@ -508,6 +509,10 @@ export default function HrProfileScreen() {
         </button>
       </section>
 
+      {/* Аварийное переключение сервера: если основной домен заблокирован,
+          резервный контур подставляется без новой сборки приложения. */}
+      {me.is_admin && <ServerSwitch />}
+
       {showDemo && <HrDemoPanel onClose={() => setShowDemo(false)} />}
 
       {showFeedback && (
@@ -520,6 +525,39 @@ export default function HrProfileScreen() {
         </div>
       )}
     </div>
+  );
+}
+
+function ServerSwitch() {
+  const [value, setValue] = useState(getApiBase());
+  return (
+    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <h2 className="text-sm font-semibold text-tg-text">Сервер (для админа)</h2>
+      <p className="mt-1 text-[11px] text-tg-hint">
+        Если основной адрес недоступен, укажи резервный — приложение продолжит
+        работать без переустановки. Пусто — адрес из сборки.
+      </p>
+      <input
+        value={value}
+        onChange={(e) => setValue(e.target.value.trim())}
+        placeholder="https://backup.example.ru"
+        inputMode="url"
+        autoCapitalize="none"
+        autoCorrect="off"
+        className="mt-2 min-h-10 w-full rounded-lg bg-tg-bg/60 px-2 text-xs text-tg-text"
+      />
+      <button
+        type="button"
+        onClick={() => {
+          haptic("medium");
+          setApiBase(value || null);
+          window.location.reload();
+        }}
+        className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text"
+      >
+        Сохранить и перезагрузить
+      </button>
+    </section>
   );
 }
 

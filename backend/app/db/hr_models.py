@@ -26,6 +26,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     SmallInteger,
     String,
     Text,
@@ -625,6 +626,11 @@ class ChecklistCompletion(Base):
     )
     # TG file_id фотоотчёта (стабильнее протухающего file_path, как у аватарок).
     photo_file_id: Mapped[str | None] = mapped_column(Text)
+    # Фото, загруженное прямо в мини-аппе: байты лежат в `media_blobs`, поэтому
+    # оно не зависит от доступности Telegram и открывается в `<img>`.
+    photo_media_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("media_blobs.id", ondelete="SET NULL")
+    )
     note: Mapped[str | None] = mapped_column(Text)
 
 
@@ -842,9 +848,46 @@ class TaskPhoto(Base):
     employee_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
     )
-    file_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # `file_id` остаётся для фото из чата; `media_id` — для загрузки из
+    # мини-аппа и для кеша, снятого с Telegram (тогда заполнены оба поля).
+    file_id: Mapped[str | None] = mapped_column(Text)
+    media_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("media_blobs.id", ondelete="SET NULL")
+    )
     # Одобрение руководителем — заглушка под Этап 3 («подтверждение фотоотчётов»).
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MediaBlob(Base):
+    """Байты фотоотчёта, загруженного в мини-аппе.
+
+    Раньше хранился только Telegram `file_id`: картинку нельзя было показать в
+    приложении (у `<img>` нет доступа к Bot API), а при недоступном Telegram
+    фото пропадало совсем. Теперь байты лежат в БД: `GET /api/media/{id}`
+    отдаёт их с подписью, поэтому фото видно и в приложении, и после рестарта,
+    без токена бота наружу.
+
+    `sha256` даёт дедупликацию: повторная отправка того же снимка не раздувает
+    базу. `telegram_file_id` заполнен, если блоб — кеш фото из чата.
+    """
+
+    __tablename__ = "media_blobs"
+    __table_args__ = (
+        UniqueConstraint("sha256", name="uq_media_blobs_sha"),
+        Index("ix_media_blobs_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    mime: Mapped[str] = mapped_column(String(64), nullable=False, default="image/jpeg")
+    size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    telegram_file_id: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1378,5 +1421,52 @@ class EmployeeTrainingStep(Base):
     )
     code: Mapped[str] = mapped_column(String(64), nullable=False)
     completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Материалы смены из Google Sheets
+# --------------------------------------------------------------------------
+
+
+class SheetSource(Base):
+    """Внешняя таблица, содержимое которой показываем в приложении.
+
+    Зачем копия в БД, а не ссылка «открыть Google»: в России Google Sheets
+    открывается нестабильно, а иногда недоступен вовсе. Сервер (HF Space)
+    забирает CSV и хранит последний удачный снимок, поэтому сотрудник видит
+    актуальный график/меню даже тогда, когда сама таблица у него не грузится.
+
+    `rows_json` — снимок `list[list[str]]` (строки как есть, без заголовков-
+    догадок). `synced_at` и `sync_error` показывают, насколько данным можно
+    верить: при ошибке старые строки НЕ затираются.
+    """
+
+    __tablename__ = "sheet_sources"
+    __table_args__ = (
+        UniqueConstraint("spreadsheet_id", "gid", name="uq_sheet_sources_sheet"),
+        Index("ix_sheet_sources_sort", "sort_order", "id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    emoji: Mapped[str | None] = mapped_column(String(16))
+    # Оригинальная ссылка для «открыть в Google» (может не работать без VPN).
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    spreadsheet_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    # `gid` — номер листа. Пустой означает первый лист.
+    gid: Mapped[str | None] = mapped_column(String(32))
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    rows_json: Mapped[str | None] = mapped_column(Text)
+    synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sync_error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

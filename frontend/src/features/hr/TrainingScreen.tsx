@@ -3,13 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   completeTrainingLesson,
   fetchTraining,
+  resetTraining,
   type HrTraining,
   type HrTrainingLesson,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
-import { haptic, showAlert } from "@/tg/webapp";
+import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
  * Обучение пользованию приложением — отдельный этап онбординга.
@@ -34,6 +35,18 @@ export default function TrainingScreen({
   const qc = useQueryClient();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const training = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
+
+  const reset = useMutation({
+    mutationFn: () => resetTraining(),
+    onSuccess: (data: HrTraining) => {
+      haptic("success");
+      qc.setQueryData(["hr-training"], data);
+      void qc.invalidateQueries({ queryKey: ["hr-employee"] });
+      setOpenCode(null);
+      void showAlert("Курс сброшен — можно пройти заново с первого урока.");
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
 
   const complete = useMutation({
     mutationFn: (code: string) => completeTrainingLesson(code),
@@ -208,6 +221,36 @@ export default function TrainingScreen({
                 ))}
               </section>
             ))}
+
+            {/* Сброс доступен всегда: и сотруднику (повторить материал), и
+                разработчику (проверить сценарий «как у новичка»). */}
+            <section className="rounded-xl border border-tg-hint/20 p-3">
+              <div className="text-sm font-medium text-tg-text">
+                Пройти курс заново
+              </div>
+              <p className="mt-1 text-[11px] text-tg-hint">
+                Снимет отметки уроков, но оставит подразделение и опыт. Смена,
+                задачи и отметки чек-листа не затрагиваются.
+              </p>
+              <button
+                type="button"
+                disabled={reset.isPending}
+                onClick={async () => {
+                  haptic("light");
+                  const ok = await showConfirm(
+                    "Сбросить прогресс обучения и начать курс заново?",
+                  );
+                  if (!ok) return;
+                  const sure = await showConfirm(
+                    "Точно? Отметки уроков будут удалены.",
+                  );
+                  if (sure) reset.mutate();
+                }}
+                className="mt-2 min-h-10 w-full rounded-lg bg-tg-secondary-bg text-sm text-tg-text disabled:opacity-50"
+              >
+                {reset.isPending ? "Сбрасываю…" : "Сбросить прогресс обучения"}
+              </button>
+            </section>
           </>
         )}
       </div>

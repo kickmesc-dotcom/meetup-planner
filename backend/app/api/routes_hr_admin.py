@@ -279,6 +279,15 @@ class TaskAssignmentOut(BaseModel):
     done_at: datetime | None
 
 
+class TaskAdminPhotoOut(BaseModel):
+    """Фотоотчёт в карточке приёмки: ссылка уже готова для `<img>`."""
+
+    id: int
+    url: str
+    width: int | None = None
+    height: int | None = None
+
+
 class TaskAdminOut(BaseModel):
     id: int
     title: str
@@ -300,6 +309,8 @@ class TaskAdminOut(BaseModel):
     progress_done: int = 0
     progress_total: int = 0
     assignments: list[TaskAssignmentOut] = []
+    # Снимки, которые сотрудник приложил в приложении или прислал в чат.
+    photos: list[TaskAdminPhotoOut] = []
 
 
 class ReportOut(BaseModel):
@@ -672,6 +683,46 @@ async def _employee_names(session, ids: set[int]) -> dict[int, str]:  # noqa: AN
     return {int(employee_id): str(name) for employee_id, name in rows.all()}
 
 
+async def _task_photo_outs(session, task_id: int) -> list[TaskAdminPhotoOut]:  # noqa: ANN001
+    """Фото поручения: блоб из приложения или подписанная ссылка на кеш TG."""
+    from app.db.hr_models import MediaBlob, TaskPhoto
+    from app.services import hr_media
+
+    rows = (
+        await session.scalars(
+            select(TaskPhoto)
+            .where(TaskPhoto.task_id == task_id)
+            .order_by(TaskPhoto.created_at, TaskPhoto.id)
+        )
+    ).all()
+    if not rows:
+        return []
+    media_ids = [p.media_id for p in rows if p.media_id is not None]
+    blobs: dict[int, MediaBlob] = {}
+    if media_ids:
+        for blob in (
+            await session.scalars(select(MediaBlob).where(MediaBlob.id.in_(media_ids)))
+        ).all():
+            blobs[int(blob.id)] = blob
+    out: list[TaskAdminPhotoOut] = []
+    for photo in rows:
+        blob = blobs.get(int(photo.media_id)) if photo.media_id is not None else None
+        if blob is not None:
+            out.append(
+                TaskAdminPhotoOut(
+                    id=int(photo.id),
+                    url=hr_media.url_for(int(blob.id)),
+                    width=blob.width,
+                    height=blob.height,
+                )
+            )
+        else:
+            out.append(
+                TaskAdminPhotoOut(id=int(photo.id), url=hr_media.photo_url(int(photo.id)))
+            )
+    return out
+
+
 async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
     assignees = await hr_tasks.assignees(session, task)
     rows = await hr_tasks.assignments_of(session, task.id)
@@ -696,6 +747,7 @@ async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
         requires_review=bool(task.requires_review),
         progress_done=sum(1 for row in rows if row.status == TASK_DONE),
         progress_total=len(rows),
+        photos=await _task_photo_outs(session, int(task.id)),
         assignments=[
             TaskAssignmentOut(
                 employee_id=row.employee_id,
