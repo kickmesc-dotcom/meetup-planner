@@ -2870,3 +2870,22 @@ Chrome и Telegram-веб пишут WebM/OPUS — `sendVoice` его отбив
   `.text-3xs{10px}`, вхождений `text-[11px]` — 0.
 - Живой вход проверить нельзя: без initData страница отдаёт «Ошибка
   авторизации», поэтому вёрстка проверена сборкой, тестами и содержимым бандла.
+
+## Радиусы (P1.6)
+
+- Введены два токена в `tailwind.config.ts`: `rounded-card` (12px) и
+  `rounded-tile` (8px); пилюли — `rounded-full`. `md` (6px) и `lg` (8px) больше
+  не выбираются «по настроению»: всё внутри карточки — `tile`, включая поля,
+  кнопки и бейджи.
+- `rounded-xl` и `rounded-2xl` (в том числе `rounded-t-2xl` в шапках sheet'ов)
+  сведены к `card`; одиночный `rounded` и `rounded-[5px]/[3px]` — к `tile`.
+  `.chk-tg` в `styles.css` выровнен на те же 8px.
+- Защита: `src/styles.radius.test.ts` падает на `rounded-md/lg/xl/2xl`,
+  произвольных `rounded-[..]` и пустом списке файлов.
+- Мини-апп перевыложен на `semitaskbot.pages.dev` (`index-XMSD59WH.js`,
+  `index-UobHyTsI.css`). В бандле есть `.rounded-card{border-radius:12px}`,
+  `.rounded-tile{border-radius:8px}` и `.rounded-t-card`; правил
+  `.rounded-md/.lg/.xl/.2xl` — 0.
+- Проверка: `tsc --noEmit` чисто, `vitest run` — 170 тестов, `vite build` — ок;
+  живой вход в Telegram по-прежнему не проверить (без initData «Ошибка
+  авторизации»).
