@@ -23,7 +23,6 @@ from app.db.base import get_sessionmaker
 from app.services import scheduler_leader
 from app.services.admin_config import (
     get_autoloser_settings,
-    get_reminders_tick_minutes,
     get_scheduled_settings,
 )
 from app.services.birthdays import run_birthdays_job
@@ -163,26 +162,16 @@ def get_scheduler() -> AsyncIOScheduler:
     return _scheduler
 
 # --- IDs динамических job'ов, которыми управляют admin-настройки ---
+#
+# Список почищен вместе с модулями: job'ы игрового контура, случайных фраз и
+# паузы бота больше не планируются, поэтому их идентификаторы здесь не нужны.
 JOB_REMINDERS_TICK = "meeting_reminders_tick"
-JOB_RANDOM_PHRASES = "random_phrases"
-JOB_AUTOLOSER = "autoloser"
 JOB_PROXY_HEALTH = "proxy_health"
-JOB_CHUKHAN_WEEKLY = "chukhan_weekly"
 JOB_AVATAR_SYNC = "avatar_sync_daily"
 JOB_BIRTHDAYS = "birthdays_daily"
-JOB_BOT_PAUSE_AUTO_RESTORE = "bot_pause_auto_restore"  # GHG6 E11
-JOB_AUTO_ZAEBAL = "auto_zaebal"  # GHG6 E11.3
 JOB_MEETING_FEEDBACK = "meeting_feedback_daily"  # GHG6 N2.3
-JOB_LOSER_OUTBOX_RETRY = "loser_outbox_retry"  # GHG7 P0.2.b.4
-JOB_CHUKHAN_RETRY = "chukhan_retry"  # GHG7 P11 (инцидент 03.06 #1)
 JOB_DEAD_CHAT = "dead_chat_hourly"  # GHG8 P7
 JOB_SPACE_RESTART = "space_restart_tick"  # GHG8 P14
-JOB_GAME_HOLIDAYS = "game_holidays_daily"  # GHG10 Э10
-JOB_GAME_WEEK_ACTIVITY = "game_week_activity_weekly"  # GHG10 Э6
-JOB_GAME_MEMES = "game_memes_sweep"  # GHG10 Э7
-JOB_GAME_MEMORIAL = "game_memorial_daily"  # GHG10 Э13
-JOB_GAME_EVENTS = "game_events_hourly"  # GHG10 Э13
-JOB_GAME_DIGEST = "game_digest_flush"  # GHG10 Э13
 JOB_GAME_ACHIEVEMENTS_FLUSH = "game_achievements_flush"  # GHG10 Э19 (буфер ачивок)
 JOB_GAME_VOICE = "game_voice_tick"  # GHG10 Э14
 JOB_GAME_MUSIC = "game_music_weekly"  # GHG10 Э15

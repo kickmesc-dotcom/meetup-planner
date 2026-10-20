@@ -11,7 +11,7 @@
 Стенд: AsyncMock на bot.stop_poll/bot.send_message + минимальный fake-Session
 с тем-же интерфейсом, что нужен функциям (commit/scalar/refresh). Полноценный
 sqlite-стенд для async-моделей в проект не тащим (другие сервисы тоже его
-не имеют — см. test_worm, test_bot_pause, test_loser_cooldown_split).
+не имеют — см. test_worm, test_loser_cooldown_split).
 """
 from __future__ import annotations
 

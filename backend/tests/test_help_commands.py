@@ -132,5 +132,5 @@ def test_private_user_help_contains_expected_public_commands():
     for cmd in ("/start", "/menu", "/whoami", "/help"):
         assert cmd in text, f"в private /help нет {cmd}"
     # Наследные шуточные команды сняты с витрины (обработчики при этом живы).
-    for legacy in ("/loser", "/phrase", "/zaebal", "/chukhan", "/top"):
+    for legacy in ("/loser", "/phrase", "/chukhan", "/top"):
         assert legacy not in text, f"{legacy} не должен светиться в витрине"

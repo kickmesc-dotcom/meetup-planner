@@ -984,45 +984,9 @@ export const setFeedViewFlag = (compact: boolean) =>
     body: JSON.stringify({ compact }),
   });
 
-// --- GHG6 E11: bot pause + zaebal settings ---
-
-export interface BotPauseState {
-  active: boolean;
-  id: number | null;
-  started_at: string | null;
-  ends_at: string | null;
-  reason: string | null;
-}
-
-export interface ZaebalSettings {
-  threshold: number;
-  duration_days: number;
-  poll_hours: number;
-  vote_duration_days: number;
-  auto_enabled: boolean;
-  auto_max_per_month: number;
-}
-
-export const fetchBotPauseCurrent = () =>
-  api<BotPauseState>("/api/admin/bot-pause/current");
-
-export const startBotPause = (durationDays: number | null) =>
-  api<BotPauseState>("/api/admin/bot-pause/start", {
-    method: "POST",
-    body: JSON.stringify({ duration_days: durationDays }),
-  });
-
-export const stopBotPause = () =>
-  api<BotPauseState>("/api/admin/bot-pause/stop", { method: "POST" });
-
-export const fetchZaebalSettings = () =>
-  api<ZaebalSettings>("/api/admin/zaebal-settings");
-
-export const updateZaebalSettings = (s: ZaebalSettings) =>
-  api<ZaebalSettings>("/api/admin/zaebal-settings", {
-    method: "PUT",
-    body: JSON.stringify(s),
-  });
+// Модуль «пауза бота» и голосование за неё удалён целиком: ручек и клиентских
+// обёрток больше нет. Возвращать его не планируется — при необходимости
+// управляющий выключает алерты в центре уведомлений.
 
 // --- GHG6 E9: реакции бота на @-mention и reply ---
 

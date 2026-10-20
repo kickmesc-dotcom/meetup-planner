@@ -8,7 +8,7 @@
   и admin force-reroll).
 - Пишет `LoserRoll.source` (по умолчанию 'manual').
 
-В проекте нет async-sqlite-стенда (см. test_worm, test_bot_pause — тот же
+В проекте нет async-sqlite-стенда (см. test_worm — тот же
 паттерн), поэтому юнитим логику через минимальный fake-session-stub,
 покрывающий ровно те запросы, что делает функция.
 """

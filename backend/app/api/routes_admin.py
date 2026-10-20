@@ -776,7 +776,7 @@ class PollsDefaultsIO(BaseModel):
     `live_participants_count` (G3): сколько уникальных голосов = «все живые».
     Default 5 (шестёрка минус автор/админ обычно).
     `pin_result` (G3): пинить ли announce-сообщение с результатами после
-    закрытия опроса (game_choice/game_when/zaebal).
+    закрытия опроса (выбор игры/времени).
     """
 
     pin_default: bool
@@ -3313,106 +3313,8 @@ async def admin_feed_view_put(
     return FeedViewOut(compact=body.compact)
 
 
-# --- GHG6 E11: bot pause + zaebal settings ---
-
-
-class BotPauseStartIn(BaseModel):
-    duration_days: int | None = None
-    reason: str | None = None
-
-
-class BotPauseOut(BaseModel):
-    active: bool
-    id: int | None = None
-    started_at: datetime | None = None
-    ends_at: datetime | None = None
-    reason: str | None = None
-
-
-class ZaebalSettingsIO(BaseModel):
-    threshold: int = Field(..., ge=1, le=10)
-    duration_days: int = Field(..., ge=1, le=30)
-    poll_hours: int = Field(..., ge=1, le=72)
-    vote_duration_days: int = Field(..., ge=1, le=30)
-    auto_enabled: bool
-    auto_max_per_month: int = Field(..., ge=0, le=10)
-
-
-def _pause_to_out(p) -> BotPauseOut:
-    if p is None:
-        return BotPauseOut(active=False)
-    return BotPauseOut(
-        active=p.ended_at is None,
-        id=p.id,
-        started_at=p.started_at,
-        ends_at=p.ends_at,
-        reason=p.reason,
-    )
-
-
-@router.get("/admin/bot-pause/current", response_model=BotPauseOut)
-async def admin_pause_current(
-    session: SessionDep, user: CurrentUser
-) -> BotPauseOut:
-    _ensure_admin(user)
-    from app._legacy.services.bot_pause import get_active_pause
-
-    return _pause_to_out(await get_active_pause(session))
-
-
-@router.post("/admin/bot-pause/start", response_model=BotPauseOut)
-async def admin_pause_start(
-    body: BotPauseStartIn, session: SessionDep, user: CurrentUser
-) -> BotPauseOut:
-    _ensure_admin(user)
-    from app._legacy.services.bot_pause import start_pause
-
-    reason = body.reason or "manual_admin"
-    try:
-        pause = await start_pause(
-            session,
-            duration_days=body.duration_days,
-            reason=reason,
-            started_by_tg_id=user.telegram_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
-    return _pause_to_out(pause)
-
-
-@router.post("/admin/bot-pause/stop", response_model=BotPauseOut)
-async def admin_pause_stop(
-    session: SessionDep, user: CurrentUser
-) -> BotPauseOut:
-    _ensure_admin(user)
-    from app._legacy.services.bot_pause import stop_pause
-
-    pause = await stop_pause(session)
-    return _pause_to_out(pause)
-
-
-@router.get("/admin/zaebal-settings", response_model=ZaebalSettingsIO)
-async def admin_zaebal_get(
-    session: SessionDep, user: CurrentUser
-) -> ZaebalSettingsIO:
-    _ensure_admin(user)
-    from app._legacy.services.bot_pause import get_zaebal_settings
-
-    return ZaebalSettingsIO(**(await get_zaebal_settings(session)))
-
-
-@router.put("/admin/zaebal-settings", response_model=ZaebalSettingsIO)
-async def admin_zaebal_put(
-    body: ZaebalSettingsIO, session: SessionDep, user: CurrentUser
-) -> ZaebalSettingsIO:
-    _ensure_admin(user)
-    from app.bot.dispatcher import get_bot
-    from app._legacy.services.bot_pause import set_zaebal_settings
-
-    await set_zaebal_settings(session, body.model_dump())
-    await reload_dynamic_jobs(get_bot())
-    log.info("admin.zaebal_settings_updated", by=user.id)
-    return body
+# Модули «пауза бота» и её голосование удалены целиком: ручек больше нет, в
+# `_legacy` остались только сервисы, которые никто не вызывает.
 
 
 # --- GHG6 E9: реакции бота на @-mention и reply ---

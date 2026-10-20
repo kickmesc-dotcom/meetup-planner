@@ -54,7 +54,8 @@ FEEDBACK_OPTIONS: tuple[str, ...] = (
 # Индекс 0..4 → rating 1..5; индекс 5 → was_absent.
 FEEDBACK_ABSENT_INDEX = 5
 
-# Метка kind для Poll-таблицы. Не путать с 'game_choice'/'game_when'/'zaebal'.
+# Метка kind для Poll-таблицы. Не путать с игровыми видами опросов
+# ('game_choice'/'game_when'), которые остались только в `_legacy`.
 POLL_KIND_MEETING_FEEDBACK = "meeting_feedback"
 
 
