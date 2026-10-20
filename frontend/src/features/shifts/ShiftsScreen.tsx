@@ -2,10 +2,14 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import {
+  bulkSaveShifts,
+  clearShiftCells,
+  copyShiftWeek,
   deleteShift,
   fetchShiftWeek,
   moveShift,
   saveShift,
+  type BulkResult,
   type ShiftItem,
   type ShiftPerson,
   type ShiftStatus,
@@ -13,7 +17,18 @@ import {
 } from "@/api/shifts";
 import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
+import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import MassPlanSheet, { type MassPlanInput } from "./MassPlanSheet";
+import {
+  addDays,
+  cellKey,
+  formatDate,
+  mondayOf,
+  rangeLabel,
+  toIso,
+  weekday,
+} from "./shiftDates";
 
 /**
  * Табель смен: одна неделя, одна сетка.
@@ -28,6 +43,8 @@ export default function ShiftsScreen() {
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [sheet, setSheet] = useState<SheetState | null>(null);
+  // Шаблон недели / массовые правки — отдельный лист: сетка остаётся по клеткам.
+  const [massOpen, setMassOpen] = useState(false);
 
   const startIso = toIso(weekStart);
   const q = useQuery({
@@ -71,6 +88,59 @@ export default function ShiftsScreen() {
       haptic("success");
       setSheet(null);
       refresh();
+    },
+    onError,
+  });
+
+  /** «Записано 5, пропущено 2» — без чисел результат массовой правки не понять. */
+  const bulkText = (result: BulkResult, verb: string) =>
+    `${verb}: ${result.saved}` +
+    (result.skipped ? ` · пропущено занятых: ${result.skipped}` : "");
+
+  const bulk = useMutation({
+    mutationFn: (input: MassPlanInput) =>
+      bulkSaveShifts({
+        employee_ids: input.employeeIds,
+        days: input.days,
+        status: input.status,
+        starts_at: input.startsAt || null,
+        ends_at: input.endsAt || null,
+        note: input.note.trim() || null,
+        overwrite: input.overwrite,
+      }),
+    onSuccess: (result) => {
+      haptic("success");
+      setMassOpen(false);
+      refresh();
+      void showAlert(bulkText(result, "Записано смен"));
+    },
+    onError,
+  });
+
+  const copyPrevious = useMutation({
+    mutationFn: (employeeIds: number[]) =>
+      copyShiftWeek({
+        from_start: toIso(addDays(weekStart, -7)),
+        to_start: toIso(weekStart),
+        employee_ids: employeeIds,
+      }),
+    onSuccess: (result) => {
+      haptic("success");
+      setMassOpen(false);
+      refresh();
+      void showAlert(bulkText(result, "Скопировано смен"));
+    },
+    onError,
+  });
+
+  const clearCells = useMutation({
+    mutationFn: (input: { employeeIds: number[]; days: string[] }) =>
+      clearShiftCells({ employee_ids: input.employeeIds, days: input.days }),
+    onSuccess: (result) => {
+      haptic("success");
+      setMassOpen(false);
+      refresh();
+      void showAlert(`Снято смен: ${result.removed}`);
     },
     onError,
   });
@@ -157,6 +227,20 @@ export default function ShiftsScreen() {
             ))}
           </div>
         )}
+
+        {canEdit && q.data && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic("light");
+              setMassOpen(true);
+            }}
+            className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-secondary-bg/60 text-xs font-medium text-tg-text"
+          >
+            <Icon name="clipboard" size={16} />
+            Шаблон недели и массовые правки
+          </button>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto p-2">
@@ -234,6 +318,27 @@ export default function ShiftsScreen() {
           </>
         )}
       </div>
+
+      {massOpen && q.data && (
+        <MassPlanSheet
+          people={q.data.people}
+          weekStart={weekStart}
+          statuses={q.data.statuses}
+          busy={bulk.isPending}
+          copyBusy={copyPrevious.isPending}
+          clearBusy={clearCells.isPending}
+          onClose={() => setMassOpen(false)}
+          onApply={(input) => bulk.mutate(input)}
+          onCopyPrevious={(employeeIds) => copyPrevious.mutate(employeeIds)}
+          onClear={(input) => {
+            void (async () => {
+              const count = input.employeeIds.length * input.days.length;
+              const ok = await showConfirm(`Снять смены с выбранных клеток (${count})?`);
+              if (ok) clearCells.mutate(input);
+            })();
+          }}
+        />
+      )}
 
       {sheet && (
         <ShiftSheet
@@ -590,63 +695,12 @@ function FilterChip({
       type="button"
       onClick={onClick}
       className={`shrink-0 min-h-8 rounded-full px-2.5 text-xs ${
-        active ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg/60 text-tg-text"
+        active
+          ? "bg-tg-link/15 font-medium text-tg-text"
+          : "bg-tg-secondary-bg/60 text-tg-text"
       }`}
     >
       {label}
     </button>
   );
-}
-
-// --- Даты ------------------------------------------------------------------
-
-function mondayOf(date: Date): Date {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  const shift = (copy.getDay() + 6) % 7;
-  copy.setDate(copy.getDate() - shift);
-  return copy;
-}
-
-function addDays(date: Date, days: number): Date {
-  const copy = new Date(date);
-  copy.setDate(copy.getDate() + days);
-  return copy;
-}
-
-function toIso(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function cellKey(employeeId: number, day: string): string {
-  return `${employeeId}:${day}`;
-}
-
-function weekday(date: Date): string {
-  return date.toLocaleDateString("ru-RU", { weekday: "short" }).slice(0, 2);
-}
-
-function formatDate(iso: string): string {
-  const date = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
-}
-
-function rangeLabel(days: Date[]): string {
-  const first = days[0];
-  const last = days[days.length - 1];
-  const sameMonth = first.getMonth() === last.getMonth();
-  const left = first.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "short",
-  });
-  const right = last.toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: sameMonth ? undefined : "short",
-    year: last.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
-  });
-  return `${left} — ${right}`;
 }

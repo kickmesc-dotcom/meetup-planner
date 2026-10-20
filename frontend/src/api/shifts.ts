@@ -90,3 +90,50 @@ export const moveShift = (shiftId: number, day: string) =>
 
 export const deleteShift = (shiftId: number) =>
   api<{ removed: boolean }>(`/api/shifts/${shiftId}`, { method: "DELETE" });
+
+export interface BulkShiftInput {
+  employee_ids: number[];
+  /** Конкретные даты: «пн-ср» в даты переводит фронтенд. */
+  days: string[];
+  status: ShiftStatus;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  note?: string | null;
+  /** false — заполнять только пустые клетки. */
+  overwrite?: boolean;
+}
+
+export interface BulkResult {
+  saved: number;
+  skipped: number;
+}
+
+/** Шаблон недели и массовая правка: одна смена на много клеток сразу. */
+export const bulkSaveShifts = (body: BulkShiftInput) =>
+  api<BulkResult>("/api/shifts/bulk", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/** Копия недели: день недели сохраняется, занятые дни по умолчанию не трогаются. */
+export const copyShiftWeek = (body: {
+  from_start: string;
+  to_start: string;
+  employee_ids?: number[];
+  department_id?: number | null;
+  overwrite?: boolean;
+}) =>
+  api<BulkResult>("/api/shifts/copy-week", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/** Массово снять смены с выбранных клеток. */
+export const clearShiftCells = (body: {
+  employee_ids: number[];
+  days: string[];
+}) =>
+  api<{ removed: number }>("/api/shifts/clear", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });

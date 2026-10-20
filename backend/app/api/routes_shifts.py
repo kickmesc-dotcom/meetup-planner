@@ -83,6 +83,46 @@ class ShiftMoveIn(BaseModel):
     day: date
 
 
+class BulkShiftIn(BaseModel):
+    """Шаблон недели / массовая правка: одна смена на много клеток сразу.
+
+    `days` — конкретные даты, а не дни недели: фронтенд сам переводит
+    «пн-ср» в числа выбранной недели, а сервер не угадывает часовой пояс.
+    """
+
+    employee_ids: list[int] = Field(
+        min_length=1, max_length=hr_shifts.MAX_BULK_PEOPLE
+    )
+    days: list[date] = Field(min_length=1, max_length=hr_shifts.MAX_BULK_DAYS)
+    status: str = Field(pattern="^(planned|worked|sick|absent|dayoff|vacation)$")
+    starts_at: time | None = None
+    ends_at: time | None = None
+    note: str | None = Field(None, max_length=200)
+    overwrite: bool = True
+
+
+class CopyWeekIn(BaseModel):
+    from_start: date
+    to_start: date
+    employee_ids: list[int] | None = Field(
+        None, max_length=hr_shifts.MAX_BULK_PEOPLE
+    )
+    department_id: int | None = None
+    overwrite: bool = False
+
+
+class ClearCellsIn(BaseModel):
+    employee_ids: list[int] = Field(
+        min_length=1, max_length=hr_shifts.MAX_BULK_PEOPLE
+    )
+    days: list[date] = Field(min_length=1, max_length=hr_shifts.MAX_BULK_DAYS)
+
+
+class BulkResultOut(BaseModel):
+    saved: int
+    skipped: int
+
+
 def _shift_error(exc: hr_shifts.ShiftError) -> HTTPException:
     code = str(exc)
     if code in {"employee_not_found", "shift_not_found"}:
@@ -228,6 +268,65 @@ async def put_shift(
         raise _shift_error(exc) from exc
     flags = await _flags(session, [employee_id], start=day, end=day)
     return _shift_out(row, flags.get(employee_id))
+
+
+@router.post("/shifts/bulk", response_model=BulkResultOut)
+async def bulk_put_shifts(
+    body: BulkShiftIn, session: SessionDep, employee: AupDep
+) -> BulkResultOut:
+    """Поставить одну смену сразу на несколько человек и дней (шаблон недели)."""
+    try:
+        result = await hr_shifts.bulk_apply(
+            session,
+            employee,
+            employee_ids=body.employee_ids,
+            days=body.days,
+            status=body.status,
+            starts_at=body.starts_at,
+            ends_at=body.ends_at,
+            note=body.note,
+            overwrite=body.overwrite,
+        )
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return BulkResultOut(saved=result.saved, skipped=result.skipped)
+
+
+@router.post("/shifts/copy-week", response_model=BulkResultOut)
+async def copy_week_shifts(
+    body: CopyWeekIn, session: SessionDep, employee: AupDep
+) -> BulkResultOut:
+    """Скопировать смены недели на другую неделю (день недели сохраняется)."""
+    try:
+        result = await hr_shifts.copy_week(
+            session,
+            employee,
+            from_start=body.from_start,
+            to_start=body.to_start,
+            employee_ids=body.employee_ids,
+            department_id=body.department_id,
+            overwrite=body.overwrite,
+        )
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return BulkResultOut(saved=result.saved, skipped=result.skipped)
+
+
+@router.post("/shifts/clear")
+async def clear_shift_cells(
+    body: ClearCellsIn, session: SessionDep, employee: AupDep
+) -> dict[str, int]:
+    """Массово снять смены с выбранных клеток (остальные дни не трогаем)."""
+    try:
+        removed = await hr_shifts.clear_cells(
+            session,
+            employee,
+            employee_ids=body.employee_ids,
+            days=body.days,
+        )
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return {"removed": removed}
 
 
 @router.post("/shifts/{shift_id}/move", response_model=ShiftOut)

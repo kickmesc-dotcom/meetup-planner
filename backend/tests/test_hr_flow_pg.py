@@ -1263,3 +1263,88 @@ async def test_shifts_timesheet_and_training_by_work(flow: Flow) -> None:
         json={"status": "worked"},
     )
     assert r.status_code == 403
+
+
+async def test_shifts_bulk_and_copy_week(flow: Flow) -> None:
+    """Массовое планирование: шаблон недели, копирование недели, очистка.
+
+    Проверяем три обещания: шаблон ставит одну смену на набор дней без дублей,
+    копирование переезжает по дню недели и по умолчанию не затирает уже
+    поставленное, а очистка снимает только выбранные клетки.
+    """
+    client = flow.client
+    await _onboard_employee(flow)
+    flow.act_as(flow.manager_user)
+
+    monday = date.today() + timedelta(days=14 - date.today().weekday())
+    next_monday = monday + timedelta(days=7)
+    wednesday = monday + timedelta(days=2)
+
+    template = {
+        "employee_ids": [flow.employee_id],
+        "days": [monday.isoformat(), wednesday.isoformat()],
+        "status": "planned",
+        "starts_at": "10:00",
+        "ends_at": "18:00",
+        "note": "смена по шаблону",
+    }
+    r = await client.post("/api/shifts/bulk", json=template)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"saved": 2, "skipped": 0}
+
+    # Повтор с overwrite=false не трогает уже поставленное.
+    r = await client.post("/api/shifts/bulk", json={**template, "overwrite": False})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"saved": 0, "skipped": 2}
+
+    # Копирование на следующую неделю: день недели сохраняется.
+    copy = {
+        "from_start": monday.isoformat(),
+        "to_start": next_monday.isoformat(),
+        "employee_ids": [flow.employee_id],
+    }
+    r = await client.post("/api/shifts/copy-week", json=copy)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"saved": 2, "skipped": 0}
+
+    # Второй раз — пусто: дублей не появляется.
+    r = await client.post("/api/shifts/copy-week", json=copy)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"saved": 0, "skipped": 2}
+
+    r = await client.get(f"/api/shifts?start={next_monday.isoformat()}&days=7")
+    assert r.status_code == 200, r.text
+    rows = {
+        (item["employee_id"], item["day"]): item for item in r.json()["shifts"]
+    }
+    copied = rows[(flow.employee_id, (next_monday + timedelta(days=2)).isoformat())]
+    assert copied["status"] == "planned"
+    assert copied["starts_at"] == "10:00" and copied["ends_at"] == "18:00"
+    assert copied["note"] == "смена по шаблону"
+
+    # Очистка снимает только выбранную клетку.
+    r = await client.post(
+        "/api/shifts/clear",
+        json={
+            "employee_ids": [flow.employee_id],
+            "days": [next_monday.isoformat()],
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {"removed": 1}
+    r = await client.get(f"/api/shifts?start={next_monday.isoformat()}&days=7")
+    remaining = {
+        (item["employee_id"], item["day"]) for item in r.json()["shifts"]
+    }
+    assert (flow.employee_id, next_monday.isoformat()) not in remaining
+    assert (flow.employee_id, (next_monday + timedelta(days=2)).isoformat()) in remaining
+
+    # Сотруднику массовые ручки закрыты, даже если он знает URL.
+    flow.act_as(flow.employee_user)
+    for path, payload in (
+        ("/api/shifts/bulk", template),
+        ("/api/shifts/copy-week", copy),
+        ("/api/shifts/clear", {"employee_ids": [flow.employee_id], "days": [monday.isoformat()]}),
+    ):
+        r = await client.post(path, json=payload)
+        assert r.status_code == 403, f"{path}: {r.status_code} {r.text}"
