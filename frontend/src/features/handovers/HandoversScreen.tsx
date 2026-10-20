@@ -96,7 +96,7 @@ export default function HandoversScreen() {
               haptic("light");
               setTab("tasks");
             }}
-            className="-ml-1 min-h-9 min-w-9 rounded-lg text-lg text-tg-hint"
+            className="-ml-1 min-h-11 min-w-11 rounded-lg text-lg text-tg-hint"
             aria-label="Назад к задачам"
           >
             ‹

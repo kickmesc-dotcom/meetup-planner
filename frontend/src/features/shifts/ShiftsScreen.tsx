@@ -109,7 +109,7 @@ export default function ShiftsScreen() {
           <button
             type="button"
             onClick={() => stepWeek(-1)}
-            className="min-h-9 min-w-9 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Предыдущая неделя"
           >
             ‹
@@ -127,7 +127,7 @@ export default function ShiftsScreen() {
           <button
             type="button"
             onClick={() => stepWeek(1)}
-            className="min-h-9 min-w-9 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Следующая неделя"
           >
             ›
@@ -451,7 +451,7 @@ function ShiftSheet({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-9 min-w-9 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Закрыть"
           >
             ✕

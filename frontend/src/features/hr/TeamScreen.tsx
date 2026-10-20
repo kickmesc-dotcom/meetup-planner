@@ -77,7 +77,7 @@ export default function TeamScreen({
               haptic("light");
               onBack();
             }}
-            className="min-h-9 min-w-9 rounded-lg text-lg text-tg-link"
+            className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
             aria-label="Назад"
           >
             ‹
@@ -96,7 +96,7 @@ export default function TeamScreen({
         <button
           type="button"
           onClick={() => void dashboard.refetch()}
-          className="min-h-9 rounded-lg px-2 text-xs text-tg-link"
+          className="min-h-11 min-w-11 rounded-lg px-2 text-xs text-tg-link"
         >
           ⟳
         </button>

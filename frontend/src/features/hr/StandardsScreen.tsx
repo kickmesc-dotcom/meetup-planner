@@ -53,7 +53,7 @@ export default function StandardsScreen() {
             haptic("light");
             setTab("tasks");
           }}
-          className="min-h-9 min-w-9 rounded-lg text-lg text-tg-link"
+          className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
           aria-label="Назад к задачам"
         >
           ‹
@@ -264,7 +264,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         <button
           type="button"
           onClick={onBack}
-          className="min-h-9 min-w-9 rounded-lg text-lg text-tg-link"
+          className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
           aria-label="Назад к списку"
         >
           ‹
@@ -579,7 +579,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                   onClick={() =>
                     setQuestions((prev) => prev.filter((_, i) => i !== index))
                   }
-                  className="min-h-9 min-w-9 rounded-lg text-xs text-tg-hint"
+                  className="min-h-11 min-w-11 rounded-lg text-xs text-tg-hint"
                   aria-label="Удалить вопрос"
                 >
                   ✕

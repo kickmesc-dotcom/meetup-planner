@@ -59,6 +59,42 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
+/* VISUAL_AUDIT P2.14: на Windows полосатый системный скроллбар торчал поверх
+   мобильной вёрстки. Тонкий скроллбар только для точных указателей (мышь,
+   трекпад); на тач-экранах он не нужен вовсе и не занимает ширину. */
+@media (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(
+        in srgb,
+        var(--tg-theme-hint-color, #999999) 45%,
+        transparent
+      )
+      transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(
+      in srgb,
+      var(--tg-theme-hint-color, #999999) 45%,
+      transparent
+    );
+    border-radius: 999px;
+  }
+}
+@media (pointer: coarse) {
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
 /* DESIGN_SYSTEM §7: мягкое появление оверлеев. Раньше здесь были Tailwind-классы
    `animate-in fade-in zoom-in` — но `tailwindcss-animate` не установлен, поэтому
    они резолвились в animation-name:none (проверено в браузере). Анимируем только

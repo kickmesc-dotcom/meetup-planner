@@ -233,7 +233,7 @@ function PlanCard({
                 type="button"
                 disabled={busy || plan.training_days <= 0}
                 onClick={() => onTrainingDays(Math.max(0, plan.training_days - 1))}
-                className="min-h-9 min-w-9 rounded-lg bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded-lg bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
                 aria-label="Меньше учебных смен"
               >
                 −
@@ -245,7 +245,7 @@ function PlanCard({
                 type="button"
                 disabled={busy || plan.training_days >= 30}
                 onClick={() => onTrainingDays(Math.min(30, plan.training_days + 1))}
-                className="min-h-9 min-w-9 rounded-lg bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded-lg bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
                 aria-label="Больше учебных смен"
               >
                 +

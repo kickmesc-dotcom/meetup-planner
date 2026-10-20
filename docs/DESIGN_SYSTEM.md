@@ -30,6 +30,11 @@ Telegram theme; never hardcode their equivalents.
 white (`text-white`), because those backgrounds are theme-independent. Everywhere else,
 prefer a token over `text-white`.
 
+**Exception (§1.1.a, P0 accessibility):** the Telegram default button colors do not
+pass WCAG AA with white text — `#5288c1` = 3.72:1 (dark), `#2481cc` = 4.12:1 (light).
+The app's palettes in `store/theme.ts` use `#3b6ea5` (5.30:1) and `#1c6fb8` (5.24:1).
+`store/theme.contrast.test.ts` enforces ≥ 4.5:1 for the button and hint tokens.
+
 ### 1.2 Availability status colors
 
 Semantic scale for availability (`1=свободен`, `2=может`, `3=занят`). Fixed hexes, not

@@ -91,7 +91,9 @@ export default function ChecklistScreen() {
         <div className="flex items-baseline justify-between gap-2">
           <h1 className="text-lg font-semibold text-tg-text">Чек-лист смены</h1>
           {data && data.total > 0 && (
-            <span className="text-xs text-tg-hint">{data.progress_text}</span>
+            <span className="text-xs tabular-nums text-tg-hint">
+              {data.progress_text}
+            </span>
           )}
         </div>
         <div className="mt-3 flex gap-1.5">
@@ -106,7 +108,7 @@ export default function ChecklistScreen() {
                 setNoteFor(null);
               }}
               className={[
-                "min-h-8 rounded-full px-3 text-xs transition-colors",
+                "min-h-11 rounded-full px-3 text-xs transition-colors",
                 kind === v
                   ? "bg-tg-button text-tg-button-text"
                   : "bg-tg-secondary-bg text-tg-hint",
@@ -127,7 +129,7 @@ export default function ChecklistScreen() {
                 haptic("light");
                 setChangingHall(true);
               }}
-              className="text-[11px] text-tg-link"
+              className="min-h-11 px-2 text-[11px] text-tg-link"
             >
               сменить
             </button>

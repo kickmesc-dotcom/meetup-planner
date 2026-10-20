@@ -10,6 +10,9 @@
  * с настоящими элементами). Теперь это обычный flex-элемент в верхней строке
  * каждого экрана — выравнивание получается само: тот же центр строки и тот же
  * отступ, что у колокольчика/стрелок/заголовка.
+ *
+ * VISUAL_AUDIT P0.2: видимая плашка остаётся 28px, но нажимаемая область —
+ * 44×44 (`-my-2` компенсирует рост, чтобы шапки не разъезжались).
  */
 import { useTheme } from "@/store/theme";
 import { haptic, syncWebAppChrome } from "@/tg/webapp";
@@ -34,12 +37,17 @@ export default function ThemeSwitcher({ className }: { className?: string }) {
         syncWebAppChrome(dark ? "light" : "dark");
       }}
       className={[
-        "grid h-7 w-7 shrink-0 place-items-center rounded-full bg-tg-secondary-bg/70",
-        "text-[13px] leading-none text-tg-hint active:scale-95 transition-transform",
+        "-my-2 grid h-11 w-11 shrink-0 place-items-center rounded-full",
+        "active:scale-95 transition-transform",
         className ?? "",
       ].join(" ")}
     >
-      <span aria-hidden>{dark ? "🌙" : "☀️"}</span>
+      <span
+        aria-hidden
+        className="grid h-7 w-7 place-items-center rounded-full bg-tg-secondary-bg/70 text-[13px] leading-none text-tg-hint"
+      >
+        {dark ? "🌙" : "☀️"}
+      </span>
     </button>
   );
 }

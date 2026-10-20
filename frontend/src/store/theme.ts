@@ -34,8 +34,13 @@ export const DEFAULT_THEME: Theme = "light";
 
 /**
  * Палитры. Значения — официальные цвета Telegram (`themeParams`) для тёмной
- * «ночной» и светлой схем, кроме `hint-color`: там сознательно взят более
- * контрастный `#707579` вместо `#999999`, иначе подписи не читаются (AA).
+ * «ночной» и светлой схем, кроме двух сознательных отступлений:
+ *
+ * - `hint-color`: `#707579` вместо `#999999` — иначе подписи не читаются (AA).
+ * - `button-color`: официальные `#5288c1` (dark) и `#2481cc` (light) дают с
+ *   белым текстом 3.72:1 и 4.12:1 — ниже нормы 4.5:1 для мелкого текста (это
+ *   замерено в `VISUAL_AUDIT.md`, P0.1). Оттенки затемнены до 5.3:1;
+ *   проверяется тестом `theme.contrast.test.ts`.
  */
 export const THEME_PALETTE: Record<Theme, Record<string, string>> = {
   dark: {
@@ -44,7 +49,7 @@ export const THEME_PALETTE: Record<Theme, Record<string, string>> = {
     "--tg-theme-text-color": "#f5f5f5",
     "--tg-theme-hint-color": "#7d8b99",
     "--tg-theme-link-color": "#6ab3f3",
-    "--tg-theme-button-color": "#5288c1",
+    "--tg-theme-button-color": "#3b6ea5",
     "--tg-theme-button-text-color": "#ffffff",
     "--tg-theme-header-bg-color": "#17212b",
     "--tg-theme-section-bg-color": "#17212b",
@@ -59,7 +64,7 @@ export const THEME_PALETTE: Record<Theme, Record<string, string>> = {
     "--tg-theme-text-color": "#000000",
     "--tg-theme-hint-color": "#707579",
     "--tg-theme-link-color": "#2481cc",
-    "--tg-theme-button-color": "#2481cc",
+    "--tg-theme-button-color": "#1c6fb8",
     "--tg-theme-button-text-color": "#ffffff",
     "--tg-theme-header-bg-color": "#ffffff",
     "--tg-theme-section-bg-color": "#ffffff",

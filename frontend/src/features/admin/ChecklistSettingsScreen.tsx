@@ -191,7 +191,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
               haptic("selection");
               createTpl.mutate();
             }}
-            className="mt-3 min-h-10 rounded-lg bg-tg-button px-4 text-sm font-medium text-tg-button-text disabled:opacity-50"
+            className="mt-3 min-h-11 rounded-lg bg-tg-button px-4 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
             {createTpl.isPending ? "Создаю…" : "Создать чек-лист"}
           </button>
@@ -313,7 +313,7 @@ function TemplateEditor({
             haptic("light");
             setAdding(true);
           }}
-          className="min-h-10 w-full rounded-xl border border-dashed border-tg-hint/40 text-sm text-tg-text"
+          className="min-h-11 w-full rounded-xl border border-dashed border-tg-hint/40 text-sm text-tg-text"
         >
           ＋ Добавить пункт
         </button>
@@ -353,14 +353,14 @@ function AddItemForm({
           type="button"
           disabled={busy || !title.trim()}
           onClick={() => onSubmit(title.trim(), photo)}
-          className="min-h-10 flex-1 rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+          className="min-h-11 flex-1 rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
           Добавить
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="min-h-10 rounded-lg bg-tg-bg/60 px-3 text-sm text-tg-text"
+          className="min-h-11 rounded-lg bg-tg-bg/60 px-3 text-sm text-tg-text"
         >
           Отмена
         </button>
@@ -428,7 +428,7 @@ function ItemEditor({
             aria-label="Выше"
             disabled={isFirst}
             onClick={() => onMove(-1)}
-            className="h-7 w-7 rounded-md bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
+            className="h-11 w-11 rounded-md bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
           >
             ↑
           </button>
@@ -437,7 +437,7 @@ function ItemEditor({
             aria-label="Ниже"
             disabled={isLast}
             onClick={() => onMove(1)}
-            className="h-7 w-7 rounded-md bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
+            className="h-11 w-11 rounded-md bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
           >
             ↓
           </button>
@@ -482,7 +482,7 @@ function ItemEditor({
                   description: description.trim() || null,
                 })
               }
-              className="min-h-10 flex-1 rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
               Сохранить
             </button>
@@ -495,7 +495,7 @@ function ItemEditor({
                 );
                 if (ok) remove.mutate();
               }}
-              className="min-h-10 rounded-lg bg-status-busy/15 px-3 text-sm text-status-busy"
+              className="min-h-11 rounded-lg bg-status-busy/15 px-3 text-sm text-status-busy"
             >
               Удалить
             </button>
@@ -605,7 +605,7 @@ function HallsCard() {
               type="button"
               disabled={create.isPending || !name.trim()}
               onClick={() => create.mutate(name.trim())}
-              className="min-h-10 rounded-lg bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="min-h-11 rounded-lg bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
               ＋
             </button>
@@ -647,7 +647,7 @@ function Chips<T extends string | number>({
             onChange(o.value);
           }}
           className={[
-            "min-h-8 rounded-full px-3 text-xs transition-colors",
+            "min-h-11 rounded-full px-3 text-xs transition-colors",
             o.value === value
               ? "bg-tg-button text-tg-button-text"
               : "bg-tg-secondary-bg text-tg-hint",

@@ -202,7 +202,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("standards");
               }}
-              className="min-h-8 min-w-8 rounded-lg bg-tg-secondary-bg text-base leading-none"
+              className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg text-base leading-none"
               aria-label="База стандартов"
               title="База стандартов"
             >
@@ -215,7 +215,7 @@ export default function MyTasksScreen() {
                   haptic("selection");
                   setTab("review");
                 }}
-                className="min-h-8 min-w-8 rounded-lg bg-tg-secondary-bg text-base leading-none"
+                className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg text-base leading-none"
                 aria-label="Приёмка работ"
                 title="Приёмка работ"
               >
@@ -229,7 +229,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("handovers");
               }}
-              className="min-h-8 min-w-8 rounded-lg bg-tg-secondary-bg text-base leading-none"
+              className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg text-base leading-none"
               aria-label="Передача смены"
               title="Передача смены"
             >
@@ -256,7 +256,7 @@ export default function MyTasksScreen() {
                 setShowClosed(o.v);
               }}
               className={[
-                "min-h-8 rounded-full px-3 text-xs transition-colors",
+                "min-h-11 rounded-full px-3 text-xs transition-colors",
                 showClosed === o.v
                   ? "bg-tg-button text-tg-button-text"
                   : "bg-tg-secondary-bg text-tg-hint",
@@ -273,7 +273,7 @@ export default function MyTasksScreen() {
               haptic("selection");
               setTab("issues");
             }}
-            className="ml-auto min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
+            className="ml-auto min-h-11 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
           >
             🛠 Проблемы
           </button>
@@ -301,7 +301,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("checklist");
               }}
-              className="mt-2 min-h-8 rounded-full bg-tg-bg px-3 text-xs text-tg-link"
+              className="mt-2 min-h-11 rounded-full bg-tg-bg px-3 text-xs text-tg-link"
             >
               {checklist.status === "done" ? "Смена закрыта" : "Открыть чек-лист"}
             </button>
@@ -355,7 +355,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("feed");
               }}
-              className="mt-3 min-h-9 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-link"
+              className="mt-3 min-h-11 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-link"
             >
               События
             </button>

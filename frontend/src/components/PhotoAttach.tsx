@@ -51,8 +51,9 @@ export default function PhotoAttach({
     upload.mutate(file);
   };
 
+  // VISUAL_AUDIT P0.2: даже компактные «Снять / Галерея» — не меньше 44px.
   const buttonClass = compact
-    ? "min-h-9 rounded-lg bg-tg-secondary-bg px-2.5 text-[12px] text-tg-text"
+    ? "min-h-11 rounded-lg bg-tg-secondary-bg px-2.5 text-[12px] text-tg-text"
     : "min-h-11 flex-1 rounded-lg bg-tg-secondary-bg px-3 text-sm text-tg-text";
 
   return (
