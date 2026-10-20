@@ -105,6 +105,32 @@ that still has to be **read** (captions, ledger ranks, empty states) uses the se
 **`text-muted`** token: 62% of the theme's text color → **5.96:1 light / 7.40:1 dark**
 (measured). Reserve `text-tg-hint` for text that is decorative or duplicated elsewhere.
 
+### 1.7 One accent per screen (VISUAL_AUDIT P3.16)
+
+The accent is the theme's `tg-button`/`tg-link` pair. Only one thing on a screen may
+wear a **filled** accent: the screen's main action ("Продолжить чек-лист",
+"+ Сообщить", "Завести карточку").
+
+| Role | Look |
+|---|---|
+| Main action | `bg-tg-button text-tg-button-text` — at most one per screen |
+| Selection (segment tabs, filter chips) | `bg-tg-link/15 font-medium text-tg-text` — never filled |
+| Secondary/inline action | `text-tg-link` on a neutral surface |
+| State (done, overdue, error, warning) | `status-*` palette only, on the item's own pill |
+
+Two rules follow from this and are easy to break:
+
+1. **Status colors are semantics, not decoration.** A label like the test-pool `BOT`
+   mark stays neutral (`bg-tg-hint/15 text-tg-hint`); otherwise amber/green on the same
+   screen competes with real state.
+2. **A selected filter is not a button.** Filling it with `bg-tg-button` made filters in
+   the header look like the primary action and flattened the hierarchy.
+
+The selection style deliberately uses `text-tg-text`, not `text-tg-link`: on a 15%
+link tint the link color measures **3.07:1** in the light theme (AA needs 4.5:1 for
+12px), while the body text color keeps **15.60:1 light / 10.33:1 dark**.
+`theme.contrast.test.ts` checks the pair.
+
 ---
 
 ## 2. Typography
@@ -229,6 +255,11 @@ Opacity/enter: 150ms. Defined with framer-motion — **do not** use Tailwind `an
 utility classes for entrances (no plugin installed). Always honour
 `prefers-reduced-motion` for scroll/transform animation, but keep functional motion (drag,
 snap) intact.
+
+**Tab change** (P3.17): `components/TabTransition.tsx` — 140ms `easeOut`, opacity
+0→1 plus 4px rise. The key is applied by the caller (`key={tab}`), so the enter plays
+per screen; under `prefers-reduced-motion` `initial={false}` and the screen appears in
+its final state. No exit animation: navigation must not wait for the old screen.
 
 ---
 

@@ -29,6 +29,7 @@ import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
 import ErrorState from "./components/ErrorState";
+import TabTransition from "./components/TabTransition";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import SimulationBanner from "./components/SimulationBanner";
 import { useSimulation } from "./store/simulation";
@@ -314,7 +315,8 @@ export default function App() {
     // остальным шуточным контуром — он уехал в `src/_legacy`, каркас остался.
     <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
       <SimulationBanner />
-      {content}
+      {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
+      <TabTransition key={tab}>{content}</TabTransition>
       <TabBar isAdmin={isAdmin} canManage={canManage} />
     </div>
   );

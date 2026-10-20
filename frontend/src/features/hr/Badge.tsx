@@ -28,7 +28,10 @@ export default function Badge({
       {emoji && <span aria-hidden>{emoji}</span>}
       {text && <span className="truncate">{text}</span>}
       {demo && (
-        <span className="shrink-0 rounded-full bg-status-maybe/20 px-1 text-status-maybe">
+        // VISUAL_AUDIT P3.16: «BOT» — это подпись, а не состояние, поэтому
+        // нейтральный фон: янтарный статусный цвет на плашке спорил с
+        // настоящими статусами (выполнено/просрочено) на том же экране.
+        <span className="shrink-0 rounded-full bg-tg-hint/15 px-1 text-tg-hint">
           BOT
         </span>
       )}

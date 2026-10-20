@@ -110,8 +110,10 @@ export default function ChecklistScreen() {
               }}
               className={[
                 "min-h-11 rounded-full px-3 text-xs transition-colors",
+                // P3.16: вкладка чек-листа — выбор, а не действие. Текст
+                // нейтральный: `text-tg-link` на 15%-подложке — 3.1:1 (ниже AA).
                 kind === v
-                  ? "bg-tg-button text-tg-button-text"
+                  ? "bg-tg-link/15 font-medium text-tg-text"
                   : "bg-tg-secondary-bg text-tg-hint",
               ].join(" ")}
             >

@@ -262,8 +262,12 @@ export default function MyTasksScreen() {
               }}
               className={[
                 "min-h-11 rounded-full px-3 text-xs transition-colors",
+                // P3.16: выбранный фильтр — не главная кнопка экрана. Заливка
+                // `bg-tg-button` остаётся за действием («Продолжить чек-лист»).
+                // Текст нейтральный, а не `text-tg-link`: на 15%-подложке
+                // ссылочный цвет даёт 3.1:1 — ниже AA для 12px.
                 showClosed === o.v
-                  ? "bg-tg-button text-tg-button-text"
+                  ? "bg-tg-link/15 font-medium text-tg-text"
                   : "bg-tg-secondary-bg text-tg-hint",
               ].join(" ")}
             >

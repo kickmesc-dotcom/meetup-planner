@@ -309,8 +309,11 @@ export default function HrFeedScreen() {
                     }}
                     className={[
                       "min-h-7 rounded-full px-2.5 text-xs transition-colors",
+                      // P3.16: фильтр по типам — выбор, а не действие; заливка
+                      // главной кнопки остаётся за кнопками-действиями. Текст
+                      // нейтральный: ссылочный цвет на подложке — 3.1:1.
                       active
-                        ? "bg-tg-button text-tg-button-text"
+                        ? "bg-tg-link/15 font-medium text-tg-text"
                         : "bg-tg-secondary-bg text-tg-hint",
                     ].join(" ")}
                   >
