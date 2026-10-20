@@ -12,9 +12,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ShiftsScreen from "./ShiftsScreen";
 import { addDays, mondayOf, toIso } from "./shiftDates";
 import {
+  applyShiftTemplate,
   bulkSaveShifts,
   clearShiftCells,
   copyShiftWeek,
+  fetchShiftTemplates,
   fetchShiftWeek,
   type ShiftWeek,
 } from "@/api/shifts";
@@ -27,6 +29,10 @@ vi.mock("@/api/shifts", () => ({
   bulkSaveShifts: vi.fn(),
   copyShiftWeek: vi.fn(),
   clearShiftCells: vi.fn(),
+  fetchShiftTemplates: vi.fn(),
+  saveShiftTemplate: vi.fn(),
+  applyShiftTemplate: vi.fn(),
+  deleteShiftTemplate: vi.fn(),
 }));
 
 const showAlert = vi.fn().mockResolvedValue(undefined);
@@ -38,6 +44,8 @@ vi.mock("@/tg/webapp", () => ({
 }));
 
 const weekMock = vi.mocked(fetchShiftWeek);
+const templatesMock = vi.mocked(fetchShiftTemplates);
+const applyTemplateMock = vi.mocked(applyShiftTemplate);
 const bulkMock = vi.mocked(bulkSaveShifts);
 const copyMock = vi.mocked(copyShiftWeek);
 const clearMock = vi.mocked(clearShiftCells);
@@ -85,11 +93,15 @@ function renderScreen() {
 
 beforeEach(() => {
   weekMock.mockReset();
+  templatesMock.mockReset();
+  templatesMock.mockResolvedValue([]);
   bulkMock.mockReset();
   copyMock.mockReset();
   clearMock.mockReset();
   showAlert.mockClear();
   showConfirm.mockClear();
+  applyTemplateMock.mockReset();
+  applyTemplateMock.mockResolvedValue({ saved: 2, skipped: 0 });
   bulkMock.mockResolvedValue({ saved: 2, skipped: 1 });
   copyMock.mockResolvedValue({ saved: 3, skipped: 0 });
   clearMock.mockResolvedValue({ removed: 1 });
@@ -140,6 +152,35 @@ describe("ShiftsScreen: массовое планирование", () => {
     await waitFor(() =>
       expect(showAlert).toHaveBeenCalledWith("Записано смен: 2 · пропущено занятых: 1"),
     );
+  });
+
+  it("применяет сохранённый шаблон на текущую неделю", async () => {
+    weekMock.mockResolvedValue(week(true));
+    templatesMock.mockResolvedValue([
+      {
+        id: 7,
+        name: "Официант 5/2",
+        department_id: 1,
+        department_name: "Зал",
+        days: [
+          { weekday: 0, status: "planned", starts_at: "10:00", ends_at: "18:00" },
+        ],
+      },
+    ]);
+    renderScreen();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: /Шаблон недели и массовые правки/,
+      }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Применить" }));
+
+    await waitFor(() => expect(applyTemplateMock).toHaveBeenCalledTimes(1));
+    expect(applyTemplateMock).toHaveBeenCalledWith(7, {
+      employee_ids: [5],
+      week_start: MONDAY_ISO,
+    });
   });
 
   it("копирует прошлую неделю с тем же выбором людей", async () => {

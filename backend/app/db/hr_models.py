@@ -454,6 +454,47 @@ class HrShift(Base):
     )
 
 
+class HrShiftTemplate(Base):
+    """Именованный шаблон недели табеля («Официант · 5/2», «Бармен · выходные»).
+
+    Хранит не смены на датах, а рисунок недели: день недели, статус и часы.
+    Поэтому один шаблон применяется на любую неделю и не устаревает вместе с
+    календарём. `pattern` — JSONB-список объектов
+    `{"weekday": 0..6, "status": "planned", "starts_at": "10:00", "ends_at": "18:00"}`
+    (0 = понедельник).
+
+    `department_id IS NULL` — общий шаблон для всех подразделений; иначе
+    шаблон принадлежит отделу и виден только его руководителю.
+    """
+
+    __tablename__ = "hr_shift_templates"
+    __table_args__ = (
+        UniqueConstraint(
+            "department_id", "name", name="uq_hr_shift_template_name"
+        ),
+        Index("ix_hr_shift_templates_department", "department_id", "name"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), nullable=False)
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    pattern: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_by_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class EmployeeTrainingDay(Base):
     """Точечная правка расписания: «эта смена учебная / обычная».
 

@@ -113,6 +113,7 @@ _TOUCHED = (
     "checklist_items",
     "checklist_templates",
     "app_notifications",
+    "hr_shift_templates",
     "hr_shifts",
     "employee_training_days",
     "departments",
@@ -1348,3 +1349,85 @@ async def test_shifts_bulk_and_copy_week(flow: Flow) -> None:
     ):
         r = await client.post(path, json=payload)
         assert r.status_code == 403, f"{path}: {r.status_code} {r.text}"
+
+
+async def test_shift_templates_save_apply_and_delete(flow: Flow) -> None:
+    """Шаблоны недели: сохранить рисунок, разложить на неделю, убрать.
+
+    Проверяем то, ради чего шаблон и заводился: типовая неделя сохраняется
+    один раз и выдаётся новому сотруднику на любую дату, не переписывая уже
+    поставленные смены.
+    """
+    client = flow.client
+    await _onboard_employee(flow)
+    flow.act_as(flow.manager_user)
+
+    monday = date.today() + timedelta(days=21 - date.today().weekday())
+
+    r = await client.post(
+        "/api/shifts/templates",
+        json={
+            "name": "Официант 5/2",
+            "department_id": flow.department_id,
+            "days": [
+                {"weekday": 0, "status": "planned", "starts_at": "10:00", "ends_at": "18:00"},
+                {"weekday": 2, "status": "planned", "starts_at": "10:00", "ends_at": "18:00"},
+                {"weekday": 4, "status": "dayoff"},
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    template = r.json()
+    assert template["name"] == "Официант 5/2"
+    assert [day["weekday"] for day in template["days"]] == [0, 2, 4]
+    assert template["days"][0]["starts_at"] == "10:00"
+    template_id = template["id"]
+
+    r = await client.get("/api/shifts/templates")
+    assert r.status_code == 200, r.text
+    assert [item["name"] for item in r.json()] == ["Официант 5/2"]
+
+    # Повторное сохранение с тем же именем обновляет, а не плодит дубли.
+    r = await client.post(
+        "/api/shifts/templates",
+        json={
+            "name": "Официант 5/2",
+            "department_id": flow.department_id,
+            "days": [{"weekday": 1, "status": "planned", "starts_at": "09:00"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["id"] == template_id
+    assert [day["weekday"] for day in r.json()["days"]] == [1]
+
+    apply = {
+        "employee_ids": [flow.employee_id],
+        "week_start": monday.isoformat(),
+        "overwrite": False,
+    }
+    r = await client.post(f"/api/shifts/templates/{template_id}/apply", json=apply)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"saved": 1, "skipped": 0}
+
+    r = await client.post(f"/api/shifts/templates/{template_id}/apply", json=apply)
+    assert r.json() == {"saved": 0, "skipped": 1}
+
+    r = await client.get(f"/api/shifts?start={monday.isoformat()}&days=7")
+    rows = {
+        (item["employee_id"], item["day"]): item for item in r.json()["shifts"]
+    }
+    applied = rows[(flow.employee_id, (monday + timedelta(days=1)).isoformat())]
+    assert applied["status"] == "planned" and applied["starts_at"] == "09:00"
+
+    # Сотруднику шаблоны недоступны.
+    flow.act_as(flow.employee_user)
+    r = await client.get("/api/shifts/templates")
+    assert r.status_code == 403
+
+    flow.act_as(flow.manager_user)
+    r = await client.delete(f"/api/shifts/templates/{template_id}")
+    assert r.status_code == 200, r.text
+    r = await client.get("/api/shifts/templates")
+    assert r.json() == []
+    r = await client.post(f"/api/shifts/templates/{template_id}/apply", json=apply)
+    assert r.status_code == 404, r.text

@@ -33,6 +33,7 @@ from app.db.hr_models import (
     Department,
     Employee,
     HrShift,
+    HrShiftTemplate,
 )
 from app.db.models import User
 from app.services import hr_access
@@ -474,6 +475,204 @@ async def copy_week(
     return BulkResult(saved=saved, skipped=skipped)
 
 
+@dataclass(frozen=True)
+class TemplateDay:
+    """Один день шаблона: 0 = понедельник, время уже в «HH:MM»."""
+
+    weekday: int
+    status: str
+    starts_at: str | None
+    ends_at: str | None
+
+
+@dataclass(frozen=True)
+class ShiftTemplate:
+    id: int
+    name: str
+    department_id: int | None
+    department_name: str | None
+    days: tuple[TemplateDay, ...]
+
+
+def _parse_time(value: object) -> time | None:
+    """«10:00», «10:00:00» и `time` — всё к одному `time`; мусор — ошибка."""
+    if value in (None, ""):
+        return None
+    try:
+        return time.fromisoformat(str(value))
+    except ValueError as exc:
+        raise ShiftError("bad_time") from exc
+
+
+def parse_pattern(raw: Iterable[object]) -> tuple[TemplateDay, ...]:
+    """Рисунок недели: до семи уникальных дней, только известные статусы.
+
+    Шаблон приходит из JSON и живёт между релизами, поэтому проверяем каждый
+    элемент, а не верим типу: иначе битый JSON ронял бы всю ручку 500-й.
+    """
+    parsed: dict[int, TemplateDay] = {}
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise ShiftError("bad_pattern")
+        weekday = entry.get("weekday")
+        if (
+            not isinstance(weekday, int)
+            or isinstance(weekday, bool)
+            or not 0 <= weekday <= 6
+        ):
+            raise ShiftError("bad_pattern")
+        status = entry.get("status")
+        if not isinstance(status, str) or status not in SHIFT_STATUSES:
+            raise ShiftError("bad_status")
+        starts = _parse_time(entry.get("starts_at"))
+        ends = _parse_time(entry.get("ends_at"))
+        parsed[weekday] = TemplateDay(
+            weekday=weekday,
+            status=status,
+            starts_at=starts.strftime("%H:%M") if starts else None,
+            ends_at=ends.strftime("%H:%M") if ends else None,
+        )
+    if not parsed:
+        raise ShiftError("bad_pattern")
+    return tuple(parsed[day] for day in sorted(parsed))
+
+
+def _pattern_json(days: Iterable[TemplateDay]) -> list[dict[str, object]]:
+    return [
+        {
+            "weekday": day.weekday,
+            "status": day.status,
+            "starts_at": day.starts_at,
+            "ends_at": day.ends_at,
+        }
+        for day in days
+    ]
+
+
+async def templates(
+    session: AsyncSession, viewer: Employee
+) -> tuple[ShiftTemplate, ...]:
+    """Сохранённые шаблоны недели: управляющий видит все, включая общие."""
+    if not can_edit(viewer):
+        raise ShiftError("forbidden")
+    rows = (
+        await session.execute(
+            select(HrShiftTemplate, Department.name)
+            .outerjoin(Department, Department.id == HrShiftTemplate.department_id)
+            .order_by(HrShiftTemplate.name)
+        )
+    ).all()
+    return tuple(
+        ShiftTemplate(
+            id=int(row.id),
+            name=str(row.name),
+            department_id=row.department_id,
+            department_name=str(dept) if dept else None,
+            days=parse_pattern(row.pattern or []),
+        )
+        for row, dept in rows
+    )
+
+
+async def save_template(
+    session: AsyncSession,
+    viewer: Employee,
+    *,
+    name: str,
+    department_id: int | None,
+    raw_days: Iterable[object],
+) -> ShiftTemplate:
+    """Сохранить подборку как шаблон. Одноимённый шаблон отдела обновляется."""
+    if not can_edit(viewer):
+        raise ShiftError("forbidden")
+    clean_name = (name or "").strip()
+    if not clean_name or len(clean_name) > 64:
+        raise ShiftError("bad_name")
+    days = parse_pattern(raw_days)
+    if department_id is not None:
+        department = await session.get(Department, int(department_id))
+        if department is None:
+            raise ShiftError("department_not_found")
+    condition = (
+        HrShiftTemplate.department_id.is_(None)
+        if department_id is None
+        else HrShiftTemplate.department_id == int(department_id)
+    )
+    row = await session.scalar(
+        select(HrShiftTemplate).where(
+            HrShiftTemplate.name == clean_name, condition
+        )
+    )
+    if row is None:
+        row = HrShiftTemplate(
+            name=clean_name,
+            department_id=int(department_id) if department_id else None,
+            created_by_id=int(viewer.id),
+        )
+        session.add(row)
+    row.pattern = _pattern_json(days)
+    await session.commit()
+    await session.refresh(row)
+    department_name = None
+    if row.department_id is not None:
+        department = await session.get(Department, int(row.department_id))
+        department_name = str(department.name) if department else None
+    return ShiftTemplate(
+        id=int(row.id),
+        name=str(row.name),
+        department_id=row.department_id,
+        department_name=department_name,
+        days=days,
+    )
+
+
+async def apply_template(
+    session: AsyncSession,
+    viewer: Employee,
+    template_id: int,
+    *,
+    employee_ids: Sequence[int],
+    week_start: date,
+    overwrite: bool = False,
+) -> BulkResult:
+    """Разложить шаблон на неделю: каждый его день — на свою дату этой недели."""
+    if not can_edit(viewer):
+        raise ShiftError("forbidden")
+    row = await session.get(HrShiftTemplate, int(template_id))
+    if row is None:
+        raise ShiftError("template_not_found")
+    days = parse_pattern(row.pattern or [])
+    saved = 0
+    skipped = 0
+    for day in days:
+        result = await bulk_apply(
+            session,
+            viewer,
+            employee_ids=list(employee_ids),
+            days=[week_start + timedelta(days=day.weekday)],
+            status=day.status,
+            starts_at=_parse_time(day.starts_at),
+            ends_at=_parse_time(day.ends_at),
+            overwrite=overwrite,
+        )
+        saved += result.saved
+        skipped += result.skipped
+    return BulkResult(saved=saved, skipped=skipped)
+
+
+async def delete_template(
+    session: AsyncSession, viewer: Employee, template_id: int
+) -> None:
+    if not can_edit(viewer):
+        raise ShiftError("forbidden")
+    result = await session.execute(
+        delete(HrShiftTemplate).where(HrShiftTemplate.id == int(template_id))
+    )
+    if not result.rowcount:
+        raise ShiftError("template_not_found")
+    await session.commit()
+
+
 async def clear_cells(
     session: AsyncSession,
     viewer: Employee,
@@ -509,14 +708,21 @@ __all__ = [
     "ShiftError",
     "ShiftPerson",
     "ShiftRow",
+    "ShiftTemplate",
     "ShiftWeek",
+    "TemplateDay",
+    "apply_template",
     "bulk_apply",
     "bulk_days",
     "can_edit",
     "clear_cells",
     "copy_week",
     "delete_shift",
+    "delete_template",
     "move_shift",
+    "parse_pattern",
+    "save_template",
+    "templates",
     "upsert_shift",
     "week",
     "weekdays_days",

@@ -123,9 +123,55 @@ class BulkResultOut(BaseModel):
     skipped: int
 
 
+class TemplateDayIn(BaseModel):
+    """День шаблона: 0 = понедельник, время в «HH:MM» или ISO."""
+
+    weekday: int = Field(ge=0, le=6)
+    status: str = Field(pattern="^(planned|worked|sick|absent|dayoff|vacation)$")
+    starts_at: time | None = None
+    ends_at: time | None = None
+
+
+class TemplateIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    # Общий шаблон, если отдел не задан.
+    department_id: int | None = None
+    days: list[TemplateDayIn] = Field(min_length=1, max_length=7)
+
+
+class TemplateDayOut(BaseModel):
+    """Время в ответе — строка «HH:MM»: так его сразу понимает `<input type=time>`."""
+
+    weekday: int
+    status: str
+    starts_at: str | None
+    ends_at: str | None
+
+
+class TemplateOut(BaseModel):
+    id: int
+    name: str
+    department_id: int | None
+    department_name: str | None
+    days: list[TemplateDayOut]
+
+
+class ApplyTemplateIn(BaseModel):
+    employee_ids: list[int] = Field(
+        min_length=1, max_length=hr_shifts.MAX_BULK_PEOPLE
+    )
+    week_start: date
+    overwrite: bool = False
+
+
 def _shift_error(exc: hr_shifts.ShiftError) -> HTTPException:
     code = str(exc)
-    if code in {"employee_not_found", "shift_not_found"}:
+    if code in {
+        "employee_not_found",
+        "shift_not_found",
+        "template_not_found",
+        "department_not_found",
+    }:
         return HTTPException(status.HTTP_404_NOT_FOUND, detail=code)
     if code == "forbidden":
         return HTTPException(status.HTTP_403_FORBIDDEN, detail=code)
@@ -268,6 +314,95 @@ async def put_shift(
         raise _shift_error(exc) from exc
     flags = await _flags(session, [employee_id], start=day, end=day)
     return _shift_out(row, flags.get(employee_id))
+
+
+def _template_out(template: hr_shifts.ShiftTemplate) -> TemplateOut:
+    return TemplateOut(
+        id=template.id,
+        name=template.name,
+        department_id=template.department_id,
+        department_name=template.department_name,
+        days=[
+            TemplateDayOut(
+                weekday=day.weekday,
+                status=day.status,
+                starts_at=day.starts_at,
+                ends_at=day.ends_at,
+            )
+            for day in template.days
+        ],
+    )
+
+
+@router.get("/shifts/templates", response_model=list[TemplateOut])
+async def list_shift_templates(
+    session: SessionDep, employee: AupDep
+) -> list[TemplateOut]:
+    """Сохранённые шаблоны недели («официант 5/2», «бармен выходные»)."""
+    try:
+        items = await hr_shifts.templates(session, employee)
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return [_template_out(item) for item in items]
+
+
+@router.post("/shifts/templates", response_model=TemplateOut)
+async def save_shift_template(
+    body: TemplateIn, session: SessionDep, employee: AupDep
+) -> TemplateOut:
+    """Сохранить рисунок недели. Одноимённый шаблон отдела перезаписывается."""
+    try:
+        saved = await hr_shifts.save_template(
+            session,
+            employee,
+            name=body.name,
+            department_id=body.department_id,
+            raw_days=[
+                {
+                    "weekday": day.weekday,
+                    "status": day.status,
+                    "starts_at": day.starts_at,
+                    "ends_at": day.ends_at,
+                }
+                for day in body.days
+            ],
+        )
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return _template_out(saved)
+
+
+@router.post("/shifts/templates/{template_id}/apply", response_model=BulkResultOut)
+async def apply_shift_template(
+    template_id: int,
+    body: ApplyTemplateIn,
+    session: SessionDep,
+    employee: AupDep,
+) -> BulkResultOut:
+    """Разложить шаблон на неделю для выбранных людей."""
+    try:
+        result = await hr_shifts.apply_template(
+            session,
+            employee,
+            template_id,
+            employee_ids=body.employee_ids,
+            week_start=body.week_start,
+            overwrite=body.overwrite,
+        )
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return BulkResultOut(saved=result.saved, skipped=result.skipped)
+
+
+@router.delete("/shifts/templates/{template_id}")
+async def remove_shift_template(
+    template_id: int, session: SessionDep, employee: AupDep
+) -> dict[str, bool]:
+    try:
+        await hr_shifts.delete_template(session, employee, template_id)
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+    return {"removed": True}
 
 
 @router.post("/shifts/bulk", response_model=BulkResultOut)

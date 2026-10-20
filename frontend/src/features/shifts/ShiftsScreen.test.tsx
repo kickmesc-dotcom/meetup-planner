@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ShiftsScreen from "./ShiftsScreen";
 import {
   deleteShift,
+  fetchShiftTemplates,
   fetchShiftWeek,
   moveShift,
   saveShift,
@@ -22,6 +23,13 @@ vi.mock("@/api/shifts", () => ({
   saveShift: vi.fn(),
   moveShift: vi.fn(),
   deleteShift: vi.fn(),
+  bulkSaveShifts: vi.fn(),
+  copyShiftWeek: vi.fn(),
+  clearShiftCells: vi.fn(),
+  fetchShiftTemplates: vi.fn(),
+  saveShiftTemplate: vi.fn(),
+  applyShiftTemplate: vi.fn(),
+  deleteShiftTemplate: vi.fn(),
 }));
 
 const fetchMock = vi.mocked(fetchShiftWeek);
@@ -71,6 +79,8 @@ beforeEach(() => {
   saveMock.mockReset();
   moveMock.mockReset();
   deleteMock.mockReset();
+  // Шаблоны в этой сетке не предмет теста — отдаём пустой список.
+  vi.mocked(fetchShiftTemplates).mockResolvedValue([]);
   saveMock.mockResolvedValue({
     id: 1,
     employee_id: 5,

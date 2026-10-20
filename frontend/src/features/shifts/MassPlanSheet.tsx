@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import type { ShiftPerson, ShiftStatus, ShiftStatusMeta } from "@/api/shifts";
+import type {
+  ShiftPerson,
+  ShiftStatus,
+  ShiftStatusMeta,
+  ShiftTemplate,
+} from "@/api/shifts";
 import { haptic } from "@/tg/webapp";
 import { addDays, formatDate, toIso, weekdaysToIso } from "./shiftDates";
 
@@ -18,6 +23,16 @@ import { addDays, formatDate, toIso, weekdaysToIso } from "./shiftDates";
  * По умолчанию дни не выбраны и «заменить существующие» выключено: массовая
  * запись в график не должна случаться от одного неосторожного тапа.
  */
+export interface TemplateSaveInput {
+  name: string;
+  days: {
+    weekday: number;
+    status: ShiftStatus;
+    starts_at: string | null;
+    ends_at: string | null;
+  }[];
+}
+
 export interface MassPlanInput {
   employeeIds: number[];
   days: string[];
@@ -43,24 +58,35 @@ export default function MassPlanSheet({
   people,
   weekStart,
   statuses,
+  templates,
   busy,
   copyBusy,
   clearBusy,
+  templateBusy,
   onClose,
   onApply,
   onCopyPrevious,
   onClear,
+  onApplyTemplate,
+  onSaveTemplate,
+  onDeleteTemplate,
 }: {
   people: ShiftPerson[];
   weekStart: Date;
   statuses: ShiftStatusMeta[];
+  /** Сохранённые шаблоны подразделения: применяются на эту неделю. */
+  templates: ShiftTemplate[];
   busy: boolean;
   copyBusy: boolean;
   clearBusy: boolean;
+  templateBusy: boolean;
   onClose: () => void;
   onApply: (input: MassPlanInput) => void;
   onCopyPrevious: (employeeIds: number[]) => void;
   onClear: (input: { employeeIds: number[]; days: string[] }) => void;
+  onApplyTemplate: (templateId: number, employeeIds: number[]) => void;
+  onSaveTemplate: (input: TemplateSaveInput) => void;
+  onDeleteTemplate: (templateId: number) => void;
 }) {
   // По умолчанию выбраны все, кто виден в текущем фильтре отдела: чаще всего
   // шаблон ставят всему подразделению. Дни — наоборот, пустые.
@@ -73,6 +99,10 @@ export default function MassPlanSheet({
   const [endsAt, setEndsAt] = useState("");
   const [note, setNote] = useState("");
   const [overwrite, setOverwrite] = useState(false);
+  // Сохранение шаблона: имя спрашивается здесь же, чтобы не гонять человека
+  // в другое окно за одной строкой.
+  const [naming, setNaming] = useState(false);
+  const [templateName, setTemplateName] = useState("");
 
   const dayIsos = useMemo(() => weekdaysToIso(weekStart, days), [weekStart, days]);
   const allPicked = picked.length > 0 && picked.length === people.length;
@@ -104,6 +134,21 @@ export default function MassPlanSheet({
 
   const sameHours = startsAt && endsAt ? `${startsAt}–${endsAt}` : startsAt;
 
+  const saveTemplate = () => {
+    haptic("medium");
+    onSaveTemplate({
+      name: templateName.trim(),
+      days: [...days]
+        .sort((a, b) => a - b)
+        .map((weekday) => ({
+          weekday,
+          status,
+          starts_at: startsAt || null,
+          ends_at: endsAt || null,
+        })),
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
       <div
@@ -130,6 +175,49 @@ export default function MassPlanSheet({
             ✕
           </button>
         </div>
+
+        {/* 0. Сохранённые шаблоны: применяются своим рисунком недели и не
+            зависят от выбранных ниже дней — только от людей. */}
+        {templates.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs font-medium text-tg-text">
+              Шаблоны подразделения
+            </div>
+            <div className="mt-1 space-y-1.5">
+              {templates.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-center gap-2 rounded-tile bg-tg-secondary-bg/40 px-2 py-1.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs text-tg-text">
+                      {template.name}
+                    </div>
+                    <div className="truncate text-2xs text-tg-hint">
+                      {templateSummary(template)}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={picked.length === 0 || templateBusy}
+                    onClick={() => onApplyTemplate(template.id, picked)}
+                    className="min-h-9 rounded-tile bg-tg-link/15 px-2 text-xs font-medium text-tg-text disabled:opacity-40"
+                  >
+                    Применить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteTemplate(template.id)}
+                    aria-label={`Удалить шаблон ${template.name}`}
+                    className="min-h-9 min-w-9 rounded-tile bg-tg-bg/60 text-xs text-status-busy"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 1. Кому. */}
         <div className="mt-3 flex items-baseline justify-between gap-2">
@@ -289,6 +377,47 @@ export default function MassPlanSheet({
             : "Выбери людей и дни"}
         </div>
 
+        {/* Сохранить текущую подборку как шаблон отдела. */}
+        <div className="mt-2">
+          {naming ? (
+            <div className="flex gap-2">
+              <input
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
+                maxLength={64}
+                placeholder="Название шаблона"
+                aria-label="Название шаблона"
+                className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+              />
+              <button
+                type="button"
+                disabled={!templateName.trim() || !ready || templateBusy}
+                onClick={saveTemplate}
+                className="min-h-9 rounded-tile bg-tg-button px-2 text-xs text-tg-button-text disabled:opacity-40"
+              >
+                {templateBusy ? "Сохраняем…" : "Сохранить"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setNaming(false)}
+                aria-label="Отменить сохранение шаблона"
+                className="min-h-9 min-w-9 rounded-tile bg-tg-secondary-bg/60 text-xs text-tg-text"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={!ready || templateBusy}
+              onClick={() => setNaming(true)}
+              className="min-h-9 text-xs text-tg-link disabled:opacity-40"
+            >
+              Сохранить подборку как шаблон
+            </button>
+          )}
+        </div>
+
         {/* 4. Соседние операции с тем же выделением. */}
         <div className="mt-3 flex gap-2 border-t border-tg-hint/10 pt-3">
           <button
@@ -310,9 +439,21 @@ export default function MassPlanSheet({
         </div>
         <p className="mt-2 text-2xs text-tg-hint">
           Копирование переносит прошлую неделю на эту и не затирает занятые дни.
-          «Снять смены» трогает только выбранные дни.
+          «Снять смены» трогает только выбранные дни. Шаблон применяется своим
+          рисунком недели — выбранные дни для него не важны.
         </p>
       </div>
     </div>
   );
+}
+
+/** «Пн Ср Пт · 10:00–18:00» — одной строкой, чтобы не открывать шаблон. */
+function templateSummary(template: ShiftTemplate): string {
+  const labels = template.days
+    .map((day) => WEEKDAYS[day.weekday]?.label ?? "?")
+    .join(" ");
+  const starts = template.days.find((day) => day.starts_at)?.starts_at;
+  const ends = template.days.find((day) => day.ends_at)?.ends_at;
+  if (!starts) return labels;
+  return `${labels} · ${starts}${ends ? `–${ends}` : ""}`;
 }

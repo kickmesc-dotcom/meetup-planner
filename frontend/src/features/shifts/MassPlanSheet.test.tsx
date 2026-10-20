@@ -14,6 +14,20 @@ import type { ShiftPerson, ShiftStatusMeta } from "@/api/shifts";
 
 vi.mock("@/tg/webapp", () => ({ haptic: vi.fn() }));
 
+const TEMPLATES = [
+  {
+    id: 7,
+    name: "Официант 5/2",
+    department_id: 1,
+    department_name: "Зал",
+    days: [
+      { weekday: 0, status: "planned" as const, starts_at: "10:00", ends_at: "18:00" },
+      { weekday: 2, status: "planned" as const, starts_at: "10:00", ends_at: "18:00" },
+      { weekday: 4, status: "dayoff" as const, starts_at: null, ends_at: null },
+    ],
+  },
+];
+
 const PEOPLE: ShiftPerson[] = [
   {
     employee_id: 1,
@@ -44,22 +58,38 @@ function renderSheet(overrides: Partial<Parameters<typeof MassPlanSheet>[0]> = {
   const onClear = vi.fn();
   const onCopyPrevious = vi.fn();
   const onClose = vi.fn();
+  const onApplyTemplate = vi.fn();
+  const onSaveTemplate = vi.fn();
+  const onDeleteTemplate = vi.fn();
   render(
     <MassPlanSheet
       people={PEOPLE}
       weekStart={WEEK_START}
       statuses={STATUSES}
+      templates={[]}
       busy={false}
       copyBusy={false}
       clearBusy={false}
+      templateBusy={false}
       onClose={onClose}
       onApply={onApply}
       onClear={onClear}
       onCopyPrevious={onCopyPrevious}
+      onApplyTemplate={onApplyTemplate}
+      onSaveTemplate={onSaveTemplate}
+      onDeleteTemplate={onDeleteTemplate}
       {...overrides}
     />,
   );
-  return { onApply, onClear, onCopyPrevious, onClose };
+  return {
+    onApply,
+    onClear,
+    onCopyPrevious,
+    onClose,
+    onApplyTemplate,
+    onSaveTemplate,
+    onDeleteTemplate,
+  };
 }
 
 afterEach(cleanup);
@@ -133,6 +163,46 @@ describe("MassPlanSheet", () => {
     expect(screen.getByText("Выбери людей и дни")).toBeTruthy();
     const apply = screen.getByRole("button", { name: /Применить/ });
     expect((apply as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("применяет сохранённый шаблон выбранным людям", () => {
+    const { onApplyTemplate } = renderSheet({ templates: TEMPLATES });
+
+    expect(screen.getByText("Официант 5/2")).toBeTruthy();
+    expect(screen.getByText("Пн Ср Пт · 10:00–18:00")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Применить" }));
+    expect(onApplyTemplate).toHaveBeenCalledWith(7, [1, 2]);
+  });
+
+  it("сохраняет текущую подборку как шаблон с днями недели", () => {
+    const { onSaveTemplate } = renderSheet();
+
+    fireEvent.click(screen.getByRole("button", { name: "Пн" }));
+    fireEvent.click(screen.getByRole("button", { name: "Пт" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Сохранить подборку как шаблон" }),
+    );
+    fireEvent.change(screen.getByLabelText("Название шаблона"), {
+      target: { value: "Бармен вечер" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
+
+    expect(onSaveTemplate).toHaveBeenCalledWith({
+      name: "Бармен вечер",
+      days: [
+        { weekday: 0, status: "planned", starts_at: null, ends_at: null },
+        { weekday: 4, status: "planned", starts_at: null, ends_at: null },
+      ],
+    });
+  });
+
+  it("удаляет шаблон по крестику", () => {
+    const { onDeleteTemplate } = renderSheet({ templates: TEMPLATES });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Удалить шаблон Официант 5/2" }),
+    );
+    expect(onDeleteTemplate).toHaveBeenCalledWith(7);
   });
 
   it("копирует прошлую неделю и снимает смены тем же выбором людей", () => {

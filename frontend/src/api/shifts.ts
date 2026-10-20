@@ -128,6 +128,56 @@ export const copyShiftWeek = (body: {
     body: JSON.stringify(body),
   });
 
+export interface ShiftTemplateDay {
+  /** 0 = понедельник … 6 = воскресенье. */
+  weekday: number;
+  status: ShiftStatus;
+  starts_at: string | null;
+  ends_at: string | null;
+}
+
+export interface ShiftTemplate {
+  id: number;
+  name: string;
+  department_id: number | null;
+  department_name: string | null;
+  days: ShiftTemplateDay[];
+}
+
+/** Сохранённые шаблоны недели («официант 5/2»). */
+export const fetchShiftTemplates = () =>
+  api<ShiftTemplate[]>("/api/shifts/templates");
+
+export const saveShiftTemplate = (body: {
+  name: string;
+  department_id?: number | null;
+  days: {
+    weekday: number;
+    status: ShiftStatus;
+    starts_at?: string | null;
+    ends_at?: string | null;
+  }[];
+}) =>
+  api<ShiftTemplate>("/api/shifts/templates", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/** Разложить шаблон на неделю: его дни → даты этой недели. */
+export const applyShiftTemplate = (
+  templateId: number,
+  body: { employee_ids: number[]; week_start: string; overwrite?: boolean },
+) =>
+  api<BulkResult>(`/api/shifts/templates/${templateId}/apply`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+export const deleteShiftTemplate = (templateId: number) =>
+  api<{ removed: boolean }>(`/api/shifts/templates/${templateId}`, {
+    method: "DELETE",
+  });
+
 /** Массово снять смены с выбранных клеток. */
 export const clearShiftCells = (body: {
   employee_ids: number[];

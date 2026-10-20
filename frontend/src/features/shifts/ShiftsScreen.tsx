@@ -2,13 +2,17 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import {
+  applyShiftTemplate,
   bulkSaveShifts,
   clearShiftCells,
   copyShiftWeek,
   deleteShift,
+  deleteShiftTemplate,
+  fetchShiftTemplates,
   fetchShiftWeek,
   moveShift,
   saveShift,
+  saveShiftTemplate,
   type BulkResult,
   type ShiftItem,
   type ShiftPerson,
@@ -19,7 +23,10 @@ import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-import MassPlanSheet, { type MassPlanInput } from "./MassPlanSheet";
+import MassPlanSheet, {
+  type MassPlanInput,
+  type TemplateSaveInput,
+} from "./MassPlanSheet";
 import {
   addDays,
   cellKey,
@@ -53,8 +60,18 @@ export default function ShiftsScreen() {
     staleTime: 20_000,
   });
 
+  // Шаблоны нужны только тем, кто правит табель: сотруднику ручка ответит 403.
+  const templatesQ = useQuery({
+    queryKey: ["shift-templates"],
+    queryFn: fetchShiftTemplates,
+    enabled: q.data?.can_edit === true,
+    retry: false,
+    staleTime: 60_000,
+  });
+
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["shifts"] });
+    void qc.invalidateQueries({ queryKey: ["shift-templates"] });
     void qc.invalidateQueries({ queryKey: ["admin", "training-plan"] });
     void qc.invalidateQueries({ queryKey: ["hr-training"] });
   };
@@ -129,6 +146,51 @@ export default function ShiftsScreen() {
       setMassOpen(false);
       refresh();
       void showAlert(bulkText(result, "Скопировано смен"));
+    },
+    onError,
+  });
+
+  const saveTemplate = useMutation({
+    mutationFn: (input: TemplateSaveInput) =>
+      saveShiftTemplate({
+        name: input.name,
+        department_id: departmentId,
+        days: input.days,
+      }),
+    onSuccess: (template) => {
+      haptic("success");
+      refresh();
+      void showAlert(`Шаблон «${template.name}» сохранён`);
+    },
+    onError,
+  });
+
+  const applyTemplate = useMutation({
+    mutationFn: ({
+      templateId,
+      employeeIds,
+    }: {
+      templateId: number;
+      employeeIds: number[];
+    }) =>
+      applyShiftTemplate(templateId, {
+        employee_ids: employeeIds,
+        week_start: toIso(weekStart),
+      }),
+    onSuccess: (result) => {
+      haptic("success");
+      setMassOpen(false);
+      refresh();
+      void showAlert(bulkText(result, "Записано смен"));
+    },
+    onError,
+  });
+
+  const removeTemplate = useMutation({
+    mutationFn: (templateId: number) => deleteShiftTemplate(templateId),
+    onSuccess: () => {
+      haptic("success");
+      refresh();
     },
     onError,
   });
@@ -324,12 +386,28 @@ export default function ShiftsScreen() {
           people={q.data.people}
           weekStart={weekStart}
           statuses={q.data.statuses}
+          templates={templatesQ.data ?? []}
           busy={bulk.isPending}
           copyBusy={copyPrevious.isPending}
           clearBusy={clearCells.isPending}
+          templateBusy={
+            saveTemplate.isPending ||
+            applyTemplate.isPending ||
+            removeTemplate.isPending
+          }
           onClose={() => setMassOpen(false)}
           onApply={(input) => bulk.mutate(input)}
           onCopyPrevious={(employeeIds) => copyPrevious.mutate(employeeIds)}
+          onApplyTemplate={(templateId, employeeIds) =>
+            applyTemplate.mutate({ templateId, employeeIds })
+          }
+          onSaveTemplate={(input) => saveTemplate.mutate(input)}
+          onDeleteTemplate={(templateId) => {
+            void (async () => {
+              const ok = await showConfirm("Удалить шаблон недели?");
+              if (ok) removeTemplate.mutate(templateId);
+            })();
+          }}
           onClear={(input) => {
             void (async () => {
               const count = input.employeeIds.length * input.days.length;

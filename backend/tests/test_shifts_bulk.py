@@ -196,3 +196,81 @@ async def test_clear_without_people_is_rejected():
 def test_single_shift_keeps_its_time_format():
     """Массовая ручка переиспользует те же `time`, что и одиночная: 10:00 → 10:00."""
     assert time(10, 0).strftime("%H:%M") == "10:00"
+
+
+# --------------------------------------------------------------------------
+# Шаблоны недели
+# --------------------------------------------------------------------------
+
+
+def test_pattern_sorts_days_and_normalises_time():
+    days = hr_shifts.parse_pattern(
+        [
+            {"weekday": 4, "status": "planned", "starts_at": "18:00:00"},
+            {"weekday": 0, "status": "dayoff"},
+        ]
+    )
+    assert [day.weekday for day in days] == [0, 4]
+    assert days[0].status == "dayoff" and days[0].starts_at is None
+    assert days[1].starts_at == "18:00"
+
+
+def test_pattern_keeps_the_last_entry_for_a_repeated_day():
+    days = hr_shifts.parse_pattern(
+        [
+            {"weekday": 1, "status": "planned", "starts_at": "10:00"},
+            {"weekday": 1, "status": "worked", "starts_at": "12:00"},
+        ]
+    )
+    assert len(days) == 1
+    assert days[0].status == "worked" and days[0].starts_at == "12:00"
+
+
+def test_pattern_rejects_unknown_status():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        hr_shifts.parse_pattern([{"weekday": 0, "status": "party"}])
+    assert str(exc.value) == "bad_status"
+
+
+def test_pattern_rejects_out_of_range_weekday():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        hr_shifts.parse_pattern([{"weekday": 7, "status": "planned"}])
+    assert str(exc.value) == "bad_pattern"
+
+
+def test_pattern_rejects_broken_time():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        hr_shifts.parse_pattern(
+            [{"weekday": 0, "status": "planned", "starts_at": "10:00 завтра"}]
+        )
+    assert str(exc.value) == "bad_time"
+
+
+def test_pattern_requires_at_least_one_day():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        hr_shifts.parse_pattern([])
+    assert str(exc.value) == "bad_pattern"
+
+
+async def test_templates_are_forbidden_for_an_employee():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        await hr_shifts.templates(None, STAFF)  # type: ignore[arg-type]
+    assert str(exc.value) == "forbidden"
+
+
+async def test_saving_a_template_rejects_an_empty_name():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        await hr_shifts.save_template(
+            None,  # type: ignore[arg-type]
+            MANAGER,
+            name="   ",
+            department_id=None,
+            raw_days=[{"weekday": 0, "status": "planned"}],
+        )
+    assert str(exc.value) == "bad_name"
+
+
+async def test_deleting_a_template_is_forbidden_for_an_employee():
+    with pytest.raises(hr_shifts.ShiftError) as exc:
+        await hr_shifts.delete_template(None, STAFF, 1)  # type: ignore[arg-type]
+    assert str(exc.value) == "forbidden"
