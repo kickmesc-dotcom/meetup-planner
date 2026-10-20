@@ -104,4 +104,13 @@ describe("HrFeedScreen (P1.8)", () => {
     expect(screen.getByText("Су-шеф")).toBeTruthy();
     expect(screen.queryByTestId("feed-demo-mark")).toBeNull();
   });
+
+  it("не повторяет область видимости в пилюле и подзаголовке (P2.13)", async () => {
+    renderFeed([item()]);
+
+    await screen.findByText("Пётр");
+    // Пилюля «Всё предприятие» одна, подзаголовок объясняет правило.
+    expect(screen.getAllByText("Всё предприятие")).toHaveLength(1);
+    expect(screen.getByText("Всё, что происходит на смене.")).toBeTruthy();
+  });
 });

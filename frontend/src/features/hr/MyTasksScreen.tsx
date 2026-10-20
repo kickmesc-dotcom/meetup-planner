@@ -113,7 +113,10 @@ export default function MyTasksScreen() {
   const [issueFor, setIssueFor] = useState<number | null>(null);
   // Подписи пустого состояния меняет управляющий (админка → «Тексты»).
   const emptyTitle = useAppText("tasks.empty.title", "На сегодня всё");
-  const emptyHint = useAppText("tasks.empty.hint", "Загляни в события смены.");
+  const emptyHint = useAppText(
+    "tasks.empty.hint",
+    "Задач нет — можно проверить чек-лист смены.",
+  );
 
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const tasksQ = useQuery({
@@ -182,21 +185,22 @@ export default function MyTasksScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">
-            {firstName ? `Привет, ${firstName}` : "Мои задачи"}
-          </h1>
-          <span className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          {/* VISUAL_AUDIT P2.13: имя стояло дважды — в приветствии и рядом
+              подписью. Оставляем приветствие и плашку, без повтора. */}
+          <div className="flex min-w-0 items-baseline gap-2">
+            <h1 className="truncate text-lg font-semibold text-tg-text">
+              {firstName ? `Привет, ${firstName}` : "Мои задачи"}
+            </h1>
             {meQ.data && (
-              <span className="flex items-center gap-1.5 text-xs text-tg-hint">
-                <span className="truncate">{meQ.data.display_name}</span>
-                <Badge
-                  text={meQ.data.badge}
-                  emoji={meQ.data.badge_emoji}
-                  demo={meQ.data.is_demo}
-                />
-              </span>
+              <Badge
+                text={meQ.data.badge}
+                emoji={meQ.data.badge_emoji}
+                demo={meQ.data.is_demo}
+              />
             )}
+          </div>
+          <span className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => {
@@ -343,22 +347,28 @@ export default function MyTasksScreen() {
 
         {!tasksQ.isLoading && tasks.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-center">
-            <div className="text-4xl" aria-hidden>
-              ✅
-            </div>
+            <Icon name="check" size={30} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               {emptyTitle}
             </div>
             <div className="mt-1 text-xs text-tg-hint">{emptyHint}</div>
+            {/* VISUAL_AUDIT P2.12: пустое состояние ведёт к главному делу смены,
+                а не в «События» — они и так есть в нижней полосе. */}
             <button
               type="button"
               onClick={() => {
                 haptic("selection");
-                setTab("feed");
+                setTab("checklist");
               }}
-              className="mt-3 min-h-11 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-link"
+              className="mt-3 min-h-11 rounded-full bg-tg-button px-4 text-xs text-tg-button-text"
             >
-              События
+              {checklist && checklist.status === "done"
+                ? "Посмотреть чек-лист"
+                : checklist && checklist.total > 0
+                  ? checklist.done > 0
+                    ? "Продолжить чек-лист"
+                    : "Начать смену"
+                  : "Открыть чек-лист"}
             </button>
           </div>
         )}

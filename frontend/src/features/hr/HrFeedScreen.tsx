@@ -32,10 +32,12 @@ const SCOPE_TITLE: Record<HrFeed["scope"], string> = {
   all: "Всё предприятие",
 };
 
+// VISUAL_AUDIT P2.13: подзаголовок не повторял пилюлю («Всё предприятие» и
+// «Всё предприятие.» подряд), а объяснял правило видимости.
 const SCOPE_HINT: Record<HrFeed["scope"], string> = {
-  self: "Только твои отметки.",
-  department: "Действия твоего подразделения.",
-  all: "Всё предприятие.",
+  self: "Чужих записей здесь нет.",
+  department: "Коллеги из других подразделений сюда не попадают.",
+  all: "Всё, что происходит на смене.",
 };
 
 const KIND_ICON: Record<FeedKind, string> = {

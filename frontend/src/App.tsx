@@ -295,7 +295,7 @@ export default function App() {
           <div className="min-w-0 flex-1">
             <div className="text-base font-medium">⚙️ Админка</div>
             <div className="text-xs text-tg-hint">
-              Только для {meData.display_name}-уровня админов.
+              Люди, смены и правила — только для управляющих.
             </div>
           </div>
           <ThemeSwitcher />

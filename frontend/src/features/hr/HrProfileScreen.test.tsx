@@ -131,6 +131,29 @@ describe("HrProfileScreen (P1.7)", () => {
     expect(screen.queryByText("Примерить роль")).toBeNull();
   });
 
+  it("управляющему без подразделения показывает доступ, а не «не выбрано» (P2.15)", async () => {
+    employeeMock.mockResolvedValue(
+      me({
+        role: "admin",
+        is_admin: true,
+        is_staff: true,
+        is_aup: true,
+        department_id: null,
+        department_name: null,
+        experience: null,
+      }),
+    );
+    renderScreen();
+
+    await screen.findByText("Пётр");
+    expect(screen.getByText("Доступ")).toBeTruthy();
+    expect(screen.getByText("все подразделения")).toBeTruthy();
+    expect(screen.queryByText("не выбрано")).toBeNull();
+    expect(screen.queryByText("не указан")).toBeNull();
+    // Опыт для staff-роли не изображаем: это не брошенная анкета.
+    expect(screen.queryByText("Опыт")).toBeNull();
+  });
+
   it("сворачивает админ-инструменты у админа", async () => {
     employeeMock.mockResolvedValue(
       me({ role: "admin", is_admin: true, is_staff: true, is_aup: true }),

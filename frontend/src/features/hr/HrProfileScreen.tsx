@@ -176,6 +176,10 @@ export default function HrProfileScreen() {
   const editing = editingOverride ?? onboarding;
   const pickedDept = departmentId ?? me.department_id;
   const deps = depsQ.data ?? [];
+  // VISUAL_AUDIT P2.15: у управляющего/админа подразделение и опыт могут быть
+  // не заданы — «не выбрано» и «не указан» читались как брошенная анкета.
+  // Для staff-ролей показываем доступ, а пустые поля опыта не рисуем.
+  const staffView = !onboarding && !!(me.is_admin || me.is_staff || me.is_aup);
 
   // Семь разделов уже есть в нижней полосе (задачи, смена, табель, события,
   // команда, админ). Второй вход в то же место только путал.
@@ -239,27 +243,36 @@ export default function HrProfileScreen() {
           )}
         </div>
 
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-          <Info
-            label="Подразделение"
-            value={
-              me.department_name ??
-              (onboarding ? "выбери ниже" : "не выбрано")
-            }
-          />
-          <Info
-            label="Опыт"
-            value={
-              me.experience === "new"
-                ? "новичок"
-                : me.experience === "experienced"
-                  ? "с опытом"
-                  : onboarding
-                    ? "выбери ниже"
-                    : "не указан"
-            }
-          />
-        </div>
+        {staffView ? (
+          <div className="mt-2 text-xs">
+            <Info
+              label="Доступ"
+              value={me.department_name ?? "все подразделения"}
+            />
+          </div>
+        ) : (
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+            <Info
+              label="Подразделение"
+              value={
+                me.department_name ??
+                (onboarding ? "выбери ниже" : "не выбрано")
+              }
+            />
+            <Info
+              label="Опыт"
+              value={
+                me.experience === "new"
+                  ? "новичок"
+                  : me.experience === "experienced"
+                    ? "с опытом"
+                    : onboarding
+                      ? "выбери ниже"
+                      : "не указан"
+              }
+            />
+          </div>
+        )}
 
         <p className="mt-2 text-xs text-tg-hint">{ROLE_HINT[me.role]}</p>
 
