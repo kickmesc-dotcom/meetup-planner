@@ -8,7 +8,6 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import TimelineNavBar from "./views/TimelineNavBar";
 import NavBar from "./NavBar";
 import WelcomeBanner from "@/features/welcome/WelcomeBanner";
@@ -34,13 +33,9 @@ describe("свитчер темы в панелях календаря", () => {
   });
 
   it("в приветствии свитчера нет — баннер закрывается, кнопка бы пропала", () => {
-    // Баннер ходит в react-query за званиями — нужен провайдер.
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <WelcomeBanner users={[]} meName="Сомов" format="avatar" onHide={vi.fn()} />
-      </QueryClientProvider>,
-    );
+    // Сводки званий больше нет, поэтому баннеру не нужен react-query-провайдер:
+    // он сам себе ничего не грузит.
+    render(<WelcomeBanner meName="Сомов" onHide={vi.fn()} />);
     expect(screen.queryByTestId("theme-switcher")).toBeNull();
     expect(screen.getByLabelText("Скрыть приветствие")).toBeTruthy();
   });

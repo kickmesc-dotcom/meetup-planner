@@ -64,9 +64,9 @@ export default function FeedSettingsScreen({ onBack }: Props) {
           </span>
         </div>
         <div className="text-[11px] text-tg-hint">
-          Под каждым блоком (голосовые, музыка, раунд, лох/чухан, активность
-          фич) — миниатюры участников с бейджем «+XP»/«❤️лайки». Без «спама»
-          отдельными блоками. Выключено — классический вид, как было раньше.
+          Под событием смены — миниатюры участников и бейдж «+XP». Плотнее по
+          вертикали и без отдельных блоков на каждую строку. Выключено —
+          классический вид с карточкой на событие.
         </div>
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="text-sm text-tg-text">

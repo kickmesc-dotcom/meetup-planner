@@ -156,14 +156,12 @@ export default function App() {
   if (tab === "calendar") {
     content = (
       <>
-        {/* GHG8 P4: приветствие с быстрой инфой по званиям (welcome-screen).
-            Закрытие — confirm внутри баннера (P4.1.c), сама пометка —
-            та же ui-prefs мутация что и раньше. */}
+        {/* GHG8 P4: приветствие над календарём. Сводки званий больше нет —
+            остались имя и закрытие (P4.1.c), сама пометка — та же ui-prefs
+            мутация, что и раньше. */}
         {!greetingHidden && (
           <WelcomeBanner
-            users={users.data}
             meName={meData.display_name}
-            format={uiPrefs.data?.welcome_format ?? "avatar"}
             onHide={() => hideGreeting.mutate()}
           />
         )}
