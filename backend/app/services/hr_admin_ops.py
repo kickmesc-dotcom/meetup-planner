@@ -48,7 +48,7 @@ from app.db.hr_models import (
     TaskReminder,
 )
 from app.db.models import AppNotification, User
-from app.services import hr_access, hr_settings, hr_tasks
+from app.services import hr_access, hr_demo, hr_settings, hr_tasks
 
 log = structlog.get_logger()
 
@@ -640,7 +640,11 @@ async def update_profile(
         user = await session.get(User, employee.user_id)
         if user is None:
             raise AdminOpsError("employee_not_found")
-        user.display_name = clean
+        # Тестовый пул носит метку `[BOT]` в имени: правка из админки не должна
+        # её срезать, иначе тестовые люди станут неотличимы от настоящих.
+        user.display_name = (
+            hr_demo.demo_title(clean) if employee.is_demo else clean
+        )
     if position is not None:
         employee.position = position.strip()[:MAX_NAME] or None
     if badge is not None:

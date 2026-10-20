@@ -194,6 +194,9 @@ export interface HrFeedItem {
   ref_id: number | null;
   badge: string | null;
   badge_emoji: string | null;
+  /** VISUAL_AUDIT P1.8: тестовый пул `[BOT]`. Старый бэкенд поля не шлёт —
+   * тогда фронтенд падает обратно на префикс в имени. */
+  is_demo?: boolean;
 }
 
 export interface HrFeed {

@@ -1074,6 +1074,8 @@ class FeedItemOut(BaseModel):
     ref_id: int | None
     badge: str | None = None
     badge_emoji: str | None = None
+    # Тестовый пул `[BOT]`: одна пометка вместо трёх в строке ленты.
+    is_demo: bool = False
 
 
 class FeedOut(BaseModel):
@@ -1247,6 +1249,7 @@ async def feed(
                 ref_id=item.ref_id,
                 badge=item.badge,
                 badge_emoji=item.badge_emoji,
+                is_demo=item.is_demo,
             )
             for item in items
         ],

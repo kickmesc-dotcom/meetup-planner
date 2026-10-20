@@ -85,6 +85,29 @@ function groupByDay(items: HrFeedItem[]): { label: string; items: HrFeedItem[] }
   return groups;
 }
 
+/**
+ * VISUAL_AUDIT P1.8: тестовый сотрудник помечался трижды в одной строке —
+ * префиксом `[BOT]` в имени, плашкой должности и чипом `BOT` внутри неё. Три
+ * метки читались как три разных статуса. Теперь имя чистое, а пул помечается
+ * один раз — нейтральным «тест» вместо плашки.
+ *
+ * Флаг приходит с сервера (`is_demo`), а префикс остаётся запасным вариантом:
+ * фронтенд может уехать раньше бэкенда, и лента не должна ломаться.
+ */
+const DEMO_PREFIX = "[BOT]";
+
+function isDemoItem(item: HrFeedItem): boolean {
+  return item.is_demo ?? item.display_name.trimStart().startsWith(DEMO_PREFIX);
+}
+
+function stripDemoPrefix(name: string): string {
+  let clean = name.trim();
+  while (clean.startsWith(DEMO_PREFIX)) {
+    clean = clean.slice(DEMO_PREFIX.length).trim();
+  }
+  return clean;
+}
+
 function fmtWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -353,6 +376,7 @@ function FeedRow({
   item: HrFeedItem;
   departmentName: string | null;
 }) {
+  const demo = isDemoItem(item);
   return (
     <article className="px-3 py-2.5">
       <div className="flex items-start gap-2">
@@ -361,12 +385,21 @@ function FeedRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm text-tg-text break-words">
-            <span className="font-medium">{item.display_name}</span>{" "}
-            <Badge
-              text={item.badge}
-              emoji={item.badge_emoji}
-              demo={item.display_name.startsWith("[BOT]")}
-            />{" "}
+            <span className="font-medium">
+              {stripDemoPrefix(item.display_name)}
+            </span>{" "}
+            {demo ? (
+              // Одна пометка на всю строку: ни плашки, ни префикса в имени.
+              <span
+                data-testid="feed-demo-mark"
+                title="Тестовый сотрудник"
+                className="inline-flex items-center rounded-full bg-tg-bg/70 px-1.5 py-0.5 align-middle text-2xs font-medium text-tg-hint"
+              >
+                тест
+              </span>
+            ) : (
+              <Badge text={item.badge} emoji={item.badge_emoji} />
+            )}{" "}
             {item.text}
           </div>
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">

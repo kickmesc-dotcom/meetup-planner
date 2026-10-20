@@ -90,6 +90,18 @@ def test_demo_names_carry_prefix():
     assert not hr_demo.is_demo_name("Сергей")
 
 
+def test_demo_rename_keeps_marker():
+    """Правка имени в админке не срезает `[BOT]`: метка — инвариант пула."""
+    assert hr_demo.demo_title("Алина") == f"{hr_demo.DEMO_PREFIX} Алина"
+    # Имя уже с префиксом — второй раз его не добавляем.
+    once = hr_demo.demo_title("Алина")
+    assert hr_demo.demo_title(once) == once
+    # Пробелы и пустое имя не ломают метку.
+    assert hr_demo.demo_title(f"  {hr_demo.DEMO_PREFIX}   Борис ") == (
+        f"{hr_demo.DEMO_PREFIX} Борис"
+    )
+
+
 def test_demo_telegram_ids_are_synthetic():
     """Синтетическая база выше любых настоящих аккаунтов TG."""
     first = hr_demo.demo_telegram_id(0)

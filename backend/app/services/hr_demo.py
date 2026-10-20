@@ -111,6 +111,20 @@ def is_demo_name(name: str) -> bool:
     return name.strip().startswith(DEMO_PREFIX)
 
 
+def demo_title(name: str) -> str:
+    """Имя тестового сотрудника с меткой, без двойного префикса.
+
+    Админка переименовывает людей обычной ручкой и перезаписывает
+    `users.display_name` целиком. Для пула это значило бы потерять `[BOT]` —
+    и тестовые люди стали бы неотличимы от настоящих в ленте и списках.
+    Поэтому любая правка имени у `is_demo` проходит через эту функцию.
+    """
+    clean = name.strip()
+    while clean.startswith(DEMO_PREFIX):
+        clean = clean[len(DEMO_PREFIX) :].strip()
+    return demo_display_name(clean)
+
+
 def demo_telegram_id(index: int) -> int:
     return DEMO_TG_BASE + index
 

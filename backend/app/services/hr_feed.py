@@ -99,6 +99,9 @@ class FeedItem:
     # кому она не назначена (массовых сотрудников).
     badge: str | None = None
     badge_emoji: str | None = None
+    # Тестовый пул `[BOT]`. Фронтенд по этому флагу рисует ОДНУ пометку
+    # («тест») вместо трёх (префикс в имени + плашка + чип BOT).
+    is_demo: bool = False
 
 
 # --------------------------------------------------------------------------
@@ -187,8 +190,8 @@ def resolve_employee_filter(
 
 async def _directory(
     session: AsyncSession, employee_ids: set[int]
-) -> dict[int, tuple[str, int, int | None, str | None, str | None]]:
-    """`employee.id` → (имя, user_id, department_id, плашка, эмодзи). Один запрос."""
+) -> dict[int, tuple[str, int, int | None, str | None, str | None, bool]]:
+    """`employee.id` → (имя, user_id, department_id, плашка, эмодзи, демо)."""
     if not employee_ids:
         return {}
     rows = await session.execute(
@@ -199,18 +202,21 @@ async def _directory(
             User.display_name,
             Employee.badge,
             Employee.badge_emoji,
+            Employee.is_demo,
         )
         .join(User, User.id == Employee.user_id)
         .where(Employee.id.in_(employee_ids))
     )
     return {
-        int(eid): (str(name), int(uid), did, badge, badge_emoji)
-        for eid, uid, did, name, badge, badge_emoji in rows.all()
+        int(eid): (str(name), int(uid), did, badge, badge_emoji, bool(demo))
+        for eid, uid, did, name, badge, badge_emoji, demo in rows.all()
     }
 
 
-# `employee.id` → (имя, user_id, department_id, плашка, эмодзи)
-_Directory = dict[int, tuple[str, int, int | None, str | None, str | None]]
+# `employee.id` → (имя, user_id, department_id, плашка, эмодзи, демо)
+_Directory = dict[
+    int, tuple[str, int, int | None, str | None, str | None, bool]
+]
 
 
 def _name_of(directory: _Directory, employee_id: int | None) -> str:
@@ -391,6 +397,7 @@ async def collect_items(
                 ref_id=ref_id,
                 badge=entry[3] if entry else None,
                 badge_emoji=entry[4] if entry else None,
+                is_demo=entry[5] if entry else False,
             )
         )
     return items
