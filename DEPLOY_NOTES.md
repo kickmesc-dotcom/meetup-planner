@@ -2853,3 +2853,20 @@ Chrome и Telegram-веб пишут WebM/OPUS — `sendVoice` его отбив
   это следующий проход.
 - Мини-апп перевыложен на `semitaskbot.pages.dev`; в бандле есть
   `viewBox="0 0 24 24"` и `strokeWidth:1.8`, вкладки рисуются SVG.
+
+## Типографика (P1.5)
+
+- Вся вёрстка переведена на шкалу `DESIGN_SYSTEM §2`: `text-[11px]` (327) →
+  `text-xs` (12px), `text-[10px]` (86) → `text-2xs` (11px), 8–9px (11) →
+  `text-3xs` (10px, минимум). 11px остался мета-токеном: время, счётчики, чипы,
+  инициалы, заголовки дней.
+- Произвольных `text-[Npx]` в `src/**` больше нет; страж —
+  `src/styles.typeScale.test.ts` (сканирует исходники через `import.meta.glob`
+  и падает на любом новом размере).
+- `tsconfig.json`: добавлены `types: ["vite/client"]` — нужны для `?raw`/glob.
+- Проверка: `tsc --noEmit` чисто, `vitest run` — 166 тестов, `vite build` — ок.
+- Мини-апп перевыложен на `semitaskbot.pages.dev` (`index-jC5inRXG.js`,
+  `index-DwRRnVfw.css`). В бандле `.text-xs{.75rem}`, `.text-2xs{11px}`,
+  `.text-3xs{10px}`, вхождений `text-[11px]` — 0.
+- Живой вход проверить нельзя: без initData страница отдаёт «Ошибка
+  авторизации», поэтому вёрстка проверена сборкой, тестами и содержимым бандла.
