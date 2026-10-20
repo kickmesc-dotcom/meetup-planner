@@ -14,6 +14,7 @@ import { useAppText } from "@/api/texts";
 import { useSimulation } from "@/store/simulation";
 import { getApiBase, humanizeApiError, setApiBase } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
+import Icon, { type IconName } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import AchievementsCard from "@/features/hr/AchievementsCard";
 import Badge from "@/features/hr/Badge";
@@ -27,11 +28,22 @@ import { haptic, showAlert, WebApp } from "@/tg/webapp";
 /**
  * SemiTaskBot: «Профиль».
  *
- * Две задачи экрана:
- *  1. закончить знакомство, если оно оборвалось в чате (бот спрашивает
- *     подразделение и опыт — здесь те же два шага, чтобы человек не застревал);
- *  2. показать, кем он числится в системе: роль видна честно, потому что от неё
- *     зависит, что он видит в ленте и какие кнопки у него есть.
+ * VISUAL_AUDIT P1.7: раньше экран был свалкой из 15 блоков — «кто я», KPI,
+ * обучение, «примерить роль», «режим проверки», достижения, «мои данные»,
+ * 14 «быстрых переходов» (из них семь дублировали нижнюю полосу), чат с ботом
+ * и серверный переключатель. Человек листал профиль дольше, чем работал.
+ *
+ * Теперь четыре блока по смыслу:
+ *  1. «Кто я» — имя, роль, подразделение, опыт; правка данных открывается
+ *     кнопкой, а во время знакомства показана сразу;
+ *  2. «Опыт и обучение» — KPI, курс и достижения вместе (это одна тема);
+ *  3. «Разделы» — один свёрнутый список; то, что уже есть в нижней полосе,
+ *     из него убрано, чтобы не было двух входов в одно место;
+ *  4. «Для администратора» — примерка роли, режим проверки, тестовый пул и
+ *     серверный переключатель, свёрнуто по умолчанию.
+ *
+ * Ничего не удалено: календарь, встречи, материалы, стандарты, приёмка и
+ * отчёты по-прежнему открываются из списка разделов.
  */
 const ROLE_LABEL: Record<HrEmployee["role"], string> = {
   employee: "Сотрудник",
@@ -44,6 +56,12 @@ const ROLE_HINT: Record<HrEmployee["role"], string> = {
   aup: "В событиях смены видны действия твоего подразделения.",
   admin: "В событиях смены видно всё, с фильтрами по людям и подразделениям.",
 };
+
+interface RowItem {
+  icon: IconName;
+  label: string;
+  onSelect: () => void;
+}
 
 export default function HrProfileScreen() {
   const qc = useQueryClient();
@@ -62,6 +80,9 @@ export default function HrProfileScreen() {
   const [experience, setExperience] = useState<"new" | "experienced" | null>(
     null,
   );
+  // Правка «моих данных» по умолчанию открыта только пока знакомство не
+  // закончено: это обязательный шаг, его нельзя прятать за кнопку.
+  const [editingOverride, setEditingOverride] = useState<boolean | null>(null);
   // Опрос живёт оверлеем поверх вкладок: он нужен раз в смену и не стоит
   // отдельной кнопки в нижней полосе.
   const [showFeedback, setShowFeedback] = useState(false);
@@ -69,6 +90,9 @@ export default function HrProfileScreen() {
   const [showDemo, setShowDemo] = useState(false);
   // Обучение — этап онбординга и всегда доступный справочник.
   const [showTraining, setShowTraining] = useState(false);
+  // Разделы и админ-инструменты свёрнуты: это редкие переходы, а не работа.
+  const [showSections, setShowSections] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const trainingQ = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
   const staff = !!(meQ.data?.is_admin || meQ.data?.is_staff);
   const employeesQ = useQuery({
@@ -125,6 +149,7 @@ export default function HrProfileScreen() {
     onSuccess: (data) => {
       haptic("success");
       qc.setQueryData(["hr-employee"], data);
+      setEditingOverride(false);
       void showAlert(
         data.onboarding_state === "done"
           ? "Профиль готов. Смена начнётся с чек-листа."
@@ -148,18 +173,45 @@ export default function HrProfileScreen() {
 
   const me = meQ.data;
   const onboarding = me.onboarding_state !== "done";
+  const editing = editingOverride ?? onboarding;
   const pickedDept = departmentId ?? me.department_id;
   const deps = depsQ.data ?? [];
 
+  // Семь разделов уже есть в нижней полосе (задачи, смена, табель, события,
+  // команда, админ). Второй вход в то же место только путал.
+  const sections: RowItem[] = [
+    { icon: "book", label: "Материалы смены", onSelect: () => setTab("materials") },
+    { icon: "globe", label: "Ссылки", onSelect: () => setTab("links") },
+    { icon: "checklist", label: "Стандарты", onSelect: () => setTab("standards") },
+    { icon: "alert", label: "Журнал проблем", onSelect: () => setTab("issues") },
+    { icon: "send", label: "Передача смены", onSelect: () => setTab("handovers") },
+    { icon: "calendar", label: "График", onSelect: () => setTab("calendar") },
+    { icon: "clock", label: "Встречи", onSelect: () => setTab("meetings") },
+    { icon: "edit", label: "Обратная связь", onSelect: () => setShowFeedback(true) },
+  ];
+  if (me.is_aup || me.is_staff) {
+    sections.splice(4, 0, {
+      icon: "check",
+      label: "Приёмка",
+      onSelect: () => setTab("review"),
+    });
+    sections.splice(5, 0, {
+      icon: "layout",
+      label: "Отчёт смены",
+      onSelect: () => setTab("reports"),
+    });
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
+    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
+      {/* 1. Кто я. */}
+      <section
+        data-testid="profile-identity"
+        className="rounded-card bg-tg-secondary-bg/60 p-3"
+      >
         <div className="flex items-center gap-3">
-          <div
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-tg-bg/60 text-xl"
-            aria-hidden
-          >
-            👷
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-tg-bg/60 text-tg-hint">
+            <Icon name="profile" size={26} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
@@ -173,11 +225,27 @@ export default function HrProfileScreen() {
               {me.position ? ` · ${me.position}` : ""}
             </div>
           </div>
+          {!editing && (
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                setEditingOverride(true);
+              }}
+              className="min-h-11 shrink-0 rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-link"
+            >
+              Изменить
+            </button>
+          )}
         </div>
+
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
           <Info
             label="Подразделение"
-            value={me.department_name ?? "не выбрано"}
+            value={
+              me.department_name ??
+              (onboarding ? "выбери ниже" : "не выбрано")
+            }
           />
           <Info
             label="Опыт"
@@ -186,318 +254,369 @@ export default function HrProfileScreen() {
                 ? "новичок"
                 : me.experience === "experienced"
                   ? "с опытом"
-                  : "не указан"
+                  : onboarding
+                    ? "выбери ниже"
+                    : "не указан"
             }
           />
         </div>
-        <p className="mt-2 rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
-          {ROLE_HINT[me.role]}
-        </p>
+
+        <p className="mt-2 text-xs text-tg-hint">{ROLE_HINT[me.role]}</p>
+
+        {editing && (
+          <div className="mt-3 border-t border-tg-hint/10 pt-3">
+            <h2 className="text-xs font-medium text-tg-text">
+              {onboarding ? "Закончим знакомство" : "Мои данные"}
+            </h2>
+            <p className="mt-1 text-xs text-tg-hint">
+              Подразделение определяет чек-листы, поручения и ссылки, которые
+              тебе приходят.
+            </p>
+
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {depsQ.isLoading && (
+                <div className="text-xs text-tg-hint">Загружаем…</div>
+              )}
+              {deps.map((d) => {
+                const active = pickedDept === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      haptic("selection");
+                      setDepartmentId(d.id);
+                    }}
+                    className={[
+                      "min-h-9 rounded-full px-3 text-xs transition-colors",
+                      active
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-bg/60 text-tg-text",
+                    ].join(" ")}
+                  >
+                    {d.emoji ? `${d.emoji} ` : ""}
+                    {d.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {[
+                { v: "new" as const, label: "Я новичок" },
+                { v: "experienced" as const, label: "У меня есть опыт" },
+              ].map((o) => {
+                const active = (experience ?? me.experience) === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      haptic("selection");
+                      setExperience(o.v);
+                    }}
+                    className={[
+                      "min-h-9 rounded-full px-3 text-xs transition-colors",
+                      active
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-bg/60 text-tg-text",
+                    ].join(" ")}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              {!onboarding && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic("light");
+                    setDepartmentId(null);
+                    setExperience(null);
+                    setEditingOverride(false);
+                  }}
+                  className="min-h-11 rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
+                >
+                  Отмена
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={save.isPending || (!pickedDept && !experience)}
+                onClick={() =>
+                  save.mutate({
+                    department_id: pickedDept,
+                    experience: experience ?? me.experience,
+                  })
+                }
+                className="min-h-11 flex-1 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+              >
+                {onboarding ? "Продолжить" : "Сохранить"}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
-      {/* Опыт за работу: открыт всем — это мотивация, а не надзор. */}
-      <KpiCard />
+      {/* 2. Опыт и обучение: мотивация и курс — одна тема, а не три блока.
+          KpiCard и AchievementsCard — самостоятельные карточки, поэтому здесь
+          общий заголовок, а не карточка в карточке. */}
+      <div data-testid="profile-progress" className="space-y-2">
+        <h2 className="px-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+          Опыт и обучение
+        </h2>
+        <KpiCard />
 
-      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-tg-text">🎓 Обучение</h2>
-          <span className="text-xs tabular-nums text-tg-hint">
-            {trainingQ.data
-              ? `${trainingQ.data.done}/${trainingQ.data.total}`
-              : "…"}
-          </span>
-        </div>
-        <p className="mt-1 text-xs text-tg-hint">
-          Три уровня от знакомства до самостоятельной работы — по одному действию
-          на урок.
-        </p>
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-tg-text">Курс</h3>
+            <span className="text-xs tabular-nums text-tg-hint">
+              {trainingQ.data
+                ? `${trainingQ.data.done}/${trainingQ.data.total}`
+                : "…"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-tg-hint">
+            Три уровня от знакомства до самостоятельной работы — по одному
+            действию на урок.
+          </p>
+
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={learningMode.isPending}
+              aria-pressed={me.learning_mode}
+              onClick={() => learningMode.mutate(!me.learning_mode)}
+              className={[
+                "min-h-10 flex-1 rounded-tile px-2 text-xs transition-colors disabled:opacity-50",
+                me.learning_mode
+                  ? "bg-tg-button text-tg-button-text"
+                  : "bg-tg-bg/60 text-tg-text",
+              ].join(" ")}
+            >
+              {me.learning_mode ? "Учимся вместе · вкл" : "Учимся вместе · выкл"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                setShowTraining(true);
+              }}
+              className="min-h-10 flex-1 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text"
+            >
+              {trainingQ.data?.complete ? "Открыть курс" : "Продолжить курс"}
+            </button>
+          </div>
+        </section>
+
+        {/* Скрытый личный прогресс: сервер сам решает, показывать ли блок
+            (сейчас — руководителю и админу), см. `AchievementsCard`. */}
+        <AchievementsCard />
+      </div>
+
+      {/* 3. Разделы: один вход вместо сетки из 14 кнопок. */}
+      <section className="rounded-card bg-tg-secondary-bg/60">
         <button
           type="button"
-          disabled={learningMode.isPending}
-          aria-pressed={me.learning_mode}
-          onClick={() => learningMode.mutate(!me.learning_mode)}
-          className={[
-            "mt-2 min-h-9 w-full rounded-tile px-3 text-xs transition-colors disabled:opacity-50",
-            me.learning_mode
-              ? "bg-tg-button text-tg-button-text"
-              : "bg-tg-bg/60 text-tg-text",
-          ].join(" ")}
-        >
-          {me.learning_mode
-            ? "Учимся вместе · выключить"
-            : "Продолжаем учиться вместе"}
-        </button>
-        <button
-          type="button"
+          aria-expanded={showSections}
+          aria-controls="profile-sections"
           onClick={() => {
             haptic("light");
-            setShowTraining(true);
+            setShowSections((v) => !v);
           }}
-          className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text"
+          className="flex min-h-12 w-full items-center gap-2 rounded-card px-3 text-left"
         >
-          {trainingQ.data?.complete
-            ? "Открыть курс"
-            : trainingQ.data
-              ? `Продолжить (${
-                  trainingQ.data.lessons.find((l) => !l.done)?.title ?? "курс"
-                })`
-              : "Открыть курс"}
+          <Icon name="layout" size={18} className="text-tg-hint" />
+          <span className="flex-1 text-sm font-semibold text-tg-text">
+            Все разделы
+          </span>
+          <span className="text-xs tabular-nums text-tg-hint">
+            {sections.length}
+          </span>
+          <Icon
+            name="chevron"
+            size={16}
+            className={[
+              "text-tg-hint transition-transform",
+              showSections ? "rotate-90" : "",
+            ].join(" ")}
+          />
         </button>
+        {showSections && (
+          <div id="profile-sections" className="border-t border-tg-hint/10 p-2">
+            {sections.map((item) => (
+              <Row key={item.label} {...item} />
+            ))}
+          </div>
+        )}
       </section>
 
+      {/* 4. Админ-инструменты: нужны редко, поэтому свёрнуты. */}
       {(me.is_admin || me.is_staff) && (
-        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-          <h2 className="text-sm font-semibold text-tg-text">Примерить роль</h2>
-          <p className="mt-1 text-xs text-tg-hint">
-            Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ в
-            админку остаётся — вернуть себя можно этой же кнопкой.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {([
-              { v: "employee", label: "Сотрудник" },
-              { v: "aup", label: "Руководитель" },
-              { v: "admin", label: "Администратор" },
-            ] as const).map((option) => {
-              const active = me.role === option.v;
-              return (
-                <button
-                  key={option.v}
-                  type="button"
-                  aria-pressed={active}
-                  disabled={roleSwitch.isPending || active}
-                  onClick={() => roleSwitch.mutate(option.v)}
-                  className={[
-                    "min-h-9 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
-                    active
-                      ? "bg-tg-button text-tg-button-text"
-                      : "bg-tg-bg/60 text-tg-text",
-                  ].join(" ")}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {(me.is_admin || me.is_staff) && (
-        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-          <h2 className="text-sm font-semibold text-tg-text">🧪 Режим проверки</h2>
-          <p className="mt-1 text-xs text-tg-hint">
-            Открой приложение глазами сотрудника. Тестовые задачи и смены
-            удалятся при выходе — настоящие данные не изменятся.
-          </p>
-          <select
-            aria-label="Кого проверяем"
-            value={simulationTarget ?? ""}
-            onChange={(event) =>
-              setSimulationTarget(
-                event.target.value ? Number(event.target.value) : null,
-              )
-            }
-            className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg px-2 text-xs text-tg-text"
-          >
-            <option value="">Выбери сотрудника</option>
-            {(employeesQ.data ?? []).map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.display_name}
-                {person.department_name ? ` · ${person.department_name}` : ""}
-              </option>
-            ))}
-          </select>
-          <div className="mt-2 flex gap-1.5">
-            {(
-              [
-                { v: "new" as const, label: "Как новичок" },
-                { v: "as_is" as const, label: "Как сейчас" },
-              ]
-            ).map((option) => (
-              <button
-                key={option.v}
-                type="button"
-                aria-pressed={simulationMode === option.v}
-                onClick={() => setSimulationMode(option.v)}
-                className={[
-                  "min-h-9 flex-1 rounded-full px-3 text-xs transition-colors",
-                  simulationMode === option.v
-                    ? "bg-tg-button text-tg-button-text"
-                    : "bg-tg-bg/60 text-tg-text",
-                ].join(" ")}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+        <section className="rounded-card bg-tg-secondary-bg/60">
           <button
             type="button"
-            disabled={simulationTarget === null || simulationStart.isPending}
-            onClick={() => simulationStart.mutate()}
-            className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+            aria-expanded={showAdmin}
+            aria-controls="profile-admin"
+            onClick={() => {
+              haptic("light");
+              setShowAdmin((v) => !v);
+            }}
+            className="flex min-h-12 w-full items-center gap-2 rounded-card px-3 text-left"
           >
-            {simulationStart.isPending ? "Открываем…" : "Открыть как сотрудник"}
+            <Icon name="admin" size={18} className="text-tg-hint" />
+            <span className="flex-1 text-sm font-semibold text-tg-text">
+              Для администратора
+            </span>
+            <Icon
+              name="chevron"
+              size={16}
+              className={[
+                "text-tg-hint transition-transform",
+                showAdmin ? "rotate-90" : "",
+              ].join(" ")}
+            />
           </button>
+
+          {showAdmin && (
+            <div id="profile-admin" className="space-y-4 border-t border-tg-hint/10 p-3">
+              <div>
+                <h3 className="text-xs font-medium text-tg-text">
+                  Примерить роль
+                </h3>
+                <p className="mt-1 text-xs text-tg-hint">
+                  Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ
+                  в админку остаётся — вернуть себя можно этой же кнопкой.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(
+                    [
+                      { v: "employee", label: "Сотрудник" },
+                      { v: "aup", label: "Руководитель" },
+                      { v: "admin", label: "Администратор" },
+                    ] as const
+                  ).map((option) => {
+                    const active = me.role === option.v;
+                    return (
+                      <button
+                        key={option.v}
+                        type="button"
+                        aria-pressed={active}
+                        disabled={roleSwitch.isPending || active}
+                        onClick={() => roleSwitch.mutate(option.v)}
+                        className={[
+                          "min-h-9 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
+                          active
+                            ? "bg-tg-button text-tg-button-text"
+                            : "bg-tg-bg/60 text-tg-text",
+                        ].join(" ")}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border-t border-tg-hint/10 pt-3">
+                <h3 className="text-xs font-medium text-tg-text">
+                  Режим проверки
+                </h3>
+                <p className="mt-1 text-xs text-tg-hint">
+                  Открой приложение глазами сотрудника. Тестовые задачи и смены
+                  удалятся при выходе — настоящие данные не изменятся.
+                </p>
+                <select
+                  aria-label="Кого проверяем"
+                  value={simulationTarget ?? ""}
+                  onChange={(event) =>
+                    setSimulationTarget(
+                      event.target.value ? Number(event.target.value) : null,
+                    )
+                  }
+                  className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg px-2 text-xs text-tg-text"
+                >
+                  <option value="">Выбери сотрудника</option>
+                  {(employeesQ.data ?? []).map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.display_name}
+                      {person.department_name ? ` · ${person.department_name}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-2 flex gap-1.5">
+                  {[
+                    { v: "new" as const, label: "Как новичок" },
+                    { v: "as_is" as const, label: "Как сейчас" },
+                  ].map((option) => (
+                    <button
+                      key={option.v}
+                      type="button"
+                      aria-pressed={simulationMode === option.v}
+                      onClick={() => setSimulationMode(option.v)}
+                      className={[
+                        "min-h-9 flex-1 rounded-full px-3 text-xs transition-colors",
+                        simulationMode === option.v
+                          ? "bg-tg-button text-tg-button-text"
+                          : "bg-tg-bg/60 text-tg-text",
+                      ].join(" ")}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={simulationTarget === null || simulationStart.isPending}
+                  onClick={() => simulationStart.mutate()}
+                  className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+                >
+                  {simulationStart.isPending
+                    ? "Открываем…"
+                    : "Открыть как сотрудник"}
+                </button>
+              </div>
+
+              {me.is_admin && (
+                <div className="border-t border-tg-hint/10 pt-3">
+                  <h3 className="text-xs font-medium text-tg-text">
+                    Тестовый пул
+                  </h3>
+                  <p className="mt-1 text-xs text-tg-hint">
+                    Сотрудники `[BOT]` для проверки сценариев. Настоящие данные
+                    не затрагиваются.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      haptic("light");
+                      setShowDemo(true);
+                    }}
+                    className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg/60 text-xs text-tg-text"
+                  >
+                    Открыть тестовый пул
+                  </button>
+                </div>
+              )}
+
+              {me.is_admin && (
+                <div className="border-t border-tg-hint/10 pt-3">
+                  <ServerSwitch />
+                </div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
-      {/* Скрытый личный прогресс: сервер сам решает, показывать ли блок
-          (сейчас — руководителю и админу), см. `AchievementsCard`. */}
-      <AchievementsCard />
-
-      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-        <h2 className="text-sm font-semibold text-tg-text">
-          {onboarding ? "Закончим знакомство" : "Мои данные"}
-        </h2>
-        <p className="mt-1 text-xs text-tg-hint">
-          Подразделение определяет чек-листы, поручения и ссылки, которые тебе
-          приходят.
-        </p>
-
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {depsQ.isLoading && (
-            <div className="text-xs text-tg-hint">Загружаем…</div>
-          )}
-          {deps.map((d) => {
-            const active = pickedDept === d.id;
-            return (
-              <button
-                key={d.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  haptic("selection");
-                  setDepartmentId(d.id);
-                }}
-                className={[
-                  "min-h-9 rounded-full px-3 text-xs transition-colors",
-                  active
-                    ? "bg-tg-button text-tg-button-text"
-                    : "bg-tg-bg/60 text-tg-text",
-                ].join(" ")}
-              >
-                {d.emoji ? `${d.emoji} ` : ""}
-                {d.name}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {[
-            { v: "new" as const, label: "Я новичок" },
-            { v: "experienced" as const, label: "У меня есть опыт" },
-          ].map((o) => {
-            const active = (experience ?? me.experience) === o.v;
-            return (
-              <button
-                key={o.v}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  haptic("selection");
-                  setExperience(o.v);
-                }}
-                className={[
-                  "min-h-9 rounded-full px-3 text-xs transition-colors",
-                  active
-                    ? "bg-tg-button text-tg-button-text"
-                    : "bg-tg-bg/60 text-tg-text",
-                ].join(" ")}
-              >
-                {o.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          disabled={save.isPending || (!pickedDept && !experience)}
-          onClick={() =>
-            save.mutate({
-              department_id: pickedDept,
-              experience: experience ?? me.experience,
-            })
-          }
-          className="mt-3 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-        >
-          {onboarding ? "Продолжить" : "Сохранить"}
-        </button>
-      </section>
-
-      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-        <h2 className="text-sm font-semibold text-tg-text">Быстрые переходы</h2>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <Jump icon="✅" label="Мои задачи" onClick={() => setTab("tasks")} />
-          <Jump
-            icon="🕒"
-            label="Чек-лист смены"
-            onClick={() => setTab("checklist")}
-          />
-          <Jump icon="🗓" label="Табель смен" onClick={() => setTab("shifts")} />
-          <Jump
-            icon="📋"
-            label="События смены"
-            onClick={() => setTab("feed")}
-          />
-          <Jump icon="📚" label="Материалы" onClick={() => setTab("materials")} />
-          <Jump icon="🔗" label="Ссылки" onClick={() => setTab("links")} />
-          <Jump
-            icon="🛠"
-            label="Журнал проблем"
-            onClick={() => setTab("issues")}
-          />
-          {/* Луна в приложении означает тему — передача смены помечена отправкой,
-              чтобы два разных действия не выглядели одним и тем же. */}
-          <Jump
-            icon="📤"
-            label="Передача смены"
-            onClick={() => setTab("handovers")}
-          />
-          <Jump
-            icon="📚"
-            label="Стандарты"
-            onClick={() => setTab("standards")}
-          />
-          {(me.is_aup || me.is_staff) && (
-            <>
-              <Jump
-                icon="🔍"
-                label="Приёмка"
-                onClick={() => setTab("review")}
-              />
-              <Jump
-                icon="📊"
-                label="Отчёт смены"
-                onClick={() => setTab("reports")}
-              />
-            </>
-          )}
-          <Jump
-            icon="📝"
-            label="Обратная связь"
-            onClick={() => setShowFeedback(true)}
-          />
-          {/* Календарь-график и встречи не удалены: из нижней полосы они убраны,
-              чтобы подписи оставались читаемыми, но вход сохранён. */}
-          <Jump icon="📅" label="График" onClick={() => setTab("calendar")} />
-          <Jump icon="🤝" label="Встречи" onClick={() => setTab("meetings")} />
-          {(me.is_aup || me.is_staff) && (
-            <Jump icon="👀" label="Команда" onClick={() => setTab("team")} />
-          )}
-          {me.is_admin && (
-            <Jump
-              icon="🧪"
-              label="Тестовый пул"
-              onClick={() => setShowDemo(true)}
-            />
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-        <h2 className="text-sm font-semibold text-tg-text">Пиши боту в чат</h2>
-        <p className="mt-1 text-xs text-tg-hint">{photoHint}</p>
+      {/* Чат с ботом — тихая ссылка внизу, а не отдельная карточка. */}
+      <div className="pb-2 text-center">
+        <p className="text-xs text-tg-hint">{photoHint}</p>
         <button
           type="button"
           onClick={() => {
@@ -505,15 +624,11 @@ export default function HrProfileScreen() {
             const app = WebApp as unknown as { close?: () => void };
             app.close?.();
           }}
-          className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg/60 text-xs font-medium text-tg-text"
+          className="mt-2 min-h-11 rounded-tile px-3 text-xs font-medium text-tg-link"
         >
           Вернуться в чат с ботом
         </button>
-      </section>
-
-      {/* Аварийное переключение сервера: если основной домен заблокирован,
-          резервный контур подставляется без новой сборки приложения. */}
-      {me.is_admin && <ServerSwitch />}
+      </div>
 
       {showDemo && <HrDemoPanel onClose={() => setShowDemo(false)} />}
 
@@ -533,8 +648,8 @@ export default function HrProfileScreen() {
 function ServerSwitch() {
   const [value, setValue] = useState(getApiBase());
   return (
-    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-      <h2 className="text-sm font-semibold text-tg-text">Сервер (для админа)</h2>
+    <div>
+      <h3 className="text-xs font-medium text-tg-text">Сервер</h3>
       <p className="mt-1 text-xs text-tg-hint">
         Если основной адрес недоступен, укажи резервный — приложение продолжит
         работать без переустановки. Пусто — адрес из сборки.
@@ -559,7 +674,7 @@ function ServerSwitch() {
       >
         Сохранить и перезагрузить
       </button>
-    </section>
+    </div>
   );
 }
 
@@ -572,26 +687,20 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Jump({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: string;
-  label: string;
-  onClick: () => void;
-}) {
+/** Строка списка разделов: иконка, подпись, шеврон. */
+function Row({ icon, label, onSelect }: RowItem) {
   return (
     <button
       type="button"
       onClick={() => {
         haptic("light");
-        onClick();
+        onSelect();
       }}
-      className="flex min-h-11 items-center gap-2 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text active:scale-[0.98] transition-transform"
+      className="flex min-h-11 w-full items-center gap-2 rounded-tile px-2 text-left text-sm text-tg-text active:bg-tg-bg/60"
     >
-      <span aria-hidden>{icon}</span>
-      <span className="truncate">{label}</span>
+      <Icon name={icon} size={18} className="text-tg-hint" />
+      <span className="flex-1 truncate">{label}</span>
+      <Icon name="chevron" size={14} className="text-tg-hint" />
     </button>
   );
 }
