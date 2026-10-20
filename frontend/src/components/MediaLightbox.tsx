@@ -234,7 +234,7 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
         />
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-[11px] text-white/60">
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs text-white/60">
         Двойной тап или колесо — зум · тяни, чтобы сдвинуть · тап по фону — закрыть
       </div>
     </div>,

@@ -286,7 +286,7 @@ export default function MyTasksScreen() {
           <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium text-tg-text">Смена сегодня</span>
-              <span className="text-[11px] tabular-nums text-tg-hint">
+              <span className="text-xs tabular-nums text-tg-hint">
                 {checklist.done}/{checklist.total}
               </span>
             </div>
@@ -322,11 +322,11 @@ export default function MyTasksScreen() {
           >
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium text-tg-text">🛠 Проблемы</span>
-              <span className="text-[11px] tabular-nums text-tg-hint">
+              <span className="text-xs tabular-nums text-tg-hint">
                 открыто {openIssues}
               </span>
             </div>
-            <p className="mt-1 text-[11px] text-tg-hint">
+            <p className="mt-1 text-xs text-tg-hint">
               {urgentIssues > 0
                 ? `${urgentIssues} ждут внимания: срок или повтор.`
                 : "Все в работе — открой журнал, если нужен статус."}
@@ -412,7 +412,7 @@ function TaskCard({
         </h2>
         <span
           className={[
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px]",
+            "shrink-0 rounded-full px-2 py-0.5 text-xs",
             STATUS_CLASS[status],
           ].join(" ")}
         >
@@ -420,7 +420,7 @@ function TaskCard({
         </span>
       </div>
 
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-tg-hint">
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
         <span>⏰ {fmtDue(task.due_at)}</span>
         {shift && <span>🗓 смена {shift}</span>}
         {task.priority !== "normal" && (
@@ -438,13 +438,13 @@ function TaskCard({
       </div>
 
       {group && (
-        <div className="mt-1.5 text-[11px] text-tg-hint">
+        <div className="mt-1.5 text-xs text-tg-hint">
           👥 {TASK_MODE_LABEL[task.mode]} · сделали {task.progress_done} из{" "}
           {task.progress_total}
         </div>
       )}
       {task.my_part && (
-        <div className="mt-1 text-[11px] text-tg-text/90">
+        <div className="mt-1 text-xs text-tg-text/90">
           Моя часть: {task.my_part}
         </div>
       )}
@@ -464,7 +464,7 @@ function TaskCard({
       <TaskPhotos task={task} closed={closed} />
 
       {!closed && status === "on_review" && (
-        <div className="mt-3 rounded-lg bg-tg-bg/60 px-2.5 py-2 text-[11px] text-tg-hint">
+        <div className="mt-3 rounded-lg bg-tg-bg/60 px-2.5 py-2 text-xs text-tg-hint">
           Работа сдана — ждёт приёмки руководителя.
         </div>
       )}
@@ -498,7 +498,7 @@ function TaskCard({
 
 
       {closed && task.done_at && (
-        <div className="mt-2 text-[11px] text-tg-hint">
+        <div className="mt-2 text-xs text-tg-hint">
           Закрыто: {new Date(task.done_at).toLocaleString("ru-RU")}
         </div>
       )}
@@ -536,7 +536,7 @@ function TaskPhotos({ task, closed }: { task: HrTask; closed: boolean }) {
       {!closed && (
         <div className="mt-2">
           {needsPhoto && (
-            <div className="mb-1 text-[11px] text-tg-hint">
+            <div className="mb-1 text-xs text-tg-hint">
               📷 Фотоотчёт: сними или выбери фото — поручение закроется само.
             </div>
           )}
@@ -576,7 +576,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
 
   return (
     <div className="mt-3 rounded-lg bg-tg-bg/60 p-3">
-      <label className="block text-[11px] text-tg-hint">
+      <label className="block text-xs text-tg-hint">
         Причина
         <select
           value={reason}
@@ -591,7 +591,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
         </select>
       </label>
 
-      <label className="mt-2 block text-[11px] text-tg-hint">
+      <label className="mt-2 block text-xs text-tg-hint">
         Когда сможешь закончить (необязательно)
         <input
           type="datetime-local"
@@ -601,7 +601,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
         />
       </label>
 
-      <label className="mt-2 block text-[11px] text-tg-hint">
+      <label className="mt-2 block text-xs text-tg-hint">
         Комментарий
         <textarea
           value={comment}

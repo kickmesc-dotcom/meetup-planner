@@ -305,10 +305,10 @@ function Card({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-tg-text">{title}</div>
-        <div className="text-[11px] text-tg-hint truncate">{subtitle}</div>
+        <div className="text-xs text-tg-hint truncate">{subtitle}</div>
       </div>
       {badge !== undefined && badge > 0 && (
-        <div className="min-w-5 h-5 px-1.5 rounded-full bg-status-busy text-white text-[11px] font-semibold tabular-nums flex items-center justify-center shrink-0">
+        <div className="min-w-5 h-5 px-1.5 rounded-full bg-status-busy text-white text-xs font-semibold tabular-nums flex items-center justify-center shrink-0">
           {badge}
         </div>
       )}

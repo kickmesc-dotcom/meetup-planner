@@ -234,7 +234,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             старых фраз» — показывает что реально в admin_config и даёт залить
             дефолты одной кнопкой (вытесняет кривой/пустой ключ валидным JSON). */}
         {reasonsRaw.data && (
-          <div className="mt-3 rounded-md bg-tg-bg/40 p-2 text-[11px] text-tg-hint">
+          <div className="mt-3 rounded-md bg-tg-bg/40 p-2 text-xs text-tg-hint">
             <div className="font-medium text-tg-text mb-1">🔍 Диагностика</div>
             {reasonsRaw.data.using_default ? (
               <div className="text-status-busy">
@@ -320,7 +320,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
                       {u?.display_name ?? `#${h.user_id}`}
                     </div>
                   </div>
-                  <div className="text-[10px] text-tg-hint tabular-nums whitespace-nowrap">
+                  <div className="text-2xs text-tg-hint tabular-nums whitespace-nowrap">
                     {format(new Date(h.week_start), "dd.MM.yyyy")}
                   </div>
                 </div>
@@ -364,7 +364,7 @@ function WeightRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm truncate text-tg-text">{name}</div>
-        <div className="text-[10px] text-tg-hint">tg={tg}</div>
+        <div className="text-2xs text-tg-hint">tg={tg}</div>
       </div>
       <input
         type="number"
@@ -448,7 +448,7 @@ function MinutesRow({
           {saving ? "…" : "OK"}
         </button>
       </div>
-      <div className="flex flex-wrap gap-1.5 text-[11px]">
+      <div className="flex flex-wrap gap-1.5 text-xs">
         {(
           [
             [60, "1 ч"],
@@ -473,7 +473,7 @@ function MinutesRow({
         ))}
       </div>
       {!valid && draft.trim() !== "" && (
-        <div className="text-[11px] text-status-busy">
+        <div className="text-xs text-status-busy">
           Допустимо от {lo} до {hi} минут.
         </div>
       )}

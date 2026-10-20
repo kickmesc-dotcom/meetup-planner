@@ -53,7 +53,7 @@ export default function SimulationBanner() {
   const place = simulation.departmentName ? ` · ${simulation.departmentName}` : "";
   return (
     <div
-      className="flex items-center gap-2 border-b border-status-busy/30 bg-status-busy/15 px-3 py-1.5 text-[11px] text-tg-text"
+      className="flex items-center gap-2 border-b border-status-busy/30 bg-status-busy/15 px-3 py-1.5 text-xs text-tg-text"
       role="status"
     >
       <span aria-hidden>🧪</span>
@@ -65,7 +65,7 @@ export default function SimulationBanner() {
         type="button"
         disabled={exit.isPending}
         onClick={() => exit.mutate()}
-        className="min-h-7 shrink-0 rounded-full bg-tg-bg px-2.5 text-[11px] font-medium text-tg-link disabled:opacity-50"
+        className="min-h-7 shrink-0 rounded-full bg-tg-bg px-2.5 text-xs font-medium text-tg-link disabled:opacity-50"
       >
         {exit.isPending ? "Чистим…" : "Выйти"}
       </button>

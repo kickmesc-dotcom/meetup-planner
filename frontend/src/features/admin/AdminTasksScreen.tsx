@@ -131,7 +131,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
         <div className="text-sm font-semibold text-tg-text">Новое поручение</div>
 
-        <label className="block text-[11px] text-tg-hint">
+        <label className="block text-xs text-tg-hint">
           Что сделать
           <input
             value={title}
@@ -169,7 +169,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         {scope === "department" ? (
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Подразделение
             <select
               value={departmentId ?? ""}
@@ -186,7 +186,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             </select>
           </label>
         ) : (
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Сотрудник
             <select
               value={assigneeId ?? ""}
@@ -204,7 +204,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           </label>
         )}
 
-        <label className="block text-[11px] text-tg-hint">
+        <label className="block text-xs text-tg-hint">
           Описание (необязательно)
           <textarea
             value={description}
@@ -215,7 +215,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           />
         </label>
 
-        <label className="block text-[11px] text-tg-hint">
+        <label className="block text-xs text-tg-hint">
           Что должно получиться (необязательно)
           <input
             value={expected}
@@ -226,7 +226,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </label>
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Смена (необязательно)
             <input
               type="date"
@@ -235,7 +235,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
               className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Приоритет
             <select
               value={priority}
@@ -265,11 +265,11 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="rounded-lg bg-tg-bg/50 p-2.5">
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Срок — дата, время и секунды. Пусто = без срока.
           </div>
           <div className="mt-2 grid grid-cols-[1.4fr_1fr_0.7fr] gap-2">
-            <label className="block text-[11px] text-tg-hint">
+            <label className="block text-xs text-tg-hint">
               Дата
               <input
                 type="date"
@@ -278,7 +278,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
             </label>
-            <label className="block text-[11px] text-tg-hint">
+            <label className="block text-xs text-tg-hint">
               Время
               <input
                 type="time"
@@ -288,7 +288,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
             </label>
-            <label className="block text-[11px] text-tg-hint">
+            <label className="block text-xs text-tg-hint">
               Сек.
               <input
                 inputMode="numeric"
@@ -310,7 +310,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 key={q.label}
                 type="button"
                 onClick={() => quickDue(q.min)}
-                className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-[11px] text-tg-text"
+                className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
               >
                 {q.label}
               </button>
@@ -322,13 +322,13 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 setDueTime("");
                 setDueSeconds("00");
               }}
-              className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-[11px] text-tg-hint"
+              className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
             >
               без срока
             </button>
           </div>
 
-          <div className="mt-2 text-[11px] text-tg-hint">
+          <div className="mt-2 text-xs text-tg-hint">
             {dueAt
               ? `Срок: ${formatPrecise(dueAt)}`
               : "Срок не задан — планировщик не будет напоминать."}
@@ -354,13 +354,13 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 <div className="text-sm font-medium text-tg-text break-words">
                   {task.title}
                 </div>
-                <div className="mt-1 text-[11px] text-tg-hint">
+                <div className="mt-1 text-xs text-tg-hint">
                   {task.due_at ? `⏰ ${formatPrecise(new Date(task.due_at))}` : "без срока"}
                   {task.requires_photo ? " · 📷" : ""}
                   {task.photos?.length ? ` · фото ${task.photos.length}` : ""}
                 </div>
               </div>
-              <span className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-0.5 text-[11px] text-tg-hint">
+              <span className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-hint">
                 {task.status}
               </span>
             </div>

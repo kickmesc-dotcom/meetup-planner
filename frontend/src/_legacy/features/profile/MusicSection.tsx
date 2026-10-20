@@ -166,7 +166,7 @@ function WeekTracksSection({ week }: { week: MusicWeek }) {
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm">{trackTitle(t)}</div>
               {t.kind === "link" && t.url && (
-                <div className="truncate text-[11px] text-tg-hint">
+                <div className="truncate text-xs text-tg-hint">
                   {t.url}
                 </div>
               )}
@@ -264,13 +264,13 @@ export function MusicScreen() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm">{trackTitle(t)}</div>
                     {t.kind === "link" && t.url && (
-                      <div className="truncate text-[11px] text-tg-hint">
+                      <div className="truncate text-xs text-tg-hint">
                         {t.url}
                       </div>
                     )}
                   </div>
                   <span
-                    className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] ${badge.className}`}
+                    className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${badge.className}`}
                   >
                     {badge.text}
                   </span>

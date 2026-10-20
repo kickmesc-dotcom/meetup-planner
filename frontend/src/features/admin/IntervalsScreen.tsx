@@ -87,7 +87,7 @@ export default function IntervalsScreen({ onBack }: Props) {
         </div>
       </Block>
 
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-[11px] text-tg-hint">
+      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
         Напоминания о сроках поручений настраиваются в «Уведомлениях сотрудников»:
         там же можно выключить конкретное, перенести его вперёд или замьютить все
         алерты.
@@ -128,7 +128,7 @@ function Block({
         <span className="text-base">{icon}</span>
         <div className="min-w-0">
           <div className="text-base font-semibold text-tg-text">{title}</div>
-          <div className="text-[11px] text-tg-hint">{hint}</div>
+          <div className="text-xs text-tg-hint">{hint}</div>
         </div>
       </div>
       {children}

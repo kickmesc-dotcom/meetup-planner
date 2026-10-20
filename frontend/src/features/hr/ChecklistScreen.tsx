@@ -131,7 +131,7 @@ export default function ChecklistScreen() {
                 haptic("light");
                 setChangingHall(true);
               }}
-              className="min-h-11 px-2 text-[11px] text-tg-link"
+              className="min-h-11 px-2 text-xs text-tg-link"
             >
               сменить
             </button>
@@ -224,7 +224,7 @@ function HallPicker({
         <div className="text-sm font-semibold text-tg-text">
           В каком зале работаешь?
         </div>
-        <div className="mt-0.5 text-[11px] text-tg-hint">
+        <div className="mt-0.5 text-xs text-tg-hint">
           У каждого зала свой чек-лист открытия. Выбор запомнится на сегодня —
           сменить можно в любой момент.
         </div>
@@ -335,16 +335,16 @@ function ItemRow({
           >
             {item.title}
             {!item.is_mandatory && (
-              <span className="ml-1 text-[11px] text-tg-hint">(опц.)</span>
+              <span className="ml-1 text-xs text-tg-hint">(опц.)</span>
             )}
           </div>
           {item.description && (
-            <div className="mt-0.5 text-[11px] text-tg-hint">
+            <div className="mt-0.5 text-xs text-tg-hint">
               {item.description}
             </div>
           )}
           {item.requires_photo && (
-            <div className="mt-1 text-[11px] text-tg-hint">
+            <div className="mt-1 text-xs text-tg-hint">
               📷{" "}
               {item.done
                 ? "фотоотчёт приложен"
@@ -367,7 +367,7 @@ function ItemRow({
             }
           />
           {item.done_at && (
-            <div className="mt-1 text-[11px] text-tg-hint">
+            <div className="mt-1 text-xs text-tg-hint">
               закрыто в{" "}
               {new Date(item.done_at).toLocaleTimeString("ru-RU", {
                 hour: "2-digit",
@@ -376,7 +376,7 @@ function ItemRow({
             </div>
           )}
           {item.note && (
-            <div className="mt-1 rounded-md bg-tg-bg/50 p-2 text-[11px] text-tg-text/90">
+            <div className="mt-1 rounded-md bg-tg-bg/50 p-2 text-xs text-tg-text/90">
               {item.note}
             </div>
           )}
@@ -386,7 +386,7 @@ function ItemRow({
           <button
             type="button"
             onClick={onToggleNote}
-            className="shrink-0 rounded-lg bg-tg-bg/60 px-2 py-1 text-[11px] text-tg-text"
+            className="shrink-0 rounded-lg bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
           >
             {noteOpen ? "Отмена" : "Заметка"}
           </button>

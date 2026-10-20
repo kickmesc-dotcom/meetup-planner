@@ -184,7 +184,7 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
         </>
       )}
       {!closed && !done && activity.expires_at && (
-        <div className="text-[11px] text-tg-hint">
+        <div className="text-xs text-tg-hint">
           Ответы принимаются {formatUntil(activity.expires_at)}
         </div>
       )}
@@ -282,7 +282,7 @@ export function VoiceWithdraw() {
           {withdraw.isPending ? "Убираем…" : "Да, убрать"}
         </button>
       </div>
-      <div className="text-[11px] text-status-busy">
+      <div className="text-xs text-status-busy">
         Удаление отменит сдачу и откатит полученный за неё опыт.
       </div>
     </div>

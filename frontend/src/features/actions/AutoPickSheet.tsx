@@ -101,7 +101,7 @@ export default function AutoPickSheet() {
             <span className="text-tg-text">
               {presetsQ.data.map((p) => `${p.start}–${p.end}`).join(", ")}
             </span>
-            <div className="mt-0.5 text-[10px]">
+            <div className="mt-0.5 text-2xs">
               Меняются в админке → «🕒 Пресеты времени».
             </div>
           </div>

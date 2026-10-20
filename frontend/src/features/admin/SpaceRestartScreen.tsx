@@ -99,7 +99,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
       {q.data && (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
           <div className="text-sm font-semibold text-tg-text">⚡ Сейчас</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Лечит зависшие сетевые состояния (дохлый keep-alive-пул).
             Mini App переключается бесшовно; бот восстанавливает вебхук
             ~5–7 минут.
@@ -120,7 +120,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             🔄 Рестарт Space
           </button>
           {q.data.last_restart_at && (
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               Последний рестарт: {fmtDt(q.data.last_restart_at)}
             </div>
           )}
@@ -133,7 +133,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             <div className="text-sm font-semibold text-tg-text">
               📅 По расписанию
             </div>
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               Анти-луп: не чаще раза в 30 минут (после ручного — тоже).
             </div>
           </div>
@@ -172,7 +172,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
 
           {draft.mode === "once" && (
             <div>
-              <div className="text-[11px] text-tg-hint mb-1">
+              <div className="text-xs text-tg-hint mb-1">
                 Дата и время (локальные)
               </div>
               <input
@@ -193,7 +193,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
 
           {draft.mode === "interval" && (
             <div>
-              <div className="text-[11px] text-tg-hint mb-1">
+              <div className="text-xs text-tg-hint mb-1">
                 Каждые {draft.every_hours ?? 24} ч
               </div>
               <input
@@ -207,7 +207,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
                 }
                 className="w-full accent-tg-button"
               />
-              <div className="mt-1 text-[10px] text-tg-hint">
+              <div className="mt-1 text-2xs text-tg-hint">
                 1 ч … 168 ч (неделя). Отсчёт — от последнего рестарта.
               </div>
             </div>

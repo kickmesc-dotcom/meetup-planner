@@ -115,7 +115,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 <div className="text-sm font-semibold text-tg-text">Следы пула</div>
                 <span
                   className={[
-                    "rounded-full px-2 py-0.5 text-[11px]",
+                    "rounded-full px-2 py-0.5 text-xs",
                     data.visible
                       ? "bg-status-free/20 text-status-free"
                       : "bg-status-busy/20 text-status-busy",
@@ -124,7 +124,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   {data.visible ? "👁 видны" : "🙈 скрыты"}
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-tg-hint">
+              <p className="mt-1 text-xs text-tg-hint">
                 Тумблер прячет пул из ленты, списков и отчётов, не удаляя данные.
                 Один тап — и боевая картина чистая.
               </p>
@@ -162,7 +162,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   </div>
                 ))}
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-2 text-center text-[11px]">
+              <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
                 <Metric label="Смен" value={data.activity.checklist_runs} />
                 <Metric label="Поручений" value={data.activity.tasks} />
                 <Metric label="Ответов ОС" value={data.activity.feedback_answers} />
@@ -195,7 +195,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
 
             <section className="rounded-xl border border-status-busy/30 p-3">
               <div className="text-sm font-semibold text-tg-text">Удаление</div>
-              <p className="mt-1 text-[11px] text-tg-hint">
+              <p className="mt-1 text-xs text-tg-hint">
                 Обратной операции нет. «Активность» убирает смены, поручения и
                 ответы, а «вместе с сотрудниками» удаляет и самих тестовых людей
                 с их строками в базе.

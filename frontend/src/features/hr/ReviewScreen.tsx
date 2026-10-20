@@ -56,7 +56,7 @@ export default function ReviewScreen() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">🔍 Приёмка</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {waiting.length === 0
               ? "Работ на проверке нет"
               : `Ждут приёмки: ${waiting.length}`}
@@ -136,11 +136,11 @@ function ReviewCard({
           <h2 className="text-sm font-semibold text-tg-text break-words">
             {task.title}
           </h2>
-          <span className="shrink-0 rounded-full bg-status-maybe/20 px-2 py-0.5 text-[11px] text-status-maybe">
+          <span className="shrink-0 rounded-full bg-status-maybe/20 px-2 py-0.5 text-xs text-status-maybe">
             сдано {waiting.length}
           </span>
         </div>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-tg-hint">
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
           <span>⏰ {fmtDue(task.due_at)}</span>
           {task.progress_total > 1 && (
             <span>
@@ -214,12 +214,12 @@ function ReviewRow({
         {assignment ? assignment.display_name : "Все, кто сдал"}
       </div>
       {assignment?.part && (
-        <div className="mt-0.5 text-[11px] text-tg-hint">
+        <div className="mt-0.5 text-xs text-tg-hint">
           Часть: {assignment.part}
         </div>
       )}
       {assignment?.done_at && (
-        <div className="mt-0.5 text-[11px] text-tg-hint">
+        <div className="mt-0.5 text-xs text-tg-hint">
           Сдано: {new Date(assignment.done_at).toLocaleString("ru-RU")}
         </div>
       )}

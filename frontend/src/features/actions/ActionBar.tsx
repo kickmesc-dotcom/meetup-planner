@@ -31,7 +31,7 @@ export default function ActionBar() {
           setOpen(true);
         }}
         aria-expanded={false}
-        className="flex w-full items-center justify-center gap-1.5 border-t border-tg-secondary-bg bg-tg-bg px-2 py-2 text-[11px] text-tg-hint"
+        className="flex w-full items-center justify-center gap-1.5 border-t border-tg-secondary-bg bg-tg-bg px-2 py-2 text-xs text-tg-hint"
       >
         <span aria-hidden>▴</span> Кнопки действий — развернуть
       </button>
@@ -48,7 +48,7 @@ export default function ActionBar() {
         }}
         aria-expanded
         title="Свернуть кнопки действий"
-        className="col-span-full -mt-1 flex items-center justify-center gap-1 text-[10px] text-tg-hint"
+        className="col-span-full -mt-1 flex items-center justify-center gap-1 text-2xs text-tg-hint"
       >
         <span aria-hidden>▾</span> свернуть кнопки
       </button>

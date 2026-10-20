@@ -27,12 +27,12 @@ export default function KpiCard() {
     <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text">Опыт смены</h2>
-        <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-[11px] text-tg-text">
+        <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-text">
           {kpi.rank.emoji} {kpi.rank.title}
         </span>
       </div>
 
-      <div className="mt-2 flex items-end justify-between text-[11px] text-tg-hint">
+      <div className="mt-2 flex items-end justify-between text-xs text-tg-hint">
         <span className="tabular-nums">{kpi.xp} XP</span>
         {kpi.next_rank ? (
           <span>
@@ -56,7 +56,7 @@ export default function KpiCard() {
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
         <Cell label="За неделю" value={`${kpi.week_xp} XP`} />
         <Cell
           label="Место в неделе"
@@ -66,7 +66,7 @@ export default function KpiCard() {
         <Cell label="Поручений закрыто" value={String(kpi.week_counts.tasks_done)} />
       </div>
 
-      <div className="mt-3 rounded-lg bg-tg-bg/50 p-2 text-[11px]">
+      <div className="mt-3 rounded-lg bg-tg-bg/50 p-2 text-xs">
         {winner ? (
           <>
             <div className="text-tg-hint">Сотрудник недели</div>
@@ -83,7 +83,7 @@ export default function KpiCard() {
         )}
       </div>
 
-      <p className="mt-2 text-[11px] text-tg-hint">
+      <p className="mt-2 text-xs text-tg-hint">
         Опыт дают закрытые пункты чек-листа, полностью закрытая смена и поручения.
         Вовремя закрытое поручение даёт надбавку.
       </p>

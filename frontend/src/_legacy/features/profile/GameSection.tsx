@@ -115,7 +115,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
 
       {g.unlocked.length > 0 && (
         <div className="space-y-1">
-          <div className="text-[11px] text-tg-hint">Что уже открыто</div>
+          <div className="text-xs text-tg-hint">Что уже открыто</div>
           <div className="flex flex-wrap gap-1">
             {g.unlocked.map((f) =>
               f.tab ? (
@@ -124,7 +124,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
                   type="button"
                   title={f.description || undefined}
                   onClick={() => goToFeature(f.tab, f.anchor, f.admin_section)}
-                  className="rounded-md bg-tg-button/10 px-2 py-0.5 text-[11px] text-tg-link active:scale-[0.97]"
+                  className="rounded-md bg-tg-button/10 px-2 py-0.5 text-xs text-tg-link active:scale-[0.97]"
                 >
                   {f.title} →
                 </button>
@@ -132,7 +132,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
                 <span
                   key={f.code}
                   title={f.description || undefined}
-                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
+                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-xs text-tg-hint"
                 >
                   {f.title}
                 </span>
@@ -140,7 +140,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
             )}
           </div>
           {g.unlocked.some((f) => f.description) && (
-            <details className="text-[11px]">
+            <details className="text-xs">
               <summary className="cursor-pointer text-tg-link">
                 Что это значит
               </summary>
@@ -279,7 +279,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] text-tg-hint">{label}</span>
+      <span className="text-xs text-tg-hint">{label}</span>
       <input
         type="text"
         value={value}
@@ -313,7 +313,7 @@ function LevelUpNotice({
             <li key={f.code} className="text-xs text-tg-text">
               <div className="font-medium">• {f.title}</div>
               {f.description && (
-                <div className="mt-0.5 pl-3 text-[11px] text-tg-hint">
+                <div className="mt-0.5 pl-3 text-xs text-tg-hint">
                   {f.description}
                 </div>
               )}
@@ -321,7 +321,7 @@ function LevelUpNotice({
                 <button
                   type="button"
                   onClick={() => goToFeature(f.tab, f.anchor, f.admin_section)}
-                  className="mt-1 ml-3 rounded-md bg-tg-button/15 px-2 py-0.5 text-[11px] font-medium text-tg-link active:scale-[0.97]"
+                  className="mt-1 ml-3 rounded-md bg-tg-button/15 px-2 py-0.5 text-xs font-medium text-tg-link active:scale-[0.97]"
                 >
                   Открыть и применить →
                 </button>
@@ -345,7 +345,7 @@ function LevelUpNotice({
 function TodayHistory({ profile }: { profile: GameProfile }) {
   return (
     <div>
-      <div className="flex items-baseline justify-between text-[11px] text-tg-hint">
+      <div className="flex items-baseline justify-between text-xs text-tg-hint">
         <span>Сегодня</span>
         <span className="tabular-nums">+{profile.today_total} XP</span>
       </div>
@@ -434,7 +434,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-medium text-tg-text">
                       {a.title}
-                      <span className="ml-1.5 rounded bg-tg-hint/15 px-1 py-0.5 align-middle text-[10px] font-normal text-tg-hint">
+                      <span className="ml-1.5 rounded bg-tg-hint/15 px-1 py-0.5 align-middle text-2xs font-normal text-tg-hint">
                         {a.tiers.length > 0
                           ? "разовая + юбилеи"
                           : a.kind === "threshold"
@@ -443,12 +443,12 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                       </span>
                     </span>
                     {a.collected && (
-                      <span className="shrink-0 text-[11px] font-medium text-status-free tabular-nums">
+                      <span className="shrink-0 text-xs font-medium text-status-free tabular-nums">
                         ✅ +{a.points} XP
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-tg-hint line-clamp-2">
+                  <div className="text-xs text-tg-hint line-clamp-2">
                     {a.description}
                   </div>
                   {/* Разделение «разовая» vs «юбилейные ×N» прямым текстом:
@@ -456,7 +456,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                       Иначе «С почином 18/20» читается как «нужно стать лохом 20 раз». */}
                   {a.tiers.length > 0 ? (
                     <div className="mt-1.5 space-y-1">
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-tg-hint">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-2xs text-tg-hint">
                         <span className="rounded bg-tg-hint/15 px-1 py-0.5">разовая</span>
                         <span className={a.collected ? "text-status-free" : ""}>
                           {a.collected ? "✅ взята" : "▫️ пока нет"}
@@ -468,7 +468,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                           </span>
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-tg-hint">
+                      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-2xs text-tg-hint">
                         <span>юбилейные:</span>
                         {a.tiers.map((t) => {
                           const got = (a.collected_tiers ?? []).includes(t);
@@ -527,7 +527,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <span className="shrink-0 text-xs font-medium tabular-nums text-tg-text">
                     {s.percent}%
                   </span>
-                  <span className="w-10 shrink-0 text-right text-[11px] tabular-nums text-tg-hint">
+                  <span className="w-10 shrink-0 text-right text-xs tabular-nums text-tg-hint">
                     {s.holders}/{s.total}
                   </span>
                 </li>
@@ -555,7 +555,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <span className="min-w-0 flex-1 truncate text-sm">
                     {u?.display_name ?? `id=${r.user_id}`}
                   </span>
-                  <span className="shrink-0 text-[11px] tabular-nums text-tg-hint">
+                  <span className="shrink-0 text-xs tabular-nums text-tg-hint">
                     {r.xp} XP
                   </span>
                   <RankPlaque hex={r.hex} bold={r.bold || r.supreme}>
@@ -616,7 +616,7 @@ function achievementProgress(a: GameAchievement): {
 function Avatar({ user, fallback }: { user?: User; fallback: number }) {
   return (
     <div
-      className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] text-white"
+      className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full text-2xs text-white"
       style={{ background: user?.color_hex ?? "#888" }}
     >
       {user?.avatar_url ? (

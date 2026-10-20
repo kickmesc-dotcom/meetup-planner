@@ -113,7 +113,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
               enterHotMode();
               jobs.refetch();
             }}
-            className="shrink-0 rounded-md bg-tg-bg/70 px-2 py-1 text-[10px] text-tg-hint active:scale-95 transition-transform"
+            className="shrink-0 rounded-md bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint active:scale-95 transition-transform"
             title="Обновить и опрашивать чаще 3 минуты"
           >
             ↻ {isHot ? "тик 5с" : "тик 10м"}
@@ -209,7 +209,7 @@ function JobRow({
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <div className="text-sm truncate text-tg-text">{job.label}</div>
-          <div className="text-[10px] text-tg-hint truncate">
+          <div className="text-2xs text-tg-hint truncate">
             {job.next_run_at
               ? format(new Date(job.next_run_at), "dd.MM HH:mm")
               : "—"}
@@ -218,7 +218,7 @@ function JobRow({
         </div>
         <div
           className={[
-            "text-[10px] rounded-full px-1.5 py-0.5 shrink-0",
+            "text-2xs rounded-full px-1.5 py-0.5 shrink-0",
             kindLabel === "reminder"
               ? "bg-status-maybe/15 text-status-maybe"
               : kindLabel === "date"

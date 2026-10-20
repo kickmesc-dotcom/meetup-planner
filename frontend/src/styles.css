@@ -4,7 +4,7 @@
 
 /* DESIGN_SYSTEM §1.2: availability status scale. `*-fill` = large tinted areas
    (cells, drag preview); `*-pill` = darkened background that carries white text
-   at 11px (>= 4.5:1 WCAG AA, verified in both light and Telegram-dark themes).
+   at 12px (>= 4.5:1 WCAG AA, verified in both light and Telegram-dark themes).
    Fixed hexes on purpose: status must read identically regardless of the theme. */
 :root {
   --status-free-fill: #22c55e;

@@ -98,7 +98,7 @@ function MonthBlock({
       <div className="text-base font-semibold mb-2">
         {ruMonthFull(monthAnchor.getMonth())} {monthAnchor.getFullYear()}
       </div>
-      <div className="grid grid-cols-7 gap-px text-[10px] text-tg-hint mb-1">
+      <div className="grid grid-cols-7 gap-px text-2xs text-tg-hint mb-1">
         {[1, 2, 3, 4, 5, 6, 0].map((d) => (
           <div key={d} className="text-center uppercase">
             {ruWeekdayShort(d)}
@@ -165,11 +165,11 @@ function MonthBlock({
                       displayName: first.display_name,
                     });
                   }}
-                  className="absolute top-0.5 right-0.5 text-[10px] leading-none cursor-pointer"
+                  className="absolute top-0.5 right-0.5 text-2xs leading-none cursor-pointer"
                 >
                   🎂
                   {bdayList.length > 1 && (
-                    <span className="ml-0.5 text-[8px]">×{bdayList.length}</span>
+                    <span className="ml-0.5 text-3xs">×{bdayList.length}</span>
                   )}
                 </span>
               )}

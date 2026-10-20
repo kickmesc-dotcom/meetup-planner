@@ -63,7 +63,7 @@ export default function FeedSettingsScreen({ onBack }: Props) {
             Компактный вид
           </span>
         </div>
-        <div className="text-[11px] text-tg-hint">
+        <div className="text-xs text-tg-hint">
           Под событием смены — миниатюры участников и бейдж «+XP». Плотнее по
           вертикали и без отдельных блоков на каждую строку. Выключено —
           классический вид с карточкой на событие.
@@ -72,7 +72,7 @@ export default function FeedSettingsScreen({ onBack }: Props) {
           <div className="text-sm text-tg-text">
             Включён
             {q.isPending && (
-              <span className="ml-2 text-[11px] text-tg-hint">загрузка…</span>
+              <span className="ml-2 text-xs text-tg-hint">загрузка…</span>
             )}
           </div>
           <Switch
@@ -84,7 +84,7 @@ export default function FeedSettingsScreen({ onBack }: Props) {
             }}
           />
         </div>
-        <div className="text-[10px] text-tg-hint">
+        <div className="text-2xs text-tg-hint">
           Влияет на ленту у всех участников. Откат — переключить тумблер обратно.
         </div>
       </section>

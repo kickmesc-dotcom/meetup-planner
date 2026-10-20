@@ -90,7 +90,7 @@ export default function ReportsScreen() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">📊 Отчёт смены</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {report ? fmtDate(report.work_date) : "Срез на дату"}
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function ReportsScreen() {
             )}
           </div>
           {report && (
-            <div className="mt-2 text-[11px] text-tg-hint">
+            <div className="mt-2 text-xs text-tg-hint">
               {report.scope === "all"
                 ? "Видно все отделы"
                 : "Видно своё подразделение"}{" "}
@@ -187,7 +187,7 @@ export default function ReportsScreen() {
                   {report.tasks_open} поручений · {report.issues_open} проблем
                 </span>
               </div>
-              <div className="mt-1 text-[11px] text-tg-hint">
+              <div className="mt-1 text-xs text-tg-hint">
                 Новых проблем за смену: {report.issues_new}
               </div>
             </section>
@@ -206,7 +206,7 @@ export default function ReportsScreen() {
                 <h2 className="text-sm font-semibold text-tg-text">
                   Обязательные стандарты
                 </h2>
-                <label className="flex items-center gap-1 text-[11px] text-tg-hint">
+                <label className="flex items-center gap-1 text-xs text-tg-hint">
                   <input
                     type="checkbox"
                     checked={onlyGaps}
@@ -247,7 +247,7 @@ function Metric({
 }) {
   return (
     <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
-      <div className="text-[11px] text-tg-hint">{label}</div>
+      <div className="text-xs text-tg-hint">{label}</div>
       <div
         className={[
           "mt-0.5 text-xl font-semibold tabular-nums",
@@ -256,7 +256,7 @@ function Metric({
       >
         {value}
       </div>
-      {hint && <div className="text-[10px] text-tg-hint">{hint}</div>}
+      {hint && <div className="text-2xs text-tg-hint">{hint}</div>}
     </div>
   );
 }
@@ -269,14 +269,14 @@ function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
           {dept.emoji ? `${dept.emoji} ` : ""}
           {dept.name}
         </div>
-        <div className="shrink-0 text-[11px] text-tg-hint">
+        <div className="shrink-0 text-xs text-tg-hint">
           {dept.employees} чел.
         </div>
       </div>
-      <div className="mt-1 text-[11px] text-tg-hint">
+      <div className="mt-1 text-xs text-tg-hint">
         Смены {dept.shifts_started}/{dept.employees} · закрыто {dept.shifts_done}
       </div>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-tg-hint">
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-tg-hint">
         <span>поручений {dept.tasks_shift}</span>
         <span>на проверке {dept.tasks_on_review}</span>
         <span className={dept.tasks_overdue > 0 ? "text-status-busy" : ""}>
@@ -303,7 +303,7 @@ function StandardCard({ standard }: { standard: HrStandardCoverage }) {
           {standard.emoji ? `${standard.emoji} ` : ""}
           {standard.title}
           {standard.required && (
-            <span className="ml-1 rounded bg-status-busy/15 px-1 text-[10px] text-status-busy">
+            <span className="ml-1 rounded bg-status-busy/15 px-1 text-2xs text-status-busy">
               обязательный
             </span>
           )}
@@ -319,12 +319,12 @@ function StandardCard({ standard }: { standard: HrStandardCoverage }) {
         />
       </div>
       {standard.missing.length > 0 && (
-        <div className="mt-1.5 text-[11px] text-tg-hint">
+        <div className="mt-1.5 text-xs text-tg-hint">
           Не сдали: {standard.missing.map((person) => person.display_name).join(", ")}
         </div>
       )}
       {standard.department_name && (
-        <div className="mt-0.5 text-[10px] text-tg-hint">
+        <div className="mt-0.5 text-2xs text-tg-hint">
           Только {standard.department_name}
         </div>
       )}

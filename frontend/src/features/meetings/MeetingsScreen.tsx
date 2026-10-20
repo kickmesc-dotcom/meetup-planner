@@ -161,7 +161,7 @@ function Card({
           )}
         </div>
         {meeting.auto_picked && meeting.score != null && (
-          <div className="rounded-full bg-tg-link/15 px-2 py-0.5 text-[10px] font-medium text-tg-link shrink-0">
+          <div className="rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs font-medium text-tg-link shrink-0">
             ⭐ {meeting.score.toFixed(1)}
           </div>
         )}
@@ -174,11 +174,11 @@ function Card({
           return (
             <div
               key={u.id}
-              className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-[11px]"
+              className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs"
               title={`${u.display_name}: ${RSVP_LABELS[rsvp]}`}
             >
               <span
-                className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-[9px]"
+                className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-3xs"
                 style={{ background: u.color_hex }}
               >
                 {u.avatar_url ? (

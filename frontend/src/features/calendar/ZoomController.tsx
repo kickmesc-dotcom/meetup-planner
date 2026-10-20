@@ -28,7 +28,7 @@ export default function ZoomController() {
               setZoom(z);
             }}
             className={[
-              "px-2.5 py-1 text-[11px] rounded-lg transition-colors whitespace-nowrap",
+              "px-2.5 py-1 text-xs rounded-lg transition-colors whitespace-nowrap",
               z === zoom ? "bg-tg-button text-tg-button-text font-medium" : "text-tg-hint",
             ].join(" ")}
             aria-pressed={z === zoom}

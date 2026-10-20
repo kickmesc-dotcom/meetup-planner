@@ -56,7 +56,7 @@ export default function RankPlaque({
       title={title}
       className={[
         "inline-flex items-center gap-1 rounded-md leading-tight",
-        size === "sm" ? "px-1.5 py-0 text-[10px]" : "px-2 py-0.5 text-xs",
+        size === "sm" ? "px-1.5 py-0 text-2xs" : "px-2 py-0.5 text-xs",
         bold ? "font-bold" : "font-semibold",
         className ?? "",
       ].join(" ")}

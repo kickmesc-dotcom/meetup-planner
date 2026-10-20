@@ -93,7 +93,7 @@ function SourceRow({
         {hint && (
           <span
             className={[
-              "block truncate text-[10px]",
+              "block truncate text-2xs",
               active ? "text-tg-button-text/80" : "text-tg-hint",
             ].join(" ")}
           >
@@ -137,7 +137,7 @@ export default function PlayerSheet() {
     <BottomSheet title="🎧 Музыка" onClose={() => close(false)}>
       <div data-testid="player-sheet" className="flex flex-col gap-4">
         <div className="flex flex-col gap-1.5">
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Играет, пока сам не остановишь. Кончится подборка — плеер подхватит
             треки, которые звучали реже.
           </div>
@@ -171,7 +171,7 @@ export default function PlayerSheet() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <div className="text-[11px] font-medium text-tg-hint">Подборки по неделям</div>
+          <div className="text-xs font-medium text-tg-hint">Подборки по неделям</div>
           {player.playlists.length === 0 ? (
             <div data-testid="player-sheet-empty" className="text-xs text-tg-hint">
               Пока нет ни одной подборки с треками, загруженными боту.
@@ -208,7 +208,7 @@ export default function PlayerSheet() {
             <span aria-hidden>🔔</span>
             <span className="min-w-0 flex-1 truncate font-medium">Личные уведомления</span>
             {unread > 0 && (
-              <span className="shrink-0 rounded-full bg-status-busy px-1.5 text-[10px] font-semibold text-tg-bg">
+              <span className="shrink-0 rounded-full bg-status-busy px-1.5 text-2xs font-semibold text-tg-bg">
                 {unread > 9 ? "9+" : unread}
               </span>
             )}

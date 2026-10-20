@@ -60,7 +60,7 @@ export default function StandardsScreen() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">📚 Стандарты</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Инструкции и короткие тесты по ним
           </div>
         </div>
@@ -147,7 +147,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
           />
         </div>
         {data.attempts > 0 && (
-          <div className="mt-1.5 text-[11px] text-tg-hint">
+          <div className="mt-1.5 text-xs text-tg-hint">
             Попыток: {data.attempts}
           </div>
         )}
@@ -155,7 +155,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
 
       {[...groups.entries()].map(([category, items]) => (
         <section key={category}>
-          <h2 className="px-1 text-[11px] uppercase tracking-wide text-tg-hint">
+          <h2 className="px-1 text-xs uppercase tracking-wide text-tg-hint">
             {STANDARD_CATEGORY_LABEL[category]}
           </h2>
           <div className="mt-1.5 space-y-2">
@@ -179,7 +179,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
                     </span>
                     <span
                       className={[
-                        "shrink-0 rounded-full px-2 py-0.5 text-[11px]",
+                        "shrink-0 rounded-full px-2 py-0.5 text-xs",
                         item.passed
                           ? "bg-status-free/20 text-status-free"
                           : "bg-tg-bg/70 text-tg-hint",
@@ -189,11 +189,11 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
                     </span>
                   </span>
                   {item.summary && (
-                    <span className="mt-0.5 block text-[11px] text-tg-hint break-words">
+                    <span className="mt-0.5 block text-xs text-tg-hint break-words">
                       {item.summary}
                     </span>
                   )}
-                  <span className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-tg-hint">
+                  <span className="mt-1 flex flex-wrap gap-x-2 text-xs text-tg-hint">
                     {item.questions_count > 0 && (
                       <span>вопросов: {item.questions_count}</span>
                     )}
@@ -273,7 +273,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
           <div className="truncate text-sm font-semibold text-tg-text">
             {standard?.emoji ?? "📄"} {standard?.title ?? "Стандарт"}
           </div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {standard
               ? `${STANDARD_CATEGORY_LABEL[standard.category]} · порог ${standard.pass_percent}%`
               : "…"}
@@ -352,7 +352,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
                         : "bg-tg-bg/60 text-tg-text/90",
                     ].join(" ")}
                   >
-                    <span className="text-[11px] text-tg-hint">
+                    <span className="text-xs text-tg-hint">
                       {String.fromCharCode(1040 + optionIndex)})
                     </span>
                     <span className="min-w-0 flex-1 break-words">{option}</span>
@@ -361,7 +361,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               })}
             </div>
             {result?.wrong_indexes.includes(index) && (
-              <div className="mt-1.5 text-[11px] text-status-busy">
+              <div className="mt-1.5 text-xs text-status-busy">
                 Ответ неверный — вернись к инструкции выше.
               </div>
             )}
@@ -464,11 +464,11 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
   return (
     <section className="mb-4 rounded-xl bg-tg-secondary-bg/60 p-3">
       <h2 className="text-sm font-semibold text-tg-text">Новый стандарт</h2>
-      <p className="mt-0.5 text-[11px] text-tg-hint">
+      <p className="mt-0.5 text-xs text-tg-hint">
         Пиши как для нового сотрудника: что сделать, в каком порядке и почему.
       </p>
 
-      <label className="mt-3 block text-[11px] text-tg-hint">
+      <label className="mt-3 block text-xs text-tg-hint">
         Название
         <input
           value={title}
@@ -480,7 +480,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
       </label>
 
       <div className="mt-2 flex gap-2">
-        <label className="w-16 shrink-0 text-[11px] text-tg-hint">
+        <label className="w-16 shrink-0 text-xs text-tg-hint">
           Значок
           <input
             value={emoji}
@@ -490,7 +490,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
             className="mt-1 min-h-10 w-full rounded-lg bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
           />
         </label>
-        <label className="min-w-0 flex-1 text-[11px] text-tg-hint">
+        <label className="min-w-0 flex-1 text-xs text-tg-hint">
           Категория
           <select
             value={category}
@@ -508,7 +508,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         </label>
       </div>
 
-      <label className="mt-2 block text-[11px] text-tg-hint">
+      <label className="mt-2 block text-xs text-tg-hint">
         Короткое описание (для списка)
         <input
           value={summary}
@@ -518,7 +518,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         />
       </label>
 
-      <label className="mt-2 block text-[11px] text-tg-hint">
+      <label className="mt-2 block text-xs text-tg-hint">
         Инструкция
         <textarea
           value={body}
@@ -529,7 +529,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         />
       </label>
 
-      <label className="mt-2 block text-[11px] text-tg-hint">
+      <label className="mt-2 block text-xs text-tg-hint">
         Порог сдачи: {passPercent}%
         <input
           type="range"
@@ -542,7 +542,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         />
       </label>
 
-      <label className="mt-2 flex items-start gap-2 text-[11px] text-tg-hint">
+      <label className="mt-2 flex items-start gap-2 text-xs text-tg-hint">
         <input
           type="checkbox"
           checked={isRequired}
@@ -555,7 +555,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
       </label>
 
       <div className="mt-3 space-y-2">
-        <div className="text-[11px] uppercase tracking-wide text-tg-hint">
+        <div className="text-xs uppercase tracking-wide text-tg-hint">
           Тест
         </div>
         {questions.map((q, index) => (
@@ -589,7 +589,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
             {q.options.map((option, optionIndex) => (
               <label
                 key={optionIndex}
-                className="mt-1.5 flex items-center gap-2 text-[11px] text-tg-hint"
+                className="mt-1.5 flex items-center gap-2 text-xs text-tg-hint"
               >
                 <input
                   type="radio"

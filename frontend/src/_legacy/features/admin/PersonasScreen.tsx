@@ -94,7 +94,7 @@ function PersonaList({ onEdit }: { onEdit: (row: PersonaRow) => void }) {
           >
             <div className="flex-1 min-w-0">
               <div className="text-sm text-tg-text truncate">{row.display_name}</div>
-              <div className="text-[11px] text-tg-hint">
+              <div className="text-xs text-tg-hint">
                 {row.persona_text == null
                   ? "персоналия не заведена"
                   : `шаблонов: ${row.templates_count}` +
@@ -153,7 +153,7 @@ function PersonaEditor({ row, onDone }: { row: PersonaRow; onDone: () => void })
         placeholder={FORMAT_HINT}
         className="w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link font-mono leading-snug"
       />
-      <div className="text-[11px] text-tg-hint px-1">
+      <div className="text-xs text-tg-hint px-1">
         [шаблоны] — по одному на строку, «{"{слот}"}» — плейсхолдер. Любая
         другая секция [имя] — значения слота. Пустой текст = удалить
         персоналию.

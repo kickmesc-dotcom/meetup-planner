@@ -627,7 +627,7 @@ function LastErrorCard({
           ✕
         </button>
       </div>
-      <div className="text-[11px] text-tg-hint">
+      <div className="text-xs text-tg-hint">
         {new Date(error.at).toLocaleString()} · {error.mode_used}
         {error.proxy_id !== null && <> · proxy #{error.proxy_id}</>}
       </div>
@@ -683,7 +683,7 @@ function ProxyRow({
           <div className="text-sm text-tg-text truncate">
             {p.server}:{p.port}
           </div>
-          <div className="text-[10px] text-tg-hint">
+          <div className="text-2xs text-tg-hint">
             {p.type.toUpperCase()}
             {p.fail_count > 0 ? ` · fails: ${p.fail_count}` : ""}
             {dead ? ` · 💤 до ${new Date(p.dead_until!).toLocaleTimeString()}` : ""}
@@ -954,7 +954,7 @@ function ParserBox({
               <span className="text-tg-text truncate">
                 {d.server}:{d.port}
               </span>
-              <span className="text-[10px] text-tg-hint ml-auto">{d.type}</span>
+              <span className="text-2xs text-tg-hint ml-auto">{d.type}</span>
             </label>
           ))}
           <button

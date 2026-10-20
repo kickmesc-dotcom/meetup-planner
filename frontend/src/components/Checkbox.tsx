@@ -37,7 +37,7 @@ export function Checkbox({
   );
   if (!label) return inner;
   return (
-    <label className="flex items-center gap-1.5 text-[11px] text-tg-hint cursor-pointer">
+    <label className="flex items-center gap-1.5 text-xs text-tg-hint cursor-pointer">
       {inner}
       <span>{label}</span>
     </label>

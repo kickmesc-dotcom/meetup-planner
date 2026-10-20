@@ -274,7 +274,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
             </h2>
             <span
               className={[
-                "shrink-0 rounded-full px-2 py-0.5 text-[11px]",
+                "shrink-0 rounded-full px-2 py-0.5 text-xs",
                 STATUS_CLASS[issue.status],
               ].join(" ")}
             >
@@ -282,7 +282,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
             </span>
           </div>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-tg-hint">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tg-hint">
             <span
               className={[
                 "rounded-full px-1.5 py-0.5",
@@ -296,7 +296,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
             {issue.department_name && <span>· {issue.department_name}</span>}
           </div>
 
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-tg-hint">
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-tg-hint">
             <span>висит {fmtAge(issue.age_hours)}</span>
             {issue.created_by_name && <span>· завёл {issue.created_by_name}</span>}
             {issue.assignee_name && (
@@ -341,7 +341,7 @@ function CreateIssueSheet({
 
   return (
     <BottomSheet title="Новая проблема" onClose={onClose}>
-      <label className="block text-[11px] text-tg-hint">
+      <label className="block text-xs text-tg-hint">
         Что случилось
         <input
           value={title}
@@ -352,7 +352,7 @@ function CreateIssueSheet({
         />
       </label>
 
-      <div className="mt-3 text-[11px] text-tg-hint">Категория</div>
+      <div className="mt-3 text-xs text-tg-hint">Категория</div>
       <div className="mt-1 flex flex-wrap gap-1.5">
         {CATEGORIES.map((c) => (
           <button
@@ -374,7 +374,7 @@ function CreateIssueSheet({
         ))}
       </div>
 
-      <div className="mt-3 text-[11px] text-tg-hint">Насколько срочно</div>
+      <div className="mt-3 text-xs text-tg-hint">Насколько срочно</div>
       <div className="mt-1 grid grid-cols-4 gap-1.5">
         {SEVERITIES.map((s) => (
           <button
@@ -385,7 +385,7 @@ function CreateIssueSheet({
               setSeverity(s);
             }}
             className={[
-              "min-h-8 rounded-lg px-1 text-[11px] transition-colors",
+              "min-h-8 rounded-lg px-1 text-xs transition-colors",
               severity === s
                 ? "bg-tg-button text-tg-button-text"
                 : "bg-tg-secondary-bg text-tg-hint",
@@ -396,7 +396,7 @@ function CreateIssueSheet({
         ))}
       </div>
 
-      <label className="mt-3 block text-[11px] text-tg-hint">
+      <label className="mt-3 block text-xs text-tg-hint">
         Где (необязательно)
         <input
           value={zone}
@@ -407,7 +407,7 @@ function CreateIssueSheet({
         />
       </label>
 
-      <label className="mt-3 block text-[11px] text-tg-hint">
+      <label className="mt-3 block text-xs text-tg-hint">
         Подробности (необязательно)
         <textarea
           value={description}
@@ -427,7 +427,7 @@ function CreateIssueSheet({
       >
         {m.isPending ? "Записываю…" : "Завести карточку"}
       </button>
-      <p className="mt-2 text-center text-[11px] text-tg-hint">
+      <p className="mt-2 text-center text-xs text-tg-hint">
         Руководитель отдела увидит проблему в колокольчике и в журнале. В чат
         сообщение не уходит — это не срочный алерт.
       </p>
@@ -496,7 +496,7 @@ function IssueSheet({
 
       {issue && (
         <>
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-tg-hint">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-tg-hint">
             <span
               className={[
                 "rounded-full px-2 py-0.5",
@@ -527,7 +527,7 @@ function IssueSheet({
             </p>
           )}
 
-          <div className="mt-2 text-[11px] text-tg-hint">
+          <div className="mt-2 text-xs text-tg-hint">
             Завёл {issue.created_by_name ?? "—"} · смена {issue.shift_date} ·
             висит {fmtAge(issue.age_hours)}
             {issue.assignee_name ? ` · ответственный: ${issue.assignee_name}` : ""}
@@ -590,7 +590,7 @@ function IssueSheet({
                 key={event.id}
                 className="rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-xs"
               >
-                <div className="text-[11px] text-tg-hint">
+                <div className="text-xs text-tg-hint">
                   {fmtMoment(event.at)} · {event.by_name ?? "система"}
                 </div>
                 <div className="mt-0.5 text-tg-text">

@@ -238,7 +238,7 @@ function TimelineHeader({
                   : "text-tg-text",
             ].join(" ")}
           >
-            <div className="text-[10px] uppercase tracking-wide text-tg-hint">
+            <div className="text-2xs uppercase tracking-wide text-tg-hint">
               {ruWeekdayShort(d.getDay())}
             </div>
             <div className="text-sm leading-none">

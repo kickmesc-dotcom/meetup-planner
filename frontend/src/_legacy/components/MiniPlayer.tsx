@@ -481,7 +481,7 @@ export function MiniPlayerBar({
             ⏭
           </button>
         </div>
-        <div className="shrink-0 text-right text-[10px] leading-tight tabular-nums text-tg-hint">
+        <div className="shrink-0 text-right text-2xs leading-tight tabular-nums text-tg-hint">
           <div>
             {formatTime(player.time)} / {formatTime(player.duration)}
           </div>

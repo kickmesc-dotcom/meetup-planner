@@ -89,7 +89,7 @@ function PollCard({
         </div>
         <div
           className={[
-            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+            "shrink-0 rounded-full px-2 py-0.5 text-2xs font-medium",
             isClosed
               ? "bg-tg-bg/60 text-tg-hint"
               : "bg-status-free/15 text-status-free",
@@ -135,7 +135,7 @@ function PollCard({
                           <span
                             key={uid}
                             title={u?.display_name ?? `#${uid}`}
-                            className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-[8px]"
+                            className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-3xs"
                             style={{ background: u?.color_hex ?? "#888" }}
                           >
                             {u?.avatar_url ? (
@@ -163,12 +163,12 @@ function PollCard({
       </div>
 
       {poll.my_vote_option_id == null && !isClosed && (
-        <div className="mt-2 text-[11px] text-tg-hint">
+        <div className="mt-2 text-xs text-tg-hint">
           Голосуй прямо в Telegram-чате — результат подтянется сюда.
         </div>
       )}
       {poll.my_vote_option_id != null && (
-        <div className="mt-2 text-[11px] text-tg-link">
+        <div className="mt-2 text-xs text-tg-link">
           Твой голос учтён{usersById.get(meId) ? "" : ""}.
         </div>
       )}

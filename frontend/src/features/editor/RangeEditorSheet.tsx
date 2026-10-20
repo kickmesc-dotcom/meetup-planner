@@ -345,7 +345,7 @@ function ConfidencePicker({
             disabled={disabled}
             onClick={() => onChange(c)}
             className={[
-              "flex-1 py-2 rounded-lg text-[11px] leading-tight",
+              "flex-1 py-2 rounded-lg text-xs leading-tight",
               value === c ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg",
             ].join(" ")}
           >

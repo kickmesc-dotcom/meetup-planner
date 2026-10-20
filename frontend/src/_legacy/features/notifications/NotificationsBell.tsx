@@ -113,7 +113,7 @@ export function NotificationsList() {
             <span>{notificationIcon(n.kind)}</span>
             <span className="min-w-0 flex-1 text-tg-text">{n.text}</span>
           </div>
-          <div className="mt-0.5 text-[10px] text-tg-hint">
+          <div className="mt-0.5 text-2xs text-tg-hint">
             {relativeTime(n.created_at)}
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function NotificationsBell() {
       {unread > 0 && (
         <span
           data-testid="notifications-badge"
-          className="absolute -right-0.5 -top-0.5 rounded-full bg-status-busy px-1.5 text-[10px] font-semibold text-tg-bg"
+          className="absolute -right-0.5 -top-0.5 rounded-full bg-status-busy px-1.5 text-2xs font-semibold text-tg-bg"
         >
           {unread > 9 ? "9+" : unread}
         </span>

@@ -82,7 +82,7 @@ function MiniMonth({
           <div
             key={d.toISOString()}
             className={[
-              "aspect-square rounded-[3px] flex items-center justify-center text-[8px]",
+              "aspect-square rounded-[3px] flex items-center justify-center text-3xs",
               inMonth ? "text-tg-text" : "text-muted",
               today ? "ring-1 ring-tg-link" : "",
               bg,

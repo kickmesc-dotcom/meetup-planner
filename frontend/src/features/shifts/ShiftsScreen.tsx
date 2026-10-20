@@ -102,7 +102,7 @@ export default function ShiftsScreen() {
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-tg-text">🗓 Табель смен</div>
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               {rangeLabel(days)} · {canEdit ? "можно править" : "твой отдел"}
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function ShiftsScreen() {
               haptic("selection");
               setWeekStart(mondayOf(new Date()));
             }}
-            className="min-h-9 rounded-lg bg-tg-secondary-bg/60 px-2 text-[11px] text-tg-text"
+            className="min-h-9 rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
           >
             Сегодня
           </button>
@@ -187,14 +187,14 @@ export default function ShiftsScreen() {
                 role="table"
                 aria-label="Табель смен на неделю"
               >
-                <div className="px-1 py-1 text-[10px] text-tg-hint">Сотрудник</div>
+                <div className="px-1 py-1 text-2xs text-tg-hint">Сотрудник</div>
                 {days.map((day) => {
                   const iso = toIso(day);
                   const isToday = iso === todayIso;
                   return (
                     <div
                       key={iso}
-                      className={`rounded-lg px-0.5 py-1 text-center text-[10px] ${
+                      className={`rounded-lg px-0.5 py-1 text-center text-2xs ${
                         isToday
                           ? "bg-tg-link/15 font-medium text-tg-link"
                           : "text-tg-hint"
@@ -221,7 +221,7 @@ export default function ShiftsScreen() {
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 px-1 text-[10px] text-tg-hint">
+            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 px-1 text-2xs text-tg-hint">
               {q.data.statuses.map((item) => (
                 <span key={item.value}>
                   <b className="text-tg-text">{item.short}</b> — {item.label}
@@ -287,7 +287,7 @@ function GroupRows({
   return (
     <>
       <div
-        className="col-span-8 mt-2 px-1 pt-1 text-[10px] font-medium uppercase tracking-wide text-tg-hint"
+        className="col-span-8 mt-2 px-1 pt-1 text-2xs font-medium uppercase tracking-wide text-tg-hint"
         style={{ gridColumn: "1 / -1" }}
       >
         {group}
@@ -298,7 +298,7 @@ function GroupRows({
             <div className="min-w-0">
               <div className="truncate text-xs text-tg-text">{person.display_name}</div>
               {person.position && (
-                <div className="truncate text-[10px] text-tg-hint">
+                <div className="truncate text-2xs text-tg-hint">
                   {person.position}
                 </div>
               )}
@@ -362,7 +362,7 @@ function Cell({
             }${shift.ends_at ? `–${shift.ends_at}` : ""}`
           : "Смены нет"
       }
-      className={`relative flex min-h-11 flex-col items-center justify-center rounded-lg text-[11px] leading-none transition-transform active:scale-95 ${
+      className={`relative flex min-h-11 flex-col items-center justify-center rounded-lg text-xs leading-none transition-transform active:scale-95 ${
         shift
           ? TONE[shift.status]
           : "border border-dashed border-tg-hint/25 text-tg-hint"
@@ -372,10 +372,10 @@ function Cell({
         <>
           <span className="font-medium">{shift.short}</span>
           {shift.starts_at && (
-            <span className="mt-0.5 text-[9px] opacity-80">{shift.starts_at}</span>
+            <span className="mt-0.5 text-3xs opacity-80">{shift.starts_at}</span>
           )}
           {shift.is_training && (
-            <span className="absolute right-0.5 top-0.5 text-[9px] font-semibold">
+            <span className="absolute right-0.5 top-0.5 text-3xs font-semibold">
               у
             </span>
           )}
@@ -441,7 +441,7 @@ function ShiftSheet({
             <div className="text-sm font-semibold text-tg-text">
               {state.person.display_name} · {formatDate(state.day)}
             </div>
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               {state.person.department_name ?? "Без подразделения"}
               {state.shift?.moved_from
                 ? ` · перенесена с ${formatDate(state.shift.moved_from)}`
@@ -471,7 +471,7 @@ function ShiftSheet({
               </div>
             )}
             {state.shift?.note && <div>Заметка: {state.shift.note}</div>}
-            <p className="pt-2 text-[11px] text-tg-hint">
+            <p className="pt-2 text-xs text-tg-hint">
               Править табель может руководитель подразделения.
             </p>
           </div>
@@ -488,7 +488,7 @@ function ShiftSheet({
                     haptic("selection");
                     setStatus(item.value);
                   }}
-                  className={`min-h-9 rounded-lg px-1 text-[11px] ${
+                  className={`min-h-9 rounded-lg px-1 text-xs ${
                     status === item.value
                       ? "bg-tg-button text-tg-button-text"
                       : "bg-tg-secondary-bg/60 text-tg-text"
@@ -500,7 +500,7 @@ function ShiftSheet({
             </div>
 
             <div className="mt-2 flex items-center gap-2">
-              <label className="flex-1 text-[11px] text-tg-hint">
+              <label className="flex-1 text-xs text-tg-hint">
                 Начало
                 <input
                   type="time"
@@ -509,7 +509,7 @@ function ShiftSheet({
                   className="mt-0.5 min-h-9 w-full rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
                 />
               </label>
-              <label className="flex-1 text-[11px] text-tg-hint">
+              <label className="flex-1 text-xs text-tg-hint">
                 Конец
                 <input
                   type="time"
@@ -528,7 +528,7 @@ function ShiftSheet({
               className="mt-2 min-h-9 w-full rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
             />
 
-            <label className="mt-2 block text-[11px] text-tg-hint">
+            <label className="mt-2 block text-xs text-tg-hint">
               Перенести на дату (необязательно)
               <input
                 type="date"
@@ -589,7 +589,7 @@ function FilterChip({
     <button
       type="button"
       onClick={onClick}
-      className={`shrink-0 min-h-8 rounded-full px-2.5 text-[11px] ${
+      className={`shrink-0 min-h-8 rounded-full px-2.5 text-xs ${
         active ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg/60 text-tg-text"
       }`}
     >

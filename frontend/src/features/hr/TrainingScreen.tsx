@@ -104,12 +104,12 @@ export default function TrainingScreen({
         )}
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">🎓 Обучение</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Три уровня, по одному действию на экран.
           </div>
         </div>
         {training.data && (
-          <span className="rounded-full bg-tg-bg/60 px-2 py-1 text-[11px] tabular-nums text-tg-hint">
+          <span className="rounded-full bg-tg-bg/60 px-2 py-1 text-xs tabular-nums text-tg-hint">
             {training.data.done}/{training.data.total}
           </span>
         )}
@@ -171,7 +171,7 @@ export default function TrainingScreen({
                     Я уже запомнил
                   </button>
                 </div>
-                <p className="mt-2 text-[11px] text-tg-hint">
+                <p className="mt-2 text-xs text-tg-hint">
                   Обязательные чек-листы и поручения остаются в любом режиме.
                 </p>
               </section>
@@ -188,7 +188,7 @@ export default function TrainingScreen({
                   aria-valuemax={100}
                 />
               </div>
-              <div className="mt-2 text-[11px] text-tg-hint">
+              <div className="mt-2 text-xs text-tg-hint">
                 {done
                   ? "Готово. Можно возвращаться к смене."
                   : `Осталось ${training.data.total - training.data.done}. Уроки можно проходить в любом порядке.`}
@@ -201,11 +201,11 @@ export default function TrainingScreen({
                   <div className="text-sm font-semibold text-tg-text">
                     Уровень {level.level} · {level.title}
                   </div>
-                  <span className="shrink-0 text-[11px] tabular-nums text-tg-hint">
+                  <span className="shrink-0 text-xs tabular-nums text-tg-hint">
                     {level.done}/{level.total}
                   </span>
                 </div>
-                <p className="text-[11px] text-tg-hint">{level.hint}</p>
+                <p className="text-xs text-tg-hint">{level.hint}</p>
                 {(byLevel.get(level.level) ?? []).map((lesson) => (
                   <LessonCard
                     key={lesson.code}
@@ -228,7 +228,7 @@ export default function TrainingScreen({
               <div className="text-sm font-medium text-tg-text">
                 Пройти курс заново
               </div>
-              <p className="mt-1 text-[11px] text-tg-hint">
+              <p className="mt-1 text-xs text-tg-hint">
                 Снимет отметки уроков, но оставит подразделение и опыт. Смена,
                 задачи и отметки чек-листа не затрагиваются.
               </p>
@@ -291,7 +291,7 @@ function LessonCard({
           <span className="block truncate text-sm font-medium text-tg-text">
             {lesson.title}
           </span>
-          <span className="block text-[11px] text-tg-hint">
+          <span className="block text-xs text-tg-hint">
             {lesson.minutes} мин · {lesson.summary}
           </span>
         </span>
@@ -323,7 +323,7 @@ function LessonCard({
               Понятно, отметил
             </button>
           ) : (
-            <div className="text-[11px] text-status-free">Пройдено</div>
+            <div className="text-xs text-status-free">Пройдено</div>
           )}
         </div>
       )}

@@ -27,7 +27,7 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold truncate">{title}</div>
           {subtitle && (
-            <div className="text-[11px] text-tg-hint truncate">{subtitle}</div>
+            <div className="text-xs text-tg-hint truncate">{subtitle}</div>
           )}
         </div>
       </div>

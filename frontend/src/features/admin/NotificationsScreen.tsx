@@ -135,7 +135,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
     >
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">Мьют алертов</div>
-        <p className="mt-1 text-[11px] text-tg-hint">
+        <p className="mt-1 text-xs text-tg-hint">
           {muted
             ? `Чат молчит до ${formatMoment(muted)}.`
             : "Алерты в чат идут как обычно."}
@@ -171,7 +171,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             </button>
           )}
         </div>
-        <p className="mt-2 text-[10px] text-tg-hint">
+        <p className="mt-2 text-2xs text-tg-hint">
           Мьют глушит доставку в Telegram: в приложении уведомления продолжают
           копиться, поэтому утренний разбор не потеряется.
         </p>
@@ -181,7 +181,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         <div className="text-sm font-semibold text-tg-text">
           Написать сотруднику
         </div>
-        <p className="mt-1 text-[11px] text-tg-hint">
+        <p className="mt-1 text-xs text-tg-hint">
           Личное уведомление в приложение. В чат не дублируем.
         </p>
         <select
@@ -248,12 +248,12 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                       ? "напоминание о сроке"
                       : "вторая ступень"}
                     {item.moved && (
-                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-0.5 text-[10px] text-tg-link">
+                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">
                         перенесено вручную
                       </span>
                     )}
                   </div>
-                  <div className="mt-0.5 text-[11px] text-tg-hint">
+                  <div className="mt-0.5 text-xs text-tg-hint">
                     {formatMoment(item.at)} · «{item.task_title}»
                   </div>
                   {item.kind === "deadline" && (
@@ -276,7 +276,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                                   minutes: option.minutes,
                                 });
                               }}
-                              className="min-h-8 rounded-full bg-tg-link/15 px-2.5 text-[11px] text-tg-link disabled:opacity-50"
+                              className="min-h-8 rounded-full bg-tg-link/15 px-2.5 text-xs text-tg-link disabled:opacity-50"
                             >
                               {option.label}
                             </button>
@@ -284,7 +284,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                           <button
                             type="button"
                             onClick={() => setMoving(null)}
-                            className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-hint"
+                            className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-hint"
                           >
                             Отмена
                           </button>
@@ -297,7 +297,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                             haptic("selection");
                             setMoving(item.task_id);
                           }}
-                          className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-text disabled:opacity-50"
+                          className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-text disabled:opacity-50"
                         >
                           Передвинуть
                         </button>
@@ -314,7 +314,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                             if (ok) skip.mutate(item.task_id);
                           })();
                         }}
-                        className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-status-busy disabled:opacity-50"
+                        className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-status-busy disabled:opacity-50"
                       >
                         Выключить
                       </button>
@@ -340,7 +340,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                           <span className="font-medium">{item.display_name}</span>{" "}
                           · «{item.task_title}»
                         </div>
-                        <div className="mt-0.5 text-[11px] text-tg-hint">
+                        <div className="mt-0.5 text-xs text-tg-hint">
                           Напоминание о сроке не уйдёт. Вторая ступень после
                           просрочки работает отдельно.
                         </div>
@@ -352,7 +352,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                           haptic("selection");
                           restore.mutate(item.task_id);
                         }}
-                        className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-link disabled:opacity-50"
+                        className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
                       >
                         Вернуть
                       </button>
@@ -377,7 +377,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                     <div className="text-sm text-tg-text break-words">
                       {item.text}
                     </div>
-                    <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-tg-hint">
+                    <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
                       <span>{item.display_name ?? "без профиля"}</span>
                       <span>· {formatMoment(item.created_at)}</span>
                       {item.department_name && <span>· {item.department_name}</span>}
@@ -396,7 +396,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                         if (ok) drop.mutate(item.id);
                       })();
                     }}
-                    className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-status-busy disabled:opacity-50"
+                    className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-status-busy disabled:opacity-50"
                   >
                     Убрать
                   </button>

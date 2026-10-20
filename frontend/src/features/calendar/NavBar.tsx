@@ -36,7 +36,7 @@ export default function NavBar() {
               haptic("light");
               goToday();
             }}
-            className="text-[11px] text-tg-link underline-offset-2 hover:underline"
+            className="text-xs text-tg-link underline-offset-2 hover:underline"
           >
             к сегодня
           </button>

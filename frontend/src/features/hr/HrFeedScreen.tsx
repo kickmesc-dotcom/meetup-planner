@@ -171,7 +171,7 @@ export default function HrFeedScreen() {
         <div className="flex items-baseline justify-between gap-2">
           <h1 className="text-lg font-semibold text-tg-text">События смены</h1>
           {feed && (
-            <span className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-0.5 text-[11px] text-tg-hint">
+            <span className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-hint">
               {SCOPE_TITLE[feed.scope]}
             </span>
           )}
@@ -262,7 +262,7 @@ export default function HrFeedScreen() {
                   setDepartmentId(null);
                   setKinds([]);
                 }}
-                className="min-h-7 rounded-full px-2.5 text-[11px] text-tg-link"
+                className="min-h-7 rounded-full px-2.5 text-xs text-tg-link"
               >
                 Сбросить фильтры
               </button>
@@ -283,7 +283,7 @@ export default function HrFeedScreen() {
                       );
                     }}
                     className={[
-                      "min-h-7 rounded-full px-2.5 text-[11px] transition-colors",
+                      "min-h-7 rounded-full px-2.5 text-xs transition-colors",
                       active
                         ? "bg-tg-button text-tg-button-text"
                         : "bg-tg-secondary-bg text-tg-hint",
@@ -298,7 +298,7 @@ export default function HrFeedScreen() {
         )}
 
         {feed && !canFilter && (
-          <p className="mt-2 rounded-lg bg-tg-secondary-bg/60 p-2 text-[11px] text-tg-hint">
+          <p className="mt-2 rounded-lg bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
             🔒 Видны только твои действия. Расширенные фильтры доступны
             руководителю подразделения и управляющему.
           </p>
@@ -324,7 +324,7 @@ export default function HrFeedScreen() {
 
         {groupByDay(items).map((group) => (
           <section key={group.label}>
-            <h2 className="sticky top-0 z-10 -mx-4 bg-tg-bg/95 px-4 py-1 text-[11px] font-medium text-tg-hint backdrop-blur">
+            <h2 className="sticky top-0 z-10 -mx-4 bg-tg-bg/95 px-4 py-1 text-xs font-medium text-tg-hint backdrop-blur">
               {group.label}
             </h2>
             <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
@@ -369,7 +369,7 @@ function FeedRow({
             />{" "}
             {item.text}
           </div>
-          <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-tg-hint">
+          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
             <span>{fmtWhen(item.at)}</span>
             {departmentName && <span>· {departmentName}</span>}
             <span>· {KIND_LABEL[item.kind]}</span>

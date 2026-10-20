@@ -119,7 +119,7 @@ function BirthdaysMasterSwitch() {
               save.mutate(next);
             }}
           />
-          <div className="mt-1 text-[11px] text-tg-hint">
+          <div className="mt-1 text-xs text-tg-hint">
             Глобальный рубильник — гасит все ДР-уведомления у всех участников.
             Персональные галочки ниже при этом сохраняются.
           </div>
@@ -183,7 +183,7 @@ function BirthdaysForm({
 
             <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] text-tg-hint">Дата рождения</span>
+                <span className="text-xs text-tg-hint">Дата рождения</span>
                 <input
                   type="date"
                   value={d.bday ?? ""}

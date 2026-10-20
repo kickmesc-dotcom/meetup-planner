@@ -73,7 +73,7 @@ function RatingTop({ users }: { users: User[] }) {
       <header className="flex items-center gap-2">
         <span
           aria-hidden
-          className="grid h-8 w-8 shrink-0 place-items-center bg-ink-stamp text-[17px] leading-none text-white"
+          className="grid h-8 w-8 shrink-0 place-items-center bg-ink-stamp text-lg leading-none text-white"
         >
           🏆
         </span>
@@ -202,7 +202,7 @@ function Section({
       <header className="flex items-center gap-2">
         <span
           aria-hidden
-          className="grid h-8 w-8 shrink-0 place-items-center bg-ink-stamp text-[17px] leading-none text-white"
+          className="grid h-8 w-8 shrink-0 place-items-center bg-ink-stamp text-lg leading-none text-white"
         >
           {icon}
         </span>

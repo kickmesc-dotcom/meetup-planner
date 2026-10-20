@@ -54,7 +54,7 @@ export default function LinksScreen() {
               <span className="block text-sm font-medium text-tg-text">
                 Материалы смены
               </span>
-              <span className="block text-[11px] text-tg-hint">
+              <span className="block text-xs text-tg-hint">
                 График, меню и методички — открываются без Google
               </span>
             </span>
@@ -102,7 +102,7 @@ export default function LinksScreen() {
                 <span className="block truncate text-sm font-medium text-tg-text">
                   {l.title}
                 </span>
-                <span className="block truncate text-[11px] text-tg-hint">
+                <span className="block truncate text-xs text-tg-hint">
                   {l.url}
                 </span>
               </span>

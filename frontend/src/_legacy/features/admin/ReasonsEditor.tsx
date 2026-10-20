@@ -181,7 +181,7 @@ export default function ReasonsEditor({
 
       {metaEnabled && (
         <>
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
             {(
               [
                 ["all", `Все (${list.length})`],
@@ -209,7 +209,7 @@ export default function ReasonsEditor({
           </div>
 
           {onBulkMeta && filteredPhrases.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 text-[11px]">
+            <div className="flex flex-wrap gap-1.5 text-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -266,7 +266,7 @@ export default function ReasonsEditor({
             return (
               <div key={`${i}:${r}`} className="px-2 py-1.5">
                 <div className="flex items-start gap-2">
-                  <div className="text-[10px] text-tg-hint w-6 tabular-nums pt-0.5 shrink-0">
+                  <div className="text-2xs text-tg-hint w-6 tabular-nums pt-0.5 shrink-0">
                     {i + 1}
                   </div>
                   {isEditing ? (
@@ -349,14 +349,14 @@ export default function ReasonsEditor({
                               haptic("warning");
                               onSetCount(r, 0);
                             }}
-                            className="text-[10px] text-tg-hint tabular-nums rounded px-1 py-0.5 hover:bg-tg-secondary-bg/60 active:scale-95 transition"
+                            className="text-2xs text-tg-hint tabular-nums rounded px-1 py-0.5 hover:bg-tg-secondary-bg/60 active:scale-95 transition"
                             title={`Использовано ${count} раз${count === 1 ? "" : "а"} — нажми, чтобы сбросить в 0`}
                           >
                             use:{count} ↺
                           </button>
                         ) : (
                           <span
-                            className="text-[10px] text-tg-hint tabular-nums"
+                            className="text-2xs text-tg-hint tabular-nums"
                             title={`Использовано ${count} раз${count === 1 ? "" : "а"}`}
                           >
                             use:{count}
@@ -437,7 +437,7 @@ export default function ReasonsEditor({
               onResetCounts();
             }
           }}
-          className="w-full min-h-11 rounded-md bg-tg-bg/70 px-2 text-[11px] text-tg-hint disabled:opacity-50 inline-flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-hint disabled:opacity-50 inline-flex items-center justify-center gap-2"
         >
           {resetCountsPending && <Spinner />}
           🔄 Сбросить счётчики использования

@@ -130,7 +130,7 @@ export default function WormMasterScreen({ onBack }: Props) {
           <div className="text-sm font-semibold text-tg-text">
             🎲 Выпадение титула
           </div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             На каждом ролле лоха с этим шансом вместо обычного лоха выпадает
             «червь-пидор» — и титул переходит к нему. Слишком высокий шанс = титул
             скачет каждый день.
@@ -188,7 +188,7 @@ export default function WormMasterScreen({ onBack }: Props) {
               <div className="flex items-center gap-2">
                 <div className="text-sm text-tg-text">🤫 Поддакивание</div>
               </div>
-              <div className="text-[11px] text-tg-hint">
+              <div className="text-xs text-tg-hint">
                 Бот изредка одобрительно комментирует сообщения господина.
                 Господин может заткнуть подхалима командой <b>/отвали</b> — тогда
                 этот тумблер выключится, и его нужно будет включить здесь снова.
@@ -319,12 +319,12 @@ function PoolSection({
       <div className="flex items-center gap-2">
         <div className="text-sm font-semibold text-tg-text">{title}</div>
         {badge && (
-          <span className="text-[10px] rounded bg-status-busy/15 px-1.5 py-0.5 text-status-busy">
+          <span className="text-2xs rounded bg-status-busy/15 px-1.5 py-0.5 text-status-busy">
             {badge}
           </span>
         )}
       </div>
-      <div className="text-[11px] text-tg-hint">{hint}</div>
+      <div className="text-xs text-tg-hint">{hint}</div>
       {isPending || data === undefined ? (
         <ListSkeleton rows={3} />
       ) : (
@@ -356,7 +356,7 @@ function ToggleRow({
     <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
       <div className="min-w-0">
         <div className="text-sm text-tg-text">{label}</div>
-        {hint && <div className="text-[11px] text-tg-hint">{hint}</div>}
+        {hint && <div className="text-xs text-tg-hint">{hint}</div>}
       </div>
       <Switch
         checked={checked}
@@ -384,7 +384,7 @@ function PctRow({
     <div className="flex items-center justify-between gap-2">
       <div className="min-w-0">
         <div className="text-sm text-tg-text">{label}</div>
-        {hint && <div className="text-[11px] text-tg-hint">{hint}</div>}
+        {hint && <div className="text-xs text-tg-hint">{hint}</div>}
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <input
@@ -423,7 +423,7 @@ function NumRow({
     <div className="flex items-center justify-between gap-2">
       <div className="min-w-0">
         <div className="text-sm text-tg-text">{label}</div>
-        {hint && <div className="text-[11px] text-tg-hint">{hint}</div>}
+        {hint && <div className="text-xs text-tg-hint">{hint}</div>}
       </div>
       <input
         type="number"

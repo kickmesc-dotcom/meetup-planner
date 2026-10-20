@@ -108,7 +108,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
       onBack={onBack}
     >
       <section className="space-y-2">
-        <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-tg-hint">
+        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
           Подразделение
         </div>
         <Chips
@@ -123,7 +123,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
       </section>
 
       <section className="space-y-2">
-        <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-tg-hint">
+        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
           Вид чек-листа
         </div>
         <Chips
@@ -140,7 +140,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
 
       {kind === "shift" ? (
         <section className="space-y-2">
-          <div className="px-1 text-[11px] font-semibold uppercase tracking-wide text-tg-hint">
+          <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
             Зал
           </div>
           <Chips
@@ -151,13 +151,13 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
             value={hallSel}
             onChange={(v) => setHallSel(v)}
           />
-          <div className="px-1 text-[11px] text-tg-hint">
+          <div className="px-1 text-xs text-tg-hint">
             «Общий» — шаблон-подстраховка, если для зала своего нет. Закрытие
             смены всегда общее.
           </div>
         </section>
       ) : (
-        <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-[11px] text-tg-hint">
+        <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
           {kind === "close"
             ? "Закрытие смены — общий чек-лист: один на все залы. Последний пункт обычно с фотоотчётом."
             : "Чек-лист первого дня показывается новичку; зала у него нет."}
@@ -180,7 +180,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
           <div className="mt-1 text-sm font-semibold text-tg-text">
             Чек-листа ещё нет
           </div>
-          <div className="mt-1 text-[11px] text-tg-hint">
+          <div className="mt-1 text-xs text-tg-hint">
             {hallName} · {KIND_LABEL[kind]}. Создай шаблон и добавь пункты — они
             сразу появятся у сотрудников.
           </div>
@@ -259,7 +259,7 @@ function TemplateEditor({
           label={template.is_active ? "Включён у сотрудников" : "Выключен"}
           onChange={(v) => saveTpl.mutate({ is_active: v })}
         />
-        <div className="text-[11px] text-tg-hint">
+        <div className="text-xs text-tg-hint">
           {items.length} пунктов · фотоотчёт обязателен у{" "}
           {items.filter((i) => i.requires_photo).length}
         </div>
@@ -414,7 +414,7 @@ function ItemEditor({
           className="min-w-0 flex-1 text-left"
         >
           <div className="text-sm text-tg-text">{item.title}</div>
-          <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-tg-hint">
+          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
             {item.requires_photo && <span>📷 фотоотчёт</span>}
             {!item.is_mandatory && <span>(опц.)</span>}
             {item.condition_position && (
@@ -558,7 +558,7 @@ function HallsCard() {
       >
         <div>
           <div className="text-sm font-semibold text-tg-text">Залы ресторана</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {hallsQ.data?.length ?? 0} залов · от них зависит выбор у официанта
           </div>
         </div>
@@ -610,7 +610,7 @@ function HallsCard() {
               ＋
             </button>
           </div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             После заведения зала создай для него чек-лист открытия: выбери зал
             выше и нажми «Создать чек-лист».
           </div>

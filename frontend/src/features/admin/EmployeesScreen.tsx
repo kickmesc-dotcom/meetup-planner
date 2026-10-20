@@ -220,7 +220,7 @@ function EmployeeRow({
           <span className="block truncate text-sm font-medium text-tg-text">
             {card.display_name}
           </span>
-          <span className="block truncate text-[11px] text-tg-hint">
+          <span className="block truncate text-xs text-tg-hint">
             {[card.department_name, card.position ?? card.badge]
               .filter(Boolean)
               .join(" · ") || "без отдела"}
@@ -235,7 +235,7 @@ function EmployeeRow({
       {open && (
         <div className="space-y-2 px-3 pb-3">
           {fired && (
-            <p className="rounded-lg bg-status-busy/10 p-2 text-[11px] text-status-busy">
+            <p className="rounded-lg bg-status-busy/10 p-2 text-xs text-status-busy">
               Доступ закрыт.{" "}
               {card.purge_after
                 ? `Данные в корзине до ${formatDate(card.purge_after)}.`
@@ -243,7 +243,7 @@ function EmployeeRow({
             </p>
           )}
 
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Имя
             <input
               type="text"
@@ -253,7 +253,7 @@ function EmployeeRow({
               className="mt-1 min-h-9 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Должность (влияет на пункты чек-листа)
             <input
               type="text"
@@ -264,7 +264,7 @@ function EmployeeRow({
               className="mt-1 min-h-9 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-[11px] text-tg-hint">
+          <label className="block text-xs text-tg-hint">
             Плашка под именем
             <input
               type="text"
@@ -321,7 +321,7 @@ function EmployeeRow({
               </button>
             )}
           </div>
-          <p className="text-[10px] text-tg-hint">
+          <p className="text-2xs text-tg-hint">
             Увольнение даёт выбор: корзина на {trashDays} дней или удаление сразу.
           </p>
         </div>

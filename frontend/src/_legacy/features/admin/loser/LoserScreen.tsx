@@ -233,10 +233,10 @@ export default function LoserScreen({ users, onBack }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-tg-text">{u?.display_name ?? `#${h.loser_user_id}`}</div>
                     {h.reason_text && (
-                      <div className="text-[11px] text-tg-hint italic">{h.reason_text}</div>
+                      <div className="text-xs text-tg-hint italic">{h.reason_text}</div>
                     )}
                   </div>
-                  <div className="text-[10px] text-tg-hint tabular-nums whitespace-nowrap mt-1">
+                  <div className="text-2xs text-tg-hint tabular-nums whitespace-nowrap mt-1">
                     {format(new Date(h.rolled_at), "dd.MM HH:mm")}
                   </div>
                 </div>
@@ -352,7 +352,7 @@ function NumField({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] text-tg-hint">{label}</span>
+      <span className="text-xs text-tg-hint">{label}</span>
       <input
         type="text"
         inputMode="numeric"
@@ -360,7 +360,7 @@ function NumField({
         onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ""))}
         className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
       />
-      {hint && <span className="text-[10px] text-tg-hint">{hint}</span>}
+      {hint && <span className="text-2xs text-tg-hint">{hint}</span>}
     </label>
   );
 }

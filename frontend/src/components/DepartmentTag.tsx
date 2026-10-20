@@ -18,7 +18,7 @@ export default function DepartmentTag({
   return (
     <span
       className={[
-        "inline-flex max-w-full items-center gap-1 rounded-full bg-tg-bg/70 px-1.5 py-0.5 text-[10px] leading-none text-tg-hint",
+        "inline-flex max-w-full items-center gap-1 rounded-full bg-tg-bg/70 px-1.5 py-0.5 text-2xs leading-none text-tg-hint",
         className,
       ].join(" ")}
       title={name}

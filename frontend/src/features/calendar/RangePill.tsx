@@ -60,11 +60,11 @@ export default function RangePill({
         e.stopPropagation();
         onTap();
       }}
-      className="absolute top-1/2 -translate-y-1/2 h-7 px-2 text-white text-[11px] font-medium flex items-center shadow-sm select-none"
+      className="absolute top-1/2 -translate-y-1/2 h-7 px-2 text-white text-xs font-medium flex items-center shadow-sm select-none"
       style={{
         left,
         width,
-        // DESIGN_SYSTEM §1.2/§6: darkened pill bg + white text = WCAG AA at 11px.
+        // DESIGN_SYSTEM §1.2/§6: darkened pill bg + white text = WCAG AA at 12px.
         // Confidence is already encoded by the cell fill, so we no longer fade the
         // pill (the old opacity<1 pushed the label below AA contrast).
         background: statusPillBg(range.status),

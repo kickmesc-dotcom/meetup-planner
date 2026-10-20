@@ -74,7 +74,7 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
             Новый таймлайн-вид
           </span>
         </div>
-        <div className="text-[11px] text-tg-hint">
+        <div className="text-xs text-tg-hint">
           Горизонтальная лента с pinch-zoom и инерционной прокруткой. Активна
           при увеличениях <b>день / неделя / месяц</b>. Для остальных уровней
           (часы, 3/6 месяцев, год, все годы) используется legacy-вид независимо
@@ -84,7 +84,7 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
           <div className="text-sm text-tg-text">
             Включён
             {q.isPending && (
-              <span className="ml-2 text-[11px] text-tg-hint">загрузка…</span>
+              <span className="ml-2 text-xs text-tg-hint">загрузка…</span>
             )}
           </div>
           <Switch
@@ -96,7 +96,7 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
             }}
           />
         </div>
-        <div className="text-[10px] text-tg-hint">
+        <div className="text-2xs text-tg-hint">
           Откат на legacy — переключить тумблер обратно. Никаких рестартов не
           требуется.
         </div>

@@ -174,7 +174,7 @@ export default function HrProfileScreen() {
             </div>
           </div>
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
           <Info
             label="Подразделение"
             value={me.department_name ?? "не выбрано"}
@@ -190,7 +190,7 @@ export default function HrProfileScreen() {
             }
           />
         </div>
-        <p className="mt-2 rounded-lg bg-tg-bg/50 p-2 text-[11px] text-tg-hint">
+        <p className="mt-2 rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-hint">
           {ROLE_HINT[me.role]}
         </p>
       </section>
@@ -201,13 +201,13 @@ export default function HrProfileScreen() {
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-tg-text">🎓 Обучение</h2>
-          <span className="text-[11px] tabular-nums text-tg-hint">
+          <span className="text-xs tabular-nums text-tg-hint">
             {trainingQ.data
               ? `${trainingQ.data.done}/${trainingQ.data.total}`
               : "…"}
           </span>
         </div>
-        <p className="mt-1 text-[11px] text-tg-hint">
+        <p className="mt-1 text-xs text-tg-hint">
           Три уровня от знакомства до самостоятельной работы — по одному действию
           на урок.
         </p>
@@ -248,7 +248,7 @@ export default function HrProfileScreen() {
       {(me.is_admin || me.is_staff) && (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
           <h2 className="text-sm font-semibold text-tg-text">Примерить роль</h2>
-          <p className="mt-1 text-[11px] text-tg-hint">
+          <p className="mt-1 text-xs text-tg-hint">
             Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ в
             админку остаётся — вернуть себя можно этой же кнопкой.
           </p>
@@ -284,7 +284,7 @@ export default function HrProfileScreen() {
       {(me.is_admin || me.is_staff) && (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
           <h2 className="text-sm font-semibold text-tg-text">🧪 Режим проверки</h2>
-          <p className="mt-1 text-[11px] text-tg-hint">
+          <p className="mt-1 text-xs text-tg-hint">
             Открой приложение глазами сотрудника. Тестовые задачи и смены
             удалятся при выходе — настоящие данные не изменятся.
           </p>
@@ -348,7 +348,7 @@ export default function HrProfileScreen() {
         <h2 className="text-sm font-semibold text-tg-text">
           {onboarding ? "Закончим знакомство" : "Мои данные"}
         </h2>
-        <p className="mt-1 text-[11px] text-tg-hint">
+        <p className="mt-1 text-xs text-tg-hint">
           Подразделение определяет чек-листы, поручения и ссылки, которые тебе
           приходят.
         </p>
@@ -497,7 +497,7 @@ export default function HrProfileScreen() {
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <h2 className="text-sm font-semibold text-tg-text">Пиши боту в чат</h2>
-        <p className="mt-1 text-[11px] text-tg-hint">{photoHint}</p>
+        <p className="mt-1 text-xs text-tg-hint">{photoHint}</p>
         <button
           type="button"
           onClick={() => {
@@ -535,7 +535,7 @@ function ServerSwitch() {
   return (
     <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
       <h2 className="text-sm font-semibold text-tg-text">Сервер (для админа)</h2>
-      <p className="mt-1 text-[11px] text-tg-hint">
+      <p className="mt-1 text-xs text-tg-hint">
         Если основной адрес недоступен, укажи резервный — приложение продолжит
         работать без переустановки. Пусто — адрес из сборки.
       </p>

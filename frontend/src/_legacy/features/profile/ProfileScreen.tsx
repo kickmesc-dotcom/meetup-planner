@@ -239,7 +239,7 @@ function CharacterCard({
           Формулировка (Э19): «Лох дня ×N» / «Чухан недели ×N» — звание, а не
           падежная фраза, и сразу видно число (тот же знак ×, что у юбилейных
           ачивок). Раньше было «Лохом дня: N раз» — громоздко и без акцента. */}
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-tg-bg/40 pt-2.5 text-[11px] text-tg-hint">
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-tg-bg/40 pt-2.5 text-xs text-tg-hint">
         <span
           className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5"
           title="Сколько раз тебя выбирали лохом дня (👑) с начала игры"
@@ -292,7 +292,7 @@ function GreetingSettings() {
           <div className="flex items-center justify-between gap-3 pb-2.5">
             <div className="min-w-0">
               <div className="text-sm text-tg-text">👋 Приветствие</div>
-              <div className="text-[11px] text-tg-hint truncate">
+              <div className="text-xs text-tg-hint truncate">
                 Баннер званий над календарём
               </div>
             </div>
@@ -344,7 +344,7 @@ function GreetingSettings() {
           <div className="flex items-center justify-between gap-3 pt-2.5">
             <div className="min-w-0">
               <div className="text-sm text-tg-text">🚪 Последний заход</div>
-              <div className="text-[11px] text-tg-hint truncate">
+              <div className="text-xs text-tg-hint truncate">
                 Видно другим в профиле
               </div>
             </div>
@@ -443,7 +443,7 @@ function Row({
   return (
     <div className="flex items-start gap-2 py-1.5">
       <div
-        className="w-6 h-6 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-[10px] shrink-0"
+        className="w-6 h-6 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-2xs shrink-0"
         style={{ background: user?.color_hex ?? "#888" }}
       >
         {user?.avatar_url ? (
@@ -455,7 +455,7 @@ function Row({
       <div className="flex-1 min-w-0">
         <div className="text-sm truncate">{user?.display_name ?? fallback}</div>
         {reason && (
-          <div className="text-[11px] text-tg-hint italic line-clamp-2">«{reason}»</div>
+          <div className="text-xs text-tg-hint italic line-clamp-2">«{reason}»</div>
         )}
       </div>
       <span className="text-xs text-tg-hint tabular-nums shrink-0">{dateStr}</span>
@@ -485,7 +485,7 @@ function NavCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold text-tg-text">{title}</div>
-        <div className="text-[11px] text-tg-hint truncate">{subtitle}</div>
+        <div className="text-xs text-tg-hint truncate">{subtitle}</div>
       </div>
       <div className="text-tg-hint text-base">›</div>
     </button>

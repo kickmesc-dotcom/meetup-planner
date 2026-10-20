@@ -68,7 +68,7 @@ export default function ParticipantsFilterSheet({
         <div className="flex items-center gap-2 border-b border-tg-secondary-bg px-4 py-3">
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold">👥 Фильтр по участникам</div>
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               Чьи события не показывать в моей ленте
             </div>
           </div>
@@ -118,7 +118,7 @@ export default function ParticipantsFilterSheet({
                     <div className="truncate text-sm text-tg-text">
                       {me.display_name}
                     </div>
-                    <div className="text-[10px] text-tg-hint">
+                    <div className="text-2xs text-tg-hint">
                       Это ты — свои события видны всегда
                     </div>
                   </div>
@@ -132,7 +132,7 @@ export default function ParticipantsFilterSheet({
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <div
-                      className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-tg-secondary-bg text-center text-[11px] leading-7 text-white"
+                      className="h-7 w-7 shrink-0 overflow-hidden rounded-full bg-tg-secondary-bg text-center text-xs leading-7 text-white"
                       style={{ background: u.color_hex ?? "#888" }}
                     >
                       {u.avatar_url ? (

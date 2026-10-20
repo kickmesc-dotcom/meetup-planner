@@ -93,7 +93,7 @@ export default function AppTextsScreen({ onBack }: Props) {
       subtitle="Подписи, которые видит сотрудник"
       onBack={onBack}
     >
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-[11px] text-tg-hint">
+      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
         Меняй формулировки под свой ресторан. Пустое поле — вернуть исходный
         текст. Кнопки и юридически значимые подписи здесь не редактируются:
         их нельзя сломать случайной правкой.
@@ -113,7 +113,7 @@ export default function AppTextsScreen({ onBack }: Props) {
             <label key={item.code} className="block space-y-1">
               <span className="block text-xs text-tg-text">{item.title}</span>
               {item.hint && (
-                <span className="block text-[10px] text-tg-hint">{item.hint}</span>
+                <span className="block text-2xs text-tg-hint">{item.hint}</span>
               )}
               <textarea
                 value={draft[item.code] ?? ""}
@@ -127,7 +127,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                 className="w-full resize-none rounded-lg bg-tg-bg/70 p-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
               />
               <span className="flex items-center justify-between gap-2">
-                <span className="text-[10px] text-tg-hint">
+                <span className="text-2xs text-tg-hint">
                   {(draft[item.code] ?? "").trim()
                     ? `${(draft[item.code] ?? "").length}/600`
                     : "по умолчанию"}
@@ -137,7 +137,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                   <button
                     type="button"
                     onClick={() => reset(item)}
-                    className="min-h-9 rounded-md bg-tg-bg/70 px-2 text-[11px] text-tg-link active:scale-95 transition-transform"
+                    className="min-h-9 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
                     ↺ Как было
                   </button>

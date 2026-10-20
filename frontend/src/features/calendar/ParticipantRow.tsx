@@ -161,7 +161,7 @@ export default function ParticipantRow({
             )}
           </div>
         </div>
-        <div className="text-[10px] text-tg-hint truncate max-w-[60px] mt-0.5">
+        <div className="text-2xs text-tg-hint truncate max-w-[60px] mt-0.5">
           {firstName(user.display_name)}
         </div>
       </div>
@@ -293,7 +293,7 @@ export default function ParticipantRow({
                 {hasPartial && (
                   <span
                     aria-hidden
-                    className="pointer-events-none absolute top-0.5 left-0.5 text-[10px] leading-none opacity-70"
+                    className="pointer-events-none absolute top-0.5 left-0.5 text-2xs leading-none opacity-70"
                   >
                     🕓
                   </span>
@@ -315,7 +315,7 @@ export default function ParticipantRow({
                         displayName: user.display_name,
                       });
                     }}
-                    className="absolute top-0.5 right-0.5 z-10 text-[12px] leading-none rounded-sm bg-tg-bg/70 px-0.5 active:scale-95"
+                    className="absolute top-0.5 right-0.5 z-10 text-xs leading-none rounded-sm bg-tg-bg/70 px-0.5 active:scale-95"
                   >
                     🎂
                   </button>

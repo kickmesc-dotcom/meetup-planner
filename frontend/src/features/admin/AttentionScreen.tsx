@@ -90,14 +90,14 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   <button
                     type="button"
                     onClick={onOpenTasks}
-                    className="min-h-9 rounded-md bg-tg-bg/70 px-2 text-[11px] text-tg-link active:scale-95 transition-transform"
+                    className="min-h-9 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
                     Открыть →
                   </button>
                 )}
               </div>
               {overdue.length > 0 && (
-                <div className="text-[11px] text-status-busy">
+                <div className="text-xs text-status-busy">
                   Просрочено: {overdue.length}
                 </div>
               )}
@@ -106,11 +106,11 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   <div key={t.id} className="px-2 py-1.5 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-tg-text">{t.title}</span>
-                      <span className="shrink-0 text-[10px] tabular-nums text-status-busy">
+                      <span className="shrink-0 text-2xs tabular-nums text-status-busy">
                         {fmtDue(t.due_at)}
                       </span>
                     </div>
-                    <div className="text-[10px] text-tg-hint">
+                    <div className="text-2xs text-tg-hint">
                       {t.assignments.length
                         ? t.assignments.map((a) => a.display_name).join(", ")
                         : `Осталось ${Math.max(0, t.progress_total - t.progress_done)} из ${t.progress_total}`}
@@ -119,7 +119,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                 ))}
               </div>
               {onReview.length > 0 && (
-                <div className="text-[11px] text-tg-hint">
+                <div className="text-xs text-tg-hint">
                   Ждут приёмки: {onReview.length}
                 </div>
               )}
@@ -133,7 +133,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   🛠 Проблемы: {openIssues.length}
                 </div>
                 {issues.data && issues.data.summary.attention > 0 && (
-                  <span className="rounded-full bg-status-busy/15 px-2 py-0.5 text-[10px] text-status-busy">
+                  <span className="rounded-full bg-status-busy/15 px-2 py-0.5 text-2xs text-status-busy">
                     срочных: {issues.data.summary.attention}
                   </span>
                 )}
@@ -146,11 +146,11 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                       <span className="min-w-0 flex-1 truncate text-sm text-tg-text">
                         {issue.title}
                       </span>
-                      <span className="shrink-0 text-[10px] text-tg-hint">
+                      <span className="shrink-0 text-2xs text-tg-hint">
                         {ISSUE_STATUS_LABEL[issue.status]}
                       </span>
                     </div>
-                    <div className="text-[10px] text-tg-hint">
+                    <div className="text-2xs text-tg-hint">
                       {issue.department_name ?? "без отдела"}
                       {issue.assignee_name ? ` · ${issue.assignee_name}` : ""}
                       {issue.age_hours >= 24

@@ -189,7 +189,7 @@ export default function PollSheet(_props: Props) {
           size="md"
         />
         {!includeTime && (
-          <div className="mt-1 pl-1 text-[11px] text-tg-hint">
+          <div className="mt-1 pl-1 text-xs text-tg-hint">
             Без времени — в опросе будет только день недели и число.
           </div>
         )}
@@ -261,7 +261,7 @@ export default function PollSheet(_props: Props) {
         />
         <span>
           📌 Закрепить опрос в чате
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Сразу после публикации бот пин-нёт сообщение (без шумного
             уведомления).
           </div>

@@ -85,7 +85,7 @@ export default function TeamScreen({
         )}
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">👀 Команда</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {dashboard.data
               ? `${dashboard.data.work_date} · ${
                   dashboard.data.scope === "all" ? "все подразделения" : "моё подразделение"
@@ -153,7 +153,7 @@ export default function TeamScreen({
                   ))}
                 </ul>
                 {dashboard.data.attention.length > 8 && (
-                  <div className="mt-1 text-[11px] text-tg-hint">
+                  <div className="mt-1 text-xs text-tg-hint">
                     и ещё {dashboard.data.attention.length - 8}
                   </div>
                 )}
@@ -175,7 +175,7 @@ export default function TeamScreen({
             <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-tg-text">Сотрудники</h2>
-                <span className="text-[11px] tabular-nums text-tg-hint">
+                <span className="text-xs tabular-nums text-tg-hint">
                   {employees.length}
                   {needle ? ` из ${dashboard.data.employees.length}` : ""}
                 </span>
@@ -207,7 +207,7 @@ export default function TeamScreen({
                   {dashboard.data.activity.map((item, index) => (
                     <li
                       key={`${item.at}-${index}`}
-                      className="flex items-baseline justify-between gap-2 text-[11px]"
+                      className="flex items-baseline justify-between gap-2 text-xs"
                     >
                       <span className="min-w-0 truncate text-tg-text">
                         {item.display_name ? `${item.display_name}: ` : ""}
@@ -269,7 +269,7 @@ function Tile({
       <div className={`text-lg font-semibold tabular-nums ${danger ? "text-status-busy" : "text-tg-text"}`}>
         {value}
       </div>
-      <div className="text-[11px] text-tg-hint">{label}</div>
+      <div className="text-xs text-tg-hint">{label}</div>
     </div>
   );
 }
@@ -283,7 +283,7 @@ function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text">
           {row.name}
         </span>
-        <span className="text-[11px] tabular-nums text-tg-hint">
+        <span className="text-xs tabular-nums text-tg-hint">
           {row.started}/{row.employees}
         </span>
       </div>
@@ -293,7 +293,7 @@ function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-tg-hint">
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-tg-hint">
         <span>закрыто {row.done}</span>
         {row.overdue_tasks > 0 && (
           <span className="text-status-busy">просрочено {row.overdue_tasks}</span>
@@ -327,7 +327,7 @@ function EmployeeRow({ employee }: { employee: HrDashboardEmployee }) {
           name={employee.department_name}
           emoji={employee.department_emoji}
         />
-        <span className={`shrink-0 text-[10px] ${meta.className}`}>
+        <span className={`shrink-0 text-2xs ${meta.className}`}>
           <span aria-hidden>{meta.icon}</span> {meta.label}
         </span>
       </div>
@@ -338,11 +338,11 @@ function EmployeeRow({ employee }: { employee: HrDashboardEmployee }) {
             style={{ width: `${progress}%` }}
           />
         </div>
-        <span className="shrink-0 text-[10px] tabular-nums text-tg-hint">
+        <span className="shrink-0 text-2xs tabular-nums text-tg-hint">
           {employee.checklist_done}/{employee.checklist_total}
         </span>
         {employee.tasks_overdue > 0 && (
-          <span className="shrink-0 text-[10px] text-status-busy">
+          <span className="shrink-0 text-2xs text-status-busy">
             ⏰ {employee.tasks_overdue}
           </span>
         )}
@@ -377,7 +377,7 @@ function WorkHoursPanel() {
   });
 
   if (settings.isLoading || !settings.data) {
-    return <div className="mt-2 text-[11px] text-tg-hint">Загружаем…</div>;
+    return <div className="mt-2 text-xs text-tg-hint">Загружаем…</div>;
   }
 
   const data = settings.data;
@@ -387,7 +387,7 @@ function WorkHoursPanel() {
   return (
     <div className="mt-2 space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <label className="rounded-lg bg-tg-bg/50 p-2 text-[11px] text-tg-hint">
+        <label className="rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-hint">
           Открытие
           <input
             type="time"
@@ -396,7 +396,7 @@ function WorkHoursPanel() {
             className="mt-1 w-full bg-transparent text-sm text-tg-text outline-none"
           />
         </label>
-        <label className="rounded-lg bg-tg-bg/50 p-2 text-[11px] text-tg-hint">
+        <label className="rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-hint">
           Закрытие
           <input
             type="time"
@@ -415,7 +415,7 @@ function WorkHoursPanel() {
         Сохранить часы
       </button>
 
-      <label className="flex items-center justify-between rounded-lg bg-tg-bg/50 p-2 text-[11px] text-tg-text">
+      <label className="flex items-center justify-between rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-text">
         <span>Алерты только в рабочее время</span>
         <input
           type="checkbox"
@@ -428,7 +428,7 @@ function WorkHoursPanel() {
       </label>
 
       <div className="rounded-lg bg-tg-bg/50 p-2">
-        <label className="flex items-center justify-between text-[11px] text-tg-text">
+        <label className="flex items-center justify-between text-xs text-tg-text">
           <span>Вторая ступень: пинг админам</span>
           <input
             type="checkbox"
@@ -439,7 +439,7 @@ function WorkHoursPanel() {
             className="h-4 w-4"
           />
         </label>
-        <label className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-tg-hint">
+        <label className="mt-1.5 flex items-center justify-between gap-2 text-xs text-tg-hint">
           <span>Если руководитель молчит</span>
           <select
             value={data.escalation_second_hours}
@@ -459,7 +459,7 @@ function WorkHoursPanel() {
               ))}
           </select>
         </label>
-        <label className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-tg-text">
+        <label className="mt-1.5 flex items-center justify-between gap-2 text-xs text-tg-text">
           <span>Напоминать в каждой смене</span>
           <input
             type="checkbox"
@@ -474,7 +474,7 @@ function WorkHoursPanel() {
       </div>
 
       <div className="rounded-lg bg-tg-bg/50 p-2">
-        <div className="text-[11px] text-tg-hint">
+        <div className="text-xs text-tg-hint">
           {data.muted_until
             ? `Мьют до ${formatDateTime(data.muted_until)}`
             : "Мьют выключен"}
@@ -491,7 +491,7 @@ function WorkHoursPanel() {
               type="button"
               disabled={mute.isPending}
               onClick={() => mute.mutate(option.hours)}
-              className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-[11px] text-tg-text disabled:opacity-50"
+              className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text disabled:opacity-50"
             >
               {option.label}
             </button>
@@ -501,14 +501,14 @@ function WorkHoursPanel() {
               type="button"
               disabled={mute.isPending}
               onClick={() => mute.mutate(0)}
-              className="min-h-8 rounded-full bg-status-busy/15 px-2.5 text-[11px] text-status-busy disabled:opacity-50"
+              className="min-h-8 rounded-full bg-status-busy/15 px-2.5 text-xs text-status-busy disabled:opacity-50"
             >
               Снять
             </button>
           )}
         </div>
       </div>
-      <p className="text-[10px] text-tg-hint">
+      <p className="text-2xs text-tg-hint">
         Ночью уведомления не уходят в чат, но копятся в приложении — утренний
         разбор не потеряется.
       </p>
@@ -569,10 +569,10 @@ function DangerZone() {
 
   return (
     <div className="mt-3 rounded-lg border border-status-busy/30 bg-status-busy/5 p-2">
-      <div className="text-[11px] font-medium text-status-busy">
+      <div className="text-xs font-medium text-status-busy">
         Опасная зона
       </div>
-      <p className="mt-0.5 text-[10px] text-tg-hint">
+      <p className="mt-0.5 text-2xs text-tg-hint">
         Убирает незакрытые поручения и открытые проблемы. Завершённые задачи,
         KPI и история сдач остаются; тестовый пул сбрасывается отдельно.
       </p>

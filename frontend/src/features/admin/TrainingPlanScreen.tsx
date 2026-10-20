@@ -84,7 +84,7 @@ export default function TrainingPlanScreen({ onBack }: { onBack: () => void }) {
       subtitle="Учебные и обычные смены, ставка сотрудника"
       onBack={onBack}
     >
-      <p className="text-[11px] text-tg-hint">
+      <p className="text-xs text-tg-hint">
         Учебные смены считаются по табелю: первые N отработанных смен. Больничный
         или пропуск учебную не съедает, перенесённая смена остаётся в счёте. Пока
         табель пуст, работает старый расчёт по дате найма. Любой день можно
@@ -180,16 +180,16 @@ function PlanCard({
               {plan.display_name}
             </span>
             {newcomer && (
-              <span className="rounded-full bg-tg-link/15 px-1.5 py-0.5 text-[10px] text-tg-link">
+              <span className="rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">
                 новичок
               </span>
             )}
           </div>
-          <div className="mt-0.5 truncate text-[11px] text-tg-hint">
+          <div className="mt-0.5 truncate text-xs text-tg-hint">
             {[plan.position, plan.department_name].filter(Boolean).join(" · ") ||
               "Без должности"}
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-tg-hint">
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-tg-hint">
             <span className="text-tg-text">{labels[plan.rate_type] ?? plan.rate_type}</span>
             <span>
               · учебных {trainingCount} из {plan.days.length}
@@ -204,7 +204,7 @@ function PlanCard({
       {open && (
         <div className="space-y-3 border-t border-tg-bg/50 px-3 py-3">
           <div>
-            <div className="text-[11px] font-medium text-tg-hint">Ставка</div>
+            <div className="text-xs font-medium text-tg-hint">Ставка</div>
             <div className="mt-1 flex gap-1.5">
               {(["full", "partial"] as HrRateType[]).map((rate) => (
                 <button
@@ -225,7 +225,7 @@ function PlanCard({
           </div>
 
           <div>
-            <div className="text-[11px] font-medium text-tg-hint">
+            <div className="text-xs font-medium text-tg-hint">
               Учебных смен по табелю
             </div>
             <div className="mt-1 flex items-center gap-2">
@@ -250,7 +250,7 @@ function PlanCard({
               >
                 +
               </button>
-              <span className="text-[10px] text-tg-hint">
+              <span className="text-2xs text-tg-hint">
                 {plan.has_shifts
                   ? "считаем отработанные смены"
                   : plan.hire_date
@@ -261,7 +261,7 @@ function PlanCard({
           </div>
 
           <div>
-            <div className="text-[11px] font-medium text-tg-hint">
+            <div className="text-xs font-medium text-tg-hint">
               Ближайшие две недели
             </div>
             <div className="mt-1 grid grid-cols-7 gap-1">
@@ -276,7 +276,7 @@ function PlanCard({
                       ? "Учебная смена — нажми, чтобы сделать обычной"
                       : "Обычная смена — нажми, чтобы сделать учебной"
                   }
-                  className={`relative min-h-11 rounded-lg px-1 py-1 text-center text-[10px] leading-tight transition-colors disabled:opacity-50 ${
+                  className={`relative min-h-11 rounded-lg px-1 py-1 text-center text-2xs leading-tight transition-colors disabled:opacity-50 ${
                     item.is_training
                       ? "bg-tg-link/20 text-tg-link"
                       : "bg-tg-bg/50 text-tg-hint"
@@ -285,13 +285,13 @@ function PlanCard({
                   <div className="uppercase">{weekday(item.day)}</div>
                   <div className="text-sm tabular-nums">{dayNumber(item.day)}</div>
                   {item.shift_status && (
-                    <div className="text-[9px] opacity-70">
+                    <div className="text-3xs opacity-70">
                       {SHIFT_CHAR[item.shift_status] ?? "·"}
                     </div>
                   )}
                   {item.explicit && (
                     <span
-                      className="absolute right-1 top-0.5 text-[9px]"
+                      className="absolute right-1 top-0.5 text-3xs"
                       aria-hidden
                     >
                       •
@@ -300,7 +300,7 @@ function PlanCard({
                 </button>
               ))}
             </div>
-            <div className="mt-1 text-[10px] text-tg-hint">
+            <div className="mt-1 text-2xs text-tg-hint">
               Синее — учебная смена, серое — обычная. Точка — день задан вручную,
               буква — статус в табеле (Р работа, П план, Б больничный, Н не пришёл,
               В выходной, О отпуск).
@@ -312,7 +312,7 @@ function PlanCard({
               {explicit.map((item) => (
                 <div
                   key={`rule-${item.day}`}
-                  className="flex items-center gap-2 text-[11px]"
+                  className="flex items-center gap-2 text-xs"
                 >
                   <span className="min-w-0 flex-1 text-tg-text">
                     {formatDate(item.day)} —{" "}
@@ -322,7 +322,7 @@ function PlanCard({
                     type="button"
                     disabled={busy}
                     onClick={() => onResetDay(item.day)}
-                    className="min-h-8 shrink-0 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-link disabled:opacity-50"
+                    className="min-h-8 shrink-0 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
                   >
                     Вернуть правило
                   </button>

@@ -41,7 +41,7 @@ export default function ProgressBar({
   return (
     <div className={["w-full", className].join(" ")}>
       {(label || hint) && (
-        <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px] text-tg-hint">
+        <div className="mb-1 flex items-baseline justify-between gap-2 text-xs text-tg-hint">
           <span className="min-w-0 truncate">{label}</span>
           <span className="shrink-0 tabular-nums">
             {hint ? `${hint} ` : ""}
@@ -96,7 +96,7 @@ export function InlineProgress({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="shrink-0 text-[11px] tabular-nums text-tg-hint">
+      <span className="shrink-0 text-xs tabular-nums text-tg-hint">
         {safeValue}/{total}
       </span>
     </div>

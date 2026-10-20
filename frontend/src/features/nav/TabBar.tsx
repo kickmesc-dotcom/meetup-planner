@@ -71,7 +71,7 @@ export default function TabBar({
               setTab(it.id);
             }}
             className={[
-              "relative flex-1 min-h-12 flex flex-col items-center justify-center py-2 text-[11px] transition-colors",
+              "relative flex-1 min-h-12 flex flex-col items-center justify-center py-2 text-xs transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
           >

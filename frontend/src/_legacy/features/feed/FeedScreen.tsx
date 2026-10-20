@@ -306,13 +306,13 @@ export default function FeedScreen({ meId }: { meId: number }) {
           }}
           className="flex w-full items-center gap-1.5 px-3 py-2 text-left active:bg-tg-secondary-bg/40"
         >
-          <span aria-hidden className="shrink-0 text-[11px] text-tg-hint">
+          <span aria-hidden className="shrink-0 text-xs text-tg-hint">
             ▾
           </span>
           <span className="shrink-0 text-xs font-medium">
             {scope === "mine" ? "Только мои" : "Все события"}
           </span>
-          <span className="min-w-0 flex-1 truncate text-[11px] text-tg-hint">
+          <span className="min-w-0 flex-1 truncate text-xs text-tg-hint">
             {controlsSummary}
           </span>
         </button>
@@ -411,7 +411,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
         {(pull > 0 || refreshing) && (
           <div
             data-testid="feed-pull-indicator"
-            className="flex items-center justify-center text-[11px] text-tg-hint"
+            className="flex items-center justify-center text-xs text-tg-hint"
             style={{ height: refreshing ? 24 : Math.max(0, pull) }}
           >
             {refreshing
@@ -529,7 +529,7 @@ function KindChip({
       type="button"
       onClick={onClick}
       className={[
-        "rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors",
+        "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
         active
           ? "bg-tg-link/15 text-tg-link ring-1 ring-tg-link/50"
           : "bg-tg-secondary-bg/70 text-tg-hint",
@@ -554,7 +554,7 @@ function CollapseButton({ onClick }: { open: boolean; onClick: () => void }) {
       aria-label="Свернуть управление лентой"
       aria-expanded={true}
       onClick={onClick}
-      className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-tg-secondary-bg/70 text-[11px] leading-none text-tg-hint transition-transform active:scale-95"
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-tg-secondary-bg/70 text-xs leading-none text-tg-hint transition-transform active:scale-95"
     >
       <span aria-hidden>▴</span>
     </button>
@@ -579,7 +579,7 @@ function TopToggle({
       onClick={onClick}
       aria-expanded={open}
       className={[
-        "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition-colors",
+        "inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
         active ? "bg-tg-link text-white" : "bg-tg-secondary-bg/70 text-tg-text",
       ].join(" ")}
     >
@@ -748,7 +748,7 @@ function FeedActions({
       {/* GHG11: действия червя доступны только его владельцу. */}
       {isWormOwner && (
         <div className="mt-2 rounded-xl bg-tg-bg/60 px-3 py-2">
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             🪱 Ты — червь-господин{ownerName ? ` (${ownerName})` : ""}. Передай власть:
           </div>
           <WormTransfer />
@@ -847,7 +847,7 @@ function TargetRadio({
         onClick();
       }}
       className={[
-        "flex-1 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+        "flex-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
         active ? "bg-tg-link text-white" : "bg-tg-secondary-bg/80 text-tg-hint",
       ].join(" ")}
     >
@@ -862,7 +862,7 @@ function ActionChip({ onClick, label }: { onClick: () => void; label: string }) 
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg bg-tg-secondary-bg/80 px-2.5 py-1.5 text-[11px] font-medium text-tg-text active:scale-[0.97]"
+      className="rounded-lg bg-tg-secondary-bg/80 px-2.5 py-1.5 text-xs font-medium text-tg-text active:scale-[0.97]"
     >
       {label}
     </button>
@@ -1143,7 +1143,7 @@ export function FeedRow({
           data-testid="feed-swipe-hide"
           aria-label="Скрыть запись из ленты"
           disabled={hide.isPending}
-          onClick={() => hide.mutate()}            className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-tg-secondary-bg text-[10px] font-medium text-tg-text disabled:opacity-50"
+          onClick={() => hide.mutate()}            className="flex w-[52px] flex-col items-center justify-center gap-0.5 bg-tg-secondary-bg text-2xs font-medium text-tg-text disabled:opacity-50"
         >
           <span aria-hidden className="text-base leading-none">
             ➖
@@ -1157,10 +1157,10 @@ export function FeedRow({
             aria-label="Удалить запись из ленты для всех (админ)"
             disabled={remove.isPending}
             onClick={() => remove.mutate()}
-            className="flex w-[68px] flex-col items-center justify-center gap-0.5 bg-status-busy px-0.5 text-center text-[10px] font-medium leading-tight text-white disabled:opacity-50"
+            className="flex w-[68px] flex-col items-center justify-center gap-0.5 bg-status-busy px-0.5 text-center text-2xs font-medium leading-tight text-white disabled:opacity-50"
           >
             Удалить
-            <span className="text-[9px] font-normal opacity-90">(админ)</span>
+            <span className="text-3xs font-normal opacity-90">(админ)</span>
           </button>
         )}
       </div>
@@ -1213,7 +1213,7 @@ export function FeedRow({
           )}
           {/* GHG11: плашки званий над головой — сегодня лох/чухан/червь. */}
           {(item.badges?.length ?? 0) > 0 && (
-            <span className="pointer-events-none absolute -right-1 -top-1 text-[11px] leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.35))]">
+            <span className="pointer-events-none absolute -right-1 -top-1 text-xs leading-none [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.35))]">
               {item.badges!.join("")}
             </span>
           )}
@@ -1239,7 +1239,7 @@ export function FeedRow({
               <span
                 data-testid="feed-task-badge"
                 className={[
-                  "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] leading-none",
+                  "shrink-0 rounded-full px-1.5 py-0.5 text-2xs leading-none",
                   visual.badgeClass,
                 ].join(" ")}
               >
@@ -1306,7 +1306,7 @@ export function FeedRow({
               }}
               className={[
                 "mt-1 inline-flex w-fit items-center gap-1.5 rounded-md px-1.5 py-0.5",
-                "text-[11px] font-medium leading-tight tabular-nums text-tg-hint",
+                "text-xs font-medium leading-tight tabular-nums text-tg-hint",
                 visual.countBg,
                 expandable ? "active:scale-[0.98]" : "",
               ].join(" ")}
@@ -1355,7 +1355,7 @@ export function FeedRow({
           {compact &&
             item.kind === "music_game" &&
             typeof item.detail?.track_likes === "number" && (
-              <div className="mt-1 text-[11px] text-tg-hint">
+              <div className="mt-1 text-xs text-tg-hint">
                 ❤️ Лайков у трека: {item.detail.track_likes}
               </div>
             )}
@@ -1368,7 +1368,7 @@ export function FeedRow({
                 setPlayId(null);
                 setOpen(true);
               }}
-              className="mt-1 rounded-lg bg-tg-secondary-bg/80 px-2 py-1 text-[11px] font-medium text-tg-text"
+              className="mt-1 rounded-lg bg-tg-secondary-bg/80 px-2 py-1 text-xs font-medium text-tg-text"
             >
               {item.kind === "music" ? "🎧 Слушать и лайкать" : "🎙 Подробности и прослушать"}
             </button>
@@ -1542,12 +1542,12 @@ export function FeedDetailPanel({
               {d.description}
             </div>
           )}
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {item.user_name ? `${item.user_name} получил: ` : "Получено: "}
             {formatFull(item.at)}
           </div>
           {typeof d.points === "number" && (
-            <div className="text-[11px] text-tg-hint">Награда: +{d.points} XP</div>
+            <div className="text-xs text-tg-hint">Награда: +{d.points} XP</div>
           )}
         </>
       )}
@@ -1565,14 +1565,14 @@ export function FeedDetailPanel({
               />
             </div>
           )}
-          <div className="text-[11px] text-tg-hint">Открыто: {formatFull(d.opened_at)}</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">Открыто: {formatFull(d.opened_at)}</div>
+          <div className="text-xs text-tg-hint">
             {d.closed
               ? `Закрыто: ${formatFull(d.closed_at)}`
               : `Идёт приём до: ${formatFull(d.expires_at)}`}
           </div>
           {typeof d.reward === "number" && (
-            <div className="text-[11px] text-tg-hint">Награда: +{d.reward} XP</div>
+            <div className="text-xs text-tg-hint">Награда: +{d.reward} XP</div>
           )}
           {/* GHG11(8): участие прямо у задания — запись или отказ от своей. */}
           {!d.closed && taskId !== null && <VoiceTaskAction taskId={taskId} />}
@@ -1589,7 +1589,7 @@ export function FeedDetailPanel({
               ))}
             </div>
           ) : (
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               Никто не отправил свой вариант.
             </div>
           )}
@@ -1606,7 +1606,7 @@ export function FeedDetailPanel({
 
       {item.kind === "music_game" && (
         <>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {d.closed ? `Раунд закрыт: ${formatFull(d.closed_at)}` : "Голосование ещё идёт"}
           </div>
           {/* GHG11(4): кто получил опыт — автор трека и угадавшие. */}
@@ -1615,7 +1615,7 @@ export function FeedDetailPanel({
               {d.participants!.map((p, i) => (
                 <span
                   key={p.user_id ?? i}
-                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-[11px] text-tg-hint"
+                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-xs text-tg-hint"
                 >
                   {p.role === "author" ? "🎼 " : "🎯 "}
                   {p.user_name ?? "участник"}
@@ -1625,13 +1625,13 @@ export function FeedDetailPanel({
             </div>
           )}
           {typeof d.track_likes === "number" && (
-            <div className="text-[11px] text-tg-hint">❤️ Лайков у трека: {d.track_likes}</div>
+            <div className="text-xs text-tg-hint">❤️ Лайков у трека: {d.track_likes}</div>
           )}
         </>
       )}
 
       {(item.kind === "loser" || item.kind === "chukhan") && (
-        <div className="text-[11px] text-tg-hint">
+        <div className="text-xs text-tg-hint">
           Когда: {formatFull(item.at)}
           {item.kind === "chukhan" && d.week_start
             ? ` · неделя с ${formatDate(d.week_start)}`
@@ -1708,7 +1708,7 @@ export function ParticipantsStrip({
             {badge && (
               <span
                 data-testid="participant-badge"
-                className="absolute -bottom-1 -right-1 z-10 rounded-full bg-status-free px-1 text-[9px] font-bold leading-tight text-white shadow-sm ring-1 ring-tg-bg"
+                className="absolute -bottom-1 -right-1 z-10 rounded-full bg-status-free px-1 text-3xs font-bold leading-tight text-white shadow-sm ring-1 ring-tg-bg"
               >
                 {badge}
               </span>
@@ -1793,7 +1793,7 @@ function SubmissionPlayer({
       <span className="min-w-0 flex-1 truncate text-sm">
         {submission.user_name ?? "участник"}
         {typeof xp === "number" && xp > 0 && (
-          <span className="ml-1.5 text-[11px] font-medium text-status-free">
+          <span className="ml-1.5 text-xs font-medium text-status-free">
             +{xp} XP
           </span>
         )}
@@ -1826,7 +1826,7 @@ function SubmissionPlayer({
 function MusicDetail({ d }: { d: FeedDetail }) {
   const tracks = d.tracks ?? [];
   if (tracks.length === 0) {
-    return <div className="text-[11px] text-tg-hint">Треков нет.</div>;
+    return <div className="text-xs text-tg-hint">Треков нет.</div>;
   }
   // GHG11(8): подборка — это только список. Играет ОДИН плеер приложения
   // (`GlobalPlayer`), поэтому музыка не рвётся при смене вкладки, а очередь —
@@ -1870,7 +1870,7 @@ function MusicTrackRow({
           {track.title || track.performer || "трек"}
         </div>
         {track.performer && track.title && (
-          <div className="truncate text-[11px] text-tg-hint">{track.performer}</div>
+          <div className="truncate text-xs text-tg-hint">{track.performer}</div>
         )}
       </div>
       {track.kind === "audio" ? (

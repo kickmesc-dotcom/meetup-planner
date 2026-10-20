@@ -90,7 +90,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
   return (
     <div className="mx-auto flex h-full w-full max-w-[560px] flex-col bg-tg-bg">
       <header className="flex items-center justify-between px-5 pb-2 pt-4">
-        <span className="text-[11px] text-tg-hint">
+        <span className="text-xs text-tg-hint">
           {step < 3 ? `Шаг ${step + 1} из 3` : "Знакомство"}
         </span>
         <ThemeSwitcher />
@@ -251,7 +251,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                 >
                   Я уже запомнил
                 </button>
-                <p className="pb-2 text-center text-[11px] text-tg-hint">
+                <p className="pb-2 text-center text-xs text-tg-hint">
                   Обязательные чек-листы и задачи это не отменяет.
                 </p>
               </div>

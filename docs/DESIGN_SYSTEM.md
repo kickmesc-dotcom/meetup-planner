@@ -50,7 +50,7 @@ theme-dependent — they must read identically in light and dark.
 | `--status-busy-pill` | `#b91c1c` | pill background |
 
 `*-fill` values are for large tinted areas with no text. `*-pill` values are the
-darkened shades that carry white text at 11px (≥ 4.5:1 WCAG AA, see §6).
+darkened shades that carry white text at 12px (≥ 4.5:1 WCAG AA, see §6).
 Accessors: `statusColor()` (fill), `statusPillBg()` (pill) in
 `src/features/calendar/dateUtils.ts`.
 
@@ -132,9 +132,21 @@ title headings only (the "stamped" register).
 | `text-base` | 16px | 1.4 | screen titles, card titles |
 | `text-lg` | 18px | 1.3 | hero name, stat values |
 
-**Rules:** minimum 10px anywhere; 9px is banned. Do not introduce sizes 1px apart —
-use the scale. Weights: 400 body, 500 medium (buttons, values), 600 semibold (titles).
-Uppercase + `tracking-wide` only for section-group labels (always `text-2xs text-tg-hint`).
+**Rules:** minimum 10px anywhere; 8px and 9px are banned. Do not introduce sizes 1px
+apart — use the scale. Weights: 400 body, 500 medium (buttons, values), 600 semibold
+(titles). Uppercase + `tracking-wide` only for section-group labels (always
+`text-2xs text-tg-hint`).
+
+**`text-2xs` (11px) is a meta token, not body text.** It is allowed for timestamps,
+counters, chip/badge text, avatar initials (with `text-3xs`) and day/weekday headers.
+Descriptions, action captions and anything the user has to *read* start at `text-xs`
+(12px). Before the 2026-10-20 typography pass, `text-[11px]` appeared 327 times and
+`text-[10px]` 86 times, which read as "unfinished" on a phone (VISUAL_AUDIT P1.5).
+
+**Arbitrary sizes are banned.** `text-[11px]`, `text-[9px]` and friends are not
+allowed at all — the scale tokens are the only source of type sizes.
+`src/styles.typeScale.test.ts` scans `src/**` and fails on any `text-[Npx]`, so a new
+size cannot sneak back in.
 
 ---
 

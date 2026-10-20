@@ -29,11 +29,11 @@ export default function AchievementsCard() {
         <h2 className="text-sm font-semibold text-tg-text">
           🏅 Личный прогресс
         </h2>
-        <span className="text-[11px] text-tg-hint">
+        <span className="text-xs text-tg-hint">
           {awarded.length ? `${awarded.length} шт.` : "пока пусто"}
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-tg-hint">
+      <p className="mt-1 text-xs text-tg-hint">
         Счётчик для себя: он растёт от закрытых поручений и отработанных смен.
         Гостям и коллегам блок пока не виден.
       </p>
@@ -43,7 +43,7 @@ export default function AchievementsCard() {
           {awarded.map((a) => (
             <li
               key={a.code}
-              className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-1 text-[11px] text-tg-text"
+              className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
             >
               <span aria-hidden>{a.emoji}</span>
               <span className="truncate">{a.title}</span>
@@ -57,7 +57,7 @@ export default function AchievementsCard() {
           {goals.map((g) => (
             <div
               key={g.code}
-              className="flex items-center justify-between gap-2 text-[11px] text-tg-hint"
+              className="flex items-center justify-between gap-2 text-xs text-tg-hint"
             >
               <span className="truncate">
                 <span aria-hidden>{g.emoji}</span> {g.title}
@@ -71,7 +71,7 @@ export default function AchievementsCard() {
       )}
 
       {Object.keys(stats).length > 0 && (
-        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-[11px]">
+        <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-xs">
           <Stat label="поручений" value={stats.tasks_done ?? 0} />
           <Stat label="рабочих дней" value={stats.shift_days ?? 0} />
           <Stat label="пунктов" value={stats.checklist_items ?? 0} />

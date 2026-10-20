@@ -22,7 +22,7 @@ export default function DayHeader({ days }: Props) {
               today ? "text-tg-link font-semibold" : we ? "text-status-busy/70" : "text-tg-text",
             ].join(" ")}
           >
-            <div className="text-[10px] uppercase tracking-wide text-tg-hint">
+            <div className="text-2xs uppercase tracking-wide text-tg-hint">
               {format(d, "EEEEEE", { locale: ru })}
             </div>
             <div className="text-sm leading-none">{format(d, "d")}</div>

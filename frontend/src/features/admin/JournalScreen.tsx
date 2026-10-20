@@ -59,7 +59,7 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
 
       {groups.map((group) => (
         <section key={group.label} className="space-y-2">
-          <h2 className="text-[11px] font-medium uppercase tracking-wide text-tg-hint">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-tg-hint">
             {group.label}
           </h2>
           <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
@@ -116,7 +116,7 @@ function JournalRow({
             {item.text}
             {item.task_title ? ` «${item.task_title}»` : ""}
           </div>
-          <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11px] text-tg-hint">
+          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
             <span>{formatMoment(item.at)}</span>
             {item.is_system && <span>· автоматически</span>}
           </div>
@@ -129,7 +129,7 @@ function JournalRow({
               haptic("selection");
               onForce();
             }}
-            className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-[11px] text-tg-link disabled:opacity-50"
+            className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
           >
             Зачесть
           </button>

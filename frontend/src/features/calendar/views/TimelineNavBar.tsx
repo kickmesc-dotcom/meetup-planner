@@ -90,7 +90,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
                 type="button"
                 onClick={() => onPreset(p.z)}
                 className={[
-                  "min-h-11 rounded-md text-[12px] font-medium px-1 py-1 active:scale-[0.97] transition-transform",
+                  "min-h-11 rounded-md text-xs font-medium px-1 py-1 active:scale-[0.97] transition-transform",
                   active
                     ? "bg-tg-button text-tg-button-text shadow-sm"
                     : "bg-tg-secondary-bg text-tg-text",
@@ -115,7 +115,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
           Год/Все года он бесполезен — там cellWidth не используется. */}
       {isTimelineMode && (
         <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-tg-hint min-w-6 text-right tabular-nums">
+          <span className="text-2xs text-tg-hint min-w-6 text-right tabular-nums">
             {Math.round(cellWidth ?? 56)}px
           </span>
           <input
@@ -137,7 +137,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
               haptic("selection");
               setCellWidth(null);
             }}
-            className="text-[10px] text-tg-link active:opacity-70"
+            className="text-2xs text-tg-link active:opacity-70"
             title="Авто-ширина по контейнеру"
           >
             авто

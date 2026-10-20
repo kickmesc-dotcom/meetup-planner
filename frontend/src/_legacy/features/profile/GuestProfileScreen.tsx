@@ -203,7 +203,7 @@ function MainPlaque({ p }: { p: GuestProfile }) {
               style={{ width: `${total > 0 ? Math.min(100, (p.xp_into_level * 100) / total) : 0}%` }}
             />
           </div>
-          <div className="mt-1 flex items-center justify-between text-[11px] text-tg-hint">
+          <div className="mt-1 flex items-center justify-between text-xs text-tg-hint">
             <span className="tabular-nums">
               {p.xp_into_level}/{total} XP
             </span>
@@ -249,9 +249,9 @@ function StateRow({
     <div className="flex items-start gap-2 rounded-lg bg-tg-bg/40 px-2 py-1.5">
       <span className="shrink-0 text-sm leading-tight">{icon}</span>
       <div className="min-w-0 flex-1">
-        <div className="text-[11px] font-semibold text-tg-text">{label}</div>
+        <div className="text-xs font-semibold text-tg-text">{label}</div>
         {reason && (
-          <div className="text-[11px] italic leading-snug text-tg-hint [word-break:break-word]">
+          <div className="text-xs italic leading-snug text-tg-hint [word-break:break-word]">
             «{reason}»
           </div>
         )}
@@ -332,7 +332,7 @@ function AchievementsBlock({
             style={{ width: `${Math.min(100, p.achievements_percent)}%` }}
           />
         </div>
-        <div className="mt-1 text-[11px] text-tg-hint">
+        <div className="mt-1 text-xs text-tg-hint">
           {p.achievements_collected}/{p.achievements_total} ачивок
           {myPercent != null &&
             ` · у тебя ${myPercent}% — ${
@@ -343,7 +343,7 @@ function AchievementsBlock({
                   : "наравне"
             }`}
         </div>
-        <div className="mt-1 text-[10px] text-tg-hint">
+        <div className="mt-1 text-2xs text-tg-hint">
           {open
             ? "Свернуть список"
             : "Разверни — посмотреть, какие именно, и сравнить со своими"}
@@ -408,7 +408,7 @@ function CollapsibleHistory({
         className="flex w-full items-center gap-2 p-3 text-left"
       >
         <span className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</span>
-        <span className="shrink-0 text-[11px] tabular-nums text-tg-hint">
+        <span className="shrink-0 text-xs tabular-nums text-tg-hint">
           {events.length} шт.
         </span>
         <span className="shrink-0 text-tg-hint">{open ? "▾" : "▸"}</span>
@@ -476,7 +476,7 @@ function MuteFeedSwitch({
     >
       <div
         title={name}
-        className="min-w-0 truncate text-[10px] leading-tight text-tg-hint/80"
+        className="min-w-0 truncate text-2xs leading-tight text-tg-hint/80"
       >
         🙈 Не показывать события участника в моей ленте
       </div>
@@ -514,14 +514,14 @@ function RecentActivity({ recent }: { recent: GuestRecent[] }) {
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-sm leading-tight">{r.icon}</span>
               <div className="min-w-0 flex-1">
-                <div className="text-[10px] text-tg-hint">{r.label}</div>
+                <div className="text-2xs text-tg-hint">{r.label}</div>
                 {r.text && (
                   <div className="text-xs text-tg-text [word-break:break-word]">
                     {r.text}
                   </div>
                 )}
                 {r.at && (
-                  <div className="text-[10px] tabular-nums text-tg-hint">
+                  <div className="text-2xs tabular-nums text-tg-hint">
                     {formatDateTime(r.at)}
                   </div>
                 )}
@@ -641,17 +641,17 @@ function GuestAchievementRow({
         <span className="w-5 shrink-0 text-center text-sm">{a.icon}</span>
         <span className="min-w-0 flex-1 truncate">{a.title}</span>
         <span
-          className="shrink-0 text-[10px]"
+          className="shrink-0 text-2xs"
           title={mine ? "Такая ачивка есть и у тебя" : "У тебя её ещё нет"}
         >
           {mine ? "✓" : "·"}
         </span>
         {when && (
           <span className="shrink-0 text-right leading-tight">
-            <span className="block text-[10px] tabular-nums text-tg-hint">
+            <span className="block text-2xs tabular-nums text-tg-hint">
               {when.date}
             </span>
-            <span className="block text-[10px] tabular-nums text-tg-hint opacity-70">
+            <span className="block text-2xs tabular-nums text-tg-hint opacity-70">
               {when.time}
             </span>
           </span>
@@ -659,7 +659,7 @@ function GuestAchievementRow({
         <span className="shrink-0 text-tg-hint">{open ? "▾" : "▸"}</span>
       </div>
       {open && (
-        <div className="mt-1 space-y-0.5 pl-7 text-[11px] text-tg-hint">
+        <div className="mt-1 space-y-0.5 pl-7 text-xs text-tg-hint">
           {a.description && <div>За что: {a.description}</div>}
           {when && (
             <div>
@@ -733,9 +733,9 @@ function Stat({
 }) {
   return (
     <div className="rounded-xl bg-tg-secondary-bg/60 px-3 py-2">
-      <div className="text-[10px] text-tg-hint">{label}</div>
+      <div className="text-2xs text-tg-hint">{label}</div>
       <div className="text-sm font-semibold tabular-nums text-tg-text">{value}</div>
-      {hint && <div className="mt-0.5 text-[10px] leading-tight text-tg-hint">{hint}</div>}
+      {hint && <div className="mt-0.5 text-2xs leading-tight text-tg-hint">{hint}</div>}
     </div>
   );
 }

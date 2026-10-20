@@ -59,7 +59,7 @@ function SourceModeSwitch() {
 
   return (
     <div className="mb-2 rounded-lg bg-tg-bg/40 p-2">
-      <div className="text-[11px] text-tg-hint">
+      <div className="text-xs text-tg-hint">
         Что бот шлёт из пулов фраз — глобально для всех пулов сразу:
       </div>
       <div className="mt-1 flex flex-wrap gap-1">

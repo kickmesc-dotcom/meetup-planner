@@ -115,7 +115,7 @@ export default function MaterialsScreen() {
 
             {active && (
               <>
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-tg-hint">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-tg-hint">
                   <span>
                     Обновлено: {active.synced_at ? fmtStamp(active.synced_at) : "ещё ни разу"}
                   </span>
@@ -125,7 +125,7 @@ export default function MaterialsScreen() {
                       type="button"
                       disabled={refresh.isPending}
                       onClick={() => refresh.mutate(active.id)}
-                      className="ml-auto min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-[11px] text-tg-text disabled:opacity-50"
+                      className="ml-auto min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text disabled:opacity-50"
                     >
                       {refresh.isPending ? "Обновляю…" : "⟳ Обновить"}
                     </button>
@@ -133,14 +133,14 @@ export default function MaterialsScreen() {
                   <button
                     type="button"
                     onClick={() => openExternal(active.url)}
-                    className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-[11px] text-tg-text"
+                    className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
                   >
                     Открыть таблицу
                   </button>
                 </div>
 
                 {active.sync_error && (
-                  <div className="rounded-lg bg-status-busy/10 p-2.5 text-[11px] text-status-busy">
+                  <div className="rounded-lg bg-status-busy/10 p-2.5 text-xs text-status-busy">
                     Не удалось обновить ({humanizeSheetError(active.sync_error)}).
                     Показываем последнюю рабочую версию.
                   </div>
@@ -183,7 +183,7 @@ function SheetTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-tg-secondary-bg">
-      <table className="min-w-full border-collapse text-[11px]">
+      <table className="min-w-full border-collapse text-xs">
         <caption className="sr-only">Таблица материалов смены</caption>
         {header && (
           <thead>

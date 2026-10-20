@@ -89,7 +89,7 @@ export default function KpiScreen({ onBack }: Props) {
       {rules && (
         <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
           <div className="text-sm font-semibold text-tg-text">Сколько стоит работа</div>
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             Веса действуют сразу: опыт пересчитывается из уже записанных смен и
             поручений, передеплой не нужен.
           </div>
@@ -100,7 +100,7 @@ export default function KpiScreen({ onBack }: Props) {
             >
               <span className="min-w-0">
                 <span className="block text-xs text-tg-text">{field.label}</span>
-                <span className="block text-[10px] text-tg-hint">{field.hint}</span>
+                <span className="block text-2xs text-tg-hint">{field.hint}</span>
               </span>
               <input
                 type="number"
@@ -120,7 +120,7 @@ export default function KpiScreen({ onBack }: Props) {
             </label>
           ))}
           {mut.isPending && (
-            <div className="text-[11px] text-tg-hint">Сохраняем…</div>
+            <div className="text-xs text-tg-hint">Сохраняем…</div>
           )}
         </section>
       )}
@@ -128,11 +128,11 @@ export default function KpiScreen({ onBack }: Props) {
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="text-sm font-semibold text-tg-text">Неделя</div>
         {q.data && (
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             {q.data.week_start} — {q.data.week_end} · пн–вс
           </div>
         )}
-        <div className="rounded-lg bg-tg-bg/50 p-2 text-[11px]">
+        <div className="rounded-lg bg-tg-bg/50 p-2 text-xs">
           {winner ? (
             <>
               <div className="text-tg-hint">Сотрудник недели</div>
@@ -151,7 +151,7 @@ export default function KpiScreen({ onBack }: Props) {
         </div>
 
         {board.length === 0 && !q.isLoading ? (
-          <div className="text-[11px] text-tg-hint">
+          <div className="text-xs text-tg-hint">
             За эту неделю ещё нет закрытых смен и поручений.
           </div>
         ) : (
@@ -175,7 +175,7 @@ export default function KpiScreen({ onBack }: Props) {
             ))}
           </ul>
         )}
-        <div className="text-[10px] text-tg-hint">
+        <div className="text-2xs text-tg-hint">
           Тестовый пул `[BOT]` в рейтинг не попадает: звание — для живых людей.
         </div>
       </section>

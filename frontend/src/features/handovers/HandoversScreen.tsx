@@ -243,14 +243,14 @@ function HandoverCard({
           <div className="text-sm font-semibold text-tg-text">
             {handover.from_name ?? "—"} → {handover.to_name ?? "—"}
           </div>
-          <div className="mt-0.5 text-[11px] text-tg-hint">
+          <div className="mt-0.5 text-xs text-tg-hint">
             смена {handover.shift_date} · {fmtMoment(handover.created_at)}
             {handover.department_name ? ` · ${handover.department_name}` : ""}
           </div>
         </div>
         <span
           className={[
-            "shrink-0 rounded-full px-2 py-0.5 text-[11px]",
+            "shrink-0 rounded-full px-2 py-0.5 text-xs",
             STATUS_CLASS[handover.status],
           ].join(" ")}
         >
@@ -264,7 +264,7 @@ function HandoverCard({
           haptic("light");
           setExpanded((v) => !v);
         }}
-        className="mt-2 min-h-8 rounded-lg bg-tg-bg/50 px-2.5 text-[11px] text-tg-hint"
+        className="mt-2 min-h-8 rounded-lg bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
       >
         {handover.items_count > 0
           ? `Открытых пунктов: ${handover.items_count} ${expanded ? "▴" : "▾"}`
@@ -273,7 +273,7 @@ function HandoverCard({
 
       {expanded && (
         <div className="mt-2 space-y-1.5">
-          {detailQ.isLoading && <div className="text-[11px] text-tg-hint">Загружаю…</div>}
+          {detailQ.isLoading && <div className="text-xs text-tg-hint">Загружаю…</div>}
           {card.items.map((item) => (
             <div
               key={`${item.kind}-${item.ref_id ?? item.id}-${item.id}`}
@@ -283,14 +283,14 @@ function HandoverCard({
                 <span aria-hidden>{itemLabel(item)} </span>
                 {item.title}
               </div>
-              <div className="mt-0.5 text-[11px] text-tg-hint">
+              <div className="mt-0.5 text-xs text-tg-hint">
                 {item.status}
                 {item.meta ? ` · ${item.meta}` : ""}
               </div>
             </div>
           ))}
           {!detailQ.isLoading && card.items.length === 0 && (
-            <div className="text-[11px] text-tg-hint">
+            <div className="text-xs text-tg-hint">
               На момент сдачи открытых пунктов не было.
             </div>
           )}
@@ -308,7 +308,7 @@ function HandoverCard({
         </p>
       )}
       {handover.accepted_at && (
-        <div className="mt-1 text-[11px] text-tg-hint">
+        <div className="mt-1 text-xs text-tg-hint">
           Принял(а): {handover.accepted_by_name ?? handover.to_name} ·{" "}
           {fmtMoment(handover.accepted_at)}
         </div>
@@ -395,7 +395,7 @@ function CreateHandoverSheet({
 
   return (
     <BottomSheet title="Сдать смену" onClose={onClose}>
-      <div className="text-[11px] text-tg-hint">Кому передаёшь</div>
+      <div className="text-xs text-tg-hint">Кому передаёшь</div>
       {colleaguesQ.isLoading && (
         <div className="mt-1 text-xs text-tg-hint">Загружаю коллег…</div>
       )}
@@ -425,7 +425,7 @@ function CreateHandoverSheet({
         ))}
       </div>
 
-      <div className="mt-3 text-[11px] text-tg-hint">
+      <div className="mt-3 text-xs text-tg-hint">
         Что уйдёт в сдачу
         {previewQ.data
           ? ` — поручений ${previewQ.data.tasks}, проблем ${previewQ.data.issues}`
@@ -444,7 +444,7 @@ function CreateHandoverSheet({
               <span aria-hidden>{itemLabel(item)} </span>
               {item.title}
             </div>
-            <div className="mt-0.5 text-[11px] text-tg-hint">
+            <div className="mt-0.5 text-xs text-tg-hint">
               {item.status}
               {item.meta ? ` · ${item.meta}` : ""}
             </div>
@@ -457,7 +457,7 @@ function CreateHandoverSheet({
         )}
       </div>
 
-      <label className="mt-3 block text-[11px] text-tg-hint">
+      <label className="mt-3 block text-xs text-tg-hint">
         Заметка следующему (необязательно)
         <textarea
           value={note}
@@ -477,7 +477,7 @@ function CreateHandoverSheet({
       >
         {m.isPending ? "Передаю…" : "Передать смену"}
       </button>
-      <p className="mt-2 text-center text-[11px] text-tg-hint">
+      <p className="mt-2 text-center text-xs text-tg-hint">
         Принимающий получит уведомление и подтвердит приём — или вернёт с
         причиной. Снимок открытых пунктов сохранится в истории.
       </p>
