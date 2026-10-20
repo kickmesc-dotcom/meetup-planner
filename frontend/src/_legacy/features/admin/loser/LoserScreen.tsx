@@ -20,7 +20,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { Toggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "@/features/admin/SubScreen";
-import PhrasePoolEditor from "@/features/admin/PhrasePoolEditor";
+import PhrasePoolEditor from "../PhrasePoolEditor";
 
 interface Props {
   users: User[];

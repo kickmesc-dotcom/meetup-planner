@@ -38,6 +38,7 @@ from app.api import (
     routes_shifts,
     routes_simulation,
     routes_standards,
+    routes_texts,
     routes_users,
 )
 from app.bot import webhook as bot_webhook
@@ -284,6 +285,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_media.router, prefix="/api")
     # Материалы смены: снимок Google Sheets из БД (устойчиво к блокировкам).
     app.include_router(routes_materials.router, prefix="/api")
+    # Тексты интерфейса: правятся из админки, читаются без токена (это подписи).
+    app.include_router(routes_texts.router, prefix="/api")
     # Журнал операционных проблем — отдельная сущность со своими правами.
     app.include_router(routes_issues.router, prefix="/api")
     # База стандартов и проверка знаний (сотрудник + наполнение АУП/админом).

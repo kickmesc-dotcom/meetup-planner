@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchEmployee } from "@/api/hr";
+import { useAppText } from "@/api/texts";
 import {
   fetchMaterials,
   refreshMaterial,
@@ -21,6 +22,10 @@ import { haptic, showAlert, WebApp } from "@/tg/webapp";
  */
 export default function MaterialsScreen() {
   const qc = useQueryClient();
+  const hint = useAppText(
+    "materials.hint",
+    "График, меню и методички. Показываем копию с сервера — Google открывать не нужно.",
+  );
   const materialsQ = useQuery({
     queryKey: ["hr-materials"],
     queryFn: fetchMaterials,
@@ -58,10 +63,7 @@ export default function MaterialsScreen() {
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <h1 className="text-lg font-semibold text-tg-text">Материалы смены</h1>
-        <p className="mt-1 text-xs text-tg-hint">
-          График, меню и методички. Показываем копию с сервера — Google открывать
-          не нужно.
-        </p>
+        <p className="mt-1 text-xs text-tg-hint">{hint}</p>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

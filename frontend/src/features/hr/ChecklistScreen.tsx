@@ -7,6 +7,7 @@ import {
   type HrChecklistItem,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
@@ -24,6 +25,7 @@ import { haptic, showAlert } from "@/tg/webapp";
  */
 export default function ChecklistScreen() {
   const qc = useQueryClient();
+  const emptyTitle = useAppText("checklist.empty.title", "Чек-лист не назначен");
   const [kind, setKind] = useState<ChecklistKind>("shift");
   const [noteFor, setNoteFor] = useState<number | null>(null);
 
@@ -100,7 +102,7 @@ export default function ChecklistScreen() {
               🗒
             </div>
             <div className="mt-2 text-sm font-medium text-tg-text">
-              Чек-лист не назначен
+              {emptyTitle}
             </div>
             <div className="mt-1 text-xs text-tg-hint">
               Попроси руководителя назначить шаблон{" "}

@@ -16,7 +16,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import SubScreen from "@/features/admin/SubScreen";
 import { Switch } from "@/components/Checkbox";
-import PhrasePoolEditor from "@/features/admin/PhrasePoolEditor";
+import PhrasePoolEditor from "./PhrasePoolEditor";
 import type { PhrasePool } from "@/api/admin";
 
 interface Props {

@@ -1,101 +1,69 @@
 import { ReactNode, useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  clearRandomPhrasesPool,
-  fetchRandomPhrasesPool,
-  triggerRandomPhrases,
-} from "@/api/admin";
+import { useQuery } from "@tanstack/react-query";
+import { fetchAdminTasks } from "@/api/hr";
+import { fetchIssues } from "@/api/issues";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
-import ScheduledPublicationsScreen from "./ScheduledPublicationsScreen";
-import RandomPhrasesScreen from "./RandomPhrasesScreen";
-import BotReactionsScreen from "./BotReactionsScreen";
-import MediaReactionsScreen from "./MediaReactionsScreen";
-import AdviceScreen from "./AdviceScreen";
-import PhrasesSnapshotScreen from "./PhrasesSnapshotScreen";
-import PostingAlertsScreen from "./PostingAlertsScreen";
-import { fetchPostingAlerts } from "@/api/admin";
-import HistoryScreen from "./HistoryScreen";
+import AttentionScreen from "./AttentionScreen";
+import AppTextsScreen from "./AppTextsScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
+import EmployeesScreen from "./EmployeesScreen";
 import FeedSettingsScreen from "./FeedSettingsScreen";
+import IntervalsScreen from "./IntervalsScreen";
+import JobsQueueScreen from "./JobsQueueScreen";
+import JournalScreen from "./JournalScreen";
+import KpiScreen from "./KpiScreen";
+import NotificationsScreen from "./NotificationsScreen";
 import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
-import GamesScreen from "./GamesScreen";
-import ZaebalSettingsScreen from "./ZaebalSettingsScreen";
-import IntervalsScreen from "./IntervalsScreen";
-import BotPauseBar from "./BotPauseBar";
-import JobsQueueScreen from "./JobsQueueScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
-import GameScreen from "./GameScreen";
-import AllFeaturesScreen from "./AllFeaturesScreen";
-import DeliveryScreen from "./DeliveryScreen";
-import KpiScreen from "./KpiScreen";
-import JournalScreen from "./JournalScreen";
-import NotificationsScreen from "./NotificationsScreen";
-import EmployeesScreen from "./EmployeesScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
 import { useUI } from "@/store/ui";
 
+/**
+ * Админка управляющего. Здесь только рабочие вещи: люди, смена, контроль,
+ * календарь и системные экраны. Наследные шуточные разделы (лох/чухан/игры/
+ * реакции/рандомные фразы/пауза) удалены вместе с модулями — их больше нет ни
+ * в API, ни в боте.
+ */
 type Section =
   | "root"
-  | "scheduled-pubs"
-  | "rp"
-  | "bot-reactions"
-  | "media-reactions"
-  | "advice"
-  | "phrases-snapshot"
-  | "posting-alerts"
-  | "history"
-  | "birthdays"
-  | "calendar-settings"
-  | "feed-settings"
-  | "poll-presets"
-  | "proxy"
-  | "games"
-  | "zaebal"
-  | "intervals"
-  | "jobs"
-  | "game"
-  | "all-features"
-  | "delivery"
-  | "kpi"
+  | "attention"
+  | "admin-tasks"
   | "journal"
   | "notifications"
   | "employees"
   | "training-plan"
-  | "admin-tasks"
+  | "feed-settings"
+  | "kpi"
+  | "calendar-settings"
+  | "birthdays"
+  | "poll-presets"
+  | "texts"
+  | "intervals"
+  | "proxy"
+  | "jobs"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
 const VALID_SECTIONS: Section[] = [
-  "scheduled-pubs",
-  "rp",
-  "bot-reactions",
-  "media-reactions",
-  "advice",
-  "phrases-snapshot",
-  "posting-alerts",
-  "history",
-  "birthdays",
-  "calendar-settings",
-  "feed-settings",
-  "poll-presets",
-  "proxy",
-  "games",
-  "zaebal",
-  "intervals",
-  "jobs",
-  "game",
-  "all-features",
-  "delivery",
-  "kpi",
+  "attention",
+  "admin-tasks",
   "journal",
   "notifications",
   "employees",
   "training-plan",
-  "admin-tasks",
+  "feed-settings",
+  "kpi",
+  "calendar-settings",
+  "birthdays",
+  "poll-presets",
+  "texts",
+  "intervals",
+  "proxy",
+  "jobs",
   "space-restart",
 ];
 
@@ -104,8 +72,8 @@ interface Props {
 }
 
 export default function AdminScreen({ users }: Props) {
+  void users;
   const [section, setSection] = useState<Section>("root");
-  const [poolOpen, setPoolOpen] = useState(false);
 
   // GHG11(4): переход из анонса фичи — сразу открыть нужный подраздел.
   const pendingAdminSection = useUI((s) => s.pendingAdminSection);
@@ -118,69 +86,44 @@ export default function AdminScreen({ users }: Props) {
     setPendingAdminSection(null);
   }, [pendingAdminSection, setPendingAdminSection]);
 
-  const runPhrases = useMutation({
-    mutationFn: triggerRandomPhrases,
-    onSuccess: () => haptic("success"),
-    onError: () => haptic("error"),
+  // Бейдж «требует внимания» — просроченные поручения + срочные проблемы.
+  const tasks = useQuery({
+    queryKey: ["admin", "tasks", "attention"],
+    queryFn: () => fetchAdminTasks(),
+    staleTime: 60_000,
   });
-
-  const pool = useQuery({
-    queryKey: ["admin", "rp-pool"],
-    queryFn: fetchRandomPhrasesPool,
-    enabled: poolOpen,
-    staleTime: 30_000,
+  const issues = useQuery({
+    queryKey: ["issues", "attention"],
+    queryFn: () => fetchIssues({ statuses: ["open", "in_progress"], limit: 50 }),
+    staleTime: 60_000,
   });
-
-  // GHG11: очистка пула фраз (был только просмотр).
-  const clearPool = useMutation({
-    mutationFn: () => clearRandomPhrasesPool(),
-    onSuccess: () => {
-      haptic("success");
-      void pool.refetch();
-    },
-    onError: () => haptic("error"),
-  });
-
-  // T3.3: счётчик пропущенных постов для бейджа на карточке (read-only, обычно 0).
-  const postingAlerts = useQuery({
-    queryKey: ["admin", "posting-alerts"],
-    queryFn: fetchPostingAlerts,
-    staleTime: 30_000,
-  });
+  const attentionCount =
+    (tasks.data ?? []).filter(
+      (t) => t.is_overdue && t.status !== "done" && t.status !== "failed",
+    ).length + (issues.data?.summary.attention ?? 0);
 
   const back = () => setSection("root");
 
-  if (section === "scheduled-pubs") return <ScheduledPublicationsScreen onBack={back} />;
-  if (section === "rp") return <RandomPhrasesScreen onBack={back} />;
-  if (section === "bot-reactions") return <BotReactionsScreen onBack={back} />;
-  if (section === "media-reactions") return <MediaReactionsScreen onBack={back} />;
-  if (section === "advice") return <AdviceScreen onBack={back} />;
-  if (section === "phrases-snapshot") return <PhrasesSnapshotScreen onBack={back} />;
-  if (section === "posting-alerts") return <PostingAlertsScreen onBack={back} />;
-  if (section === "history") return <HistoryScreen users={users} onBack={back} />;
-  if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
-  if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
+  if (section === "attention") {
+    return (
+      <AttentionScreen onBack={back} onOpenTasks={() => setSection("admin-tasks")} />
+    );
+  }
+  if (section === "admin-tasks") return <AdminTasksScreen onBack={back} />;
+  if (section === "journal") return <JournalScreen onBack={back} />;
+  if (section === "notifications") return <NotificationsScreen onBack={back} />;
+  if (section === "employees") return <EmployeesScreen onBack={back} />;
+  if (section === "training-plan") return <TrainingPlanScreen onBack={back} />;
   if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;
+  if (section === "kpi") return <KpiScreen onBack={back} />;
+  if (section === "calendar-settings") return <CalendarSettingsScreen onBack={back} />;
+  if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
-  if (section === "proxy") return <ProxyScreen onBack={back} />;
-  if (section === "games") return <GamesScreen onBack={back} />;
-  if (section === "zaebal") return <ZaebalSettingsScreen onBack={back} />;
+  if (section === "texts") return <AppTextsScreen onBack={back} />;
   if (section === "intervals") return <IntervalsScreen onBack={back} />;
+  if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
-  if (section === "game") return <GameScreen users={users} onBack={back} />;
-  if (section === "all-features") return <AllFeaturesScreen onBack={back} />;
-  if (section === "delivery") return <DeliveryScreen onBack={back} />;
-  if (section === "kpi") return <KpiScreen onBack={back} />;
-  if (section === "journal") return <JournalScreen onBack={back} />;
-  if (section === "notifications") {
-    return <NotificationsScreen onBack={back} />;
-  }
-  if (section === "employees") return <EmployeesScreen onBack={back} />;
-  if (section === "admin-tasks") return <AdminTasksScreen onBack={back} />;
-  if (section === "training-plan") {
-    return <TrainingPlanScreen onBack={back} />;
-  }
 
   const select = (s: Section) => {
     haptic("selection");
@@ -189,37 +132,19 @@ export default function AdminScreen({ users }: Props) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      {/* GHG6 E11: статус глобальной паузы — sticky-плашка при active, иначе
-          компактная полоска «в эфире» с кнопкой инициации паузы. */}
-      <BotPauseBar />
-
-      {/* GHG11: «Режим бота» — мастер-свитчеры доставки САМЫМ ПЕРВЫМ разделом:
-          это точка входа для «куда вообще пишет бот» (чат / мини-апп / оба). */}
-      <SectionGroup icon="🎛" title="Режим бота">
+      <SectionGroup icon="🧑‍🍳" title="Смена и люди">
         <Card
-          icon="🎛"
-          title="Куда пишет бот"
-          subtitle="Мастер-режим: Выкл · Чат · Мини-апп · Чат+апп (все механики)"
-          onClick={() => select("delivery")}
+          icon="🚨"
+          title="Требует внимания"
+          subtitle="Просроченные поручения и открытые проблемы"
+          onClick={() => select("attention")}
+          badge={attentionCount}
         />
-        {/* GHG11(4): вид ленты активности — новый компактный / классический. */}
         <Card
-          icon="📰"
-          title="Вид ленты"
-          subtitle="Компактный (миниатюры участников) / классический"
-          onClick={() => select("feed-settings")}
-        />
-      </SectionGroup>
-
-      {/* Управление сменой живёт рядом: люди, их уведомления и журнал событий.
-          Раньше системные строки планировщика торчали в кабинете руководителя,
-          а уволить человека было нечем. */}
-      <SectionGroup icon="🧑🍳" title="Смена и люди">
-        <Card
-          icon="🗂"
-          title="Журнал событий"
-          subtitle="Поручения человеческим языком, включая автоматику"
-          onClick={() => select("journal")}
+          icon="📝"
+          title="Поручения"
+          subtitle="Создать, назначить, срок с точностью до секунды"
+          onClick={() => select("admin-tasks")}
         />
         <Card
           icon="🔔"
@@ -228,7 +153,7 @@ export default function AdminScreen({ users }: Props) {
           onClick={() => select("notifications")}
         />
         <Card
-          icon="🧑🍳"
+          icon="🧑‍🍳"
           title="Пул сотрудников"
           subtitle="Имя, должность, прогресс, увольнение и корзина"
           onClick={() => select("employees")}
@@ -240,172 +165,25 @@ export default function AdminScreen({ users }: Props) {
           onClick={() => select("training-plan")}
         />
         <Card
-          icon="📝"
-          title="Поручения"
-          subtitle="Создать в приложении · срок с точностью до секунды"
-          onClick={() => select("admin-tasks")}
+          icon="🗂"
+          title="Журнал событий"
+          subtitle="Поручения человеческим языком, включая автоматику"
+          onClick={() => select("journal")}
+        />
+        <Card
+          icon="📰"
+          title="Вид ленты"
+          subtitle="Компактный (миниатюры участников) / классический"
+          onClick={() => select("feed-settings")}
         />
       </SectionGroup>
 
-      {/* ⚡ Quick actions
-          GHG6 D4: убрали «Крутануть лоха» — он игнорил cooldown и не показывал recent;
-          force-reroll переехал в подраздел «Лох». «Прогон фразы» доступен и тут,
-          и из главной (ActionBar внизу календаря). */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
-        <SectionHeader icon="⚡" title="Быстрые действия" />
-
-        <button
-          type="button"
-          disabled={runPhrases.isPending}
-          onClick={() => {
-            haptic("medium");
-            runPhrases.mutate();
-          }}
-          className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform"
-        >
-          {runPhrases.isPending ? "⏳ Постим…" : "🚀 Прогнать рандомную фразу сейчас"}
-        </button>
-        {runPhrases.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
-            ⚠ {String((runPhrases.error as Error)?.message ?? runPhrases.error)}
-          </div>
-        )}
-        {runPhrases.isSuccess && !runPhrases.isPending && (
-          <div className="mt-2 rounded-md bg-status-free/10 p-2 text-xs text-status-free">
-            ✓ Запустили — проверь чат.
-          </div>
-        )}
-
-        <button
-          type="button"
-          onClick={() => {
-            haptic("selection");
-            setPoolOpen((v) => !v);
-          }}
-          className="mt-2 w-full min-h-11 rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs text-tg-text flex items-center justify-between active:scale-[0.99] transition-transform"
-        >
-          <span>📊 Пул фраз сейчас{pool.data ? ` (${pool.data.total_chunks})` : ""}</span>
-          <span className="text-tg-hint">{poolOpen ? "▾" : "▸"}</span>
-        </button>
-        {poolOpen && (
-          <div className="mt-2 rounded-md bg-tg-bg/40 p-2 text-xs">
-            {pool.isPending ? (
-              <div className="text-tg-hint">Считаем…</div>
-            ) : pool.isError ? (
-              <div className="text-status-busy">⚠ {String((pool.error as Error)?.message ?? pool.error)}</div>
-            ) : pool.data ? (
-              <>
-                <div className="text-tg-hint mb-1">
-                  За {pool.data.lookback_days} дн · всего {pool.data.total_chunks} кусков
-                </div>
-                <ul className="space-y-0.5">
-                  {pool.data.rows.map((r) => (
-                    <li
-                      key={r.user_id}
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="truncate text-tg-text">{r.display_name}</span>
-                      <span
-                        className={`tabular-nums ${
-                          r.chunks_count === 0 ? "text-status-busy" : "text-tg-text"
-                        }`}
-                      >
-                        {r.chunks_count}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  disabled={clearPool.isPending}
-                  onClick={() => {
-                    haptic("medium");
-                    clearPool.mutate();
-                  }}
-                  className="mt-2 w-full min-h-9 rounded-lg bg-status-busy/15 px-3 py-1.5 text-xs font-medium text-status-busy active:scale-[0.98] disabled:opacity-60"
-                >
-                  {clearPool.isPending ? "🗑 Чистим…" : "🗑 Очистить пул фраз"}
-                </button>
-              </>
-            ) : null}
-          </div>
-        )}
-      </section>
-
-      {/* GHG6 D4: новый порядок — прокси сразу после quick actions (самое важное),
-          потом запланированные публикации, потом календарь, лох, чухан, история. */}
-      <SectionGroup icon="🌐" title="Прокси">
+      <SectionGroup icon="🏅" title="Опыт и результат">
         <Card
-          icon="🌐"
-          title="Прокси"
-          subtitle="Пул прокси, индикаторы, парсер, авто-фолбэк"
-          onClick={() => select("proxy")}
-        />
-        {/* GHG8 P14: рестарт Space — рядом с прокси, это смежная
-            «сеть зависла, расклинь» история. */}
-        <Card
-          icon="🔄"
-          title="Рестарт Space"
-          subtitle="Кнопка + расписание (once / каждые N часов)"
-          onClick={() => select("space-restart")}
-        />
-        {/* GHG8 T3.3 (п.18): алёрты «лох/чухан не запостился» — по соседству с
-            прокси, как просил пользователь. Бейдж = число пропусков (обычно 0). */}
-        <Card
-          icon="🚨"
-          title="Алёрты постинга"
-          subtitle="Лох / чухан не вышли в чат + дослать"
-          onClick={() => select("posting-alerts")}
-          badge={postingAlerts.data?.total}
-        />
-      </SectionGroup>
-
-      {/* GHG6 M6 (п.17): «Очередь задач» поднята СРАЗУ под Прокси — пользователь
-          просил видеть её ближе к топу. Раньше та же таблица жила внутри
-          ScheduledPublicationsScreen, теперь это отдельный экран с reschedule
-          и skip-next кнопками. */}
-      <SectionGroup icon="📋" title="Очередь задач">
-        <Card
-          icon="📋"
-          title="Запланированные задачи"
-          subtitle="APScheduler-job'ы + напоминания. ✎ изменить, ⏭ пропустить"
-          onClick={() => select("jobs")}
-        />
-      </SectionGroup>
-
-      <SectionGroup icon="⏰" title="Запланированные публикации">
-        <Card
-          icon="⏱️"
-          title="Настройки задач"
-          subtitle="Master-toggles, дефолты опросов, опросы в чате"
-          onClick={() => select("scheduled-pubs")}
-        />
-        {/* GHG7 P2.3.b: «Автопост рандомных» + «Генератор фраз» объединены
-            в одну Card → один экран с двумя секциями. */}
-        <Card
-          icon="💬"
-          title="Рандомные фразы"
-          subtitle="Расписание автопоста + параметры генератора"
-          onClick={() => select("rp")}
-        />
-        {/* GHG7 P2.3.h: «Лох дня» (автовыбор) больше не отдельный пункт здесь —
-            настройки автовыбора влиты в единый экран «Лох» (см. ниже). */}
-        <Card
-          icon="⏸"
-          title="Пауза и /zaebal"
-          subtitle="Порог голосов, длительности, авто-зэбал"
-          onClick={() => select("zaebal")}
-        />
-      </SectionGroup>
-
-      {/* GHG7 P2.3.a: «Интервалы» подняты сразу под «Запланированные
-          публикации» — это смежные настройки расписания. */}
-      <SectionGroup icon="⏱" title="Интервалы">
-        <Card
-          icon="🎛"
-          title="Интервалы и окна"
-          subtitle="Тик напоминаний, частота автолоха, окна фраз и чухана"
-          onClick={() => select("intervals")}
+          icon="🏅"
+          title="Опыт и сотрудник недели"
+          subtitle="Сколько стоит работа · рейтинг недели"
+          onClick={() => select("kpi")}
         />
       </SectionGroup>
 
@@ -413,14 +191,13 @@ export default function AdminScreen({ users }: Props) {
         <Card
           icon="🆕"
           title="Вид календаря"
-          subtitle="Новый таймлайн / legacy-вид (по умолчанию legacy)"
+          subtitle="Новый таймлайн / legacy-вид"
           onClick={() => select("calendar-settings")}
         />
-        {/* GHG11: дни рождения и праздники объединены в один экран «Настройки». */}
         <Card
           icon="⚙️"
-          title="Настройки"
-          subtitle="Дни рождения + праздники (даты и поздравления)"
+          title="Дни рождения и праздники"
+          subtitle="Даты, поздравления и напоминания"
           onClick={() => select("birthdays")}
         />
         <Card
@@ -431,97 +208,41 @@ export default function AdminScreen({ users }: Props) {
         />
       </SectionGroup>
 
-      {/* GHG6 E6: номинации игр + голосование «Во что сыграем». Отдельный раздел,
-          чтобы не путать с обычными meetup-полами. */}
-      <SectionGroup icon="🎮" title="Игры">
+      <SectionGroup icon="✍️" title="Тексты">
         <Card
-          icon="🗳"
-          title="Номинации и голосование"
-          subtitle="Добавить игру, запустить «Во что сыграем», follow-up «Когда»"
-          onClick={() => select("games")}
+          icon="✍️"
+          title="Тексты приложения"
+          subtitle="Приветствие, подсказки и пустые состояния"
+          onClick={() => select("texts")}
         />
       </SectionGroup>
 
-      <SectionGroup icon="🏅" title="KPI смены">
+      <SectionGroup icon="⚙️" title="Система">
         <Card
-          icon="🏅"
-          title="Опыт и сотрудник недели"
-          subtitle="Веса за пункты, смены и поручения · рейтинг недели"
-          onClick={() => select("kpi")}
+          icon="🎛"
+          title="Интервалы напоминаний"
+          subtitle="Как часто проверять очередь напоминаний"
+          onClick={() => select("intervals")}
+        />
+        <Card
+          icon="📋"
+          title="Запланированные задачи"
+          subtitle="APScheduler-job'ы: ✎ изменить, ⏭ пропустить"
+          onClick={() => select("jobs")}
+        />
+        <Card
+          icon="🌐"
+          title="Прокси"
+          subtitle="Пул прокси, индикаторы, авто-фолбэк"
+          onClick={() => select("proxy")}
+        />
+        <Card
+          icon="🔄"
+          title="Рестарт Space"
+          subtitle="Кнопка + расписание, если сеть зависла"
+          onClick={() => select("space-restart")}
         />
       </SectionGroup>
-
-      <SectionGroup icon="📜" title="История">
-        <Card
-          icon="📜"
-          title="Сводная история"
-          subtitle="Чуханы недели + лохи дня в одном списке"
-          onClick={() => select("history")}
-        />
-      </SectionGroup>
-
-      {/* GHG7 P2.3.f: реакции бота вынесены из «Запланированных публикаций»
-          в отдельное меню верхнего уровня. */}
-      <SectionGroup icon="🤖" title="Реакции">
-        <Card
-          icon="🤖"
-          title="Реакции бота"
-          subtitle="Ответы на @упоминание и reply"
-          onClick={() => select("bot-reactions")}
-        />
-        <Card
-          icon="🎭"
-          title="Реакции на медиа"
-          subtitle="Мемы и подборки: эмодзи + фразы"
-          onClick={() => select("media-reactions")}
-        />
-        <Card
-          icon="🔮"
-          title="Магический шар"
-          subtitle="/advice · #совет · @бот …?"
-          onClick={() => select("advice")}
-        />
-      </SectionGroup>
-
-      {/* Э22: «Все функции» — один экран со всеми рубильниками бота. Ставим
-          САМЫМ ПЕРВЫМ разделом: это точка входа для «выключить одну штуку». */}
-      <SectionGroup icon="🧰" title="Все функции">
-        <Card
-          icon="🧰"
-          title="Все функции бота"
-          subtitle="Включить/выключить любую функцию по отдельности"
-          onClick={() => select("all-features")}
-        />
-      </SectionGroup>
-
-      {/* GHG10 Э5.5: игровая система — отдельной группой: это не «настройки
-          бота», а целая подсистема со своим рубильником и отладкой. */}
-      <SectionGroup icon="🏅" title="Игровая система">
-        <Card
-          icon="🎮"
-          title="Игра"
-          subtitle="Рубильник, выдача/сброс ачивок, ручной опыт"
-          onClick={() => select("game")}
-        />
-      </SectionGroup>
-
-      <SectionGroup icon="🗄" title="Данные">
-        <Card
-          icon="🗄"
-          title="Снапшот фраз"
-          subtitle="Бэкап причин / реакций / типажей"
-          onClick={() => select("phrases-snapshot")}
-        />
-      </SectionGroup>
-    </div>
-  );
-}
-
-function SectionHeader({ icon, title }: { icon: string; title: string }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <span className="text-base">{icon}</span>
-      <span className="text-base font-semibold text-tg-text">{title}</span>
     </div>
   );
 }
@@ -536,7 +257,7 @@ function SectionGroup({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-tg-hint/15 pt-3">
+    <section className="border-t border-tg-hint/15 pt-3 first:border-t-0 first:pt-0">
       <div className="flex items-center gap-2 mb-2 px-1">
         <span className="text-base">{icon}</span>
         <span className="text-xs font-semibold uppercase tracking-wide text-tg-hint">
@@ -554,21 +275,17 @@ function Card({
   subtitle,
   onClick,
   badge,
-  id,
 }: {
   icon: string;
   title: string;
   subtitle: string;
   onClick: () => void;
-  /** Опц. счётчик-бейдж справа (T3.3: число пропущенных постов). >0 → красный. */
+  /** Опц. счётчик справа; >0 → красный. */
   badge?: number;
-  /** GHG11(4): якорь для перехода из анонса фичи (доскролл к карточке). */
-  id?: string;
 }) {
   return (
     <button
       type="button"
-      id={id}
       onClick={onClick}
       className="w-full text-left rounded-xl bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
     >

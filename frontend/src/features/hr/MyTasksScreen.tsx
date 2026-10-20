@@ -13,6 +13,7 @@ import {
   type TaskStatus,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import { fetchIssues } from "@/api/issues";
@@ -109,6 +110,9 @@ export default function MyTasksScreen() {
   const setTab = useUI((s) => s.setTab);
   const [showClosed, setShowClosed] = useState(false);
   const [issueFor, setIssueFor] = useState<number | null>(null);
+  // Подписи пустого состояния меняет управляющий (админка → «Тексты»).
+  const emptyTitle = useAppText("tasks.empty.title", "На сегодня всё");
+  const emptyHint = useAppText("tasks.empty.hint", "Загляни в события смены.");
 
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const tasksQ = useQuery({
@@ -342,11 +346,9 @@ export default function MyTasksScreen() {
               ✅
             </div>
             <div className="mt-2 text-sm font-medium text-tg-text">
-              На сегодня всё
+              {emptyTitle}
             </div>
-            <div className="mt-1 text-xs text-tg-hint">
-              Загляни в события смены.
-            </div>
+            <div className="mt-1 text-xs text-tg-hint">{emptyHint}</div>
             <button
               type="button"
               onClick={() => {

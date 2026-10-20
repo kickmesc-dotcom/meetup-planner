@@ -1,4 +1,9 @@
-import { ReactNode, useEffect, useMemo, useState } from "react";
+/**
+ * «Интервалы» — один рабочий параметр: как часто планировщик проверяет очередь
+ * напоминаний к встречам. Раньше здесь же жили окна автолоха, автопоста
+ * рандомных фраз и публикации чухана; этих модулей больше нет.
+ */
+import { ReactNode, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchScheduledSettings,
@@ -11,28 +16,9 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
-/**
- * GHG6 H3 (п.16): единый блок «Интервалы и окна».
- *
- * Числовые/временные параметры расписания (тик напоминаний, частота и окно
- * автолоха, окно автопостинга фраз, день+окно публикации чухана) собраны в
- * одном экране. Master-toggles остаются в «Запланированных публикациях» —
- * один-два клика, чтобы что-то включить/выключить; сюда же залезаешь раз в
- * месяц поправить «когда» и «как часто».
- *
- * Один draft, одна sticky-кнопка «Сохранить» — backend дёргает
- * `scheduler.reload_dynamic_jobs(bot)` после PUT'а.
- */
-const WEEKDAYS_RU = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
-
 interface Props {
   onBack: () => void;
 }
-
-const errAlert = (e: unknown) => {
-  haptic("error");
-  void showAlert(humanizeApiError(e));
-};
 
 export default function IntervalsScreen({ onBack }: Props) {
   const qc = useQueryClient();
@@ -42,167 +28,83 @@ export default function IntervalsScreen({ onBack }: Props) {
     queryFn: fetchScheduledSettings,
   });
 
-  const [draft, setDraft] = useState<ScheduledSettingsIO | null>(null);
+  const [tick, setTick] = useState<number | null>(null);
   useEffect(() => {
-    if (sched.data) setDraft(structuredClone(sched.data));
+    if (sched.data) setTick(sched.data.reminders.tick_minutes);
   }, [sched.data]);
 
-  const dirty = useMemo(
-    () => !!draft && !!sched.data && JSON.stringify(draft) !== JSON.stringify(sched.data),
-    [draft, sched.data],
-  );
+  const dirty =
+    !!sched.data && tick !== null && tick !== sched.data.reminders.tick_minutes;
 
   const save = useMutation({
-    mutationFn: updateScheduledSettings,
+    mutationFn: () => {
+      const base = sched.data as ScheduledSettingsIO;
+      return updateScheduledSettings({
+        ...base,
+        reminders: { ...base.reminders, tick_minutes: tick ?? base.reminders.tick_minutes },
+      });
+    },
     onSuccess: (data) => {
       haptic("success");
       qc.setQueryData(["admin", "scheduled"], data);
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
     },
-    onError: errAlert,
+    onError: (e) => {
+      haptic("error");
+      void showAlert(humanizeApiError(e));
+    },
   });
 
-  const patch = (updater: (d: ScheduledSettingsIO) => ScheduledSettingsIO) => {
-    setDraft((cur) => (cur ? updater(structuredClone(cur)) : cur));
-  };
-
-  if (sched.isPending || !draft) {
+  if (sched.isPending || tick === null) {
     return (
-      <SubScreen title="🎛 Интервалы и окна" subtitle="Расписание задач" onBack={onBack}>
-        <ListSkeleton rows={6} />
+      <SubScreen title="🎛 Интервалы" subtitle="Расписание напоминаний" onBack={onBack}>
+        <ListSkeleton rows={3} />
       </SubScreen>
     );
   }
 
   return (
     <SubScreen
-      title="🎛 Интервалы и окна"
-      subtitle="Раз в месяц заглянуть и поправить — рубильники живут в «Запланированных публикациях»"
+      title="🎛 Интервалы"
+      subtitle="Как часто проверять очередь напоминаний"
       onBack={onBack}
     >
-      <Block icon="⏰" title="Тик напоминаний" hint="Раз в N минут бот проверяет очередь напоминаний к встречам.">
-        <Field label="Интервал, мин (1–360)">
-          <NumberInput
-            value={draft.reminders.tick_minutes}
-            min={1}
-            max={360}
-            onChange={(v) =>
-              patch((d) => {
-                d.reminders.tick_minutes = v;
-                return d;
-              })
-            }
-          />
-        </Field>
-      </Block>
-
       <Block
-        icon="👑"
-        title="Лох дня"
-        hint="Кулдаун ручной рулетки («Автолох» 🤡) и «Лоха дня» 👑 независимы — лох дня крутится по этому расписанию, ручная дуэль — по своим 12ч."
+        icon="⏰"
+        title="Тик напоминаний"
+        hint="Раз в N минут бот проверяет, кому пора напомнить о встрече."
       >
-        <Field label="Раз в сутки (1–12)">
-          <NumberInput
-            value={draft.loser.per_day}
-            min={1}
-            max={12}
-            onChange={(v) =>
-              patch((d) => {
-                d.loser.per_day = v;
-                return d;
-              })
-            }
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="numeric"
+            value={String(tick)}
+            onChange={(e) => setTick(Number(e.target.value.replace(/[^0-9]/g, "")))}
+            className="w-24 rounded-md bg-tg-bg/70 px-2 py-2 text-center text-sm tabular-nums text-tg-text outline-none border border-transparent focus:border-tg-link"
+            aria-label="Интервал напоминаний, минут"
           />
-        </Field>
-        <Field label="Окно активности (часы)">
-          <HourRange
-            start={draft.loser.window_start_hour}
-            end={draft.loser.window_end_hour}
-            onChange={(s, e) =>
-              patch((d) => {
-                d.loser.window_start_hour = s;
-                d.loser.window_end_hour = e;
-                return d;
-              })
-            }
-          />
-        </Field>
+          <span className="text-xs text-tg-hint">мин (1–360)</span>
+        </div>
       </Block>
 
-      <Block icon="💬" title="Автопост фраз" hint="Окно — когда бот может постить рандомные фразы. Сами времена — в «Автопост рандомных фраз».">
-        <Field label="Окно активности">
-          <HhmmRange
-            start={draft.phrases.window_start}
-            end={draft.phrases.window_end}
-            onChange={(s, e) =>
-              patch((d) => {
-                d.phrases.window_start = s;
-                d.phrases.window_end = e;
-                return d;
-              })
-            }
-          />
-        </Field>
-      </Block>
-
-      <Block icon="💩" title="Чухан недели" hint="День недели и окно — в этот промежуток бот публикует чухана.">
-        <Field label="День недели">
-          <div className="flex flex-wrap gap-1">
-            {WEEKDAYS_RU.map((label, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => {
-                  haptic("selection");
-                  patch((d) => {
-                    d.chukhan.weekday = idx;
-                    return d;
-                  });
-                }}
-                className={[
-                  "min-h-11 min-w-11 rounded-md px-2 text-xs",
-                  draft.chukhan.weekday === idx
-                    ? "bg-tg-button text-tg-button-text"
-                    : "bg-tg-bg/70 text-tg-text",
-                ].join(" ")}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Field label="Окно активности">
-          <HhmmRange
-            start={draft.chukhan.window_start}
-            end={draft.chukhan.window_end}
-            onChange={(s, e) =>
-              patch((d) => {
-                d.chukhan.window_start = s;
-                d.chukhan.window_end = e;
-                return d;
-              })
-            }
-          />
-        </Field>
-      </Block>
+      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-[11px] text-tg-hint">
+        Напоминания о сроках поручений настраиваются в «Уведомлениях сотрудников»:
+        там же можно выключить конкретное, перенести его вперёд или замьютить все
+        алерты.
+      </div>
 
       <div className="sticky bottom-0 -mx-3 px-3 pb-3 pt-2 bg-tg-bg/95 backdrop-blur">
         <button
           type="button"
-          disabled={!dirty || save.isPending}
+          disabled={!dirty || save.isPending || (tick !== null && (tick < 1 || tick > 360))}
           onClick={() => {
-            if (!draft) return;
             haptic("medium");
-            save.mutate(draft);
+            save.mutate();
           }}
           className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {save.isPending && <Spinner />}
-          {save.isPending
-            ? "Сохраняем…"
-            : dirty
-            ? "💾 Сохранить интервалы"
-            : "✓ Сохранено"}
+          {save.isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
         </button>
       </div>
     </SubScreen>
@@ -229,106 +131,7 @@ function Block({
           <div className="text-[11px] text-tg-hint">{hint}</div>
         </div>
       </div>
-      <div className="space-y-2">{children}</div>
-    </section>
-  );
-}
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <div className="text-[11px] text-tg-hint mb-1">{label}</div>
       {children}
-    </div>
-  );
-}
-
-function NumberInput({
-  value,
-  min,
-  max,
-  step = 1,
-  onChange,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  onChange: (v: number) => void;
-}) {
-  const [draft, setDraft] = useState(String(value));
-  useEffect(() => {
-    setDraft(String(value));
-  }, [value]);
-  const isInt = step >= 1 && Number.isInteger(step);
-  return (
-    <input
-      type="text"
-      inputMode={isInt ? "numeric" : "decimal"}
-      value={draft}
-      onChange={(e) => {
-        const cleaned = e.target.value.replace(isInt ? /[^0-9]/g : /[^0-9.]/g, "");
-        setDraft(cleaned);
-      }}
-      onBlur={() => {
-        const n = parseFloat(draft);
-        if (Number.isNaN(n)) {
-          setDraft(String(value));
-          return;
-        }
-        const clamped = Math.max(min, Math.min(max, n));
-        const rounded = isInt ? Math.round(clamped) : Math.round(clamped * 100) / 100;
-        setDraft(String(rounded));
-        if (rounded !== value) onChange(rounded);
-      }}
-      className="w-24 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
-    />
-  );
-}
-
-function HourRange({
-  start,
-  end,
-  onChange,
-}: {
-  start: number;
-  end: number;
-  onChange: (s: number, e: number) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <NumberInput value={start} min={0} max={23} onChange={(v) => onChange(v, end)} />
-      <span className="text-tg-hint text-xs">…</span>
-      <NumberInput value={end} min={0} max={23} onChange={(v) => onChange(start, v)} />
-      <span className="text-tg-hint text-xs">ч</span>
-    </div>
-  );
-}
-
-function HhmmRange({
-  start,
-  end,
-  onChange,
-}: {
-  start: string;
-  end: string;
-  onChange: (s: string, e: string) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        type="time"
-        value={start}
-        onChange={(e) => onChange(e.target.value, end)}
-        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
-      />
-      <span className="text-tg-hint text-xs">…</span>
-      <input
-        type="time"
-        value={end}
-        onChange={(e) => onChange(start, e.target.value)}
-        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
-      />
-    </div>
+    </section>
   );
 }

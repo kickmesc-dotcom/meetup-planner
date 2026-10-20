@@ -10,6 +10,7 @@ import {
   type HrEmployee,
 } from "@/api/hr";
 import { startSimulation } from "@/api/simulation";
+import { useAppText } from "@/api/texts";
 import { useSimulation } from "@/store/simulation";
 import { getApiBase, humanizeApiError, setApiBase } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
@@ -47,6 +48,10 @@ const ROLE_HINT: Record<HrEmployee["role"], string> = {
 export default function HrProfileScreen() {
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
+  const photoHint = useAppText(
+    "profile.photo.hint",
+    "Фотоотчёт можно снять прямо в пункте с 📷 (камера или галерея), а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.",
+  );
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const depsQ = useQuery({
     queryKey: ["hr-departments"],
@@ -492,10 +497,7 @@ export default function HrProfileScreen() {
 
       <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
         <h2 className="text-sm font-semibold text-tg-text">Пиши боту в чат</h2>
-        <p className="mt-1 text-[11px] text-tg-hint">
-          Фотоотчёт можно снять прямо в пункте с 📷 (камера или галерея), а
-          «не успеваю» — в карточке задачи. Чат с ботом тоже работает.
-        </p>
+        <p className="mt-1 text-[11px] text-tg-hint">{photoHint}</p>
         <button
           type="button"
           onClick={() => {
