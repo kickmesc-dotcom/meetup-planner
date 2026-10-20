@@ -60,7 +60,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
       {tasks.isPending || issues.isPending ? (
         <ListSkeleton rows={4} />
       ) : problems === 0 ? (
-        <section className="rounded-xl bg-status-free/10 p-4 text-center">
+        <section className="rounded-card bg-status-free/10 p-4 text-center">
           <div className="text-2xl mb-1">✓</div>
           <div className="text-sm font-medium text-status-free">Всё под контролем</div>
           <div className="mt-1 text-xs text-tg-hint">
@@ -70,18 +70,18 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
       ) : (
         <>
           {tasks.isError && (
-            <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
               ⚠ {humanizeApiError(tasks.error)}
             </div>
           )}
           {issues.isError && (
-            <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
               ⚠ {humanizeApiError(issues.error)}
             </div>
           )}
 
           {(overdue.length > 0 || onReview.length > 0) && (
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">
                   📝 Поручения
@@ -90,7 +90,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   <button
                     type="button"
                     onClick={onOpenTasks}
-                    className="min-h-9 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
+                    className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
                     Открыть →
                   </button>
@@ -101,7 +101,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   Просрочено: {overdue.length}
                 </div>
               )}
-              <div className="divide-y divide-tg-bg/40 rounded-lg bg-tg-bg/40">
+              <div className="divide-y divide-tg-bg/40 rounded-tile bg-tg-bg/40">
                 {overdue.slice(0, 20).map((t) => (
                   <div key={t.id} className="px-2 py-1.5 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
@@ -127,7 +127,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
           )}
 
           {openIssues.length > 0 && (
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">
                   🛠 Проблемы: {openIssues.length}
@@ -138,7 +138,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   </span>
                 )}
               </div>
-              <div className="divide-y divide-tg-bg/40 rounded-lg bg-tg-bg/40">
+              <div className="divide-y divide-tg-bg/40 rounded-tile bg-tg-bg/40">
                 {openIssues.slice(0, 20).map((issue) => (
                   <div key={issue.id} className="px-2 py-1.5 space-y-0.5">
                     <div className="flex items-center gap-1.5">

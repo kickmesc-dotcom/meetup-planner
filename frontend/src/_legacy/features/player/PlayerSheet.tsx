@@ -84,7 +84,7 @@ function SourceRow({
       aria-pressed={active}
       onClick={onClick}
       className={[
-        "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs",
+        "flex w-full items-center gap-2 rounded-tile px-2.5 py-2 text-left text-xs",
         active ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg/50 text-tg-text",
       ].join(" ")}
     >
@@ -203,7 +203,7 @@ export default function PlayerSheet() {
               close(false);
               openNotifications(true);
             }}
-            className="flex w-full items-center gap-2 rounded-lg bg-tg-secondary-bg/50 px-2.5 py-2 text-left text-xs text-tg-text"
+            className="flex w-full items-center gap-2 rounded-tile bg-tg-secondary-bg/50 px-2.5 py-2 text-left text-xs text-tg-text"
           >
             <span aria-hidden>🔔</span>
             <span className="min-w-0 flex-1 truncate font-medium">Личные уведомления</span>

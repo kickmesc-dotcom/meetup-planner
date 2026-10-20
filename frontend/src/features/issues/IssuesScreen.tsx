@@ -132,7 +132,7 @@ export default function IssuesScreen() {
               haptic("light");
               setTab("tasks");
             }}
-            className="-ml-1 min-h-11 min-w-11 rounded-lg text-lg text-tg-hint"
+            className="-ml-1 min-h-11 min-w-11 rounded-tile text-lg text-tg-hint"
             aria-label="Назад к задачам"
           >
             ‹
@@ -153,7 +153,7 @@ export default function IssuesScreen() {
               haptic("light");
               setCreating(true);
             }}
-            className="min-h-9 shrink-0 rounded-lg bg-tg-button px-3 text-xs font-medium text-tg-button-text"
+            className="min-h-9 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
           >
             + Сообщить
           </button>
@@ -256,7 +256,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-left transition-transform active:scale-[0.99]"
+      className="w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left transition-transform active:scale-[0.99]"
     >
       <div className="flex items-start gap-2">
         <span className="text-base leading-5" aria-hidden>
@@ -348,7 +348,7 @@ function CreateIssueSheet({
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
           placeholder="Например: не работает терминал на баре"
-          className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-3 text-sm text-tg-text"
+          className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
         />
       </label>
 
@@ -385,7 +385,7 @@ function CreateIssueSheet({
               setSeverity(s);
             }}
             className={[
-              "min-h-8 rounded-lg px-1 text-xs transition-colors",
+              "min-h-8 rounded-tile px-1 text-xs transition-colors",
               severity === s
                 ? "bg-tg-button text-tg-button-text"
                 : "bg-tg-secondary-bg text-tg-hint",
@@ -403,7 +403,7 @@ function CreateIssueSheet({
           onChange={(e) => setZone(e.target.value)}
           maxLength={64}
           placeholder="Зал, кухня, бар, склад…"
-          className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-3 text-sm text-tg-text"
+          className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
         />
       </label>
 
@@ -415,7 +415,7 @@ function CreateIssueSheet({
           rows={3}
           maxLength={2000}
           placeholder="Что уже пробовали, кому сказали, что нужно для решения"
-          className="mt-1 w-full rounded-lg bg-tg-secondary-bg p-2 text-sm text-tg-text"
+          className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
         />
       </label>
 
@@ -423,7 +423,7 @@ function CreateIssueSheet({
         type="button"
         disabled={m.isPending || title.trim().length === 0}
         onClick={() => m.mutate()}
-        className="mt-4 min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-4 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
         {m.isPending ? "Записываю…" : "Завести карточку"}
       </button>
@@ -588,7 +588,7 @@ function IssueSheet({
             {issue.events.map((event) => (
               <li
                 key={event.id}
-                className="rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-xs"
+                className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-xs"
               >
                 <div className="text-xs text-tg-hint">
                   {fmtMoment(event.at)} · {event.by_name ?? "система"}
@@ -608,13 +608,13 @@ function IssueSheet({
                 rows={2}
                 maxLength={2000}
                 placeholder="Добавить комментарий"
-                className="w-full rounded-lg bg-tg-secondary-bg p-2 text-sm text-tg-text"
+                className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
               />
               <button
                 type="button"
                 disabled={commentM.isPending || comment.trim().length === 0}
                 onClick={() => commentM.mutate()}
-                className="mt-2 min-h-10 w-full rounded-lg bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
+                className="mt-2 min-h-10 w-full rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
               >
                 Отправить
               </button>
@@ -665,7 +665,7 @@ function ActionButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "min-h-10 rounded-lg px-3 text-xs font-medium transition-transform active:scale-[0.98] disabled:opacity-50",
+        "min-h-10 rounded-tile px-3 text-xs font-medium transition-transform active:scale-[0.98] disabled:opacity-50",
         variant === "primary"
           ? "bg-tg-button text-tg-button-text"
           : "bg-tg-secondary-bg text-tg-text",

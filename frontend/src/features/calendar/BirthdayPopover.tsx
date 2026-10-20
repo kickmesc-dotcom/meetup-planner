@@ -111,7 +111,7 @@ export default function BirthdayPopover() {
       onClick={close}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl bg-tg-bg p-4 pb-6 shadow-2xl"
+        className="w-full max-w-md rounded-t-card bg-tg-bg p-4 pb-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -133,14 +133,14 @@ export default function BirthdayPopover() {
             type="button"
             onClick={() => greetingMut.mutate()}
             disabled={greetingMut.isPending}
-            className="rounded-lg bg-tg-button text-tg-button-text py-2 px-3 text-sm font-medium active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="rounded-tile bg-tg-button text-tg-button-text py-2 px-3 text-sm font-medium active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {greetingMut.isPending && <Spinner size={14} />}
             ✨ Креативное поздравление
           </button>
 
           {greeting && (
-            <div className="mt-2 rounded-lg bg-tg-secondary-bg/60 p-2">
+            <div className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2">
               <textarea
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value)}
@@ -151,14 +151,14 @@ export default function BirthdayPopover() {
                 <button
                   type="button"
                   onClick={onCopy}
-                  className="rounded bg-tg-button/80 text-tg-button-text text-xs px-2 py-1"
+                  className="rounded-tile bg-tg-button/80 text-tg-button-text text-xs px-2 py-1"
                 >
                   📋 Скопировать
                 </button>
                 <button
                   type="button"
                   onClick={() => greetingMut.mutate()}
-                  className="rounded bg-tg-secondary-bg text-tg-text text-xs px-2 py-1"
+                  className="rounded-tile bg-tg-secondary-bg text-tg-text text-xs px-2 py-1"
                 >
                   🔄 Ещё вариант
                 </button>
@@ -170,7 +170,7 @@ export default function BirthdayPopover() {
                   type="button"
                   onClick={() => void onPost(false)}
                   disabled={postMut.isPending || !greeting.trim()}
-                  className="rounded bg-tg-button/80 text-tg-button-text text-xs px-2 py-1 disabled:opacity-60 flex items-center gap-1"
+                  className="rounded-tile bg-tg-button/80 text-tg-button-text text-xs px-2 py-1 disabled:opacity-60 flex items-center gap-1"
                 >
                   {postMut.isPending && <Spinner size={10} />}
                   🤖 Пост от лица бота
@@ -179,7 +179,7 @@ export default function BirthdayPopover() {
                   type="button"
                   onClick={() => void onPost(true)}
                   disabled={postMut.isPending || !greeting.trim()}
-                  className="rounded bg-tg-secondary-bg text-tg-text text-xs px-2 py-1 disabled:opacity-60"
+                  className="rounded-tile bg-tg-secondary-bg text-tg-text text-xs px-2 py-1 disabled:opacity-60"
                 >
                   ✍️ Пост от своего имени
                 </button>
@@ -190,7 +190,7 @@ export default function BirthdayPopover() {
           <button
             type="button"
             onClick={onAssignMeeting}
-            className="mt-1 rounded-lg bg-tg-secondary-bg text-tg-text py-2 px-3 text-sm font-medium active:scale-[0.98]"
+            className="mt-1 rounded-tile bg-tg-secondary-bg text-tg-text py-2 px-3 text-sm font-medium active:scale-[0.98]"
           >
             📅 Назначить встречу
           </button>

@@ -24,7 +24,7 @@ export default function BottomSheet({ title, onClose, children }: Props) {
         data-testid="sheet"
         role="dialog"
         aria-label={title}
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-tg-bg p-4 pb-8 shadow-xl"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}

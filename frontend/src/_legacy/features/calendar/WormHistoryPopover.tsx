@@ -52,7 +52,7 @@ export default function WormHistoryPopover() {
       onClick={close}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl bg-tg-bg p-4 pb-6 shadow-2xl"
+        className="w-full max-w-md rounded-t-card bg-tg-bg p-4 pb-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -95,7 +95,7 @@ export default function WormHistoryPopover() {
                 <div
                   key={`${r.user_id}-${r.started_at}-${i}`}
                   className={[
-                    "rounded-lg p-3 text-sm",
+                    "rounded-tile p-3 text-sm",
                     active
                       ? "bg-tg-button/15 ring-1 ring-tg-button/40"
                       : "bg-tg-secondary-bg/60",

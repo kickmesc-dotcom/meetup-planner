@@ -281,7 +281,7 @@ export default function ProxyScreen({ onBack }: Props) {
       onBack={onBack}
     >
       {/* === Индикаторы === */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
         <StatusBadge statusQ={statusQ} />
         <SelftestCard
           last={statusQ.data?.last_selftest ?? null}
@@ -297,7 +297,7 @@ export default function ProxyScreen({ onBack }: Props) {
       </section>
 
       {/* === Режим === */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="text-base font-semibold">Режим</div>
         {modeQ.isPending || !modeQ.data ? (
           <ListSkeleton rows={1} />
@@ -313,7 +313,7 @@ export default function ProxyScreen({ onBack }: Props) {
                     setMode.mutate(m);
                   }}
                   className={[
-                    "min-h-11 rounded-lg px-3 py-2 text-sm text-left transition-colors",
+                    "min-h-11 rounded-tile px-3 py-2 text-sm text-left transition-colors",
                     modeQ.data.mode === m
                       ? "bg-tg-link/20 text-tg-link border border-tg-link/40"
                       : "bg-tg-bg/50 text-tg-text border border-transparent",
@@ -331,7 +331,7 @@ export default function ProxyScreen({ onBack }: Props) {
       </section>
 
       {/* === Алёрты === */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="text-base font-semibold">🔔 Уведомлять админа</div>
@@ -357,7 +357,7 @@ export default function ProxyScreen({ onBack }: Props) {
       </section>
 
       {/* === Добавление через парсер === */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="text-base font-semibold">Добавить прокси</div>
         <div className="text-xs text-tg-hint">
           Вставь сюда блок из <b>@ProxyMTProto</b> (можно несколько подряд) или
@@ -377,7 +377,7 @@ export default function ProxyScreen({ onBack }: Props) {
             })
           }
         />
-        <details className="rounded-md bg-tg-bg/30 p-2">
+        <details className="rounded-tile bg-tg-bg/30 p-2">
           <summary className="text-xs text-tg-link cursor-pointer select-none">
             Ввести вручную (IP / port / type / secret)
           </summary>
@@ -402,7 +402,7 @@ export default function ProxyScreen({ onBack }: Props) {
             haptic("medium");
             bootstrap.mutate();
           }}
-          className="w-full min-h-10 rounded-md bg-tg-button/80 px-3 py-2 text-sm text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
+          className="w-full min-h-10 rounded-tile bg-tg-button/80 px-3 py-2 text-sm text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
           title="Скачать публичный список прокси, пингануть и добавить живые"
         >
           {bootstrap.isPending && <Spinner />}
@@ -421,7 +421,7 @@ export default function ProxyScreen({ onBack }: Props) {
       )}
 
       {/* === Пул === */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -442,7 +442,7 @@ export default function ProxyScreen({ onBack }: Props) {
                   haptic("medium");
                   pingAllM.mutate();
                 }}
-                className="min-h-11 rounded-md bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
+                className="min-h-11 rounded-tile bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
                 title="Пинг всех (медленно)"
               >
                 {pingAllM.isPending && <Spinner />}
@@ -457,7 +457,7 @@ export default function ProxyScreen({ onBack }: Props) {
                     delDead.mutate();
                   }
                 }}
-                className="min-h-11 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
+                className="min-h-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
                 title="Удалить мёртвые"
               >
                 🗑 dead
@@ -466,7 +466,7 @@ export default function ProxyScreen({ onBack }: Props) {
                 type="button"
                 onClick={() => setSortBySpeed((v) => !v)}
                 className={[
-                  "min-h-11 rounded-md px-2 text-xs",
+                  "min-h-11 rounded-tile px-2 text-xs",
                   sortBySpeed ? "bg-tg-link/20 text-tg-link" : "bg-tg-bg/50 text-tg-text",
                 ].join(" ")}
                 title="Сортировать по скорости (свежее last_ok сверху)"
@@ -572,7 +572,7 @@ function SelftestCard({
     ? "bg-status-free"
     : "bg-status-maybe";
   return (
-    <div className="rounded-lg bg-tg-bg/40 p-2 space-y-1">
+    <div className="rounded-tile bg-tg-bg/40 p-2 space-y-1">
       <div className="flex items-center gap-2">
         <span className={`inline-block h-2.5 w-2.5 rounded-full ${color}`} />
         <span className="text-sm font-medium">Отправка сообщений</span>
@@ -583,7 +583,7 @@ function SelftestCard({
             haptic("medium");
             onRun();
           }}
-          className="ml-auto min-h-11 rounded-md bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
+          className="ml-auto min-h-11 rounded-tile bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
         >
           {isRunning && <Spinner />}
           🧪 Проверить
@@ -615,13 +615,13 @@ function LastErrorCard({
 }) {
   if (!error.message) return null;
   return (
-    <div className="rounded-lg bg-status-busy/15 border border-status-busy/40 p-2 space-y-1">
+    <div className="rounded-tile bg-status-busy/15 border border-status-busy/40 p-2 space-y-1">
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-status-busy">Последняя ошибка</span>
         <button
           type="button"
           onClick={onClear}
-          className="ml-auto min-h-7 min-w-7 rounded-md bg-tg-bg/40 px-1 text-xs text-tg-hint"
+          className="ml-auto min-h-7 min-w-7 rounded-tile bg-tg-bg/40 px-1 text-xs text-tg-hint"
           title="Очистить"
         >
           ✕
@@ -676,7 +676,7 @@ function ProxyRow({
     ? "bg-status-free"
     : "bg-status-maybe";
   return (
-    <div className="rounded-lg bg-tg-bg/40 p-2 space-y-1">
+    <div className="rounded-tile bg-tg-bg/40 p-2 space-y-1">
       <div className="flex items-center gap-2">
         <span className={`inline-block h-2.5 w-2.5 rounded-full ${statusDot} shrink-0`} />
         <div className="flex-1 min-w-0">
@@ -697,7 +697,7 @@ function ProxyRow({
             haptic("medium");
             onPing();
           }}
-          className="min-h-11 min-w-11 rounded-md bg-tg-bg/50 px-2 text-xs text-tg-text disabled:opacity-50 inline-flex items-center justify-center gap-1"
+          className="min-h-11 min-w-11 rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text disabled:opacity-50 inline-flex items-center justify-center gap-1"
           title="Ping"
         >
           {pingPending ? <Spinner /> : "📶"}
@@ -705,7 +705,7 @@ function ProxyRow({
         <button
           type="button"
           onClick={() => (editing ? onEditCancel() : onEditStart())}
-          className="min-h-11 min-w-11 rounded-md bg-tg-bg/50 px-2 text-xs text-tg-text"
+          className="min-h-11 min-w-11 rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text"
           title="Edit"
         >
           {editing ? "↩" : "✎"}
@@ -718,7 +718,7 @@ function ProxyRow({
             haptic("warning");
             onDelete();
           }}
-          className="min-h-11 min-w-11 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
+          className="min-h-11 min-w-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
           title="Удалить"
         >
           ✕
@@ -789,20 +789,20 @@ function EditRowForm({
         <input
           value={server}
           onChange={(e) => setServer(e.target.value)}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
         />
         <input
           inputMode="numeric"
           value={port}
           onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ""))}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text tabular-nums outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text tabular-nums outline-none border border-transparent focus:border-tg-link"
         />
       </div>
       <div className="grid grid-cols-[1fr_1fr] gap-2">
         <select
           value={type}
           onChange={(e) => setType(e.target.value as ProxyType)}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
         >
           <option value="socks5">SOCKS5</option>
           <option value="http">HTTP</option>
@@ -812,7 +812,7 @@ function EditRowForm({
           placeholder="secret / pass"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -820,7 +820,7 @@ function EditRowForm({
           type="button"
           disabled={!valid || saving}
           onClick={handleSave}
-          className="flex-1 min-h-10 rounded-lg bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
+          className="flex-1 min-h-10 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
         >
           {saving && <Spinner />}
           💾 Сохранить
@@ -828,7 +828,7 @@ function EditRowForm({
         <button
           type="button"
           onClick={onCancel}
-          className="min-h-10 rounded-lg bg-tg-bg/50 px-3 text-sm text-tg-text"
+          className="min-h-10 rounded-tile bg-tg-bg/50 px-3 text-sm text-tg-text"
         >
           Отмена
         </button>
@@ -898,14 +898,14 @@ function ParserBox({
         onChange={(e) => setText(e.target.value)}
         rows={4}
         placeholder={"Server: 178.105.137.152\nPort: 443\nSecret: eeabf...\n@ProxyMTProto"}
-        className="w-full rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link font-mono"
+        className="w-full rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link font-mono"
       />
       <div className="flex items-center gap-2">
         <button
           type="button"
           disabled={parsing || !text.trim()}
           onClick={handleParse}
-          className="flex-1 min-h-10 rounded-lg bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
+          className="flex-1 min-h-10 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
         >
           {parsing && <Spinner />}
           📋 Распарсить
@@ -918,7 +918,7 @@ function ParserBox({
               setDrafts(null);
               setSelected(new Set());
             }}
-            className="min-h-10 rounded-lg bg-tg-bg/50 px-3 text-sm text-tg-text"
+            className="min-h-10 rounded-tile bg-tg-bg/50 px-3 text-sm text-tg-text"
           >
             Сброс
           </button>
@@ -936,7 +936,7 @@ function ParserBox({
             // строки до 44px по Apple/TG guideline — тыкать пальцем удобно.
             <label
               key={i}
-              className="flex items-center gap-2 rounded-md bg-tg-bg/40 px-2 py-1.5 text-sm cursor-pointer min-h-11"
+              className="flex items-center gap-2 rounded-tile bg-tg-bg/40 px-2 py-1.5 text-sm cursor-pointer min-h-11"
             >
               <input
                 type="checkbox"
@@ -961,7 +961,7 @@ function ParserBox({
             type="button"
             disabled={adding || selected.size === 0}
             onClick={handleAdd}
-            className="w-full min-h-10 rounded-lg bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
+            className="w-full min-h-10 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
           >
             {adding && <Spinner />}
             ➕ Добавить выбранные ({selected.size})
@@ -1002,7 +1002,7 @@ function AddProxyForm({
           placeholder="server (IP/host)"
           value={server}
           onChange={(e) => setServer(e.target.value)}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
         />
         <input
           type="text"
@@ -1010,14 +1010,14 @@ function AddProxyForm({
           placeholder="port"
           value={port}
           onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ""))}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text tabular-nums placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text tabular-nums placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
         />
       </div>
       <div className="grid grid-cols-[1fr_1fr] gap-2">
         <select
           value={type}
           onChange={(e) => setType(e.target.value as ProxyType)}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
         >
           <option value="mtproto">MTProto</option>
           <option value="socks5">SOCKS5</option>
@@ -1028,7 +1028,7 @@ function AddProxyForm({
           placeholder="secret / pass (опц.)"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
         />
       </div>
       <button
@@ -1046,7 +1046,7 @@ function AddProxyForm({
           setPort("443");
           setSecret("");
         }}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+        className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
         {isPending && <Spinner />}
         {isPending ? "Добавляем…" : "➕ Добавить"}
@@ -1088,7 +1088,7 @@ function AddResultBanner({
   }
   return (
     <div
-      className={`flex items-start gap-2 rounded-lg border ${cls} px-3 py-2 text-sm`}
+      className={`flex items-start gap-2 rounded-tile border ${cls} px-3 py-2 text-sm`}
     >
       <span className="mt-0.5">{icon}</span>
       <span className="flex-1 min-w-0 break-words">{msg}</span>
@@ -1125,7 +1125,7 @@ function AddErrorsSection({
   // Показываем самые свежие сверху.
   const reversed = [...errors].reverse();
   return (
-    <section className="rounded-xl bg-status-busy/10 border border-status-busy/30 p-3 space-y-2">
+    <section className="rounded-card bg-status-busy/10 border border-status-busy/30 p-3 space-y-2">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -1141,7 +1141,7 @@ function AddErrorsSection({
           onClick={() => {
             if (confirm("Очистить ленту ошибок добавления?")) onClear();
           }}
-          className="min-h-11 rounded-md bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
+          className="min-h-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
         >
           {isClearing && <Spinner />}✕ Очистить
         </button>
@@ -1157,7 +1157,7 @@ function AddErrorsSection({
             return (
               <li
                 key={`${e.at}-${i}`}
-                className="rounded-md bg-tg-bg/60 px-2 py-1.5 text-tg-text"
+                className="rounded-tile bg-tg-bg/60 px-2 py-1.5 text-tg-text"
               >
                 <div className="flex items-center justify-between gap-2 tabular-nums">
                   <span className="font-semibold text-status-busy">

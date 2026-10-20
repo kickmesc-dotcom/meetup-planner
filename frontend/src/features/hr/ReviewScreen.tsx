@@ -49,7 +49,7 @@ export default function ReviewScreen() {
             haptic("light");
             setTab("tasks");
           }}
-          className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
+          className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label="Назад к задачам"
         >
           ‹
@@ -130,7 +130,7 @@ function ReviewCard({
   const waiting = task.assignments.filter((a) => a.status === "on_review");
 
   return (
-    <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <article className="rounded-card bg-tg-secondary-bg/60 p-3">
       <button type="button" onClick={onToggle} className="w-full text-left">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-sm font-semibold text-tg-text break-words">
@@ -209,7 +209,7 @@ function ReviewRow({
   });
 
   return (
-    <div className="rounded-lg bg-tg-bg/60 p-2.5">
+    <div className="rounded-tile bg-tg-bg/60 p-2.5">
       <div className="text-xs font-medium text-tg-text">
         {assignment ? assignment.display_name : "Все, кто сдал"}
       </div>
@@ -229,7 +229,7 @@ function ReviewRow({
           type="button"
           disabled={review.isPending}
           onClick={() => review.mutate(true)}
-          className="min-h-9 rounded-lg bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+          className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
         >
           Принять
         </button>
@@ -240,7 +240,7 @@ function ReviewRow({
             haptic("light");
             setReworkOpen((v) => !v);
           }}
-          className="min-h-9 rounded-lg bg-tg-secondary-bg px-3 text-xs text-tg-text"
+          className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
         >
           {reworkOpen ? "Отмена" : "На доработку"}
         </button>
@@ -254,13 +254,13 @@ function ReviewRow({
             rows={2}
             maxLength={500}
             placeholder="Что переделать — коротко и по делу"
-            className="w-full rounded-lg bg-tg-secondary-bg p-2 text-xs text-tg-text"
+            className="w-full rounded-tile bg-tg-secondary-bg p-2 text-xs text-tg-text"
           />
           <button
             type="button"
             disabled={review.isPending || !comment.trim()}
             onClick={() => review.mutate(false)}
-            className="mt-1.5 min-h-9 w-full rounded-lg bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
+            className="mt-1.5 min-h-9 w-full rounded-tile bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
           >
             Вернуть с комментарием
           </button>

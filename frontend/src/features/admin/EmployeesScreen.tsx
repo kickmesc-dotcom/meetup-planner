@@ -142,7 +142,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
         onChange={(event) => setSearch(event.target.value)}
         placeholder="Найти по имени, должности или отделу"
         aria-label="Поиск по сотрудникам"
-        className="min-h-10 w-full rounded-lg bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
+        className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
       />
 
       {q.isLoading && <ListSkeleton rows={6} />}
@@ -206,7 +206,7 @@ function EmployeeRow({
 
   const fired = card.fired_at !== null;
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60">
+    <section className="rounded-card bg-tg-secondary-bg/60">
       <button
         type="button"
         onClick={onToggle}
@@ -235,7 +235,7 @@ function EmployeeRow({
       {open && (
         <div className="space-y-2 px-3 pb-3">
           {fired && (
-            <p className="rounded-lg bg-status-busy/10 p-2 text-xs text-status-busy">
+            <p className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
               Доступ закрыт.{" "}
               {card.purge_after
                 ? `Данные в корзине до ${formatDate(card.purge_after)}.`
@@ -250,7 +250,7 @@ function EmployeeRow({
               value={name}
               maxLength={64}
               onChange={(event) => setName(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
           <label className="block text-xs text-tg-hint">
@@ -261,7 +261,7 @@ function EmployeeRow({
               maxLength={64}
               placeholder="например, су-шеф"
               onChange={(event) => setPosition(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
           <label className="block text-xs text-tg-hint">
@@ -272,7 +272,7 @@ function EmployeeRow({
               maxLength={64}
               placeholder="например, Управляющий"
               onChange={(event) => setBadge(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
 
@@ -287,7 +287,7 @@ function EmployeeRow({
                   badge,
                 })
               }
-              className="min-h-9 rounded-lg bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+              className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
             >
               Сохранить
             </button>
@@ -295,7 +295,7 @@ function EmployeeRow({
               type="button"
               disabled={busy}
               onClick={onReset}
-              className="min-h-9 rounded-lg bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
+              className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
             >
               Обнулить прогресс
             </button>
@@ -305,7 +305,7 @@ function EmployeeRow({
                   type="button"
                   disabled={busy}
                   onClick={onRestore}
-                  className="min-h-9 rounded-lg bg-status-free/15 px-3 text-xs text-status-free disabled:opacity-50"
+                  className="min-h-9 rounded-tile bg-status-free/15 px-3 text-xs text-status-free disabled:opacity-50"
                 >
                   Вернуть из корзины
                 </button>
@@ -315,7 +315,7 @@ function EmployeeRow({
                 type="button"
                 disabled={busy}
                 onClick={onFire}
-                className="min-h-9 rounded-lg bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
+                className="min-h-9 rounded-tile bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
               >
                 Уволить
               </button>

@@ -130,7 +130,7 @@ export default function LoserScreen({ users, onBack }: Props) {
     >
       {/* Настройки автовыбора (бывший AutoLoserScreen). */}
       {auto.isPending || !auto.data ? (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <ListSkeleton rows={4} />
         </section>
       ) : (
@@ -141,12 +141,12 @@ export default function LoserScreen({ users, onBack }: Props) {
         />
       )}
       {saveAuto.isError && (
-        <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ {String((saveAuto.error as Error)?.message ?? saveAuto.error)}
         </div>
       )}
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">🎲 Принудительный re-roll</div>
         <div className="text-xs text-tg-hint mb-2">
           Прокручивает выбор лоха прямо сейчас и публикует результат в общий чат.
@@ -158,19 +158,19 @@ export default function LoserScreen({ users, onBack }: Props) {
             haptic("medium");
             if (confirm("Крутануть лоха сейчас?")) rollNow.mutate();
           }}
-          className="w-full min-h-11 rounded-lg bg-tg-button py-2.5 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-tile bg-tg-button py-2.5 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {rollNow.isPending && <Spinner />}
           {rollNow.isPending ? "Катаем…" : "🎲 Крутануть лоха"}
         </button>
         {rollNow.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+          <div className="mt-2 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
             ⚠ {String((rollNow.error as Error)?.message ?? rollNow.error)}
           </div>
         )}
         {rollNow.isSuccess && !rollNow.isPending && (
           <div
-            className={`mt-2 rounded-md p-2 text-xs ${
+            className={`mt-2 rounded-tile p-2 text-xs ${
               rollNow.data.ok
                 ? "bg-status-free/10 text-status-free"
                 : "bg-status-busy/10 text-status-busy"
@@ -183,7 +183,7 @@ export default function LoserScreen({ users, onBack }: Props) {
         )}
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">🤡 Шаблоны фраз</div>
         <div className="text-xs text-tg-hint mb-2">
           Бот выбирает случайную фразу при roll'е лоха. Пустой список → дефолт из кода.
@@ -204,13 +204,13 @@ export default function LoserScreen({ users, onBack }: Props) {
           />
         )}
         {saveReasons.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+          <div className="mt-2 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
             ⚠ {String((saveReasons.error as Error)?.message ?? saveReasons.error)}
           </div>
         )}
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">📜 История лохов</div>
         <div className="text-xs text-tg-hint mb-2">Последние roll'ы.</div>
         {history.isPending ? (
@@ -291,7 +291,7 @@ function AutoLoserForm({
 
   return (
     <>
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
         <div className="text-base font-semibold">⚙️ Автовыбор</div>
         <Toggle
           checked={enabled}
@@ -330,7 +330,7 @@ function AutoLoserForm({
         type="button"
         disabled={!dirty || isPending}
         onClick={() => onSave(body)}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+        className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
         {isPending && <Spinner />}
         {isPending ? "Сохраняем…" : dirty ? "💾 Сохранить настройки автовыбора" : "✓ Сохранено"}
@@ -358,7 +358,7 @@ function NumField({
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ""))}
-        className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
+        className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text text-center tabular-nums outline-none border border-transparent focus:border-tg-link"
       />
       {hint && <span className="text-2xs text-tg-hint">{hint}</span>}
     </label>

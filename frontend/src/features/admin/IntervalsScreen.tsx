@@ -80,14 +80,14 @@ export default function IntervalsScreen({ onBack }: Props) {
             inputMode="numeric"
             value={String(tick)}
             onChange={(e) => setTick(Number(e.target.value.replace(/[^0-9]/g, "")))}
-            className="w-24 rounded-md bg-tg-bg/70 px-2 py-2 text-center text-sm tabular-nums text-tg-text outline-none border border-transparent focus:border-tg-link"
+            className="w-24 rounded-tile bg-tg-bg/70 px-2 py-2 text-center text-sm tabular-nums text-tg-text outline-none border border-transparent focus:border-tg-link"
             aria-label="Интервал напоминаний, минут"
           />
           <span className="text-xs text-tg-hint">мин (1–360)</span>
         </div>
       </Block>
 
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
+      <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
         Напоминания о сроках поручений настраиваются в «Уведомлениях сотрудников»:
         там же можно выключить конкретное, перенести его вперёд или замьютить все
         алерты.
@@ -101,7 +101,7 @@ export default function IntervalsScreen({ onBack }: Props) {
             haptic("medium");
             save.mutate();
           }}
-          className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {save.isPending && <Spinner />}
           {save.isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
@@ -123,7 +123,7 @@ function Block({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
       <div className="flex items-center gap-2">
         <span className="text-base">{icon}</span>
         <div className="min-w-0">

@@ -128,7 +128,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       subtitle="Создать и закрыть · срок с точностью до секунды"
       onBack={onBack}
     >
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
         <div className="text-sm font-semibold text-tg-text">Новое поручение</div>
 
         <label className="block text-xs text-tg-hint">
@@ -138,7 +138,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             onChange={(e) => setTitle(e.target.value)}
             maxLength={200}
             placeholder="Проверить сроки на витрине"
-            className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-3 text-sm text-tg-text"
+            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
           />
         </label>
 
@@ -157,7 +157,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 setScope(o.v);
               }}
               className={[
-                "min-h-9 flex-1 rounded-lg text-xs",
+                "min-h-9 flex-1 rounded-tile text-xs",
                 scope === o.v
                   ? "bg-tg-button text-tg-button-text"
                   : "bg-tg-bg/60 text-tg-hint",
@@ -174,7 +174,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             <select
               value={departmentId ?? ""}
               onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
               <option value="">— выбери —</option>
               {departments.map((d) => (
@@ -191,7 +191,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             <select
               value={assigneeId ?? ""}
               onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
               <option value="">— выбери —</option>
               {employees.map((e) => (
@@ -211,7 +211,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             maxLength={1000}
-            className="mt-1 w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text"
+            className="mt-1 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
           />
         </label>
 
@@ -221,7 +221,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             value={expected}
             onChange={(e) => setExpected(e.target.value)}
             maxLength={300}
-            className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-3 text-sm text-tg-text"
+            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
           />
         </label>
 
@@ -232,7 +232,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
               type="date"
               value={shiftDate}
               onChange={(e) => setShiftDate(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
           <label className="block text-xs text-tg-hint">
@@ -242,7 +242,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
               onChange={(e) =>
                 setPriority(e.target.value as "low" | "normal" | "high")
               }
-              className="mt-1 min-h-11 w-full rounded-lg bg-tg-bg/60 px-2 text-sm text-tg-text"
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
               <option value="low">низкий</option>
               <option value="normal">обычный</option>
@@ -264,7 +264,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           />
         </div>
 
-        <div className="rounded-lg bg-tg-bg/50 p-2.5">
+        <div className="rounded-tile bg-tg-bg/50 p-2.5">
           <div className="text-xs text-tg-hint">
             Срок — дата, время и секунды. Пусто = без срока.
           </div>
@@ -275,7 +275,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
             </label>
             <label className="block text-xs text-tg-hint">
@@ -285,7 +285,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 step={1}
                 value={dueTime}
                 onChange={(e) => setDueTime(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
             </label>
             <label className="block text-xs text-tg-hint">
@@ -294,7 +294,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 inputMode="numeric"
                 value={dueSeconds}
                 onChange={(e) => setDueSeconds(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                className="mt-1 min-h-11 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text tabular-nums"
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text tabular-nums"
               />
             </label>
           </div>
@@ -339,7 +339,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           type="button"
           disabled={create.isPending}
           onClick={() => create.mutate()}
-          className="min-h-11 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+          className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
           {create.isPending ? "Создаю…" : "Создать поручение"}
         </button>
@@ -348,7 +348,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       <section className="space-y-2">
         <div className="text-sm font-semibold text-tg-text">Последние поручения</div>
         {(tasksQ.data ?? []).slice(0, 20).map((task) => (
-          <article key={task.id} className="rounded-xl bg-tg-secondary-bg/60 p-3">
+          <article key={task.id} className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <div className="text-sm font-medium text-tg-text break-words">
@@ -372,7 +372,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   const ok = await showConfirm(`Закрыть «${task.title}»?`);
                   if (ok) close.mutate(task);
                 }}
-                className="mt-2 min-h-9 rounded-lg bg-tg-bg/60 px-3 text-xs text-tg-text"
+                className="mt-2 min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text"
               >
                 Зачесть выполненным
               </button>
@@ -380,7 +380,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           </article>
         ))}
         {tasksQ.data?.length === 0 && (
-          <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+          <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
             Пока пусто — создай первое поручение выше.
           </div>
         )}
@@ -408,7 +408,7 @@ function Check({
         onChange(!checked);
       }}
       className={[
-        "min-h-9 rounded-lg px-3 text-xs",
+        "min-h-9 rounded-tile px-3 text-xs",
         checked ? "bg-tg-button text-tg-button-text" : "bg-tg-bg/60 text-tg-hint",
       ].join(" ")}
     >

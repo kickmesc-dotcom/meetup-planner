@@ -434,7 +434,7 @@ export function MiniPlayerBar({
     <div
       data-testid="mini-player"
       className={[
-        "flex flex-col gap-2 rounded-xl bg-tg-secondary-bg/80 px-3 py-2.5",
+        "flex flex-col gap-2 rounded-card bg-tg-secondary-bg/80 px-3 py-2.5",
         className ?? "",
       ].join(" ")}
     >

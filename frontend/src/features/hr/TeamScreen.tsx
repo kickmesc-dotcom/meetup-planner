@@ -77,7 +77,7 @@ export default function TeamScreen({
               haptic("light");
               onBack();
             }}
-            className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
+            className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
             aria-label="Назад"
           >
             ‹
@@ -96,7 +96,7 @@ export default function TeamScreen({
         <button
           type="button"
           onClick={() => void dashboard.refetch()}
-          className="min-h-11 min-w-11 rounded-lg px-2 text-xs text-tg-link"
+          className="min-h-11 min-w-11 rounded-tile px-2 text-xs text-tg-link"
         >
           ⟳
         </button>
@@ -131,7 +131,7 @@ export default function TeamScreen({
             </section>
 
             {dashboard.data.attention.length > 0 && (
-              <section className="rounded-xl bg-status-busy/10 p-3">
+              <section className="rounded-card bg-status-busy/10 p-3">
                 <h2 className="text-sm font-semibold text-status-busy">
                   Требует внимания
                 </h2>
@@ -160,7 +160,7 @@ export default function TeamScreen({
               </section>
             )}
 
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <h2 className="text-sm font-semibold text-tg-text">Подразделения</h2>
               <div className="mt-2 space-y-2">
                 {dashboard.data.departments.length === 0 && (
@@ -172,7 +172,7 @@ export default function TeamScreen({
               </div>
             </section>
 
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-tg-text">Сотрудники</h2>
                 <span className="text-xs tabular-nums text-tg-hint">
@@ -186,7 +186,7 @@ export default function TeamScreen({
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Найти человека или должность"
                 aria-label="Поиск по сотрудникам"
-                className="mt-2 min-h-9 w-full rounded-lg bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+                className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
               />
               <div className="mt-2 space-y-1.5">
                 {employees.length === 0 && (
@@ -201,7 +201,7 @@ export default function TeamScreen({
             </section>
 
             {dashboard.data.activity.length > 0 && (
-              <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+              <section className="rounded-card bg-tg-secondary-bg/60 p-3">
                 <h2 className="text-sm font-semibold text-tg-text">Последние действия</h2>
                 <ul className="mt-2 space-y-1">
                   {dashboard.data.activity.map((item, index) => (
@@ -223,7 +223,7 @@ export default function TeamScreen({
             )}
 
             {canManage && (
-              <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+              <section className="rounded-card bg-tg-secondary-bg/60 p-3">
                 <button
                   type="button"
                   onClick={() => {
@@ -265,7 +265,7 @@ function Tile({
   danger?: boolean;
 }) {
   return (
-    <div className="rounded-lg bg-tg-secondary-bg/60 p-2">
+    <div className="rounded-tile bg-tg-secondary-bg/60 p-2">
       <div className={`text-lg font-semibold tabular-nums ${danger ? "text-status-busy" : "text-tg-text"}`}>
         {value}
       </div>
@@ -277,7 +277,7 @@ function Tile({
 function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
   const percent = row.employees ? Math.round((100 * row.done) / row.employees) : 0;
   return (
-    <div className="rounded-lg bg-tg-bg/50 p-2">
+    <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="flex items-center gap-2">
         <span aria-hidden>{row.emoji ?? "•"}</span>
         <span className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text">
@@ -313,7 +313,7 @@ function EmployeeRow({ employee }: { employee: HrDashboardEmployee }) {
       ? Math.round((100 * employee.checklist_done) / employee.checklist_total)
       : 0;
   return (
-    <div className="rounded-lg bg-tg-bg/50 p-2">
+    <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="flex min-w-0 items-center gap-2">
         <span className="min-w-0 flex-1 truncate text-xs text-tg-text">
           {employee.display_name}
@@ -387,7 +387,7 @@ function WorkHoursPanel() {
   return (
     <div className="mt-2 space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <label className="rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-hint">
+        <label className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
           Открытие
           <input
             type="time"
@@ -396,7 +396,7 @@ function WorkHoursPanel() {
             className="mt-1 w-full bg-transparent text-sm text-tg-text outline-none"
           />
         </label>
-        <label className="rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-hint">
+        <label className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
           Закрытие
           <input
             type="time"
@@ -410,12 +410,12 @@ function WorkHoursPanel() {
         type="button"
         disabled={save.isPending}
         onClick={() => save.mutate({ work_open: openValue, work_close: closeValue })}
-        className="min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+        className="min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
       >
         Сохранить часы
       </button>
 
-      <label className="flex items-center justify-between rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-text">
+      <label className="flex items-center justify-between rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-text">
         <span>Алерты только в рабочее время</span>
         <input
           type="checkbox"
@@ -427,7 +427,7 @@ function WorkHoursPanel() {
         />
       </label>
 
-      <div className="rounded-lg bg-tg-bg/50 p-2">
+      <div className="rounded-tile bg-tg-bg/50 p-2">
         <label className="flex items-center justify-between text-xs text-tg-text">
           <span>Вторая ступень: пинг админам</span>
           <input
@@ -447,7 +447,7 @@ function WorkHoursPanel() {
             onChange={(event) =>
               save.mutate({ escalation_second_hours: Number(event.target.value) })
             }
-            className="min-h-9 rounded-lg border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text disabled:opacity-50"
+            className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text disabled:opacity-50"
             aria-label="Порог второй ступени, часы"
           >
             {[...new Set([1, 2, 4, 8, 12, 24, 48, data.escalation_second_hours])]
@@ -473,7 +473,7 @@ function WorkHoursPanel() {
         </label>
       </div>
 
-      <div className="rounded-lg bg-tg-bg/50 p-2">
+      <div className="rounded-tile bg-tg-bg/50 p-2">
         <div className="text-xs text-tg-hint">
           {data.muted_until
             ? `Мьют до ${formatDateTime(data.muted_until)}`
@@ -568,7 +568,7 @@ function DangerZone() {
   };
 
   return (
-    <div className="mt-3 rounded-lg border border-status-busy/30 bg-status-busy/5 p-2">
+    <div className="mt-3 rounded-tile border border-status-busy/30 bg-status-busy/5 p-2">
       <div className="text-xs font-medium text-status-busy">
         Опасная зона
       </div>
@@ -580,7 +580,7 @@ function DangerZone() {
         type="button"
         disabled={busy}
         onClick={() => void run()}
-        className="mt-2 min-h-9 w-full rounded-lg bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
+        className="mt-2 min-h-9 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
       >
         {busy ? "Считаем…" : "🧹 Сбросить текущую работу"}
       </button>

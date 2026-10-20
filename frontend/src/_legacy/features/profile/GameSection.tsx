@@ -95,7 +95,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
 
   if (!profile) {
     return (
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-4">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-4">
         <ListSkeleton rows={2} />
       </section>
     );
@@ -104,7 +104,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
   if (!g.enabled || !g.rank) return null;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-4 space-y-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-4 space-y-3">
       {g.level_up && (
         <LevelUpNotice
           levelUp={g.level_up}
@@ -124,7 +124,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
                   type="button"
                   title={f.description || undefined}
                   onClick={() => goToFeature(f.tab, f.anchor, f.admin_section)}
-                  className="rounded-md bg-tg-button/10 px-2 py-0.5 text-xs text-tg-link active:scale-[0.97]"
+                  className="rounded-tile bg-tg-button/10 px-2 py-0.5 text-xs text-tg-link active:scale-[0.97]"
                 >
                   {f.title} →
                 </button>
@@ -132,7 +132,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
                 <span
                   key={f.code}
                   title={f.description || undefined}
-                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-xs text-tg-hint"
+                  className="rounded-tile bg-tg-bg/50 px-2 py-0.5 text-xs text-tg-hint"
                 >
                   {f.title}
                 </span>
@@ -168,7 +168,7 @@ export function GameDetails({ profile }: { profile: GameProfile | undefined }) {
             haptic("selection");
             setShowRules((v) => !v);
           }}
-          className="min-h-9 rounded-md text-xs text-tg-link"
+          className="min-h-9 rounded-tile text-xs text-tg-link"
           aria-expanded={showRules}
         >
           {showRules ? "▾ Скрыть" : "▸ За что дают опыт"}
@@ -258,7 +258,7 @@ function CustomizeSection({ profile }: { profile: GameProfile }) {
         type="button"
         onClick={() => save.mutate(patch)}
         disabled={!dirty || save.isPending}
-        className="min-h-9 w-full rounded-md bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+        className="min-h-9 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
       >
         {save.isPending ? "Сохраняем…" : "Сохранить"}
       </button>
@@ -285,7 +285,7 @@ function Field({
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-0.5 w-full rounded-lg bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+        className="mt-0.5 w-full rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
       />
     </label>
   );
@@ -302,7 +302,7 @@ function LevelUpNotice({
   pending: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-tg-button/40 bg-tg-button/10 p-3">
+    <div className="rounded-tile border border-tg-button/40 bg-tg-button/10 p-3">
       <div className="text-sm font-semibold text-tg-text">🎉 Новый ранг!</div>
       <div className="mt-1 text-xs text-tg-hint">
         {levelUp.from_rank} → <span className="text-tg-text">{levelUp.to_rank}</span>
@@ -321,7 +321,7 @@ function LevelUpNotice({
                 <button
                   type="button"
                   onClick={() => goToFeature(f.tab, f.anchor, f.admin_section)}
-                  className="mt-1 ml-3 rounded-md bg-tg-button/15 px-2 py-0.5 text-xs font-medium text-tg-link active:scale-[0.97]"
+                  className="mt-1 ml-3 rounded-tile bg-tg-button/15 px-2 py-0.5 text-xs font-medium text-tg-link active:scale-[0.97]"
                 >
                   Открыть и применить →
                 </button>
@@ -334,7 +334,7 @@ function LevelUpNotice({
         type="button"
         onClick={onAck}
         disabled={pending}
-        className="mt-2 min-h-9 rounded-md bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-2 min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
       >
         Понятно
       </button>
@@ -398,7 +398,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-semibold">🏅 Мои ачивки</h2>
           <span className="text-xs text-tg-hint tabular-nums">
@@ -425,7 +425,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
               <li
                 key={a.code}
                 className={[
-                  "flex items-start gap-2 rounded-lg px-2 py-1.5",
+                  "flex items-start gap-2 rounded-tile px-2 py-1.5",
                   a.collected ? "bg-tg-bg/50" : "opacity-45",
                 ].join(" ")}
               >
@@ -434,7 +434,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   <div className="flex items-baseline justify-between gap-2">
                     <span className="min-w-0 truncate text-sm font-medium text-tg-text">
                       {a.title}
-                      <span className="ml-1.5 rounded bg-tg-hint/15 px-1 py-0.5 align-middle text-2xs font-normal text-tg-hint">
+                      <span className="ml-1.5 rounded-tile bg-tg-hint/15 px-1 py-0.5 align-middle text-2xs font-normal text-tg-hint">
                         {a.tiers.length > 0
                           ? "разовая + юбилеи"
                           : a.kind === "threshold"
@@ -457,7 +457,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
                   {a.tiers.length > 0 ? (
                     <div className="mt-1.5 space-y-1">
                       <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-2xs text-tg-hint">
-                        <span className="rounded bg-tg-hint/15 px-1 py-0.5">разовая</span>
+                        <span className="rounded-tile bg-tg-hint/15 px-1 py-0.5">разовая</span>
                         <span className={a.collected ? "text-status-free" : ""}>
                           {a.collected ? "✅ взята" : "▫️ пока нет"}
                         </span>
@@ -504,7 +504,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
 
       {/* Вместо списка имён «кто сколько собрал» — сводка «сколько % участников
           имеют такую»: имена для этой задачи не нужны, а сравнимость лучше. */}
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <h2 className="text-base font-semibold">🏆 Редкость ачивок</h2>
         <div className="text-xs text-tg-hint mb-2">Сколько % участников её имеют</div>
         {stats.isPending ? (
@@ -538,7 +538,7 @@ export function AchievementsScreen({ users }: { users: User[] }) {
 
       {/* GHG11: праздники переехали в админку («Настройки») — из профиля убраны. */}
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <h2 className="text-base font-semibold">📈 Ранги участников</h2>
         <div className="text-xs text-tg-hint mb-2">Опыт и ранг каждого</div>
         {ranks.isPending ? (

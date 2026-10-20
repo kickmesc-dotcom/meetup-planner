@@ -86,7 +86,7 @@ export default function GuestProfileScreen({
             onClose();
           }}
           aria-label="Закрыть профиль"
-          className="rounded-lg bg-tg-secondary-bg/70 px-2.5 py-1.5 text-sm font-medium text-tg-text active:scale-[0.98]"
+          className="rounded-tile bg-tg-secondary-bg/70 px-2.5 py-1.5 text-sm font-medium text-tg-text active:scale-[0.98]"
         >
           ← Назад
         </button>
@@ -112,7 +112,7 @@ export default function GuestProfileScreen({
         )}
 
         {p && !p.enabled && (
-          <section className="rounded-xl bg-tg-secondary-bg/60 p-3 text-sm text-tg-hint">
+          <section className="rounded-card bg-tg-secondary-bg/60 p-3 text-sm text-tg-hint">
             Игровая система сейчас выключена — профиль показывать нечего.
           </section>
         )}
@@ -158,7 +158,7 @@ function MainPlaque({ p }: { p: GuestProfile }) {
   const hasState = !!(p.today?.loser || p.today?.chukhan || p.today?.worm);
   const total = p.xp_into_level + (p.xp_to_next ?? 0);
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-4">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-4">
       <div className="flex items-center gap-3">
         <div
           className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full text-xl font-semibold text-white"
@@ -189,7 +189,7 @@ function MainPlaque({ p }: { p: GuestProfile }) {
 
       {/* «Сколько до следующего» — как в своём профиле. На максимуме — престиж. */}
       {p.at_max ? (
-        <div className="mt-3 flex items-center justify-between rounded-lg bg-tg-bg/50 px-3 py-2">
+        <div className="mt-3 flex items-center justify-between rounded-tile bg-tg-bg/50 px-3 py-2">
           <span className="text-xs text-tg-hint">Максимальный ранг</span>
           <span className="text-sm text-tg-text">
             ✦ Престиж <span className="font-bold tabular-nums">{p.prestige}</span>
@@ -246,7 +246,7 @@ function StateRow({
   reason: string | null;
 }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg bg-tg-bg/40 px-2 py-1.5">
+    <div className="flex items-start gap-2 rounded-tile bg-tg-bg/40 px-2 py-1.5">
       <span className="shrink-0 text-sm leading-tight">{icon}</span>
       <div className="min-w-0 flex-1">
         <div className="text-xs font-semibold text-tg-text">{label}</div>
@@ -307,7 +307,7 @@ function AchievementsBlock({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60">
+    <section className="rounded-card bg-tg-secondary-bg/60">
       <button
         type="button"
         onClick={() => {
@@ -389,7 +389,7 @@ function CollapsibleHistory({
 
   if (events.length === 0) {
     return (
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold">{title}</div>
         <div className="mt-1 text-xs text-tg-hint">{empty}</div>
       </section>
@@ -397,7 +397,7 @@ function CollapsibleHistory({
   }
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60">
+    <section className="rounded-card bg-tg-secondary-bg/60">
       <button
         type="button"
         onClick={() => {
@@ -421,7 +421,7 @@ function CollapsibleHistory({
                 key={`${e.at}-${i}`}
                 data-stripe={i % 2 === 0 ? "dark" : "light"}
                 className={[
-                  "rounded-md px-2 py-1 text-xs leading-snug text-tg-text [word-break:break-word]",
+                  "rounded-tile px-2 py-1 text-xs leading-snug text-tg-text [word-break:break-word]",
                   i % 2 === 0 ? "bg-tg-bg/60" : "bg-tg-hint/10",
                 ].join(" ")}
               >
@@ -506,11 +506,11 @@ function RecentActivity({ recent }: { recent: GuestRecent[] }) {
   if (recent.length === 0) return null;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="text-sm font-semibold">🕘 Последняя активность</div>
       <div className="mt-2 space-y-1.5">
         {recent.map((r) => (
-          <div key={r.kind} className="rounded-lg bg-tg-bg/40 px-2 py-1.5">
+          <div key={r.kind} className="rounded-tile bg-tg-bg/40 px-2 py-1.5">
             <div className="flex items-start gap-2">
               <span className="shrink-0 text-sm leading-tight">{r.icon}</span>
               <div className="min-w-0 flex-1">
@@ -569,7 +569,7 @@ function MediaThumb({
       <div
         data-testid="media-thumb"
         title="Превью недоступно"
-        className="mt-1.5 flex h-20 w-20 items-center justify-center rounded-lg bg-tg-bg/60 text-xl opacity-70"
+        className="mt-1.5 flex h-20 w-20 items-center justify-center rounded-tile bg-tg-bg/60 text-xl opacity-70"
       >
         {mediaIcon(mediaType)}
       </div>
@@ -583,7 +583,7 @@ function MediaThumb({
         haptic("light");
         onOpen();
       }}
-      className="mt-1.5 block h-20 w-20 overflow-hidden rounded-lg bg-tg-bg/60"
+      className="mt-1.5 block h-20 w-20 overflow-hidden rounded-tile bg-tg-bg/60"
     >
       <img
         src={apiPublicUrl(`/api/media/${postId}`)}
@@ -635,7 +635,7 @@ function GuestAchievementRow({
         haptic("light");
         setOpen((v) => !v);
       }}
-      className="cursor-pointer rounded-lg bg-tg-bg/40 px-2 py-1.5"
+      className="cursor-pointer rounded-tile bg-tg-bg/40 px-2 py-1.5"
     >
       <div className="flex items-center gap-2 text-xs text-tg-text">
         <span className="w-5 shrink-0 text-center text-sm">{a.icon}</span>
@@ -732,7 +732,7 @@ function Stat({
   hint?: string;
 }) {
   return (
-    <div className="rounded-xl bg-tg-secondary-bg/60 px-3 py-2">
+    <div className="rounded-card bg-tg-secondary-bg/60 px-3 py-2">
       <div className="text-2xs text-tg-hint">{label}</div>
       <div className="text-sm font-semibold tabular-nums text-tg-text">{value}</div>
       {hint && <div className="mt-0.5 text-2xs leading-tight text-tg-hint">{hint}</div>}

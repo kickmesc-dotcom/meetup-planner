@@ -62,7 +62,7 @@ function LikeButton({ track }: { track: MusicWeekTrack }) {
       type="button"
       onClick={() => like.mutate()}
       disabled={like.isPending}
-      className="shrink-0 rounded-md bg-tg-bg/60 px-2 py-1 text-xs tabular-nums disabled:opacity-50"
+      className="shrink-0 rounded-tile bg-tg-bg/60 px-2 py-1 text-xs tabular-nums disabled:opacity-50"
       aria-label={track.liked ? "Убрать лайк" : "Поставить лайк"}
     >
       {track.liked ? "❤️" : "🤍"} {track.likes}
@@ -101,13 +101,13 @@ function AddTrackForm() {
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className="w-full rounded-lg bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+        className="w-full rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
       />
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Название (необязательно)"
-        className="w-full rounded-lg bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+        className="w-full rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
       />
       <button
         type="button"
@@ -116,7 +116,7 @@ function AddTrackForm() {
           haptic("selection");
           add.mutate();
         }}
-        className="w-full rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-50"
+        className="w-full rounded-tile bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-50"
       >
         {add.isPending ? "Добавляем…" : "Добавить трек по ссылке"}
       </button>
@@ -150,7 +150,7 @@ function addTrackStatus(status: string): string {
 function WeekTracksSection({ week }: { week: MusicWeek }) {
   const player = useGlobalPlayer();
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-base font-semibold">📻 Подборка недели</div>
         <span className="shrink-0 text-xs tabular-nums text-tg-hint">
@@ -214,7 +214,7 @@ export function MusicScreen() {
   if (!data?.enabled) {
     return (
       <div className="flex-1 overflow-y-auto p-3">
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-4 text-sm text-tg-hint">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-4 text-sm text-tg-hint">
           🎧 Музыкальная предложка сейчас выключена.
         </section>
       </div>
@@ -229,10 +229,10 @@ export function MusicScreen() {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-4">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-base font-semibold">🎧 Моя неделя</div>
-          <span className="shrink-0 rounded-md bg-tg-bg/60 px-2 py-0.5 text-xs tabular-nums text-tg-hint">
+          <span className="shrink-0 rounded-tile bg-tg-bg/60 px-2 py-0.5 text-xs tabular-nums text-tg-hint">
             осталось {left} из {data.per_user_weekly}
           </span>
         </div>
@@ -244,7 +244,7 @@ export function MusicScreen() {
         <AddTrackForm />
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold">Сдано на этой неделе</div>
         <div className="mb-2 text-xs text-tg-hint">
           {data.tracks.length
@@ -270,7 +270,7 @@ export function MusicScreen() {
                     )}
                   </div>
                   <span
-                    className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${badge.className}`}
+                    className={`shrink-0 rounded-tile px-2 py-0.5 text-xs ${badge.className}`}
                   >
                     {badge.text}
                   </span>
@@ -284,7 +284,7 @@ export function MusicScreen() {
       {week && week.tracks.length > 0 && <WeekTracksSection week={week} />}
 
       {top.length > 0 && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <div className="text-base font-semibold">🏆 Топ недели</div>
           <div className="mb-2 text-xs text-tg-hint">По лайкам за 7 дней</div>
           <div className="divide-y divide-tg-bg/40">
@@ -305,7 +305,7 @@ export function MusicScreen() {
         </section>
       )}
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold">📀 Прошлые подборки</div>
         <div className="mb-2 text-xs text-tg-hint">Последние 10 сборок</div>
         {!data.history.length ? (

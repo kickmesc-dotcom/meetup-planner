@@ -68,7 +68,7 @@ function RatingTop({ users }: { users: User[] }) {
   return (
     <section
       data-testid="rating-top"
-      className="rounded-xl bg-tg-secondary-bg border border-tg-hint/10 p-3"
+      className="rounded-card bg-tg-secondary-bg border border-tg-hint/10 p-3"
     >
       <header className="flex items-center gap-2">
         <span
@@ -163,7 +163,7 @@ function RatingTop({ users }: { users: User[] }) {
                   title={`Собрано ачивок: ${r.achievements_collected ?? 0} из ${
                     r.achievements_total ?? 0
                   }`}
-                  className="shrink-0 rounded-md bg-tg-bg/60 px-1.5 py-0.5 text-2xs tabular-nums text-tg-text"
+                  className="shrink-0 rounded-tile bg-tg-bg/60 px-1.5 py-0.5 text-2xs tabular-nums text-tg-text"
                 >
                   🏅 {r.achievements_percent ?? 0}%
                 </span>
@@ -198,7 +198,7 @@ function Section({
   const max = sorted[0]?.count ?? 1;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg border border-tg-hint/10 p-3">
+    <section className="rounded-card bg-tg-secondary-bg border border-tg-hint/10 p-3">
       <header className="flex items-center gap-2">
         <span
           aria-hidden

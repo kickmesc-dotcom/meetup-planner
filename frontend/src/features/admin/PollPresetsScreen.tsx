@@ -62,7 +62,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
       onBack={onBack}
     >
       {q.isPending || !q.data ? (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <ListSkeleton rows={4} />
         </section>
       ) : (
@@ -89,7 +89,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
                 haptic("selection");
                 setDraft((d) => [...d, { start: "20:00", end: "23:00" }]);
               }}
-              className="rounded-lg bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
+              className="rounded-tile bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
             >
               ➕ слот
             </button>
@@ -99,7 +99,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
                 haptic("warning");
                 setDraft(DEFAULTS.map((p) => ({ ...p })));
               }}
-              className="rounded-lg bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
+              className="rounded-tile bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
             >
               ↻ дефолт
             </button>
@@ -112,13 +112,13 @@ export default function PollPresetsScreen({ onBack }: Props) {
               haptic("medium");
               save.mutate(draft);
             }}
-            className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
             {save.isPending ? "Сохраняем…" : allValid ? "💾 Сохранить" : "⚠ Проверь HH:MM"}
           </button>
           {save.isError && (
-            <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+            <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
               ⚠ {humanizeApiError(save.error)}
             </div>
           )}
@@ -140,21 +140,21 @@ function PresetRow({
   const valid = isValid(preset);
   return (
     <section
-      className={`rounded-xl p-3 ${valid ? "bg-tg-secondary-bg/60" : "bg-status-busy/10 ring-1 ring-status-busy/40"}`}
+      className={`rounded-card p-3 ${valid ? "bg-tg-secondary-bg/60" : "bg-status-busy/10 ring-1 ring-status-busy/40"}`}
     >
       <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-center">
         <input
           type="time"
           value={preset.start}
           onChange={(e) => onChange({ ...preset, start: e.target.value })}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text border-2 border-tg-secondary-bg/80 focus:border-tg-link outline-none"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text border-2 border-tg-secondary-bg/80 focus:border-tg-link outline-none"
         />
         <span className="text-tg-hint">→</span>
         <input
           type="time"
           value={preset.end}
           onChange={(e) => onChange({ ...preset, end: e.target.value })}
-          className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text border-2 border-tg-secondary-bg/80 focus:border-tg-link outline-none"
+          className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text border-2 border-tg-secondary-bg/80 focus:border-tg-link outline-none"
         />
         <button
           type="button"
@@ -162,7 +162,7 @@ function PresetRow({
             haptic("warning");
             onRemove();
           }}
-          className="rounded-lg bg-status-busy/20 px-2 py-2 text-status-busy"
+          className="rounded-tile bg-status-busy/20 px-2 py-2 text-status-busy"
           aria-label="Удалить"
         >
           ✕

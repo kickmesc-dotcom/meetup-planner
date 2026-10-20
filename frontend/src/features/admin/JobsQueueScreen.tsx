@@ -103,7 +103,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
       subtitle="APScheduler-job'ы + напоминания встреч"
       onBack={onBack}
     >
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="text-base font-semibold">📋 Очередь</div>
           <button
@@ -113,7 +113,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
               enterHotMode();
               jobs.refetch();
             }}
-            className="shrink-0 rounded-md bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint active:scale-95 transition-transform"
+            className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint active:scale-95 transition-transform"
             title="Обновить и опрашивать чаще 3 минуты"
           >
             ↻ {isHot ? "тик 5с" : "тик 10м"}
@@ -137,7 +137,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
             }
           }}
           disabled={collapse.isPending}
-          className="mb-2 w-full rounded-lg bg-status-busy/15 px-3 py-2 text-xs font-semibold text-status-busy active:scale-[0.99] disabled:opacity-50"
+          className="mb-2 w-full rounded-tile bg-status-busy/15 px-3 py-2 text-xs font-semibold text-status-busy active:scale-[0.99] disabled:opacity-50"
         >
           {collapse.isPending
             ? "Пересобираем…"
@@ -205,7 +205,7 @@ function JobRow({
       : "Пропустить ближайший запуск";
 
   return (
-    <div className="rounded-lg bg-tg-bg/50 px-2 py-1.5">
+    <div className="rounded-tile bg-tg-bg/50 px-2 py-1.5">
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
           <div className="text-sm truncate text-tg-text">{job.label}</div>
@@ -237,7 +237,7 @@ function JobRow({
                 setEditing((v) => !v);
               }}
               disabled={pending}
-              className="min-h-11 min-w-11 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-text border border-tg-hint/30 disabled:opacity-40"
+              className="min-h-11 min-w-11 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-text border border-tg-hint/30 disabled:opacity-40"
               title="Изменить время"
             >
               ✎
@@ -246,7 +246,7 @@ function JobRow({
               type="button"
               onClick={onCancel}
               disabled={pending}
-              className="min-h-11 min-w-11 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-40 inline-flex items-center justify-center"
+              className="min-h-11 min-w-11 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-40 inline-flex items-center justify-center"
               title={cancelTitle}
             >
               {pending ? <Spinner /> : cancelLabel}
@@ -260,7 +260,7 @@ function JobRow({
             type="datetime-local"
             value={localValue}
             onChange={(e) => setLocalValue(e.target.value)}
-            className="flex-1 rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+            className="flex-1 rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
           />
           <button
             type="button"
@@ -275,7 +275,7 @@ function JobRow({
               onReschedule(iso);
             }}
             disabled={pending}
-            className="min-h-11 rounded-md bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+            className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
           >
             💾
           </button>

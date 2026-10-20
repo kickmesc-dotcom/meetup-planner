@@ -62,7 +62,7 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
           <h2 className="text-xs font-medium uppercase tracking-wide text-tg-hint">
             {group.label}
           </h2>
-          <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+          <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
             {group.items.map((item, index) => (
               <JournalRow
                 key={`${item.at}-${item.task_id ?? "x"}-${index}`}

@@ -81,10 +81,10 @@ export default function App() {
   if (me.isPending || users.isPending) {
     return (
       <div className="mx-auto flex h-full w-full max-w-[560px] flex-col p-4 gap-3 animate-pulse">
-        <div className="h-12 rounded-xl bg-tg-secondary-bg/60" />
-        <div className="h-24 rounded-xl bg-tg-secondary-bg/60" />
-        <div className="h-24 rounded-xl bg-tg-secondary-bg/60" />
-        <div className="flex-1 rounded-xl bg-tg-secondary-bg/40" />
+        <div className="h-12 rounded-card bg-tg-secondary-bg/60" />
+        <div className="h-24 rounded-card bg-tg-secondary-bg/60" />
+        <div className="h-24 rounded-card bg-tg-secondary-bg/60" />
+        <div className="flex-1 rounded-card bg-tg-secondary-bg/40" />
       </div>
     );
   }

@@ -447,7 +447,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
             type="button"
             onClick={() => q.fetchNextPage()}
             disabled={q.isFetchingNextPage}
-            className="w-full rounded-xl bg-tg-secondary-bg/70 py-2.5 text-sm font-medium text-tg-text active:scale-[0.99] disabled:opacity-60"
+            className="w-full rounded-card bg-tg-secondary-bg/70 py-2.5 text-sm font-medium text-tg-text active:scale-[0.99] disabled:opacity-60"
           >
             {q.isFetchingNextPage ? "Грузим…" : "Показать ещё"}
           </button>
@@ -457,7 +457,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
       {/* GHG11: плашка-отмена поверх ленты. */}
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-20 z-40 flex justify-center px-4">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-xl bg-tg-secondary-bg px-3 py-2 shadow-lg">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-card bg-tg-secondary-bg px-3 py-2 shadow-lg">
             <span className="text-xs text-tg-text">{toast.text}</span>
             {toast.undo && (
               <button
@@ -473,7 +473,7 @@ export default function FeedScreen({ meId }: { meId: number }) {
                   }
                   void invalidateFeed();
                 }}
-                className="shrink-0 rounded-lg bg-tg-link/15 px-2.5 py-1 text-xs font-semibold text-tg-link"
+                className="shrink-0 rounded-tile bg-tg-link/15 px-2.5 py-1 text-xs font-semibold text-tg-link"
               >
                 Отменить
               </button>
@@ -705,13 +705,13 @@ function FeedActions({
 
       {/* GHG11(3): сценарий шара — вопрос + радио «в ленту / в шапку». */}
       {showAdvice && (
-        <div className="mt-2 space-y-2 rounded-xl bg-tg-bg/60 px-3 py-2">
+        <div className="mt-2 space-y-2 rounded-card bg-tg-bg/60 px-3 py-2">
           <input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="Вопрос шару (необязательно)"
             maxLength={500}
-            className="w-full rounded-lg bg-tg-secondary-bg px-2 py-1.5 text-sm text-tg-text outline-none"
+            className="w-full rounded-tile bg-tg-secondary-bg px-2 py-1.5 text-sm text-tg-text outline-none"
           />
           <div className="flex gap-1.5">
             <TargetRadio
@@ -732,12 +732,12 @@ function FeedActions({
               haptic("medium");
               advice.mutate();
             }}
-            className="w-full rounded-lg bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text disabled:opacity-50"
+            className="w-full rounded-tile bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
             {advice.isPending ? "Крутим…" : "Закрутить шар"}
           </button>
           {adviceTarget === "header" && advice.data?.ok && advice.data.text && (
-            <div className="rounded-lg bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text">
+            <div className="rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text">
               <span className="mr-1">🔮</span>
               {advice.data.text}
             </div>
@@ -747,7 +747,7 @@ function FeedActions({
 
       {/* GHG11: действия червя доступны только его владельцу. */}
       {isWormOwner && (
-        <div className="mt-2 rounded-xl bg-tg-bg/60 px-3 py-2">
+        <div className="mt-2 rounded-card bg-tg-bg/60 px-3 py-2">
           <div className="text-xs text-tg-hint">
             🪱 Ты — червь-господин{ownerName ? ` (${ownerName})` : ""}. Передай власть:
           </div>
@@ -790,7 +790,7 @@ function WormTransfer() {
       <select
         value={target}
         onChange={(e) => setTarget(e.target.value)}
-        className="min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 py-1.5 text-sm"
+        className="min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 py-1.5 text-sm"
       >
         <option value="">Кому передать…</option>
         {users.map((u) => (
@@ -806,7 +806,7 @@ function WormTransfer() {
           haptic("medium");
           mut.mutate(Number(target));
         }}
-        className="shrink-0 rounded-lg bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text disabled:opacity-50"
+        className="shrink-0 rounded-tile bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
         {mut.isPending ? "…" : "Передать"}
       </button>
@@ -847,7 +847,7 @@ function TargetRadio({
         onClick();
       }}
       className={[
-        "flex-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+        "flex-1 rounded-tile px-2.5 py-1.5 text-xs font-medium transition-colors",
         active ? "bg-tg-link text-white" : "bg-tg-secondary-bg/80 text-tg-hint",
       ].join(" ")}
     >
@@ -862,7 +862,7 @@ function ActionChip({ onClick, label }: { onClick: () => void; label: string }) 
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg bg-tg-secondary-bg/80 px-2.5 py-1.5 text-xs font-medium text-tg-text active:scale-[0.97]"
+      className="rounded-tile bg-tg-secondary-bg/80 px-2.5 py-1.5 text-xs font-medium text-tg-text active:scale-[0.97]"
     >
       {label}
     </button>
@@ -1131,7 +1131,7 @@ export function FeedRow({
   return (
     // GHG11(12): iPhone-механика — карточка выезжает влево, из-под неё — плашка
     // «скрыть» (минус); полноценное удаление из ленты — только админу.
-    <div data-testid="feed-row" className="relative overflow-hidden rounded-2xl">
+    <div data-testid="feed-row" className="relative overflow-hidden rounded-card">
       <div
         className={[
           "absolute inset-y-0 right-0 flex items-stretch",
@@ -1173,7 +1173,7 @@ export function FeedRow({
         onClick={toggle}
         style={{ transform: `translateX(${dx}px)`, touchAction: "pan-y" }}
         className={[
-          "relative rounded-2xl bg-tg-bg transition-transform duration-150",
+          "relative rounded-card bg-tg-bg transition-transform duration-150",
           expandable && !playerLike ? "cursor-pointer active:scale-[0.99]" : "",
         ].join(" ")}
       >
@@ -1183,7 +1183,7 @@ export function FeedRow({
         <div
           aria-hidden
           className={[
-            "pointer-events-none absolute inset-0 rounded-2xl",
+            "pointer-events-none absolute inset-0 rounded-card",
             visual?.card ?? "bg-tg-secondary-bg/50",
           ].join(" ")}
         />
@@ -1259,7 +1259,7 @@ export function FeedRow({
                   if (!open) setPlayId(null);
                   setOpen((o) => !o);
                 }}
-                className="shrink-0 rounded-md px-1 text-base leading-none text-tg-hint active:scale-95"
+                className="shrink-0 rounded-tile px-1 text-base leading-none text-tg-hint active:scale-95"
               >
                 👁
               </button>
@@ -1305,7 +1305,7 @@ export function FeedRow({
                 setOpen((o) => !o);
               }}
               className={[
-                "mt-1 inline-flex w-fit items-center gap-1.5 rounded-md px-1.5 py-0.5",
+                "mt-1 inline-flex w-fit items-center gap-1.5 rounded-tile px-1.5 py-0.5",
                 "text-xs font-medium leading-tight tabular-nums text-tg-hint",
                 visual.countBg,
                 expandable ? "active:scale-[0.98]" : "",
@@ -1368,7 +1368,7 @@ export function FeedRow({
                 setPlayId(null);
                 setOpen(true);
               }}
-              className="mt-1 rounded-lg bg-tg-secondary-bg/80 px-2 py-1 text-xs font-medium text-tg-text"
+              className="mt-1 rounded-tile bg-tg-secondary-bg/80 px-2 py-1 text-xs font-medium text-tg-text"
             >
               {item.kind === "music" ? "🎧 Слушать и лайкать" : "🎙 Подробности и прослушать"}
             </button>
@@ -1421,7 +1421,7 @@ function FeedMediaPreview({
         data-testid="feed-media-thumb"
         title="Превью недоступно"
         aria-label="Превью медиа недоступно"
-        className="mt-1.5 flex h-16 w-16 items-center justify-center rounded-lg bg-tg-bg/60 text-lg opacity-70"
+        className="mt-1.5 flex h-16 w-16 items-center justify-center rounded-tile bg-tg-bg/60 text-lg opacity-70"
       >
         {mediaTypeIcon(mediaType)}
       </div>
@@ -1437,7 +1437,7 @@ function FeedMediaPreview({
           haptic("light");
           setOpen(true);
         }}
-        className="mt-1.5 block h-16 w-16 overflow-hidden rounded-lg bg-tg-bg/60"
+        className="mt-1.5 block h-16 w-16 overflow-hidden rounded-tile bg-tg-bg/60"
       >
         <img
           src={src}
@@ -1615,7 +1615,7 @@ export function FeedDetailPanel({
               {d.participants!.map((p, i) => (
                 <span
                   key={p.user_id ?? i}
-                  className="rounded-md bg-tg-bg/50 px-2 py-0.5 text-xs text-tg-hint"
+                  className="rounded-tile bg-tg-bg/50 px-2 py-0.5 text-xs text-tg-hint"
                 >
                   {p.role === "author" ? "🎼 " : "🎯 "}
                   {p.user_name ?? "участник"}
@@ -1647,7 +1647,7 @@ export function FeedDetailPanel({
             haptic("light");
             onClose();
           }}
-          className="w-full rounded-lg bg-tg-secondary-bg/70 py-1.5 text-xs font-medium text-tg-text active:scale-[0.99]"
+          className="w-full rounded-tile bg-tg-secondary-bg/70 py-1.5 text-xs font-medium text-tg-text active:scale-[0.99]"
         >
           ▲ Свернуть
         </button>
@@ -1777,7 +1777,7 @@ function SubmissionPlayer({
     <div
       onClick={(e) => e.stopPropagation()}
       className={[
-        "flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5",
+        "flex items-center gap-2 rounded-tile bg-tg-bg/50 px-2 py-1.5",
         compact && autoPlay ? "ring-1 ring-tg-link/40" : "",
       ].join(" ")}
     >
@@ -1863,7 +1863,7 @@ function MusicTrackRow({
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="flex items-center gap-2 rounded-lg bg-tg-bg/50 px-2 py-1.5"
+      className="flex items-center gap-2 rounded-tile bg-tg-bg/50 px-2 py-1.5"
     >
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-tg-text">

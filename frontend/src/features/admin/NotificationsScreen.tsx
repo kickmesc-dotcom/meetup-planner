@@ -133,7 +133,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
       subtitle="Что ушло и что запланировано"
       onBack={onBack}
     >
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">Мьют алертов</div>
         <p className="mt-1 text-xs text-tg-hint">
           {muted
@@ -177,7 +177,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         </p>
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">
           Написать сотруднику
         </div>
@@ -190,7 +190,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
           onChange={(event) =>
             setTarget(event.target.value ? Number(event.target.value) : null)
           }
-          className="mt-2 min-h-9 w-full rounded-lg bg-tg-bg/60 px-2 text-xs text-tg-text"
+          className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
         >
           <option value="">Выбери сотрудника</option>
           {people.map((card) => (
@@ -206,7 +206,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
           rows={2}
           maxLength={400}
           placeholder="Что сказать сотруднику"
-          className="mt-2 w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text placeholder:text-tg-hint"
+          className="mt-2 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text placeholder:text-tg-hint"
         />
         <button
           type="button"
@@ -215,7 +215,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             haptic("medium");
             send.mutate();
           }}
-          className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+          className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
         >
           Отправить
         </button>
@@ -236,7 +236,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                 срок.
               </p>
             )}
-            <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+            <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {q.data.pending.map((item) => (
                 <div
                   key={`${item.kind}-${item.task_id}-${item.at}`}
@@ -329,7 +329,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                 <h2 className="text-sm font-semibold text-tg-text">
                   Выключено ({q.data.disabled.length})
                 </h2>
-                <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+                <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
                   {q.data.disabled.map((item) => (
                     <div
                       key={`off-${item.task_id}-${item.employee_id}`}
@@ -370,7 +370,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             {q.data.items.length === 0 && (
               <p className="text-xs text-tg-hint">Колокольчики пока пустые.</p>
             )}
-            <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+            <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {q.data.items.map((item) => (
                 <div key={item.id} className="flex items-start gap-2 px-3 py-2.5">
                   <div className="min-w-0 flex-1">

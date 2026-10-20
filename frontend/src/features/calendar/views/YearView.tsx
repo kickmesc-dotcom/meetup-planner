@@ -39,7 +39,7 @@ export default function YearView({ anchor, ranges, users }: Props) {
             key={m.getMonth()}
             type="button"
             onClick={() => onMonthTap(m)}
-            className="bg-tg-secondary-bg/40 rounded-2xl p-2 text-left active:scale-95 transition-transform"
+            className="bg-tg-secondary-bg/40 rounded-card p-2 text-left active:scale-95 transition-transform"
           >
             <div className="text-xs font-semibold mb-1 capitalize">
               {ruMonthFull(m.getMonth())}
@@ -82,7 +82,7 @@ function MiniMonth({
           <div
             key={d.toISOString()}
             className={[
-              "aspect-square rounded-[3px] flex items-center justify-center text-3xs",
+              "aspect-square rounded-tile flex items-center justify-center text-3xs",
               inMonth ? "text-tg-text" : "text-muted",
               today ? "ring-1 ring-tg-link" : "",
               bg,

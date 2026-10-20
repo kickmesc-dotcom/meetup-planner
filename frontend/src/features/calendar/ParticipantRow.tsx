@@ -315,7 +315,7 @@ export default function ParticipantRow({
                         displayName: user.display_name,
                       });
                     }}
-                    className="absolute top-0.5 right-0.5 z-10 text-xs leading-none rounded-sm bg-tg-bg/70 px-0.5 active:scale-95"
+                    className="absolute top-0.5 right-0.5 z-10 text-xs leading-none rounded-tile bg-tg-bg/70 px-0.5 active:scale-95"
                   >
                     🎂
                   </button>

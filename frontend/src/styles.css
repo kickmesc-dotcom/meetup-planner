@@ -147,7 +147,6 @@ input {
   appearance: none;
   width: 20px;
   height: 20px;
-  border-radius: 6px;
   border: 2px solid var(--tg-theme-hint-color, #999999);
   background-color: var(--tg-theme-bg-color, #ffffff);
   display: inline-flex;
@@ -157,6 +156,9 @@ input {
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, transform 0.05s;
   position: relative;
+  /* VISUAL_AUDIT P1.6: тот же 8px, что у `rounded-tile`, иначе чекбокс выпадал
+     из шкалы (было 6px) и рядом с полями выглядел чужим. */
+  border-radius: 8px;
 }
 .chk-tg:checked {
   background-color: var(--tg-theme-link-color, #2481cc);

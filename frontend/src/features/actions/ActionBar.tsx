@@ -78,7 +78,7 @@ function ActionBtn({
       whileTap={{ scale: 0.94 }}
       transition={{ type: "spring", stiffness: 500, damping: 22 }}
       className={[
-        "min-h-12 rounded-xl py-3 text-sm font-medium inline-flex items-center justify-center gap-1.5",
+        "min-h-12 rounded-card py-3 text-sm font-medium inline-flex items-center justify-center gap-1.5",
         primary
           ? "bg-tg-button text-tg-button-text shadow-sm"
           : "bg-tg-secondary-bg",

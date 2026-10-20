@@ -96,7 +96,7 @@ export default function HandoversScreen() {
               haptic("light");
               setTab("tasks");
             }}
-            className="-ml-1 min-h-11 min-w-11 rounded-lg text-lg text-tg-hint"
+            className="-ml-1 min-h-11 min-w-11 rounded-tile text-lg text-tg-hint"
             aria-label="Назад к задачам"
           >
             ‹
@@ -119,7 +119,7 @@ export default function HandoversScreen() {
               haptic("light");
               setCreating(true);
             }}
-            className="min-h-9 shrink-0 rounded-lg bg-tg-button px-3 text-xs font-medium text-tg-button-text"
+            className="min-h-9 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
           >
             Сдать смену
           </button>
@@ -237,7 +237,7 @@ function HandoverCard({
   const card = detailQ.data ?? handover;
 
   return (
-    <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <article className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-tg-text">
@@ -264,7 +264,7 @@ function HandoverCard({
           haptic("light");
           setExpanded((v) => !v);
         }}
-        className="mt-2 min-h-8 rounded-lg bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
+        className="mt-2 min-h-8 rounded-tile bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
       >
         {handover.items_count > 0
           ? `Открытых пунктов: ${handover.items_count} ${expanded ? "▴" : "▾"}`
@@ -277,7 +277,7 @@ function HandoverCard({
           {card.items.map((item) => (
             <div
               key={`${item.kind}-${item.ref_id ?? item.id}-${item.id}`}
-              className="rounded-lg bg-tg-bg/50 px-2.5 py-1.5"
+              className="rounded-tile bg-tg-bg/50 px-2.5 py-1.5"
             >
               <div className="text-xs text-tg-text">
                 <span aria-hidden>{itemLabel(item)} </span>
@@ -303,7 +303,7 @@ function HandoverCard({
         </p>
       )}
       {handover.reject_reason && (
-        <p className="mt-2 rounded-lg bg-status-busy/10 px-2.5 py-1.5 text-xs text-status-busy">
+        <p className="mt-2 rounded-tile bg-status-busy/10 px-2.5 py-1.5 text-xs text-status-busy">
           Возвращено: {handover.reject_reason}
         </p>
       )}
@@ -320,7 +320,7 @@ function HandoverCard({
             type="button"
             disabled={busy}
             onClick={() => acceptM.mutate()}
-            className="min-h-10 rounded-lg bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+            className="min-h-10 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
             Принять смену
           </button>
@@ -331,7 +331,7 @@ function HandoverCard({
               haptic("light");
               setRejecting((v) => !v);
             }}
-            className="min-h-10 rounded-lg bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text disabled:opacity-50"
+            className="min-h-10 rounded-tile bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text disabled:opacity-50"
           >
             {rejecting ? "Отмена" : "Вернуть"}
           </button>
@@ -346,13 +346,13 @@ function HandoverCard({
             rows={2}
             maxLength={2000}
             placeholder="Почему не принимаешь? Без причины вернуть нельзя."
-            className="w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text"
+            className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
           />
           <button
             type="button"
             disabled={rejectM.isPending || reason.trim().length === 0}
             onClick={() => rejectM.mutate()}
-            className="mt-2 min-h-10 w-full rounded-lg bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
+            className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
           >
             Вернуть с причиной
           </button>
@@ -438,7 +438,7 @@ function CreateHandoverSheet({
         {(previewQ.data?.items ?? []).map((item) => (
           <div
             key={`${item.kind}-${item.ref_id ?? item.id}`}
-            className="rounded-lg bg-tg-secondary-bg/60 px-2.5 py-1.5"
+            className="rounded-tile bg-tg-secondary-bg/60 px-2.5 py-1.5"
           >
             <div className="text-xs text-tg-text">
               <span aria-hidden>{itemLabel(item)} </span>
@@ -465,7 +465,7 @@ function CreateHandoverSheet({
           rows={3}
           maxLength={2000}
           placeholder="Что важно знать: ключи, гости, недоделанное"
-          className="mt-1 w-full rounded-lg bg-tg-secondary-bg p-2 text-sm text-tg-text"
+          className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
         />
       </label>
 
@@ -473,7 +473,7 @@ function CreateHandoverSheet({
         type="button"
         disabled={m.isPending || toId === null}
         onClick={() => m.mutate()}
-        className="mt-4 min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-4 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
         {m.isPending ? "Передаю…" : "Передать смену"}
       </button>

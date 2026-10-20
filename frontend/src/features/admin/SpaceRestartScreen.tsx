@@ -84,20 +84,20 @@ export default function SpaceRestartScreen({ onBack }: Props) {
     >
       {q.isPending && <div className="text-xs text-tg-hint">Загрузка…</div>}
       {q.isError && (
-        <div className="rounded-lg bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ {humanizeApiError(q.error)}
         </div>
       )}
 
       {q.data && !available && (
-        <div className="rounded-lg bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ Env <code>HF_TOKEN</code> не задан в настройках Space — рестарт
           недоступен. Добавь write-токен HF в секреты Space.
         </div>
       )}
 
       {q.data && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
           <div className="text-sm font-semibold text-tg-text">⚡ Сейчас</div>
           <div className="text-xs text-tg-hint">
             Лечит зависшие сетевые состояния (дохлый keep-alive-пул).
@@ -114,7 +114,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
               );
               if (ok) restart.mutate();
             }}
-            className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             {restart.isPending && <Spinner />}
             🔄 Рестарт Space
@@ -128,7 +128,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
       )}
 
       {draft && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
           <div>
             <div className="text-sm font-semibold text-tg-text">
               📅 По расписанию
@@ -138,7 +138,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             </div>
           </div>
 
-          <div className="flex rounded-lg bg-tg-bg/60 p-0.5 text-xs">
+          <div className="flex rounded-tile bg-tg-bg/60 p-0.5 text-xs">
             {(
               [
                 ["off", "Выкл"],
@@ -159,7 +159,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
                   });
                 }}
                 className={[
-                  "flex-1 min-h-11 rounded-md transition-colors",
+                  "flex-1 min-h-11 rounded-tile transition-colors",
                   draft.mode === mode
                     ? "bg-tg-button text-tg-button-text font-medium"
                     : "text-tg-hint",
@@ -186,7 +186,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
                       : null,
                   })
                 }
-                className="w-full rounded-lg bg-tg-bg/60 px-2 py-2 text-sm text-tg-text"
+                className="w-full rounded-tile bg-tg-bg/60 px-2 py-2 text-sm text-tg-text"
               />
             </div>
           )}
@@ -214,7 +214,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
           )}
 
           {q.data?.next_restart_at && q.data.schedule.mode !== "off" && (
-            <div className="rounded-md bg-tg-bg/40 p-2 text-xs text-tg-text">
+            <div className="rounded-tile bg-tg-bg/40 p-2 text-xs text-tg-text">
               Следующий рестарт: {fmtDt(q.data.next_restart_at)}
             </div>
           )}
@@ -226,7 +226,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
               haptic("medium");
               save.mutate(draft);
             }}
-            className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
             💾 Сохранить расписание

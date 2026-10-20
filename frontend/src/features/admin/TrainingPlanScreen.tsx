@@ -168,7 +168,7 @@ function PlanCard({
     plan.onboarding_state !== "done" || plan.hire_date === null;
 
   return (
-    <section className="overflow-hidden rounded-xl bg-tg-secondary-bg/50">
+    <section className="overflow-hidden rounded-card bg-tg-secondary-bg/50">
       <button
         type="button"
         onClick={onToggleOpen}
@@ -212,7 +212,7 @@ function PlanCard({
                   type="button"
                   disabled={busy}
                   onClick={() => onRate(rate)}
-                  className={`min-h-9 flex-1 rounded-lg px-2 text-xs transition-colors disabled:opacity-50 ${
+                  className={`min-h-9 flex-1 rounded-tile px-2 text-xs transition-colors disabled:opacity-50 ${
                     plan.rate_type === rate
                       ? "bg-tg-button text-tg-button-text"
                       : "bg-tg-bg/60 text-tg-text"
@@ -233,7 +233,7 @@ function PlanCard({
                 type="button"
                 disabled={busy || plan.training_days <= 0}
                 onClick={() => onTrainingDays(Math.max(0, plan.training_days - 1))}
-                className="min-h-11 min-w-11 rounded-lg bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
                 aria-label="Меньше учебных смен"
               >
                 −
@@ -245,7 +245,7 @@ function PlanCard({
                 type="button"
                 disabled={busy || plan.training_days >= 30}
                 onClick={() => onTrainingDays(Math.min(30, plan.training_days + 1))}
-                className="min-h-11 min-w-11 rounded-lg bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
+                className="min-h-11 min-w-11 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
                 aria-label="Больше учебных смен"
               >
                 +
@@ -276,7 +276,7 @@ function PlanCard({
                       ? "Учебная смена — нажми, чтобы сделать обычной"
                       : "Обычная смена — нажми, чтобы сделать учебной"
                   }
-                  className={`relative min-h-11 rounded-lg px-1 py-1 text-center text-2xs leading-tight transition-colors disabled:opacity-50 ${
+                  className={`relative min-h-11 rounded-tile px-1 py-1 text-center text-2xs leading-tight transition-colors disabled:opacity-50 ${
                     item.is_training
                       ? "bg-tg-link/20 text-tg-link"
                       : "bg-tg-bg/50 text-tg-hint"

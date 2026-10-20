@@ -93,7 +93,7 @@ export default function AppTextsScreen({ onBack }: Props) {
       subtitle="Подписи, которые видит сотрудник"
       onBack={onBack}
     >
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
+      <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
         Меняй формулировки под свой ресторан. Пустое поле — вернуть исходный
         текст. Кнопки и юридически значимые подписи здесь не редактируются:
         их нельзя сломать случайной правкой.
@@ -101,13 +101,13 @@ export default function AppTextsScreen({ onBack }: Props) {
 
       {q.isPending && <ListSkeleton rows={4} />}
       {q.isError && (
-        <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ {humanizeApiError(q.error)}
         </div>
       )}
 
       {groups.map(([group, groupItems]) => (
-        <section key={group} className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+        <section key={group} className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
           <div className="text-sm font-semibold text-tg-text">{group}</div>
           {groupItems.map((item) => (
             <label key={item.code} className="block space-y-1">
@@ -124,7 +124,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                 }}
                 rows={2}
                 maxLength={600}
-                className="w-full resize-none rounded-lg bg-tg-bg/70 p-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+                className="w-full resize-none rounded-tile bg-tg-bg/70 p-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
               />
               <span className="flex items-center justify-between gap-2">
                 <span className="text-2xs text-tg-hint">
@@ -137,7 +137,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                   <button
                     type="button"
                     onClick={() => reset(item)}
-                    className="min-h-9 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
+                    className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
                     ↺ Как было
                   </button>
@@ -157,7 +157,7 @@ export default function AppTextsScreen({ onBack }: Props) {
               haptic("medium");
               save.mutate();
             }}
-            className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
             {save.isPending ? "Сохраняем…" : dirty ? "💾 Сохранить тексты" : "✓ Сохранено"}

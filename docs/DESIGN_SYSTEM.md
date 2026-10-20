@@ -169,13 +169,21 @@ size cannot sneak back in.
 
 | Token | Value | Use |
 |---|---|---|
-| `rounded-md` | 12px | buttons, inputs, small controls |
-| `rounded-lg` | 16px | inner tiles, secondary surfaces, sheets' inner blocks |
-| `rounded-xl` | 20px | cards, sheets, screen sections |
+| `rounded-card` | 12px | cards, sheets, screen sections |
+| `rounded-tile` | 8px | inner tiles, inputs, buttons, badges, secondary surfaces |
 | `rounded-full` | — | chips, pills, avatars, toggles |
 
-**Rule:** one role → one token. Cards are never `rounded-md`; buttons are never
-`rounded-xl`. (Legacy code mixes these; migrate on touch.)
+**Rule:** one role → one token. Cards are never `rounded-tile`; fields and small
+controls are never `rounded-card`. Side variants follow the same tokens
+(`rounded-t-card`).
+
+**Не `md`/`lg`/`xl`.** До 2026-10-20 в разметке жили четыре ступени Tailwind сразу:
+`rounded-md` (6px) и `rounded-lg` (8px) обозначали одну и ту же роль, `rounded-xl`
+(12px) был карточкой, `rounded-2xl` (16px) — редким исключением. Таблица выше
+раньше называла неверные px (12/16/20 вместо реальных 6/8/12), и разметка
+разъезжалась между соседними ступенями. Сейчас допустимы только `rounded-card`,
+`rounded-tile`, `rounded-full` (и `rounded-none`); старые классы и произвольные
+`rounded-[..]` ловит `src/styles.radius.test.ts`.
 
 ---
 

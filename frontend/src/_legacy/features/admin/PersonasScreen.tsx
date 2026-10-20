@@ -62,14 +62,14 @@ function PersonaList({ onEdit }: { onEdit: (row: PersonaRow) => void }) {
 
   if (personas.isPending) {
     return (
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <ListSkeleton rows={6} />
       </section>
     );
   }
   if (personas.isError || !personas.data) {
     return (
-      <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+      <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
         ⚠ {humanizeApiError(personas.error)}
       </div>
     );
@@ -81,7 +81,7 @@ function PersonaList({ onEdit }: { onEdit: (row: PersonaRow) => void }) {
         Тексты хранятся только в БД (не в git). Версия генератора
         переключается в «Рандомные фразы → Версия генератора».
       </div>
-      <section className="rounded-xl bg-tg-secondary-bg/60 divide-y divide-tg-bg/40">
+      <section className="rounded-card bg-tg-secondary-bg/60 divide-y divide-tg-bg/40">
         {personas.data.map((row) => (
           <button
             key={row.user_id}
@@ -151,7 +151,7 @@ function PersonaEditor({ row, onDone }: { row: PersonaRow; onDone: () => void })
         onChange={(e) => setText(e.target.value)}
         rows={14}
         placeholder={FORMAT_HINT}
-        className="w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link font-mono leading-snug"
+        className="w-full rounded-card bg-tg-secondary-bg/60 p-3 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link font-mono leading-snug"
       />
       <div className="text-xs text-tg-hint px-1">
         [шаблоны] — по одному на строку, «{"{слот}"}» — плейсхолдер. Любая
@@ -160,7 +160,7 @@ function PersonaEditor({ row, onDone }: { row: PersonaRow; onDone: () => void })
       </div>
 
       {preview != null && (
-        <div className="rounded-xl bg-tg-bg/50 p-3 text-sm italic">«{preview}»</div>
+        <div className="rounded-card bg-tg-bg/50 p-3 text-sm italic">«{preview}»</div>
       )}
 
       <div className="grid grid-cols-2 gap-2">
@@ -168,7 +168,7 @@ function PersonaEditor({ row, onDone }: { row: PersonaRow; onDone: () => void })
           type="button"
           disabled={tryPreview.isPending || !text.trim()}
           onClick={() => tryPreview.mutate()}
-          className="min-h-11 rounded-lg bg-tg-secondary-bg py-2 text-sm font-medium text-tg-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+          className="min-h-11 rounded-tile bg-tg-secondary-bg py-2 text-sm font-medium text-tg-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {tryPreview.isPending && <Spinner />}
           🎲 Превью
@@ -180,7 +180,7 @@ function PersonaEditor({ row, onDone }: { row: PersonaRow; onDone: () => void })
             haptic("medium");
             save.mutate();
           }}
-          className="min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+          className="min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {save.isPending && <Spinner />}
           💾 Сохранить

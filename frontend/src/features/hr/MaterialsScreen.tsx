@@ -140,14 +140,14 @@ export default function MaterialsScreen() {
                 </div>
 
                 {active.sync_error && (
-                  <div className="rounded-lg bg-status-busy/10 p-2.5 text-xs text-status-busy">
+                  <div className="rounded-tile bg-status-busy/10 p-2.5 text-xs text-status-busy">
                     Не удалось обновить ({humanizeSheetError(active.sync_error)}).
                     Показываем последнюю рабочую версию.
                   </div>
                 )}
 
                 {active.rows.length === 0 ? (
-                  <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+                  <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
                     Данных ещё нет: таблица не отдала CSV. Проверь, что доступ
                     «всем, у кого есть ссылка».
                   </div>
@@ -182,7 +182,7 @@ function SheetTable({
   const body = header ? rows.slice(1) : rows;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-tg-secondary-bg">
+    <div className="overflow-x-auto rounded-card border border-tg-secondary-bg">
       <table className="min-w-full border-collapse text-xs">
         <caption className="sr-only">Таблица материалов смены</caption>
         {header && (

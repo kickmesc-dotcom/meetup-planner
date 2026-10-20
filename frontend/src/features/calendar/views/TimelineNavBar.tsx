@@ -90,7 +90,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
                 type="button"
                 onClick={() => onPreset(p.z)}
                 className={[
-                  "min-h-11 rounded-md text-xs font-medium px-1 py-1 active:scale-[0.97] transition-transform",
+                  "min-h-11 rounded-tile text-xs font-medium px-1 py-1 active:scale-[0.97] transition-transform",
                   active
                     ? "bg-tg-button text-tg-button-text shadow-sm"
                     : "bg-tg-secondary-bg text-tg-text",
@@ -185,7 +185,7 @@ function NavBtn({
       type="button"
       onClick={onClick}
       aria-label={aria}
-      className="min-w-11 min-h-11 rounded-md bg-tg-secondary-bg text-tg-text font-semibold active:scale-[0.96] transition-transform"
+      className="min-w-11 min-h-11 rounded-tile bg-tg-secondary-bg text-tg-text font-semibold active:scale-[0.96] transition-transform"
     >
       {label}
     </button>

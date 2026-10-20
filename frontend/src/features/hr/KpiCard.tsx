@@ -24,7 +24,7 @@ export default function KpiCard() {
   const place = kpi.week_place;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text">Опыт смены</h2>
         <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-text">
@@ -66,7 +66,7 @@ export default function KpiCard() {
         <Cell label="Поручений закрыто" value={String(kpi.week_counts.tasks_done)} />
       </div>
 
-      <div className="mt-3 rounded-lg bg-tg-bg/50 p-2 text-xs">
+      <div className="mt-3 rounded-tile bg-tg-bg/50 p-2 text-xs">
         {winner ? (
           <>
             <div className="text-tg-hint">Сотрудник недели</div>
@@ -93,7 +93,7 @@ export default function KpiCard() {
 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-tg-bg/50 p-2">
+    <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="text-tg-hint">{label}</div>
       <div className="tabular-nums text-tg-text">{value}</div>
     </div>

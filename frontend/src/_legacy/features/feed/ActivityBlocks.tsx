@@ -99,14 +99,14 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
       data-testid="feed-activity"
     >
       {done ? (
-        <div className="rounded-lg bg-status-free/15 px-2 py-1.5 text-xs font-medium text-status-free">
+        <div className="rounded-tile bg-status-free/15 px-2 py-1.5 text-xs font-medium text-status-free">
           ✅ Засчитано! Опыт уже в профиле.
         </div>
       ) : closed ? (
         <>
           {/* GHG11(8.a): задание закрывается — поле ввода/кнопки тоже. */}
           <div
-            className="rounded-lg bg-tg-bg/60 px-2 py-1.5 text-xs font-medium text-tg-hint"
+            className="rounded-tile bg-tg-bg/60 px-2 py-1.5 text-xs font-medium text-tg-hint"
             data-testid="feed-activity-closed"
           >
             ⛔ Задание закрыто — приём ответов окончен.
@@ -160,7 +160,7 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
                 onChange={(e) => setText(e.target.value)}
                 placeholder="Ответь прямо здесь…"
                 maxLength={1000}
-                className="min-w-0 flex-1 rounded-lg bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+                className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
               />
               <button
                 type="button"
@@ -170,14 +170,14 @@ export function ActivityResponse({ activity }: { activity: ActivityLike }) {
                   send.mutate(text.trim());
                   setText("");
                 }}
-                className="shrink-0 rounded-lg bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-50"
+                className="shrink-0 rounded-tile bg-tg-button px-3 py-1.5 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-50"
               >
                 Отправить
               </button>
             </div>
           )}
           {answer && !answer.ok && (
-            <div className="rounded-lg bg-status-busy/15 px-2 py-1.5 text-xs font-medium text-status-busy">
+            <div className="rounded-tile bg-status-busy/15 px-2 py-1.5 text-xs font-medium text-status-busy">
               Не подошло — попробуй другой ответ.
             </div>
           )}
@@ -253,7 +253,7 @@ export function VoiceWithdraw() {
             haptic("selection");
             setConfirming(true);
           }}
-          className="shrink-0 rounded-lg bg-status-busy/15 px-3 py-1.5 text-xs font-medium text-status-busy"
+          className="shrink-0 rounded-tile bg-status-busy/15 px-3 py-1.5 text-xs font-medium text-status-busy"
         >
           Убрать
         </button>
@@ -266,7 +266,7 @@ export function VoiceWithdraw() {
         <button
           type="button"
           onClick={() => setConfirming(false)}
-          className="rounded-lg bg-tg-secondary-bg/70 px-2.5 py-1.5 text-xs font-medium text-tg-text"
+          className="rounded-tile bg-tg-secondary-bg/70 px-2.5 py-1.5 text-xs font-medium text-tg-text"
         >
           Оставить
         </button>
@@ -277,7 +277,7 @@ export function VoiceWithdraw() {
             haptic("medium");
             withdraw.mutate();
           }}
-          className="rounded-lg bg-status-busy px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          className="rounded-tile bg-status-busy px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50"
         >
           {withdraw.isPending ? "Убираем…" : "Да, убрать"}
         </button>
@@ -403,7 +403,7 @@ export function VoiceRecorder({
       type="button"
       onClick={() => (recording ? void stopAndSend() : void start())}
       className={[
-        "w-full rounded-lg px-3 py-2 text-sm font-medium active:scale-[0.98]",
+        "w-full rounded-tile px-3 py-2 text-sm font-medium active:scale-[0.98]",
         recording
           ? "bg-status-busy/20 text-status-busy"
           : "bg-tg-button text-tg-button-text",
@@ -439,7 +439,7 @@ export function OrphanActivities({ seenIds }: { seenIds: Set<number> }) {
       {items.map((it) => (
         <div
           key={it.id}
-          className="rounded-2xl bg-tg-secondary-bg/60 p-3"
+          className="rounded-card bg-tg-secondary-bg/60 p-3"
           data-testid="orphan-activity"
         >
           <div className="flex items-center gap-1.5 text-xs text-tg-hint">

@@ -114,7 +114,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                 haptic("light");
                 setStep(1);
               }}
-              className="mt-8 min-h-12 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text"
+              className="mt-8 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text"
             >
               Начать
             </button>
@@ -140,7 +140,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                       setDepartmentId(item.id);
                     }}
                     className={[
-                      "min-h-14 rounded-xl px-3 text-left text-sm transition-colors",
+                      "min-h-14 rounded-card px-3 text-left text-sm transition-colors",
                       active
                         ? "bg-tg-button text-tg-button-text"
                         : "bg-tg-secondary-bg text-tg-text",
@@ -163,7 +163,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                   { onSuccess: () => setStep(2) },
                 )
               }
-              className="mt-6 min-h-12 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="mt-6 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
               {save.isPending ? "Сохраняем…" : "Продолжить"}
             </button>
@@ -195,7 +195,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                       setExperience(option.value);
                     }}
                     className={[
-                      "w-full rounded-xl p-3 text-left transition-colors",
+                      "w-full rounded-card p-3 text-left transition-colors",
                       active ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg",
                     ].join(" ")}
                   >
@@ -216,7 +216,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                   { onSuccess: () => setStep(3) },
                 )
               }
-              className="mt-6 min-h-12 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="mt-6 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
               {save.isPending ? "Сохраняем…" : "Продолжить"}
             </button>
@@ -247,7 +247,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                   type="button"
                   disabled={finish.isPending}
                   onClick={() => finish.mutate(false)}
-                  className="min-h-12 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                  className="min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
                 >
                   Я уже запомнил
                 </button>

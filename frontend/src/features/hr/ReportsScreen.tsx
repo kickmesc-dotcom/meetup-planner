@@ -83,7 +83,7 @@ export default function ReportsScreen() {
             haptic("light");
             setTab("profile");
           }}
-          className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
+          className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label="Назад в профиль"
         >
           ‹
@@ -97,21 +97,21 @@ export default function ReportsScreen() {
         <button
           type="button"
           onClick={() => void download()}
-          className="min-h-9 rounded-lg bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text"
+          className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text"
         >
           CSV
         </button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="date"
               value={on}
               max={todayIso()}
               onChange={(event) => setOn(event.target.value || todayIso())}
-              className="min-h-9 rounded-lg border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+              className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
               aria-label="Дата смены"
             />
             {!!meQ.data?.is_staff && (
@@ -120,7 +120,7 @@ export default function ReportsScreen() {
                 onChange={(event) =>
                   setDepartmentId(event.target.value ? Number(event.target.value) : null)
                 }
-                className="min-h-9 rounded-lg border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+                className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
                 aria-label="Подразделение"
               >
                 <option value="">Все отделы</option>
@@ -180,7 +180,7 @@ export default function ReportsScreen() {
               />
             </section>
 
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-baseline justify-between">
                 <h2 className="text-sm font-semibold text-tg-text">Сейчас в работе</h2>
                 <span className="text-xs text-tg-hint">
@@ -216,7 +216,7 @@ export default function ReportsScreen() {
                 </label>
               </div>
               {standards.length === 0 ? (
-                <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
+                <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
                   {requiredStandards.length === 0
                     ? "Обязательных стандартов пока нет — отметь их в базе стандартов."
                     : "Все обязательные стандарты сданы ✅"}
@@ -246,7 +246,7 @@ function Metric({
   accent?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <div className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="text-xs text-tg-hint">{label}</div>
       <div
         className={[
@@ -263,7 +263,7 @@ function Metric({
 
 function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
   return (
-    <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <div className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0 truncate text-sm font-medium text-tg-text">
           {dept.emoji ? `${dept.emoji} ` : ""}
@@ -297,13 +297,13 @@ function StandardCard({ standard }: { standard: HrStandardCoverage }) {
   const percent =
     standard.total > 0 ? Math.round((standard.passed * 100) / standard.total) : 0;
   return (
-    <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <div className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0 text-sm font-medium text-tg-text">
           {standard.emoji ? `${standard.emoji} ` : ""}
           {standard.title}
           {standard.required && (
-            <span className="ml-1 rounded bg-status-busy/15 px-1 text-2xs text-status-busy">
+            <span className="ml-1 rounded-tile bg-status-busy/15 px-1 text-2xs text-status-busy">
               обязательный
             </span>
           )}

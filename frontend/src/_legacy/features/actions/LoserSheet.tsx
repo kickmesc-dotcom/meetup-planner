@@ -111,7 +111,7 @@ export default function LoserSheet() {
   return (
     <BottomSheet title="🤡 Автолох" onClose={close}>
       {locked ? (
-        <div className="rounded-xl bg-tg-secondary-bg p-4 text-center text-sm text-tg-hint">
+        <div className="rounded-card bg-tg-secondary-bg p-4 text-center text-sm text-tg-hint">
           🔒 Ручная рулетка открывается со 2 ранга.
           <div className="mt-1 text-xs">
             Качай опыт в чате и календаре — ранг растёт сам.
@@ -122,7 +122,7 @@ export default function LoserSheet() {
           type="button"
           onClick={() => mut.mutate()}
           disabled={mut.isPending || remaining > 0}
-          className="w-full rounded-xl bg-tg-button py-4 text-base font-bold text-tg-button-text disabled:opacity-50"
+          className="w-full rounded-card bg-tg-button py-4 text-base font-bold text-tg-button-text disabled:opacity-50"
         >
           {remaining > 0
             ? `Кулдаун: ${fmtRemaining(remaining)}`
@@ -133,7 +133,7 @@ export default function LoserSheet() {
       )}
 
       {!locked && (isSpinning || (mut.isSuccess && spinName == null)) && (
-        <div className="mt-4 rounded-xl bg-tg-secondary-bg p-4 text-center overflow-hidden">
+        <div className="mt-4 rounded-card bg-tg-secondary-bg p-4 text-center overflow-hidden">
           <div className="text-xs text-tg-hint mb-1">
             {isSpinning ? "Барабан крутится…" : "🥁 Победитель"}
           </div>
@@ -158,13 +158,13 @@ export default function LoserSheet() {
       )}
 
       {error && (
-        <div className="mt-2 rounded-lg bg-status-busy/15 p-2 text-center text-sm text-status-busy">
+        <div className="mt-2 rounded-tile bg-status-busy/15 p-2 text-center text-sm text-status-busy">
           {error}
         </div>
       )}
 
       {!isSpinning && !mut.isSuccess && last && (
-        <div className="mt-4 rounded-xl bg-tg-secondary-bg p-3">
+        <div className="mt-4 rounded-card bg-tg-secondary-bg p-3">
           <div className="text-xs text-tg-hint">Последний раз</div>
           <div className="font-medium">{lastUser?.display_name ?? "???"}</div>
           {last.reason_text && (
@@ -184,7 +184,7 @@ export default function LoserSheet() {
             return (
               <li
                 key={id}
-                className="flex items-center justify-between rounded-lg bg-tg-secondary-bg/50 px-3 py-2"
+                className="flex items-center justify-between rounded-tile bg-tg-secondary-bg/50 px-3 py-2"
               >
                 <span>
                   {i + 1}. {u?.display_name ?? `#${id}`}
@@ -199,7 +199,7 @@ export default function LoserSheet() {
       <button
         type="button"
         onClick={close}
-        className="mt-4 w-full rounded-xl bg-tg-secondary-bg py-3 font-medium"
+        className="mt-4 w-full rounded-card bg-tg-secondary-bg py-3 font-medium"
       >
         Закрыть
       </button>

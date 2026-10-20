@@ -18,7 +18,7 @@ export default function ZoomController() {
 
   return (
     <div className="px-3 py-2 border-b border-tg-secondary-bg overflow-x-auto">
-      <div className="flex bg-tg-secondary-bg rounded-xl p-0.5 gap-0.5 w-max mx-auto">
+      <div className="flex bg-tg-secondary-bg rounded-card p-0.5 gap-0.5 w-max mx-auto">
         {COMPACT_ORDER.map((z) => (
           <button
             key={z}
@@ -28,7 +28,7 @@ export default function ZoomController() {
               setZoom(z);
             }}
             className={[
-              "px-2.5 py-1 text-xs rounded-lg transition-colors whitespace-nowrap",
+              "px-2.5 py-1 text-xs rounded-tile transition-colors whitespace-nowrap",
               z === zoom ? "bg-tg-button text-tg-button-text font-medium" : "text-tg-hint",
             ].join(" ")}
             aria-pressed={z === zoom}

@@ -69,7 +69,7 @@ export default function NominationsSheet({ onClose }: { onClose: () => void }) {
           Не удалось загрузить номинации.
         </div>
       ) : !data?.enabled ? (
-        <div className="rounded-xl bg-tg-secondary-bg p-4 text-center text-sm text-tg-hint">
+        <div className="rounded-card bg-tg-secondary-bg p-4 text-center text-sm text-tg-hint">
           Номинации выключены.
         </div>
       ) : (
@@ -80,7 +80,7 @@ export default function NominationsSheet({ onClose }: { onClose: () => void }) {
 
           <ul className="mt-3 space-y-1.5">
             {data.items.length === 0 && (
-              <li className="rounded-xl bg-tg-secondary-bg/50 px-3 py-3 text-center text-sm text-tg-hint">
+              <li className="rounded-card bg-tg-secondary-bg/50 px-3 py-3 text-center text-sm text-tg-hint">
                 Пока ничего не номинировано — предложи игру первым.
               </li>
             )}
@@ -96,7 +96,7 @@ export default function NominationsSheet({ onClose }: { onClose: () => void }) {
                       vote.mutate(n.id);
                     }}
                     className={[
-                      "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors disabled:opacity-60",
+                      "flex w-full items-center gap-2 rounded-card px-3 py-2 text-left transition-colors disabled:opacity-60",
                       mine
                         ? "bg-tg-link/15 ring-1 ring-tg-link/50"
                         : "bg-tg-secondary-bg/50",
@@ -127,7 +127,7 @@ export default function NominationsSheet({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Название игры…"
                 maxLength={80}
-                className="min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text"
+                className="min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text"
               />
               <button
                 type="button"
@@ -136,13 +136,13 @@ export default function NominationsSheet({ onClose }: { onClose: () => void }) {
                   haptic("light");
                   add.mutate(name.trim());
                 }}
-                className="shrink-0 rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text disabled:opacity-50"
+                className="shrink-0 rounded-tile bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
                 {add.isPending ? "…" : "Номинировать"}
               </button>
             </div>
           ) : (
-            <div className="mt-3 rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-center text-xs text-tg-hint">
+            <div className="mt-3 rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-center text-xs text-tg-hint">
               Достигнут лимит активных номинаций ({data.max_active}).
             </div>
           )}
@@ -152,7 +152,7 @@ export default function NominationsSheet({ onClose }: { onClose: () => void }) {
       <button
         type="button"
         onClick={onClose}
-        className="mt-4 w-full rounded-xl bg-tg-secondary-bg py-3 font-medium"
+        className="mt-4 w-full rounded-card bg-tg-secondary-bg py-3 font-medium"
       >
         Закрыть
       </button>

@@ -271,7 +271,7 @@ describe("GuestProfileScreen: свитчер ленты (GHG11(7))", () => {
   it("компактный: контейнер-строка без карточки и свитчер размера sm", async () => {
     renderProfile();
     const wrap = await screen.findByTestId("mute-feed-switch");
-    expect(wrap.className).not.toContain("rounded-xl");
+    expect(wrap.className).not.toContain("rounded-card");
     // Тот же контейнер держит переключатель.
     const sw = wrap.querySelector('[role="switch"]');
     expect(sw).not.toBeNull();

@@ -147,7 +147,7 @@ function Card({
     <motion.div
       initial={{ y: 8, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="rounded-xl bg-tg-secondary-bg/60 p-3 shadow-sm"
+      className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-sm"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -208,7 +208,7 @@ function Card({
           onClick={() => {
             if (confirm("Отменить встречу?")) onCancel();
           }}
-          className="mt-2 w-full min-h-11 rounded-lg bg-status-busy/15 px-3 text-xs font-medium text-status-busy"
+          className="mt-2 w-full min-h-11 rounded-tile bg-status-busy/15 px-3 text-xs font-medium text-status-busy"
         >
           Отменить встречу
         </button>
@@ -231,7 +231,7 @@ function RsvpBtn({
       type="button"
       onClick={onClick}
       className={[
-        "flex-1 min-h-11 rounded-lg px-2 text-xs font-medium transition-colors",
+        "flex-1 min-h-11 rounded-tile px-2 text-xs font-medium transition-colors",
         active
           ? "bg-tg-button text-tg-button-text"
           : "bg-tg-bg/50 text-tg-text active:bg-tg-bg",
@@ -262,7 +262,7 @@ function IcalSubscribeButton() {
     <button
       type="button"
       onClick={onTap}
-      className="w-full min-h-11 rounded-xl bg-tg-secondary-bg/60 px-3 py-2 text-sm text-tg-text active:bg-tg-secondary-bg"
+      className="w-full min-h-11 rounded-card bg-tg-secondary-bg/60 px-3 py-2 text-sm text-tg-text active:bg-tg-secondary-bg"
     >
       📥 Подписаться в системный календарь
     </button>

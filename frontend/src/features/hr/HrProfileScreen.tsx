@@ -153,7 +153,7 @@ export default function HrProfileScreen() {
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-center gap-3">
           <div
             className="flex h-12 w-12 items-center justify-center rounded-full bg-tg-bg/60 text-xl"
@@ -190,7 +190,7 @@ export default function HrProfileScreen() {
             }
           />
         </div>
-        <p className="mt-2 rounded-lg bg-tg-bg/50 p-2 text-xs text-tg-hint">
+        <p className="mt-2 rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
           {ROLE_HINT[me.role]}
         </p>
       </section>
@@ -198,7 +198,7 @@ export default function HrProfileScreen() {
       {/* Опыт за работу: открыт всем — это мотивация, а не надзор. */}
       <KpiCard />
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-tg-text">🎓 Обучение</h2>
           <span className="text-xs tabular-nums text-tg-hint">
@@ -217,7 +217,7 @@ export default function HrProfileScreen() {
           aria-pressed={me.learning_mode}
           onClick={() => learningMode.mutate(!me.learning_mode)}
           className={[
-            "mt-2 min-h-9 w-full rounded-lg px-3 text-xs transition-colors disabled:opacity-50",
+            "mt-2 min-h-9 w-full rounded-tile px-3 text-xs transition-colors disabled:opacity-50",
             me.learning_mode
               ? "bg-tg-button text-tg-button-text"
               : "bg-tg-bg/60 text-tg-text",
@@ -233,7 +233,7 @@ export default function HrProfileScreen() {
             haptic("light");
             setShowTraining(true);
           }}
-          className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text"
+          className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text"
         >
           {trainingQ.data?.complete
             ? "Открыть курс"
@@ -246,7 +246,7 @@ export default function HrProfileScreen() {
       </section>
 
       {(me.is_admin || me.is_staff) && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <h2 className="text-sm font-semibold text-tg-text">Примерить роль</h2>
           <p className="mt-1 text-xs text-tg-hint">
             Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ в
@@ -282,7 +282,7 @@ export default function HrProfileScreen() {
       )}
 
       {(me.is_admin || me.is_staff) && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <h2 className="text-sm font-semibold text-tg-text">🧪 Режим проверки</h2>
           <p className="mt-1 text-xs text-tg-hint">
             Открой приложение глазами сотрудника. Тестовые задачи и смены
@@ -296,7 +296,7 @@ export default function HrProfileScreen() {
                 event.target.value ? Number(event.target.value) : null,
               )
             }
-            className="mt-2 min-h-10 w-full rounded-lg bg-tg-bg px-2 text-xs text-tg-text"
+            className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg px-2 text-xs text-tg-text"
           >
             <option value="">Выбери сотрудника</option>
             {(employeesQ.data ?? []).map((person) => (
@@ -333,7 +333,7 @@ export default function HrProfileScreen() {
             type="button"
             disabled={simulationTarget === null || simulationStart.isPending}
             onClick={() => simulationStart.mutate()}
-            className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+            className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
             {simulationStart.isPending ? "Открываем…" : "Открыть как сотрудник"}
           </button>
@@ -344,7 +344,7 @@ export default function HrProfileScreen() {
           (сейчас — руководителю и админу), см. `AchievementsCard`. */}
       <AchievementsCard />
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <h2 className="text-sm font-semibold text-tg-text">
           {onboarding ? "Закончим знакомство" : "Мои данные"}
         </h2>
@@ -419,13 +419,13 @@ export default function HrProfileScreen() {
               experience: experience ?? me.experience,
             })
           }
-          className="mt-3 min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+          className="mt-3 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
           {onboarding ? "Продолжить" : "Сохранить"}
         </button>
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <h2 className="text-sm font-semibold text-tg-text">Быстрые переходы</h2>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <Jump icon="✅" label="Мои задачи" onClick={() => setTab("tasks")} />
@@ -495,7 +495,7 @@ export default function HrProfileScreen() {
         </div>
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <h2 className="text-sm font-semibold text-tg-text">Пиши боту в чат</h2>
         <p className="mt-1 text-xs text-tg-hint">{photoHint}</p>
         <button
@@ -505,7 +505,7 @@ export default function HrProfileScreen() {
             const app = WebApp as unknown as { close?: () => void };
             app.close?.();
           }}
-          className="mt-2 min-h-10 w-full rounded-lg bg-tg-bg/60 text-xs font-medium text-tg-text"
+          className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg/60 text-xs font-medium text-tg-text"
         >
           Вернуться в чат с ботом
         </button>
@@ -533,7 +533,7 @@ export default function HrProfileScreen() {
 function ServerSwitch() {
   const [value, setValue] = useState(getApiBase());
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <h2 className="text-sm font-semibold text-tg-text">Сервер (для админа)</h2>
       <p className="mt-1 text-xs text-tg-hint">
         Если основной адрес недоступен, укажи резервный — приложение продолжит
@@ -546,7 +546,7 @@ function ServerSwitch() {
         inputMode="url"
         autoCapitalize="none"
         autoCorrect="off"
-        className="mt-2 min-h-10 w-full rounded-lg bg-tg-bg/60 px-2 text-xs text-tg-text"
+        className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
       />
       <button
         type="button"
@@ -555,7 +555,7 @@ function ServerSwitch() {
           setApiBase(value || null);
           window.location.reload();
         }}
-        className="mt-2 min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text"
+        className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text"
       >
         Сохранить и перезагрузить
       </button>
@@ -565,7 +565,7 @@ function ServerSwitch() {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-tg-bg/50 p-2">
+    <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="text-tg-hint">{label}</div>
       <div className="text-tg-text">{value}</div>
     </div>
@@ -588,7 +588,7 @@ function Jump({
         haptic("light");
         onClick();
       }}
-      className="flex min-h-11 items-center gap-2 rounded-lg bg-tg-bg/60 px-3 text-xs text-tg-text active:scale-[0.98] transition-transform"
+      className="flex min-h-11 items-center gap-2 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text active:scale-[0.98] transition-transform"
     >
       <span aria-hidden>{icon}</span>
       <span className="truncate">{label}</span>

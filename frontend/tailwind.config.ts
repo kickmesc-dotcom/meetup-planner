@@ -27,6 +27,16 @@ export default {
         "3xs": ["10px", { lineHeight: "1.2" }],
         "2xs": ["11px", { lineHeight: "1.25" }],
       },
+      // VISUAL_AUDIT P1.6: два радиуса вместо «по настроению». Карточка — 12px
+      // (`rounded-card`), всё внутри неё — 8px (`rounded-tile`): плитки, поля,
+      // кнопки, бейджи. Пиллюли остаются `rounded-full`. Старые `md/lg/xl/2xl`
+      // запрещены тестом `styles.radius.test.ts`: до прохода `rounded-md` (6px)
+      // и `rounded-lg` (8px) обозначали одну и ту же роль, а `rounded-2xl`
+      // выпадал из шкалы вовсе.
+      borderRadius: {
+        card: "12px",
+        tile: "8px",
+      },
       // DESIGN_SYSTEM §2: the "ledger" face. System mono only — the app ships
       // no webfonts (external CDNs are unreliable for this audience).
       fontFamily: {

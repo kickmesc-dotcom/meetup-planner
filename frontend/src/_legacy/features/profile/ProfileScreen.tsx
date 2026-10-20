@@ -172,7 +172,7 @@ function CharacterCard({
   const avatarUrl = g?.avatar_manual_url ?? me.avatar_url;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-4">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-4">
       <div className="flex items-center gap-3">
         <div
           className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center text-white text-2xl font-semibold shrink-0 ring-2"
@@ -212,7 +212,7 @@ function CharacterCard({
       {g && (
         <div className="mt-3">
           {g.at_max ? (
-            <div className="flex items-center justify-between rounded-lg bg-tg-bg/50 px-3 py-2">
+            <div className="flex items-center justify-between rounded-tile bg-tg-bg/50 px-3 py-2">
               <span className="text-xs text-tg-hint">Максимальный ранг</span>
               <span className="text-sm text-tg-text">
                 ✦ Престиж{" "}
@@ -241,7 +241,7 @@ function CharacterCard({
           ачивок). Раньше было «Лохом дня: N раз» — громоздко и без акцента. */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-tg-bg/40 pt-2.5 text-xs text-tg-hint">
         <span
-          className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5"
+          className="inline-flex items-center gap-1 rounded-tile bg-tg-bg/40 px-2 py-0.5"
           title="Сколько раз тебя выбирали лохом дня (👑) с начала игры"
         >
           🤡 Лох дня ×
@@ -250,7 +250,7 @@ function CharacterCard({
           </span>
         </span>
         <span
-          className="inline-flex items-center gap-1 rounded-md bg-tg-bg/40 px-2 py-0.5"
+          className="inline-flex items-center gap-1 rounded-tile bg-tg-bg/40 px-2 py-0.5"
           title="Сколько раз тебя выбирали чуханом недели (💩) с начала игры"
         >
           💩 Чухан недели ×
@@ -283,7 +283,7 @@ function GreetingSettings() {
   // контрол справа) — раньше блок занимал ~четверть экрана, а фича не настолько
   // важная (прод-фидбек 10.06 п.2/п.3).
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 divide-y divide-tg-bg/40">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3 divide-y divide-tg-bg/40">
       {!p ? (
         <ListSkeleton rows={2} />
       ) : (
@@ -304,7 +304,7 @@ function GreetingSettings() {
           {/* F3: формат участника — лейбл + компактный сегмент-контрол в строку. */}
           <div className="flex items-center justify-between gap-3 pt-2.5">
             <div className="text-sm text-tg-text shrink-0">Формат</div>
-            <div className="flex rounded-lg bg-tg-bg/60 p-0.5 text-xs shrink-0">
+            <div className="flex rounded-tile bg-tg-bg/60 p-0.5 text-xs shrink-0">
               {(
                 [
                   ["avatar", "Аватар"],
@@ -328,7 +328,7 @@ function GreetingSettings() {
                     save.mutate({ welcome_format: fmt });
                   }}
                   className={[
-                    "min-h-11 px-2.5 rounded-md transition-colors",
+                    "min-h-11 px-2.5 rounded-tile transition-colors",
                     p.welcome_format === fmt
                       ? "bg-tg-button text-tg-button-text font-medium"
                       : "text-tg-hint",
@@ -374,7 +374,7 @@ function HistorySection({ users }: { users: User[] }) {
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold">💩 Чуханы недели</div>
         <div className="text-xs text-tg-hint mb-2">Последние 20 недель</div>
         {chukhans.isPending ? (
@@ -396,7 +396,7 @@ function HistorySection({ users }: { users: User[] }) {
         )}
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold">👑 Лохи дня</div>
         <div className="text-xs text-tg-hint mb-2">Последние 20 роллов</div>
         {losers.isPending ? (
@@ -478,9 +478,9 @@ function NavCard({
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-xl bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
+      className="w-full text-left rounded-card bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
     >
-      <div className="w-10 h-10 rounded-lg bg-tg-bg/60 flex items-center justify-center text-2xl shrink-0">
+      <div className="w-10 h-10 rounded-tile bg-tg-bg/60 flex items-center justify-center text-2xl shrink-0">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -510,7 +510,7 @@ function InnerScreen({
             haptic("light");
             onBack();
           }}
-          className="min-h-11 min-w-11 rounded-md bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
+          className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
           aria-label="Назад"
         >
           ←

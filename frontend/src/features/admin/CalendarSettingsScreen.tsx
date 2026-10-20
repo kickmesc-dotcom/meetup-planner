@@ -62,12 +62,12 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
       onBack={onBack}
     >
       {q.isError && (
-        <div className="rounded-lg bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ {humanizeApiError(q.error)}
         </div>
       )}
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
         <div className="flex items-center gap-2">
           <span className="text-base">🆕</span>
           <span className="text-sm font-semibold text-tg-text">

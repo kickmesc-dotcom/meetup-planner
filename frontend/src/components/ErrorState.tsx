@@ -35,7 +35,7 @@ export default function ErrorState({
             haptic("light");
             onRetry();
           }}
-          className="mt-4 min-h-11 rounded-lg bg-tg-button px-4 text-sm font-medium text-tg-button-text active:scale-[0.98] transition-transform"
+          className="mt-4 min-h-11 rounded-tile bg-tg-button px-4 text-sm font-medium text-tg-button-text active:scale-[0.98] transition-transform"
         >
           Повторить
         </button>

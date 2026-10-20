@@ -202,7 +202,7 @@ export default function HrFeedScreen() {
                     }
                   }
                 }}
-                className="min-h-9 min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text"
+                className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
               >
                 <option value="">Все подразделения</option>
                 {filters.departments.map((d) => (
@@ -218,7 +218,7 @@ export default function HrFeedScreen() {
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Поиск по имени или должности"
                 aria-label="Поиск сотрудника"
-                className="min-h-9 w-full rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text placeholder:text-tg-hint"
+                className="min-h-9 w-full rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text placeholder:text-tg-hint"
               />
               <select
                 aria-label="Фильтр по сотруднику"
@@ -227,7 +227,7 @@ export default function HrFeedScreen() {
                   haptic("light");
                   setEmployeeId(e.target.value ? Number(e.target.value) : null);
                 }}
-                className="min-h-9 min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text"
+                className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
               >
                 <option value="">Все сотрудники</option>
                 {visibleEmployees.length === 0 && (
@@ -298,7 +298,7 @@ export default function HrFeedScreen() {
         )}
 
         {feed && !canFilter && (
-          <p className="mt-2 rounded-lg bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
+          <p className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
             🔒 Видны только твои действия. Расширенные фильтры доступны
             руководителю подразделения и управляющему.
           </p>
@@ -327,7 +327,7 @@ export default function HrFeedScreen() {
             <h2 className="sticky top-0 z-10 -mx-4 bg-tg-bg/95 px-4 py-1 text-xs font-medium text-tg-hint backdrop-blur">
               {group.label}
             </h2>
-            <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-xl bg-tg-secondary-bg/40">
+            <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {group.items.map((item, i) => (
                 <FeedRow
                   key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}

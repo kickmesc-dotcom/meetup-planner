@@ -53,8 +53,8 @@ export default function PhotoAttach({
 
   // VISUAL_AUDIT P0.2: даже компактные «Снять / Галерея» — не меньше 44px.
   const buttonClass = compact
-    ? "min-h-11 rounded-lg bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
-    : "min-h-11 flex-1 rounded-lg bg-tg-secondary-bg px-3 text-sm text-tg-text";
+    ? "min-h-11 rounded-tile bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
+    : "min-h-11 flex-1 rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -133,7 +133,7 @@ export function PhotoThumbs({
                 haptic("light");
                 setOpen(photo);
               }}
-              className="overflow-hidden rounded-lg bg-tg-bg/60"
+              className="overflow-hidden rounded-tile bg-tg-bg/60"
               aria-label="Открыть фото"
             >
               <img
@@ -161,7 +161,7 @@ export function PhotoThumbs({
           <div className="flex justify-end p-3">
             <button
               type="button"
-              className="min-h-11 min-w-11 rounded-lg bg-white/10 text-lg text-white"
+              className="min-h-11 min-w-11 rounded-tile bg-white/10 text-lg text-white"
               onClick={() => setOpen(null)}
               aria-label="Закрыть"
             >

@@ -203,7 +203,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("standards");
               }}
-              className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg text-base leading-none"
+              className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg text-base leading-none"
               aria-label="База стандартов"
               title="База стандартов"
             >
@@ -216,7 +216,7 @@ export default function MyTasksScreen() {
                   haptic("selection");
                   setTab("review");
                 }}
-                className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg text-base leading-none"
+                className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg text-base leading-none"
                 aria-label="Приёмка работ"
                 title="Приёмка работ"
               >
@@ -230,7 +230,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("handovers");
               }}
-              className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg text-base leading-none"
+              className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg text-base leading-none"
               aria-label="Передача смены"
               title="Передача смены"
             >
@@ -283,7 +283,7 @@ export default function MyTasksScreen() {
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {checklist && checklist.total > 0 && (
-          <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+          <section className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium text-tg-text">Смена сегодня</span>
               <span className="text-xs tabular-nums text-tg-hint">
@@ -318,7 +318,7 @@ export default function MyTasksScreen() {
               haptic("selection");
               setTab("issues");
             }}
-            className="w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-left"
+            className="w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left"
           >
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm font-medium text-tg-text">🛠 Проблемы</span>
@@ -405,7 +405,7 @@ function TaskCard({
   const shift = fmtShift(task.shift_date);
   const group = task.progress_total > 1;
   return (
-    <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <article className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text break-words">
           {task.title}
@@ -464,7 +464,7 @@ function TaskCard({
       <TaskPhotos task={task} closed={closed} />
 
       {!closed && status === "on_review" && (
-        <div className="mt-3 rounded-lg bg-tg-bg/60 px-2.5 py-2 text-xs text-tg-hint">
+        <div className="mt-3 rounded-tile bg-tg-bg/60 px-2.5 py-2 text-xs text-tg-hint">
           Работа сдана — ждёт приёмки руководителя.
         </div>
       )}
@@ -575,13 +575,13 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
   });
 
   return (
-    <div className="mt-3 rounded-lg bg-tg-bg/60 p-3">
+    <div className="mt-3 rounded-tile bg-tg-bg/60 p-3">
       <label className="block text-xs text-tg-hint">
         Причина
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          className="mt-1 min-h-10 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
         >
           {ISSUE_REASONS.map((r) => (
             <option key={r.code} value={r.code}>
@@ -597,7 +597,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
           type="datetime-local"
           value={eta}
           onChange={(e) => setEta(e.target.value)}
-          className="mt-1 min-h-10 w-full rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
         />
       </label>
 
@@ -609,7 +609,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
           rows={2}
           maxLength={500}
           placeholder="Что именно мешает?"
-          className="mt-1 w-full rounded-lg bg-tg-secondary-bg p-2 text-sm text-tg-text"
+          className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
         />
       </label>
 
@@ -617,7 +617,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
         type="button"
         disabled={m.isPending}
         onClick={() => m.mutate()}
-        className="mt-3 min-h-10 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-3 min-h-10 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
         Отправить руководителю
       </button>
@@ -642,7 +642,7 @@ function ActionButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "min-h-10 rounded-lg px-3 text-xs font-medium transition-transform active:scale-[0.98] disabled:opacity-50",
+        "min-h-10 rounded-tile px-3 text-xs font-medium transition-transform active:scale-[0.98] disabled:opacity-50",
         variant === "primary"
           ? "bg-tg-button text-tg-button-text"
           : "bg-tg-secondary-bg text-tg-text",

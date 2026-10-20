@@ -44,7 +44,7 @@ export default function LinksScreen() {
             haptic("light");
             setTab("materials");
           }}
-          className="block w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
+          className="block w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
         >
           <div className="flex items-center gap-3">
             <span className="text-xl" aria-hidden>
@@ -92,7 +92,7 @@ export default function LinksScreen() {
               if (app.openLink) app.openLink(l.url);
               else window.open(l.url, "_blank", "noopener,noreferrer");
             }}
-            className="block w-full rounded-xl bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
+            className="block w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
           >
             <div className="flex items-center gap-3">
               <span className="text-xl" aria-hidden>

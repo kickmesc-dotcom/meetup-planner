@@ -167,13 +167,13 @@ export default function ReasonsEditor({
             }
           }}
           placeholder={placeholder}
-          className="flex-1 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
+          className="flex-1 rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
         />
         <button
           type="button"
           onClick={add}
           disabled={!draft.trim()}
-          className="min-h-11 min-w-11 rounded-md bg-tg-link/15 px-2 text-xs text-tg-link disabled:opacity-40"
+          className="min-h-11 min-w-11 rounded-tile bg-tg-link/15 px-2 text-xs text-tg-link disabled:opacity-40"
         >
           + добавить
         </button>
@@ -216,7 +216,7 @@ export default function ReasonsEditor({
                   haptic("medium");
                   onBulkMeta(filteredPhrases, { hidden: true });
                 }}
-                className="rounded-md bg-status-busy/15 px-2 py-1 text-status-busy"
+                className="rounded-tile bg-status-busy/15 px-2 py-1 text-status-busy"
               >
                 🚫 Скрыть показанные ({filteredPhrases.length})
               </button>
@@ -226,7 +226,7 @@ export default function ReasonsEditor({
                   haptic("medium");
                   onBulkMeta(filteredPhrases, { hidden: false });
                 }}
-                className="rounded-md bg-tg-link/15 px-2 py-1 text-tg-link"
+                className="rounded-tile bg-tg-link/15 px-2 py-1 text-tg-link"
               >
                 👁 Показать показанные
               </button>
@@ -240,7 +240,7 @@ export default function ReasonsEditor({
                       { hidden: true },
                     );
                   }}
-                  className="rounded-md bg-tg-bg/70 px-2 py-1 text-tg-hint"
+                  className="rounded-tile bg-tg-bg/70 px-2 py-1 text-tg-hint"
                 >
                   🤖 Скрыть весь ИИ
                 </button>
@@ -250,7 +250,7 @@ export default function ReasonsEditor({
         </>
       )}
 
-      <div className="max-h-72 overflow-y-auto rounded-lg bg-tg-bg/40 divide-y divide-tg-secondary-bg/40">
+      <div className="max-h-72 overflow-y-auto rounded-tile bg-tg-bg/40 divide-y divide-tg-secondary-bg/40">
         {list.length === 0 ? (
           <div className="px-2 py-3 text-xs text-tg-hint text-center">{emptyHint}</div>
         ) : rows.length === 0 ? (
@@ -275,21 +275,21 @@ export default function ReasonsEditor({
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
                         rows={2}
-                        className="w-full rounded-md bg-tg-bg/70 px-2 py-1 text-sm text-tg-text outline-none border border-tg-link resize-y"
+                        className="w-full rounded-tile bg-tg-bg/70 px-2 py-1 text-sm text-tg-text outline-none border border-tg-link resize-y"
                       />
                       <div className="flex flex-wrap gap-1.5">
                         <button
                           type="button"
                           onClick={commitEdit}
                           disabled={!editDraft.trim()}
-                          className="min-h-11 rounded-md bg-tg-button px-3 py-1 text-xs font-medium text-tg-button-text disabled:opacity-40"
+                          className="min-h-11 rounded-tile bg-tg-button px-3 py-1 text-xs font-medium text-tg-button-text disabled:opacity-40"
                         >
                           ✓ ОК
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditingIndex(null)}
-                          className="min-h-11 rounded-md bg-tg-bg/70 px-3 py-1 text-xs text-tg-hint"
+                          className="min-h-11 rounded-tile bg-tg-bg/70 px-3 py-1 text-xs text-tg-hint"
                         >
                           отмена
                         </button>
@@ -299,7 +299,7 @@ export default function ReasonsEditor({
                         <button
                           type="button"
                           onClick={() => remove(i)}
-                          className="min-h-11 rounded-md bg-status-busy/15 px-3 py-1 text-xs text-status-busy"
+                          className="min-h-11 rounded-tile bg-status-busy/15 px-3 py-1 text-xs text-status-busy"
                           title="Удалить фразу"
                         >
                           ✕ Удалить
@@ -336,7 +336,7 @@ export default function ReasonsEditor({
                               ? "ИИ-слоп — нажми, чтобы оставить как «мою» фразу"
                               : `${sourceTitle(src)} — нажми, чтобы пометить как ИИ-слоп`
                           }
-                          className="min-h-11 rounded-md bg-tg-bg/70 px-1.5 text-xs disabled:opacity-100"
+                          className="min-h-11 rounded-tile bg-tg-bg/70 px-1.5 text-xs disabled:opacity-100"
                         >
                           {sourceIcon(src)}
                         </button>
@@ -349,7 +349,7 @@ export default function ReasonsEditor({
                               haptic("warning");
                               onSetCount(r, 0);
                             }}
-                            className="text-2xs text-tg-hint tabular-nums rounded px-1 py-0.5 hover:bg-tg-secondary-bg/60 active:scale-95 transition"
+                            className="text-2xs text-tg-hint tabular-nums rounded-tile px-1 py-0.5 hover:bg-tg-secondary-bg/60 active:scale-95 transition"
                             title={`Использовано ${count} раз${count === 1 ? "" : "а"} — нажми, чтобы сбросить в 0`}
                           >
                             use:{count} ↺
@@ -365,7 +365,7 @@ export default function ReasonsEditor({
                       <button
                         type="button"
                         onClick={() => startEdit(i)}
-                        className="min-h-11 min-w-11 rounded-md bg-tg-bg/70 px-1.5 text-xs text-tg-hint"
+                        className="min-h-11 min-w-11 rounded-tile bg-tg-bg/70 px-1.5 text-xs text-tg-hint"
                         title="Редактировать"
                       >
                         ✎
@@ -377,7 +377,7 @@ export default function ReasonsEditor({
                             haptic(isHidden ? "selection" : "warning");
                             onSetMeta(r, { hidden: !isHidden });
                           }}
-                          className={`min-h-11 min-w-11 rounded-md px-1.5 text-xs ${
+                          className={`min-h-11 min-w-11 rounded-tile px-1.5 text-xs ${
                             isHidden
                               ? "bg-status-busy/15 text-status-busy"
                               : "bg-tg-bg/70 text-tg-hint"
@@ -404,7 +404,7 @@ export default function ReasonsEditor({
             haptic("medium");
             onSave(list);
           }}
-          className="flex-1 min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+          className="flex-1 min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {isPending && <Spinner />}
           {isPending
@@ -420,7 +420,7 @@ export default function ReasonsEditor({
               haptic("warning");
               setList(initial);
             }}
-            className="min-h-11 min-w-11 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-hint"
+            className="min-h-11 min-w-11 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-hint"
           >
             ↺
           </button>
@@ -437,7 +437,7 @@ export default function ReasonsEditor({
               onResetCounts();
             }
           }}
-          className="w-full min-h-11 rounded-md bg-tg-bg/70 px-2 text-xs text-tg-hint disabled:opacity-50 inline-flex items-center justify-center gap-2"
+          className="w-full min-h-11 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-hint disabled:opacity-50 inline-flex items-center justify-center gap-2"
         >
           {resetCountsPending && <Spinner />}
           🔄 Сбросить счётчики использования

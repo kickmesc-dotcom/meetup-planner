@@ -48,7 +48,7 @@ export default function BirthdaysScreen({ onBack }: Props) {
     >
       <BirthdaysMasterSwitch />
       {list.isPending || !list.data ? (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <ListSkeleton rows={6} />
         </section>
       ) : (
@@ -59,7 +59,7 @@ export default function BirthdaysScreen({ onBack }: Props) {
         />
       )}
       {save.isError && (
-        <div className="rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ {String((save.error as Error)?.message ?? save.error)}
         </div>
       )}
@@ -104,7 +104,7 @@ function BirthdaysMasterSwitch() {
   const enabled = sched.data?.birthdays.alerts_enabled ?? true;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       {sched.isPending || !sched.data ? (
         <ListSkeleton rows={1} />
       ) : (
@@ -178,7 +178,7 @@ function BirthdaysForm({
       {rows.map((r) => {
         const d = draft.get(r.user_id) ?? rowToDraft(r);
         return (
-          <section key={r.user_id} className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+          <section key={r.user_id} className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
             <div className="text-sm font-semibold text-tg-text">{r.display_name}</div>
 
             <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
@@ -191,7 +191,7 @@ function BirthdaysForm({
                     haptic("selection");
                     patch(r.user_id, { bday: e.target.value || null });
                   }}
-                  className="rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+                  className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
                 />
               </label>
               <div className="pb-2">
@@ -242,7 +242,7 @@ function BirthdaysForm({
           haptic("medium");
           onSave(Array.from(draft.values()));
         }}
-        className="w-full min-h-11 rounded-lg bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+        className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
         {isPending && <Spinner />}
         {isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}

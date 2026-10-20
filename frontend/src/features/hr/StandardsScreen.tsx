@@ -53,7 +53,7 @@ export default function StandardsScreen() {
             haptic("light");
             setTab("tasks");
           }}
-          className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
+          className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label="Назад к задачам"
         >
           ‹
@@ -71,7 +71,7 @@ export default function StandardsScreen() {
               haptic("selection");
               setAdding((v) => !v);
             }}
-            className="min-h-9 rounded-lg bg-tg-secondary-bg px-3 text-xs text-tg-text"
+            className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
           >
             {adding ? "Отмена" : "+ Стандарт"}
           </button>
@@ -131,7 +131,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-baseline justify-between text-xs">
           <span className="text-tg-hint">Сдано стандартов</span>
           <span className="font-medium text-tg-text">
@@ -167,7 +167,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
                   haptic("light");
                   onOpen(item.id);
                 }}
-                className="flex w-full items-start gap-3 rounded-xl bg-tg-secondary-bg/60 p-3 text-left"
+                className="flex w-full items-start gap-3 rounded-card bg-tg-secondary-bg/60 p-3 text-left"
               >
                 <span className="text-xl leading-none" aria-hidden>
                   {item.emoji ?? "📄"}
@@ -264,7 +264,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         <button
           type="button"
           onClick={onBack}
-          className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
+          className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label="Назад к списку"
         >
           ‹
@@ -285,7 +285,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         {detailQ.isLoading && <CardSkeleton />}
 
         {standard && (
-          <article className="rounded-xl bg-tg-secondary-bg/60 p-3">
+          <article className="rounded-card bg-tg-secondary-bg/60 p-3">
             <p className="whitespace-pre-wrap break-words text-sm text-tg-text/90">
               {standard.body}
             </p>
@@ -301,7 +301,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               toggleRequired.mutate(!standard.is_required);
             }}
             className={[
-              "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs disabled:opacity-50",
+              "flex w-full items-center justify-between rounded-card px-3 py-2 text-left text-xs disabled:opacity-50",
               standard.is_required
                 ? "bg-status-busy/15 text-status-busy"
                 : "bg-tg-secondary-bg/60 text-tg-hint",
@@ -319,13 +319,13 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         )}
 
         {standard && questions.length === 0 && (
-          <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
+          <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
             Теста к этому стандарту нет — достаточно прочитать инструкцию.
           </div>
         )}
 
         {questions.map((q, index) => (
-          <section key={q.id} className="rounded-xl bg-tg-secondary-bg/60 p-3">
+          <section key={q.id} className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="text-sm font-medium text-tg-text">
               {index + 1}. {q.text}
             </div>
@@ -344,7 +344,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
                       setAnswers((prev) => ({ ...prev, [q.id]: optionIndex }));
                     }}
                     className={[
-                      "flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-xs",
+                      "flex w-full items-start gap-2 rounded-tile px-2.5 py-2 text-left text-xs",
                       picked
                         ? wrong
                           ? "bg-status-busy/20 text-tg-text"
@@ -371,7 +371,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         {result && (
           <div
             className={[
-              "rounded-xl p-3 text-sm",
+              "rounded-card p-3 text-sm",
               result.passed
                 ? "bg-status-free/15 text-status-free"
                 : "bg-status-busy/15 text-status-busy",
@@ -391,7 +391,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               const values = questions.map((q) => answers[q.id] ?? -1);
               check.mutate(values);
             }}
-            className="min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+            className="min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
             {result ? "Попробовать снова" : "Проверить ответы"}
           </button>
@@ -462,7 +462,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
     );
 
   return (
-    <section className="mb-4 rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="mb-4 rounded-card bg-tg-secondary-bg/60 p-3">
       <h2 className="text-sm font-semibold text-tg-text">Новый стандарт</h2>
       <p className="mt-0.5 text-xs text-tg-hint">
         Пиши как для нового сотрудника: что сделать, в каком порядке и почему.
@@ -475,7 +475,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
           placeholder="Гигиена рук перед сменой"
-          className="mt-1 min-h-10 w-full rounded-lg bg-tg-bg/70 px-2 text-sm text-tg-text"
+          className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
         />
       </label>
 
@@ -487,7 +487,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
             onChange={(e) => setEmoji(e.target.value)}
             maxLength={4}
             placeholder="🧼"
-            className="mt-1 min-h-10 w-full rounded-lg bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
           />
         </label>
         <label className="min-w-0 flex-1 text-xs text-tg-hint">
@@ -495,7 +495,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as StandardCategory)}
-            className="mt-1 min-h-10 w-full rounded-lg bg-tg-bg/70 px-2 text-sm text-tg-text"
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
           >
             {(
               Object.keys(STANDARD_CATEGORY_LABEL) as StandardCategory[]
@@ -514,7 +514,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           maxLength={200}
-          className="mt-1 min-h-10 w-full rounded-lg bg-tg-bg/70 px-2 text-sm text-tg-text"
+          className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
         />
       </label>
 
@@ -525,7 +525,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setBody(e.target.value)}
           rows={5}
           placeholder="1. Помой руки…"
-          className="mt-1 w-full rounded-lg bg-tg-bg/70 p-2 text-sm text-tg-text"
+          className="mt-1 w-full rounded-tile bg-tg-bg/70 p-2 text-sm text-tg-text"
         />
       </label>
 
@@ -559,7 +559,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           Тест
         </div>
         {questions.map((q, index) => (
-          <div key={index} className="rounded-lg bg-tg-bg/60 p-2">
+          <div key={index} className="rounded-tile bg-tg-bg/60 p-2">
             <div className="flex items-center gap-2">
               <input
                 value={q.text}
@@ -571,7 +571,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                   )
                 }
                 placeholder={`Вопрос ${index + 1}`}
-                className="min-h-9 min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 text-sm text-tg-text"
+                className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
               {questions.length > 1 && (
                 <button
@@ -579,7 +579,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                   onClick={() =>
                     setQuestions((prev) => prev.filter((_, i) => i !== index))
                   }
-                  className="min-h-11 min-w-11 rounded-lg text-xs text-tg-hint"
+                  className="min-h-11 min-w-11 rounded-tile text-xs text-tg-hint"
                   aria-label="Удалить вопрос"
                 >
                   ✕
@@ -623,7 +623,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                   placeholder={
                     optionIndex === 0 ? "Верный вариант" : "Вариант"
                   }
-                  className="min-h-8 min-w-0 flex-1 rounded-lg bg-tg-secondary-bg px-2 text-xs text-tg-text"
+                  className="min-h-8 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
                 />
               </label>
             ))}
@@ -632,7 +632,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={() => setQuestions((prev) => [...prev, EMPTY_QUESTION()])}
-          className="min-h-9 w-full rounded-lg bg-tg-secondary-bg text-xs text-tg-text"
+          className="min-h-9 w-full rounded-tile bg-tg-secondary-bg text-xs text-tg-text"
         >
           + Вопрос
         </button>
@@ -642,7 +642,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         type="button"
         disabled={!canSave}
         onClick={() => save.mutate()}
-        className="mt-3 min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-3 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
         Сохранить стандарт
       </button>

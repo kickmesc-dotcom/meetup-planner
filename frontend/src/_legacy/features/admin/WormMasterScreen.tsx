@@ -122,11 +122,11 @@ export default function WormMasterScreen({ onBack }: Props) {
       {/* 0. Выпадение титула (E8): базовая механика — кто вообще становится
           червём. Без неё «господина» не появится, поэтому секция первая. */}
       {wormQ.isPending || !wormDraft ? (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 mb-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3 mb-3">
           <ListSkeleton rows={2} />
         </section>
       ) : (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 mb-3 space-y-2">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3 mb-3 space-y-2">
           <div className="text-sm font-semibold text-tg-text">
             🎲 Выпадение титула
           </div>
@@ -152,11 +152,11 @@ export default function WormMasterScreen({ onBack }: Props) {
 
       {/* 1. Поведение */}
       {settingsQ.isPending || !draft ? (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <ListSkeleton rows={4} />
         </section>
       ) : (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
           <div className="text-xs text-tg-hint mb-1">
             Червь периода владения становится «господином»: при лохе/чухане бот
             добавляет подхалимский префикс/суффикс, расширяет анонс становления и
@@ -184,7 +184,7 @@ export default function WormMasterScreen({ onBack }: Props) {
             />
 
             {/* Поддакивание (T3.6.8). */}
-            <div className="rounded-md bg-tg-bg/40 px-2 py-2 space-y-2">
+            <div className="rounded-tile bg-tg-bg/40 px-2 py-2 space-y-2">
               <div className="flex items-center gap-2">
                 <div className="text-sm text-tg-text">🤫 Поддакивание</div>
               </div>
@@ -315,11 +315,11 @@ function PoolSection({
   onSave: (phrases: string[]) => void;
 }) {
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 mt-3 space-y-2">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3 mt-3 space-y-2">
       <div className="flex items-center gap-2">
         <div className="text-sm font-semibold text-tg-text">{title}</div>
         {badge && (
-          <span className="text-2xs rounded bg-status-busy/15 px-1.5 py-0.5 text-status-busy">
+          <span className="text-2xs rounded-tile bg-status-busy/15 px-1.5 py-0.5 text-status-busy">
             {badge}
           </span>
         )}
@@ -353,7 +353,7 @@ function ToggleRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-2 rounded-md bg-tg-bg/40 px-2 py-2">
+    <div className="flex items-start justify-between gap-2 rounded-tile bg-tg-bg/40 px-2 py-2">
       <div className="min-w-0">
         <div className="text-sm text-tg-text">{label}</div>
         {hint && <div className="text-xs text-tg-hint">{hint}</div>}
@@ -396,7 +396,7 @@ function PctRow({
             const n = Math.max(0, Math.min(100, Number(e.target.value) || 0));
             onChange(n);
           }}
-          className="w-16 rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right outline-none border border-transparent focus:border-tg-link tabular-nums"
+          className="w-16 rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right outline-none border border-transparent focus:border-tg-link tabular-nums"
         />
         <span className="text-xs text-tg-hint">%</span>
       </div>
@@ -434,7 +434,7 @@ function NumRow({
           const n = Math.max(min, Math.min(max, Number(e.target.value) || min));
           onChange(n);
         }}
-        className="w-16 shrink-0 rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right outline-none border border-transparent focus:border-tg-link tabular-nums"
+        className="w-16 shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right outline-none border border-transparent focus:border-tg-link tabular-nums"
       />
     </div>
   );

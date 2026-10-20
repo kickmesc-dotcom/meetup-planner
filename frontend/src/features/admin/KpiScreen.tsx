@@ -80,14 +80,14 @@ export default function KpiScreen({ onBack }: Props) {
       onBack={onBack}
     >
       {q.isError && (
-        <div className="rounded-lg bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           ⚠ {humanizeApiError(q.error)}
         </div>
       )}
       {q.isLoading && <ListSkeleton rows={4} />}
 
       {rules && (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
           <div className="text-sm font-semibold text-tg-text">Сколько стоит работа</div>
           <div className="text-xs text-tg-hint">
             Веса действуют сразу: опыт пересчитывается из уже записанных смен и
@@ -96,7 +96,7 @@ export default function KpiScreen({ onBack }: Props) {
           {FIELDS.map((field) => (
             <label
               key={field.key}
-              className="flex items-center justify-between gap-3 rounded-lg bg-tg-bg/50 p-2"
+              className="flex items-center justify-between gap-3 rounded-tile bg-tg-bg/50 p-2"
             >
               <span className="min-w-0">
                 <span className="block text-xs text-tg-text">{field.label}</span>
@@ -114,7 +114,7 @@ export default function KpiScreen({ onBack }: Props) {
                   if (!Number.isFinite(next) || next === rules[field.key]) return;
                   mut.mutate({ [field.key]: Math.max(0, Math.round(next)) });
                 }}
-                className="w-16 shrink-0 rounded-md bg-tg-bg px-2 py-1 text-right text-sm tabular-nums text-tg-text"
+                className="w-16 shrink-0 rounded-tile bg-tg-bg px-2 py-1 text-right text-sm tabular-nums text-tg-text"
                 aria-label={field.label}
               />
             </label>
@@ -125,14 +125,14 @@ export default function KpiScreen({ onBack }: Props) {
         </section>
       )}
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="text-sm font-semibold text-tg-text">Неделя</div>
         {q.data && (
           <div className="text-xs text-tg-hint">
             {q.data.week_start} — {q.data.week_end} · пн–вс
           </div>
         )}
-        <div className="rounded-lg bg-tg-bg/50 p-2 text-xs">
+        <div className="rounded-tile bg-tg-bg/50 p-2 text-xs">
           {winner ? (
             <>
               <div className="text-tg-hint">Сотрудник недели</div>
@@ -159,7 +159,7 @@ export default function KpiScreen({ onBack }: Props) {
             {board.slice(0, 10).map((row) => (
               <li
                 key={row.employee_id}
-                className="flex items-center gap-2 rounded-lg bg-tg-bg/40 px-2 py-1.5 text-xs"
+                className="flex items-center gap-2 rounded-tile bg-tg-bg/40 px-2 py-1.5 text-xs"
               >
                 <span className="w-5 shrink-0 text-right tabular-nums text-tg-hint">
                   {row.place}

@@ -62,7 +62,7 @@ export default function ParticipantsFilterSheet({
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-black/40" onClick={onClose}>
       <div
-        className="mt-auto flex max-h-[80%] flex-col rounded-t-2xl bg-tg-bg"
+        className="mt-auto flex max-h-[80%] flex-col rounded-t-card bg-tg-bg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-tg-secondary-bg px-4 py-3">
@@ -79,7 +79,7 @@ export default function ParticipantsFilterSheet({
               onClose();
             }}
             aria-label="Закрыть фильтр"
-            className="rounded-lg bg-tg-secondary-bg/70 px-3 py-1.5 text-sm text-tg-text"
+            className="rounded-tile bg-tg-secondary-bg/70 px-3 py-1.5 text-sm text-tg-text"
           >
             Готово
           </button>
@@ -91,7 +91,7 @@ export default function ParticipantsFilterSheet({
             type="button"
             onClick={muteAll}
             disabled={busy}
-            className="flex-1 rounded-lg bg-tg-secondary-bg/70 py-2 text-xs font-semibold text-tg-text active:scale-[0.98] disabled:opacity-50"
+            className="flex-1 rounded-tile bg-tg-secondary-bg/70 py-2 text-xs font-semibold text-tg-text active:scale-[0.98] disabled:opacity-50"
           >
             Все
           </button>
@@ -99,7 +99,7 @@ export default function ParticipantsFilterSheet({
             type="button"
             onClick={muteNone}
             disabled={busy}
-            className="flex-1 rounded-lg bg-tg-secondary-bg/70 py-2 text-xs font-semibold text-tg-text active:scale-[0.98] disabled:opacity-50"
+            className="flex-1 rounded-tile bg-tg-secondary-bg/70 py-2 text-xs font-semibold text-tg-text active:scale-[0.98] disabled:opacity-50"
           >
             Никто
           </button>

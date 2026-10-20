@@ -24,7 +24,7 @@ export default function AchievementsCard() {
   const { awarded, stats, next_goals: goals } = q.data;
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text">
           🏅 Личный прогресс
@@ -83,7 +83,7 @@ export default function AchievementsCard() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg bg-tg-bg/50 p-2">
+    <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="text-sm font-semibold text-tg-text tabular-nums">
         {value}
       </div>

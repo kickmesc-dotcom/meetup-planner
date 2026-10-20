@@ -195,7 +195,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
       />
       <motion.div
         key="sheet"
-        className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-tg-bg p-4 pb-8 shadow-xl"
+        className="fixed inset-x-0 bottom-0 z-50 rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
@@ -244,7 +244,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
                   haptic("warning");
                   deleteMut.mutate();
                 }}
-                className="mt-4 w-full rounded-xl bg-status-busy/15 text-status-busy py-3 font-medium"
+                className="mt-4 w-full rounded-card bg-status-busy/15 text-status-busy py-3 font-medium"
               >
                 Удалить
               </button>
@@ -255,7 +255,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
                 haptic("light");
                 setEditing(null);
               }}
-              className="mt-2 w-full rounded-xl bg-tg-button text-tg-button-text py-3 font-medium"
+              className="mt-2 w-full rounded-card bg-tg-button text-tg-button-text py-3 font-medium"
             >
               Готово
             </button>
@@ -290,7 +290,7 @@ function StatusPicker({
           disabled={disabled}
           onClick={() => onChange(s.value)}
           className={[
-            "flex-1 py-3 rounded-xl text-white font-medium transition-opacity",
+            "flex-1 py-3 rounded-card text-white font-medium transition-opacity",
             s.color,
             value === s.value ? "opacity-100" : "opacity-40",
           ].join(" ")}
@@ -345,7 +345,7 @@ function ConfidencePicker({
             disabled={disabled}
             onClick={() => onChange(c)}
             className={[
-              "flex-1 py-2 rounded-lg text-xs leading-tight",
+              "flex-1 py-2 rounded-tile text-xs leading-tight",
               value === c ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg",
             ].join(" ")}
           >
@@ -393,7 +393,7 @@ function TimePicker({
         <div className="mt-2 flex items-center gap-2">
           <input
             type="time"
-            className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
+            className="flex-1 rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm"
             value={startHm}
             disabled={disabled}
             onChange={(e) => onTimeChange("start", e.currentTarget.value)}
@@ -401,7 +401,7 @@ function TimePicker({
           <span className="text-tg-hint text-sm">→</span>
           <input
             type="time"
-            className="flex-1 rounded-lg bg-tg-secondary-bg px-3 py-2 text-sm"
+            className="flex-1 rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm"
             value={endHm}
             disabled={disabled}
             onChange={(e) => onTimeChange("end", e.currentTarget.value)}

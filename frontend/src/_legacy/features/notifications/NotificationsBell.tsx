@@ -105,7 +105,7 @@ export function NotificationsList() {
           key={n.id}
           data-testid="notification-row"
           className={[
-            "rounded-lg px-2.5 py-2 text-xs",
+            "rounded-tile px-2.5 py-2 text-xs",
             n.read ? "bg-tg-secondary-bg/50" : "bg-tg-secondary-bg",
           ].join(" ")}
         >

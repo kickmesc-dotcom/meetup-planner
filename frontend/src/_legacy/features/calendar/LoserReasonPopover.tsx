@@ -60,7 +60,7 @@ export default function LoserReasonPopover() {
       onClick={close}
     >
       <div
-        className="w-full max-w-md rounded-t-2xl bg-tg-bg p-4 pb-6 shadow-2xl"
+        className="w-full max-w-md rounded-t-card bg-tg-bg p-4 pb-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -94,7 +94,7 @@ export default function LoserReasonPopover() {
 
         {reason && (
           <div className="flex flex-col gap-2">
-            <div className="rounded-lg bg-tg-secondary-bg/60 p-3 text-sm">
+            <div className="rounded-tile bg-tg-secondary-bg/60 p-3 text-sm">
               <div className="text-xs text-tg-hint mb-1">
                 {sourceLabel} · {rolledAtFormatted}
               </div>

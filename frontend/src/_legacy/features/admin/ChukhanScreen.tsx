@@ -156,7 +156,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
       subtitle="Веса, ре-ролл, история, шаблоны фраз"
       onBack={onBack}
     >
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">⚖️ Веса</div>
         <div className="text-xs text-tg-hint mb-2">
           Чем выше вес — тем чаще выпадает. База 1.0. Обнуляй, чтобы вернуть env.
@@ -180,7 +180,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
         )}
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">🎲 Принудительный re-roll</div>
         <div className="text-xs text-tg-hint mb-2">
           Удаляет запись чухана текущей недели и публикует нового в общий чат.
@@ -192,19 +192,19 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             haptic("medium");
             if (confirm("Перевыбрать чухана недели?")) reroll.mutate();
           }}
-          className="w-full rounded-lg bg-tg-button py-2.5 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+          className="w-full rounded-tile bg-tg-button py-2.5 text-sm font-medium text-tg-button-text disabled:opacity-50 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
           {reroll.isPending && <Spinner />}
           {reroll.isPending ? "Катаем…" : "Перевыбрать чухана"}
         </button>
         {reroll.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+          <div className="mt-2 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
             ⚠ {String((reroll.error as Error)?.message ?? reroll.error)}
           </div>
         )}
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">💩 Шаблоны фраз чухана</div>
         <div className="text-xs text-tg-hint mb-2">
           Используются при объявлении чухана недели. Пустой список → дефолт из кода.
@@ -225,7 +225,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
           />
         )}
         {saveReasons.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+          <div className="mt-2 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
             ⚠ {String((saveReasons.error as Error)?.message ?? saveReasons.error)}
           </div>
         )}
@@ -234,7 +234,7 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             старых фраз» — показывает что реально в admin_config и даёт залить
             дефолты одной кнопкой (вытесняет кривой/пустой ключ валидным JSON). */}
         {reasonsRaw.data && (
-          <div className="mt-3 rounded-md bg-tg-bg/40 p-2 text-xs text-tg-hint">
+          <div className="mt-3 rounded-tile bg-tg-bg/40 p-2 text-xs text-tg-hint">
             <div className="font-medium text-tg-text mb-1">🔍 Диагностика</div>
             {reasonsRaw.data.using_default ? (
               <div className="text-status-busy">
@@ -266,13 +266,13 @@ export default function ChukhanScreen({ users, onBack }: Props) {
             })();
           }}
           disabled={resetReasons.isPending}
-          className="mt-2 w-full rounded-lg border border-tg-hint/30 py-2 text-xs text-tg-text active:scale-[0.99] disabled:opacity-50"
+          className="mt-2 w-full rounded-tile border border-tg-hint/30 py-2 text-xs text-tg-text active:scale-[0.99] disabled:opacity-50"
         >
           {resetReasons.isPending ? "Сбрасываю…" : "↩ Сбросить к дефолтам из кода"}
         </button>
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">⏱ Оспаривание чухана</div>
         <div className="text-xs text-tg-hint mb-2">
           Сколько длится опрос «согласны с чуханом?» после анонса. Раньше был жёстко
@@ -289,13 +289,13 @@ export default function ChukhanScreen({ users, onBack }: Props) {
           />
         )}
         {appeal.isError && (
-          <div className="mt-2 rounded-md bg-status-busy/10 p-2 text-xs text-status-busy">
+          <div className="mt-2 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
             ⚠ {humanizeApiError(appeal.error)}
           </div>
         )}
       </section>
 
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-base font-semibold mb-1">📜 История чуханов</div>
         <div className="text-xs text-tg-hint mb-2">Последние записи по неделям.</div>
         {history.isPending ? (
@@ -373,7 +373,7 @@ function WeightRow({
         max={10}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        className="w-16 rounded-md bg-tg-bg/70 px-2 py-1 text-sm text-tg-text text-right tabular-nums outline-none border border-transparent focus:border-tg-link"
+        className="w-16 rounded-tile bg-tg-bg/70 px-2 py-1 text-sm text-tg-text text-right tabular-nums outline-none border border-transparent focus:border-tg-link"
       />
       <button
         type="button"
@@ -382,14 +382,14 @@ function WeightRow({
           const v = parseFloat(draft);
           if (!Number.isNaN(v) && v >= 0) onSet(v);
         }}
-        className="min-h-11 min-w-11 rounded-md bg-tg-link/15 px-2 text-xs text-tg-link disabled:opacity-40"
+        className="min-h-11 min-w-11 rounded-tile bg-tg-link/15 px-2 text-xs text-tg-link disabled:opacity-40"
       >
         OK
       </button>
       <button
         type="button"
         onClick={onReset}
-        className="min-h-11 min-w-11 rounded-md bg-tg-bg/70 px-2 text-base text-tg-hint"
+        className="min-h-11 min-w-11 rounded-tile bg-tg-bg/70 px-2 text-base text-tg-hint"
         title="Сбросить к значению из env"
       >
         ↺
@@ -434,7 +434,7 @@ function MinutesRow({
           max={hi}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          className="w-24 rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right tabular-nums outline-none border border-transparent focus:border-tg-link"
+          className="w-24 rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text text-right tabular-nums outline-none border border-transparent focus:border-tg-link"
         />
         <span className="text-xs text-tg-hint">
           минут · сейчас ≈ {(value / 60).toFixed(value % 60 === 0 ? 0 : 1)} ч
@@ -443,7 +443,7 @@ function MinutesRow({
           type="button"
           disabled={!dirty || saving}
           onClick={() => onSave(parsed)}
-          className="ml-auto min-h-11 min-w-11 rounded-md bg-tg-link/15 px-3 text-xs text-tg-link disabled:opacity-40"
+          className="ml-auto min-h-11 min-w-11 rounded-tile bg-tg-link/15 px-3 text-xs text-tg-link disabled:opacity-40"
         >
           {saving ? "…" : "OK"}
         </button>

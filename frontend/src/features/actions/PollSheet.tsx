@@ -177,7 +177,7 @@ export default function PollSheet(_props: Props) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           maxLength={255}
-          className="w-full rounded-lg bg-tg-secondary-bg px-3 py-2"
+          className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2"
         />
       </label>
 
@@ -202,14 +202,14 @@ export default function PollSheet(_props: Props) {
         {options.map((o, i) => (
           <div
             key={i}
-            className="rounded-lg bg-tg-secondary-bg/40 p-2 space-y-1.5"
+            className="rounded-tile bg-tg-secondary-bg/40 p-2 space-y-1.5"
           >
             <div className="flex items-center gap-2">
               <input
                 type="date"
                 value={o.date}
                 onChange={(e) => setOption(i, { date: e.target.value })}
-                className="flex-1 rounded-md bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+                className="flex-1 rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
               />
               <span className="min-w-[78px] text-right text-xs text-tg-hint tabular-nums">
                 {fmtDateRu(o.date)}
@@ -218,7 +218,7 @@ export default function PollSheet(_props: Props) {
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
-                  className="min-h-11 min-w-11 rounded-md bg-status-busy/15 px-2 text-xs text-status-busy"
+                  className="min-h-11 min-w-11 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy"
                   title="Убрать"
                 >
                   ✕
@@ -230,7 +230,7 @@ export default function PollSheet(_props: Props) {
                 type="time"
                 value={o.time || defaultTime}
                 onChange={(e) => setOption(i, { time: e.target.value })}
-                className="w-[120px] rounded-md bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text tabular-nums outline-none border border-transparent focus:border-tg-link"
+                className="w-[120px] rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text tabular-nums outline-none border border-transparent focus:border-tg-link"
               />
             )}
           </div>
@@ -239,7 +239,7 @@ export default function PollSheet(_props: Props) {
           <button
             type="button"
             onClick={addOption}
-            className="w-full rounded-lg bg-tg-secondary-bg/60 py-2 text-sm"
+            className="w-full rounded-tile bg-tg-secondary-bg/60 py-2 text-sm"
           >
             + ещё вариант
           </button>
@@ -273,7 +273,7 @@ export default function PollSheet(_props: Props) {
         <select
           value={closesIn}
           onChange={(e) => setClosesIn(Number(e.target.value))}
-          className="w-full rounded-lg bg-tg-secondary-bg px-2 py-2"
+          className="w-full rounded-tile bg-tg-secondary-bg px-2 py-2"
         >
           <option value={6}>6 часов</option>
           <option value={12}>12 часов</option>
@@ -284,7 +284,7 @@ export default function PollSheet(_props: Props) {
       </label>
 
       {error && (
-        <div className="mt-2 rounded-lg bg-status-busy/15 p-2 text-center text-sm text-status-busy">
+        <div className="mt-2 rounded-tile bg-status-busy/15 p-2 text-center text-sm text-status-busy">
           {error}
         </div>
       )}
@@ -296,7 +296,7 @@ export default function PollSheet(_props: Props) {
           mut.mutate();
         }}
         disabled={!valid || mut.isPending}
-        className="mt-4 w-full rounded-xl bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
+        className="mt-4 w-full rounded-card bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
       >
         {mut.isPending && <Spinner />}
         {mut.isPending ? "Отправляем…" : "Отправить в чат"}
@@ -305,7 +305,7 @@ export default function PollSheet(_props: Props) {
       <button
         type="button"
         onClick={close}
-        className="mt-2 w-full rounded-xl bg-tg-secondary-bg py-3 font-medium"
+        className="mt-2 w-full rounded-card bg-tg-secondary-bg py-3 font-medium"
       >
         Отмена
       </button>

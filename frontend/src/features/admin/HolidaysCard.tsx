@@ -57,7 +57,7 @@ export default function HolidaysCard() {
   const ready = month.trim() && day.trim() && message.trim();
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <h2 className="text-base font-semibold">🎉 Праздники</h2>
       <div className="mb-2 text-xs text-tg-hint">
         В эти дни всем участникам капает +50 XP, а бот поздравляет в чате
@@ -82,7 +82,7 @@ export default function HolidaysCard() {
                   removeMut.mutate(h.id);
                 }}
                 disabled={removeMut.isPending}
-                className="shrink-0 rounded bg-tg-bg/60 px-2 py-1 text-xs text-status-busy active:scale-95 disabled:opacity-60"
+                className="shrink-0 rounded-tile bg-tg-bg/60 px-2 py-1 text-xs text-status-busy active:scale-95 disabled:opacity-60"
               >
                 ✕
               </button>
@@ -100,20 +100,20 @@ export default function HolidaysCard() {
             onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
             inputMode="numeric"
             placeholder="ДД"
-            className="w-14 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+            className="w-14 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
           />
           <input
             value={month}
             onChange={(e) => setMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
             inputMode="numeric"
             placeholder="ММ"
-            className="w-14 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+            className="w-14 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
           />
           <input
             value={message}
             onChange={(e) => setMessage(e.target.value.slice(0, 120))}
             placeholder="Что за праздник"
-            className="min-w-0 flex-1 rounded bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+            className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
           />
         </div>
         <button
@@ -123,7 +123,7 @@ export default function HolidaysCard() {
             addMut.mutate();
           }}
           disabled={!ready || addMut.isPending}
-          className="w-full rounded-lg bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
+          className="w-full rounded-tile bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
         >
           + Добавить праздник
         </button>

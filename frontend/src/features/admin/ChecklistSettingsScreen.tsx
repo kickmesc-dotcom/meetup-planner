@@ -157,7 +157,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
           </div>
         </section>
       ) : (
-        <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+        <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
           {kind === "close"
             ? "Закрытие смены — общий чек-лист: один на все залы. Последний пункт обычно с фотоотчётом."
             : "Чек-лист первого дня показывается новичку; зала у него нет."}
@@ -173,7 +173,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
           onSaved={invalidate}
         />
       ) : (
-        <section className="rounded-xl bg-tg-secondary-bg/60 p-4 text-center">
+        <section className="rounded-card bg-tg-secondary-bg/60 p-4 text-center">
           <div className="text-3xl" aria-hidden>
             🗒
           </div>
@@ -191,7 +191,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
               haptic("selection");
               createTpl.mutate();
             }}
-            className="mt-3 min-h-11 rounded-lg bg-tg-button px-4 text-sm font-medium text-tg-button-text disabled:opacity-50"
+            className="mt-3 min-h-11 rounded-tile bg-tg-button px-4 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
             {createTpl.isPending ? "Создаю…" : "Создать чек-лист"}
           </button>
@@ -238,7 +238,7 @@ function TemplateEditor({
 
   return (
     <>
-      <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+      <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="flex items-center gap-2">
           <input
             value={title}
@@ -249,7 +249,7 @@ function TemplateEditor({
               else setTitle(template.title);
             }}
             maxLength={200}
-            className="min-w-0 flex-1 rounded-lg bg-tg-bg/60 px-3 py-2 text-sm font-semibold text-tg-text"
+            className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-3 py-2 text-sm font-semibold text-tg-text"
             aria-label="Название чек-листа"
           />
           {saveTpl.isPending && <Spinner />}
@@ -291,7 +291,7 @@ function TemplateEditor({
           />
         ))}
         {items.length === 0 && (
-          <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+          <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
             Пока ни одного пункта. Добавь первый — иначе сотрудник увидит пустой
             экран.
           </div>
@@ -313,7 +313,7 @@ function TemplateEditor({
             haptic("light");
             setAdding(true);
           }}
-          className="min-h-11 w-full rounded-xl border border-dashed border-tg-hint/40 text-sm text-tg-text"
+          className="min-h-11 w-full rounded-card border border-dashed border-tg-hint/40 text-sm text-tg-text"
         >
           ＋ Добавить пункт
         </button>
@@ -334,14 +334,14 @@ function AddItemForm({
   const [title, setTitle] = useState("");
   const [photo, setPhoto] = useState(false);
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3 space-y-2">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
       <textarea
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         rows={2}
         maxLength={500}
         placeholder="Что сделать? Например: протереть столы 400–500"
-        className="w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text"
+        className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
       />
       <TgToggle
         checked={photo}
@@ -353,14 +353,14 @@ function AddItemForm({
           type="button"
           disabled={busy || !title.trim()}
           onClick={() => onSubmit(title.trim(), photo)}
-          className="min-h-11 flex-1 rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+          className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
           Добавить
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="min-h-11 rounded-lg bg-tg-bg/60 px-3 text-sm text-tg-text"
+          className="min-h-11 rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
         >
           Отмена
         </button>
@@ -403,7 +403,7 @@ function ItemEditor({
   });
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-start gap-2">
         <button
           type="button"
@@ -428,7 +428,7 @@ function ItemEditor({
             aria-label="Выше"
             disabled={isFirst}
             onClick={() => onMove(-1)}
-            className="h-11 w-11 rounded-md bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
+            className="h-11 w-11 rounded-tile bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
           >
             ↑
           </button>
@@ -437,7 +437,7 @@ function ItemEditor({
             aria-label="Ниже"
             disabled={isLast}
             onClick={() => onMove(1)}
-            className="h-11 w-11 rounded-md bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
+            className="h-11 w-11 rounded-tile bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
           >
             ↓
           </button>
@@ -451,7 +451,7 @@ function ItemEditor({
             onChange={(e) => setTitle(e.target.value)}
             rows={2}
             maxLength={500}
-            className="w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text"
+            className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
             placeholder="Пункт"
           />
           <textarea
@@ -459,7 +459,7 @@ function ItemEditor({
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
             maxLength={1000}
-            className="w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text"
+            className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
             placeholder="Пояснение (необязательно)"
           />
           <TgToggle
@@ -482,7 +482,7 @@ function ItemEditor({
                   description: description.trim() || null,
                 })
               }
-              className="min-h-11 flex-1 rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
               Сохранить
             </button>
@@ -495,7 +495,7 @@ function ItemEditor({
                 );
                 if (ok) remove.mutate();
               }}
-              className="min-h-11 rounded-lg bg-status-busy/15 px-3 text-sm text-status-busy"
+              className="min-h-11 rounded-tile bg-status-busy/15 px-3 text-sm text-status-busy"
             >
               Удалить
             </button>
@@ -547,7 +547,7 @@ function HallsCard() {
   });
 
   return (
-    <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <button
         type="button"
         onClick={() => {
@@ -570,7 +570,7 @@ function HallsCard() {
           {(hallsQ.data ?? []).map((hall) => (
             <div
               key={hall.id}
-              className="flex items-center gap-2 rounded-lg bg-tg-bg/50 p-2"
+              className="flex items-center gap-2 rounded-tile bg-tg-bg/50 p-2"
             >
               <input
                 defaultValue={hall.name}
@@ -581,7 +581,7 @@ function HallsCard() {
                   else e.target.value = hall.name;
                 }}
                 maxLength={120}
-                className="min-w-0 flex-1 rounded-md bg-tg-secondary-bg px-2 py-1 text-sm text-tg-text"
+                className="min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 py-1 text-sm text-tg-text"
                 aria-label={`Название зала ${hall.name}`}
               />
               <Checkbox
@@ -599,13 +599,13 @@ function HallsCard() {
               onChange={(e) => setName(e.target.value)}
               maxLength={120}
               placeholder="Название нового зала"
-              className="min-w-0 flex-1 rounded-lg bg-tg-bg/60 px-3 py-2 text-sm text-tg-text"
+              className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-3 py-2 text-sm text-tg-text"
             />
             <button
               type="button"
               disabled={create.isPending || !name.trim()}
               onClick={() => create.mutate(name.trim())}
-              className="min-h-11 rounded-lg bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
               ＋
             </button>

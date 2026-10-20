@@ -93,7 +93,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
             haptic("light");
             onClose();
           }}
-          className="min-h-9 rounded-lg bg-tg-secondary-bg px-3 text-xs text-tg-text"
+          className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
         >
           Закрыть
         </button>
@@ -110,7 +110,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
 
         {data && (
           <>
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">Следы пула</div>
                 <span
@@ -136,13 +136,13 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   haptic("selection");
                   toggle.mutate(!data.visible);
                 }}
-                className="mt-2 min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                className="mt-2 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
                 {data.visible ? "🙈 Скрыть следы" : "👁 Показать следы"}
               </button>
             </section>
 
-            <section className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="text-sm font-semibold text-tg-text">
                 Сотрудники пула: {data.employees.length}
               </div>
@@ -175,7 +175,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                     haptic("light");
                     seed.mutate();
                   }}
-                  className="min-h-10 w-full rounded-lg bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
+                  className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
                 >
                   🆕 Завести пул
                 </button>
@@ -186,14 +186,14 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                     haptic("light");
                     simulate.mutate();
                   }}
-                  className="min-h-10 w-full rounded-lg bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
+                  className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
                 >
                   ▶️ Симулировать 3 смены
                 </button>
               </div>
             </section>
 
-            <section className="rounded-xl border border-status-busy/30 p-3">
+            <section className="rounded-card border border-status-busy/30 p-3">
               <div className="text-sm font-semibold text-tg-text">Удаление</div>
               <p className="mt-1 text-xs text-tg-hint">
                 Обратной операции нет. «Активность» убирает смены, поручения и
@@ -209,7 +209,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   );
                   if (ok) purge.mutate(false);
                 }}
-                className="mt-2 min-h-10 w-full rounded-lg bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
+                className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
               >
                 🧹 Снести только активность
               </button>
@@ -222,7 +222,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   );
                   if (ok) purge.mutate(true);
                 }}
-                className="mt-2 min-h-10 w-full rounded-lg bg-status-busy text-xs font-medium text-white disabled:opacity-50"
+                className="mt-2 min-h-10 w-full rounded-tile bg-status-busy text-xs font-medium text-white disabled:opacity-50"
               >
                 🗑 Удалить сотрудников и следы
               </button>
@@ -236,7 +236,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg bg-tg-bg/50 p-2">
+    <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="tabular-nums text-tg-text">{value}</div>
       <div className="text-tg-hint">{label}</div>
     </div>

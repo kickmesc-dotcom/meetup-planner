@@ -109,7 +109,7 @@ export default function ShiftsScreen() {
           <button
             type="button"
             onClick={() => stepWeek(-1)}
-            className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Предыдущая неделя"
           >
             ‹
@@ -120,14 +120,14 @@ export default function ShiftsScreen() {
               haptic("selection");
               setWeekStart(mondayOf(new Date()));
             }}
-            className="min-h-9 rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+            className="min-h-9 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
           >
             Сегодня
           </button>
           <button
             type="button"
             onClick={() => stepWeek(1)}
-            className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Следующая неделя"
           >
             ›
@@ -194,7 +194,7 @@ export default function ShiftsScreen() {
                   return (
                     <div
                       key={iso}
-                      className={`rounded-lg px-0.5 py-1 text-center text-2xs ${
+                      className={`rounded-tile px-0.5 py-1 text-center text-2xs ${
                         isToday
                           ? "bg-tg-link/15 font-medium text-tg-link"
                           : "text-tg-hint"
@@ -294,7 +294,7 @@ function GroupRows({
       </div>
       {people.map((person) => (
         <div key={person.employee_id} className="contents">
-          <div className="flex min-h-11 items-center rounded-lg bg-tg-secondary-bg/40 px-2">
+          <div className="flex min-h-11 items-center rounded-tile bg-tg-secondary-bg/40 px-2">
             <div className="min-w-0">
               <div className="truncate text-xs text-tg-text">{person.display_name}</div>
               {person.position && (
@@ -362,7 +362,7 @@ function Cell({
             }${shift.ends_at ? `–${shift.ends_at}` : ""}`
           : "Смены нет"
       }
-      className={`relative flex min-h-11 flex-col items-center justify-center rounded-lg text-xs leading-none transition-transform active:scale-95 ${
+      className={`relative flex min-h-11 flex-col items-center justify-center rounded-tile text-xs leading-none transition-transform active:scale-95 ${
         shift
           ? TONE[shift.status]
           : "border border-dashed border-tg-hint/25 text-tg-hint"
@@ -433,7 +433,7 @@ function ShiftSheet({
   return (
     <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
       <div
-        className="mx-auto w-full max-w-[560px] rounded-t-2xl bg-tg-bg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
+        className="mx-auto w-full max-w-[560px] rounded-t-card bg-tg-bg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-start gap-2">
@@ -451,7 +451,7 @@ function ShiftSheet({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-11 min-w-11 rounded-lg bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Закрыть"
           >
             ✕
@@ -488,7 +488,7 @@ function ShiftSheet({
                     haptic("selection");
                     setStatus(item.value);
                   }}
-                  className={`min-h-9 rounded-lg px-1 text-xs ${
+                  className={`min-h-9 rounded-tile px-1 text-xs ${
                     status === item.value
                       ? "bg-tg-button text-tg-button-text"
                       : "bg-tg-secondary-bg/60 text-tg-text"
@@ -506,7 +506,7 @@ function ShiftSheet({
                   type="time"
                   value={startsAt}
                   onChange={(event) => setStartsAt(event.target.value)}
-                  className="mt-0.5 min-h-9 w-full rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+                  className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
                 />
               </label>
               <label className="flex-1 text-xs text-tg-hint">
@@ -515,7 +515,7 @@ function ShiftSheet({
                   type="time"
                   value={endsAt}
                   onChange={(event) => setEndsAt(event.target.value)}
-                  className="mt-0.5 min-h-9 w-full rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+                  className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
                 />
               </label>
             </div>
@@ -525,7 +525,7 @@ function ShiftSheet({
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
               placeholder="Заметка (необязательно)"
-              className="mt-2 min-h-9 w-full rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+              className="mt-2 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
             />
 
             <label className="mt-2 block text-xs text-tg-hint">
@@ -534,7 +534,7 @@ function ShiftSheet({
                 type="date"
                 value={moveTo}
                 onChange={(event) => setMoveTo(event.target.value)}
-                className="mt-0.5 min-h-9 w-full rounded-lg bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+                className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
               />
             </label>
 
@@ -554,7 +554,7 @@ function ShiftSheet({
                     moveTo,
                   });
                 }}
-                className="min-h-11 flex-1 rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                className="min-h-11 flex-1 rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
                 {busy ? "Сохраняем…" : `Сохранить · ${statusMeta?.label ?? status}`}
               </button>
@@ -563,7 +563,7 @@ function ShiftSheet({
                   type="button"
                   disabled={busy}
                   onClick={() => onDelete(state.shift!.id)}
-                  className="min-h-11 rounded-xl bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
+                  className="min-h-11 rounded-card bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
                 >
                   Удалить
                 </button>

@@ -58,7 +58,7 @@ function SourceModeSwitch() {
   const options: PhrasesSourceMode[] = q.data?.modes ?? ["manual", "ai", "both"];
 
   return (
-    <div className="mb-2 rounded-lg bg-tg-bg/40 p-2">
+    <div className="mb-2 rounded-tile bg-tg-bg/40 p-2">
       <div className="text-xs text-tg-hint">
         Что бот шлёт из пулов фраз — глобально для всех пулов сразу:
       </div>
@@ -73,7 +73,7 @@ function SourceModeSwitch() {
               mut.mutate(opt);
             }}
             className={[
-              "rounded-lg px-2 py-1 text-xs font-medium active:scale-[0.98] disabled:opacity-60",
+              "rounded-tile px-2 py-1 text-xs font-medium active:scale-[0.98] disabled:opacity-60",
               mode === opt
                 ? "bg-tg-button text-tg-button-text"
                 : "bg-tg-secondary-bg/70 text-tg-text",

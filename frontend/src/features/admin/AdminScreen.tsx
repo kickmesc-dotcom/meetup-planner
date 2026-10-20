@@ -298,9 +298,9 @@ function Card({
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-xl bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
+      className="w-full text-left rounded-card bg-tg-secondary-bg/60 p-3 flex items-center gap-3 active:scale-[0.98] transition-transform"
     >
-      <div className="w-10 h-10 rounded-lg bg-tg-bg/60 flex items-center justify-center text-tg-text shrink-0">
+      <div className="w-10 h-10 rounded-tile bg-tg-bg/60 flex items-center justify-center text-tg-text shrink-0">
         <Icon name={icon} size={22} />
       </div>
       <div className="flex-1 min-w-0">

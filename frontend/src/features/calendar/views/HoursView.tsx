@@ -257,7 +257,7 @@ function UserSlot({
                 e.stopPropagation();
                 onTapRange(r);
               }}
-              className="absolute inset-x-1 rounded-md text-white text-xs font-medium flex items-start justify-start px-1.5 py-1 shadow-sm overflow-hidden"
+              className="absolute inset-x-1 rounded-tile text-white text-xs font-medium flex items-start justify-start px-1.5 py-1 shadow-sm overflow-hidden"
               style={{
                 top: offsetY,
                 height: totalHeight - 2,

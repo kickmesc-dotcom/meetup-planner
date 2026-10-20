@@ -120,7 +120,7 @@ export default function ChecklistScreen() {
           ))}
         </div>
         {kind === "shift" && data?.hall_name && !showingHallPicker && (
-          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-tg-secondary-bg/50 px-3 py-1.5">
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-tile bg-tg-secondary-bg/50 px-3 py-1.5">
             <span className="flex items-center gap-1.5 text-xs text-tg-text">
               <Icon name="door" size={16} />
               Сегодня работаешь: <b>{data.hall_name}</b>
@@ -195,7 +195,7 @@ export default function ChecklistScreen() {
           ))}
 
         {!showingHallPicker && data?.status === "done" && (
-          <div className="rounded-xl bg-status-free/10 p-3 text-center text-xs text-status-free">
+          <div className="rounded-card bg-status-free/10 p-3 text-center text-xs text-status-free">
             ✓ {kind === "close" ? "Смена закрыта" : "Смена открыта"}.
             {kind === "close" ? " Спасибо за работу!" : " Хорошей смены!"}
           </div>
@@ -220,7 +220,7 @@ function HallPicker({
 }) {
   return (
     <div className="space-y-2">
-      <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+      <div className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">
           В каком зале работаешь?
         </div>
@@ -231,7 +231,7 @@ function HallPicker({
       </div>
       {loading && <CardSkeleton />}
       {!loading && halls.length === 0 && (
-        <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+        <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
           Залы не заведены. Попроси руководителя добавить их в разделе
           «Чек-листы».
         </div>
@@ -243,7 +243,7 @@ function HallPicker({
           disabled={busy}
           onClick={() => onChange(hall.id)}
           className={[
-            "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm transition-transform active:scale-[0.99] disabled:opacity-60",
+            "flex w-full items-center justify-between rounded-card px-4 py-3 text-left text-sm transition-transform active:scale-[0.99] disabled:opacity-60",
             hall.id === selectedId
               ? "bg-tg-button text-tg-button-text"
               : "bg-tg-secondary-bg/60 text-tg-text",
@@ -303,7 +303,7 @@ function ItemRow({
   return (
     <div
       className={[
-        "rounded-xl p-3",
+        "rounded-card p-3",
         item.done ? "bg-tg-secondary-bg/40" : "bg-tg-secondary-bg/60",
       ].join(" ")}
     >
@@ -317,7 +317,7 @@ function ItemRow({
           disabled={busy || item.done || photoBlocks}
           onClick={onToggle}
           className={[
-            "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-sm",
+            "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-tile border text-sm",
             item.done
               ? "border-status-free bg-status-free/20 text-status-free"
               : "border-tg-hint/40 text-transparent",
@@ -376,7 +376,7 @@ function ItemRow({
             </div>
           )}
           {item.note && (
-            <div className="mt-1 rounded-md bg-tg-bg/50 p-2 text-xs text-tg-text/90">
+            <div className="mt-1 rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-text/90">
               {item.note}
             </div>
           )}
@@ -386,7 +386,7 @@ function ItemRow({
           <button
             type="button"
             onClick={onToggleNote}
-            className="shrink-0 rounded-lg bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
+            className="shrink-0 rounded-tile bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
           >
             {noteOpen ? "Отмена" : "Заметка"}
           </button>
@@ -394,20 +394,20 @@ function ItemRow({
       </div>
 
       {noteOpen && (
-        <div className="mt-2 rounded-lg bg-tg-bg/60 p-2">
+        <div className="mt-2 rounded-tile bg-tg-bg/60 p-2">
           <textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             maxLength={500}
             placeholder="Например: инвентарь в порядке, не хватило 2 упаковок"
-            className="w-full rounded-lg bg-tg-secondary-bg p-2 text-sm text-tg-text"
+            className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
           />
           <button
             type="button"
             disabled={busy || !note.trim()}
             onClick={() => onSaveNote(note.trim())}
-            className="mt-2 min-h-9 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+            className="mt-2 min-h-9 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
             Сохранить заметку
           </button>

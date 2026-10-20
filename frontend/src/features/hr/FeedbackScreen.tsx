@@ -62,7 +62,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
             haptic("light");
             onClose();
           }}
-          className="min-h-9 rounded-lg bg-tg-secondary-bg px-3 text-xs text-tg-text"
+          className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
         >
           Закрыть
         </button>
@@ -81,13 +81,13 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
         )}
 
         {sent && (
-          <div className="rounded-xl bg-status-free/10 p-3 text-center text-sm text-status-free">
+          <div className="rounded-card bg-status-free/10 p-3 text-center text-sm text-status-free">
             ✓ Ответы отправлены
           </div>
         )}
 
         {q.data?.length === 0 && (
-          <div className="rounded-xl bg-tg-secondary-bg/60 p-3 text-center text-xs text-tg-hint">
+          <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-center text-xs text-tg-hint">
             Вопросов пока нет — администратор их ещё не завёл.
           </div>
         )}
@@ -95,7 +95,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
         {q.data?.map((question) => (
           <section
             key={question.id}
-            className="rounded-xl bg-tg-secondary-bg/60 p-3"
+            className="rounded-card bg-tg-secondary-bg/60 p-3"
           >
             <h2 className="text-sm text-tg-text">{question.text}</h2>
 
@@ -113,7 +113,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
                         set(question, { value_scale: v });
                       }}
                       className={[
-                        "min-h-10 flex-1 rounded-lg text-sm font-medium transition-colors",
+                        "min-h-10 flex-1 rounded-tile text-sm font-medium transition-colors",
                         active
                           ? "bg-tg-button text-tg-button-text"
                           : "bg-tg-bg/60 text-tg-text",
@@ -160,7 +160,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
                 value={answers[question.id]?.value_text ?? ""}
                 onChange={(e) => set(question, { value_text: e.target.value })}
                 placeholder="Пара слов своими словами"
-                className="mt-2 w-full rounded-lg bg-tg-bg/60 p-2 text-sm text-tg-text"
+                className="mt-2 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
               />
             )}
           </section>
@@ -171,7 +171,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
             type="button"
             disabled={send.isPending || Object.keys(answers).length === 0}
             onClick={() => send.mutate()}
-            className="min-h-11 w-full rounded-lg bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+            className="min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
             {send.isPending ? "Отправляем…" : "Отправить"}
           </button>

@@ -96,7 +96,7 @@ export default function TrainingScreen({
               haptic("light");
               onClose();
             }}
-            className="min-h-11 min-w-11 rounded-lg text-lg text-tg-link"
+            className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
             aria-label="Назад"
           >
             ‹
@@ -126,7 +126,7 @@ export default function TrainingScreen({
         {training.data && (
           <>
             {training.data.today_training && (
-              <section className="rounded-xl bg-tg-link/10 p-3">
+              <section className="rounded-card bg-tg-link/10 p-3">
                 <div className="text-sm font-semibold text-tg-text">
                   Сегодня учебная смена
                 </div>
@@ -140,7 +140,7 @@ export default function TrainingScreen({
               </section>
             )}
             {done && onFinish && (
-              <section className="rounded-xl bg-status-free/10 p-3">
+              <section className="rounded-card bg-status-free/10 p-3">
                 <div className="text-sm font-semibold text-tg-text">
                   Отлично, первый этап пройден.
                 </div>
@@ -155,7 +155,7 @@ export default function TrainingScreen({
                       haptic("medium");
                       onFinish(true);
                     }}
-                    className="min-h-11 w-full rounded-xl bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                    className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
                   >
                     Повторим вместе
                   </button>
@@ -166,7 +166,7 @@ export default function TrainingScreen({
                       haptic("light");
                       onFinish(false);
                     }}
-                    className="min-h-11 w-full rounded-xl bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
+                    className="min-h-11 w-full rounded-card bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
                   >
                     Я уже запомнил
                   </button>
@@ -177,7 +177,7 @@ export default function TrainingScreen({
               </section>
             )}
 
-            <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+            <div className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-tg-bg/60">
                 <div
                   className="h-full rounded-full bg-tg-link transition-[width]"
@@ -224,7 +224,7 @@ export default function TrainingScreen({
 
             {/* Сброс доступен всегда: и сотруднику (повторить материал), и
                 разработчику (проверить сценарий «как у новичка»). */}
-            <section className="rounded-xl border border-tg-hint/20 p-3">
+            <section className="rounded-card border border-tg-hint/20 p-3">
               <div className="text-sm font-medium text-tg-text">
                 Пройти курс заново
               </div>
@@ -246,7 +246,7 @@ export default function TrainingScreen({
                   );
                   if (sure) reset.mutate();
                 }}
-                className="mt-2 min-h-10 w-full rounded-lg bg-tg-secondary-bg text-sm text-tg-text disabled:opacity-50"
+                className="mt-2 min-h-10 w-full rounded-tile bg-tg-secondary-bg text-sm text-tg-text disabled:opacity-50"
               >
                 {reset.isPending ? "Сбрасываю…" : "Сбросить прогресс обучения"}
               </button>
@@ -274,7 +274,7 @@ function LessonCard({
   return (
     <section
       className={[
-        "rounded-xl p-3 transition-colors",
+        "rounded-card p-3 transition-colors",
         lesson.done ? "bg-status-free/10" : "bg-tg-secondary-bg/60",
       ].join(" ")}
     >
@@ -318,7 +318,7 @@ function LessonCard({
                 haptic("medium");
                 onComplete();
               }}
-              className="min-h-10 w-full rounded-lg bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+              className="min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
             >
               Понятно, отметил
             </button>

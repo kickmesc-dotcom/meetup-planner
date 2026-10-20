@@ -88,7 +88,7 @@ export default function AutoPickSheet() {
           <select
             value={windowDays}
             onChange={(e) => setWindowDays(Number(e.target.value))}
-            className="w-full rounded-lg bg-tg-secondary-bg px-2 py-2"
+            className="w-full rounded-tile bg-tg-secondary-bg px-2 py-2"
           >
             <option value={7}>Неделя</option>
             <option value={14}>2 недели</option>
@@ -96,7 +96,7 @@ export default function AutoPickSheet() {
           </select>
         </label>
         {presetsQ.data && presetsQ.data.length > 0 && (
-          <div className="rounded-lg bg-tg-secondary-bg/60 px-3 py-2 text-xs text-tg-hint">
+          <div className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-xs text-tg-hint">
             🕒 Слоты времени:{" "}
             <span className="text-tg-text">
               {presetsQ.data.map((p) => `${p.start}–${p.end}`).join(", ")}
@@ -115,7 +115,7 @@ export default function AutoPickSheet() {
           mut.mutate();
         }}
         disabled={mut.isPending}
-        className="mt-3 w-full rounded-xl bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-3 w-full rounded-card bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50"
       >
         {mut.isPending ? "Считаем…" : "Найти слоты"}
       </button>
@@ -129,7 +129,7 @@ export default function AutoPickSheet() {
       {slots && slots.length > 0 && (
         <ul className="mt-3 space-y-2">
           {slots.map((s, i) => (
-            <li key={i} className="rounded-xl bg-tg-secondary-bg p-3">
+            <li key={i} className="rounded-card bg-tg-secondary-bg p-3">
               <div className="flex items-baseline justify-between">
                 <div className="font-medium">
                   {format(new Date(s.starts_at), "EEE d MMM, HH:mm")} →{" "}
@@ -161,7 +161,7 @@ export default function AutoPickSheet() {
             pollMut.mutate();
           }}
           disabled={pollMut.isPending}
-          className="mt-3 w-full rounded-xl bg-status-maybe/20 py-3 font-medium text-tg-text disabled:opacity-50"
+          className="mt-3 w-full rounded-card bg-status-maybe/20 py-3 font-medium text-tg-text disabled:opacity-50"
         >
           {pollMut.isPending ? "Публикуем…" : "📊 Опубликовать опрос топ-3"}
         </button>
@@ -173,7 +173,7 @@ export default function AutoPickSheet() {
       <button
         type="button"
         onClick={close}
-        className="mt-4 w-full rounded-xl bg-tg-secondary-bg py-3 font-medium"
+        className="mt-4 w-full rounded-card bg-tg-secondary-bg py-3 font-medium"
       >
         Закрыть
       </button>

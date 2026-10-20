@@ -22,7 +22,7 @@ export function Checkbox({
   size = "md",
   className,
 }: CheckboxProps) {
-  const sizeCls = size === "sm" ? "w-4 h-4 rounded-[5px]" : "";
+  const sizeCls = size === "sm" ? "w-4 h-4 rounded-tile" : "";
   const inner = (
     <input
       type="checkbox"
@@ -146,7 +146,7 @@ export function Toggle({
   if (!label) return input;
   return (
     <label
-      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-2 transition-colors cursor-pointer ${
+      className={`flex items-center justify-between gap-2 rounded-tile px-2 py-2 transition-colors cursor-pointer ${
         highlight && checked ? "bg-status-free/10" : "bg-tg-bg/30"
       }`}
     >
