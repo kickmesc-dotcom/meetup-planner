@@ -2911,3 +2911,25 @@ Chrome и Telegram-веб пишут WebM/OPUS — `sendVoice` его отбив
   «Быстрые переходы» — 0.
 - Живой вход в Telegram не проверить: без initData страница отдаёт «Ошибка
   авторизации».
+
+## Метка тестового пула в ленте (P1.8)
+
+- Сервер отдаёт `is_demo` в `FeedItem`/`FeedItemOut` (директория ленты теперь
+  читает `Employee.is_demo`), фронтенд срезает префикс `[BOT]` из имени и
+  ставит одну нейтральную пометку «тест» вместо плашки. У живых людей плашка
+  на месте; для старого бэкенда остаётся запасное распознавание по префиксу.
+- `hr_demo.demo_title`: правка имени из админки больше не срезает `[BOT]` —
+  иначе тестовые люди становились неотличимы от настоящих.
+- Тесты: `HrFeedScreen.test.tsx` (3) + `test_hr_demo.py` (метка при
+  переименовании); `pytest tests/test_hr_demo.py tests/test_hr_flow.py` —
+  37 passed, `ruff` по изменённым файлам— чисто.
+- Фронтенд: `vitest run` — 176 тестов, `vite build` — ок; перевыложен
+  `semitaskbot.pages.dev` (`index-D0Tyw1f0.js`), в бандле есть `feed-demo-mark`.
+- HF Space: `deploy-hf.py all` — RUNNING, `/api/meta` head 0047, в живом
+  `/openapi.json` у `FeedItemOut` появилось `is_demo: boolean`.
+- Amvera: сборка образа прошла (exit 0), но деплой упал на выкатке —
+  `Unable to retrieve some image pull secrets (harborcred)`, статус
+  `BUILD_FAILED`; старый контейнер продолжает отвечать 200 на старом образе.
+  На мини-апп это не влияет (API мини-аппа — HF), за ботом — долг: повторить
+  выкатку, когда Amvera починит доступ к registry.
+- Живой вход в Telegram по-прежнему не проверить без initData.
