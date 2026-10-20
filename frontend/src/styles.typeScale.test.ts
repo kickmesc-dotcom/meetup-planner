@@ -29,6 +29,10 @@ const sources = import.meta.glob("./**/*.{ts,tsx}", {
 const ARBITRARY_SIZE = /text-\[\d+px\]/;
 
 describe("типографическая шкала", () => {
+  it("действительно видит исходники (иначе проверка ниже пустая)", () => {
+    expect(Object.keys(sources).length).toBeGreaterThan(50);
+  });
+
   it("не использует произвольные размеры text-[Npx]", () => {
     const offenders: string[] = [];
     for (const [file, source] of Object.entries(sources)) {
