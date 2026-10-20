@@ -22,6 +22,7 @@ from app.config import get_settings
 from app.db.hr_models import (
     RUN_DONE,
     RUN_IN_PROGRESS,
+    TEMPLATE_CLOSE,
     TEMPLATE_FIRST_DAY,
     TEMPLATE_SHIFT,
     ChecklistCompletion,
@@ -29,6 +30,8 @@ from app.db.hr_models import (
     ChecklistRun,
     ChecklistTemplate,
     Employee,
+    Hall,
+    ShiftHallChoice,
 )
 
 
@@ -108,12 +111,18 @@ async def list_templates(
     department_id: int | None = None,
     kind: str | None = None,
     active_only: bool = True,
+    hall_id: int | None = None,
+    common_only: bool = False,
 ) -> list[ChecklistTemplate]:
     stmt = select(ChecklistTemplate)
     if department_id is not None:
         stmt = stmt.where(ChecklistTemplate.department_id == department_id)
     if kind is not None:
         stmt = stmt.where(ChecklistTemplate.kind == kind)
+    if common_only:
+        stmt = stmt.where(ChecklistTemplate.hall_id.is_(None))
+    elif hall_id is not None:
+        stmt = stmt.where(ChecklistTemplate.hall_id == hall_id)
     if active_only:
         stmt = stmt.where(ChecklistTemplate.is_active.is_(True))
     stmt = stmt.order_by(ChecklistTemplate.sort_order, ChecklistTemplate.id)
@@ -126,29 +135,134 @@ async def get_template(
     return await session.get(ChecklistTemplate, template_id)
 
 
+async def _first_active_template(
+    session: AsyncSession,
+    department_id: int,
+    kind: str,
+    hall_id: int | None,
+) -> ChecklistTemplate | None:
+    """Один активный шаблон нужного вида и зала (None — общий)."""
+    rows = await list_templates(
+        session,
+        department_id=department_id,
+        kind=kind,
+        hall_id=hall_id,
+        common_only=hall_id is None,
+    )
+    return rows[0] if rows else None
+
+
 async def select_template(
     session: AsyncSession,
     *,
     department_id: int | None,
     kind: str,
+    hall_id: int | None = None,
 ) -> ChecklistTemplate | None:
     """Активный шаблон подразделения нужного вида (или None).
 
-    Новичку показываем `first_day`, если он есть, иначе обычную смену: так
-    первый рабочий день не проваливается в пустой экран, пока админ не завёл
-    отдельный шаблон.
+    Открытие зала (`shift`) ищется сначала по выбранному залу, потом — общий:
+    заведение без залов работает ровно как раньше. Новичку показываем
+    `first_day`, если он есть, иначе обычную смену: так первый рабочий день не
+    проваливается в пустой экран, пока админ не завёл отдельный шаблон.
     """
     if department_id is None:
         return None
-    first = await list_templates(session, department_id=department_id, kind=kind)
-    if first:
-        return first[0]
+    common = await _first_active_template(session, department_id, kind, None)
+    if kind == TEMPLATE_SHIFT:
+        if hall_id is not None:
+            specific = await _first_active_template(
+                session, department_id, kind, hall_id
+            )
+            if specific is not None:
+                return specific
+        return common
+    if common is not None:
+        return common
     if kind == TEMPLATE_FIRST_DAY:
-        fallback = await list_templates(
-            session, department_id=department_id, kind=TEMPLATE_SHIFT
+        return await _first_active_template(
+            session, department_id, TEMPLATE_SHIFT, None
         )
-        return fallback[0] if fallback else None
     return None
+
+
+# --------------------------------------------------------------------------
+# Залы и выбор зала на смену
+# --------------------------------------------------------------------------
+
+
+async def list_halls(
+    session: AsyncSession, *, active_only: bool = True
+) -> list[Hall]:
+    stmt = select(Hall)
+    if active_only:
+        stmt = stmt.where(Hall.is_active.is_(True))
+    stmt = stmt.order_by(Hall.sort_order, Hall.id)
+    return list(await session.scalars(stmt))
+
+
+async def get_hall(session: AsyncSession, hall_id: int) -> Hall | None:
+    return await session.get(Hall, hall_id)
+
+
+async def department_has_halls(
+    session: AsyncSession, department_id: int | None
+) -> bool:
+    """Есть ли у подразделения отдельные шаблоны по залам.
+
+    Если нет — спрашивать «в каком ты зале» бессмысленно: повар, бармен и
+    менеджер продолжают видеть один общий чек-лист.
+    """
+    if department_id is None:
+        return False
+    stmt = (
+        select(ChecklistTemplate.id)
+        .where(
+            ChecklistTemplate.department_id == department_id,
+            ChecklistTemplate.kind == TEMPLATE_SHIFT,
+            ChecklistTemplate.is_active.is_(True),
+            ChecklistTemplate.hall_id.is_not(None),
+        )
+        .limit(1)
+    )
+    return await session.scalar(stmt) is not None
+
+
+async def hall_choice(
+    session: AsyncSession, employee_id: int, shift_date: date
+) -> Hall | None:
+    row = await session.scalar(
+        select(ShiftHallChoice).where(
+            ShiftHallChoice.employee_id == employee_id,
+            ShiftHallChoice.shift_date == shift_date,
+        )
+    )
+    if row is None:
+        return None
+    return await session.get(Hall, row.hall_id)
+
+
+async def choose_hall(
+    session: AsyncSession, *, employee: Employee, hall: Hall, shift_date: date
+) -> None:
+    """Запомнить зал на смену (повторный выбор перезаписывает)."""
+    row = await session.scalar(
+        select(ShiftHallChoice).where(
+            ShiftHallChoice.employee_id == employee.id,
+            ShiftHallChoice.shift_date == shift_date,
+        )
+    )
+    if row is None:
+        session.add(
+            ShiftHallChoice(
+                employee_id=employee.id,
+                shift_date=shift_date,
+                hall_id=hall.id,
+            )
+        )
+    else:
+        row.hall_id = hall.id
+    await session.flush()
 
 
 async def items_of(session: AsyncSession, template_id: int) -> list[ChecklistItem]:
@@ -345,6 +459,11 @@ class ChecklistView:
     status: str
     progress: ChecklistProgress
     items: list[ChecklistItemView]
+    # Зал смены: у открытия он обязателен, у закрытия всегда None.
+    hall_id: int | None = None
+    hall_name: str | None = None
+    # Сотруднику нужно сначала выбрать зал — пунктов поэтому нет.
+    needs_hall: bool = False
 
 
 async def build_view(
@@ -357,11 +476,41 @@ async def build_view(
     """Собрать чек-лист сотрудника к показу (без создания прогона).
 
     Прогон создаём только при первой отметке — иначе «открыл экран» навсегда
-    плодил бы пустые строки смен.
+    плодил бы пустые строки смен. Но зал нужен раньше: пока он не выбран,
+    отдаём `needs_hall=True` и пустой список — фронт показывает выбор зала.
     """
     shift_date = shift_date or local_today()
+    day = shift_date
+
+    hall: Hall | None = None
+    needs_hall = False
+    if kind == TEMPLATE_SHIFT:
+        hall = await hall_choice(session, employee.id, day)
+        needs_hall = hall is None and await department_has_halls(
+            session, employee.department_id
+        )
+    elif kind not in (TEMPLATE_CLOSE, TEMPLATE_FIRST_DAY):
+        # Неизвестный вид — не падаем, показываем пустое состояние.
+        kind = TEMPLATE_SHIFT
+
+    if needs_hall:
+        return ChecklistView(
+            run_id=None,
+            template_id=None,
+            template_title=None,
+            kind=kind,
+            shift_date=day,
+            status=RUN_IN_PROGRESS,
+            progress=ChecklistProgress(done=0, total=0),
+            items=[],
+            needs_hall=True,
+        )
+
     template = await select_template(
-        session, department_id=employee.department_id, kind=kind
+        session,
+        department_id=employee.department_id,
+        kind=kind,
+        hall_id=hall.id if hall is not None else None,
     )
     if template is None:
         return ChecklistView(
@@ -369,14 +518,16 @@ async def build_view(
             template_id=None,
             template_title=None,
             kind=kind,
-            shift_date=shift_date,
+            shift_date=day,
             status=RUN_IN_PROGRESS,
             progress=ChecklistProgress(done=0, total=0),
             items=[],
+            hall_id=hall.id if hall is not None else None,
+            hall_name=hall.name if hall is not None else None,
         )
 
     items = applicable_items(await items_of(session, template.id), employee.position)
-    run = await get_run(session, employee.id, template.id, shift_date)
+    run = await get_run(session, employee.id, template.id, day)
     completions = await completions_of(session, run.id) if run else {}
     views = [
         ChecklistItemView(
@@ -400,8 +551,10 @@ async def build_view(
         template_id=template.id,
         template_title=template.title,
         kind=template.kind,
-        shift_date=shift_date,
+        shift_date=day,
         status=run.status if run else RUN_IN_PROGRESS,
         progress=progress(items, set(completions)),
         items=views,
+        hall_id=hall.id if hall is not None else None,
+        hall_name=hall.name if hall is not None else None,
     )

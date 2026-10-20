@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  chooseHall,
   completeChecklistItem,
   fetchChecklist,
+  fetchHalls,
   type ChecklistKind,
   type HrChecklistItem,
 } from "@/api/hr";
@@ -18,20 +20,50 @@ import { haptic, showAlert } from "@/tg/webapp";
 /**
  * SemiTaskBot: «Чек-лист смены».
  *
- * Два режима: первый день (`first_day`) и обычная смена (`shift`). Пункты,
- * требующие фото, закрываются ТОЛЬКО фотографией — и теперь снять её можно
- * здесь же, в приложении: камера или галерея, без перехода в чат с ботом.
- * Фото из чата тоже продолжает работать — сервер принимает оба пути.
+ * Открытие зала начинается с выбора зала: у первого и второго зала свои
+ * пункты (DOCX владельца), поэтому чек-лист показывается только после выбора.
+ * Выбор запоминается на смену и меняется одной кнопкой. Закрытие смены —
+ * отдельная вкладка и общий чек-лист: вечером зал уже не важен. Последний
+ * пункт закрытия — «показать рабочее место» с фотоотчётом.
  */
+const KIND_LABEL: Record<ChecklistKind, string> = {
+  shift: "Открытие",
+  close: "Закрытие",
+  first_day: "Первый день",
+};
+
 export default function ChecklistScreen() {
   const qc = useQueryClient();
   const emptyTitle = useAppText("checklist.empty.title", "Чек-лист не назначен");
   const [kind, setKind] = useState<ChecklistKind>("shift");
   const [noteFor, setNoteFor] = useState<number | null>(null);
+  const [changingHall, setChangingHall] = useState(false);
 
   const q = useQuery({
     queryKey: ["hr-checklist", kind],
     queryFn: () => fetchChecklist(kind),
+  });
+
+  const data = q.data;
+  const showingHallPicker =
+    kind === "shift" && (changingHall || Boolean(data?.needs_hall));
+
+  const hallsQ = useQuery({
+    queryKey: ["hr-halls"],
+    queryFn: fetchHalls,
+    enabled: showingHallPicker,
+    staleTime: 5 * 60_000,
+  });
+
+  const pickHall = useMutation({
+    mutationFn: (hallId: number) => chooseHall(hallId),
+    onSuccess: (next) => {
+      haptic("success");
+      qc.setQueryData(["hr-checklist", "shift"], next);
+      setChangingHall(false);
+      void qc.invalidateQueries({ queryKey: ["hr-feed"] });
+    },
+    onError: (e) => void showAlert(humanizeApiError(e)),
   });
 
   const complete = useMutation({
@@ -41,9 +73,9 @@ export default function ChecklistScreen() {
       photo_file_id?: string;
       media_id?: number | null;
     }) => completeChecklistItem(body),
-    onSuccess: (data) => {
+    onSuccess: (next) => {
       haptic("success");
-      qc.setQueryData(["hr-checklist", kind], data);
+      qc.setQueryData(["hr-checklist", kind], next);
       void qc.invalidateQueries({ queryKey: ["hr-feed"] });
       setNoteFor(null);
     },
@@ -52,40 +84,55 @@ export default function ChecklistScreen() {
 
   if (q.isError)
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
-  const data = q.data;
 
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
           <h1 className="text-lg font-semibold text-tg-text">Чек-лист смены</h1>
-          {data && (
+          {data && data.total > 0 && (
             <span className="text-xs text-tg-hint">{data.progress_text}</span>
           )}
         </div>
         <div className="mt-3 flex gap-1.5">
-          {[
-            { v: "shift" as const, label: "Смена" },
-            { v: "first_day" as const, label: "Первый день" },
-          ].map((o) => (
+          {(["shift", "close", "first_day"] as const).map((v) => (
             <button
-              key={o.v}
+              key={v}
               type="button"
               onClick={() => {
                 haptic("light");
-                setKind(o.v);
+                setKind(v);
+                setChangingHall(false);
+                setNoteFor(null);
               }}
               className={[
                 "min-h-8 rounded-full px-3 text-xs transition-colors",
-                kind === o.v
+                kind === v
                   ? "bg-tg-button text-tg-button-text"
                   : "bg-tg-secondary-bg text-tg-hint",
               ].join(" ")}
             >
-              {o.label}
+              {KIND_LABEL[v]}
             </button>
           ))}
         </div>
+        {kind === "shift" && data?.hall_name && !showingHallPicker && (
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg bg-tg-secondary-bg/50 px-3 py-1.5">
+            <span className="text-xs text-tg-text">
+              🚪 Сегодня работаешь: <b>{data.hall_name}</b>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                setChangingHall(true);
+              }}
+              className="text-[11px] text-tg-link"
+            >
+              сменить
+            </button>
+          </div>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
@@ -96,22 +143,24 @@ export default function ChecklistScreen() {
           </>
         )}
 
-        {data && data.items.length === 0 && (
-          <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-4xl" aria-hidden>
-              🗒
-            </div>
-            <div className="mt-2 text-sm font-medium text-tg-text">
-              {emptyTitle}
-            </div>
-            <div className="mt-1 text-xs text-tg-hint">
-              Попроси руководителя назначить шаблон{" "}
-              {kind === "shift" ? "смены" : "первого дня"}.
-            </div>
-          </div>
+        {showingHallPicker && (
+          <HallPicker
+            halls={hallsQ.data ?? []}
+            loading={hallsQ.isLoading}
+            busy={pickHall.isPending}
+            selectedId={data?.hall_id ?? null}
+            onChange={(id) => {
+              haptic("selection");
+              pickHall.mutate(id);
+            }}
+          />
         )}
 
-        {data && data.items.length > 0 && (
+        {!showingHallPicker && data && data.items.length === 0 && (
+          <EmptyState title={emptyTitle} kind={kind} />
+        )}
+
+        {!showingHallPicker && data && data.items.length > 0 && (
           <ProgressBar
             value={data.done}
             total={data.total}
@@ -119,32 +168,108 @@ export default function ChecklistScreen() {
           />
         )}
 
-        {data?.items.map((item) => (
-          <ItemRow
-            key={item.id}
-            item={item}
-            busy={complete.isPending}
-            noteOpen={noteFor === item.id}
-            onToggleNote={() => {
-              haptic("light");
-              setNoteFor(noteFor === item.id ? null : item.id);
-            }}
-            onToggle={() => {
-              if (item.done) return;
-              complete.mutate({ item_id: item.id });
-            }}
-            onPhoto={(media: MediaItem) =>
-              complete.mutate({ item_id: item.id, media_id: media.id })
-            }
-            onSaveNote={(note) => complete.mutate({ item_id: item.id, note })}
-          />
-        ))}
+        {!showingHallPicker &&
+          data?.items.map((item) => (
+            <ItemRow
+              key={item.id}
+              item={item}
+              busy={complete.isPending}
+              noteOpen={noteFor === item.id}
+              onToggleNote={() => {
+                haptic("light");
+                setNoteFor(noteFor === item.id ? null : item.id);
+              }}
+              onToggle={() => {
+                if (item.done) return;
+                complete.mutate({ item_id: item.id });
+              }}
+              onPhoto={(media: MediaItem) =>
+                complete.mutate({ item_id: item.id, media_id: media.id })
+              }
+              onSaveNote={(note) => complete.mutate({ item_id: item.id, note })}
+            />
+          ))}
 
-        {data?.status === "done" && (
+        {!showingHallPicker && data?.status === "done" && (
           <div className="rounded-xl bg-status-free/10 p-3 text-center text-xs text-status-free">
-            ✓ Смена закрыта. Спасибо за работу!
+            ✓ {kind === "close" ? "Смена закрыта" : "Смена открыта"}.
+            {kind === "close" ? " Спасибо за работу!" : " Хорошей смены!"}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function HallPicker({
+  halls,
+  loading,
+  busy,
+  selectedId,
+  onChange,
+}: {
+  halls: { id: number; name: string }[];
+  loading: boolean;
+  busy: boolean;
+  selectedId: number | null;
+  onChange: (hallId: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="rounded-xl bg-tg-secondary-bg/60 p-3">
+        <div className="text-sm font-semibold text-tg-text">
+          В каком зале работаешь?
+        </div>
+        <div className="mt-0.5 text-[11px] text-tg-hint">
+          У каждого зала свой чек-лист открытия. Выбор запомнится на сегодня —
+          сменить можно в любой момент.
+        </div>
+      </div>
+      {loading && <CardSkeleton />}
+      {!loading && halls.length === 0 && (
+        <div className="rounded-xl bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
+          Залы не заведены. Попроси руководителя добавить их в разделе
+          «Чек-листы».
+        </div>
+      )}
+      {halls.map((hall) => (
+        <button
+          key={hall.id}
+          type="button"
+          disabled={busy}
+          onClick={() => onChange(hall.id)}
+          className={[
+            "flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm transition-transform active:scale-[0.99] disabled:opacity-60",
+            hall.id === selectedId
+              ? "bg-tg-button text-tg-button-text"
+              : "bg-tg-secondary-bg/60 text-tg-text",
+          ].join(" ")}
+        >
+          <span>🚪 {hall.name}</span>
+          <span className="text-xs opacity-70">
+            {hall.id === selectedId ? "выбран" : "выбрать"}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ title, kind }: { title: string; kind: ChecklistKind }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center text-center">
+      <div className="text-4xl" aria-hidden>
+        🗒
+      </div>
+      <div className="mt-2 text-sm font-medium text-tg-text">{title}</div>
+      <div className="mt-1 text-xs text-tg-hint">
+        Попроси руководителя назначить шаблон{" "}
+        {kind === "close"
+          ? "закрытия смены"
+          : kind === "shift"
+            ? "открытия зала"
+            : "первого дня"}
+        .
       </div>
     </div>
   );
@@ -215,7 +340,10 @@ function ItemRow({
           )}
           {item.requires_photo && (
             <div className="mt-1 text-[11px] text-tg-hint">
-              📷 {item.done ? "фотоотчёт приложен" : "нужен фотоотчёт: снимок с камеры или из галереи"}
+              📷{" "}
+              {item.done
+                ? "фотоотчёт приложен"
+                : "нужен фотоотчёт: снимок с камеры или из галереи"}
             </div>
           )}
           {!item.done && photoBlocks && (
@@ -230,9 +358,7 @@ function ItemRow({
           )}
           <PhotoThumbs
             photos={
-              item.photo_url
-                ? [{ id: item.id, url: item.photo_url }]
-                : []
+              item.photo_url ? [{ id: item.id, url: item.photo_url }] : []
             }
           />
           {item.done_at && (

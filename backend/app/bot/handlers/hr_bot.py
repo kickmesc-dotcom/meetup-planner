@@ -47,6 +47,7 @@ from app.db.hr_models import (
     TASK_IN_PROGRESS,
     TASK_ON_REVIEW,
     TASK_SCOPE_DEPARTMENT,
+    TEMPLATE_CLOSE,
     TEMPLATE_FIRST_DAY,
     ChecklistItem,
     Employee,
@@ -615,16 +616,28 @@ def _checklist_kb(view: hr_checklists.ChecklistView) -> InlineKeyboardMarkup:
 
 
 def _checklist_text(view: hr_checklists.ChecklistView) -> str:
+    if view.needs_hall:
+        return (
+            "📋 <b>Чек-лист смены</b>\n\n"
+            "Сначала выбери зал, в котором сегодня работаешь: "
+            "у каждого зала свой чек-лист открытия."
+        )
     if view.template_id is None:
         return (
             "📋 <b>Чек-лист смены</b>\n\n"
             "Для твоего подразделения чек-лист ещё не заведён. "
             "Обратись к администратору."
         )
-    kind_label = "Первый рабочий день" if view.kind == TEMPLATE_FIRST_DAY else "Смена"
+    if view.kind == TEMPLATE_FIRST_DAY:
+        kind_label = "Первый рабочий день"
+    elif view.kind == TEMPLATE_CLOSE:
+        kind_label = "Закрытие смены"
+    else:
+        kind_label = "Смена"
+    hall_label = f" · {view.hall_name}" if view.hall_name else ""
     return (
         f"📋 <b>{view.template_title}</b>\n"
-        f"{kind_label} · {view.shift_date.strftime('%d.%m.%Y')}\n\n"
+        f"{kind_label}{hall_label} · {view.shift_date.strftime('%d.%m.%Y')}\n\n"
         f"Выполнено {view.progress.done} из {view.progress.total}\n"
         "⬜️ — отметить, 📷 — нужен фотоотчёт, ✅ — готово"
     )
@@ -634,7 +647,53 @@ async def _render_checklist(callback: CallbackQuery, employee: Employee) -> None
     sm = get_sessionmaker()
     async with sm() as session:
         view = await hr_checklists.build_view(session, employee)
+        halls = await hr_checklists.list_halls(session) if view.needs_hall else []
+    if view.needs_hall:
+        rows = [
+            [
+                InlineKeyboardButton(
+                    text=f"🚪 {hall.name}",
+                    callback_data=f"{CB}:chkh:{hall.id}",
+                )
+            ]
+            for hall in halls
+        ]
+        rows.append(
+            [InlineKeyboardButton(text="⬅️ В меню", callback_data=f"{CB}:menu")]
+        )
+        await _answer(
+            callback, _checklist_text(view), InlineKeyboardMarkup(inline_keyboard=rows)
+        )
+        return
     await _answer(callback, _checklist_text(view), _checklist_kb(view))
+
+
+@router.callback_query(F.data.startswith(f"{CB}:chkh:"))
+async def on_checklist_hall(callback: CallbackQuery) -> None:
+    if callback.from_user is None or callback.data is None:
+        return
+    hall_id = int(callback.data.rsplit(":", 1)[1])
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, callback.from_user.id)
+        if ctx is None:
+            await callback.answer("Нет доступа", show_alert=True)
+            return
+        _user, employee = ctx
+        hall = await hr_checklists.get_hall(session, hall_id)
+        if hall is None or not hall.is_active:
+            await callback.answer("Зал не найден", show_alert=True)
+            return
+        hall_name = hall.name
+        await hr_checklists.choose_hall(
+            session,
+            employee=employee,
+            hall=hall,
+            shift_date=hr_checklists.local_today(),
+        )
+        await session.commit()
+    await callback.answer(f"Зал: {hall_name}")
+    await _render_checklist(callback, employee)
 
 
 @router.callback_query(F.data == f"{CB}:chk")

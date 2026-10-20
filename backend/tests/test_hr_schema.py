@@ -51,6 +51,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0044_shifts.py",
     "0045_media.py",
     "0046_materials.py",
+    "0047_checklist_halls.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -63,6 +64,8 @@ HR_TABLES = {
     "checklist_items",
     "checklist_runs",
     "checklist_completions",
+    "halls",
+    "shift_hall_choices",
     "tasks",
     "task_events",
     "task_reminders",

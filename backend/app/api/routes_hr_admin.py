@@ -34,6 +34,7 @@ from app.db.hr_models import (
     Department,
     Employee,
     FeedbackQuestion,
+    Hall,
     Task,
     UsefulLink,
 )
@@ -93,17 +94,35 @@ class DepartmentAdminOut(BaseModel):
     sort_order: int
 
 
-class TemplateIn(BaseModel):
-    department_id: int
-    title: str = Field(min_length=1)
-    kind: str = "shift"
-
-
 class TemplatePatch(BaseModel):
     title: str | None = Field(None, min_length=1)
     kind: str | None = None
+    # Зал шаблона; `0` или null в паре с `kind` не меняет зал — для этого
+    # есть `hall_id` вместе с `hall_set`, чтобы можно было снять привязку.
+    hall_id: int | None = None
+    hall_set: bool = False
     is_active: bool | None = None
     sort_order: int | None = None
+
+
+class HallIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    slug: str | None = Field(None, max_length=64)
+    sort_order: int | None = None
+
+
+class HallPatch(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=120)
+    is_active: bool | None = None
+    sort_order: int | None = None
+
+
+class HallAdminOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+    is_active: bool
+    sort_order: int
 
 
 class ItemOut(BaseModel):
@@ -120,11 +139,19 @@ class ItemOut(BaseModel):
 class TemplateOut(BaseModel):
     id: int
     department_id: int
+    hall_id: int | None
     title: str
     kind: str
     is_active: bool
     sort_order: int
     items: list[ItemOut]
+
+
+class TemplateIn(BaseModel):
+    department_id: int
+    title: str = Field(min_length=1)
+    kind: str = "shift"
+    hall_id: int | None = None
 
 
 class ItemIn(BaseModel):
@@ -411,11 +438,83 @@ async def _template_out(
     return TemplateOut(
         id=template.id,
         department_id=template.department_id,
+        hall_id=template.hall_id,
         title=template.title,
         kind=template.kind,
         is_active=template.is_active,
         sort_order=template.sort_order,
         items=[_item_out(i) for i in items],
+    )
+
+
+async def _require_hall(session, hall_id: int) -> None:  # noqa: ANN001
+    """Зал из запроса должен существовать (иначе шаблон уйдёт в никуда)."""
+    if await hr_checklists.get_hall(session, hall_id) is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="hall_not_found")
+
+
+@router.get("/halls", response_model=list[HallAdminOut])
+async def admin_halls(session: SessionDep, _: AdminDep) -> list[HallAdminOut]:
+    rows = await hr_checklists.list_halls(session, active_only=False)
+    return [
+        HallAdminOut(
+            id=h.id,
+            name=h.name,
+            slug=h.slug,
+            is_active=h.is_active,
+            sort_order=h.sort_order,
+        )
+        for h in rows
+    ]
+
+
+@router.post("/halls", response_model=HallAdminOut)
+async def create_hall(
+    body: HallIn, session: SessionDep, _: AdminDep
+) -> HallAdminOut:
+    name = body.name.strip()
+    slug = (body.slug or name).strip().casefold().replace(" ", "-")[:64]
+    existing = await session.scalar(select(Hall).where(Hall.slug == slug))
+    if existing is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="hall_exists")
+    order = body.sort_order
+    if order is None:
+        rows = await hr_checklists.list_halls(session, active_only=False)
+        order = (max((h.sort_order for h in rows), default=0) // 10 + 1) * 10
+    hall = Hall(name=name, slug=slug, sort_order=order)
+    session.add(hall)
+    await session.commit()
+    await session.refresh(hall)
+    return HallAdminOut(
+        id=hall.id,
+        name=hall.name,
+        slug=hall.slug,
+        is_active=hall.is_active,
+        sort_order=hall.sort_order,
+    )
+
+
+@router.patch("/halls/{hall_id}", response_model=HallAdminOut)
+async def patch_hall(
+    hall_id: int, body: HallPatch, session: SessionDep, _: AdminDep
+) -> HallAdminOut:
+    hall = await hr_checklists.get_hall(session, hall_id)
+    if hall is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="hall_not_found")
+    if body.name is not None:
+        hall.name = body.name.strip()
+    if body.is_active is not None:
+        hall.is_active = body.is_active
+    if body.sort_order is not None:
+        hall.sort_order = body.sort_order
+    await session.commit()
+    await session.refresh(hall)
+    return HallAdminOut(
+        id=hall.id,
+        name=hall.name,
+        slug=hall.slug,
+        is_active=hall.is_active,
+        sort_order=hall.sort_order,
     )
 
 
@@ -440,8 +539,11 @@ async def create_template(
     dept = await hr_departments.get_department(session, body.department_id)
     if dept is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="department_not_found")
+    if body.hall_id is not None:
+        await _require_hall(session, body.hall_id)
     template = ChecklistTemplate(
         department_id=body.department_id,
+        hall_id=body.hall_id,
         title=body.title.strip(),
         kind=body.kind,
     )
@@ -464,6 +566,10 @@ async def patch_template(
         template.kind = body.kind
     if body.title is not None:
         template.title = body.title.strip()
+    if body.hall_set:
+        if body.hall_id is not None:
+            await _require_hall(session, body.hall_id)
+        template.hall_id = body.hall_id
     if body.is_active is not None:
         template.is_active = body.is_active
     if body.sort_order is not None:

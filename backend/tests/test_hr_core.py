@@ -31,6 +31,8 @@ from app.db.hr_models import (  # noqa: E402
     TASK_IN_PROGRESS,
     TASK_NEW,
     TASK_OVERDUE,
+    TEMPLATE_CLOSE,
+    TEMPLATE_SHIFT,
     ChecklistItem,
     Employee,
     FeedbackQuestion,
@@ -119,6 +121,16 @@ def test_local_today_is_a_date():
     from datetime import date
 
     assert isinstance(hr_checklists.local_today("Europe/Moscow"), date)
+
+
+def test_close_is_a_template_kind():
+    """Закрытие смены — отдельный вид шаблона, а не «ещё одна смена»."""
+    from app.db.hr_models import TEMPLATE_FIRST_DAY, TEMPLATE_KINDS
+
+    assert TEMPLATE_CLOSE in TEMPLATE_KINDS
+    assert TEMPLATE_SHIFT in TEMPLATE_KINDS
+    assert TEMPLATE_FIRST_DAY in TEMPLATE_KINDS
+    assert len(set(TEMPLATE_KINDS)) == len(TEMPLATE_KINDS)
 
 
 # --------------------------------------------------------------------------
@@ -232,6 +244,8 @@ def test_hr_routes_are_registered():
         ("GET", "/api/departments"),
         ("GET", "/api/checklist"),
         ("POST", "/api/checklist/complete"),
+        ("GET", "/api/halls"),
+        ("POST", "/api/checklist/hall"),
         ("GET", "/api/tasks"),
         ("GET", "/api/links"),
         ("GET", "/api/feedback/questions"),
@@ -242,6 +256,9 @@ def test_hr_routes_are_registered():
         ("POST", "/api/admin/departments"),
         ("GET", "/api/admin/checklists"),
         ("POST", "/api/admin/checklists"),
+        ("GET", "/api/admin/halls"),
+        ("POST", "/api/admin/halls"),
+        ("PATCH", "/api/admin/halls/{hall_id}"),
         ("GET", "/api/admin/links"),
         ("POST", "/api/admin/tasks"),
         ("PATCH", "/api/admin/tasks/{task_id}/status"),

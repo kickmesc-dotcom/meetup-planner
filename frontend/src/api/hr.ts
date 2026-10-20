@@ -44,7 +44,16 @@ export interface HrDepartment {
   sort_order: number;
 }
 
-export type ChecklistKind = "first_day" | "shift";
+/** `shift` — открытие зала (у официанта сначала выбор зала), `close` —
+ * общее закрытие смены, `first_day` — первый рабочий день. */
+export type ChecklistKind = "first_day" | "shift" | "close";
+
+export interface HrHall {
+  id: number;
+  name: string;
+  slug: string;
+  sort_order: number;
+}
 
 /** Снимок к отчёту: ссылка уже подписана сервером и годится для `<img>`. */
 export interface HrPhoto {
@@ -80,6 +89,11 @@ export interface HrChecklist {
   total: number;
   progress_text: string;
   items: HrChecklistItem[];
+  /** Зал смены: у открытия его выбирает сотрудник, у закрытия его нет. */
+  hall_id?: number | null;
+  hall_name?: string | null;
+  /** Сначала нужно выбрать зал — списка пунктов пока нет. */
+  needs_hall?: boolean;
 }
 
 export type TaskStatus =
@@ -265,6 +279,16 @@ export const fetchChecklist = (
   if (shiftDate) params.set("shift_date", shiftDate);
   return api<HrChecklist>(`/api/checklist?${params.toString()}`);
 };
+
+/** Активные залы ресторана (для выбора перед чек-листом открытия). */
+export const fetchHalls = () => api<HrHall[]>("/api/halls");
+
+/** Запомнить зал на сегодня и получить чек-лист этого зала. */
+export const chooseHall = (hallId: number) =>
+  api<HrChecklist>("/api/checklist/hall", {
+    method: "POST",
+    body: JSON.stringify({ hall_id: hallId }),
+  });
 
 export const completeChecklistItem = (body: {
   item_id: number;

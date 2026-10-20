@@ -25,6 +25,7 @@ from app.db.hr_models import (
     ONBOARDING_EXPERIENCE,
     ONBOARDING_TRAINING,
     TASK_DONE,
+    TEMPLATE_KINDS,
     TEMPLATE_SHIFT,
     ChecklistItem,
     Department,
@@ -144,6 +145,22 @@ class ChecklistOut(BaseModel):
     total: int
     progress_text: str
     items: list[ChecklistItemOut]
+    # Зал смены (для открытия): его выбирает сотрудник до первого пункта.
+    hall_id: int | None = None
+    hall_name: str | None = None
+    # True — сначала нужно выбрать зал, пунктов пока нет.
+    needs_hall: bool = False
+
+
+class HallOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+    sort_order: int
+
+
+class ChooseHallIn(BaseModel):
+    hall_id: int
 
 
 class CompleteIn(BaseModel):
@@ -408,6 +425,9 @@ def _checklist_out(view: hr_checklists.ChecklistView) -> ChecklistOut:
         done=view.progress.done,
         total=view.progress.total,
         progress_text=view.progress.text(),
+        hall_id=view.hall_id,
+        hall_name=view.hall_name,
+        needs_hall=view.needs_hall,
         items=[
             ChecklistItemOut(
                 id=item.id,
@@ -647,8 +667,37 @@ async def departments(session: SessionDep, _: CurrentUser) -> list[DepartmentOut
 
 
 # --------------------------------------------------------------------------
-# Чек-лист смены
+# Залы и чек-лист смены
 # --------------------------------------------------------------------------
+
+
+@router.get("/halls", response_model=list[HallOut])
+async def halls(session: SessionDep, _employee: EmployeeDep) -> list[HallOut]:
+    """Активные залы для выбора перед чек-листом открытия."""
+    rows = await hr_checklists.list_halls(session)
+    return [
+        HallOut(id=h.id, name=h.name, slug=h.slug, sort_order=h.sort_order)
+        for h in rows
+    ]
+
+
+@router.post("/checklist/hall", response_model=ChecklistOut)
+async def checklist_choose_hall(
+    body: ChooseHallIn, session: SessionDep, employee: EmployeeDep
+) -> ChecklistOut:
+    """Запомнить зал на сегодня и вернуть чек-лист именно этого зала."""
+    hall = await hr_checklists.get_hall(session, body.hall_id)
+    if hall is None or not hall.is_active:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="hall_not_found")
+    day = hr_checklists.local_today()
+    await hr_checklists.choose_hall(
+        session, employee=employee, hall=hall, shift_date=day
+    )
+    await session.commit()
+    view = await hr_checklists.build_view(
+        session, employee, kind=TEMPLATE_SHIFT, shift_date=day
+    )
+    return _checklist_out(view)
 
 
 @router.get("/checklist", response_model=ChecklistOut)
@@ -658,6 +707,8 @@ async def checklist(
     kind: str = TEMPLATE_SHIFT,
     shift_date: date | None = None,
 ) -> ChecklistOut:
+    if kind not in TEMPLATE_KINDS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_kind")
     view = await hr_checklists.build_view(
         session, employee, kind=kind, shift_date=shift_date
     )

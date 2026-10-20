@@ -32,12 +32,14 @@ from app.db.hr_models import (
     STANDARD_CATEGORY_EQUIPMENT,
     STANDARD_CATEGORY_SAFETY,
     STANDARD_CATEGORY_SERVICE,
+    TEMPLATE_CLOSE,
     TEMPLATE_SHIFT,
     ChecklistItem,
     ChecklistTemplate,
     Department,
     Employee,
     FeedbackQuestion,
+    Hall,
     Standard,
     StandardQuestion,
     UsefulLink,
@@ -171,6 +173,257 @@ async def seed_departments(session: AsyncSession) -> dict[str, Department]:
         await session.flush()
     log.info("hr.seed_departments", count=len(created))
     return created
+
+
+# --------------------------------------------------------------------------
+# Залы и чек-листы открытия/закрытия (DOCX владельца)
+# --------------------------------------------------------------------------
+
+# (slug, name, sort_order)
+_HALLS: tuple[tuple[str, str, int], ...] = (
+    ("first", "Первый зал", 10),
+    ("second", "Второй зал", 20),
+)
+
+# Открытие зала. Содержимое перенесено из «Чек-лист открытия и закрытия.docx»:
+# ничего не придумано, только разбито на пункты. `True` — пункт требует фото.
+_HALL_OPENING: dict[str, tuple[tuple[str, bool], ...]] = {
+    "first": (
+        (
+            "Залить воду в отпариватель (стоит на 305 столе) и только после "
+            "включить его, подождать пока нагреется",
+            False,
+        ),
+        ("Поднять жалюзи (в летний сезон открываем окна)", False),
+        (
+            "Протереть столы 400–500 спецраствором: «Ника Экстра М» "
+            "(стоит на полу с внутренней стороны мойки) + вода 1:2",
+            False,
+        ),
+        (
+            "Отпарить отпаривателем столы 100–300, зону раздачи, пиццы, "
+            "мойки и хостес",
+            False,
+        ),
+        ("Протереть все отпаренные зоны спецраствором", False),
+        (
+            "Пройтись щёткой (лежит слева от мойки, на стеллаже) по диванам "
+            "и стульям",
+            False,
+        ),
+        (
+            "Выровнять стулья 100-го стола, засервировать стол ручниками, "
+            "приборами и постановочными роксами",
+            False,
+        ),
+        (
+            "Протереть салфетницы (лежат в стейшене сверху слева) и пополнить "
+            "их салфетками (салфетки лежат над мойкой)",
+            False,
+        ),
+        (
+            "Протереть кондименты (перечницы, солонки, соусники, сахарницы) "
+            "тряпкой или влажной салфеткой",
+            False,
+        ),
+        ("Протереть айки (антисептик + сухая тряпка)", False),
+        ("Проверить наличие необходимого инвентаря для работы", False),
+        (
+            "По четвергам: пополнить солонки, перечницы, сахарницы и соусники, "
+            "закрутить перчатки, привести в порядок станции официантов",
+            False,
+        ),
+    ),
+    "second": (
+        ("Поднять жалюзи. Открыть окна ИЛИ включить кондиционеры", False),
+        ("Протереть столы спецраствором", False),
+        ("Накрутить ручники", False),
+        ("Накрыть сервировку (ручники, приборы, роксы)", False),
+        ("Пройтись щёткой по диванам и стульям", False),
+        ("Взбить и поправить подушки", False),
+        ("Выровнять все стулья в зале", False),
+        ("Расставить вазы по своим местам", False),
+        ("Протереть салфетницы и пополнить их", False),
+        (
+            "Протереть кондименты (перечницы, солонки, соусники, сахарницы)",
+            False,
+        ),
+        ("Протереть айки (антисептик + сухая тряпка)", False),
+        ("Проверить наличие необходимого инвентаря для начала работы", False),
+        ("Аккуратно расставить посуду на стеллаже напротив мойки", False),
+        (
+            "По утрам понедельника сдать дощечки (для приборов и чеков) на мойку",
+            False,
+        ),
+        ("По понедельникам и средам отпаривать столы", False),
+        (
+            "Вечером понедельника и вечером четверга полностью убирать "
+            "сервировку со второго зала",
+            False,
+        ),
+        (
+            "По четвергам: пополнить солонки, перечницы, сахарницы и соусники, "
+            "закрутить перчатки, привести в порядок станции официантов",
+            False,
+        ),
+    ),
+}
+
+# Закрытие смены — общее для всех залов. Последний пункт — фотоотчёт рабочего
+# места: его закрывают официанты и хостес.
+_CLOSING: tuple[tuple[str, bool, str | None], ...] = (
+    ("Убрать весь мусор из зала", False, None),
+    ("Сдать все меню на позицию хостес", False, None),
+    ("Протереть столы и станции официантов", False, None),
+    (
+        "Проверить, что все окна закрыты, жалюзи спущены, кондиционеры выключены",
+        False,
+        None,
+    ),
+    (
+        "Во втором зале накрыть обязательную сервировку столов (кроме дней, "
+        "когда её полностью убирают)",
+        False,
+        None,
+    ),
+    ("Показать рабочее место перед закрытием смены", True, None),
+)
+
+_HOSTESS_CLOSING: tuple[tuple[str, bool, str | None], ...] = (
+    ("Принять меню у официантов и убрать на позицию хостес", False, None),
+    ("Убрать мусор и привести в порядок зону хостес", False, None),
+    (
+        "Проверить, что окна закрыты, жалюзи спущены, кондиционеры выключены",
+        False,
+        None,
+    ),
+    ("Показать рабочее место перед закрытием смены", True, None),
+)
+
+_HOSTESS_SHIFT: tuple[tuple[str, bool, str | None], ...] = (
+    ("Переодеться в рабочую форму", False, None),
+    ("Открыть смену в iiko", False, None),
+    ("Протереть стойку хостес и пополнить меню", False, None),
+    ("Проверить брони и посадку на сегодня", False, None),
+)
+
+async def _ensure_hall(session: AsyncSession, slug: str, name: str, order: int) -> Hall:
+    hall = await session.scalar(select(Hall).where(Hall.slug == slug))
+    if hall is not None:
+        return hall
+    hall = Hall(name=name, slug=slug, sort_order=order)
+    session.add(hall)
+    await session.flush()
+    return hall
+
+
+async def _add_items(
+    session: AsyncSession,
+    template: ChecklistTemplate,
+    items: tuple[tuple[str, bool, str | None], ...],
+) -> None:
+    for order, (title, requires_photo, condition) in enumerate(items):
+        session.add(
+            ChecklistItem(
+                template_id=template.id,
+                title=title,
+                requires_photo=requires_photo,
+                is_mandatory=True,
+                condition_position=condition,
+                sort_order=order,
+            )
+        )
+    await session.flush()
+
+
+async def seed_hall_checklists(session: AsyncSession) -> None:
+    """Залы, открытие по залам и общее закрытие смены.
+
+    Идемпотентно и аддитивно: на боевой базе создаёт только то, чего ещё нет.
+    Если администратор уже завёл шаблоны под залы — ничего не трогаем.
+    """
+    halls = [await _ensure_hall(session, slug, name, order) for slug, name, order in _HALLS]
+
+    waiter = await session.scalar(select(Department).where(Department.slug == "waiter"))
+    if waiter is not None:
+        existing = list(
+            await session.scalars(
+                select(ChecklistTemplate).where(
+                    ChecklistTemplate.department_id == waiter.id,
+                    ChecklistTemplate.kind == TEMPLATE_SHIFT,
+                    ChecklistTemplate.hall_id.is_not(None),
+                )
+            )
+        )
+        if not existing:
+            for hall in halls:
+                items = _HALL_OPENING.get(hall.slug, ())
+                if not items:
+                    continue
+                template = ChecklistTemplate(
+                    department_id=waiter.id,
+                    hall_id=hall.id,
+                    title=f"Открытие — {hall.name}",
+                    kind=TEMPLATE_SHIFT,
+                    sort_order=hall.sort_order,
+                )
+                session.add(template)
+                await session.flush()
+                await _add_items(session, template, tuple((t, p, None) for t, p in items))
+
+    # Хостес: отдельное подразделение и общий чек-лист закрытия с фотоотчётом.
+    hostess = await session.scalar(
+        select(Department).where(Department.slug == "hostess")
+    )
+    if hostess is None:
+        hostess = Department(name="Хостес", slug="hostess", emoji="💁", sort_order=4)
+        session.add(hostess)
+        await session.flush()
+
+    for dept, closing, shift_items in (
+        (waiter, _CLOSING, None),
+        (hostess, _HOSTESS_CLOSING, _HOSTESS_SHIFT),
+    ):
+        if dept is None:
+            continue
+        has_close = await session.scalar(
+            select(ChecklistTemplate.id)
+            .where(
+                ChecklistTemplate.department_id == dept.id,
+                ChecklistTemplate.kind == TEMPLATE_CLOSE,
+            )
+            .limit(1)
+        )
+        if has_close is None:
+            template = ChecklistTemplate(
+                department_id=dept.id,
+                title="Закрытие смены",
+                kind=TEMPLATE_CLOSE,
+            )
+            session.add(template)
+            await session.flush()
+            await _add_items(session, template, closing)
+
+        if shift_items is not None:
+            has_shift = await session.scalar(
+                select(ChecklistTemplate.id)
+                .where(
+                    ChecklistTemplate.department_id == dept.id,
+                    ChecklistTemplate.kind == TEMPLATE_SHIFT,
+                )
+                .limit(1)
+            )
+            if has_shift is None:
+                template = ChecklistTemplate(
+                    department_id=dept.id,
+                    title=f"Чек-лист смены — {dept.name}",
+                    kind=TEMPLATE_SHIFT,
+                )
+                session.add(template)
+                await session.flush()
+                await _add_items(session, template, shift_items)
+
+    log.info("hr.seed_hall_checklists", halls=len(halls))
 
 
 async def seed_feedback_questions(session: AsyncSession) -> int:
@@ -439,6 +692,7 @@ async def seed_hr(session: AsyncSession) -> None:
     """Один вход для lifespan: владельцы → подразделения → вопросы → ссылки → стандарты."""
     await seed_owners(session)
     await seed_departments(session)
+    await seed_hall_checklists(session)
     await seed_feedback_questions(session)
     await seed_links(session)
     await seed_standards(session)

@@ -110,10 +110,12 @@ RATE_FULL = "full"
 RATE_PARTIAL = "partial"
 RATES: tuple[str, ...] = (RATE_FULL, RATE_PARTIAL)
 
-# Вид чек-листа: первый рабочий день / обычная смена.
+# Вид чек-листа: первый рабочий день / смена (открытие зала) / закрытие смены.
+# `close` — общий для всех залов: вечером зал уже не важен.
 TEMPLATE_FIRST_DAY = "first_day"
 TEMPLATE_SHIFT = "shift"
-TEMPLATE_KINDS: tuple[str, ...] = (TEMPLATE_FIRST_DAY, TEMPLATE_SHIFT)
+TEMPLATE_CLOSE = "close"
+TEMPLATE_KINDS: tuple[str, ...] = (TEMPLATE_FIRST_DAY, TEMPLATE_SHIFT, TEMPLATE_CLOSE)
 
 # Прогон чек-листа.
 RUN_IN_PROGRESS = "in_progress"
@@ -490,18 +492,61 @@ class EmployeeTrainingDay(Base):
 # --------------------------------------------------------------------------
 
 
+class Hall(Base):
+    """Зал ресторана (первый, второй, летняя веранда …).
+
+    Заводится администратором в разделе «Чек-листы». Зал нужен только там, где
+    у подразделения есть отдельные шаблоны под залы: официант перед чек-листом
+    выбирает, в каком зале он сегодня работает. Если залов нет — выбора нет.
+    """
+
+    __tablename__ = "halls"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_hall_slug"),
+        Index("ix_halls_active_sort", "is_active", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
 class ChecklistTemplate(Base):
-    """Шаблон чек-листа подразделения (первый день / обычная смена)."""
+    """Шаблон чек-листа подразделения.
+
+    `hall_id` разделяет открытие по залам; NULL — общий шаблон (закрытие смены,
+    первый день или заведение вообще без залов).
+    """
 
     __tablename__ = "checklist_templates"
     __table_args__ = (
         CheckConstraint(_in_list("kind", TEMPLATE_KINDS), name="ck_checklist_template_kind"),
         Index("ix_checklist_templates_dept", "department_id", "is_active", "kind"),
+        Index("ix_checklist_templates_hall", "hall_id", "kind", "is_active"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     department_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False
+    )
+    # NULL — шаблон общий для всех залов подразделения.
+    hall_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("halls.id", ondelete="SET NULL")
     )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     kind: Mapped[str] = mapped_column(
@@ -597,6 +642,34 @@ class ChecklistRun(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ShiftHallChoice(Base):
+    """В каком зале сотрудник работает в эту смену.
+
+    Хранится отдельно от прогона: прогон создаётся только при первой отметке, а
+    зал нужно помнить сразу после выбора — иначе после перезагрузки экран снова
+    спрашивал бы то же самое.
+    """
+
+    __tablename__ = "shift_hall_choices"
+    __table_args__ = (
+        UniqueConstraint(
+            "employee_id", "shift_date", name="uq_shift_hall_choice"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False
+    )
+    shift_date: Mapped[date] = mapped_column(Date, nullable=False)
+    hall_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("halls.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class ChecklistCompletion(Base):

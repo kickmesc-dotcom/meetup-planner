@@ -8,6 +8,7 @@ import AttentionScreen from "./AttentionScreen";
 import AppTextsScreen from "./AppTextsScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
+import ChecklistSettingsScreen from "./ChecklistSettingsScreen";
 import EmployeesScreen from "./EmployeesScreen";
 import FeedSettingsScreen from "./FeedSettingsScreen";
 import IntervalsScreen from "./IntervalsScreen";
@@ -35,6 +36,7 @@ type Section =
   | "journal"
   | "notifications"
   | "employees"
+  | "checklists"
   | "training-plan"
   | "feed-settings"
   | "kpi"
@@ -54,6 +56,7 @@ const VALID_SECTIONS: Section[] = [
   "journal",
   "notifications",
   "employees",
+  "checklists",
   "training-plan",
   "feed-settings",
   "kpi",
@@ -113,6 +116,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "journal") return <JournalScreen onBack={back} />;
   if (section === "notifications") return <NotificationsScreen onBack={back} />;
   if (section === "employees") return <EmployeesScreen onBack={back} />;
+  if (section === "checklists") return <ChecklistSettingsScreen onBack={back} />;
   if (section === "training-plan") return <TrainingPlanScreen onBack={back} />;
   if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;
   if (section === "kpi") return <KpiScreen onBack={back} />;
@@ -157,6 +161,12 @@ export default function AdminScreen({ users }: Props) {
           title="Пул сотрудников"
           subtitle="Имя, должность, прогресс, увольнение и корзина"
           onClick={() => select("employees")}
+        />
+        <Card
+          icon="🗒"
+          title="Чек-листы"
+          subtitle="Пункты по залам, закрытие смены, фотоотчёт"
+          onClick={() => select("checklists")}
         />
         <Card
           icon="🎓"
