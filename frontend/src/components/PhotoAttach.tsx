@@ -108,6 +108,59 @@ export default function PhotoAttach({
   );
 }
 
+/**
+ * Картинка с двумя повторами.
+ *
+ * Зачем: на мобильной сети ответ может оборваться, а Cloudflare/HF иногда
+ * отдают 502 на первом запросе после простоя. Без повтора человек видит
+ * навсегда «сломанное» фото и не понимает, что с этим делать. Повтор идёт с
+ * параметром `retry` — подпись считается только по id, поэтому URL остаётся
+ * валидным.
+ */
+function ImgWithRetry({
+  src,
+  alt,
+  size,
+  className,
+  style,
+}: {
+  src: string;
+  alt: string;
+  size?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  if (attempt > 2) {
+    return (
+      <span
+        className="grid place-items-center bg-tg-secondary-bg px-1 text-center text-2xs leading-tight text-tg-hint"
+        style={size ? { width: size, height: size } : undefined}
+      >
+        Фото не открылось
+      </span>
+    );
+  }
+  const url = attempt
+    ? `${src}${src.includes("?") ? "&" : "?"}retry=${attempt}`
+    : src;
+  return (
+    <img
+      key={attempt}
+      src={url}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      width={size}
+      height={size}
+      className={className}
+      style={style}
+      onError={() => setAttempt((current) => current + 1)}
+    />
+  );
+}
+
 /** Превью снимков с полноэкранным просмотром по тапу. */
 export function PhotoThumbs({
   photos,
@@ -136,12 +189,10 @@ export function PhotoThumbs({
               className="overflow-hidden rounded-tile bg-tg-bg/60"
               aria-label="Открыть фото"
             >
-              <img
+              <ImgWithRetry
                 src={src}
                 alt="Фотоотчёт"
-                loading="lazy"
-                width={size}
-                height={size}
+                size={size}
                 className="object-cover"
                 style={{ width: size, height: size }}
               />
@@ -169,7 +220,7 @@ export function PhotoThumbs({
             </button>
           </div>
           <div className="flex flex-1 items-center justify-center p-3">
-            <img
+            <ImgWithRetry
               src={mediaUrl(open.url) ?? ""}
               alt="Фотоотчёт"
               className="max-h-full max-w-full object-contain"

@@ -70,8 +70,12 @@ export default function TabBar({
               haptic("light");
               setTab(it.id);
             }}
+            // P3.17: у админа с «Командой» семь вкладок на 360–390 px. При
+            // 12 px подписи «Команда»/«События» вылезали за кнопку и обрезались
+            // по краям экрана. `text-2xs` + truncate держат семь подписей
+            // целиком, а min-w-0 не даёт flex-1 раздуться от длинного слова.
             className={[
-              "relative flex-1 min-h-12 flex flex-col items-center justify-center py-2 text-xs transition-colors",
+              "relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
           >
@@ -84,8 +88,8 @@ export default function TabBar({
             )}
             {/* Иконка декоративная — рядом есть подпись, поэтому её не должно
                 быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
-            <Icon name={it.icon} size={22} />
-            <span className="mt-0.5">{it.label}</span>
+            <Icon name={it.icon} size={20} />
+            <span className="w-full truncate text-center">{it.label}</span>
           </button>
         );
       })}

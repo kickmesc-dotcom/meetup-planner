@@ -35,6 +35,18 @@ describe("TabBar", () => {
     expect(screen.getAllByRole("button")).toHaveLength(7);
   });
 
+  it("семь подписей не вылезают за кнопку", () => {
+    // P3.17: на 360–390 px «Команда»/«События» при 12 px обрезались по краям
+    // экрана. Подпись обязана ужиматься внутри своей кнопки, а не вылезать.
+    render(<TabBar isAdmin canManage />);
+    const label = screen.getByText("Команда");
+    expect(label.className).toContain("truncate");
+    expect(label.className).toContain("text-center");
+    const button = label.closest("button");
+    expect(button?.className).toContain("min-w-0");
+    expect(button?.className).toContain("text-2xs");
+  });
+
   it("тап переключает вкладку", () => {
     render(<TabBar isAdmin={false} />);
     fireEvent.click(screen.getByText("Смена"));

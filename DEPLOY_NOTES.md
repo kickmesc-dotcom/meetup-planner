@@ -2793,6 +2793,14 @@ Chrome и Telegram-веб пишут WebM/OPUS — `sendVoice` его отбив
 | API для мини-аппа | HF Space `fryesw/meetup-planner-backend` | `backend/.venv/Scripts/python.exe tools/deploy-hf.py all` |
 | Мини-апп | CF Pages **`semitaskbot`** → `semitaskbot.pages.dev` | `npm run build` + `wrangler pages deploy dist --project-name semitaskbot` |
 
+⚠ С 21.10.2026 в `frontend/functions/api/media/[[path]].ts` живёт Pages Function:
+фото отдаются и принимаются через домен приложения, а не напрямую с `hf.space`.
+Запускать `wrangler pages deploy` нужно **из `frontend/`**: Functions берутся из
+`frontend/functions`, и в логе должно быть `✨ Compiled Worker successfully` и
+`Uploading Functions bundle`. Адрес апстрима можно переопределить переменной
+`API_ORIGIN` в настройках Pages (по умолчанию — текущий HF Space). Без Function
+мини-апп продолжит работать, но фото пойдут напрямую на HF.
+
 `meetup-planner1.pages.dev` — отдельный проект в другом аккаунте: он собирается
 из GitHub и указывает на Amvera, но его origin **не в списке CORS**, поэтому
 живым мини-аппом он не является. Ориентир — `MINI_APP_URL` в `backend/.env`

@@ -191,6 +191,13 @@ export function humanizeApiError(e: unknown): string {
 export async function api<T>(
   path: string,
   init: RequestInit = {},
+  /**
+   * `sameOrigin` — гнать запрос через свой домен (Pages Function), а не прямо
+   * на бэкенд. Нужно фото: POST снимка идёт с телефона на край Cloudflare,
+   * а уже оттуда в HF — так слабый мобильный канал не теряет загрузку.
+   * В dev-сервере запрос всё равно идёт на Vite-прокси.
+   */
+  options: { sameOrigin?: boolean } = {},
 ): Promise<T> {
   const initData = getInitData();
   const headers = new Headers(init.headers);
@@ -209,7 +216,10 @@ export async function api<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const url = path.startsWith("http") ? path : `${getApiBase()}${path}`;
+  const sameOrigin = options.sameOrigin && !import.meta.env.DEV;
+  const url = path.startsWith("http")
+    ? path
+    : `${sameOrigin ? "" : getApiBase()}${path}`;
   const res = await fetch(url, { ...init, headers });
 
   if (!res.ok) {

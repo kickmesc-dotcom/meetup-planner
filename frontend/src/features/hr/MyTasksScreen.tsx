@@ -185,29 +185,33 @@ export default function MyTasksScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
-          {/* VISUAL_AUDIT P2.13: имя стояло дважды — в приветствии и рядом
-              подписью. Оставляем приветствие и плашку, без повтора. */}
-          <div className="flex min-w-0 items-baseline gap-2">
-            <h1 className="truncate text-lg font-semibold text-tg-text">
+        <div className="flex items-start justify-between gap-2">
+          {/* VISUAL_AUDIT P3.17: плашка стояла в одной строке с приветствием.
+              На узком экране (и при крупном системном шрифте) три кнопки +
+              «🛠 Разработчик» съедали всю ширину, и вместо имени оставалось
+              «Привет,…». Теперь приветствие — своя строка, плашка — под ним. */}
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg font-semibold leading-tight text-tg-text">
               {firstName ? `Привет, ${firstName}` : "Мои задачи"}
             </h1>
             {meQ.data && (
-              <Badge
-                text={meQ.data.badge}
-                emoji={meQ.data.badge_emoji}
-                demo={meQ.data.is_demo}
-              />
+              <div className="mt-1 flex min-w-0">
+                <Badge
+                  text={meQ.data.badge}
+                  emoji={meQ.data.badge_emoji}
+                  demo={meQ.data.is_demo}
+                />
+              </div>
             )}
           </div>
-          <span className="flex shrink-0 items-center gap-2">
+          <span className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
                 haptic("selection");
                 setTab("standards");
               }}
-              className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg text-base leading-none"
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
               aria-label="База стандартов"
               title="База стандартов"
             >
@@ -220,7 +224,7 @@ export default function MyTasksScreen() {
                   haptic("selection");
                   setTab("review");
                 }}
-                className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg text-base leading-none"
+                className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
                 aria-label="Приёмка работ"
                 title="Приёмка работ"
               >
@@ -234,7 +238,7 @@ export default function MyTasksScreen() {
                 haptic("selection");
                 setTab("handovers");
               }}
-              className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg text-base leading-none"
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
               aria-label="Передача смены"
               title="Передача смены"
             >
