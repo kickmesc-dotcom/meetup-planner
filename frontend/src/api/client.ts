@@ -70,6 +70,18 @@ export function isEndpointMissing(e: unknown): boolean {
 export function humanizeApiError(e: unknown): string {
   if (e instanceof ApiError) {
     const d = e.detail || "";
+    // Пул сотрудников: ручное заведение по ID и снапшоты состава. Коды
+    // серверные, поэтому текст живёт здесь — одна правка на все экраны.
+    const roster: Record<string, string> = {
+      bad_telegram_id: "ID состоит только из цифр — скопируй его из профиля Telegram.",
+      demo_id_reserved: "Этот диапазон ID занят тестовым пулом: для человека он не подойдёт.",
+      already_exists: "Такой ID уже заведён в боте.",
+      employee_fired: "Этот человек уволен — верни его из корзины в списке ниже.",
+      bad_role: "Такой роли нет.",
+      department_not_found: "Подразделение не найдено — обнови список.",
+      snapshot_not_found: "Снимок уже удалён.",
+    };
+    if (d in roster) return roster[d];
     // GHG10 Э8: функция закрыта рангом (`rank_required:<N>`).
     if (d.startsWith("rank_required:")) {
       const lvl = Number(d.split(":")[1] ?? 0);

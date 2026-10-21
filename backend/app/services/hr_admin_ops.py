@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.hr_models import (
     ONBOARDING_NEW,
+    ROLES,
     TASK_DONE,
     TASK_FAILED,
     ChecklistCompletion,
@@ -48,7 +49,8 @@ from app.db.hr_models import (
     TaskReminder,
 )
 from app.db.models import AppNotification, User
-from app.services import hr_access, hr_demo, hr_settings, hr_tasks
+from app.db.seed import color_for_user
+from app.services import hr_access, hr_demo, hr_roster, hr_settings, hr_tasks
 
 log = structlog.get_logger()
 
@@ -607,6 +609,75 @@ async def directory(session: AsyncSession, viewer: Employee) -> list[EmployeeCar
     ]
 
 
+async def add_person(
+    session: AsyncSession,
+    viewer: Employee,
+    *,
+    telegram_id: int | str,
+    display_name: str | None = None,
+    department_id: int | None = None,
+    position: str | None = None,
+    badge: str | None = None,
+    role: str | None = None,
+) -> EmployeeCard:
+    """Завести человека по Telegram-ID, не дожидаясь его первого входа.
+
+    Зачем руками: сотрудник может ещё не открыть бота (или открыть не тот бот),
+    а место в пуле уже нужно — например, чтобы выдать ему поручение в первый же
+    день. Раньше для этого приходилось ждать его захода или лезть в базу.
+
+    Правила простые: ID проверяется (`hr_roster.normalize_telegram_id`),
+    существующий профиль не перезаписывается — иначе кнопка «добавить» молча
+    стёрла бы человеку имя и отдел. Уволенного возвращаем текстом-подсказкой
+    (его место — «Вернуть из корзины»), а не создаём второй профиль.
+    """
+    try:
+        number = hr_roster.normalize_telegram_id(telegram_id)
+    except hr_roster.RosterError as exc:
+        raise AdminOpsError(str(exc)) from exc
+    if role is not None and role not in ROLES:
+        raise AdminOpsError("bad_role")
+    if department_id is not None:
+        department = await session.get(Department, department_id)
+        if department is None:
+            raise AdminOpsError("department_not_found")
+
+    user = await session.scalar(select(User).where(User.telegram_id == number))
+    if user is not None:
+        existing = await session.scalar(
+            select(Employee).where(Employee.user_id == user.id)
+        )
+        if existing is not None:
+            raise AdminOpsError(
+                "employee_fired" if existing.fired_at is not None else "already_exists"
+            )
+    else:
+        user = User(
+            telegram_id=number,
+            display_name=hr_roster.clean_name(display_name, number),
+            color_hex=color_for_user(number),
+        )
+        session.add(user)
+        await session.flush()
+
+    employee = Employee(
+        user_id=int(user.id),
+        role=role or hr_access.default_role_for(number),
+        onboarding_state=ONBOARDING_NEW,
+        department_id=department_id,
+        position=(position or "").strip()[:MAX_NAME] or None,
+        badge=(badge or "").strip()[:MAX_NAME] or None,
+    )
+    session.add(employee)
+    await session.flush()
+    if role is not None:
+        # Ручной выбор роли сильнее env-списка админов (`ensure_employee`).
+        hr_access.set_role(employee, role)
+    await session.commit()
+    log.info("hr.admin.person_added", employee_id=int(employee.id), telegram_id=number)
+    return await _card_of(session, viewer, int(employee.id))
+
+
 async def employee_in_scope(
     session: AsyncSession, viewer: Employee, employee_id: int
 ) -> Employee:
@@ -759,6 +830,15 @@ async def fire(
     )
     await session.commit()
     if mode == FIRED_PURGE:
+        # Снимок ДО удаления: строка ещё на месте, состав полный. Это и есть
+        # страховка «не потерять пул заведённых ID».
+        await hr_roster.capture(
+            session,
+            created_by_employee_id=int(viewer.id),
+            kind=hr_roster.KIND_AUTO,
+            source=f"fire:{employee_id}",
+            label="Перед удалением сотрудника",
+        )
         await purge_data(session, employee_id)
     return await _card_of(session, viewer, employee_id)
 

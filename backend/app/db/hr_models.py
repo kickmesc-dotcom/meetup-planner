@@ -1584,3 +1584,48 @@ class SheetSource(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class RosterSnapshot(Base):
+    """Снимок состава: кто заведён в боте на этот момент.
+
+    Зачем отдельная таблица, а не лог изменений. Пул Telegram-ID — самое
+    дорогое, что есть в базе: его нельзя восстановить из Telegram, только
+    заново собирать у людей. Поэтому любое действие, которое может удалить
+    людей (`fire(mode=purge)`, `demo/purge` с `delete_employees`), сначала
+    складывает сюда состав целиком.
+
+    `payload` — JSONB-список людей (`telegram_id`, имя, отдел, должность,
+    роль...) без внутренних `id`: восстанавливать надо по Telegram-ID, а не по
+    номерам строк, которые после удаления переиспользуются.
+    """
+
+    __tablename__ = "hr_roster_snapshots"
+    __table_args__ = (
+        CheckConstraint(
+            _in_list("kind", ("manual", "auto")), name="ck_roster_snapshot_kind"
+        ),
+        Index("ix_roster_snapshots_created", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    label: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="manual", server_default="manual"
+    )
+    # Почему сняли: `employees` (кнопка), `fire:purge`, `demo:purge`.
+    source: Mapped[str] = mapped_column(
+        String(48), nullable=False, default="", server_default=""
+    )
+    people_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    payload: Mapped[list[dict[str, object]]] = mapped_column(
+        JSONB, nullable=False, default=list
+    )
+    created_by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

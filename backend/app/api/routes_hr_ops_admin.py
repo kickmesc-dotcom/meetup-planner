@@ -14,6 +14,11 @@
   поручение.
 * Увольнение: доступ закрывается сразу, данные — в корзину на 30 дней или
   сразу в небытие. Восстановление — одна кнопка, автоудаление — планировщик.
+* Ручное заведение по Telegram-ID (`POST /employees-pool/add`): человек
+  появляется в боте до того, как сам его откроет.
+* Снапшоты состава (`/roster-snapshots`): снять состав вручную, посмотреть
+  историю, вернуть людей по `telegram_id`. Перед удалением снимок снимается
+  сам — пул ID не теряется вместе с данными.
 
 Права: журнал и пул доступны `AupDep` (руководитель видит только своё
 подразделение), уведомления — тоже; правила области считает сервис
@@ -29,7 +34,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import AdminDep, AupDep, SessionDep
 from app.db.hr_models import Employee
-from app.services import hr_admin_ops
+from app.services import hr_admin_ops, hr_roster
 
 router = APIRouter(tags=["hr-admin-ops"])
 
@@ -152,6 +157,49 @@ class ForceDoneIn(BaseModel):
     comment: str | None = Field(None, max_length=120)
 
 
+class AddPersonIn(BaseModel):
+    """Ручное заведение по Telegram-ID: остальные поля — по желанию."""
+
+    telegram_id: int = Field(ge=1)
+    display_name: str | None = Field(None, max_length=96)
+    department_id: int | None = None
+    position: str | None = Field(None, max_length=64)
+    badge: str | None = Field(None, max_length=64)
+    role: str | None = Field(None, pattern="^(employee|aup|admin)$")
+
+
+class SnapshotOut(BaseModel):
+    id: int
+    label: str
+    kind: str
+    source: str
+    people_count: int
+    created_at: datetime
+
+
+class SnapshotListOut(BaseModel):
+    items: list[SnapshotOut]
+    max_snapshots: int
+
+
+class SnapshotDetailOut(BaseModel):
+    snapshot: SnapshotOut
+    # Состав отдаём как есть: это исторический JSON, и жёсткая схема здесь
+    # сломала бы старые снимки после любой правки полей.
+    people: list[dict[str, object]]
+
+
+class SnapshotIn(BaseModel):
+    label: str | None = Field(None, max_length=120)
+
+
+class RestoreResultOut(BaseModel):
+    created: int
+    restored: int
+    skipped: int
+    departments_missing: list[str]
+
+
 class TaskBriefOut(BaseModel):
     id: int
     status: str
@@ -164,11 +212,23 @@ class TaskBriefOut(BaseModel):
 
 def _ops_error(exc: hr_admin_ops.AdminOpsError) -> HTTPException:
     code = str(exc)
-    if code == "employee_not_found":
+    if code in ("employee_not_found", "task_not_found"):
         return HTTPException(status.HTTP_404_NOT_FOUND, detail=code)
-    if code == "task_not_found":
+    if code in ("already_exists", "employee_fired"):
+        # Это не ошибка ввода: ID верный, просто человек уже есть.
+        return HTTPException(status.HTTP_409_CONFLICT, detail=code)
+    return HTTPException(status.HTTP_400_BAD_REQUEST, detail=code)
+
+
+def _roster_error(exc: hr_roster.RosterError) -> HTTPException:
+    code = str(exc)
+    if code == "snapshot_not_found":
         return HTTPException(status.HTTP_404_NOT_FOUND, detail=code)
     return HTTPException(status.HTTP_400_BAD_REQUEST, detail=code)
+
+
+def _snapshot(row: hr_roster.SnapshotSummary) -> SnapshotOut:
+    return SnapshotOut(**row.__dict__)
 
 
 def _card(card: hr_admin_ops.EmployeeCard) -> EmployeeCardOut:
@@ -320,6 +380,27 @@ async def employees_pool(session: SessionDep, employee: AupDep) -> EmployeesPool
     )
 
 
+@router.post("/employees-pool/add", response_model=EmployeeCardOut)
+async def add_employee(
+    body: AddPersonIn, session: SessionDep, employee: AdminDep
+) -> EmployeeCardOut:
+    """Завести сотрудника по Telegram-ID (только администратор)."""
+    try:
+        card = await hr_admin_ops.add_person(
+            session,
+            employee,
+            telegram_id=body.telegram_id,
+            display_name=body.display_name,
+            department_id=body.department_id,
+            position=body.position,
+            badge=body.badge,
+            role=body.role,
+        )
+    except hr_admin_ops.AdminOpsError as exc:
+        raise _ops_error(exc) from exc
+    return _card(card)
+
+
 @router.patch("/employees/{employee_id}", response_model=EmployeeCardOut)
 async def patch_employee(
     employee_id: int,
@@ -386,6 +467,73 @@ async def restore_employee(
     except hr_admin_ops.AdminOpsError as exc:
         raise _ops_error(exc) from exc
     return _card(card)
+
+
+# --------------------------------------------------------------------------
+# Снапшоты состава
+# --------------------------------------------------------------------------
+
+
+@router.get("/roster-snapshots", response_model=SnapshotListOut)
+async def roster_snapshots(session: SessionDep, _: AdminDep) -> SnapshotListOut:
+    """История снимков состава: ручные и автоматические (перед удалением)."""
+    items = await hr_roster.list_snapshots(session)
+    return SnapshotListOut(
+        items=[_snapshot(item) for item in items],
+        max_snapshots=hr_roster.MAX_SNAPSHOTS,
+    )
+
+
+@router.post("/roster-snapshots", response_model=SnapshotDetailOut)
+async def create_roster_snapshot(
+    body: SnapshotIn, session: SessionDep, employee: AdminDep
+) -> SnapshotDetailOut:
+    """Снять состав вручную — например, перед большой чисткой."""
+    row = await hr_roster.capture(
+        session,
+        created_by_employee_id=int(employee.id),
+        label=body.label or "Снимок вручную",
+        kind=hr_roster.KIND_MANUAL,
+        source=hr_roster.SOURCE_MANUAL,
+    )
+    snapshot = _snapshot(hr_roster.summary_of(row))
+    people = [item for item in (row.payload or []) if isinstance(item, dict)]
+    return SnapshotDetailOut(snapshot=snapshot, people=people)
+
+
+@router.get("/roster-snapshots/{snapshot_id}", response_model=SnapshotDetailOut)
+async def roster_snapshot(
+    snapshot_id: int, session: SessionDep, _: AdminDep
+) -> SnapshotDetailOut:
+    try:
+        data = await hr_roster.detail(session, snapshot_id)
+    except hr_roster.RosterError as exc:
+        raise _roster_error(exc) from exc
+    return SnapshotDetailOut(snapshot=_snapshot(data.summary), people=data.people)
+
+
+@router.post(
+    "/roster-snapshots/{snapshot_id}/restore", response_model=RestoreResultOut
+)
+async def restore_roster_snapshot(
+    snapshot_id: int, session: SessionDep, _: AdminDep
+) -> RestoreResultOut:
+    """Вернуть людей из снимка по Telegram-ID (активных не трогаем)."""
+    try:
+        result = await hr_roster.restore(session, snapshot_id)
+    except hr_roster.RosterError as exc:
+        raise _roster_error(exc) from exc
+    return RestoreResultOut(**result.__dict__)
+
+
+@router.delete("/roster-snapshots/{snapshot_id}")
+async def delete_roster_snapshot(
+    snapshot_id: int, session: SessionDep, _: AdminDep
+) -> dict[str, bool]:
+    """Удалить снимок: он больше не нужен."""
+    if not await hr_roster.remove(session, snapshot_id):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="snapshot_not_found")
+    return {"removed": True}
 
 
 @router.post("/tasks/{task_id}/force-done", response_model=TaskBriefOut)

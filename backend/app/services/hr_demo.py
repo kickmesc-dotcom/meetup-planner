@@ -589,6 +589,15 @@ async def purge(session: AsyncSession, *, delete_employees: bool = False) -> dic
     )
 
     if delete_employees:
+        # Снимок состава ДО удаления — пул ID восстановим из админки.
+        from app.services import hr_roster
+
+        await hr_roster.capture(
+            session,
+            kind=hr_roster.KIND_AUTO,
+            source="demo:purge",
+            label="Перед очисткой тестового пула",
+        )
         user_ids = set(
             await session.scalars(select(Employee.user_id).where(Employee.id.in_(ids)))
         )

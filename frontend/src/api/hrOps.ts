@@ -5,6 +5,9 @@ import { api } from "@/api/client";
  *
  * Отдельный модуль, а не приписка к `hr.ts`: это управляющий контур, а не
  * кабинет сотрудника, и живёт он по своим правилам (см. `routes_hr_ops_admin`).
+ *
+ * Здесь же ручное заведение по Telegram-ID и снапшоты состава: пул ID — самое
+ * дорогое в базе, и потерять его вместе с удалённым профилем нельзя.
  */
 
 // --- Журнал событий ---------------------------------------------------------
@@ -164,6 +167,71 @@ export const fireEmployee = (employeeId: number, mode: "trash" | "purge") =>
 export const restoreEmployee = (employeeId: number) =>
   api<HrEmployeeCard>(`/api/admin/employees/${employeeId}/restore`, {
     method: "POST",
+  });
+
+/** Завести человека по Telegram-ID, не дожидаясь его первого входа. */
+export const addEmployeeByTelegramId = (body: {
+  telegram_id: number;
+  display_name?: string;
+  department_id?: number;
+  position?: string;
+  badge?: string;
+  role?: "employee" | "aup" | "admin";
+}) =>
+  api<HrEmployeeCard>("/api/admin/employees-pool/add", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+// --- Снапшоты состава -------------------------------------------------------
+
+export interface HrRosterSnapshot {
+  id: number;
+  label: string;
+  kind: "manual" | "auto";
+  /** Что сняло автоматический снимок: `fire:12`, `demo:purge`. */
+  source: string;
+  people_count: number;
+  created_at: string;
+}
+
+export interface HrRosterPerson {
+  telegram_id: number;
+  display_name: string;
+  department_name: string | null;
+  position: string | null;
+  role: string;
+  is_demo: boolean;
+}
+
+export interface HrRosterRestoreResult {
+  created: number;
+  restored: number;
+  skipped: number;
+  /** Отделы из снимка, которых больше нет в базе. */
+  departments_missing: string[];
+}
+
+export const fetchRosterSnapshots = () =>
+  api<{ items: HrRosterSnapshot[]; max_snapshots: number }>(
+    "/api/admin/roster-snapshots",
+  );
+
+export const createRosterSnapshot = (label?: string) =>
+  api<{ snapshot: HrRosterSnapshot; people: HrRosterPerson[] }>(
+    "/api/admin/roster-snapshots",
+    { method: "POST", body: JSON.stringify({ label }) },
+  );
+
+export const restoreRosterSnapshot = (snapshotId: number) =>
+  api<HrRosterRestoreResult>(
+    `/api/admin/roster-snapshots/${snapshotId}/restore`,
+    { method: "POST" },
+  );
+
+export const deleteRosterSnapshot = (snapshotId: number) =>
+  api<{ removed: boolean }>(`/api/admin/roster-snapshots/${snapshotId}`, {
+    method: "DELETE",
   });
 
 /** Зачесть поручение выполненным за конкретного человека (ручное решение). */

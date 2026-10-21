@@ -12,6 +12,7 @@ import {
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { AddPersonPanel, RosterSnapshotsPanel } from "./RosterTools";
 import SubScreen from "./SubScreen";
 
 /**
@@ -21,6 +22,10 @@ import SubScreen from "./SubScreen";
  * должность, обнулить знакомство или уволить — это действия управляющего, а не
  * самообслуживание. Увольнение уносит доступ сразу, а данные — по выбору:
  * корзина на 30 дней (восстановимо) или удаление безвозвратно.
+ *
+ * Сверху два инструмента пула: добавить человека по Telegram-ID (не дожидаясь
+ * его первого входа) и снапшоты состава — чтобы удаление не унесло с собой
+ * список заведённых ID.
  */
 export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
   const qc = useQueryClient();
@@ -144,6 +149,9 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
         aria-label="Поиск по сотрудникам"
         className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
       />
+
+      <AddPersonPanel onAdded={refresh} />
+      <RosterSnapshotsPanel />
 
       {q.isLoading && <ListSkeleton rows={6} />}
       {q.isError && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
