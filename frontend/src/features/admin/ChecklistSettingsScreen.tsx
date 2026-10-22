@@ -38,6 +38,27 @@ interface Props {
 
 type HallFilter = number | "common";
 
+// ISO-дни недели: 1 — понедельник. Подписи короткие: семь кнопок в строку
+// влезают только так, а полное слово есть в подсказке под ними.
+const WEEKDAYS: { day: number; short: string; full: string }[] = [
+  { day: 1, short: "Пн", full: "понедельник" },
+  { day: 2, short: "Вт", full: "вторник" },
+  { day: 3, short: "Ср", full: "среда" },
+  { day: 4, short: "Чт", full: "четверг" },
+  { day: 5, short: "Пт", full: "пятница" },
+  { day: 6, short: "Сб", full: "суббота" },
+  { day: 7, short: "Вс", full: "воскресенье" },
+];
+
+/** "1,4" → [1, 4] (пусто — каждый день). */
+function parseWeekdays(value: string | null | undefined): number[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((chunk) => Number(chunk.trim()))
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7);
+}
+
 export default function ChecklistSettingsScreen({ onBack }: Props) {
   const qc = useQueryClient();
   const deps = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
@@ -420,6 +441,7 @@ function ItemEditor({
             {item.condition_position && (
               <span>только «{item.condition_position}»</span>
             )}
+            {item.schedule_label && <span>🗓 {item.schedule_label}</span>}
           </div>
         </button>
         <div className="flex shrink-0 flex-col gap-1">
@@ -472,6 +494,48 @@ function ItemEditor({
             label="Обязательный пункт"
             onChange={(v) => save.mutate({ is_mandatory: v })}
           />
+
+          {/* Расписание по дням недели: пусто — каждый день. Пункт «по
+              четвергам» остаётся в списке всегда, но в другие дни неактивен и
+              не входит в прогресс. */}
+          <div>
+            <div className="text-xs text-tg-hint">В какие дни нужен пункт</div>
+            <div className="mt-1 flex gap-1">
+              {WEEKDAYS.map(({ day, short, full }) => {
+                const selected = parseWeekdays(item.weekdays).includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    aria-pressed={selected}
+                    aria-label={full}
+                    disabled={save.isPending}
+                    onClick={() => {
+                      haptic("selection");
+                      const current = parseWeekdays(item.weekdays);
+                      const next = selected
+                        ? current.filter((d) => d !== day)
+                        : [...current, day].sort((a, b) => a - b);
+                      save.mutate({ weekdays: next });
+                    }}
+                    className={[
+                      "min-h-9 flex-1 rounded-tile text-xs transition-colors disabled:opacity-50",
+                      selected
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-bg/60 text-tg-text",
+                    ].join(" ")}
+                  >
+                    {short}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1 text-2xs text-tg-hint">
+              {item.schedule_label
+                ? `${item.schedule_label[0].toUpperCase()}${item.schedule_label.slice(1)}. В другие дни пункт виден, но неактивен.`
+                : "Ничего не выбрано — каждый день."}
+            </div>
+          </div>
           <div className="flex gap-2">
             <button
               type="button"

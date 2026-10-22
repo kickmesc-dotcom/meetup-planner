@@ -8,7 +8,10 @@ import {
   type HrFeedItem,
 } from "@/api/hr";
 import Badge from "@/features/hr/Badge";
+import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
+import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
+import Icon from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
 
@@ -24,6 +27,15 @@ import { haptic } from "@/tg/webapp";
  * фильтры рисуются только тогда, когда сервер их разрешает. Скрытие кнопки —
  * лишь удобство: сам ответ уже отфильтрован по роли, а попытка выбрать чужого
  * сотрудника вернёт 403, а не чужие записи.
+ *
+ * Раунд 5, что изменилось:
+ *  • фильтры — один лист-список вместо двух нативных `<select>` в строке. Там
+ *    стрелки сортировки рисовались системой, обрезались по краям и читались
+ *    как «криво вставшие» ползунки;
+ *  • у каждого человека свой цвет аутлайна вокруг имени, у подразделения — свой
+ *    цвет пилюли. В ленте стало видно, где чьи строки;
+ *  • тап по имени открывает карточку коллеги (активность — по правилу
+ *    видимости профиля).
  */
 
 const SCOPE_TITLE: Record<HrFeed["scope"], string> = {
@@ -89,12 +101,8 @@ function groupByDay(items: HrFeedItem[]): { label: string; items: HrFeedItem[] }
 
 /**
  * VISUAL_AUDIT P1.8: тестовый сотрудник помечался трижды в одной строке —
- * префиксом `[BOT]` в имени, плашкой должности и чипом `BOT` внутри неё. Три
- * метки читались как три разных статуса. Теперь имя чистое, а пул помечается
- * один раз — нейтральным «тест» вместо плашки.
- *
- * Флаг приходит с сервера (`is_demo`), а префикс остаётся запасным вариантом:
- * фронтенд может уехать раньше бэкенда, и лента не должна ломаться.
+ * префиксом `[BOT]` в имени, плашкой должности и чипом `BOT` внутри неё. Теперь
+ * имя чистое, а пул помечается один раз — нейтральным «тест».
  */
 const DEMO_PREFIX = "[BOT]";
 
@@ -136,8 +144,13 @@ export default function HrFeedScreen() {
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [kinds, setKinds] = useState<FeedKind[]>([]);
   // Поиск по списку нужен, когда в предприятии десятки людей: прокручивать
-  // <select> в мини-аппе неудобно.
+  // список в мини-аппе неудобно.
   const [search, setSearch] = useState("");
+  // Фильтры живут в листе: два селекта в одной строке не влезали на узкий
+  // экран, и их системные стрелки обрезались по краям.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Чью карточку открыли (null — оверлей закрыт).
+  const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
 
   const filtersQ = useQuery({
     queryKey: ["hr-feed-filters"],
@@ -178,8 +191,8 @@ export default function HrFeedScreen() {
   const canFilter = feed?.can_filter === true;
   const items = feed?.items ?? [];
   const needle = search.trim().toLowerCase();
-  // Выбранный человек остаётся в списке даже при поиске: иначе <select>
-  // показал бы пустое значение и фильтр выглядел бы сброшенным.
+  // Выбранный человек остаётся в списке даже при поиске: иначе список показал
+  // бы пустое значение и фильтр выглядел бы сброшенным.
   const visibleEmployees = (filters?.employees ?? []).filter(
     (employee) =>
       (departmentId === null || employee.department_id === departmentId) &&
@@ -189,6 +202,17 @@ export default function HrFeedScreen() {
         (employee.position ?? "").toLowerCase().includes(needle) ||
         (employee.badge ?? "").toLowerCase().includes(needle)),
   );
+  const selectedDepartment = filters?.departments.find((d) => d.id === departmentId);
+  const selectedEmployee = filters?.employees.find((e) => e.id === employeeId);
+  const hasFilters = employeeId !== null || departmentId !== null || kinds.length > 0;
+
+  const resetFilters = () => {
+    haptic("selection");
+    setEmployeeId(null);
+    setDepartmentId(null);
+    setKinds([]);
+    setSearch("");
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -208,85 +232,58 @@ export default function HrFeedScreen() {
         {canFilter && filters && (
           <div className="mt-3 space-y-2">
             <div className="flex gap-1.5">
-              <select
-                aria-label="Фильтр по подразделению"
-                value={departmentId ?? ""}
-                onChange={(e) => {
-                  haptic("light");
-                  const next = e.target.value ? Number(e.target.value) : null;
-                  setDepartmentId(next);
-                  // Сотрудник из другого отдела больше не подходит: без этого
-                  // в списке оставались бы его записи, и отдел незаметно
-                  // превращался в фильтр по одному человеку.
-                  if (next !== null && employeeId !== null) {
-                    const chosen = filters.employees.find(
-                      (employee) => employee.id === employeeId,
-                    );
-                    if (chosen && chosen.department_id !== next) {
-                      setEmployeeId(null);
-                    }
-                  }
-                }}
-                className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
-              >
-                <option value="">Все подразделения</option>
-                {filters.departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.emoji ? `${d.emoji} ` : ""}
-                    {d.name}
-                  </option>
-                ))}
-              </select>
               <input
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Поиск по имени или должности"
                 aria-label="Поиск сотрудника"
-                className="min-h-9 w-full rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text placeholder:text-tg-hint"
+                className="min-h-10 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
               />
-              <select
-                aria-label="Фильтр по сотруднику"
-                value={employeeId ?? ""}
-                onChange={(e) => {
-                  haptic("light");
-                  setEmployeeId(e.target.value ? Number(e.target.value) : null);
-                }}
-                className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
-              >
-                <option value="">Все сотрудники</option>
-                {visibleEmployees.length === 0 && (
-                  <option value="" disabled>
-                    Никого не нашли
-                  </option>
-                )}
-                {visibleEmployees.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.display_name}
-                      {(e.position ?? e.badge)
-                        ? ` · ${e.position ?? e.badge}`
-                        : ""}
-                      {departmentId === null && e.department_id !== null
-                        ? ` · ${
-                            filters.departments.find(
-                              (d) => d.id === e.department_id,
-                            )?.name ?? "без отдела"
-                          }`
-                        : ""}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            {(employeeId !== null || departmentId !== null || kinds.length > 0) && (
               <button
                 type="button"
+                aria-expanded={filtersOpen}
                 onClick={() => {
                   haptic("selection");
-                  setEmployeeId(null);
-                  setDepartmentId(null);
-                  setKinds([]);
+                  setFiltersOpen(true);
                 }}
+                className="flex min-h-10 shrink-0 items-center gap-1 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
+              >
+                <Icon name="layout" size={16} />
+                Фильтр
+                {hasFilters && (
+                  <span className="grid h-4 min-w-4 place-items-center rounded-full bg-tg-link/15 px-1 text-2xs text-tg-text">
+                    {(employeeId !== null ? 1 : 0) + (departmentId !== null ? 1 : 0)}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Выбранное видно сразу: лист закрыт, а фильтр не «залип». */}
+            {(selectedDepartment || selectedEmployee) && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {selectedDepartment && (
+                  <Chip
+                    label={`${selectedDepartment.emoji ? `${selectedDepartment.emoji} ` : ""}${selectedDepartment.name}`}
+                    onClear={() => {
+                      setDepartmentId(null);
+                      setEmployeeId(null);
+                    }}
+                  />
+                )}
+                {selectedEmployee && (
+                  <Chip
+                    label={selectedEmployee.display_name}
+                    onClear={() => setEmployeeId(null)}
+                  />
+                )}
+              </div>
+            )}
+
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={resetFilters}
                 className="min-h-7 rounded-full px-2.5 text-xs text-tg-link"
               >
                 Сбросить фильтры
@@ -303,15 +300,12 @@ export default function HrFeedScreen() {
                     aria-pressed={active}
                     onClick={() => {
                       haptic("selection");
-                      setKinds(
-                        active ? kinds.filter((x) => x !== k) : [...kinds, k],
-                      );
+                      setKinds(active ? kinds.filter((x) => x !== k) : [...kinds, k]);
                     }}
                     className={[
                       "min-h-7 rounded-full px-2.5 text-xs transition-colors",
                       // P3.16: фильтр по типам — выбор, а не действие; заливка
-                      // главной кнопки остаётся за кнопками-действиями. Текст
-                      // нейтральный: ссылочный цвет на подложке — 3.1:1.
+                      // главной кнопки остаётся за кнопками-действиями.
                       active
                         ? "bg-tg-link/15 font-medium text-tg-text"
                         : "bg-tg-secondary-bg text-tg-hint",
@@ -341,9 +335,7 @@ export default function HrFeedScreen() {
             <div className="text-4xl" aria-hidden>
               📋
             </div>
-            <div className="mt-2 text-sm font-medium text-tg-text">
-              Пока тихо
-            </div>
+            <div className="mt-2 text-sm font-medium text-tg-text">Пока тихо</div>
             <div className="mt-1 text-xs text-tg-hint">
               Здесь появятся отметки и поручения.
             </div>
@@ -364,24 +356,248 @@ export default function HrFeedScreen() {
                     filters?.departments.find((d) => d.id === item.department_id)
                       ?.name ?? null
                   }
+                  onOpen={setCardEmployeeId}
                 />
               ))}
             </div>
           </section>
         ))}
       </div>
+
+      {filtersOpen && filters && (
+        <FiltersSheet
+          departments={filters.departments}
+          employees={visibleEmployees}
+          departmentId={departmentId}
+          employeeId={employeeId}
+          search={search}
+          onSearch={setSearch}
+          onDepartment={(id) => {
+            haptic("selection");
+            setDepartmentId(id);
+            if (id !== null && employeeId !== null) {
+              const chosen = filters.employees.find((e) => e.id === employeeId);
+              if (chosen && chosen.department_id !== id) setEmployeeId(null);
+            }
+          }}
+          onEmployee={(id) => {
+            haptic("selection");
+            setEmployeeId(id);
+          }}
+          onReset={resetFilters}
+          onClose={() => {
+            haptic("light");
+            setFiltersOpen(false);
+          }}
+        />
+      )}
+
+      {cardEmployeeId !== null && (
+        <EmployeeCardSheet
+          employeeId={cardEmployeeId}
+          onClose={() => setCardEmployeeId(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** Маленькая пилюля выбранного фильтра с крестиком. */
+function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs text-tg-text">
+      <span className="truncate">{label}</span>
+      <button
+        type="button"
+        onClick={onClear}
+        aria-label={`Убрать фильтр ${label}`}
+        className="shrink-0 text-tg-hint"
+      >
+        <Icon name="close" size={12} />
+      </button>
+    </span>
+  );
+}
+
+/**
+ * Лист фильтров: подразделение и сотрудник списками.
+ *
+ * Почему не `<select>`: нативный селект рисует стрелку сам, её нельзя ни
+ * выровнять, ни покрасить, а в узкой строке она обрезалась — на скриншоте это
+ * выглядело как «криво вставшие» стрелки сортировки. Список ещё и удобнее:
+ * видно отдел каждого человека.
+ */
+function FiltersSheet({
+  departments,
+  employees,
+  departmentId,
+  employeeId,
+  search,
+  onSearch,
+  onDepartment,
+  onEmployee,
+  onReset,
+  onClose,
+}: {
+  departments: { id: number; name: string; emoji: string | null }[];
+  employees: { id: number; display_name: string; department_id: number | null; position: string | null; badge: string | null }[];
+  departmentId: number | null;
+  employeeId: number | null;
+  search: string;
+  onSearch: (value: string) => void;
+  onDepartment: (id: number | null) => void;
+  onEmployee: (id: number | null) => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Фильтры ленты">
+      <button
+        type="button"
+        aria-label="Закрыть фильтры"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40"
+      />
+      <div className="relative max-h-[85%] overflow-y-auto rounded-t-card bg-tg-bg p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-tg-text">Фильтры</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
+            aria-label="Закрыть"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+
+        <h3 className="mt-3 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+          Подразделение
+        </h3>
+        <div className="mt-1 space-y-1">
+          <FilterRow
+            active={departmentId === null}
+            label="Все подразделения"
+            onSelect={() => onDepartment(null)}
+          />
+          {departments.map((department) => (
+            <FilterRow
+              key={department.id}
+              active={departmentId === department.id}
+              label={`${department.emoji ? `${department.emoji} ` : ""}${department.name}`}
+              tone={departmentTone(department.id)}
+              onSelect={() => onDepartment(department.id)}
+            />
+          ))}
+        </div>
+
+        <h3 className="mt-4 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+          Сотрудник
+        </h3>
+        <input
+          type="search"
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          placeholder="Поиск по имени или должности"
+          aria-label="Поиск сотрудника в фильтре"
+          className="mt-1 min-h-9 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
+        />
+        <div className="mt-1 space-y-1">
+          <FilterRow
+            active={employeeId === null}
+            label="Все сотрудники"
+            onSelect={() => onEmployee(null)}
+          />
+          {employees.length === 0 && (
+            <p className="px-2 py-1 text-xs text-tg-hint">Никого не нашли.</p>
+          )}
+          {employees.map((employee) => (
+            <FilterRow
+              key={employee.id}
+              active={employeeId === employee.id}
+              label={employee.display_name}
+              hint={employee.position ?? employee.badge ?? undefined}
+              tone={personTone(employee.id)}
+              onSelect={() => onEmployee(employee.id)}
+            />
+          ))}
+        </div>
+
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              onReset();
+              onClose();
+            }}
+            className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm text-tg-text"
+          >
+            Сбросить
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text"
+          >
+            Готово
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterRow({
+  active,
+  label,
+  hint,
+  tone,
+  onSelect,
+}: {
+  active: boolean;
+  label: string;
+  hint?: string;
+  tone?: { border: string; soft: string };
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onSelect}
+      className={[
+        "flex min-h-10 w-full items-center gap-2 rounded-tile px-2 text-left text-sm",
+        active ? "bg-tg-link/15 font-medium text-tg-text" : "text-tg-text",
+      ].join(" ")}
+    >
+      {tone && (
+        <span
+          className="h-3 w-3 shrink-0 rounded-full"
+          style={{ backgroundColor: tone.soft, border: `2px solid ${tone.border}` }}
+          aria-hidden
+        />
+      )}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {hint && <span className="shrink-0 text-2xs text-tg-hint">{hint}</span>}
+      {active && <Icon name="check" size={14} className="shrink-0 text-tg-link" />}
+    </button>
   );
 }
 
 function FeedRow({
   item,
   departmentName,
+  onOpen,
 }: {
   item: HrFeedItem;
   departmentName: string | null;
+  onOpen: (employeeId: number) => void;
 }) {
   const demo = isDemoItem(item);
+  const person = personTone(item.employee_id);
+  const dept = departmentTone(item.department_id);
+  const name = stripDemoPrefix(item.display_name);
+
   return (
     <article className="px-3 py-2.5">
       <div className="flex items-start gap-2">
@@ -390,9 +606,24 @@ function FeedRow({
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm text-tg-text break-words">
-            <span className="font-medium">
-              {stripDemoPrefix(item.display_name)}
-            </span>{" "}
+            <button
+              type="button"
+              disabled={item.employee_id === null}
+              onClick={() => {
+                if (item.employee_id === null) return;
+                haptic("light");
+                onOpen(item.employee_id);
+              }}
+              // Аутлайн вокруг имени: у каждого человека свой цвет, поэтому
+              // видно, где кончаются действия одного и начинаются другого.
+              className="inline-flex max-w-full items-center rounded-full px-2 py-0.5 align-middle font-medium text-tg-text active:opacity-70 disabled:opacity-100"
+              style={{
+                backgroundColor: person.soft,
+                border: `1px solid ${person.border}`,
+              }}
+            >
+              <span className="truncate">{name}</span>
+            </button>{" "}
             {demo ? (
               // Одна пометка на всю строку: ни плашки, ни префикса в имени.
               <span
@@ -403,14 +634,27 @@ function FeedRow({
                 тест
               </span>
             ) : (
-              <Badge text={item.badge} emoji={item.badge_emoji} />
+              <Badge
+                text={item.badge}
+                emoji={item.badge_emoji}
+                tone={dept}
+              />
             )}{" "}
             {item.text}
           </div>
-          <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tg-hint">
             <span>{fmtWhen(item.at)}</span>
-            {departmentName && <span>· {departmentName}</span>}
             <span>· {KIND_LABEL[item.kind]}</span>
+            {departmentName && (
+              // Подразделение — своей пилюлей: в ленте видно, откуда человек,
+              // даже если у него нет плашки должности.
+              <span
+                className="inline-flex max-w-full items-center rounded-full px-1.5 text-2xs text-tg-text"
+                style={{ backgroundColor: dept.soft, border: `1px solid ${dept.border}` }}
+              >
+                <span className="truncate">{departmentName}</span>
+              </span>
+            )}
           </div>
         </div>
       </div>

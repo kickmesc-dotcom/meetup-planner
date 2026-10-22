@@ -34,6 +34,8 @@ export interface HrEmployee {
   is_active: boolean;
   /** Тестовый пул `[BOT]` — помечается в интерфейсе. */
   is_demo: boolean;
+  /** Профиль открыт: коллеги видят активность и цифры в карточке. */
+  profile_public: boolean;
 }
 
 export interface HrDepartment {
@@ -76,6 +78,12 @@ export interface HrChecklistItem {
   /** Фото, загруженное в приложении (или подтянутое из Telegram). */
   photo_url?: string | null;
   note: string | null;
+  /** Расписание по дням недели: CSV ISO-номеров, null — каждый день. */
+  weekdays?: string | null;
+  /** «по четвергам» — готовая подпись с сервера. */
+  schedule_label?: string;
+  /** Пункт действует сегодня; false — виден, но ждёт своего дня. */
+  active?: boolean;
 }
 
 export interface HrChecklist {
@@ -140,6 +148,10 @@ export interface HrTask {
   my_part: string | null;
   progress_done: number;
   progress_total: number;
+  /** Расписание поручения по дням недели (null — каждый день). */
+  weekdays?: string | null;
+  schedule_label?: string;
+  active_today?: boolean;
   /** Фотоотчёты: превью показываются прямо в карточке. */
   photos?: HrPhoto[];
 }
@@ -208,6 +220,58 @@ export interface HrFeed {
 // --- Профиль и онбординг ---
 
 export const fetchEmployee = () => api<HrEmployee>("/api/me/employee");
+
+/** Открыть или закрыть свой профиль для коллег. */
+export const setProfileVisibility = (isPublic: boolean) =>
+  api<HrEmployee>("/api/me/profile-visibility", {
+    method: "POST",
+    body: JSON.stringify({ is_public: isPublic }),
+  });
+
+// --- Карточка коллеги -------------------------------------------------------
+
+export interface HrProfileActivity {
+  at: string;
+  kind: string;
+  text: string;
+  ref_id: number | null;
+}
+
+/**
+ * Карточка коллеги: кто он и что делал.
+ *
+ * Цифры и активность приходят только при `can_view`: закрытый профиль отдаёт
+ * имя, отдел и плашку — они и так видны в ленте.
+ */
+export interface HrProfileCard {
+  employee_id: number;
+  display_name: string;
+  department_id: number | null;
+  department_name: string | null;
+  position: string | null;
+  badge: string | null;
+  badge_emoji: string | null;
+  role: "employee" | "aup" | "admin";
+  role_label: string;
+  is_demo: boolean;
+  is_self: boolean;
+  can_manage: boolean;
+  profile_open: boolean;
+  can_view: boolean;
+  xp: number;
+  rank_title: string;
+  rank_emoji: string;
+  week_xp: number;
+  week_place: number | null;
+  week_total: number;
+  checklist_items: number;
+  tasks_done: number;
+  shifts_done: number;
+  activity: HrProfileActivity[];
+}
+
+export const fetchEmployeeCard = (employeeId: number) =>
+  api<HrProfileCard>(`/api/employees/${employeeId}/card`);
 
 export const submitOnboarding = (body: {
   department_id?: number | null;
@@ -524,6 +588,9 @@ export interface HrAdminTask {
   assignments: HrAdminTaskAssignment[];
   /** Фотоотчёты — руководитель видит их при приёмке работы. */
   photos?: HrPhoto[];
+  /** Расписание по дням недели: «по четвергам» (null — без расписания). */
+  weekdays?: string | null;
+  schedule_label?: string;
 }
 
 export interface HrSettings {
@@ -615,6 +682,8 @@ export const createAdminTask = (body: {
   comment?: string | null;
   /** Проверка руководителем: работа уходит в `on_review`. */
   requires_review?: boolean;
+  /** Дни недели (1 — Пн … 7 — Вс): «каждый четверг». Пусто — без расписания. */
+  weekdays?: number[] | null;
   /** Режим группового поручения и смена, на которую оно выдано. */
   mode?: TaskMode;
   shift_date?: string | null;

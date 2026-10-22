@@ -187,6 +187,7 @@ async def create_task(
     shift_date: date | None = None,
     parts: dict[int, str] | None = None,
     requires_review: bool = False,
+    weekdays: str | None = None,
 ) -> Task:
     clean_title = title.strip()
     if not clean_title:
@@ -219,6 +220,7 @@ async def create_task(
         mode=mode,
         shift_date=shift_date,
         requires_review=requires_review,
+        weekdays=weekdays,
         created_by_employee_id=creator.id,
     )
     session.add(task)

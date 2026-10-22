@@ -16,6 +16,7 @@ import DepartmentTag from "@/components/DepartmentTag";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
 
 /**
  * Кабинет управляющего.
@@ -50,6 +51,9 @@ export default function TeamScreen({
   // Поиск по фамилии, должности или отделу: в смену важно быстро найти
   // конкретного человека, а не листать весь штат.
   const [search, setSearch] = useState("");
+  // Карточка человека: тап по имени в сводке (активность — по видимости
+  // профиля, решает сервер).
+  const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
 
   if (dashboard.isError) {
     return (
@@ -195,7 +199,11 @@ export default function TeamScreen({
                   </div>
                 )}
                 {employees.map((employee) => (
-                  <EmployeeRow key={employee.employee_id} employee={employee} />
+                  <EmployeeRow
+                    key={employee.employee_id}
+                    employee={employee}
+                    onOpen={() => setCardEmployeeId(employee.employee_id)}
+                  />
                 ))}
               </div>
             </section>
@@ -251,6 +259,13 @@ export default function TeamScreen({
           </>
         )}
       </div>
+
+      {cardEmployeeId !== null && (
+        <EmployeeCardSheet
+          employeeId={cardEmployeeId}
+          onClose={() => setCardEmployeeId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -306,7 +321,14 @@ function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
   );
 }
 
-function EmployeeRow({ employee }: { employee: HrDashboardEmployee }) {
+function EmployeeRow({
+  employee,
+  onOpen,
+}: {
+  employee: HrDashboardEmployee;
+  /** Тап по человеку открывает его карточку (активность — по видимости). */
+  onOpen: () => void;
+}) {
   const meta = STATUS_META[employee.status];
   const progress =
     employee.checklist_total > 0
@@ -315,14 +337,22 @@ function EmployeeRow({ employee }: { employee: HrDashboardEmployee }) {
   return (
     <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 flex-1 truncate text-xs text-tg-text">
+        <button
+          type="button"
+          onClick={() => {
+            haptic("light");
+            onOpen();
+          }}
+          className="min-w-0 flex-1 truncate text-left text-xs text-tg-text"
+          title="Открыть карточку"
+        >
           {employee.display_name}
           {(employee.position ?? employee.badge) && (
             <span className="text-tg-hint">
               {" "}· {employee.position ?? employee.badge}
             </span>
           )}
-        </span>
+        </button>
         <DepartmentTag
           name={employee.department_name}
           emoji={employee.department_emoji}

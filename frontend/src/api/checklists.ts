@@ -31,6 +31,10 @@ export interface AdminChecklistItem {
   requires_photo: boolean;
   is_mandatory: boolean;
   condition_position: string | null;
+  /** Дни недели, в которые пункт действует: "1,4" (Пн и Чт), null — всегда. */
+  weekdays: string | null;
+  /** «по четвергам» — подпись считает сервер. */
+  schedule_label?: string;
   sort_order: number;
 }
 
@@ -50,6 +54,8 @@ export interface ChecklistItemInput {
   description?: string | null;
   requires_photo?: boolean;
   is_mandatory?: boolean;
+  /** ISO-дни недели: 1 — Пн … 7 — Вс. Пустой список — каждый день. */
+  weekdays?: number[];
   sort_order?: number;
 }
 

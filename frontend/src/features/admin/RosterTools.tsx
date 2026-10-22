@@ -3,11 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import { fetchDepartments } from "@/api/hr";
 import {
+  ROLE_LABEL,
   addEmployeeByTelegramId,
   createRosterSnapshot,
   deleteRosterSnapshot,
   fetchRosterSnapshots,
+  findEmployeeByTelegramId,
   restoreRosterSnapshot,
+  type HrRole,
   type HrRosterSnapshot,
 } from "@/api/hrOps";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
@@ -22,12 +25,22 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
  * Поле фильтрует ввод до цифр: ID копируют из Telegram, и любой мусор в строке
  * превращался бы в 422 вместо понятной подсказки.
  */
-export function AddPersonPanel({ onAdded }: { onAdded: () => void }) {
+export function AddPersonPanel({
+  onAdded,
+  onFound,
+}: {
+  onAdded: () => void;
+  /** Нашли существующего — открываем его карточку прямо в пуле. */
+  onFound?: (employeeId: number) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [tgId, setTgId] = useState("");
   const [name, setName] = useState("");
   const [position, setPosition] = useState("");
   const [departmentId, setDepartmentId] = useState("");
+  // Роль выдаётся здесь же: «человек выбрал не то» — обычная ситуация, и
+  // ждать, пока он сам зайдёт в профиль, не нужно.
+  const [role, setRole] = useState<HrRole>("employee");;
 
   const departments = useQuery({
     queryKey: ["hr", "departments"],
@@ -43,16 +56,38 @@ export function AddPersonPanel({ onAdded }: { onAdded: () => void }) {
         display_name: name.trim() || undefined,
         department_id: departmentId ? Number(departmentId) : undefined,
         position: position.trim() || undefined,
+        role,
       }),
     onSuccess: (card) => {
       haptic("success");
       setTgId("");
       setName("");
       setPosition("");
+      setRole("employee");
       onAdded();
-      void showAlert(`${card.display_name} заведён(а) в боте.`);
+      void showAlert(
+        `${card.display_name} заведён(а) в боте · ${ROLE_LABEL[card.role as HrRole] ?? card.role}.`,
+      );
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+
+  // Поиск по ID: человек мог уже завестись сам, и «добавить» его было бы
+  // ошибкой — нужна именно карточка существующего.
+  const find = useMutation({
+    mutationFn: () => findEmployeeByTelegramId(Number(tgId)),
+    onSuccess: (card) => {
+      haptic("success");
+      setOpen(false);
+      onFound?.(card.employee_id);
+      void showAlert(
+        `${card.display_name} уже в пуле · ${ROLE_LABEL[card.role as HrRole] ?? card.role}.`,
+      );
+    },
+    onError: () =>
+      void showAlert(
+        "Такого Telegram-ID в пуле нет. Проверь цифры или добавь человека — ID показывает команда /whoami.",
+      ),
   });
 
   return (
@@ -128,18 +163,56 @@ export function AddPersonPanel({ onAdded }: { onAdded: () => void }) {
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
+          <div>
+            <div className="text-xs text-tg-hint">Должность в боте (роль)</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {(Object.keys(ROLE_LABEL) as HrRole[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={role === value}
+                  onClick={() => {
+                    haptic("selection");
+                    setRole(value);
+                  }}
+                  className={[
+                    "min-h-9 rounded-full px-3 text-xs transition-colors",
+                    role === value
+                      ? "bg-tg-button text-tg-button-text"
+                      : "bg-tg-bg/60 text-tg-text",
+                  ].join(" ")}
+                >
+                  {ROLE_LABEL[value]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-2xs text-tg-hint">
+              Сотрудник видит только свои действия, руководитель — своё
+              подразделение, администратор — всё и получает кабинет.
+            </p>
+          </div>
 
-          <button
-            type="button"
-            disabled={tgId.length < 4 || add.isPending}
-            onClick={() => add.mutate()}
-            className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
-          >
-            {add.isPending ? "Добавляем…" : "Добавить в бот"}
-          </button>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              disabled={tgId.length < 4 || add.isPending}
+              onClick={() => add.mutate()}
+              className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+            >
+              {add.isPending ? "Добавляем…" : "Добавить в бот"}
+            </button>
+            <button
+              type="button"
+              disabled={tgId.length < 4 || find.isPending}
+              onClick={() => find.mutate()}
+              className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
+            >
+              {find.isPending ? "Ищем…" : "Найти по ID"}
+            </button>
+          </div>
           <p className="text-2xs text-tg-hint">
-            Доступ появится сразу: человек сможет открыть мини-апп и писать боту.
-            Существующий профиль не перезаписывается.
+            «Найти по ID» открывает карточку того, кто уже в пуле: там же можно
+            сменить роль. Существующий профиль не перезаписывается.
           </p>
         </div>
       )}

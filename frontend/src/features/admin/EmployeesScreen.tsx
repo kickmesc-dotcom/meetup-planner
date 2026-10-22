@@ -2,12 +2,14 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import {
+  ROLE_LABEL,
   fetchEmployeesPool,
   fireEmployee,
   patchEmployee,
   resetEmployeeProgress,
   restoreEmployee,
   type HrEmployeeCard,
+  type HrRole,
 } from "@/api/hrOps";
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
@@ -51,7 +53,12 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
       body,
     }: {
       id: number;
-      body: { display_name?: string; position?: string; badge?: string };
+      body: {
+        display_name?: string;
+        position?: string;
+        badge?: string;
+        role?: HrRole;
+      };
     }) => patchEmployee(id, body),
     onSuccess: () => {
       haptic("success");
@@ -150,7 +157,13 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
         className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
       />
 
-      <AddPersonPanel onAdded={refresh} />
+      <AddPersonPanel
+        onAdded={refresh}
+        onFound={(id) => {
+          setOpenId(id);
+          setSearch("");
+        }}
+      />
       <RosterSnapshotsPanel />
 
       {q.isLoading && <ListSkeleton rows={6} />}
@@ -203,6 +216,7 @@ function EmployeeRow({
     display_name?: string;
     position?: string;
     badge?: string;
+    role?: HrRole;
   }) => void;
   onReset: () => void;
   onFire: () => void;
@@ -211,6 +225,7 @@ function EmployeeRow({
   const [name, setName] = useState(card.display_name);
   const [position, setPosition] = useState(card.position ?? "");
   const [badge, setBadge] = useState(card.badge ?? "");
+  const [role, setRole] = useState<HrRole>(card.role as HrRole);
 
   const fired = card.fired_at !== null;
   return (
@@ -232,7 +247,11 @@ function EmployeeRow({
             {[card.department_name, card.position ?? card.badge]
               .filter(Boolean)
               .join(" · ") || "без отдела"}
+            {` · ${ROLE_LABEL[card.role as HrRole] ?? card.role}`}
             {fired ? " · уволен" : ""}
+          </span>
+          <span className="block truncate text-2xs text-tg-hint">
+            Telegram ID {card.telegram_id}
           </span>
         </span>
         <span className="shrink-0 text-tg-hint" aria-hidden>
@@ -284,6 +303,35 @@ function EmployeeRow({
             />
           </label>
 
+          {/* Роль: сотрудник / руководитель / администратор. Раньше её можно
+              было сменить только через «примерить роль» себе — выдать права
+              другому из админки было нечем. */}
+          <div>
+            <div className="text-xs text-tg-hint">Роль в боте</div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {(Object.keys(ROLE_LABEL) as HrRole[]).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={role === value}
+                  disabled={busy}
+                  onClick={() => {
+                    haptic("selection");
+                    setRole(value);
+                  }}
+                  className={[
+                    "min-h-9 rounded-full px-3 text-xs transition-colors disabled:opacity-50",
+                    role === value
+                      ? "bg-tg-button text-tg-button-text"
+                      : "bg-tg-bg/60 text-tg-text",
+                  ].join(" ")}
+                >
+                  {ROLE_LABEL[value]}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
@@ -293,6 +341,7 @@ function EmployeeRow({
                   display_name: name,
                   position,
                   badge,
+                  role,
                 })
               }
               className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"

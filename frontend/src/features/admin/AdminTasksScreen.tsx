@@ -52,6 +52,9 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [dueSeconds, setDueSeconds] = useState("00");
+  // Расписание по дням недели: «каждый четверг». Пусто — без расписания,
+  // тогда работает только срок. Понедельник — 1 (ISO), как в чек-листах.
+  const [taskWeekdays, setTaskWeekdays] = useState<number[]>([]);
 
   const departments = departmentsQ.data ?? [];
   const employees = (employeesQ.data ?? []).filter((e) => e.is_active);
@@ -89,6 +92,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         requires_review: requiresReview,
         shift_date: shiftDate || null,
         due_at: dueAt ? dueAt.toISOString() : null,
+        weekdays: taskWeekdays.length ? taskWeekdays : null,
       });
     },
     onSuccess: () => {
@@ -98,6 +102,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       setTitle("");
       setDescription("");
       setExpected("");
+      setTaskWeekdays([]);
       void showAlert("Поручение создано — сотрудник увидит его в приложении.");
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
@@ -251,6 +256,44 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           </label>
         </div>
 
+        <div>
+          <div className="text-xs text-tg-hint">Повторяется по дням (необязательно)</div>
+          <div className="mt-1 flex gap-1">
+            {WEEKDAY_OPTIONS.map(({ day, short, full }) => {
+              const selected = taskWeekdays.includes(day);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  aria-pressed={selected}
+                  aria-label={full}
+                  onClick={() => {
+                    haptic("selection");
+                    setTaskWeekdays((current) =>
+                      selected
+                        ? current.filter((d) => d !== day)
+                        : [...current, day].sort((a, b) => a - b),
+                    );
+                  }}
+                  className={[
+                    "min-h-9 flex-1 rounded-tile text-xs transition-colors",
+                    selected
+                      ? "bg-tg-button text-tg-button-text"
+                      : "bg-tg-bg/60 text-tg-hint",
+                  ].join(" ")}
+                >
+                  {short}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-2xs text-tg-hint">
+            {taskWeekdays.length
+              ? "В остальные дни поручение остаётся в списке, но помечено как не сегодняшнее."
+              : "Ничего не выбрано — срок работает как обычно."}
+          </p>
+        </div>
+
         <div className="flex flex-wrap gap-2">
           <Check
             checked={requiresPhoto}
@@ -358,6 +401,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   {task.due_at ? `⏰ ${formatPrecise(new Date(task.due_at))}` : "без срока"}
                   {task.requires_photo ? " · 📷" : ""}
                   {task.photos?.length ? ` · фото ${task.photos.length}` : ""}
+                  {task.schedule_label ? ` · 🗓 ${task.schedule_label}` : ""}
                 </div>
               </div>
               <span className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-hint">
@@ -416,6 +460,17 @@ function Check({
     </button>
   );
 }
+
+// Дни недели для расписания поручения (ISO: 1 — понедельник).
+const WEEKDAY_OPTIONS: { day: number; short: string; full: string }[] = [
+  { day: 1, short: "Пн", full: "понедельник" },
+  { day: 2, short: "Вт", full: "вторник" },
+  { day: 3, short: "Ср", full: "среда" },
+  { day: 4, short: "Чт", full: "четверг" },
+  { day: 5, short: "Пт", full: "пятница" },
+  { day: 6, short: "Сб", full: "суббота" },
+  { day: 7, short: "Вс", full: "воскресенье" },
+];
 
 /** Локальная дата `YYYY-MM-DD` — без UTC-сдвига `toISOString()`. */
 function localDate(d: Date): string {

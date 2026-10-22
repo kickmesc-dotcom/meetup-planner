@@ -374,6 +374,12 @@ class Employee(Base):
     learning_mode: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # «Профиль открыт»: коллеги могут открыть карточку с активностью. Закрытый
+    # профиль всё равно виден руководителю и администратору — иначе им нечем
+    # работать (`services/hr_profile`).
+    profile_public: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     # Ставка: полная или частичная (`RATES`). Видна управляющему в расписании
     # обучения и самому сотруднику в профиле.
     rate_type: Mapped[str] = mapped_column(
@@ -640,6 +646,10 @@ class ChecklistItem(Base):
     )
     # Показывать только сотрудникам с этой должностью (NULL — всем).
     condition_position: Mapped[str | None] = mapped_column(Text)
+    # Дни недели, в которые пункт действует: CSV из ISO-номеров (1 = Пн …
+    # 7 = Вс). NULL — каждый день. Пункт «по четвергам» виден всегда, но в
+    # остальные дни неактивен и не входит в прогресс (`services/weekdays`).
+    weekdays: Mapped[str | None] = mapped_column(String(32))
     sort_order: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
@@ -809,6 +819,10 @@ class Task(Base):
     requires_photo: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # Дни недели, в которые поручение «сегодняшнее» (CSV ISO-номеров, NULL —
+    # каждый день). В остальные дни оно остаётся в списке, но помечено как
+    # неактивное и не попадает в счётчики «горящего».
+    weekdays: Mapped[str | None] = mapped_column(String(32))
     comment: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default=TASK_NEW, server_default=TASK_NEW

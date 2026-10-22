@@ -20,10 +20,16 @@ import {
 import { showAlert, showConfirm } from "@/tg/webapp";
 
 vi.mock("@/api/hrOps", () => ({
+  ROLE_LABEL: {
+    employee: "Сотрудник",
+    aup: "Руководитель",
+    admin: "Администратор",
+  },
   addEmployeeByTelegramId: vi.fn(),
   createRosterSnapshot: vi.fn(),
   deleteRosterSnapshot: vi.fn(),
   fetchRosterSnapshots: vi.fn(),
+  findEmployeeByTelegramId: vi.fn(),
   restoreRosterSnapshot: vi.fn(),
 }));
 
@@ -63,6 +69,7 @@ describe("AddPersonPanel", () => {
     addMock.mockResolvedValue({
       employee_id: 1,
       user_id: 2,
+      telegram_id: 12345,
       display_name: "Аня",
       position: null,
       badge: null,
@@ -76,6 +83,7 @@ describe("AddPersonPanel", () => {
       is_active: true,
       fired_at: null,
       purge_after: null,
+      profile_public: true,
     });
     const onAdded = vi.fn();
     renderPanel(<AddPersonPanel onAdded={onAdded} />);
@@ -93,9 +101,13 @@ describe("AddPersonPanel", () => {
       display_name: undefined,
       department_id: undefined,
       position: undefined,
+      // Роль по умолчанию — сотрудник: права выдаются осознанно.
+      role: "employee",
     });
     await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1));
-    expect(alertMock).toHaveBeenCalledWith("Аня заведён(а) в боте.");
+    expect(alertMock).toHaveBeenCalledWith(
+      "Аня заведён(а) в боте · Сотрудник.",
+    );
   });
 
   it("не даёт отправить короткий ID", () => {

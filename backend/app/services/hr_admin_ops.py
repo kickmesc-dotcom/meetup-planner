@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.hr_models import (
     ONBOARDING_NEW,
+    ROLE_ADMIN,
     ROLES,
     TASK_DONE,
     TASK_FAILED,
@@ -126,6 +127,7 @@ class DisabledReminder:
 class EmployeeCard:
     employee_id: int
     user_id: int
+    telegram_id: int
     display_name: str
     position: str | None
     badge: str | None
@@ -139,6 +141,8 @@ class EmployeeCard:
     is_active: bool
     fired_at: datetime | None
     purge_after: datetime | None
+    # «Профиль открыт»: видят ли коллеги карточку с активностью.
+    profile_public: bool = True
 
 
 # --------------------------------------------------------------------------
@@ -576,6 +580,7 @@ async def directory(session: AsyncSession, viewer: Employee) -> list[EmployeeCar
         select(
             Employee,
             User.display_name,
+            User.telegram_id,
             Department.name,
         )
         .join(User, User.id == Employee.user_id)
@@ -591,6 +596,7 @@ async def directory(session: AsyncSession, viewer: Employee) -> list[EmployeeCar
         EmployeeCard(
             employee_id=int(employee.id),
             user_id=int(employee.user_id),
+            telegram_id=int(tg_id),
             display_name=str(name),
             position=employee.position,
             badge=employee.badge,
@@ -604,8 +610,9 @@ async def directory(session: AsyncSession, viewer: Employee) -> list[EmployeeCar
             is_active=bool(employee.is_active),
             fired_at=employee.fired_at,
             purge_after=employee.purge_after,
+            profile_public=bool(employee.profile_public),
         )
-        for employee, name, dept in rows
+        for employee, name, tg_id, dept in rows
     ]
 
 
@@ -690,6 +697,27 @@ async def employee_in_scope(
     return employee
 
 
+async def card_by_telegram_id(
+    session: AsyncSession, viewer: Employee, telegram_id: int
+) -> EmployeeCard:
+    """Карточка человека по Telegram-ID (для админки: выдать роль, проверить).
+
+    Ищем по `users.telegram_id`, а не по загруженному списку пула: список
+    ограничен `DIRECTORY_LIMIT`, и человек из хвоста выглядел бы «не найдённым».
+    Область видимости та же, что у пула: руководитель подразделения найдёт
+    только своих.
+    """
+    user = await session.scalar(select(User).where(User.telegram_id == int(telegram_id)))
+    if user is None:
+        raise AdminOpsError("employee_not_found")
+    employee = await session.scalar(
+        select(Employee).where(Employee.user_id == user.id, Employee.is_simulation.is_(False))
+    )
+    if employee is None:
+        raise AdminOpsError("employee_not_found")
+    return await _card_of(session, viewer, int(employee.id))
+
+
 async def update_profile(
     session: AsyncSession,
     viewer: Employee,
@@ -699,9 +727,25 @@ async def update_profile(
     position: str | None = None,
     badge: str | None = None,
     badge_emoji: str | None = None,
+    role: str | None = None,
 ) -> EmployeeCard:
-    """Переименование и правка должности/плашки. Пустая строка = очистить поле."""
+    """Переименование, должность/плашка и роль. Пустая строка = очистить поле.
+
+    Роль меняет только администратор: руководитель подразделения может
+    переименовать человека и поправить должность, но не выдать себе или соседу
+    права выше своих.
+    """
     employee = await employee_in_scope(session, viewer, employee_id)
+    if role is not None:
+        if not hr_access.is_admin(viewer):
+            raise AdminOpsError("role_admin_only")
+        if role not in ROLES:
+            raise AdminOpsError("bad_role")
+        if int(employee.id) == int(viewer.id) and role != ROLE_ADMIN:
+            # Себя понижать можно только осознанно — через «Примерить роль» в
+            # профиле, где рядом написано, как вернуть права обратно.
+            raise AdminOpsError("cannot_demote_self")
+        hr_access.set_role(employee, role)
     if display_name is not None:
         clean = display_name.strip()
         if not clean:

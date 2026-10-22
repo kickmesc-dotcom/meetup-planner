@@ -12,7 +12,7 @@ import { useUI } from "@/store/ui";
 
 afterEach(() => {
   cleanup();
-  useUI.setState({ tab: "tasks" });
+  useUI.setState({ tab: "feed" });
 });
 
 describe("TabBar", () => {
@@ -51,5 +51,13 @@ describe("TabBar", () => {
     render(<TabBar isAdmin={false} />);
     fireEvent.click(screen.getByText("Смена"));
     expect(useUI.getState().tab).toBe("checklist");
+  });
+
+  it("«События» стоят первыми — туда приложение и открывается", () => {
+    // Раунд 5: первый экран — события смены, а не личные задачи.
+    expect(useUI.getInitialState().tab).toBe("feed");
+    render(<TabBar isAdmin={false} />);
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0].textContent).toContain("События");
   });
 });

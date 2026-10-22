@@ -33,6 +33,7 @@ from app.db.hr_models import (
     Hall,
     ShiftHallChoice,
 )
+from app.services import weekdays
 
 
 class ChecklistError(Exception):
@@ -86,11 +87,25 @@ def applicable_items(
 
 
 def progress(items: list[ChecklistItem], completed_item_ids: set[int]) -> ChecklistProgress:
-    """Сколько пунктов закрыто из применимых."""
+    """Сколько пунктов закрыто из применимых.
+
+    `items` — уже отфильтрованные по дню: пункт «по четвергам» в остальные дни
+    виден в списке, но в прогресс не входит. Иначе в среду «Выполнено 3 из 10»
+    требовало бы закрыть то, чего сегодня делать не нужно.
+    """
     return ChecklistProgress(
         done=sum(1 for item in items if item.id in completed_item_ids),
         total=len(items),
     )
+
+
+def active_items(items: list[ChecklistItem], day: date) -> list[ChecklistItem]:
+    """Пункты, которые действуют в этот день недели.
+
+    Расписание хранится в `ChecklistItem.weekdays` ("1,4" — Пн и Чт). Пункт
+    без расписания действует всегда.
+    """
+    return [item for item in items if weekdays.is_active_on(item.weekdays, day)]
 
 
 def requires_photo(items: list[ChecklistItem], item_id: int) -> bool:
@@ -349,6 +364,10 @@ async def complete_item(
         raise ChecklistError("run_not_owned")
     if item.template_id != run.template_id:
         raise ChecklistError("item_not_in_run")
+    # Пункт с расписанием можно закрыть только в свой день: иначе «по
+    # четвергам» отмечалось бы во вторник, и к четвергу делать было бы нечего.
+    if not weekdays.is_active_on(item.weekdays, run.shift_date):
+        raise ChecklistError("item_inactive_today")
 
     existing = await session.scalar(
         select(ChecklistCompletion).where(
@@ -399,7 +418,8 @@ async def _refresh_run_status(
     position = employee.position if employee else None
     items = applicable_items(await items_of(session, template.id), position)
     done_ids = await completed_item_ids(session, run.id)
-    if progress(items, done_ids).finished:
+    today_items = active_items(items, run.shift_date)
+    if progress(today_items, done_ids).finished:
         if run.status != RUN_DONE:
             run.status = RUN_DONE
             run.completed_at = now or datetime.now(UTC)
@@ -430,6 +450,11 @@ class ChecklistItemView:
     # Подписанная ссылка на снимок, загруженный в приложении (None — фото нет
     # или оно пришло из старого потока и ещё не закешировано).
     photo_url: str | None = None
+    # Расписание по дням недели: `weekdays` — сырая строка из БД,
+    # `schedule_label` — «по четвергам», `active` — действует ли сегодня.
+    weekdays: str | None = None
+    schedule_label: str = ""
+    active: bool = True
 
 
 def _completion_photo_url(completion: ChecklistCompletion | None) -> str | None:
@@ -527,6 +552,7 @@ async def build_view(
         )
 
     items = applicable_items(await items_of(session, template.id), employee.position)
+    active_ids = {item.id for item in active_items(items, day)}
     run = await get_run(session, employee.id, template.id, day)
     completions = await completions_of(session, run.id) if run else {}
     views = [
@@ -543,6 +569,9 @@ async def build_view(
             else None,
             photo_url=_completion_photo_url(completions.get(item.id)),
             note=completions[item.id].note if item.id in completions else None,
+            weekdays=item.weekdays,
+            schedule_label=weekdays.label(item.weekdays),
+            active=item.id in active_ids,
         )
         for item in items
     ]
@@ -553,7 +582,7 @@ async def build_view(
         kind=template.kind,
         shift_date=day,
         status=run.status if run else RUN_IN_PROGRESS,
-        progress=progress(items, set(completions)),
+        progress=progress([item for item in items if item.id in active_ids], set(completions)),
         items=views,
         hall_id=hall.id if hall is not None else None,
         hall_name=hall.name if hall is not None else None,

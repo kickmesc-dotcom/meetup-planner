@@ -117,6 +117,8 @@ class NotificationSendIn(BaseModel):
 class EmployeeCardOut(BaseModel):
     employee_id: int
     user_id: int
+    # Telegram-ID нужен в админке: по нему ищут человека и выдают права.
+    telegram_id: int
     display_name: str
     position: str | None
     badge: str | None
@@ -130,6 +132,7 @@ class EmployeeCardOut(BaseModel):
     is_active: bool
     fired_at: datetime | None
     purge_after: datetime | None
+    profile_public: bool = True
 
 
 class EmployeesPoolOut(BaseModel):
@@ -144,6 +147,8 @@ class EmployeePatchIn(BaseModel):
     position: str | None = Field(None, max_length=64)
     badge: str | None = Field(None, max_length=64)
     badge_emoji: str | None = Field(None, max_length=8)
+    # Роль меняет только администратор (проверка — в сервисе).
+    role: str | None = Field(None, pattern="^(employee|aup|admin)$")
 
 
 class FireIn(BaseModel):
@@ -217,6 +222,9 @@ def _ops_error(exc: hr_admin_ops.AdminOpsError) -> HTTPException:
     if code in ("already_exists", "employee_fired"):
         # Это не ошибка ввода: ID верный, просто человек уже есть.
         return HTTPException(status.HTTP_409_CONFLICT, detail=code)
+    if code in ("role_admin_only", "cannot_demote_self"):
+        # Руководитель подразделения не выдаёт права выше своих.
+        return HTTPException(status.HTTP_403_FORBIDDEN, detail=code)
     return HTTPException(status.HTTP_400_BAD_REQUEST, detail=code)
 
 
@@ -401,6 +409,23 @@ async def add_employee(
     return _card(card)
 
 
+@router.get("/employees-pool/find", response_model=EmployeeCardOut)
+async def find_employee_by_telegram_id(
+    telegram_id: int, session: SessionDep, employee: AdminDep
+) -> EmployeeCardOut:
+    """Найти человека по Telegram-ID: выдать роль, проверить, есть ли он в пуле.
+
+    Отдельная ручка, а не поиск по уже загруженному списку: пул обрезан
+    `DIRECTORY_LIMIT`, и человек из хвоста списка «не находился» бы, хотя он
+    есть. Ищем напрямую по ID в базе.
+    """
+    try:
+        card = await hr_admin_ops.card_by_telegram_id(session, employee, telegram_id)
+    except hr_admin_ops.AdminOpsError as exc:
+        raise _ops_error(exc) from exc
+    return _card(card)
+
+
 @router.patch("/employees/{employee_id}", response_model=EmployeeCardOut)
 async def patch_employee(
     employee_id: int,
@@ -408,7 +433,7 @@ async def patch_employee(
     session: SessionDep,
     employee: AupDep,
 ) -> EmployeeCardOut:
-    """Переименовать, поменять должность или плашку. Пустая строка — очистить."""
+    """Переименовать, поменять должность/плашку или роль. Пустая строка — очистить."""
     try:
         card = await hr_admin_ops.update_profile(
             session,
@@ -418,6 +443,7 @@ async def patch_employee(
             position=body.position,
             badge=body.badge,
             badge_emoji=body.badge_emoji,
+            role=body.role,
         )
     except hr_admin_ops.AdminOpsError as exc:
         raise _ops_error(exc) from exc

@@ -52,6 +52,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0045_media.py",
     "0046_materials.py",
     "0047_checklist_halls.py",
+    "0050_weekday_schedule_profile.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -135,6 +136,11 @@ class _CapturingOp:
 
     def add_column(self, table: str, column: sa.Column, *_a: Any, **_kw: Any) -> None:
         self.tables.setdefault(table, set()).add(column.name)
+
+    def execute(self, *_a: Any, **_kw: Any) -> None:
+        # `op.execute` в миграциях — это данные (переименование «Серж-NEO»), а
+        # не схема: набор колонок от него не меняется.
+        return None
 
 
 def _apply_migration(path: Path, captured: _CapturingOp) -> None:

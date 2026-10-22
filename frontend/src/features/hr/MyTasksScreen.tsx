@@ -422,8 +422,16 @@ function TaskCard({
   const closed = status === "done" || status === "failed";
   const shift = fmtShift(task.shift_date);
   const group = task.progress_total > 1;
+  // Поручение «по четвергам» в среду остаётся в списке, но помечено: работа
+  // не сегодня. Скрывать его целиком было бы хуже — человек ищет его глазами.
+  const offSchedule = task.active_today === false && !closed;
   return (
-    <article className="rounded-card bg-tg-secondary-bg/60 p-3">
+    <article
+      className={[
+        "rounded-card p-3",
+        offSchedule ? "bg-tg-secondary-bg/30" : "bg-tg-secondary-bg/60",
+      ].join(" ")}
+    >
       <div className="flex items-start justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text break-words">
           {task.title}
@@ -441,6 +449,11 @@ function TaskCard({
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
         <span>⏰ {fmtDue(task.due_at)}</span>
         {shift && <span>🗓 смена {shift}</span>}
+        {task.schedule_label && (
+          <span>
+            🗓 {offSchedule ? `не сегодня · ${task.schedule_label}` : task.schedule_label}
+          </span>
+        )}
         {task.priority !== "normal" && (
           <span>приоритет: {PRIORITY_LABEL[task.priority]}</span>
         )}

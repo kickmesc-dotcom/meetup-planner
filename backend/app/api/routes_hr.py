@@ -50,9 +50,11 @@ from app.services import (
     hr_kpi,
     hr_links,
     hr_media,
+    hr_profile,
     hr_tasks,
     hr_training,
     hr_training_plan,
+    weekdays,
 )
 
 router = APIRouter(tags=["hr"])
@@ -88,6 +90,9 @@ class EmployeeOut(BaseModel):
     is_active: bool
     # Тестовый пул `[BOT]`: клиент показывает пометку и может спрятать его.
     is_demo: bool = False
+    # «Профиль открыт»: коллеги видят карточку с активностью. Управляющий и
+    # администратор видят её в любом случае.
+    profile_public: bool = True
 
 
 class OnboardingIn(BaseModel):
@@ -100,6 +105,50 @@ class OnboardingIn(BaseModel):
     # продолжается в рабочем сценарии, «Я уже запомнил» (false) — обычный
     # рабочий режим. Меняется и отдельно, из профиля.
     learning_mode: bool | None = None
+
+
+class ProfileActivityOut(BaseModel):
+    """Одно действие человека в его карточке (из той же ленты событий)."""
+
+    at: datetime
+    kind: str
+    text: str
+    ref_id: int | None = None
+
+
+class ProfileCardOut(BaseModel):
+    """Карточка коллеги: кто он и что делал. Цифры — только если видно."""
+
+    employee_id: int
+    display_name: str
+    department_id: int | None = None
+    department_name: str | None
+    position: str | None
+    badge: str | None = None
+    badge_emoji: str | None = None
+    role: str
+    role_label: str
+    is_demo: bool = False
+    is_self: bool = False
+    can_manage: bool = False
+    # Профиль открыт для коллег (человек сам решает в своём профиле).
+    profile_open: bool
+    # Смотрящему доступна активность и цифры.
+    can_view: bool
+    xp: int = 0
+    rank_title: str = ""
+    rank_emoji: str = ""
+    week_xp: int = 0
+    week_place: int | None = None
+    week_total: int = 0
+    checklist_items: int = 0
+    tasks_done: int = 0
+    shifts_done: int = 0
+    activity: list[ProfileActivityOut] = []
+
+
+class ProfileVisibilityIn(BaseModel):
+    is_public: bool
 
 
 class DepartmentOut(BaseModel):
@@ -132,6 +181,11 @@ class ChecklistItemOut(BaseModel):
     # Готовая ссылка на фото пункта (из приложения или кеша Telegram).
     photo_url: str | None = None
     note: str | None
+    # Расписание по дням недели: «по четвергам» и т. п. Пусто — каждый день.
+    weekdays: str | None = None
+    schedule_label: str = ""
+    # Пункт виден всегда, но сегодня не действует (ждёт своего дня недели).
+    active: bool = True
 
 
 class ChecklistOut(BaseModel):
@@ -202,6 +256,10 @@ class TaskOut(BaseModel):
     my_part: str | None = None
     # Снимки к поручению: приложение показывает их превью прямо в карточке.
     photos: list[PhotoOut] = []
+    # Расписание по дням недели: пусто — каждый день.
+    weekdays: str | None = None
+    schedule_label: str = ""
+    active_today: bool = True
 
 
 class TaskIssueIn(BaseModel):
@@ -283,6 +341,7 @@ async def _employee_out(
         experience=employee.experience,
         onboarding_state=employee.onboarding_state,
         learning_mode=bool(employee.learning_mode),
+        profile_public=bool(employee.profile_public),
         is_aup=hr_access.is_aup(employee),
         is_admin=hr_access.is_admin(employee),
         is_staff=hr_access.is_staff(employee, user),
@@ -323,6 +382,9 @@ def _task_out(
         progress_done=progress[0],
         progress_total=progress[1],
         photos=photos or [],
+        weekdays=task.weekdays,
+        schedule_label=weekdays.label(task.weekdays),
+        active_today=weekdays.is_active_on(task.weekdays, hr_checklists.local_today()),
     )
 
 
@@ -440,6 +502,9 @@ def _checklist_out(view: hr_checklists.ChecklistView) -> ChecklistOut:
                 photo_file_id=item.photo_file_id,
                 photo_url=item.photo_url,
                 note=item.note,
+                weekdays=item.weekdays,
+                schedule_label=item.schedule_label,
+                active=item.active,
             )
             for item in view.items
         ],
@@ -455,6 +520,63 @@ def _checklist_out(view: hr_checklists.ChecklistView) -> ChecklistOut:
 async def me_employee(
     session: SessionDep, user: CurrentUser, employee: EmployeeDep
 ) -> EmployeeOut:
+    return await _employee_out(session, employee, user)
+
+
+@router.get("/employees/{employee_id}/card", response_model=ProfileCardOut)
+async def employee_card(
+    employee_id: int, session: SessionDep, employee: EmployeeDep
+) -> ProfileCardOut:
+    """Карточка коллеги: активность и цифры — по правилу видимости профиля.
+
+    Тап по имени в ленте или табеле приводит сюда. Закрытый профиль отдаёт
+    только имя/отдел/плашку с `can_view=false` — приложение показывает
+    "Профиль закрыт" без запроса к администратору.
+    """
+    try:
+        card = await hr_profile.build_card(session, employee, employee_id)
+    except hr_profile.ProfileError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return ProfileCardOut(
+        employee_id=card.employee_id,
+        display_name=card.display_name,
+        department_id=card.department_id,
+        department_name=card.department_name,
+        position=card.position,
+        badge=card.badge,
+        badge_emoji=card.badge_emoji,
+        role=card.role,
+        role_label=card.role_label,
+        is_demo=card.is_demo,
+        is_self=card.is_self,
+        can_manage=card.can_manage,
+        profile_open=card.profile_open,
+        can_view=card.can_view,
+        xp=card.xp,
+        rank_title=card.rank_title,
+        rank_emoji=card.rank_emoji,
+        week_xp=card.week_xp,
+        week_place=card.week_place,
+        week_total=card.week_total,
+        checklist_items=card.checklist_items,
+        tasks_done=card.tasks_done,
+        shifts_done=card.shifts_done,
+        activity=[
+            ProfileActivityOut(at=item.at, kind=item.kind, text=item.text, ref_id=item.ref_id)
+            for item in card.activity
+        ],
+    )
+
+
+@router.post("/me/profile-visibility", response_model=EmployeeOut)
+async def set_profile_visibility(
+    body: ProfileVisibilityIn,
+    session: SessionDep,
+    user: CurrentUser,
+    employee: EmployeeDep,
+) -> EmployeeOut:
+    """Открыть или закрыть свой профиль для коллег (не для руководителя)."""
+    await hr_profile.set_visibility(session, employee, is_public=body.is_public)
     return await _employee_out(session, employee, user)
 
 

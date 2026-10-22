@@ -300,13 +300,20 @@ function ItemRow({
   onSaveNote: (note: string) => void;
 }) {
   const [note, setNote] = useState(item.note ?? "");
-  const photoBlocks = item.requires_photo && !item.done;
+  // Пункт с расписанием («по четвергам») виден всегда, но в остальные дни не
+  // отмечается и не входит в прогресс — сервер тоже откажет.
+  const inactive = item.active === false && !item.done;
+  const photoBlocks = item.requires_photo && !item.done && !inactive;
 
   return (
     <div
       className={[
         "rounded-card p-3",
-        item.done ? "bg-tg-secondary-bg/40" : "bg-tg-secondary-bg/60",
+        item.done
+          ? "bg-tg-secondary-bg/40"
+          : inactive
+            ? "bg-tg-secondary-bg/30"
+            : "bg-tg-secondary-bg/60",
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
@@ -314,9 +321,13 @@ function ItemRow({
           type="button"
           aria-pressed={item.done}
           aria-label={
-            photoBlocks ? "Пункт закрывается фотоотчётом" : "Отметить пункт"
+            inactive
+              ? `Не сегодня — ${item.schedule_label ?? "по расписанию"}`
+              : photoBlocks
+                ? "Пункт закрывается фотоотчётом"
+                : "Отметить пункт"
           }
-          disabled={busy || item.done || photoBlocks}
+          disabled={busy || item.done || photoBlocks || inactive}
           onClick={onToggle}
           className={[
             "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-tile border text-sm",
@@ -332,7 +343,11 @@ function ItemRow({
           <div
             className={[
               "text-sm",
-              item.done ? "text-tg-hint line-through" : "text-tg-text",
+              item.done
+                ? "text-tg-hint line-through"
+                : inactive
+                  ? "text-tg-hint"
+                  : "text-tg-text",
             ].join(" ")}
           >
             {item.title}
@@ -343,6 +358,12 @@ function ItemRow({
           {item.description && (
             <div className="mt-0.5 text-xs text-tg-hint">
               {item.description}
+            </div>
+          )}
+          {item.schedule_label && (
+            <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
+              <span aria-hidden>🗓</span>
+              {inactive ? `не сегодня · ${item.schedule_label}` : item.schedule_label}
             </div>
           )}
           {item.requires_photo && (
@@ -384,7 +405,7 @@ function ItemRow({
           )}
         </div>
 
-        {!item.done && (
+        {!item.done && !inactive && (
           <button
             type="button"
             onClick={onToggleNote}

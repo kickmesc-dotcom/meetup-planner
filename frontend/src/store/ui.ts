@@ -245,9 +245,10 @@ function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
 }
 
 export const useUI = create<UIState>((set, get) => ({
-  // SemiTaskBot: заходим сразу в «Мои задачи» — это первая кнопка внизу
-  // экрана и главный сценарий смены.
-  tab: "tasks",
+  // SemiTaskBot (раунд 5): приложение открывается на «Событиях» — это общий
+  // экран смены, где видно, что происходит у коллег. Свои задачи и чек-лист
+  // остаются рядом: они вторые и третьи в нижней полосе.
+  tab: "feed",
   setTab: (tab) => set({ tab }),
 
   zoom: "week",

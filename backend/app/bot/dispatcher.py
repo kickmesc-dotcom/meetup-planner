@@ -14,6 +14,7 @@ from aiogram.enums import ParseMode
 from aiogram.client.telegram import TelegramAPIServer
 
 from app.bot.handlers import (
+    changelog,
     help as help_handler,
     hr_alerts,
     hr_bot,
@@ -363,6 +364,7 @@ def get_dispatcher() -> Dispatcher:
         # Свой префикс `hra:` — с кнопками сценария сотрудника (`hr:`) не спорит.
         _dispatcher.include_router(hr_alerts.router)
         _dispatcher.include_router(whoami.router)
+        _dispatcher.include_router(changelog.router)
         _dispatcher.include_router(poll_answer.router)
         _dispatcher.include_router(next_meeting.router)
         _dispatcher.include_router(help_handler.router)

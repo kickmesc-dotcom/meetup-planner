@@ -11,18 +11,25 @@
  * лента узнаёт пул по префиксу и всё равно рисует одну метку.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HrFeedScreen from "./HrFeedScreen";
-import { fetchFeedFilters, fetchHrFeed, type HrFeedItem } from "@/api/hr";
+import {
+  fetchEmployeeCard,
+  fetchFeedFilters,
+  fetchHrFeed,
+  type HrFeedItem,
+} from "@/api/hr";
 
 vi.mock("@/api/hr", () => ({
   fetchHrFeed: vi.fn(),
   fetchFeedFilters: vi.fn(),
+  fetchEmployeeCard: vi.fn(),
 }));
 
 const feedMock = vi.mocked(fetchHrFeed);
 const filtersMock = vi.mocked(fetchFeedFilters);
+const cardMock = vi.mocked(fetchEmployeeCard);
 
 function item(overrides: Partial<HrFeedItem> = {}): HrFeedItem {
   return {
@@ -103,6 +110,50 @@ describe("HrFeedScreen (P1.8)", () => {
     expect(await screen.findByText("Пётр")).toBeTruthy();
     expect(screen.getByText("Су-шеф")).toBeTruthy();
     expect(screen.queryByTestId("feed-demo-mark")).toBeNull();
+  });
+
+  it("имя — пилюля с цветным аутлайном, по тапу открывается карточка", async () => {
+    cardMock.mockResolvedValue({
+      employee_id: 1,
+      display_name: "Пётр",
+      department_id: 1,
+      department_name: "Кухня",
+      position: null,
+      badge: "Су-шеф",
+      badge_emoji: "🍳",
+      role: "employee",
+      role_label: "Сотрудник",
+      is_demo: false,
+      is_self: false,
+      can_manage: false,
+      profile_open: true,
+      can_view: true,
+      xp: 12,
+      rank_title: "Стажёр",
+      rank_emoji: "🌱",
+      week_xp: 12,
+      week_place: 1,
+      week_total: 3,
+      checklist_items: 4,
+      tasks_done: 1,
+      shifts_done: 1,
+      activity: [],
+    });
+    renderFeed([item()]);
+
+    const name = await screen.findByText("Пётр");
+    const pill = name.closest("button") as HTMLButtonElement;
+    // Аутлайн и подложка — из палитры человека, поэтому имя не сливается с
+    // соседними строками ленты.
+    // jsdom нормализует hsl в rgba — важно, что цвет вообще задан и что он
+    // не равен цвету подложки карточки (то есть аутлайн виден).
+    expect(pill.style.border).toContain("solid");
+    expect(pill.style.border).toMatch(/rgba?\(/);
+    expect(pill.style.backgroundColor).toMatch(/rgba?\(/);
+
+    fireEvent.click(pill);
+    await screen.findByText("Последние действия");
+    expect(cardMock).toHaveBeenCalledWith(1);
   });
 
   it("не повторяет область видимости в пилюле и подзаголовке (P2.13)", async () => {

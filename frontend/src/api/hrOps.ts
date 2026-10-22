@@ -115,6 +115,8 @@ export const muteAllNotifications = (hours: number) =>
 export interface HrEmployeeCard {
   employee_id: number;
   user_id: number;
+  /** Telegram-ID: по нему человека ищут и выдают права. */
+  telegram_id: number;
   display_name: string;
   position: string | null;
   badge: string | null;
@@ -128,7 +130,17 @@ export interface HrEmployeeCard {
   is_active: boolean;
   fired_at: string | null;
   purge_after: string | null;
+  profile_public: boolean;
 }
+
+/** Роль человека в боте: от неё зависят лента, поручения и админка. */
+export type HrRole = "employee" | "aup" | "admin";
+
+export const ROLE_LABEL: Record<HrRole, string> = {
+  employee: "Сотрудник",
+  aup: "Руководитель",
+  admin: "Администратор",
+};
 
 export interface HrEmployeesPool {
   items: HrEmployeeCard[];
@@ -145,12 +157,20 @@ export const patchEmployee = (
     position?: string;
     badge?: string;
     badge_emoji?: string;
+    /** Роль: меняет только администратор (проверка на сервере). */
+    role?: HrRole;
   },
 ) =>
   api<HrEmployeeCard>(`/api/admin/employees/${employeeId}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
+
+/** Найти человека по Telegram-ID — в том числе если он уже есть в пуле. */
+export const findEmployeeByTelegramId = (telegramId: number) =>
+  api<HrEmployeeCard>(
+    `/api/admin/employees-pool/find?telegram_id=${encodeURIComponent(telegramId)}`,
+  );
 
 export const resetEmployeeProgress = (employeeId: number) =>
   api<HrEmployeeCard>(`/api/admin/employees/${employeeId}/reset-progress`, {

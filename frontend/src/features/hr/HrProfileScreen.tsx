@@ -5,6 +5,7 @@ import {
   fetchDepartments,
   fetchEmployee,
   fetchTraining,
+  setProfileVisibility,
   submitOnboarding,
   switchMyRole,
   type HrEmployee,
@@ -117,6 +118,18 @@ export default function HrProfileScreen() {
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
   });
+  // «Профиль открыт»: человек сам решает, видят ли коллеги его активность.
+  // Руководитель и админ видят её в любом случае — это написано рядом.
+  const visibility = useMutation({
+    mutationFn: (isPublic: boolean) => setProfileVisibility(isPublic),
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["hr-employee"], data);
+      void qc.invalidateQueries({ queryKey: ["hr-feed"] });
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+
   // Админ может примерить любую роль, не теряя кабинет (`is_staff`).
   const roleSwitch = useMutation({
     mutationFn: (role: HrEmployee["role"]) => switchMyRole(role),
@@ -213,21 +226,26 @@ export default function HrProfileScreen() {
         data-testid="profile-identity"
         className="rounded-card bg-tg-secondary-bg/60 p-3"
       >
-        <div className="flex items-center gap-3">
+        {/* Раунд 5: имя стояло в одной строке с плашкой и кнопкой «Изменить»
+            и обрезалось до «Серж-…». Теперь имя — своя строка, ниже плашки
+            отдельным рядом, а правка — иконкой справа. */}
+        <div className="flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-tg-bg/60 text-tg-hint">
             <Icon name="profile" size={26} />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate text-base font-semibold text-tg-text">
-                {me.display_name}
-              </span>
+            <div className="break-words text-base font-semibold leading-tight text-tg-text">
+              {me.display_name}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <Badge text={me.badge} emoji={me.badge_emoji} demo={me.is_demo} />
+              <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
+                {ROLE_LABEL[me.role]}
+              </span>
             </div>
-            <div className="text-xs text-tg-hint">
-              {ROLE_LABEL[me.role]}
-              {me.position ? ` · ${me.position}` : ""}
-            </div>
+            {me.position && (
+              <div className="mt-1 text-xs text-tg-hint">{me.position}</div>
+            )}
           </div>
           {!editing && (
             <button
@@ -236,9 +254,11 @@ export default function HrProfileScreen() {
                 haptic("light");
                 setEditingOverride(true);
               }}
-              className="min-h-11 shrink-0 rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-link"
+              className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-tile bg-tg-bg/60 text-tg-link"
+              aria-label="Изменить мои данные"
+              title="Изменить"
             >
-              Изменить
+              <Icon name="edit" size={18} />
             </button>
           )}
         </div>
@@ -275,6 +295,36 @@ export default function HrProfileScreen() {
         )}
 
         <p className="mt-2 text-xs text-tg-hint">{ROLE_HINT[me.role]}</p>
+
+        {/* Видимость профиля — рядом с «кто я», а не в глубине настроек: именно
+            здесь человек отвечает на вопрос «что обо мне видят коллеги». */}
+        <div className="mt-2 flex items-center gap-2 rounded-tile bg-tg-bg/50 p-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-tg-text">
+              {me.profile_public ? "Профиль открыт" : "Профиль закрыт"}
+            </div>
+            <div className="text-2xs text-tg-hint">
+              {me.profile_public
+                ? "Коллеги видят твою активность и цифры. Руководитель видит их всегда."
+                : "Коллеги видят только имя и отдел. Руководитель и админ — всё."}
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={me.profile_public}
+            disabled={visibility.isPending}
+            onClick={() => visibility.mutate(!me.profile_public)}
+            className={[
+              "min-h-9 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
+              me.profile_public
+                ? "bg-tg-button text-tg-button-text"
+                : "bg-tg-secondary-bg text-tg-text",
+            ].join(" ")}
+          >
+            {me.profile_public ? "Открыт" : "Закрыт"}
+          </button>
+        </div>
 
         {editing && (
           <div className="mt-3 border-t border-tg-hint/10 pt-3">

@@ -62,6 +62,7 @@ from app.services import (
     hr_settings,
     hr_simulation,
     hr_tasks,
+    weekdays,
 )
 
 router = APIRouter(tags=["hr-admin"])
@@ -133,6 +134,10 @@ class ItemOut(BaseModel):
     requires_photo: bool
     is_mandatory: bool
     condition_position: str | None
+    # Дни недели: "1,4" — Пн и Чт (NULL — каждый день). Подпись считает сервер,
+    # чтобы админка и экран смены не расходились в формулировках.
+    weekdays: str | None = None
+    schedule_label: str = ""
     sort_order: int
 
 
@@ -160,6 +165,8 @@ class ItemIn(BaseModel):
     requires_photo: bool = False
     is_mandatory: bool = True
     condition_position: str | None = None
+    # Список ISO-дней (1 = Пн … 7 = Вс). Пусто — каждый день.
+    weekdays: list[int] | None = None
     sort_order: int | None = None
 
 
@@ -169,6 +176,8 @@ class ItemPatch(BaseModel):
     requires_photo: bool | None = None
     is_mandatory: bool | None = None
     condition_position: str | None = None
+    # `None` — не менять; `[]` — снять расписание (каждый день).
+    weekdays: list[int] | None = None
     sort_order: int | None = None
 
 
@@ -257,6 +266,8 @@ class TaskIn(BaseModel):
     # Проверка руководителем: сотрудник сдаёт работу, руководитель принимает
     # или возвращает на доработку (MEGAPROMT2).
     requires_review: bool = False
+    # Дни недели (1 = Пн … 7 = Вс): «каждый четверг». Пусто — без расписания.
+    weekdays: list[int] | None = None
 
 
 class TaskStatusIn(BaseModel):
@@ -338,6 +349,9 @@ class TaskAdminOut(BaseModel):
     assignments: list[TaskAssignmentOut] = []
     # Снимки, которые сотрудник приложил в приложении или прислал в чат.
     photos: list[TaskAdminPhotoOut] = []
+    # Расписание по дням недели: «по четвергам» (пусто — без расписания).
+    weekdays: str | None = None
+    schedule_label: str = ""
 
 
 class ReportOut(BaseModel):
@@ -427,6 +441,8 @@ def _item_out(item: ChecklistItem) -> ItemOut:
         requires_photo=bool(item.requires_photo),
         is_mandatory=bool(item.is_mandatory),
         condition_position=item.condition_position,
+        weekdays=item.weekdays,
+        schedule_label=weekdays.label(item.weekdays),
         sort_order=item.sort_order,
     )
 
@@ -595,6 +611,7 @@ async def create_item(
         requires_photo=body.requires_photo,
         is_mandatory=body.is_mandatory,
         condition_position=body.condition_position,
+        weekdays=weekdays.dump(body.weekdays or []) if body.weekdays is not None else None,
         sort_order=body.sort_order,
     )
     session.add(item)
@@ -620,6 +637,8 @@ async def patch_item(
         item.is_mandatory = body.is_mandatory
     if body.condition_position is not None:
         item.condition_position = body.condition_position or None
+    if body.weekdays is not None:
+        item.weekdays = weekdays.dump(body.weekdays)
     if body.sort_order is not None:
         item.sort_order = body.sort_order
     await session.commit()
@@ -853,6 +872,8 @@ async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
         requires_review=bool(task.requires_review),
         progress_done=sum(1 for row in rows if row.status == TASK_DONE),
         progress_total=len(rows),
+        weekdays=task.weekdays,
+        schedule_label=weekdays.label(task.weekdays),
         photos=await _task_photo_outs(session, int(task.id)),
         assignments=[
             TaskAssignmentOut(
@@ -921,6 +942,9 @@ async def create_task(
             shift_date=body.shift_date,
             parts=body.parts,
             requires_review=body.requires_review,
+            weekdays=(
+                weekdays.dump(body.weekdays) if body.weekdays is not None else None
+            ),
         )
     except hr_tasks.TaskError as exc:
         await session.rollback()

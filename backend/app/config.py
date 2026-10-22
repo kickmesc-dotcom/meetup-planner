@@ -5,6 +5,8 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+DEFAULT_REPO = "kickmesc-dotcom/meetup-planner"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -36,6 +38,11 @@ class Settings(BaseSettings):
     chukhan_cron: str = Field("0 12 * * 1", alias="CHUKHAN_CRON")
 
     initdata_max_age_seconds: int = 86400
+
+    # `/changelog`: откуда брать коммиты. Токен не обязателен для публичного
+    # репозитория, но с ним выше лимит GitHub и работает приватный репо.
+    github_repo: str = Field(DEFAULT_REPO, alias="GITHUB_REPO")
+    github_token: str = Field("", alias="GITHUB_TOKEN")
 
     @property
     def whitelist_pairs(self) -> list[tuple[int, str]]:

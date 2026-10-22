@@ -116,6 +116,61 @@ describe("ChecklistScreen", () => {
     expect(screen.getByText(/Сегодня работаешь:/)).toBeTruthy();
   });
 
+  it("пункт «по четвергам» виден, но сегодня не отмечается", async () => {
+    vi.spyOn(hrApi, "fetchChecklist").mockImplementation(async (kind) =>
+      kind === "close"
+        ? {
+            run_id: null,
+            template_id: 9,
+            template_title: "Закрытие смены",
+            kind: "close",
+            shift_date: "2026-10-19",
+            status: "in_progress",
+            done: 0,
+            total: 0,
+            progress_text: "Выполнено 0 из 0",
+            items: [],
+            needs_hall: false,
+            hall_id: null,
+            hall_name: null,
+          }
+        : {
+            run_id: null,
+            template_id: 5,
+            template_title: "Открытие",
+            kind: "shift",
+            shift_date: "2026-10-19",
+            status: "in_progress",
+            done: 0,
+            total: 1,
+            progress_text: "Выполнено 0 из 1",
+            items: [
+              item,
+              {
+                ...item,
+                id: 11,
+                title: "Сдать выручку",
+                weekdays: "4",
+                schedule_label: "по четвергам",
+                active: false,
+              },
+            ],
+            needs_hall: false,
+            hall_id: 1,
+            hall_name: "Первый зал",
+          },
+    );
+
+    renderScreen();
+    // Пункт не исчезает: сотрудник должен видеть, что он есть и когда нужен.
+    expect(await screen.findByText("Сдать выручку")).toBeTruthy();
+    expect(screen.getByText("не сегодня · по четвергам")).toBeTruthy();
+    const boxes = screen.getAllByRole("button", { name: /Отметить пункт|Не сегодня/ });
+    const inactive = boxes.find((box) => (box.getAttribute("aria-label") ?? "").startsWith("Не сегодня"));
+    expect(inactive).toBeTruthy();
+    expect((inactive as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it("вкладка «Закрытие» показывает общий чек-лист с фото-пунктом", async () => {
     const fetch = vi.spyOn(hrApi, "fetchChecklist").mockImplementation(
       async (kind) =>
