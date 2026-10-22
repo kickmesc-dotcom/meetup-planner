@@ -43,6 +43,26 @@ class Settings(BaseSettings):
 
     initdata_max_age_seconds: int = 86400
 
+    # --- Вход без Telegram (B2B_PLATFORM_PLAN, 2.1) -----------------------
+    # Куда ведёт ссылка из письма и с какого адреса уходят письма.
+    app_public_url: str = Field("", alias="APP_PUBLIC_URL")
+    mail_from: str = Field("SemiTaskBot <no-reply@localhost>", alias="MAIL_FROM")
+    # Транспорт выбирается тем, что заполнено: Resend (HTTP) или SMTP (любой
+    # провайдер, включая Яндекс 360). Пусто — режим «лог» без отправки.
+    resend_api_key: str = Field("", alias="RESEND_API_KEY")
+    smtp_host: str = Field("", alias="SMTP_HOST")
+    smtp_port: int = Field(465, alias="SMTP_PORT")
+    smtp_user: str = Field("", alias="SMTP_USER")
+    smtp_password: str = Field("", alias="SMTP_PASSWORD")
+    smtp_starttls: bool = Field(True, alias="SMTP_STARTTLS")
+    auth_session_days: int = Field(30, alias="AUTH_SESSION_DAYS")
+
+    @property
+    def link_base(self) -> str:
+        """База для ссылок в письмах: без хвостового слэша."""
+        raw = self.app_public_url or self.mini_app_url
+        return raw.rstrip("/")
+
     # `/changelog`: откуда брать коммиты. Токен не обязателен для публичного
     # репозитория, но с ним выше лимит GitHub и работает приватный репо.
     github_repo: str = Field(DEFAULT_REPO, alias="GITHUB_REPO")

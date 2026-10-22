@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from contextvars import ContextVar
 from typing import Annotated
 
 from fastapi import Depends, Header, HTTPException, status
@@ -24,6 +25,12 @@ async def db_session() -> AsyncIterator[AsyncSession]:
 
 
 SessionDep = Annotated[AsyncSession, Depends(db_session)]
+
+# Каким способом человек вошёл в ЭТОМ запросе. Нужно ровно для одного
+# различия: почтовый вход без членства не имеет права завести сотрудника в
+# первой организации, а телеграм-вход (и ссылка доступа) — имеет, потому что
+# человек пришёл из конкретного бота/по приглашению администратора.
+session_auth: ContextVar[bool] = ContextVar("session_auth", default=False)
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
@@ -113,6 +120,20 @@ async def current_user(
             return user
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="missing_authorization")
 
+    # Вход по почте: `Authorization: Bearer <токен сессии>` (шаг 2.1).
+    scheme, _, bearer = authorization.partition(" ")
+    if scheme.lower() == "bearer":
+        from app.services import accounts
+
+        resolved = await accounts.resolve_session(session, bearer.strip())
+        if resolved is None:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="session_invalid")
+        user, org_id = resolved
+        session_auth.set(True)
+        if org_id is not None:
+            set_org(org_id)
+        return user
+
     init_data = _strip_tma_prefix(authorization)
     # Мини-апп мог быть открыт через бота ЛЮБОЙ организации: подпись `initData`
     # считается от токена конкретного бота (B2B_PLATFORM_PLAN, шаг 1.6).
@@ -171,6 +192,12 @@ async def current_user(
         await session.commit()
         await session.refresh(user)
 
+    if matched_org is not None:
+        # Человек пришёл через бота этой организации — значит он её сотрудник.
+        # Роль существующего членства не трогаем: иначе вход понижал бы
+        # управляющего до staff (см. `orgs.ensure_member`).
+        await orgs.ensure_member(session, org_id=matched_org, user_id=user.id)
+
     return user
 
 
@@ -226,6 +253,13 @@ async def current_employee(
         finally:
             hr_simulation.deactivate(token)
         return
+
+    # Почтовый вход без членства: приглашение ещё не принято (шаг 2.2).
+    # Без этой проверки онбординг молча завёл бы человеку сотрудника в
+    # ПЕРВОЙ организации — то есть в чужом клиенте. Телеграм-вход сюда не
+    # попадает: он уже проставил членство по боту, через который пришли.
+    if session_auth.get() and not await orgs.orgs_of(session, user.id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="org_required")
 
     try:
         employee = await hr_access.ensure_employee(session, user)

@@ -56,6 +56,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0053_tenancy.py",
     "0054_tenant_columns.py",
     "0055_org_bot.py",
+    "0056_accounts.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -94,6 +95,9 @@ HR_TABLES = {
     # 0053_tenancy: организации и членство (B2B_PLATFORM_PLAN, фаза 1).
     "organizations",
     "organization_members",
+    # 0056_accounts: вход по почте и сессии (не тенантные таблицы).
+    "auth_sessions",
+    "password_resets",
 }
 
 

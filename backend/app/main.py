@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
     routes_admin,
     routes_app_access,
+    routes_auth,
     routes_availability,
     routes_birthdays,
     routes_calendar,
@@ -53,6 +54,7 @@ from app.bot.scheduler import (
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_seed import seed_hr
+from app.api.deps import session_auth
 from app.db.org_models import DEFAULT_ORG_ID, reset_org, set_org
 from app.db.seed import seed_users
 
@@ -331,9 +333,11 @@ def create_app() -> FastAPI:
         организации увидел бы данные первой.
         """
         token = set_org(DEFAULT_ORG_ID)
+        auth_token = session_auth.set(False)
         try:
             return await call_next(request)
         finally:
+            session_auth.reset(auth_token)
             reset_org(token)
 
     app.add_middleware(
@@ -344,6 +348,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(bot_webhook.router)
+    # Вход по почте: регистрация, вход, сессии, сброс (B2B_PLATFORM_PLAN, 2.1).
+    app.include_router(routes_auth.router, prefix="/api")
     app.include_router(routes_users.router, prefix="/api")
     # Вход в веб-версию по ссылке (вне Telegram, где нет initData).
     app.include_router(routes_app_access.router, prefix="/api")

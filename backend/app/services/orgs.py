@@ -131,6 +131,27 @@ async def add_member(
     return row
 
 
+async def ensure_member(
+    session: AsyncSession, *, org_id: int, user_id: int, role: str = "staff"
+) -> OrganizationMember:
+    """Гарантировать членство, НЕ трогая уже выданную роль.
+
+    Отличие от `add_member` принципиальное: тот меняет роль на присланную, и
+    вызов «на всякий случай» при каждом входе снимал бы у управляющего его
+    права. Здесь роль ставится только новой строке.
+    """
+    if role not in ORG_ROLES:
+        raise OrgsError("bad_role")
+    existing = await member(session, org_id=org_id, user_id=user_id)
+    if existing is not None:
+        return existing
+    row = OrganizationMember(org_id=org_id, user_id=user_id, role=role)
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return row
+
+
 async def orgs_of(session: AsyncSession, user_id: int) -> list[Organization]:
     """Все организации, где человек состоит (для переключателя в UI)."""
     rows = await session.scalars(

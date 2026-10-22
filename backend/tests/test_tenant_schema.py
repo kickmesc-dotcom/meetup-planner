@@ -135,7 +135,21 @@ TENANT_ROOT: set[str] = {"organizations"}
 #   `key`. Пока один контур; при переходе на несколько клиентов ключ станет
 #   составным `(org_id, key)`, и таблица переедет в TENANT_TABLES. Это
 #   единственная оставшаяся строка долга, и она записана в плане.
-GLOBAL_TABLES: set[str] = {"users", "admin_config"}
+GLOBAL_TABLES: set[str] = {
+    "users",
+    "admin_config",
+    # Вход и сброс живут вне тенанта: аутентификация происходит ДО того, как
+    # известно, в какую организацию идёт запрос (человек может состоять в
+    # двух). Токен проверяется без фильтра, иначе вход зависел бы от угаданной
+    # организации.
+    "auth_sessions",
+    "password_resets",
+}
+
+# Глобальные таблицы, которым `org_id` нужен как ДАННЫЕ, а не как фильтр:
+# сессия помнит, в какой организации выдан вход, но сама не является её
+# содержимым.
+ORG_ID_ALLOWED_GLOBAL: set[str] = {"auth_sessions"}
 
 
 def test_lists_do_not_overlap() -> None:
@@ -164,7 +178,7 @@ def test_tenant_tables_have_org_id() -> None:
 
 def test_global_tables_still_have_no_org_id() -> None:
     """Расхождение списка с реальностью ловится сразу, а не через полгода."""
-    for name in sorted(GLOBAL_TABLES):
+    for name in sorted(GLOBAL_TABLES - ORG_ID_ALLOWED_GLOBAL):
         assert "org_id" not in Base.metadata.tables[name].columns, (
             f"{name} уже получила org_id — перенесите её в TENANT_TABLES"
         )

@@ -68,7 +68,7 @@ async def session():
     engine = create_async_engine("sqlite+aiosqlite://")
     tables = [
         Base.metadata.tables[name]
-        for name in ("organizations", "users", "employees")
+        for name in ("organizations", "users", "employees", "organization_members")
     ]
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))

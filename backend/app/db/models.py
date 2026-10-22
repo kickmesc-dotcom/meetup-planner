@@ -28,9 +28,27 @@ from app.db.org_models import OrgScoped
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        # Почта — основной вход B2B-клиента, поэтому уникальна. Храним её в
+        # нижнем регистре (`services.accounts` нормализует), иначе один и тот
+        # же адрес в двух написаниях завёл бы два аккаунта.
+        Index("uq_users_email", "email", unique=True),
+    )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    # На проде BIGSERIAL (как было), в sqlite-тестах INTEGER: иначе аккаунт
+    # по почте нельзя завести без явного id — sqlite не автоинкрементит BIGINT.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    # Telegram — ОДИН ИЗ способов входа (B2B_PLATFORM_PLAN, шаг 2.1), поэтому
+    # у аккаунта, заведённого по почте, его нет. NULL'ов в уникальном индексе
+    # PG допускает сколько угодно.
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    email: Mapped[str | None] = mapped_column(String(255))
+    # PBKDF2-хеш (`pbkdf2_sha256$итерации$соль$хеш`). Пароля в открытом виде
+    # нет нигде: ни в базе, ни в логах.
+    password_hash: Mapped[str | None] = mapped_column(Text)
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     display_name: Mapped[str] = mapped_column(Text, nullable=False)
     username: Mapped[str | None] = mapped_column(Text)
     # ⚠️ ПРОТУХАЮЩАЯ TG file-ссылка (`…/file/bot<token>/<file_path>`): TG-овский
@@ -1127,6 +1145,10 @@ def _user_default_color(_mapper, _conn, target: User) -> None:
 # импорт видит все таблицы. Строку держим последней — чтобы `users` уже была
 # зарегистрирована в `Base.metadata` (у hr-моделей на неё FK).
 from app.db import hr_models  # noqa: E402,F401  (регистрация таблиц)
+
+# Вход без Telegram: сессии и одноразовые ссылки сброса (фаза 2).
+# Импорт после `users`: у обеих таблиц на неё FK.
+from app.db import auth_models  # noqa: E402,F401  (регистрация таблиц)
 
 # Тенантский фильтр запросов (B2B_PLATFORM_PLAN, 1.3). Импорт внизу: слушатель
 # вешается на Session в момент импорта, а без него `org_id` остаётся просто

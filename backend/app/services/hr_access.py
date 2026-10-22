@@ -94,11 +94,18 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
 
     employee = Employee(
         user_id=user.id,
-        role=default_role_for(user.telegram_id),
+        role=default_role_for(user.telegram_id or 0),
         onboarding_state=ONBOARDING_NEW,
     )
     session.add(employee)
     await session.flush()
+    # Сотрудник без членства — это сотрудник, которого не видно ни в одной
+    # организации: связь создаём сразу, в организации из контекста.
+    from app.services import orgs
+
+    await orgs.ensure_member(
+        session, org_id=employee.org_id, user_id=user.id
+    )
     log.info("hr.employee_created", user_id=user.id, role=employee.role)
     return employee
 

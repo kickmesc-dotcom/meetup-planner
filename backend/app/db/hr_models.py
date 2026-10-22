@@ -332,7 +332,11 @@ class Employee(OrgScoped, Base):
         Index("ix_employees_simulation", "is_simulation"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # На проде BIGSERIAL, в sqlite-тестах INTEGER: без этого профиль
+    # сотрудника нельзя создать, не задав id вручную.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
     # `org_id` приходит из OrgScoped. `user_id` остаётся глобальным: один
     # человек — одна личность, членство живёт в `organization_members`.
     user_id: Mapped[int] = mapped_column(
