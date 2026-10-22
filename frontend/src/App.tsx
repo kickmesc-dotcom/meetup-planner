@@ -87,6 +87,29 @@ export default function App() {
   }, [setTab]);
 
   if (me.isPending || users.isPending) {
+    // На ПК скелет тоже широкий: иначе при загрузке на секунду мелькала бы
+    // мобильная колонка 560px, а потом каркас «прыгал» в дэшборд.
+    if (isDesktop) {
+      return (
+        <div className="flex h-full w-full animate-pulse">
+          <div className="w-64 shrink-0 space-y-3 border-r border-tg-hint/10 bg-tg-secondary-bg/30 p-4">
+            <div className="h-9 rounded-tile bg-tg-secondary-bg/70" />
+            <div className="h-4 rounded-tile bg-tg-secondary-bg/50" />
+            <div className="h-10 rounded-tile bg-tg-secondary-bg/60" />
+            <div className="h-10 rounded-tile bg-tg-secondary-bg/60" />
+            <div className="h-10 rounded-tile bg-tg-secondary-bg/60" />
+            <div className="h-10 rounded-tile bg-tg-secondary-bg/60" />
+          </div>
+          <div className="flex-1 space-y-3 p-6">
+            <div className="h-10 w-1/3 rounded-card bg-tg-secondary-bg/60" />
+            <div className="h-12 rounded-card bg-tg-secondary-bg/50" />
+            <div className="h-24 rounded-card bg-tg-secondary-bg/40" />
+            <div className="h-24 rounded-card bg-tg-secondary-bg/40" />
+            <div className="flex-1 rounded-card bg-tg-secondary-bg/30" />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="mx-auto flex h-full w-full max-w-[560px] flex-col p-4 gap-3 animate-pulse">
         <div className="h-12 rounded-card bg-tg-secondary-bg/60" />
