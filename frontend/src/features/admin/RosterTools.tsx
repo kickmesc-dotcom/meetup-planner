@@ -15,6 +15,7 @@ import {
 } from "@/api/hrOps";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 
 /**
  * Ручное заведение по Telegram-ID.
@@ -107,7 +108,7 @@ export function AddPersonPanel({
           Добавить по Telegram ID
         </span>
         <span className="shrink-0 text-tg-hint" aria-hidden>
-          {open ? "▾" : "▸"}
+          <ChevronToggle open={open} />
         </span>
       </button>
 
@@ -323,7 +324,7 @@ export function RosterSnapshotsPanel() {
           Снапшоты состава
         </span>
         <span className="shrink-0 text-tg-hint" aria-hidden>
-          {open ? "▾" : "▸"}
+          <ChevronToggle open={open} />
         </span>
       </button>
 

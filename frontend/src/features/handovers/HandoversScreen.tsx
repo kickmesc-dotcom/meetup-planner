@@ -18,6 +18,7 @@ import { humanizeApiError } from "@/api/client";
 import BottomSheet from "@/features/actions/BottomSheet";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -266,11 +267,13 @@ function HandoverCard({
           haptic("light");
           setExpanded((v) => !v);
         }}
-        className="mt-2 min-h-8 rounded-tile bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
+        aria-expanded={expanded}
+        className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-tile bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
       >
         {handover.items_count > 0
-          ? `Открытых пунктов: ${handover.items_count} ${expanded ? "▴" : "▾"}`
-          : "Открытых пунктов нет ▾"}
+          ? `Открытых пунктов: ${handover.items_count}`
+          : "Открытых пунктов нет"}
+        <ChevronToggle open={expanded} size={12} />
       </button>
 
       {expanded && (

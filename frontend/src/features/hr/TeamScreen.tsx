@@ -14,6 +14,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import DepartmentTag from "@/components/DepartmentTag";
 import Icon, { type IconName } from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
@@ -256,7 +257,7 @@ export default function TeamScreen({
                     Рабочие часы и уведомления
                   </span>
                   <span className="text-tg-hint" aria-hidden>
-                    {showSettings ? "▾" : "▸"}
+                    <ChevronToggle open={showSettings} />
                   </span>
                 </button>
                 {showSettings && (

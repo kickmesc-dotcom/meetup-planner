@@ -14,6 +14,7 @@ import {
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { AddPersonPanel, RosterSnapshotsPanel } from "./RosterTools";
 import SubScreen from "./SubScreen";
@@ -258,7 +259,7 @@ function EmployeeRow({
           </span>
         </span>
         <span className="shrink-0 text-tg-hint" aria-hidden>
-          {open ? "▾" : "▸"}
+          <ChevronToggle open={open} />
         </span>
       </button>
 

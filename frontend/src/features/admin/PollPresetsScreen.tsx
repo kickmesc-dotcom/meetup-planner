@@ -9,7 +9,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
-import Icon from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -103,7 +103,8 @@ export default function PollPresetsScreen({ onBack }: Props) {
               }}
               className="rounded-tile bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
             >
-              ↻ дефолт
+              <InlineIcon name="refresh" />
+              дефолт
             </button>
           </div>
 

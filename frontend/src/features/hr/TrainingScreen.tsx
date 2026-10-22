@@ -11,6 +11,7 @@ import { humanizeApiError } from "@/api/client";
 import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
@@ -301,7 +302,7 @@ function LessonCard({
           </span>
         </span>
         <span className="text-tg-hint" aria-hidden>
-          {open ? "▾" : "▸"}
+          <ChevronToggle open={open} />
         </span>
       </button>
 

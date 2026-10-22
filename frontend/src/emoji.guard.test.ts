@@ -43,6 +43,12 @@ const sources = import.meta.glob("./**/*.{ts,tsx}", {
 const PICTURE =
   /[\u{1F000}-\u{1FAFF}\u{2300}-\u{23FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u;
 
+// Текстовые раскрывашки (▴ ▾ ▸ ► ▼ ◀ …) и символы сброса (↻ ↺). Это тоже
+// элементы управления, а не типографика: они набираются шрифтом и разъезжаются
+// по базовой линии рядом с SVG. Связки в предложениях («авто-подбор → опрос»)
+// под правило не попадают — 2190–2193 в диапазон не входят.
+const GLYPH = /[\u25B2-\u25C4\u21BA-\u21BB]/u;
+
 type Hit = { line: number; text: string };
 
 /**
@@ -53,7 +59,7 @@ type Hit = { line: number; text: string };
  * не содержат `//` и `/*` в опасных местах; если появятся — тест ниже об этом
  * сообщит ложным срабатыванием, а не пропуском.
  */
-export function findPictures(source: string): Hit[] {
+function scanFor(source: string, pattern: RegExp): Hit[] {
   const hits: Hit[] = [];
   let i = 0;
   let line = 1;
@@ -85,8 +91,12 @@ export function findPictures(source: string): Hit[] {
     if (state !== "line" && state !== "block") {
       const point = source.codePointAt(i)!;
       const symbol = String.fromCodePoint(point);
-      if (PICTURE.test(symbol)) {
-        hits.push({ line, text: currentLine() });
+      if (pattern.test(symbol)) {
+        // Одна строка — одна запись в отчёте: иначе «▾ ▸» на одной строке
+        // выглядели как две разные проблемы.
+        if (hits[hits.length - 1]?.line !== line) {
+          hits.push({ line, text: currentLine() });
+        }
         i += symbol.length;
         continue;
       }
@@ -181,6 +191,16 @@ export function findPictures(source: string): Hit[] {
   return hits;
 }
 
+/** Эмодзи и пиктограммы ОС вне комментариев. */
+export function findPictures(source: string): Hit[] {
+  return scanFor(source, PICTURE);
+}
+
+/** Текстовые раскрывашки вместо иконок (P1.4, полировка). */
+export function findGlyphs(source: string): Hit[] {
+  return scanFor(source, GLYPH);
+}
+
 const SCREENS = Object.keys(sources)
   .filter((file) => file.endsWith(".tsx"))
   .filter((file) => !file.includes(".test."))
@@ -203,6 +223,13 @@ describe("P1.4: разметка без эмодзи", () => {
       offenders,
       "замените эмодзи на <Icon> / <InlineIcon>",
     ).toEqual([]);
+  });
+
+  it.each(SCREENS)("%s раскрывает списки шевроном, а не символом", (file) => {
+    const offenders = findGlyphs(sources[file] ?? "").map(
+      (hit) => `${file}:${hit.line} ${hit.text}`,
+    );
+    expect(offenders, "используйте <ChevronToggle open={…} />").toEqual([]);
   });
 });
 
@@ -246,5 +273,17 @@ describe("P1.4: страж видит именно код, а не коммен�
       "const icon = '🎯';",
     ].join("\n");
     expect(findPictures(source).map((hit) => hit.line)).toEqual([2]);
+  });
+});
+
+describe("P1.4: раскрывашки — иконки, а не символы шрифта", () => {
+  it("ловит ▾ / ▸ / ▼ / ▶ и ↻, но пропускает связки в тексте", () => {
+    const source = [
+      '<span>{open ? "▾" : "▸"}</span>',
+      '<span>{open ? "▼" : "▶"}</span>',
+      '<button>↻ дефолт</button>',
+      "Запусти из «Календаря»: авто-подбор → опрос — бот опубликует его в чате.",
+    ].join("\n");
+    expect(findGlyphs(source).map((hit) => hit.line)).toEqual([1, 2, 3]);
   });
 });

@@ -10,6 +10,7 @@ import {
   type HrRateType,
 } from "@/api/hrTrainingPlan";
 import { ListSkeleton } from "@/components/Skeleton";
+import ChevronToggle from "@/components/ChevronToggle";
 import ErrorState from "@/components/ErrorState";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
@@ -198,7 +199,7 @@ function PlanCard({
             {!plan.has_shifts && <span>· табель пуст</span>}
           </div>
         </div>
-        <span className="shrink-0 pt-0.5 text-xs text-tg-hint">{open ? "▾" : "▸"}</span>
+        <ChevronToggle open={open} className="mt-0.5 text-tg-hint" />
       </button>
 
       {open && (

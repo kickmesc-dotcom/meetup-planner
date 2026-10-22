@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
+import ChevronToggle from "@/components/ChevronToggle";
 
 /**
  * Кнопки действий календаря: авто-подбор и опрос по встрече.
@@ -33,7 +34,7 @@ export default function ActionBar() {
         aria-expanded={false}
         className="flex w-full items-center justify-center gap-1.5 border-t border-tg-secondary-bg bg-tg-bg px-2 py-2 text-xs text-tg-hint"
       >
-        <span aria-hidden>▴</span> Кнопки действий — развернуть
+        <ChevronToggle open={false} /> Кнопки действий — развернуть
       </button>
     );
   }
@@ -50,7 +51,7 @@ export default function ActionBar() {
         title="Свернуть кнопки действий"
         className="col-span-full -mt-1 flex items-center justify-center gap-1 text-2xs text-tg-hint"
       >
-        <span aria-hidden>▾</span> свернуть кнопки
+        <ChevronToggle open /> свернуть кнопки
       </button>
       <ActionBtn
         onClick={tap(() => setShowAuto(true))}

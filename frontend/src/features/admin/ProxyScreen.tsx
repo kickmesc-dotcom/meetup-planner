@@ -33,6 +33,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { Toggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -433,7 +434,7 @@ export default function ProxyScreen({ onBack }: Props) {
             onClick={() => setPoolOpen((v) => !v)}
             className="flex-1 text-left text-base font-semibold flex items-center gap-2"
           >
-            <span>{poolOpen ? "▼" : "▶"}</span>
+            <ChevronToggle open={poolOpen} className="text-tg-hint" />
             <span>
               Пул прокси {listQ.data ? `(${listQ.data.length}/50)` : ""}
             </span>
@@ -1160,7 +1161,7 @@ function AddErrorsSection({
           onClick={() => setOpen((v) => !v)}
           className="flex-1 text-left text-base font-semibold flex items-center gap-2 text-status-busy"
         >
-          <span>{open ? "▼" : "▶"}</span>
+          <ChevronToggle open={open} />
           <span className="inline-flex items-center gap-1.5">
             <Icon name="alert" size={16} />
             Ошибки добавления ({errors.length})

@@ -141,7 +141,8 @@ export default function AppTextsScreen({ onBack }: Props) {
                     onClick={() => reset(item)}
                     className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
-                    ↺ Как было
+                    <InlineIcon name="refresh" />
+                    Как было
                   </button>
                 )}
               </span>

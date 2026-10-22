@@ -21,6 +21,7 @@ import { Checkbox, Toggle as TgToggle } from "@/components/Checkbox";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
+import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -635,7 +636,7 @@ function HallsCard() {
             {hallsQ.data?.length ?? 0} залов · от них зависит выбор у официанта
           </div>
         </div>
-        <span className="text-tg-hint">{open ? "▾" : "▸"}</span>
+        <ChevronToggle open={open} className="text-tg-hint" />
       </button>
 
       {open && (
