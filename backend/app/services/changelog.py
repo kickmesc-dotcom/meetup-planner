@@ -28,7 +28,7 @@ import html
 import re
 import time
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import httpx
 import structlog
@@ -43,6 +43,9 @@ CACHE_TTL_SECONDS = 600
 FETCH_TIMEOUT_SECONDS = 6.0
 MAX_ENTRIES = 6
 MAX_AUTO_ITEMS = 4
+# Насколько назад смотрим за автоматическими расшифровками (дни от последней
+# редакторской записи). Всё, что старше, — либо уже описано, либо не новость.
+AUTO_WINDOW_DAYS = 3
 
 # Виды коммитов, которые не меняют продукт для сотрудника.
 INTERNAL_TYPES = {
@@ -122,6 +125,15 @@ JARGON: tuple[tuple[str, str], ...] = (
 
 _PREFIX_RE = re.compile(r"^(?P<type>[a-zA-Z]+)(?:\((?P<scope>[^)]*)\))?!?:\s*")
 
+# Внутренние коды работ («P3», «аудит», «ТЗ») сотруднику ничего не говорят.
+# Такие коммиты считаем обслуживанием: они попадают в строку «внутренние
+# улучшения», а не в историю продукта.
+PROCESS_JARGON = re.compile(
+    r"\b[PР][0-3](?:\.\d+)?\b|аудит|\bТЗ\b|\bMVP\b|P1\.[0-9]|паритет|легаси|"
+    r"\btailwind\b|\bvite\b|\breact\b|\btypescript\b|\beslint\b|бандл",
+    re.IGNORECASE,
+)
+
 
 @dataclass(frozen=True)
 class Commit:
@@ -198,6 +210,9 @@ def adapt_message(raw: str) -> str | None:
         rest = first[match.end() :].strip()
         if kind in INTERNAL_TYPES:
             return None
+    # «Закрыть P3 визуального аудита» — это внутренняя кухня, а не новость.
+    if PROCESS_JARGON.search(rest):
+        return None
 
     body = _jargon(rest)
     if not body:
@@ -321,6 +336,16 @@ def build_view(
         if len(result.entries) >= MAX_ENTRIES:
             break
 
+    # Автоматические строки — только про текущий релиз. Старые коммиты без
+    # редакторской записи в историю не лезут: иначе хвост списка снова
+    # превращается в «git log», от которого мы уходили.
+    newest_editorial = max((entry.day for entry in editorial.ENTRIES), default=None)
+    window_start = (
+        newest_editorial - timedelta(days=AUTO_WINDOW_DAYS)
+        if newest_editorial is not None
+        else None
+    )
+
     auto: list[EntryView] = []
     for commit in commits:
         if commit.short in covered:
@@ -330,6 +355,9 @@ def build_view(
             result.internal_count += 1
             continue
         day = commit.day or today or date.today()
+        if window_start is not None and day < window_start:
+            result.internal_count += 1
+            continue
         auto.append(EntryView(day=day, title=text, body="", automatic=True))
 
     # Автоматических строк — не больше четырёх: история не должна превращаться

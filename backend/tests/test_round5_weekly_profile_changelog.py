@@ -170,6 +170,23 @@ def test_commit_without_prefix_still_becomes_readable():
     assert text == "Обновить README"
 
 
+def test_process_jargon_is_not_shown():
+    """Коды работ и названия библиотек — внутренняя кухня, не новость."""
+    assert changelog.adapt_message("feat(ui): закрыть P3 визуального аудита") is None
+    assert changelog.adapt_message("feat(ui): два радиуса вместо Tailwind") is None
+
+
+def test_old_commits_do_not_turn_history_back_into_git_log():
+    old = changelog.Commit(
+        sha="abc1234",
+        at=datetime(2020, 1, 1, 10, 0),
+        raw="feat(ui): очень старый коммит",
+        url="",
+    )
+    view = changelog.build_view([old], source_ok=True)
+    assert all("старый коммит" not in entry.title for entry in view.entries)
+
+
 def _commit(sha: str, message: str) -> changelog.Commit:
     return changelog.Commit(
         sha=sha,
