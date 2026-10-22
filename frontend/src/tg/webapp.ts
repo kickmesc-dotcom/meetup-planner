@@ -29,13 +29,26 @@ export function initTelegramWebApp(): void {
  * проверкой типа метода. Если разворот сработал, приложение покажет каркас с
  * сайдбаром (≥1024px); выйти можно обычным способом клиента.
  */
+// Платформы, где мини-апп живёт в отдельном окне на большом экране. Смотрим
+// именно на платформу, а не на `window.innerWidth`: у Telegram Desktop окно по
+// умолчанию узкое (~450px), и проверка ширины отменяла бы разворот ровно там,
+// где он нужен.
+const DESKTOP_PLATFORMS = new Set(["tdesktop", "macos", "unigram"]);
+
 function requestFullscreenOnDesktop(): void {
   try {
-    if (typeof window === "undefined" || window.innerWidth < 1024) return;
+    if (typeof window === "undefined") return;
     const api = WebApp as unknown as {
+      platform?: string;
       requestFullscreen?: () => void;
       isFullscreen?: boolean;
     };
+    const platform = String(api.platform ?? "");
+    // Телефон не трогаем: там уже `expand()`, а fullscreen спрятал бы кнопку
+    // закрытия. В обычном браузере (без Telegram `initData`) тоже не просим —
+    // это вызвало бы системный запрос полноэкранного режима у сайта.
+    if (!DESKTOP_PLATFORMS.has(platform)) return;
+    if (!WebApp.initData) return;
     if (api.isFullscreen) return;
     if (typeof api.requestFullscreen === "function") api.requestFullscreen();
   } catch {
