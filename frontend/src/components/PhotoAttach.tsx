@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import { mediaUrl, uploadPhoto, type MediaItem } from "@/api/media";
 import { haptic, showAlert } from "@/tg/webapp";
-import Icon from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 
 export interface PhotoView {
   id: number;
@@ -92,7 +92,14 @@ export default function PhotoAttach({
         }}
         className={`${buttonClass} disabled:opacity-50`}
       >
-        {upload.isPending ? "⏳ Загружаю…" : `📷 ${compact ? "Снять" : label}`}
+        {upload.isPending ? (
+          "Загружаю…"
+        ) : (
+          <>
+            <InlineIcon name="camera" />
+            {compact ? "Снять" : label}
+          </>
+        )}
       </button>
       <button
         type="button"
@@ -103,7 +110,8 @@ export default function PhotoAttach({
         }}
         className={`${buttonClass} disabled:opacity-50`}
       >
-        🖼 {compact ? "Галерея" : "Из галереи"}
+        <InlineIcon name="image" />
+        {compact ? "Галерея" : "Из галереи"}
       </button>
     </div>
   );

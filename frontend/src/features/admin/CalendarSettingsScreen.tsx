@@ -19,7 +19,7 @@ import {
   setCalendarTimelineFlag,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
-import { InlineIcon } from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
@@ -71,7 +71,7 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
 
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
         <div className="flex items-center gap-2">
-          <span className="text-base">🆕</span>
+          <Icon name="sparkles" size={18} className="text-tg-link" />
           <span className="text-sm font-semibold text-tg-text">
             Новый таймлайн-вид
           </span>

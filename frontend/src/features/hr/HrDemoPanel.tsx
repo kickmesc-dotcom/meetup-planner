@@ -7,10 +7,10 @@ import {
   simulateDemo,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import Icon from "@/components/Icon";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
-import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
@@ -178,7 +178,8 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   }}
                   className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
                 >
-                  🆕 Завести пул
+                  <Icon name="plus" size={14} className="mr-1 inline-block" />
+                  Завести пул
                 </button>
                 <button
                   type="button"
