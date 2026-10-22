@@ -11,7 +11,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
-import Icon from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
 import ProgressBar from "@/components/ProgressBar";
@@ -197,9 +197,12 @@ export default function ChecklistScreen() {
           ))}
 
         {!showingHallPicker && data?.status === "done" && (
-          <div className="rounded-card bg-status-free/10 p-3 text-center text-xs text-status-free">
-            ✓ {kind === "close" ? "Смена закрыта" : "Смена открыта"}.
-            {kind === "close" ? " Спасибо за работу!" : " Хорошей смены!"}
+          <div className="flex items-center justify-center gap-1.5 rounded-card bg-status-free/10 p-3 text-center text-xs text-status-free">
+            <Icon name="check" size={14} />
+            <span>
+              {kind === "close" ? "Смена закрыта" : "Смена открыта"}.
+              {kind === "close" ? " Спасибо за работу!" : " Хорошей смены!"}
+            </span>
           </div>
         )}
       </div>
@@ -336,7 +339,7 @@ function ItemRow({
               : "border-tg-hint/40 text-transparent",
           ].join(" ")}
         >
-          ✓
+          <Icon name="check" size={14} />
         </button>
 
         <div className="min-w-0 flex-1">
@@ -362,13 +365,13 @@ function ItemRow({
           )}
           {item.schedule_label && (
             <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
-              <span aria-hidden>🗓</span>
+              <Icon name="calendar" size={11} />
               {inactive ? `не сегодня · ${item.schedule_label}` : item.schedule_label}
             </div>
           )}
           {item.requires_photo && (
             <div className="mt-1 text-xs text-tg-hint">
-              📷{" "}
+              <InlineIcon name="camera" />
               {item.done
                 ? "фотоотчёт приложен"
                 : "нужен фотоотчёт: снимок с камеры или из галереи"}

@@ -11,7 +11,7 @@ import Badge from "@/features/hr/Badge";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
-import Icon from "@/components/Icon";
+import Icon, { type IconName } from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
 
@@ -52,13 +52,15 @@ const SCOPE_HINT: Record<HrFeed["scope"], string> = {
   all: "Всё, что происходит на смене.",
 };
 
-const KIND_ICON: Record<FeedKind, string> = {
-  checklist_done: "🗒",
-  checklist_item: "✅",
-  task_created: "📌",
-  task_status: "🔄",
-  task_photo: "📷",
-  task_issue: "⚠️",
+// P1.4: типы событий — SVG, как и вся навигация. Эмодзи рисовались по-разному
+// на Windows/iOS/Android и выбивались из строки рядом с настоящими иконками.
+const KIND_ICON: Record<FeedKind, IconName> = {
+  checklist_done: "check",
+  checklist_item: "checklist",
+  task_created: "tasks",
+  task_status: "repeat",
+  task_photo: "camera",
+  task_issue: "alert",
 };
 
 const KIND_LABEL: Record<FeedKind, string> = {
@@ -311,7 +313,10 @@ export default function HrFeedScreen() {
                         : "bg-tg-secondary-bg text-tg-hint",
                     ].join(" ")}
                   >
-                    {KIND_ICON[k]} {KIND_LABEL[k]}
+                    <span className="inline-flex items-center gap-1">
+                      <Icon name={KIND_ICON[k]} size={13} />
+                      {KIND_LABEL[k]}
+                    </span>
                   </button>
                 );
               })}
@@ -320,9 +325,12 @@ export default function HrFeedScreen() {
         )}
 
         {feed && !canFilter && (
-          <p className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
-            🔒 Видны только твои действия. Расширенные фильтры доступны
-            руководителю подразделения и управляющему.
+          <p className="mt-2 flex items-start gap-1.5 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
+            <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
+            <span>
+              Видны только твои действия. Расширенные фильтры доступны
+              руководителю подразделения и управляющему.
+            </span>
           </p>
         )}
       </header>
@@ -332,9 +340,7 @@ export default function HrFeedScreen() {
 
         {!feedQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-4xl" aria-hidden>
-              📋
-            </div>
+            <Icon name="clipboard" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">Пока тихо</div>
             <div className="mt-1 text-xs text-tg-hint">
               Здесь появятся отметки и поручения.
@@ -601,8 +607,8 @@ function FeedRow({
   return (
     <article className="px-3 py-2.5">
       <div className="flex items-start gap-2">
-        <span className="text-base" aria-hidden>
-          {KIND_ICON[item.kind]}
+        <span className="mt-0.5 shrink-0 text-tg-hint" aria-hidden>
+          <Icon name={KIND_ICON[item.kind]} size={16} />
         </span>
         <div className="min-w-0 flex-1">
           <div className="text-sm text-tg-text break-words">

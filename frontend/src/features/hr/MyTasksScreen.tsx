@@ -15,7 +15,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
-import Icon from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import { fetchIssues } from "@/api/issues";
 import Badge from "@/features/hr/Badge";
@@ -286,9 +286,10 @@ export default function MyTasksScreen() {
               haptic("selection");
               setTab("issues");
             }}
-            className="ml-auto min-h-11 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
+            className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
           >
-            🛠 Проблемы
+            <Icon name="alert" size={14} />
+            Проблемы
           </button>
         </div>
       </header>
@@ -333,7 +334,10 @@ export default function MyTasksScreen() {
             className="w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left"
           >
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium text-tg-text">🛠 Проблемы</span>
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-tg-text">
+                <Icon name="alert" size={15} />
+                Проблемы
+              </span>
               <span className="text-xs tabular-nums text-tg-hint">
                 открыто {openIssues}
               </span>
@@ -451,11 +455,20 @@ function TaskCard({
       </div>
 
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
-        <span>⏰ {fmtDue(task.due_at)}</span>
-        {shift && <span>🗓 смена {shift}</span>}
+        <span>
+          <InlineIcon name="clock" />
+          {fmtDue(task.due_at)}
+        </span>
+        {shift && (
+          <span>
+            <InlineIcon name="calendar" />
+            смена {shift}
+          </span>
+        )}
         {task.schedule_label && (
           <span>
-            🗓 {offSchedule ? `не сегодня · ${task.schedule_label}` : task.schedule_label}
+            <InlineIcon name="calendar" />
+            {offSchedule ? `не сегодня · ${task.schedule_label}` : task.schedule_label}
           </span>
         )}
         {task.priority !== "normal" && (
@@ -463,10 +476,15 @@ function TaskCard({
         )}
         {task.requires_photo && (
           <span>
-            📷 {(task.photos?.length ?? 0) > 0 ? "фото есть" : "нужен фотоотчёт"}
+            <InlineIcon name="camera" />
+            {(task.photos?.length ?? 0) > 0 ? "фото есть" : "нужен фотоотчёт"}
           </span>
         )}
-        {task.requires_review && <span>🔍 с приёмкой</span>}
+        {task.requires_review && (
+          <span>
+            <InlineIcon name="checklist" /> с приёмкой
+          </span>
+        )}
         {task.is_overdue && !closed && (
           <span className="text-status-busy">просрочено</span>
         )}
@@ -474,7 +492,8 @@ function TaskCard({
 
       {group && (
         <div className="mt-1.5 text-xs text-tg-hint">
-          👥 {TASK_MODE_LABEL[task.mode]} · сделали {task.progress_done} из{" "}
+          <InlineIcon name="team" />
+          {TASK_MODE_LABEL[task.mode]} · сделали {task.progress_done} из{" "}
           {task.progress_total}
         </div>
       )}
@@ -572,7 +591,8 @@ function TaskPhotos({ task, closed }: { task: HrTask; closed: boolean }) {
         <div className="mt-2">
           {needsPhoto && (
             <div className="mb-1 text-xs text-tg-hint">
-              📷 Фотоотчёт: сними или выбери фото — поручение закроется само.
+              <InlineIcon name="camera" />
+              Фотоотчёт: сними или выбери фото — поручение закроется само.
             </div>
           )}
           <PhotoAttach

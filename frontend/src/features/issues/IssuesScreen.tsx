@@ -21,6 +21,7 @@ import { fetchEmployee } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import BottomSheet from "@/features/actions/BottomSheet";
 import ErrorState from "@/components/ErrorState";
+import Icon from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -138,8 +139,9 @@ export default function IssuesScreen() {
             ‹
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-tg-text">
-              🛠 Журнал проблем
+            <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
+              <Icon name="alert" size={18} />
+              Журнал проблем
             </h1>
             <p className="mt-0.5 text-xs text-tg-hint">
               {summary
@@ -191,9 +193,7 @@ export default function IssuesScreen() {
 
         {!issuesQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-            <div className="text-4xl" aria-hidden>
-              🛠
-            </div>
+            <Icon name="alert" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               {view === "mine" ? "У тебя открытых проблем нет" : "Журнал пуст"}
             </div>

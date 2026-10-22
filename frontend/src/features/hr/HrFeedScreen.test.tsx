@@ -156,6 +156,16 @@ describe("HrFeedScreen (P1.8)", () => {
     expect(cardMock).toHaveBeenCalledWith(1);
   });
 
+  it("тип события — SVG-иконка, а не эмодзи (P1.4)", async () => {
+    const { container } = renderFeed([
+      item({ badge_emoji: null, kind: "checklist_item" }),
+    ]);
+    await screen.findByText("Пётр");
+    // Строка ленты начинается с иконки типа: раньше здесь стоял ✅.
+    expect(container.querySelector("article svg")).toBeTruthy();
+    expect(container.textContent ?? "").not.toMatch(/[✅🗒📌🔄📷⚠]/u);
+  });
+
   it("не повторяет область видимости в пилюле и подзаголовке (P2.13)", async () => {
     renderFeed([item()]);
 

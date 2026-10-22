@@ -49,7 +49,8 @@ export type IconName =
   | "image"
   | "door"
   | "sun"
-  | "moon";
+  | "moon"
+  | "lock";
 
 interface Props extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
@@ -74,6 +75,23 @@ export default function Icon({ name, size = 20, ...rest }: Props) {
     >
       {PATHS[name]}
     </svg>
+  );
+}
+
+/**
+ * Иконка внутри текстовой строки (метаданные карточки: срок, смена, фото).
+ *
+ * Отдельный компонент, потому что `inline-block align-[-2px]` повторялся бы
+ * в каждой строке и разъезжался при правках. Эмодзи на этом месте рисовались
+ * по-разному в зависимости от ОС (P1.4).
+ */
+export function InlineIcon({ name }: { name: IconName }) {
+  return (
+    <Icon
+      name={name}
+      size={13}
+      className="mr-1 inline-block shrink-0 align-[-2px]"
+    />
   );
 }
 
@@ -252,4 +270,11 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   moon: <path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.5 8.5 0 1 0 10.2 10.2Z" />,
+  // Замок: подсказки «видно только тебе» и ограниченный доступ.
+  lock: (
+    <>
+      <rect x="5" y="10.8" width="14" height="9.2" rx="2" />
+      <path d="M8.2 10.8V7.9a3.8 3.8 0 0 1 7.6 0v2.9M12 14.4v2" />
+    </>
+  ),
 };

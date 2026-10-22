@@ -32,6 +32,7 @@ import DesktopShell from "./features/desktop/DesktopShell";
 import OverviewRail from "./features/desktop/OverviewRail";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import ErrorState from "./components/ErrorState";
+import Icon from "./components/Icon";
 import TabTransition from "./components/TabTransition";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import SimulationBanner from "./components/SimulationBanner";
@@ -105,9 +106,7 @@ export default function App() {
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div className="max-w-sm">
-            <div className="mb-2 text-3xl" aria-hidden>
-              🖥
-            </div>
+            <Icon name="layout" size={30} className="mx-auto mb-2 text-tg-hint" />
             <div className="text-lg font-medium">Нужен вход</div>
             <p className="mt-2 text-sm text-tg-hint">
               Открой приложение из Telegram — или возьми ссылку для компьютера
@@ -129,7 +128,11 @@ export default function App() {
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div>
-            <div className="text-3xl mb-2">🛑</div>
+            <Icon
+              name="alert"
+              size={30}
+              className="mx-auto mb-2 text-status-busy"
+            />
             <div className="text-lg font-medium">Тебя нет в списке шестёрки</div>
             <div className="text-tg-hint mt-2 text-sm">
               Скинь админу свой Telegram ID командой /whoami боту.
@@ -212,7 +215,10 @@ export default function App() {
             строки шапки и выравнивается по тексту, а не «налеплена в угол». */}
         <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
           <div className="min-w-0 flex-1">
-            <div className="text-base font-medium">🤝 Встречи и опросы</div>
+            <div className="flex items-center gap-1.5 text-base font-medium">
+              <Icon name="clock" size={17} />
+              Встречи и опросы
+            </div>
             <div className="text-xs text-tg-hint">
               RSVP по встречам и голосования за слот — всё в одном месте.
             </div>
@@ -315,7 +321,10 @@ export default function App() {
       <>
         <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
           <div className="min-w-0 flex-1">
-            <div className="text-base font-medium">👤 Профиль</div>
+            <div className="flex items-center gap-1.5 text-base font-medium">
+              <Icon name="profile" size={17} />
+              Профиль
+            </div>
             <div className="text-xs text-tg-hint">
               Подразделение, опыт и обратная связь.
             </div>
@@ -332,7 +341,10 @@ export default function App() {
       <>
         <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
           <div className="min-w-0 flex-1">
-            <div className="text-base font-medium">⚙️ Админка</div>
+            <div className="flex items-center gap-1.5 text-base font-medium">
+              <Icon name="admin" size={17} />
+              Админка
+            </div>
             <div className="text-xs text-tg-hint">
               Люди, смены и правила — только для управляющих.
             </div>

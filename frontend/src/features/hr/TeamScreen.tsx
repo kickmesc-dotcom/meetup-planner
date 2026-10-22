@@ -13,6 +13,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import DepartmentTag from "@/components/DepartmentTag";
+import Icon, { type IconName } from "@/components/Icon";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
@@ -25,14 +26,16 @@ import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
  * потом отделы, потом люди. Расширенные настройки спрятаны в конце, чтобы не
  * мешали оперативной картине.
  */
+// P1.4: статусы — SVG, а не эмодзи. На Windows «⏳» и «✅» рисовались
+// цветными картинками разного размера и ломали строку статуса.
 const STATUS_META: Record<
   HrDashboardEmployee["status"],
-  { label: string; icon: string; className: string }
+  { label: string; icon: IconName | null; className: string }
 > = {
-  done: { label: "смена закрыта", icon: "✅", className: "text-status-free" },
-  late: { label: "не закрыта вовремя", icon: "⚠️", className: "text-status-busy" },
-  in_progress: { label: "в работе", icon: "⏳", className: "text-tg-text" },
-  idle: { label: "не начинал", icon: "—", className: "text-tg-hint" },
+  done: { label: "смена закрыта", icon: "check", className: "text-status-free" },
+  late: { label: "не закрыта вовремя", icon: "alert", className: "text-status-busy" },
+  in_progress: { label: "в работе", icon: "clock", className: "text-tg-text" },
+  idle: { label: "не начинал", icon: null, className: "text-tg-hint" },
 };
 
 export default function TeamScreen({
@@ -88,7 +91,10 @@ export default function TeamScreen({
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">👀 Команда</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+            <Icon name="team" size={16} />
+            Команда
+          </div>
           <div className="text-xs text-tg-hint">
             {dashboard.data
               ? `${dashboard.data.work_date} · ${
@@ -145,12 +151,17 @@ export default function TeamScreen({
                       key={`${item.kind}-${item.task_id ?? item.employee_id}-${index}`}
                       className="flex gap-2 text-xs text-tg-text"
                     >
-                      <span aria-hidden>
-                        {item.kind === "overdue"
-                          ? "⏰"
-                          : item.kind === "issue"
-                            ? "⚠️"
-                            : "📤"}
+                      <span className="mt-0.5 shrink-0 text-tg-hint" aria-hidden>
+                        <Icon
+                          name={
+                            item.kind === "overdue"
+                              ? "clock"
+                              : item.kind === "issue"
+                                ? "alert"
+                                : "send"
+                          }
+                          size={14}
+                        />
                       </span>
                       <span className="min-w-0">{item.text}</span>
                     </li>
@@ -357,8 +368,9 @@ function EmployeeRow({
           name={employee.department_name}
           emoji={employee.department_emoji}
         />
-        <span className={`shrink-0 text-2xs ${meta.className}`}>
-          <span aria-hidden>{meta.icon}</span> {meta.label}
+        <span className={`inline-flex shrink-0 items-center gap-1 text-2xs ${meta.className}`}>
+          {meta.icon && <Icon name={meta.icon} size={12} />}
+          {meta.label}
         </span>
       </div>
       <div className="mt-1 flex items-center gap-2">
@@ -372,8 +384,9 @@ function EmployeeRow({
           {employee.checklist_done}/{employee.checklist_total}
         </span>
         {employee.tasks_overdue > 0 && (
-          <span className="shrink-0 text-2xs text-status-busy">
-            ⏰ {employee.tasks_overdue}
+          <span className="inline-flex shrink-0 items-center gap-1 text-2xs text-status-busy">
+            <Icon name="clock" size={12} />
+            {employee.tasks_overdue}
           </span>
         )}
       </div>
@@ -612,7 +625,14 @@ function DangerZone() {
         onClick={() => void run()}
         className="mt-2 min-h-9 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
       >
-        {busy ? "Считаем…" : "🧹 Сбросить текущую работу"}
+        {busy ? (
+          "Считаем…"
+        ) : (
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="trash" size={14} />
+            Сбросить текущую работу
+          </span>
+        )}
       </button>
     </div>
   );

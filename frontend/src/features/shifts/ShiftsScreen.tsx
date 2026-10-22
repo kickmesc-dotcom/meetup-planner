@@ -233,7 +233,10 @@ export default function ShiftsScreen() {
       <header className="border-b border-tg-secondary-bg px-3 py-2">
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-tg-text">🗓 Табель смен</div>
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+              <Icon name="calendar" size={16} />
+              Табель смен
+            </div>
             <div className="text-xs text-tg-hint">
               {rangeLabel(days)} · {canEdit ? "можно править" : "твой отдел"}
             </div>
@@ -634,10 +637,10 @@ function ShiftSheet({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
+            className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Закрыть"
           >
-            ✕
+            <Icon name="close" size={16} />
           </button>
         </div>
 

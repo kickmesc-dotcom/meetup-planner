@@ -8,6 +8,7 @@ import {
   type HrAdminTaskAssignment,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -55,7 +56,10 @@ export default function ReviewScreen() {
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">🔍 Приёмка</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+            <Icon name="checklist" size={16} />
+            Приёмка
+          </div>
           <div className="text-xs text-tg-hint">
             {waiting.length === 0
               ? "Работ на проверке нет"
@@ -74,9 +78,7 @@ export default function ReviewScreen() {
 
         {!tasksQ.isLoading && waiting.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="text-4xl" aria-hidden>
-              ☑️
-            </div>
+            <Icon name="check" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               Всё принято
             </div>
@@ -141,14 +143,22 @@ function ReviewCard({
           </span>
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
-          <span>⏰ {fmtDue(task.due_at)}</span>
+          <span>
+            <InlineIcon name="clock" />
+            {fmtDue(task.due_at)}
+          </span>
           {task.progress_total > 1 && (
             <span>
-              👥 {TASK_MODE_LABEL[task.mode]} · {task.progress_done} из{" "}
+              <InlineIcon name="team" />
+              {TASK_MODE_LABEL[task.mode]} · {task.progress_done} из{" "}
               {task.progress_total}
             </span>
           )}
-          {task.requires_photo && <span>📷 фотоотчёт</span>}
+          {task.requires_photo && (
+            <span>
+              <InlineIcon name="camera" /> фотоотчёт
+            </span>
+          )}
         </div>
       </button>
 

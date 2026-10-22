@@ -17,6 +17,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import BottomSheet from "@/features/actions/BottomSheet";
 import ErrorState from "@/components/ErrorState";
+import Icon, { type IconName } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -52,8 +53,10 @@ function fmtMoment(iso: string): string {
   });
 }
 
-function itemLabel(item: HrHandoverItem): string {
-  return item.kind === "task" ? "✅" : "🛠";
+// P1.4: пункт передачи — «поручение» или «проблема». Раньше это были эмодзи,
+// и в узкой строке они читались как часть названия.
+function itemIcon(item: HrHandoverItem): IconName {
+  return item.kind === "task" ? "check" : "alert";
 }
 
 export default function HandoversScreen() {
@@ -102,8 +105,9 @@ export default function HandoversScreen() {
             ‹
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-tg-text">
-              📤 Передача смены
+            <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
+              <Icon name="send" size={18} />
+              Передача смены
             </h1>
             <p className="mt-0.5 text-xs text-tg-hint">
               {summary
@@ -160,9 +164,7 @@ export default function HandoversScreen() {
 
         {!handoversQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-            <div className="text-4xl" aria-hidden>
-              📤
-            </div>
+            <Icon name="send" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               Передач пока нет
             </div>
@@ -280,7 +282,7 @@ function HandoverCard({
               className="rounded-tile bg-tg-bg/50 px-2.5 py-1.5"
             >
               <div className="text-xs text-tg-text">
-                <span aria-hidden>{itemLabel(item)} </span>
+                <Icon name={itemIcon(item)} size={13} className="mr-1 inline-block align-[-2px] text-tg-hint" />
                 {item.title}
               </div>
               <div className="mt-0.5 text-xs text-tg-hint">
@@ -441,7 +443,7 @@ function CreateHandoverSheet({
             className="rounded-tile bg-tg-secondary-bg/60 px-2.5 py-1.5"
           >
             <div className="text-xs text-tg-text">
-              <span aria-hidden>{itemLabel(item)} </span>
+              <Icon name={itemIcon(item)} size={13} className="mr-1 inline-block align-[-2px] text-tg-hint" />
               {item.title}
             </div>
             <div className="mt-0.5 text-xs text-tg-hint">

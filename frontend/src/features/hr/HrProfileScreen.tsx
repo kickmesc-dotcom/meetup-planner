@@ -70,7 +70,7 @@ export default function HrProfileScreen() {
   const setTab = useUI((s) => s.setTab);
   const photoHint = useAppText(
     "profile.photo.hint",
-    "Фотоотчёт можно снять прямо в пункте с 📷 (камера или галерея), а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.",
+    "Фотоотчёт можно приложить прямо в пункте чек-листа (камера или галерея), а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.",
   );
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const depsQ = useQuery({
