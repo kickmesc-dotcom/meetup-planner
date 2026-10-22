@@ -13,6 +13,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Checkbox, Toggle as TgToggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 import HolidaysCard from "./HolidaysCard";
 
@@ -42,7 +43,7 @@ export default function BirthdaysScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="⚙️ Настройки"
+      title="Настройки"
       subtitle="Дни рождения и праздники в одном месте"
       onBack={onBack}
     >
@@ -60,7 +61,8 @@ export default function BirthdaysScreen({ onBack }: Props) {
       )}
       {save.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ {String((save.error as Error)?.message ?? save.error)}
+          <InlineIcon name="alert" />
+          {String((save.error as Error)?.message ?? save.error)}
         </div>
       )}
 
@@ -112,7 +114,7 @@ function BirthdaysMasterSwitch() {
           <TgToggle
             checked={enabled}
             disabled={save.isPending}
-            label={enabled ? "🔔 Все ДР-напоминания" : "🔕 Напоминания отключены"}
+            label={enabled ? "Все ДР-напоминания" : "Напоминания отключены"}
             onChange={(v) => {
               const next = structuredClone(sched.data!);
               next.birthdays.alerts_enabled = v;
@@ -206,27 +208,27 @@ function BirthdaysForm({
 
             <div className="grid grid-cols-1 gap-1">
               <TgToggle
-                label="📅 За месяц"
+                label="За месяц"
                 checked={d.remind_month}
                 onChange={(v) => patch(r.user_id, { remind_month: v })}
               />
               <TgToggle
-                label="🗓️ За неделю"
+                label="За неделю"
                 checked={d.remind_week}
                 onChange={(v) => patch(r.user_id, { remind_week: v })}
               />
               <TgToggle
-                label="📌 За день"
+                label="За день"
                 checked={d.remind_day}
                 onChange={(v) => patch(r.user_id, { remind_day: v })}
               />
               <TgToggle
-                label="🎉 В сам день (поздравление)"
+                label="В сам день (поздравление)"
                 checked={d.remind_on_day}
                 onChange={(v) => patch(r.user_id, { remind_on_day: v })}
               />
               <TgToggle
-                label="💡 За неделю — намёк задать встречу"
+                label="За неделю — намёк задать встречу"
                 checked={d.remind_hint_week}
                 onChange={(v) => patch(r.user_id, { remind_hint_week: v })}
               />
@@ -245,7 +247,19 @@ function BirthdaysForm({
         className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
         {isPending && <Spinner />}
-        {isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
+        {isPending ? (
+          "Сохраняем…"
+        ) : dirty ? (
+          <>
+            <Icon name="save" size={16} />
+            Сохранить
+          </>
+        ) : (
+          <>
+            <Icon name="check" size={16} />
+            Сохранено
+          </>
+        )}
       </button>
     </>
   );

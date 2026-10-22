@@ -3100,3 +3100,38 @@ Chrome и Telegram-веб пишут WebM/OPUS — `sendVoice` его отбив
   сайдбаре (`screenshots/desktop-feed-named.png`), «Нужен вход» без
   `initData` (`screenshots/login-needed.png`). На ПК скелет загрузки теперь
   тоже широкий — без вспышки мобильной колонки.
+
+## 22.10.2026: HF догнал код, вход по ссылке заработал
+
+**Что было не так.** Pages-бандл собран с `VITE_API_BASE` на HF Space, а там
+крутился код `0050_weekday_schedule_profile` (321 маршрут) при базе на `0052`.
+Ручек `/api/me/access-links` на хосте не было вовсе, и ссылка, выпущенная
+Amvera-ботом, получала `401 access_token_invalid` — то есть веб-версия с
+компьютера не открывалась, хотя Amvera была свежей.
+
+**Что сделано.** `tools/deploy-hf.py all` поднял HF до `0052_owner_name_fix`
+(324 маршрута, отпечаток `d4d75f099b49`). Проверка после выкладки:
+
+- `/healthz` → 200, `/api/meta` — 324 пути, head `0052_owner_name_fix`;
+- `POST /api/me/access-links` без токена → 401 (ручка есть);
+- настоящий `initData` (SemiTaskBot) → `/api/me` 200, выпуск ссылки → 201;
+- ссылка открыта в браузере на `semitaskbot.pages.dev` **без** локального
+  переопределения адреса API — приложение загрузилось, данные пришли с HF.
+  Ссылка отозвана (204), из браузера удалены и токен, и переопределение.
+
+Правило на будущее: после правок, которые добавляют API-ручки, обновлять
+**оба** хоста (Amvera — бот, HF — мини-апп). `tools/deploy-hf.py status`
+показывает расхождение кода и базы одной строкой.
+
+## 22.10.2026: второй проход P1.4 — админка и сервисы
+
+Добавлены 12 SVG-иконок (`link`, `save`, `copy`, `sparkles`, `bot`, `pin`,
+`inbox`, `star`, `settings`, `swap`, `signal`, `bolt`). Эмодзи убраны из
+`ProxyScreen`, `JobsQueueScreen`, `BirthdaysScreen`, `BirthdayPopover`,
+`MeetingsScreen`, `StandardsScreen`, `SpaceRestartScreen`, `AutoPickSheet`,
+`ParticipantRow`. Ответ на встречу стал словом («идёт»/«может»/«нет»), а
+звёзды рейтинга и скорость сортировки — иконками.
+
+Страж `emoji.guard.test.ts` расширен с 12 до 21 экрана. Проверки:
+`vitest` — 257 тестов (43 файла), `tsc --noEmit` чисто. Осталось 38 файлов /
+88 строк мелких эмодзи (список и приоритет — в `docs/VISUAL_AUDIT.md`, п. 4).

@@ -9,6 +9,7 @@ import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
 import { haptic } from "@/tg/webapp";
 import RangePill from "./RangePill";
+import Icon from "@/components/Icon";
 
 interface Props {
   user: User;
@@ -293,9 +294,9 @@ export default function ParticipantRow({
                 {hasPartial && (
                   <span
                     aria-hidden
-                    className="pointer-events-none absolute top-0.5 left-0.5 text-2xs leading-none opacity-70"
+                    className="pointer-events-none absolute top-0.5 left-0.5 leading-none opacity-70"
                   >
-                    🕓
+                    <Icon name="clock" size={10} />
                   </span>
                 )}
                 {/* GHG6 BD1+BD3: 🎂 живёт в ячейке участника-именинника. Иконка —
@@ -305,7 +306,7 @@ export default function ParticipantRow({
                   <button
                     type="button"
                     aria-label={`День рождения ${user.display_name}`}
-                    title={`🎂 ${user.display_name}`}
+                    title={`День рождения: ${user.display_name}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       haptic("selection");
@@ -315,9 +316,9 @@ export default function ParticipantRow({
                         displayName: user.display_name,
                       });
                     }}
-                    className="absolute top-0.5 right-0.5 z-10 text-xs leading-none rounded-tile bg-tg-bg/70 px-0.5 active:scale-95"
+                    className="absolute top-0.5 right-0.5 z-10 grid place-items-center rounded-tile bg-tg-bg/70 p-0.5 text-tg-link active:scale-95"
                   >
-                    🎂
+                    <Icon name="cake" size={12} />
                   </button>
                 )}
               </div>,

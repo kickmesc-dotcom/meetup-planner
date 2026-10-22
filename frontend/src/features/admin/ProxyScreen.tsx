@@ -32,6 +32,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Toggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -39,9 +40,9 @@ interface Props {
 }
 
 const MODE_LABELS: Record<ProxyMode, string> = {
-  always_on: "🔗 Только через прокси",
-  always_off: "📡 Direct (без прокси)",
-  auto_fallback: "♻️ Auto-fallback (direct → прокси при проблеме)",
+  always_on: "Только через прокси",
+  always_off: "Direct (без прокси)",
+  auto_fallback: "Auto-fallback (direct → прокси при проблеме)",
 };
 
 const MODE_HINTS: Record<ProxyMode, string> = {
@@ -276,7 +277,7 @@ export default function ProxyScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🌐 Прокси"
+      title="Прокси"
       subtitle="Пул прокси, индикаторы и парсер из @ProxyMTProto"
       onBack={onBack}
     >
@@ -334,7 +335,10 @@ export default function ProxyScreen({ onBack }: Props) {
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="text-base font-semibold">🔔 Уведомлять админа</div>
+            <div className="flex items-center gap-1.5 text-base font-semibold">
+              <Icon name="bell" size={16} className="shrink-0 text-tg-hint" />
+              Уведомлять админа
+            </div>
             <div className="text-xs text-tg-hint">
               В личку при падении всех прокси. Не чаще 1 раза в час.
               {alertsQ.data?.last_alert_at && (
@@ -406,7 +410,8 @@ export default function ProxyScreen({ onBack }: Props) {
           title="Скачать публичный список прокси, пингануть и добавить живые"
         >
           {bootstrap.isPending && <Spinner />}
-          🌐 Найти живые прокси
+          <Icon name="globe" size={16} />
+          Найти живые прокси
         </button>
       </section>
 
@@ -460,7 +465,8 @@ export default function ProxyScreen({ onBack }: Props) {
                 className="min-h-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
                 title="Удалить мёртвые"
               >
-                🗑 dead
+                <Icon name="trash" size={14} />
+                dead
               </button>
               <button
                 type="button"
@@ -471,7 +477,8 @@ export default function ProxyScreen({ onBack }: Props) {
                 ].join(" ")}
                 title="Сортировать по скорости (свежее last_ok сверху)"
               >
-                ↕ speed
+                <Icon name="swap" size={14} />
+                speed
               </button>
             </>
           )}
@@ -586,7 +593,8 @@ function SelftestCard({
           className="ml-auto min-h-11 rounded-tile bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
         >
           {isRunning && <Spinner />}
-          🧪 Проверить
+          <Icon name="check" size={14} />
+          Проверить
         </button>
       </div>
       <div className="text-xs text-tg-hint">
@@ -594,12 +602,15 @@ function SelftestCard({
           "Проверка ещё не запускалась."
         ) : last.ok ? (
           <>
-            ✓ через <b className="text-tg-text">{last.mode_used}</b>
+            <InlineIcon name="check" />через <b className="text-tg-text">{last.mode_used}</b>
             {last.proxy_id !== null && <> (proxy #{last.proxy_id})</>}
             {last.latency_ms !== null && <>, ~{last.latency_ms} мс</>}
           </>
         ) : (
-          <span className="text-status-busy">✗ {last.error || "ошибка"}</span>
+          <span className="text-status-busy">
+            <InlineIcon name="close" />
+            {last.error || "ошибка"}
+          </span>
         )}
       </div>
     </div>
@@ -623,8 +634,9 @@ function LastErrorCard({
           onClick={onClear}
           className="ml-auto min-h-7 min-w-7 rounded-tile bg-tg-bg/40 px-1 text-xs text-tg-hint"
           title="Очистить"
+          aria-label="Очистить ошибку"
         >
-          ✕
+          <Icon name="close" size={14} />
         </button>
       </div>
       <div className="text-xs text-tg-hint">
@@ -686,8 +698,8 @@ function ProxyRow({
           <div className="text-2xs text-tg-hint">
             {p.type.toUpperCase()}
             {p.fail_count > 0 ? ` · fails: ${p.fail_count}` : ""}
-            {dead ? ` · 💤 до ${new Date(p.dead_until!).toLocaleTimeString()}` : ""}
-            {p.last_ok_at ? ` · ✓ ${new Date(p.last_ok_at).toLocaleString()}` : ""}
+            {dead ? ` · спит до ${new Date(p.dead_until!).toLocaleTimeString()}` : ""}
+            {p.last_ok_at ? ` · ok ${new Date(p.last_ok_at).toLocaleString()}` : ""}
           </div>
         </div>
         <button
@@ -700,7 +712,7 @@ function ProxyRow({
           className="min-h-11 min-w-11 rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text disabled:opacity-50 inline-flex items-center justify-center gap-1"
           title="Ping"
         >
-          {pingPending ? <Spinner /> : "📶"}
+          {pingPending ? <Spinner /> : <Icon name="signal" size={16} />}
         </button>
         <button
           type="button"
@@ -708,7 +720,7 @@ function ProxyRow({
           className="min-h-11 min-w-11 rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text"
           title="Edit"
         >
-          {editing ? "↩" : "✎"}
+          <Icon name={editing ? "back" : "edit"} size={16} />
         </button>
         <Toggle checked={p.enabled} onChange={onToggle} highlight={false} />
         <button
@@ -720,8 +732,9 @@ function ProxyRow({
           }}
           className="min-h-11 min-w-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
           title="Удалить"
+          aria-label="Удалить прокси"
         >
-          ✕
+          <Icon name="trash" size={16} />
         </button>
       </div>
       {editing && (
@@ -823,7 +836,8 @@ function EditRowForm({
           className="flex-1 min-h-10 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
         >
           {saving && <Spinner />}
-          💾 Сохранить
+          <Icon name="save" size={16} />
+          Сохранить
         </button>
         <button
           type="button"
@@ -908,7 +922,8 @@ function ParserBox({
           className="flex-1 min-h-10 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
         >
           {parsing && <Spinner />}
-          📋 Распарсить
+          <Icon name="copy" size={16} />
+          Распарсить
         </button>
         {drafts && (
           <button
@@ -964,7 +979,8 @@ function ParserBox({
             className="w-full min-h-10 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 inline-flex items-center justify-center gap-2"
           >
             {adding && <Spinner />}
-            ➕ Добавить выбранные ({selected.size})
+            <Icon name="plus" size={16} />
+          Добавить выбранные ({selected.size})
           </button>
         </div>
       )}
@@ -1049,7 +1065,14 @@ function AddProxyForm({
         className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
       >
         {isPending && <Spinner />}
-        {isPending ? "Добавляем…" : "➕ Добавить"}
+        {isPending ? (
+          "Добавляем…"
+        ) : (
+          <>
+            <Icon name="plus" size={16} />
+            Добавить
+          </>
+        )}
       </button>
     </div>
   );
@@ -1075,7 +1098,7 @@ function AddResultBanner({
     : dead
       ? "bg-status-busy/15 text-status-busy border-status-busy/40"
       : "bg-tg-link/15 text-tg-link border-tg-link/40";
-  const icon = ok ? "✅" : dead ? "⚠️" : "ℹ️";
+
   let msg: string;
   if (!ping_result) {
     msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"} (не пинговали — enabled=false)`;
@@ -1090,15 +1113,20 @@ function AddResultBanner({
     <div
       className={`flex items-start gap-2 rounded-tile border ${cls} px-3 py-2 text-sm`}
     >
-      <span className="mt-0.5">{icon}</span>
+      <Icon
+        name={ok ? "check" : dead ? "alert" : "link"}
+        size={16}
+        className="mt-0.5 shrink-0"
+      />
       <span className="flex-1 min-w-0 break-words">{msg}</span>
       <button
         type="button"
         onClick={onDismiss}
         className="text-current opacity-70 hover:opacity-100"
         title="Скрыть"
+        aria-label="Скрыть"
       >
-        ✕
+        <Icon name="close" size={14} />
       </button>
     </div>
   );
@@ -1133,7 +1161,10 @@ function AddErrorsSection({
           className="flex-1 text-left text-base font-semibold flex items-center gap-2 text-status-busy"
         >
           <span>{open ? "▼" : "▶"}</span>
-          <span>🚨 Ошибки добавления ({errors.length})</span>
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="alert" size={16} />
+            Ошибки добавления ({errors.length})
+          </span>
         </button>
         <button
           type="button"
@@ -1143,7 +1174,9 @@ function AddErrorsSection({
           }}
           className="min-h-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
         >
-          {isClearing && <Spinner />}✕ Очистить
+          {isClearing && <Spinner />}
+          <Icon name="close" size={14} />
+          Очистить
         </button>
       </div>
       {open && (

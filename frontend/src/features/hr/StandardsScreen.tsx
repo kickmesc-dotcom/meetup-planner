@@ -14,6 +14,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -59,7 +60,10 @@ export default function StandardsScreen() {
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">📚 Стандарты</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+            <Icon name="book" size={15} className="shrink-0" />
+            Стандарты
+          </div>
           <div className="text-xs text-tg-hint">
             Инструкции и короткие тесты по ним
           </div>
@@ -107,9 +111,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
   if (!data || data.items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="text-4xl" aria-hidden>
-          📚
-        </div>
+        <Icon name="book" size={34} className="text-tg-hint" />
         <div className="mt-2 text-sm font-medium text-tg-text">
           Стандартов пока нет
         </div>
@@ -170,7 +172,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
                 className="flex w-full items-start gap-3 rounded-card bg-tg-secondary-bg/60 p-3 text-left"
               >
                 <span className="text-xl leading-none" aria-hidden>
-                  {item.emoji ?? "📄"}
+                  {item.emoji ?? <Icon name="book" size={18} />}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-start justify-between gap-2">
@@ -271,7 +273,8 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-tg-text">
-            {standard?.emoji ?? "📄"} {standard?.title ?? "Стандарт"}
+            {standard?.emoji ? `${standard.emoji} ` : ""}
+            {standard?.title ?? "Стандарт"}
           </div>
           <div className="text-xs text-tg-hint">
             {standard
@@ -312,9 +315,13 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
                 ? "Обязательный: не сдавшие попадают в отчёт смены"
                 : "Сделать обязательным для отчёта смены"}
             </span>
-            <span aria-hidden className="ml-2 shrink-0 text-base">
-              {standard.is_required ? "☑" : "☐"}
-            </span>
+            {standard.is_required && (
+              <Icon
+                name="check"
+                size={16}
+                className="ml-2 shrink-0 text-tg-link"
+              />
+            )}
           </button>
         )}
 
@@ -377,7 +384,18 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
                 : "bg-status-busy/15 text-status-busy",
             ].join(" ")}
           >
-            {result.passed ? "✅ Сдано" : "❌ Пока не сдано"}: {result.correct} из{" "}
+            {result.passed ? (
+              <>
+                <InlineIcon name="check" />
+                Сдано
+              </>
+            ) : (
+              <>
+                <InlineIcon name="close" />
+                Пока не сдано
+              </>
+            )}
+            : {result.correct} из{" "}
             {result.total} верно ({result.percent}%, нужно {result.pass_percent}%).
             {!result.passed && " Перечитай инструкцию и попробуй снова."}
           </div>
@@ -486,7 +504,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
             value={emoji}
             onChange={(e) => setEmoji(e.target.value)}
             maxLength={4}
-            placeholder="🧼"
+            placeholder="Значок"
             className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
           />
         </label>
@@ -582,7 +600,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                   className="min-h-11 min-w-11 rounded-tile text-xs text-tg-hint"
                   aria-label="Удалить вопрос"
                 >
-                  ✕
+                  <Icon name="close" size={14} />
                 </button>
               )}
             </div>

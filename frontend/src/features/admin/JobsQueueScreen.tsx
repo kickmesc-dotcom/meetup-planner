@@ -26,6 +26,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -99,13 +100,13 @@ export default function JobsQueueScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="📋 Очередь задач"
+      title="Очередь задач"
       subtitle="APScheduler-job'ы + напоминания встреч"
       onBack={onBack}
     >
       <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="text-base font-semibold">📋 Очередь</div>
+          <div className="text-base font-semibold">Очередь</div>
           <button
             type="button"
             onClick={() => {
@@ -116,12 +117,14 @@ export default function JobsQueueScreen({ onBack }: Props) {
             className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint active:scale-95 transition-transform"
             title="Обновить и опрашивать чаще 3 минуты"
           >
-            ↻ {isHot ? "тик 5с" : "тик 10м"}
+            <Icon name="refresh" size={13} className="mr-1 inline-block" />
+            {isHot ? "тик 5с" : "тик 10м"}
           </button>
         </div>
         <div className="text-xs text-tg-hint mb-2">
-          ✎ — подвинуть время ближайшего запуска. 🚫 — пропустить ближайший
-          запуск (recurring остаётся, one-shot/reminder удаляются).
+          <InlineIcon name="edit" /> — подвинуть время ближайшего запуска.{" "}
+          <InlineIcon name="close" /> — пропустить ближайший запуск (recurring
+          остаётся, one-shot/reminder удаляются).
         </div>
         {/* GHG11(3): аварийная мастер-кнопка — пересобрать планировщик с нуля. */}
         <button
@@ -141,7 +144,12 @@ export default function JobsQueueScreen({ onBack }: Props) {
         >
           {collapse.isPending
             ? "Пересобираем…"
-            : "🧨 Схлопнуть все запланированные авто-задачи"}
+            : (
+                <>
+                  <Icon name="bolt" size={14} className="mr-1 inline-block" />
+                  Схлопнуть все запланированные авто-задачи
+                </>
+              )}
         </button>
         {jobs.isPending ? (
           <ListSkeleton rows={4} />
@@ -197,8 +205,8 @@ function JobRow({
   const editable = job.editable !== false;
   const kindLabel =
     job.trigger_kind ?? (job.kind as ScheduledJob["trigger_kind"]) ?? "unknown";
-  const cancelLabel =
-    kindLabel === "date" || job.kind === "reminder" ? "🚫" : "⏭";
+  const cancelIsDelete =
+    kindLabel === "date" || job.kind === "reminder";
   const cancelTitle =
     kindLabel === "date" || job.kind === "reminder"
       ? "Удалить"
@@ -239,8 +247,9 @@ function JobRow({
               disabled={pending}
               className="min-h-11 min-w-11 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-text border border-tg-hint/30 disabled:opacity-40"
               title="Изменить время"
+              aria-label="Изменить время"
             >
-              ✎
+              <Icon name="edit" size={16} />
             </button>
             <button
               type="button"
@@ -248,8 +257,13 @@ function JobRow({
               disabled={pending}
               className="min-h-11 min-w-11 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-40 inline-flex items-center justify-center"
               title={cancelTitle}
+              aria-label={cancelTitle}
             >
-              {pending ? <Spinner /> : cancelLabel}
+              {pending ? (
+                <Spinner />
+              ) : (
+                <Icon name={cancelIsDelete ? "trash" : "chevron"} size={16} />
+              )}
             </button>
           </>
         )}
@@ -275,9 +289,11 @@ function JobRow({
               onReschedule(iso);
             }}
             disabled={pending}
-            className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform"
+            className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40            active:scale-[0.98] transition-transform"
+            aria-label="Сохранить время"
+            title="Сохранить время"
           >
-            💾
+            <Icon name="save" size={16} />
           </button>
         </div>
       )}

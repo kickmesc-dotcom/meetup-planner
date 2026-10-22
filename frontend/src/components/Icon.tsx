@@ -50,7 +50,21 @@ export type IconName =
   | "door"
   | "sun"
   | "moon"
-  | "lock";
+  | "lock"
+  // P1.4, проход по админке и сервисным экранам: ссылки, сохранение,
+  // копирование, бот, закладка, почта, звезда, настройки, скорость и сигнал.
+  | "link"
+  | "save"
+  | "copy"
+  | "sparkles"
+  | "bot"
+  | "pin"
+  | "inbox"
+  | "star"
+  | "settings"
+  | "swap"
+  | "signal"
+  | "bolt";
 
 interface Props extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
@@ -277,4 +291,69 @@ const PATHS: Record<IconName, ReactElement> = {
       <path d="M8.2 10.8V7.9a3.8 3.8 0 0 1 7.6 0v2.9M12 14.4v2" />
     </>
   ),
+  link: (
+    <>
+      <path d="M9.6 14.4l4.8-4.8" />
+      <path d="M13.2 7.2 15 5.4a3.6 3.6 0 0 1 5.1 5.1L18.3 12.3" />
+      <path d="M10.8 16.8 8.9 18.6a3.6 3.6 0 0 1-5.1-5.1l1.8-1.8" />
+    </>
+  ),
+  save: (
+    <>
+      <path d="M5 4.5h11.2L19.5 8v11.5h-15z" />
+      <path d="M8.5 4.5v5h7v-5M8.5 19.5v-5.2h7v5.2" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="8.5" y="8.5" width="11" height="11.5" rx="2" />
+      <path d="M15.5 8.5V5.8a1.8 1.8 0 0 0-1.8-1.8H5.8A1.8 1.8 0 0 0 4 5.8v7.9a1.8 1.8 0 0 0 1.8 1.8h2.7" />
+    </>
+  ),
+  sparkles: (
+    <>
+      <path d="M11 3.8 12.5 8l4.2 1.5L12.5 11 11 15.2 9.5 11 5.3 9.5 9.5 8z" />
+      <path d="M17.8 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" />
+    </>
+  ),
+  bot: (
+    <>
+      <rect x="4.2" y="8" width="15.6" height="11" rx="3" />
+      <path d="M12 4.2V8M9 3h6" />
+      <circle cx="9.2" cy="13" r="1.1" fill="currentColor" stroke="none" />
+      <circle cx="14.8" cy="13" r="1.1" fill="currentColor" stroke="none" />
+      <path d="M9.5 16.4h5" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s6.2-5.6 6.2-10.2A6.2 6.2 0 0 0 5.8 10.8C5.8 15.4 12 21 12 21Z" />
+      <circle cx="12" cy="10.4" r="2.4" />
+    </>
+  ),
+  inbox: (
+    <>
+      <path d="M4 5.2h16v13.6H4z" />
+      <path d="M4 13.2h4.2l1.3 2h5l1.3-2H20" />
+    </>
+  ),
+  star: <path d="m12 4 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 9.7l5.4-.8z" />,
+  // «Настройки» — ползунки: так иконка читается даже в 13 px, в отличие
+  // от шестерёнки с мелкими зубцами.
+  settings: (
+    <>
+      <path d="M4 7h6M14 7h6M4 12h10M18 12h2M4 17h4M12 17h8" />
+      <circle cx="12" cy="7" r="1.9" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="12" r="1.9" fill="currentColor" stroke="none" />
+      <circle cx="10" cy="17" r="1.9" fill="currentColor" stroke="none" />
+    </>
+  ),
+  swap: (
+    <>
+      <path d="M7 4.5v15M7 4.5 4.2 7.3M7 4.5l2.8 2.8" />
+      <path d="M17 19.5v-15M17 19.5l-2.8-2.8M17 19.5l2.8-2.8" />
+    </>
+  ),
+  signal: <path d="M5 18.5V15M9.5 18.5v-6M14 18.5V9M18.5 18.5V6.5" />,
+  bolt: <path d="M13.2 3.5 5.8 13h5l-1 7.5L17.4 11h-5.1z" />,
 };

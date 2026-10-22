@@ -11,6 +11,7 @@ import { fetchPollPresetsPublic } from "@/api/admin";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
+import Icon, { InlineIcon } from "@/components/Icon";
 import BottomSheet from "./BottomSheet";
 
 export default function AutoPickSheet() {
@@ -65,8 +66,7 @@ export default function AutoPickSheet() {
       });
     },
     onSuccess: () => {
-      haptic("success");
-      setPollMsg("📊 Опрос опубликован в чате — голосуйте.");
+      haptic("success");        setPollMsg("Опрос опубликован в чате — голосуйте.");
       qc.invalidateQueries({ queryKey: ["polls"] });
     },
     onError: (e) => {
@@ -97,12 +97,13 @@ export default function AutoPickSheet() {
         </label>
         {presetsQ.data && presetsQ.data.length > 0 && (
           <div className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-xs text-tg-hint">
-            🕒 Слоты времени:{" "}
+            <InlineIcon name="clock" />
+            Слоты времени:{" "}
             <span className="text-tg-text">
               {presetsQ.data.map((p) => `${p.start}–${p.end}`).join(", ")}
             </span>
             <div className="mt-0.5 text-2xs">
-              Меняются в админке → «🕒 Пресеты времени».
+              Меняются в админке → «Пресеты времени».
             </div>
           </div>
         )}
@@ -135,11 +136,19 @@ export default function AutoPickSheet() {
                   {format(new Date(s.starts_at), "EEE d MMM, HH:mm")} →{" "}
                   {format(new Date(s.ends_at), "HH:mm")}
                 </div>
-                <div className="text-xs text-tg-hint">★ {s.score.toFixed(1)}</div>
+                <div className="text-xs text-tg-hint">
+                  <Icon
+                    name="star"
+                    size={11}
+                    className="mr-0.5 inline-block align-[-1px]"
+                  />
+                  {s.score.toFixed(1)}
+                </div>
               </div>
               <div className="mt-1 text-xs">
                 <span className="text-status-free">
-                  ✓ {s.available_user_ids.map((id) => usersById.get(id)?.display_name ?? id).join(", ") || "—"}
+                  <InlineIcon name="check" />
+                  {s.available_user_ids.map((id) => usersById.get(id)?.display_name ?? id).join(", ") || "—"}
                 </span>
                 {s.maybe_user_ids.length > 0 && (
                   <span className="ml-2 text-status-maybe">
@@ -163,7 +172,14 @@ export default function AutoPickSheet() {
           disabled={pollMut.isPending}
           className="mt-3 w-full rounded-card bg-status-maybe/20 py-3 font-medium text-tg-text disabled:opacity-50"
         >
-          {pollMut.isPending ? "Публикуем…" : "📊 Опубликовать опрос топ-3"}
+          {pollMut.isPending ? (
+            "Публикуем…"
+          ) : (
+            <>
+              <Icon name="send" size={16} className="mr-1 inline-block align-[-2px]" />
+              Опубликовать опрос топ-3
+            </>
+          )}
         </button>
       )}
       {pollMsg && (

@@ -13,12 +13,15 @@ import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
 import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
+import Icon, { InlineIcon } from "@/components/Icon";
 
+// P1.4: ответ на встречу — слово, а не эмодзи. В чипе у имени текст ещё и
+// читается скринридером, в отличие от картинки ОС.
 const RSVP_LABELS: Record<number, string> = {
-  0: "?",
-  1: "✅",
-  2: "🤔",
-  3: "🙅",
+  0: "—",
+  1: "идёт",
+  2: "может",
+  3: "нет",
 };
 
 interface Props {
@@ -93,10 +96,10 @@ export default function MeetingsScreen({ users, meId }: Props) {
   if (list.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="text-4xl mb-2">📭</div>
+        <Icon name="inbox" size={34} className="mb-2 text-tg-hint" />
         <div className="text-tg-hint">Запланированных встреч пока нет.</div>
         <div className="text-xs text-tg-hint mt-2">
-          Открой «Календарь» → ⚡ → авто-подбор лучших слотов.
+          Открой «Календарь» и запусти авто-подбор лучших слотов.
         </div>
       </div>
     );
@@ -157,12 +160,16 @@ function Card({
             {format(end, "HH:mm", { locale: ru })}
           </div>
           {meeting.location && (
-            <div className="text-xs text-tg-hint mt-0.5">📍 {meeting.location}</div>
+            <div className="text-xs text-tg-hint mt-0.5">
+              <InlineIcon name="pin" />
+              {meeting.location}
+            </div>
           )}
         </div>
         {meeting.auto_picked && meeting.score != null && (
           <div className="rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs font-medium text-tg-link shrink-0">
-            ⭐ {meeting.score.toFixed(1)}
+            <Icon name="star" size={12} className="mr-0.5 inline-block align-[-2px]" />
+            {meeting.score.toFixed(1)}
           </div>
         )}
       </div>
@@ -197,9 +204,9 @@ function Card({
       </div>
 
       <div className="mt-3 flex gap-1.5">
-        <RsvpBtn label="✅ Приду" active={my === 1} onClick={() => onRsvp(1)} />
-        <RsvpBtn label="🤔 Может" active={my === 2} onClick={() => onRsvp(2)} />
-        <RsvpBtn label="🙅 Нет" active={my === 3} onClick={() => onRsvp(3)} />
+        <RsvpBtn label="Приду" active={my === 1} onClick={() => onRsvp(1)} />
+        <RsvpBtn label="Может" active={my === 2} onClick={() => onRsvp(2)} />
+        <RsvpBtn label="Нет" active={my === 3} onClick={() => onRsvp(3)} />
       </div>
 
       {isCreator && (
@@ -264,7 +271,8 @@ function IcalSubscribeButton() {
       onClick={onTap}
       className="w-full min-h-11 rounded-card bg-tg-secondary-bg/60 px-3 py-2 text-sm text-tg-text active:bg-tg-secondary-bg"
     >
-      📥 Подписаться в системный календарь
+      <Icon name="calendar" size={15} className="mr-1 inline-block align-[-2px]" />
+      Подписаться в системный календарь
     </button>
   );
 }

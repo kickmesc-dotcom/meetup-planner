@@ -17,6 +17,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { Spinner } from "@/components/Spinner";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -78,27 +79,32 @@ export default function SpaceRestartScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🔄 Рестарт Space"
+      title="Рестарт Space"
       subtitle="Принудительный перезапуск backend-контейнера на HF"
       onBack={onBack}
     >
       {q.isPending && <div className="text-xs text-tg-hint">Загрузка…</div>}
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ {humanizeApiError(q.error)}
+          <InlineIcon name="alert" />
+          {humanizeApiError(q.error)}
         </div>
       )}
 
       {q.data && !available && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ Env <code>HF_TOKEN</code> не задан в настройках Space — рестарт
+          <InlineIcon name="alert" />
+          Env <code>HF_TOKEN</code> не задан в настройках Space — рестарт
           недоступен. Добавь write-токен HF в секреты Space.
         </div>
       )}
 
       {q.data && (
         <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-          <div className="text-sm font-semibold text-tg-text">⚡ Сейчас</div>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+            <Icon name="bolt" size={15} className="shrink-0" />
+            Сейчас
+          </div>
           <div className="text-xs text-tg-hint">
             Лечит зависшие сетевые состояния (дохлый keep-alive-пул).
             Mini App переключается бесшовно; бот восстанавливает вебхук
@@ -117,7 +123,8 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             {restart.isPending && <Spinner />}
-            🔄 Рестарт Space
+            <Icon name="refresh" size={16} />
+            Рестарт Space
           </button>
           {q.data.last_restart_at && (
             <div className="text-xs text-tg-hint">
@@ -131,7 +138,10 @@ export default function SpaceRestartScreen({ onBack }: Props) {
         <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
           <div>
             <div className="text-sm font-semibold text-tg-text">
-              📅 По расписанию
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="calendar" size={15} />
+                По расписанию
+              </span>
             </div>
             <div className="text-xs text-tg-hint">
               Анти-луп: не чаще раза в 30 минут (после ручного — тоже).
@@ -229,7 +239,8 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
-            💾 Сохранить расписание
+            <Icon name="save" size={16} />
+            Сохранить расписание
           </button>
         </section>
       )}

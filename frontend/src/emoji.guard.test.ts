@@ -45,6 +45,17 @@ const GUARDED = [
   "features/shifts/ShiftsScreen.tsx",
   "features/desktop/DesktopShell.tsx",
   "features/desktop/OverviewRail.tsx",
+  // Второй проход P1.4 (22.10.2026): админка и сервисные экраны, где эмодзи
+  // соседствовали с иконками на одном экране.
+  "features/admin/ProxyScreen.tsx",
+  "features/admin/JobsQueueScreen.tsx",
+  "features/admin/BirthdaysScreen.tsx",
+  "features/admin/SpaceRestartScreen.tsx",
+  "features/calendar/BirthdayPopover.tsx",
+  "features/calendar/ParticipantRow.tsx",
+  "features/meetings/MeetingsScreen.tsx",
+  "features/hr/StandardsScreen.tsx",
+  "features/actions/AutoPickSheet.tsx",
 ];
 
 // Пиктограммы, символы статусов и variation selector: всё, что рисует ОС,
