@@ -42,10 +42,16 @@ const ADMIN_ITEM: Item = { id: "admin", label: "Админ", icon: "admin" };
 export default function TabBar({
   isAdmin,
   canManage = false,
+  openTasks = 0,
 }: {
   isAdmin: boolean;
   /** Руководитель или прописанный админ — видит сводку по команде. */
   canManage?: boolean;
+  /**
+   * Открытые поручения для счётчика на «Задачах». Приём из соцсетей: число
+   * на разделе видно до перехода, без открытия экрана.
+   */
+  openTasks?: number;
 }) {
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
@@ -78,6 +84,11 @@ export default function TabBar({
               "relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
+            aria-label={
+              it.id === "tasks" && openTasks > 0
+                ? `${it.label}, открытых: ${openTasks}`
+                : undefined
+            }
           >
             {active && (
               <motion.span
@@ -90,6 +101,18 @@ export default function TabBar({
                 быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
             <Icon name={it.icon} size={20} />
             <span className="w-full truncate text-center">{it.label}</span>
+            {it.id === "tasks" && openTasks > 0 && (
+              // Счётчик читается как «Задачи: 3 открытых» через aria-label
+              // кнопки; сама цифра декоративная, иначе скринридер прочитает
+              // «Задачи 3» без объяснения, что это за 3.
+              <span
+                aria-hidden
+                data-testid="tab-tasks-badge"
+                className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-tg-link/15 px-1 text-3xs font-semibold text-tg-text"
+              >
+                {openTasks > 9 ? "9+" : openTasks}
+              </span>
+            )}
           </button>
         );
       })}

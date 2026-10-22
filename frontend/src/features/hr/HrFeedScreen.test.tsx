@@ -15,21 +15,26 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HrFeedScreen from "./HrFeedScreen";
 import {
+  fetchEmployee,
   fetchEmployeeCard,
   fetchFeedFilters,
   fetchHrFeed,
+  type HrEmployee,
   type HrFeedItem,
 } from "@/api/hr";
+import { markFeedSeen, readFeedSeen } from "@/features/hr/feedSeen";
 
 vi.mock("@/api/hr", () => ({
   fetchHrFeed: vi.fn(),
   fetchFeedFilters: vi.fn(),
   fetchEmployeeCard: vi.fn(),
+  fetchEmployee: vi.fn(),
 }));
 
 const feedMock = vi.mocked(fetchHrFeed);
 const filtersMock = vi.mocked(fetchFeedFilters);
 const cardMock = vi.mocked(fetchEmployeeCard);
+const meMock = vi.mocked(fetchEmployee);
 
 function item(overrides: Partial<HrFeedItem> = {}): HrFeedItem {
   return {
@@ -64,8 +69,11 @@ function renderFeed(items: HrFeedItem[]) {
 }
 
 beforeEach(() => {
+  window.localStorage.clear();
   feedMock.mockReset();
   filtersMock.mockReset();
+  meMock.mockReset();
+  meMock.mockResolvedValue({ id: 1 } as unknown as HrEmployee);
   filtersMock.mockResolvedValue({
     scope: "all",
     can_filter: false,
@@ -164,6 +172,43 @@ describe("HrFeedScreen (P1.8)", () => {
     // Строка ленты начинается с иконки типа: раньше здесь стоял ✅.
     expect(container.querySelector("article svg")).toBeTruthy();
     expect(container.textContent ?? "").not.toMatch(/[✅🗒📌🔄📷⚠]/u);
+  });
+
+  it("рисует границу «Новые» после последнего непрочитанного", async () => {
+    // Отметка — между вторым и третьим событием (лента от новых к старым).
+    markFeedSeen(1, Date.parse("2026-10-22T09:15:00Z"));
+    const { container } = renderFeed([
+      item({ at: "2026-10-22T10:00:00Z", ref_id: 1, text: "свежее" }),
+      item({ at: "2026-10-22T09:30:00Z", ref_id: 2, text: "тоже новое" }),
+      item({ at: "2026-10-22T08:00:00Z", ref_id: 3, text: "прочитанное" }),
+    ]);
+
+    const divider = await screen.findByRole("separator", {
+      name: "Новые события: 2",
+    });
+    const text = container.textContent ?? "";
+    const at = text.indexOf("Новые · 2");
+    expect(divider.textContent).toContain("Новые · 2");
+    // Граница идёт после новых строк и до уже прочитанных.
+    expect(text.indexOf("тоже новое")).toBeLessThan(at);
+    expect(at).toBeLessThan(text.indexOf("прочитанное"));
+    expect(screen.getByTestId("feed-fresh-count").textContent).toBe("2 новых");
+  });
+
+  it("на первом визите не объявляет всю историю новой", async () => {
+    renderFeed([item({ at: "2026-10-21T10:00:00Z", text: "вчерашнее" })]);
+
+    await screen.findByText("вчерашнее");
+    expect(screen.queryByRole("separator")).toBeNull();
+    expect(screen.queryByTestId("feed-fresh-count")).toBeNull();
+  });
+
+  it("запоминает просмотр при уходе с экрана", async () => {
+    renderFeed([item()]);
+    await screen.findByText("Пётр");
+
+    cleanup();
+    expect(readFeedSeen(1)).not.toBeNull();
   });
 
   it("не повторяет область видимости в пилюле и подзаголовке (P2.13)", async () => {

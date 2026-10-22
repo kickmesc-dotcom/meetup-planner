@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchChecklist, fetchTasks, type TaskStatus } from "@/api/hr";
+import { countOpenTasks, fetchChecklist, fetchTasks } from "@/api/hr";
 import { fetchIssues } from "@/api/issues";
 import Icon, { type IconName } from "@/components/Icon";
 import ProgressBar from "@/components/ProgressBar";
@@ -38,13 +38,9 @@ export default function OverviewRail() {
 
   const shift = checklistQ.data;
   const tasks = tasksQ.data ?? [];
-  // Тот же счёт, что в «Моих задачах»: закрытыми считаем только `done` и
-  // `failed`; `on_review` ещё ждёт приёмки и остаётся открытой работой.
-  const open = tasks.filter((t) => {
-    const status = (t.my_status ?? t.status) as TaskStatus;
-    return status !== "done" && status !== "failed";
-  });
-  const overdue = open.filter((t) => t.is_overdue).length;
+  // Тот же счёт, что в «Моих задачах» и на бейдже вкладки: правило живёт в
+  // `countOpenTasks`, поэтому числа не разъезжаются между экранами.
+  const { open: openCount, overdue } = countOpenTasks(tasks);
   const problems = issuesQ.data?.summary;
 
   const go = (tab: Tab) => {
@@ -96,7 +92,7 @@ export default function OverviewRail() {
           <Muted>Не удалось загрузить</Muted>
         ) : (
           <div className="flex items-end gap-4">
-            <Figure value={open.length} caption="открыто" />
+            <Figure value={openCount} caption="открыто" />
             <Figure
               value={overdue}
               caption="просрочено"

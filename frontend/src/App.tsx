@@ -14,7 +14,7 @@ import MyTasksScreen from "./features/hr/MyTasksScreen";
 import ChecklistScreen from "./features/hr/ChecklistScreen";
 import ShiftsScreen from "./features/shifts/ShiftsScreen";
 import TeamScreen from "./features/hr/TeamScreen";
-import { fetchEmployee } from "./api/hr";
+import { countOpenTasks, fetchEmployee, fetchTasks } from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
 import IssuesScreen from "./features/issues/IssuesScreen";
 import HandoversScreen from "./features/handovers/HandoversScreen";
@@ -51,6 +51,17 @@ export default function App() {
     queryFn: fetchEmployee,
     retry: false,
     staleTime: 60_000,
+  });
+  // Счётчик на «Задачах»: приём из соцсетей — число на разделе видно до
+  // перехода. Ключ тот же, что у «Моих задач» и рельса сводки, поэтому
+  // открытие экрана не повторяет запрос. Без HR-профиля (человека нет в
+  // штате) запрос не уходит: вкладки «Задачи» у него всё равно нет.
+  const tasksQ = useQuery({
+    queryKey: ["hr-tasks", false],
+    queryFn: () => fetchTasks(false),
+    enabled: hrMe.data?.onboarding_state === "done",
+    staleTime: 60_000,
+    retry: false,
   });
   const uiPrefs = useQuery({ queryKey: ["ui-prefs"], queryFn: fetchUiPrefs });
   const hideGreeting = useMutation({
@@ -187,6 +198,8 @@ export default function App() {
   // В режиме проверки админка скрыта: смотрим ровно глазами сотрудника.
   const isAdmin = !!meData.is_admin && !simulationId;
   const canManage = !!(hrMe.data?.is_aup || hrMe.data?.is_staff);
+  // Открытые поручения — одно число на оба каркаса (нижняя полоса и сайдбар).
+  const { open: openTasks } = countOpenTasks(tasksQ.data ?? []);
 
   // Онбординг — первая точка входа, а не форма внутри профиля.
   const onboarding = !!hrMe.data && hrMe.data.onboarding_state !== "done";
@@ -389,6 +402,7 @@ export default function App() {
         <DesktopShell
           canManage={canManage}
           isAdmin={isAdmin}
+          openTasks={openTasks}
           meName={hrMe.data?.display_name.replace("[BOT]", "").trim() || meData.display_name}
           meHint={
             hrMe.data?.position ??
@@ -412,7 +426,7 @@ export default function App() {
       <SimulationBanner />
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
       <TabTransition key={tab}>{content}</TabTransition>
-      <TabBar isAdmin={isAdmin} canManage={canManage} />
+      <TabBar isAdmin={isAdmin} canManage={canManage} openTasks={openTasks} />
     </div>
   );
 }

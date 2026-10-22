@@ -53,6 +53,7 @@ export default function DesktopShell({
   isAdmin,
   meName,
   meHint,
+  openTasks = 0,
   children,
 }: {
   /** Руководитель или прописанный админ: видны «Команда», приёмка и отчёты. */
@@ -61,6 +62,8 @@ export default function DesktopShell({
   isAdmin: boolean;
   meName: string;
   meHint: string;
+  /** Открытые поручения — счётчик рядом с «Мои задачи», как в соцсетях. */
+  openTasks?: number;
   children: ReactNode;
 }) {
   const tab = useUI((s) => s.tab);
@@ -137,6 +140,15 @@ export default function DesktopShell({
                         <span className="min-w-0 flex-1 truncate">
                           {item.label}
                         </span>
+                        {item.id === "tasks" && openTasks > 0 && (
+                          <span
+                            aria-hidden
+                            data-testid="desktop-tasks-badge"
+                            className="shrink-0 rounded-full bg-tg-link/15 px-1.5 text-2xs font-semibold text-tg-text"
+                          >
+                            {openTasks > 9 ? "9+" : openTasks}
+                          </span>
+                        )}
                       </button>
                     </li>
                   );

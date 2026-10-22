@@ -47,6 +47,25 @@ describe("TabBar", () => {
     expect(button?.className).toContain("text-2xs");
   });
 
+  it("показывает число открытых поручений, но не больше 9+", () => {
+    // Приём из соцсетей: цифра на разделе видна до перехода.
+    render(<TabBar isAdmin={false} openTasks={3} />);
+    expect(screen.getByTestId("tab-tasks-badge").textContent).toBe("3");
+    // Цифра не ломает доступное имя: объяснение — в aria-label кнопки.
+    expect(
+      screen.getByRole("button", { name: "Задачи, открытых: 3" }),
+    ).toBeTruthy();
+
+    cleanup();
+    render(<TabBar isAdmin={false} openTasks={12} />);
+    expect(screen.getByTestId("tab-tasks-badge").textContent).toBe("9+");
+  });
+
+  it("не рисует бейдж без открытых задач", () => {
+    render(<TabBar isAdmin={false} openTasks={0} />);
+    expect(screen.queryByTestId("tab-tasks-badge")).toBeNull();
+  });
+
   it("тап переключает вкладку", () => {
     render(<TabBar isAdmin={false} />);
     fireEvent.click(screen.getByText("Смена"));

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchEmployee,
   fetchFeedFilters,
   fetchHrFeed,
   type FeedKind,
@@ -14,6 +15,11 @@ import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
+import {
+  countFreshItems,
+  markFeedSeen,
+  readFeedSeen,
+} from "@/features/hr/feedSeen";
 
 /**
  * SemiTaskBot: «События смены» — лента с ролевой видимостью.
@@ -154,6 +160,33 @@ export default function HrFeedScreen() {
   // Чью карточку открыли (null — оверлей закрыт).
   const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
 
+  // Чей это просмотр: отметка «новое» хранится на сотрудника, а не на
+  // устройство — за одним компьютером могут работать двое.
+  const meQ = useQuery({
+    queryKey: ["hr-employee"],
+    queryFn: fetchEmployee,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const myEmployeeId = meQ.data?.id ?? null;
+  // `null` — отметки нет (первый визит) или сотрудник ещё не загрузился.
+  const [seenAt, setSeenAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (myEmployeeId === null || seenAt !== null) return;
+    // Первый визит: считаем «прочитанным» текущий момент, иначе вся история
+    // предприятия выглядела бы новой.
+    setSeenAt(readFeedSeen(myEmployeeId) ?? Date.now());
+  }, [myEmployeeId, seenAt]);
+
+  useEffect(() => {
+    if (myEmployeeId === null) return;
+    const employeeId = myEmployeeId;
+    // Отметка ставится на выходе: пока экран открыт, свежие события остаются
+    // «новыми» и не пропадают из-под курсора.
+    return () => markFeedSeen(employeeId);
+  }, [myEmployeeId]);
+
   const filtersQ = useQuery({
     queryKey: ["hr-feed-filters"],
     queryFn: fetchFeedFilters,
@@ -192,6 +225,11 @@ export default function HrFeedScreen() {
   const filters = filtersQ.data;
   const canFilter = feed?.can_filter === true;
   const items = feed?.items ?? [];
+  // «Новое» — верхушка ленты новее отметки просмотра. Считаем по тем же
+  // строкам, что видит человек (с учётом фильтров): если он смотрит только
+  // свои события, чужие не должны попадать в счётчик.
+  const freshCount = countFreshItems(items, seenAt);
+  const lastFresh = freshCount > 0 ? items[freshCount - 1] ?? null : null;
   const needle = search.trim().toLowerCase();
   // Выбранный человек остаётся в списке даже при поиске: иначе список показал
   // бы пустое значение и фильтр выглядел бы сброшенным.
@@ -227,9 +265,19 @@ export default function HrFeedScreen() {
             </span>
           )}
         </div>
-        <p className="mt-1 text-xs text-tg-hint">
-          {feed ? SCOPE_HINT[feed.scope] : "Загружаем правила видимости…"}
-        </p>
+        <div className="mt-1 flex items-start justify-between gap-2">
+          <p className="min-w-0 text-xs text-tg-hint">
+            {feed ? SCOPE_HINT[feed.scope] : "Загружаем правила видимости…"}
+          </p>
+          {freshCount > 0 && (
+            <span
+              data-testid="feed-fresh-count"
+              className="shrink-0 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs font-medium text-tg-text"
+            >
+              {freshCount} новых
+            </span>
+          )}
+        </div>
 
         {canFilter && filters && (
           <div className="mt-3 space-y-2">
@@ -355,15 +403,20 @@ export default function HrFeedScreen() {
             </h2>
             <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {group.items.map((item, i) => (
-                <FeedRow
-                  key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}
-                  item={item}
-                  departmentName={
-                    filters?.departments.find((d) => d.id === item.department_id)
-                      ?.name ?? null
-                  }
-                  onOpen={setCardEmployeeId}
-                />
+                <Fragment key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}>
+                  <FeedRow
+                    item={item}
+                    departmentName={
+                      filters?.departments.find(
+                        (d) => d.id === item.department_id,
+                      )?.name ?? null
+                    }
+                    onOpen={setCardEmployeeId}
+                  />
+                  {/* Разделитель стоит после последнего нового события, а не
+                      после первого: читаешь сверху вниз и видишь границу. */}
+                  {item === lastFresh && <FreshDivider count={freshCount} />}
+                </Fragment>
               ))}
             </div>
           </section>
@@ -404,6 +457,27 @@ export default function HrFeedScreen() {
           onClose={() => setCardEmployeeId(null)}
         />
       )}
+    </div>
+  );
+}
+
+/**
+ * Граница «новые / прочитанные» — приём из лент соцсетей.
+ *
+ * Без него возвращение в приложение выглядит одинаково всегда: непонятно,
+ * что появилось с прошлого визита. Яркой плашкой не делаем: это навигация по
+ * времени, а не действие и не тревога.
+ */
+function FreshDivider({ count }: { count: number }) {
+  return (
+    <div
+      role="separator"
+      aria-label={`Новые события: ${count}`}
+      className="flex items-center gap-2 bg-tg-link/10 px-3 py-1 text-3xs font-medium text-tg-link"
+    >
+      <span className="h-px flex-1 bg-tg-link/30" aria-hidden />
+      <span>Новые · {count}</span>
+      <span className="h-px flex-1 bg-tg-link/30" aria-hidden />
     </div>
   );
 }

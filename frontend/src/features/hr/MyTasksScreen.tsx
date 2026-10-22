@@ -6,6 +6,8 @@ import {
   fetchEmployee,
   attachTaskPhoto,
   fetchTasks,
+  isTaskClosedForMe,
+  ownTaskStatus,
   reportTaskIssue,
   runTaskAction,
   type HrTask,
@@ -57,11 +59,6 @@ const STATUS_CLASS: Record<TaskStatus, string> = {
   overdue: "bg-status-busy/20 text-status-busy",
   failed: "bg-status-busy/20 text-status-busy",
 };
-
-/** Личный статус: в групповом поручении агрегат не отвечает «сделал ли я». */
-function ownStatus(task: HrTask): TaskStatus {
-  return task.my_status ?? task.status;
-}
 
 /** «смена 14.05» из ISO-даты смены. */
 function fmtShift(iso: string | null): string | null {
@@ -176,10 +173,7 @@ export default function MyTasksScreen() {
   // «Активные» считаем по своему статусу: в режиме «каждый сам» задача ещё
   // открыта для коллег, хотя я свою часть уже закрыл. `on_review` тоже
   // активна: работа сдана, но пока не принята — это ещё не закрыто.
-  const open = tasks.filter((t) => {
-    const status = ownStatus(t);
-    return status !== "done" && status !== "failed";
-  });
+  const open = tasks.filter((t) => !isTaskClosedForMe(t));
   const overdue = open.filter((t) => t.is_overdue).length;
 
   return (
@@ -426,7 +420,7 @@ function TaskCard({
   onAction: (a: TaskAction) => void;
   onIssued: () => void;
 }) {
-  const status = ownStatus(task);
+  const status = ownTaskStatus(task);
   const closed = status === "done" || status === "failed";
   const shift = fmtShift(task.shift_date);
   const group = task.progress_total > 1;

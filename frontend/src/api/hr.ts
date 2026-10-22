@@ -381,6 +381,36 @@ export const fetchTasks = (includeClosed = false, shiftDate?: string) => {
 
 export type TaskAction = "accept" | "start" | "done";
 
+/**
+ * Мой статус поручения: в групповом режиме агрегат не отвечает «сделал ли я».
+ *
+ * Вынесено из экранов, потому что один и тот же счёт нужен в трёх местах:
+ * «Мои задачи», рельс сводки и бейдж на вкладке. Разъехавшиеся правила
+ * (например, `on_review`, посчитанный закрытым) дали бы разные числа на одном
+ * экране.
+ */
+export function ownTaskStatus(task: HrTask): TaskStatus {
+  return task.my_status ?? task.status;
+}
+
+/**
+ * Закрыта ли задача для меня. `on_review` — ещё нет: работа сдана, но ждёт
+ * приёмки, значит висит на сотруднике.
+ */
+export function isTaskClosedForMe(task: HrTask): boolean {
+  const status = ownTaskStatus(task);
+  return status === "done" || status === "failed";
+}
+
+/** Счёт для бейджа: сколько поручений открыто и сколько из них просрочено. */
+export function countOpenTasks(tasks: HrTask[]): {
+  open: number;
+  overdue: number;
+} {
+  const open = tasks.filter((task) => !isTaskClosedForMe(task));
+  return { open: open.length, overdue: open.filter((t) => t.is_overdue).length };
+}
+
 /** Приёмка работы руководителем: принять или вернуть на доработку. */
 export const reviewTask = (
   taskId: number,
