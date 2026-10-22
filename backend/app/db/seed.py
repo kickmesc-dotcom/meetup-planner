@@ -47,13 +47,15 @@ async def seed_users(session: AsyncSession) -> None:
             )
             log.info("seed.user_created", telegram_id=tg_id, name=name)
         else:
-            updated = False
-            if existing.display_name != name:
-                existing.display_name = name
-                updated = True
+            # Имя существующего человека сид НЕ трогает.
+            #
+            # Почему: `WHITELIST_NAMES` — это стартовые подписи, а не источник
+            # правды. Раньше каждый рестарт перезаписывал `display_name` из env,
+            # и любая правка имени (в профиле или миграцией) откатывалась при
+            # следующем деплое: владелец оставался «Серж-NEO» после того, как
+            # миграция `0050` уже переименовала его в «Сергей». Цвет — другое
+            # дело, он чисто оформительский и должен совпадать с палитрой.
             if existing.color_hex != color:
                 existing.color_hex = color
-                updated = True
-            if updated:
-                log.info("seed.user_updated", telegram_id=tg_id)
+                log.info("seed.user_color_updated", telegram_id=tg_id)
     await session.commit()
