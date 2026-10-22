@@ -38,6 +38,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.db.org_models import DEFAULT_ORG_ID
 
 # --------------------------------------------------------------------------
 # Роли и состояния (единый источник правды для сервисов и API)
@@ -271,11 +272,23 @@ class Department(Base):
 
     __tablename__ = "departments"
     __table_args__ = (
-        UniqueConstraint("slug", name="uq_department_slug"),
+        # Слаг уникален ВНУТРИ организации: у салона и у ресторана может быть
+        # свой «bar» без конфликта (B2B_PLATFORM_PLAN, шаг 1.4).
+        UniqueConstraint("org_id", "slug", name="uq_department_org_slug"),
         Index("ix_departments_active_sort", "is_active", "sort_order"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Тенант. Пока один контур, дефолт = 1; серверный дефолт снимем, когда все
+    # таблицы получат org_id и организация будет приходить явно.
+    org_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        default=DEFAULT_ORG_ID,
+        server_default=str(DEFAULT_ORG_ID),
+        index=True,
+    )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(String(64), nullable=False)
     emoji: Mapped[str | None] = mapped_column(String(16))
@@ -327,6 +340,16 @@ class Employee(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Тенант сотрудника. `user_id` остаётся глобальным: один человек — одна
+    # личность, членство в организациях живёт в `organization_members`.
+    org_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+        default=DEFAULT_ORG_ID,
+        server_default=str(DEFAULT_ORG_ID),
+        index=True,
+    )
     user_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="CASCADE"),

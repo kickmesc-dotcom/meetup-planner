@@ -53,6 +53,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0046_materials.py",
     "0047_checklist_halls.py",
     "0050_weekday_schedule_profile.py",
+    "0053_tenancy.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -88,6 +89,9 @@ HR_TABLES = {
     "standard_questions",
     "standard_checks",
     "hr_simulation_sessions",
+    # 0053_tenancy: организации и членство (B2B_PLATFORM_PLAN, фаза 1).
+    "organizations",
+    "organization_members",
 }
 
 
@@ -111,6 +115,9 @@ class _CapturingOp:
         return None
 
     def drop_constraint(self, *_a: Any, **_kw: Any) -> None:
+        return None
+
+    def create_unique_constraint(self, *_a: Any, **_kw: Any) -> None:
         return None
 
     def create_foreign_key(self, *_a: Any, **_kw: Any) -> None:

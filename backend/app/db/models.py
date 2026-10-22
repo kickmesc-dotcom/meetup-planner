@@ -1125,5 +1125,7 @@ def _user_default_color(_mapper, _conn, target: User) -> None:
 # импортируется ЗДЕСЬ, в самом конце: Alembic читает `app.db.models` и через этот
 # импорт видит все таблицы. Строку держим последней — чтобы `users` уже была
 # зарегистрирована в `Base.metadata` (у hr-моделей на неё FK).
+from app.db import org_models  # noqa: E402,F401  (организации; до hr_models —
+# у сотрудников и подразделений FK на `organizations`)
 from app.db import hr_models  # noqa: E402,F401  (регистрация таблиц)
 

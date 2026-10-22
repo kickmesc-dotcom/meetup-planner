@@ -12,6 +12,7 @@ from app.auth.initdata import InitDataError, InitDataPayload, parse_and_verify
 from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
+from app.db.org_models import Organization
 from app.db.models import User
 from app.services import display_names
 
@@ -239,3 +240,22 @@ async def require_admin(employee: EmployeeDep, user: CurrentUser) -> Employee:
 
 AupDep = Annotated[Employee, Depends(require_aup)]
 AdminDep = Annotated[Employee, Depends(require_admin)]
+
+
+async def current_org(session: SessionDep, employee: EmployeeDep) -> Organization:
+    """Организация текущего сотрудника (B2B_PLATFORM_PLAN, шаг 1.2).
+
+    Источник — `employees.org_id`, а не заголовок запроса: клиент не должен
+    выбирать тенант сам, иначе достаточно прислать чужой номер. Неактивная
+    организация закрывает доступ сразу, а не после истечения сессии: клиента
+    могли заблокировать за неоплату.
+    """
+    org = await session.get(Organization, employee.org_id)
+    if org is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="org_missing")
+    if not org.is_active:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="org_inactive")
+    return org
+
+
+OrgDep = Annotated[Organization, Depends(current_org)]
