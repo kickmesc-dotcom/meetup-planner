@@ -12,7 +12,7 @@ from app.auth.initdata import InitDataError, InitDataPayload, parse_and_verify
 from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
-from app.db.org_models import Organization
+from app.db.org_models import Organization, set_org
 from app.db.models import User
 from app.services import display_names
 
@@ -196,6 +196,7 @@ async def current_employee(
             )
             raise HTTPException(status_code, detail=code) from exc
         token = hr_simulation.activate(context)
+        set_org(context.shadow.org_id)
         try:
             yield context.shadow
         finally:
@@ -203,7 +204,11 @@ async def current_employee(
         return
 
     try:
-        yield await hr_access.ensure_employee(session, user)
+        employee = await hr_access.ensure_employee(session, user)
+        # Тенантский фильтр: все дальнейшие ORM-запросы в этом запросе видят
+        # только его организацию (см. `app/db/tenancy.py`).
+        set_org(employee.org_id)
+        yield employee
     except hr_access.HrAccessError as exc:
         # Уволенный сотрудник: доступ закрыт, пока его не вернут из корзины.
         # Отдаём 403 с кодом, чтобы приложение показало человеческий текст.

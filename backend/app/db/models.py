@@ -23,6 +23,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.db.org_models import OrgScoped
 
 
 class User(Base):
@@ -58,7 +59,7 @@ class User(Base):
     ranges: Mapped[list[AvailabilityRange]] = relationship(back_populates="user")
 
 
-class AvailabilityRange(Base):
+class AvailabilityRange(OrgScoped, Base):
     __tablename__ = "availability_ranges"
     __table_args__ = (
         CheckConstraint("confidence BETWEEN 1 AND 5", name="ck_avail_confidence"),
@@ -88,7 +89,7 @@ class AvailabilityRange(Base):
     user: Mapped[User] = relationship(back_populates="ranges")
 
 
-class Meeting(Base):
+class Meeting(OrgScoped, Base):
     __tablename__ = "meetings"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -107,7 +108,7 @@ class Meeting(Base):
     )
 
 
-class MeetingAttendance(Base):
+class MeetingAttendance(OrgScoped, Base):
     __tablename__ = "meeting_attendance"
 
     meeting_id: Mapped[int] = mapped_column(
@@ -120,7 +121,7 @@ class MeetingAttendance(Base):
     showed_up: Mapped[bool | None] = mapped_column(Boolean)
 
 
-class MeetingFeedback(Base):
+class MeetingFeedback(OrgScoped, Base):
     """GHG6 N2: пост-фактум 5★ оценка встречи + опция «меня не было»."""
 
     __tablename__ = "meeting_feedback"
@@ -145,7 +146,7 @@ class MeetingFeedback(Base):
     )
 
 
-class Poll(Base):
+class Poll(OrgScoped, Base):
     __tablename__ = "polls"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -170,7 +171,7 @@ class Poll(Base):
     )
 
 
-class PollOption(Base):
+class PollOption(OrgScoped, Base):
     __tablename__ = "poll_options"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -182,7 +183,7 @@ class PollOption(Base):
     label: Mapped[str | None] = mapped_column(Text)
 
 
-class PollVote(Base):
+class PollVote(OrgScoped, Base):
     __tablename__ = "poll_votes"
     __table_args__ = (
         UniqueConstraint("poll_option_id", "user_id", name="uq_poll_vote"),
@@ -199,7 +200,7 @@ class PollVote(Base):
     )
 
 
-class LoserRoll(Base):
+class LoserRoll(OrgScoped, Base):
     __tablename__ = "loser_rolls"
     __table_args__ = (
         Index("ix_loser_rolled_at", "rolled_at"),
@@ -219,7 +220,7 @@ class LoserRoll(Base):
     source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
 
 
-class LoserOutbox(Base):
+class LoserOutbox(OrgScoped, Base):
     """GHG7 P0.2 — статус доставки автолох-поста в групповой чат.
 
     Domain (`LoserRoll`) и delivery (`LoserOutbox`) разделены: при срабатывании
@@ -266,7 +267,7 @@ class LoserOutbox(Base):
     loser_roll: Mapped["LoserRoll"] = relationship("LoserRoll")
 
 
-class WormAssignment(Base):
+class WormAssignment(OrgScoped, Base):
     """Особая номинация «Червь-пидор» (E8, GHG6).
 
     Звание переходящее: в любой момент существует ≤1 активной строки
@@ -292,7 +293,7 @@ class WormAssignment(Base):
     )
 
 
-class BotPause(Base):
+class BotPause(OrgScoped, Base):
     """GHG6 E11 — глобальная пауза публикаций бота.
 
     Активная запись — `ended_at IS NULL`. В любой момент существует
@@ -320,10 +321,10 @@ class BotPause(Base):
     settings_snapshot: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
 
 
-class WeeklyChukhan(Base):
+class WeeklyChukhan(OrgScoped, Base):
     __tablename__ = "weekly_chukhan"
     __table_args__ = (
-        UniqueConstraint("week_start", name="uq_weekly_chukhan_week"),
+        UniqueConstraint("org_id", "week_start", name="uq_weekly_chukhan_org_week"),
         Index("ix_weekly_chukhan_week", "week_start"),
     )
 
@@ -344,7 +345,7 @@ class WeeklyChukhan(Base):
     )
 
 
-class MeetingReminder(Base):
+class MeetingReminder(OrgScoped, Base):
     __tablename__ = "meeting_reminders"
     __table_args__ = (
         UniqueConstraint("meeting_id", "offset_minutes", name="uq_meeting_reminder"),
@@ -375,7 +376,7 @@ class AdminConfig(Base):
     )
 
 
-class ChatMessage(Base):
+class ChatMessage(OrgScoped, Base):
     """Кэш последних сообщений из общей группы — нужен для «рандомных фраз»."""
     __tablename__ = "chat_messages"
     __table_args__ = (
@@ -393,7 +394,7 @@ class ChatMessage(Base):
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
-class Birthday(Base):
+class Birthday(OrgScoped, Base):
     """Дата рождения участника + пер-юзерные флаги напоминаний.
     bday хранится с реальным годом (nullable: год может быть неизвестен —
     тогда напоминания работают по месяцу/дню, возраст не показываем)."""
@@ -417,7 +418,7 @@ class Birthday(Base):
     )
 
 
-class BirthdayNotification(Base):
+class BirthdayNotification(OrgScoped, Base):
     """Журнал отправленных напоминаний — чтобы не слать дубли в один и тот же день."""
     __tablename__ = "birthday_notifications"
     __table_args__ = (
@@ -435,7 +436,7 @@ class BirthdayNotification(Base):
     )
 
 
-class ProxyEntry(Base):
+class ProxyEntry(OrgScoped, Base):
     """Пул прокси для аутgoing-трафика бота (P2 Smart Proxy).
 
     Используется AiohttpSession-фолбэком: при ошибке direct connect к
@@ -443,7 +444,7 @@ class ProxyEntry(Base):
     """
     __tablename__ = "proxy_entries"
     __table_args__ = (
-        UniqueConstraint("server", "port", name="uq_proxy_server_port"),
+        UniqueConstraint("org_id", "server", "port", name="uq_proxy_org_server_port"),
         Index("ix_proxy_enabled_dead", "enabled", "dead_until"),
     )
 
@@ -462,7 +463,7 @@ class ProxyEntry(Base):
     )
 
 
-class EventLog(Base):
+class EventLog(OrgScoped, Base):
     __tablename__ = "event_log"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -474,7 +475,7 @@ class EventLog(Base):
     payload: Mapped[dict] = mapped_column(JSONB, default=dict)
 
 
-class GameNomination(Base):
+class GameNomination(OrgScoped, Base):
     """GHG6 E6 — номинированные игры для голосования «Во что сыграем».
 
     Лимит активных (10) и проверка на дубль по `name` (case-insensitive)
@@ -496,7 +497,7 @@ class GameNomination(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class ParticipantPersona(Base):
+class ParticipantPersona(OrgScoped, Base):
     """GHG8 P6.1 — типаж участника для генератора фраз v2.
 
     Тексты живут ТОЛЬКО в Neon (проект — открытый git, персоналии в репо
@@ -530,7 +531,7 @@ class ParticipantPersona(Base):
 # ---------------------------------------------------------------------------
 
 
-class GameProfile(Base):
+class GameProfile(OrgScoped, Base):
     """GHG10: игровой профиль участника.
 
     Единственный источник правды по опыту — `xp`. Уровень, ранг и престиж
@@ -570,7 +571,7 @@ class GameProfile(Base):
     )
 
 
-class XpDaily(Base):
+class XpDaily(OrgScoped, Base):
     """GHG10: дневная история начислений (агрегат).
 
     Задание: «по ходу дня у пользователя накапливается история действий и
@@ -598,7 +599,7 @@ class XpDaily(Base):
     count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class XpGrant(Base):
+class XpGrant(OrgScoped, Base):
     """GHG10: маркеры идемпотентности для лимитированных начислений.
 
     `config.XpRule.limit` = "day"/"week"/"year"/"once" → пишем маркер с
@@ -609,7 +610,7 @@ class XpGrant(Base):
 
     __tablename__ = "xp_grants"
     __table_args__ = (
-        Index("ix_xp_grant_key", "user_id", "idem_key", unique=True),
+        Index("ix_xp_grant_key", "org_id", "user_id", "idem_key", unique=True),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -623,7 +624,7 @@ class XpGrant(Base):
     )
 
 
-class UserAchievement(Base):
+class UserAchievement(OrgScoped, Base):
     """GHG10: собранные ачивки. Каждую можно взять только один раз на юзера.
 
     `code` — код из каталога в коде; для юбилейных тиров код включает тир
@@ -632,7 +633,7 @@ class UserAchievement(Base):
 
     __tablename__ = "user_achievements"
     __table_args__ = (
-        Index("uq_user_achievement", "user_id", "code", unique=True),
+        Index("uq_user_achievement", "org_id", "user_id", "code", unique=True),
         Index("ix_user_achievement_unlocked", "unlocked_at"),
     )
 
@@ -646,7 +647,7 @@ class UserAchievement(Base):
     )
 
 
-class ChatActivityDaily(Base):
+class ChatActivityDaily(OrgScoped, Base):
     """GHG10: счётчик сообщений по дням — для недельных званий.
 
     Почему не из `chat_messages`: та таблица чистится через 7 дней и хранит
@@ -666,7 +667,7 @@ class ChatActivityDaily(Base):
     messages: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
 
-class AchievementCounter(Base):
+class AchievementCounter(OrgScoped, Base):
     """GHG10: накопители ачивок, которые НЕ выводятся из существующих таблиц.
 
     Большинство трекеров считает по уже имеющимся данным (`loser_rolls`,
@@ -693,7 +694,7 @@ class AchievementCounter(Base):
     )
 
 
-class GameHoliday(Base):
+class GameHoliday(OrgScoped, Base):
     """GHG10: пул праздников (дата + сообщение). По умолчанию — Новый год.
 
     `month`/`day` без года — праздник ежегодный, как ДР в `birthdays`
@@ -702,7 +703,7 @@ class GameHoliday(Base):
 
     __tablename__ = "game_holidays"
     __table_args__ = (
-        UniqueConstraint("month", "day", name="uq_game_holiday_md"),
+        UniqueConstraint("org_id", "month", "day", name="uq_game_holiday_org_md"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -718,7 +719,7 @@ class GameHoliday(Base):
     )
 
 
-class GameMediaPost(Base):
+class GameMediaPost(OrgScoped, Base):
     """GHG10 Э7: телеметрия мем-постов (мемолог / успешный успех / опиум).
 
     Живёт в БД, а не в памяти: HF Space перезапускается, а «скинул мем и 12
@@ -785,7 +786,7 @@ class GameMediaPost(Base):
     reacted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class GameJournalEntry(Base):
+class GameJournalEntry(OrgScoped, Base):
     """Э13: игровой журнал — сводка вместо спама и «поминальные» сообщения.
 
     Одна таблица решает две задачи, потому что у них общая механика: «событие
@@ -827,7 +828,7 @@ class GameJournalEntry(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class GamePrompt(Base):
+class GamePrompt(OrgScoped, Base):
     """Э13: случайное событие, требующее действия в чате.
 
     Бот постит призыв («Первый, кто напишет "я", получает 50 XP») и ждёт
@@ -862,7 +863,7 @@ class GamePrompt(Base):
     outcome: Mapped[str | None] = mapped_column(String(16))
 
 
-class GameVoiceTask(Base):
+class GameVoiceTask(OrgScoped, Base):
     """Э14: голосовое задание — бот ставит творческую задачу и собирает голосовые.
 
     Отличие от `GamePrompt` (случайное событие): там побеждает ПЕРВЫЙ, здесь
@@ -906,7 +907,7 @@ class GameVoiceTask(Base):
     outcome: Mapped[str | None] = mapped_column(String(16))
 
 
-class GameVoiceSubmission(Base):
+class GameVoiceSubmission(OrgScoped, Base):
     """Э14: одна сдача голосового. Храним ТОЛЬКО `file_id` (и метаданные),
 
     а не файл: хост слабый, качать и держать аудио нам нельзя. `file_id`
@@ -938,7 +939,7 @@ class GameVoiceSubmission(Base):
     )
 
 
-class MusicSelection(Base):
+class MusicSelection(OrgScoped, Base):
     """Э15: выпущенная подборка треков (история публикаций для админки).
 
     `tg_message_id IS NULL` + `note='shortfall'` — попытка публикации не
@@ -960,7 +961,7 @@ class MusicSelection(Base):
     )
 
 
-class MusicTrack(Base):
+class MusicTrack(OrgScoped, Base):
     """Э15: предложенный трек. Храним только ССЫЛКУ или `file_id` — не файл.
 
     `status`: 'pool' — ждёт подборки, 'published' — уже ушёл в подборку,
@@ -996,7 +997,7 @@ class MusicTrack(Base):
     )
 
 
-class MusicGameRound(Base):
+class MusicGameRound(OrgScoped, Base):
     """Э16 (GHG8 H.8): мьюзик-гейм — «угадай, кто предложил трек».
 
     Бот выдёргивает случайный трек из предложки и вывешивает опрос «кто его
@@ -1045,7 +1046,7 @@ class MusicGameRound(Base):
     outcome: Mapped[str | None] = mapped_column(String(16))
 
 
-class MusicTrackLike(Base):
+class MusicTrackLike(OrgScoped, Base):
     """Э17 (задел H.8): лайк треку из выпущенной подборки.
 
     Ставится из мини-аппа под подборкой недели (в чате — только текст). Лайк
@@ -1077,7 +1078,7 @@ class MusicTrackLike(Base):
     )
 
 
-class AppNotification(Base):
+class AppNotification(OrgScoped, Base):
     """GHG11(9): личное уведомление внутри мини-аппа.
 
     В чат такие события не ходят (лайк чужого трека — не новость для шестёрки),
@@ -1125,7 +1126,9 @@ def _user_default_color(_mapper, _conn, target: User) -> None:
 # импортируется ЗДЕСЬ, в самом конце: Alembic читает `app.db.models` и через этот
 # импорт видит все таблицы. Строку держим последней — чтобы `users` уже была
 # зарегистрирована в `Base.metadata` (у hr-моделей на неё FK).
-from app.db import org_models  # noqa: E402,F401  (организации; до hr_models —
-# у сотрудников и подразделений FK на `organizations`)
 from app.db import hr_models  # noqa: E402,F401  (регистрация таблиц)
 
+# Тенантский фильтр запросов (B2B_PLATFORM_PLAN, 1.3). Импорт внизу: слушатель
+# вешается на Session в момент импорта, а без него `org_id` остаётся просто
+# колонкой, которую каждый запрос обязан не забыть проверить.
+from app.db import tenancy  # noqa: E402,F401  (регистрация слушателя)

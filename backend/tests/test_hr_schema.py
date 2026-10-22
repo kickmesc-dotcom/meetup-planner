@@ -54,6 +54,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0047_checklist_halls.py",
     "0050_weekday_schedule_profile.py",
     "0053_tenancy.py",
+    "0054_tenant_columns.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -142,7 +143,12 @@ class _CapturingOp:
         return None
 
     def add_column(self, table: str, column: sa.Column, *_a: Any, **_kw: Any) -> None:
-        self.tables.setdefault(table, set()).add(column.name)
+        # Колонки добавляются уже после create_table (0054_tenant_columns).
+        # Новых таблиц здесь быть не может: `setdefault` насоздавал бы записи
+        # для таблиц, которые заводят другие миграции, и сверка «ровно эти
+        # таблицы» перестала бы что-либо значить.
+        if table in self.tables:
+            self.tables[table].add(column.name)
 
     def execute(self, *_a: Any, **_kw: Any) -> None:
         # `op.execute` в миграциях — это данные (переименование «Серж-NEO»), а

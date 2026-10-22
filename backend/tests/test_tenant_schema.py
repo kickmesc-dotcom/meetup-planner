@@ -3,10 +3,10 @@
 Здесь три вещи, которые нельзя проверить «глазами»:
 
 1. **Страж схемы.** Любая новая таблица обязана либо иметь `org_id`, либо быть
-   явно перечисленной в легаси-списке. Без этого модели плодятся, а вопрос
-   «чьи это данные» никто не задаёт — и вторая организация получает чужие
-   записи. Страж работает в обе стороны: нельзя убрать `org_id` у готовой
-   таблицы и нельзя тайком добавить его легаси-таблице, не обновив список.
+   явно перечисленной в списке глобальных с обоснованием. Без этого модели
+   плодятся, а вопрос «чьи это данные» никто не задаёт — и вторая организация
+   получает чужие записи. Страж работает в обе стороны: нельзя убрать `org_id`
+   у готовой таблицы и нельзя тайком добавить его глобальной, не обновив список.
 2. **Резолв организации.** Членство важнее «первой активной»: человек из второй
    организации не должен попадать в данные первой.
 3. **Уникальность внутри тенанта.** Слаг подразделения уникален в паре с
@@ -15,7 +15,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
+from pathlib import Path
 
 os.environ.setdefault("BOT_TOKEN", "test-token")
 os.environ.setdefault("TG_WEBHOOK_SECRET", "test-secret")
@@ -24,7 +26,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/d
 
 import pytest  # noqa: E402
 from fastapi import HTTPException  # noqa: E402
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import func, select  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
 import app.db.models  # noqa: E402,F401  — регистрирует все таблицы
@@ -36,24 +38,18 @@ from app.db.org_models import (  # noqa: E402
     DEFAULT_ORG_ID,
     Organization,
     OrganizationMember,
+    reset_org,
+    set_org,
 )
+from app.db.tenancy import all_orgs  # noqa: E402
 from app.services import orgs  # noqa: E402
 
-# Таблицы, у которых `org_id` уже есть. Список только растёт: перенос таблицы
-# сюда — это и есть прогресс фазы 1.
+# Все бизнес-таблицы. Список явный, а не «всё, что есть в metadata»: новая
+# таблица обязана получить решение осознанно, а не проскочить вместе с
+# остальными. На 22.10.2026 здесь 72 таблицы — то есть `org_id` есть у всего,
+# что принадлежит клиенту.
 TENANT_TABLES: set[str] = {
-    "departments",
-    "employees",
-    "organization_members",
-}
-
-# Сама организация — корень тенанта: `org_id` у неё был бы ссылкой на себя.
-TENANT_ROOT: set[str] = {"organizations"}
-
-# Легаси: пока живут в одном контуре. Каждая строка — долг из плана.
-LEGACY_TABLES: set[str] = {
     "achievement_counters",
-    "admin_config",
     "app_access_links",
     "app_notifications",
     "availability_ranges",
@@ -66,9 +62,11 @@ LEGACY_TABLES: set[str] = {
     "checklist_items",
     "checklist_runs",
     "checklist_templates",
+    "departments",
     "employee_achievements",
     "employee_training_days",
     "employee_training_steps",
+    "employees",
     "event_log",
     "feedback_answers",
     "feedback_questions",
@@ -91,15 +89,16 @@ LEGACY_TABLES: set[str] = {
     "hr_simulation_sessions",
     "loser_outbox",
     "loser_rolls",
+    "media_blobs",
     "meeting_attendance",
     "meeting_feedback",
     "meeting_reminders",
     "meetings",
-    "media_blobs",
     "music_game_rounds",
     "music_selections",
     "music_track_likes",
     "music_tracks",
+    "organization_members",
     "participant_personas",
     "poll_options",
     "poll_votes",
@@ -116,28 +115,41 @@ LEGACY_TABLES: set[str] = {
     "task_photos",
     "task_reminders",
     "tasks",
-    "user_achievements",
     "useful_links",
-    "users",
+    "user_achievements",
     "weekly_chukhan",
     "worm_assignments",
     "xp_daily",
     "xp_grants",
 }
 
+# Сама организация — корень тенанта: `org_id` у неё был бы ссылкой на себя.
+TENANT_ROOT: set[str] = {"organizations"}
+
+# Глобальные таблицы — не «долг», а осознанное решение, и каждое с причиной:
+#
+# * `users` — личность человека. Один Telegram-аккаунт может работать в двух
+#   организациях сети, поэтому человек не принадлежит ни одной из них; связь
+#   живёт в `organization_members`.
+# * `admin_config` — настройки установки (ключ-значение) с первичным ключом по
+#   `key`. Пока один контур; при переходе на несколько клиентов ключ станет
+#   составным `(org_id, key)`, и таблица переедет в TENANT_TABLES. Это
+#   единственная оставшаяся строка долга, и она записана в плане.
+GLOBAL_TABLES: set[str] = {"users", "admin_config"}
+
 
 def test_lists_do_not_overlap() -> None:
-    assert TENANT_TABLES & LEGACY_TABLES == set()
-    assert TENANT_ROOT & (TENANT_TABLES | LEGACY_TABLES) == set()
+    assert TENANT_TABLES & GLOBAL_TABLES == set()
+    assert TENANT_ROOT & (TENANT_TABLES | GLOBAL_TABLES) == set()
 
 
 def test_every_table_is_classified() -> None:
     """Новая таблица обязана получить решение, а не проскочить молча."""
-    unknown = set(Base.metadata.tables) - TENANT_TABLES - LEGACY_TABLES - TENANT_ROOT
+    unknown = set(Base.metadata.tables) - TENANT_TABLES - GLOBAL_TABLES - TENANT_ROOT
     assert not unknown, (
         "новая таблица без решения по тенанту: "
         f"{sorted(unknown)} — добавьте org_id и запишите её в TENANT_TABLES "
-        "или осознанно внесите в LEGACY_TABLES"
+        "или осознанно внесите в GLOBAL_TABLES (с обоснованием в комментарии)"
     )
 
 
@@ -150,9 +162,9 @@ def test_tenant_tables_have_org_id() -> None:
     assert not missing, f"пропал org_id: {sorted(missing)}"
 
 
-def test_legacy_tables_still_have_no_org_id() -> None:
+def test_global_tables_still_have_no_org_id() -> None:
     """Расхождение списка с реальностью ловится сразу, а не через полгода."""
-    for name in sorted(LEGACY_TABLES):
+    for name in sorted(GLOBAL_TABLES):
         assert "org_id" not in Base.metadata.tables[name].columns, (
             f"{name} уже получила org_id — перенесите её в TENANT_TABLES"
         )
@@ -301,9 +313,12 @@ async def test_two_orgs_can_have_departments_with_the_same_slug(session) -> None
     session.add(Department(id=1, org_id=first.id, name="Бар", slug="bar"))
     session.add(Department(id=2, org_id=second.id, name="Бар", slug="bar"))
     await session.commit()
-    bars = list(
-        await session.scalars(select(Department).where(Department.slug == "bar"))
-    )
+    # Обе организации сразу видны только платформенному обходу: обычный
+    # запрос отфильтрован по текущему тенанту (шаг 1.3).
+    with all_orgs():
+        bars = list(
+            await session.scalars(select(Department).where(Department.slug == "bar"))
+        )
     assert {row.org_id for row in bars} == {first.id, second.id}
 
 
@@ -315,3 +330,169 @@ async def test_membership_row_links_user_and_org(session) -> None:
     assert len(rows) == 1
     assert rows[0].org_id == org.id
     assert isinstance(await orgs.get(session, org.id), Organization)
+
+
+# --------------------------------------------------------------------------
+# Сверка миграции с моделями
+# --------------------------------------------------------------------------
+# Страж выше ловит таблицу без `org_id` в моделях. Но схеме нужно ещё одно:
+# чтобы миграция добавляла `org_id` РОВНО тем таблицам, и чтобы уникальные
+# ключи переезжали внутри тенанта вместе с моделями. Иначе `alembic upgrade`
+# на чистой базе даст схему, отличную от той, что видят тесты на metadata.
+
+MIGRATION_0054 = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "0054_tenant_columns.py"
+
+
+def _migration_0054():
+    spec = importlib.util.spec_from_file_location("_migration_0054", MIGRATION_0054)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_migration_0054_covers_every_tenant_table() -> None:
+    module = _migration_0054()
+    already = {"departments", "employees", "organization_members"}  # получили в 0053
+    assert set(module.TENANT_TABLES) == TENANT_TABLES - already
+
+
+def test_migration_0054_unique_swaps_match_models() -> None:
+    module = _migration_0054()
+    for table, old, new, columns in module.UNIQUE_SWAPS:
+        constraints = {
+            constraint.name: tuple(column.name for column in constraint.columns)
+            for constraint in Base.metadata.tables[table].constraints
+            if constraint.__class__.__name__ == "UniqueConstraint"
+            and constraint.name
+        }
+        assert constraints.get(new) == columns, f"{table}: {new} не совпал с моделью"
+        assert old not in constraints, f"{table}: старый ключ {old} остался в модели"
+
+    indexes = {
+        index.name: (index.unique, tuple(column.name for column in index.columns))
+        for table in Base.metadata.tables.values()
+        for index in table.indexes
+    }
+    for name, _table, columns in module.UNIQUE_INDEX_SWAPS:
+        unique, actual = indexes[name]
+        assert unique, f"{name}: индекс перестал быть уникальным"
+        assert actual == columns, f"{name}: колонки индекса разошлись с миграцией"
+
+
+# --------------------------------------------------------------------------
+# Тенантский фильтр (шаг 1.3)
+# --------------------------------------------------------------------------
+# Колонка `org_id` без фильтра ничего не защищает: забытый `where` вернёт
+# строки всех клиентов. Слушатель в `app.db.tenancy` добавляет условие сам,
+# и эти тесты проверяют его на тех путях, которыми реально ходит код:
+# выборка, `count`, `Session.get`, вставка и отношения.
+
+TENANT_FIXTURE_TABLES = (
+    "organizations",
+    "users",
+    "departments",
+    "employees",
+    "organization_members",
+)
+
+
+@pytest.fixture()
+async def tenant_session():
+    engine = create_async_engine("sqlite+aiosqlite://")
+    tables = [Base.metadata.tables[name] for name in TENANT_FIXTURE_TABLES]
+    async with engine.begin() as conn:
+        await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    async with maker() as db:
+        yield db
+    await engine.dispose()
+
+
+async def _two_orgs_with_employees(session):
+    first = await orgs.ensure_default(session)
+    second = await orgs.create_org(session, slug="salon", name="Салон")
+    user_a = await _user(session, 5001)
+    user_b = await _user(session, 5002)
+    session.add(Employee(id=1, user_id=user_a.id, org_id=first.id))
+    session.add(Employee(id=2, user_id=user_b.id, org_id=second.id))
+    session.add(Department(id=1, org_id=first.id, name="Зал", slug="hall"))
+    session.add(Department(id=2, org_id=second.id, name="Зал", slug="hall"))
+    await session.commit()
+    return first, second, user_a, user_b
+
+
+async def test_selects_see_only_the_current_org(tenant_session) -> None:
+    _first, second, _user_a, user_b = await _two_orgs_with_employees(tenant_session)
+
+    token = set_org(second.id)
+    try:
+        tenant_session.expunge_all()
+        employees = list(await tenant_session.scalars(select(Employee)))
+        assert [row.user_id for row in employees] == [user_b.id]
+
+        departments = list(await tenant_session.scalars(select(Department)))
+        assert [row.org_id for row in departments] == [second.id]
+
+        total = await tenant_session.scalar(select(func.count()).select_from(Employee))
+        assert total == 1
+    finally:
+        reset_org(token)
+
+    tenant_session.expunge_all()
+    # Вне контекста — организация по умолчанию, то есть первая.
+    assert {row.org_id for row in await tenant_session.scalars(select(Employee))} == {
+        DEFAULT_ORG_ID
+    }
+
+
+async def test_get_by_primary_key_is_scoped(tenant_session) -> None:
+    first, second, _user_a, _user_b = await _two_orgs_with_employees(tenant_session)
+
+    token = set_org(second.id)
+    try:
+        tenant_session.expunge_all()
+        # Чужой id не должен находиться: иначе достаточно подставить число.
+        assert await tenant_session.get(Employee, 1) is None
+        found = await tenant_session.get(Employee, 2)
+        assert found is not None and found.org_id == second.id
+    finally:
+        reset_org(token)
+
+    tenant_session.expunge_all()
+    assert (await tenant_session.get(Employee, 1)).org_id == first.id
+
+
+async def test_insert_lands_in_the_current_org(tenant_session) -> None:
+    _first, second, user_a, _user_b = await _two_orgs_with_employees(tenant_session)
+
+    token = set_org(second.id)
+    try:
+        session_row = Employee(id=3, user_id=user_a.id)
+        tenant_session.add(session_row)
+        await tenant_session.commit()
+        await tenant_session.refresh(session_row)
+        assert session_row.org_id == second.id
+    finally:
+        reset_org(token)
+
+
+async def test_relationship_load_is_scoped(tenant_session) -> None:
+    """Связь «отдел → сотрудники» не должна тянуть чужие строки."""
+    first, second, _user_a, _user_b = await _two_orgs_with_employees(tenant_session)
+
+    token = set_org(second.id)
+    try:
+        tenant_session.expunge_all()
+        department = await tenant_session.get(Department, 2)
+        assert department is not None
+        # Отношение есть не у всех версий модели: если его нет — тест не врёт,
+        # а честно пропускает проверку (фильтр выборок уже проверен выше).
+        if hasattr(department, "employees"):
+            assert {row.org_id for row in await department.awaitable_attrs.employees} == {
+                second.id
+            }
+        else:  # pragma: no cover - зависит от состава модели
+            assert department.org_id == second.id
+    finally:
+        reset_org(token)

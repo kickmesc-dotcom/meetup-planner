@@ -38,7 +38,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.db.org_models import DEFAULT_ORG_ID
+from app.db.org_models import OrgScoped
 
 # --------------------------------------------------------------------------
 # Роли и состояния (единый источник правды для сервисов и API)
@@ -262,7 +262,7 @@ def _in_list(column: str, values: tuple[str, ...]) -> str:
 # --------------------------------------------------------------------------
 
 
-class Department(Base):
+class Department(OrgScoped, Base):
     """Подразделение (повар/официант/бармен/менеджер и любые новые).
 
     Редактируется администратором из бота/мини-аппа без разработчика (шаг 2
@@ -279,16 +279,6 @@ class Department(Base):
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    # Тенант. Пока один контур, дефолт = 1; серверный дефолт снимем, когда все
-    # таблицы получат org_id и организация будет приходить явно.
-    org_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        default=DEFAULT_ORG_ID,
-        server_default=str(DEFAULT_ORG_ID),
-        index=True,
-    )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(String(64), nullable=False)
     emoji: Mapped[str | None] = mapped_column(String(16))
@@ -314,7 +304,7 @@ class Department(Base):
 # --------------------------------------------------------------------------
 
 
-class Employee(Base):
+class Employee(OrgScoped, Base):
     """HR-профиль сотрудника: 1:1 к `users` (личность/аватар живут там).
 
     Отдельная таблица, а не новые колонки в `users`, чтобы не трогать
@@ -334,27 +324,21 @@ class Employee(Base):
             "experience IS NULL OR " + _in_list("experience", EXPERIENCES),
             name="ck_employee_experience",
         ),
+        # Человек может работать в двух организациях сети: одна личность —
+        # две строки сотрудника, по одной на тенант (B2B_PLATFORM_PLAN, 1.4).
+        UniqueConstraint("org_id", "user_id", name="uq_employee_org_user"),
         Index("ix_employees_department", "department_id", "is_active"),
         Index("ix_employees_demo", "is_demo"),
         Index("ix_employees_simulation", "is_simulation"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    # Тенант сотрудника. `user_id` остаётся глобальным: один человек — одна
-    # личность, членство в организациях живёт в `organization_members`.
-    org_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey("organizations.id", ondelete="CASCADE"),
-        nullable=False,
-        default=DEFAULT_ORG_ID,
-        server_default=str(DEFAULT_ORG_ID),
-        index=True,
-    )
+    # `org_id` приходит из OrgScoped. `user_id` остаётся глобальным: один
+    # человек — одна личность, членство живёт в `organization_members`.
     user_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True,
     )
     department_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
@@ -437,7 +421,7 @@ class Employee(Base):
     )
 
 
-class HrShift(Base):
+class HrShift(OrgScoped, Base):
     """Табель: одна смена сотрудника в конкретный день.
 
     Строка заводится, когда управляющий ставит смену в график (`planned`), и
@@ -483,7 +467,7 @@ class HrShift(Base):
     )
 
 
-class HrShiftTemplate(Base):
+class HrShiftTemplate(OrgScoped, Base):
     """Именованный шаблон недели табеля («Официант · 5/2», «Бармен · выходные»).
 
     Хранит не смены на датах, а рисунок недели: день недели, статус и часы.
@@ -524,7 +508,7 @@ class HrShiftTemplate(Base):
     )
 
 
-class EmployeeTrainingDay(Base):
+class EmployeeTrainingDay(OrgScoped, Base):
     """Точечная правка расписания: «эта смена учебная / обычная».
 
     По умолчанию учебные — первые `Employee.training_days` дней после
@@ -562,7 +546,7 @@ class EmployeeTrainingDay(Base):
 # --------------------------------------------------------------------------
 
 
-class Hall(Base):
+class Hall(OrgScoped, Base):
     """Зал ресторана (первый, второй, летняя веранда …).
 
     Заводится администратором в разделе «Чек-листы». Зал нужен только там, где
@@ -572,7 +556,7 @@ class Hall(Base):
 
     __tablename__ = "halls"
     __table_args__ = (
-        UniqueConstraint("slug", name="uq_hall_slug"),
+        UniqueConstraint("org_id", "slug", name="uq_hall_org_slug"),
         Index("ix_halls_active_sort", "is_active", "sort_order"),
     )
 
@@ -596,7 +580,7 @@ class Hall(Base):
     )
 
 
-class ChecklistTemplate(Base):
+class ChecklistTemplate(OrgScoped, Base):
     """Шаблон чек-листа подразделения.
 
     `hall_id` разделяет открытие по залам; NULL — общий шаблон (закрытие смены,
@@ -639,7 +623,7 @@ class ChecklistTemplate(Base):
     )
 
 
-class ChecklistItem(Base):
+class ChecklistItem(OrgScoped, Base):
     """Пункт чек-листа (п.3 mainPROMT).
 
     `requires_photo=True` — пункт нельзя закрыть без фото; `is_mandatory` — на
@@ -687,7 +671,7 @@ class ChecklistItem(Base):
     )
 
 
-class ChecklistRun(Base):
+class ChecklistRun(OrgScoped, Base):
     """Прохождение чек-листа сотрудником за конкретную смену (дату)."""
 
     __tablename__ = "checklist_runs"
@@ -718,7 +702,7 @@ class ChecklistRun(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class ShiftHallChoice(Base):
+class ShiftHallChoice(OrgScoped, Base):
     """В каком зале сотрудник работает в эту смену.
 
     Хранится отдельно от прогона: прогон создаётся только при первой отметке, а
@@ -746,7 +730,7 @@ class ShiftHallChoice(Base):
     )
 
 
-class ChecklistCompletion(Base):
+class ChecklistCompletion(OrgScoped, Base):
     """Отметка пункта чек-листа: когда, кем, с фото и/или заметкой."""
 
     __tablename__ = "checklist_completions"
@@ -786,7 +770,7 @@ class ChecklistCompletion(Base):
 # --------------------------------------------------------------------------
 
 
-class Task(Base):
+class Task(OrgScoped, Base):
     """Поручение (п.4 mainPROMT).
 
     Получатель — подразделение (`scope='department'`) либо конкретный сотрудник
@@ -866,7 +850,7 @@ class Task(Base):
     )
 
 
-class TaskAssignment(Base):
+class TaskAssignment(OrgScoped, Base):
     """Состояние поручения у конкретного исполнителя.
 
     Одна строка на человека — то, чего не хватало групповым поручениям: «каждый
@@ -903,7 +887,7 @@ class TaskAssignment(Base):
     )
 
 
-class TaskEvent(Base):
+class TaskEvent(OrgScoped, Base):
     """История изменений поручения (аудит: кто, когда, из какого статуса в какой)."""
 
     __tablename__ = "task_events"
@@ -924,7 +908,7 @@ class TaskEvent(Base):
     )
 
 
-class TaskReminder(Base):
+class TaskReminder(OrgScoped, Base):
     """Ручная правка запланированного напоминания (админка).
 
     Планировщик считает время напоминания сам: `due_at` минус настройка «за
@@ -957,7 +941,7 @@ class TaskReminder(Base):
     )
 
 
-class TaskIssue(Base):
+class TaskIssue(OrgScoped, Base):
     """«Не успеваю / есть проблема» по поручению (п.4.5).
 
     Причина из списка (`reason_code`) + свободный комментарий + желаемое время.
@@ -982,7 +966,7 @@ class TaskIssue(Base):
     )
 
 
-class TaskPhoto(Base):
+class TaskPhoto(OrgScoped, Base):
     """Фотоотчёт по поручению (п.4.4).
 
     Храним TG `file_id` (а не протухающий URL): мини-апп показывает фото через
@@ -1012,7 +996,7 @@ class TaskPhoto(Base):
     )
 
 
-class MediaBlob(Base):
+class MediaBlob(OrgScoped, Base):
     """Байты фотоотчёта, загруженного в мини-аппе.
 
     Раньше хранился только Telegram `file_id`: картинку нельзя было показать в
@@ -1027,7 +1011,9 @@ class MediaBlob(Base):
 
     __tablename__ = "media_blobs"
     __table_args__ = (
-        UniqueConstraint("sha256", name="uq_media_blobs_sha"),
+        # Одинаковый снимок в двух организациях — разные блобы: иначе вторая
+        # не смогла бы его загрузить, а первая получила бы чужой по id.
+        UniqueConstraint("org_id", "sha256", name="uq_media_blobs_org_sha"),
         Index("ix_media_blobs_created", "created_at"),
     )
 
@@ -1049,7 +1035,7 @@ class MediaBlob(Base):
 # --------------------------------------------------------------------------
 
 
-class Issue(Base):
+class Issue(OrgScoped, Base):
     """Операционная проблема смены как отдельная карточка.
 
     Отличие от `TaskIssue` (объяснение «не успеваю» по поручению): здесь нет
@@ -1120,7 +1106,7 @@ class Issue(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class IssueEvent(Base):
+class IssueEvent(OrgScoped, Base):
     """История карточки: создание, смена статуса/ответственного, комментарии.
 
     Отдельная таблица, а не поле «последний комментарий»: журнал нужен именно
@@ -1151,7 +1137,7 @@ class IssueEvent(Base):
 # --------------------------------------------------------------------------
 
 
-class Handover(Base):
+class Handover(OrgScoped, Base):
     """Сдача смены: кто, кому и что оставил открытым.
 
     `hr_handover_items` хранит СНИМОК на момент передачи: через сутки задача уже
@@ -1195,7 +1181,7 @@ class Handover(Base):
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
-class HandoverItem(Base):
+class HandoverItem(OrgScoped, Base):
     """Снимок одного открытого пункта, который передали следующей смене."""
 
     __tablename__ = "hr_handover_items"
@@ -1221,7 +1207,7 @@ class HandoverItem(Base):
 # --------------------------------------------------------------------------
 
 
-class Standard(Base):
+class Standard(OrgScoped, Base):
     """Инструкция по работе: что делать и как правильно.
 
     Свободный текст (`body`) вместо файлов-вложений: стандарт пишет
@@ -1275,7 +1261,7 @@ class Standard(Base):
     )
 
 
-class StandardQuestion(Base):
+class StandardQuestion(OrgScoped, Base):
     """Вопрос теста к стандарту. `options` — варианты, `correct_index` — верный."""
 
     __tablename__ = "standard_questions"
@@ -1293,7 +1279,7 @@ class StandardQuestion(Base):
     )
 
 
-class StandardCheck(Base):
+class StandardCheck(OrgScoped, Base):
     """Результат прохождения теста: фиксируем историей, а не последним баллом.
 
     Пересдавать можно — в обучении это нормально; в профиле показываем
@@ -1328,7 +1314,7 @@ class StandardCheck(Base):
 # --------------------------------------------------------------------------
 
 
-class UsefulLink(Base):
+class UsefulLink(OrgScoped, Base):
     """Ссылка в разделе «Полезные ссылки» (График, Фудбук, …).
 
     `department_id IS NULL` — видна всем; иначе только своему подразделению.
@@ -1366,7 +1352,7 @@ class UsefulLink(Base):
 # --------------------------------------------------------------------------
 
 
-class FeedbackQuestion(Base):
+class FeedbackQuestion(OrgScoped, Base):
     """Вопрос формы обратной связи — настраивается администратором.
 
     `kind`: `scale` (оценка 1..5), `choice` (вариант из `options`), `text`
@@ -1375,7 +1361,7 @@ class FeedbackQuestion(Base):
 
     __tablename__ = "feedback_questions"
     __table_args__ = (
-        UniqueConstraint("code", name="uq_feedback_question_code"),
+        UniqueConstraint("org_id", "code", name="uq_feedback_question_org_code"),
         CheckConstraint(_in_list("kind", QUESTION_KINDS), name="ck_feedback_question_kind"),
         Index("ix_feedback_questions_active_sort", "is_active", "sort_order"),
     )
@@ -1404,7 +1390,7 @@ class FeedbackQuestion(Base):
     )
 
 
-class FeedbackAnswer(Base):
+class FeedbackAnswer(OrgScoped, Base):
     """Ответ сотрудника на вопрос формы за смену (дату)."""
 
     __tablename__ = "feedback_answers"
@@ -1451,7 +1437,7 @@ SIM_MODE_AS_IS = "as_is"
 SIM_MODES: tuple[str, ...] = (SIM_MODE_NEW, SIM_MODE_AS_IS)
 
 
-class SimulationSession(Base):
+class SimulationSession(OrgScoped, Base):
     """Сеанс проверки приложения глазами сотрудника.
 
     Зачем отдельная таблица, а не просто «переключить employee_id в клиенте»:
@@ -1508,7 +1494,7 @@ class SimulationSession(Base):
     )
 
 
-class EmployeeAchievement(Base):
+class EmployeeAchievement(OrgScoped, Base):
     """Выданная ачивка: `code` из каталога + когда получена.
 
     Строка, а не колонка-счётчик: ачивки копятся историей, поэтому выдать их
@@ -1548,7 +1534,7 @@ class EmployeeAchievement(Base):
 # --------------------------------------------------------------------------
 
 
-class EmployeeTrainingStep(Base):
+class EmployeeTrainingStep(OrgScoped, Base):
     """Пройденный урок знакомства с приложением.
 
     Каталог уроков живёт в коде (`services/hr_training.py`): это текст, который
@@ -1581,7 +1567,7 @@ class EmployeeTrainingStep(Base):
 # --------------------------------------------------------------------------
 
 
-class SheetSource(Base):
+class SheetSource(OrgScoped, Base):
     """Внешняя таблица, содержимое которой показываем в приложении.
 
     Зачем копия в БД, а не ссылка «открыть Google»: в России Google Sheets
@@ -1596,7 +1582,9 @@ class SheetSource(Base):
 
     __tablename__ = "sheet_sources"
     __table_args__ = (
-        UniqueConstraint("spreadsheet_id", "gid", name="uq_sheet_sources_sheet"),
+        UniqueConstraint(
+            "org_id", "spreadsheet_id", "gid", name="uq_sheet_sources_org_sheet"
+        ),
         Index("ix_sheet_sources_sort", "sort_order", "id"),
     )
 
@@ -1623,7 +1611,7 @@ class SheetSource(Base):
     )
 
 
-class RosterSnapshot(Base):
+class RosterSnapshot(OrgScoped, Base):
     """Снимок состава: кто заведён в боте на этот момент.
 
     Зачем отдельная таблица, а не лог изменений. Пул Telegram-ID — самое
@@ -1668,7 +1656,7 @@ class RosterSnapshot(Base):
     )
 
 
-class AppAccessLink(Base):
+class AppAccessLink(OrgScoped, Base):
     """Ссылка входа в приложение из браузера (вне Telegram).
 
     Зачем. Внутри мини-аппа личность подтверждает `initData` — подпись бота,

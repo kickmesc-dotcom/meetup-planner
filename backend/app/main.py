@@ -53,6 +53,7 @@ from app.bot.scheduler import (
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_seed import seed_hr
+from app.db.org_models import DEFAULT_ORG_ID, reset_org, set_org
 from app.db.seed import seed_users
 
 
@@ -265,6 +266,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="SemiTaskBot", version="0.1.0", lifespan=lifespan)
+    @app.middleware("http")
+    async def tenant_scope(request, call_next):  # noqa: ANN001, ANN202 - FastAPI
+        """Сбросить тенантский контекст после ответа.
+
+        `current_employee` ставит организацию на время запроса. Без сброса
+        значение утекло бы в следующий запрос, выполненный в той же задаче
+        (в тестах это один и тот же event loop) — и человек из второй
+        организации увидел бы данные первой.
+        """
+        token = set_org(DEFAULT_ORG_ID)
+        try:
+            return await call_next(request)
+        finally:
+            reset_org(token)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list or ["*"],
