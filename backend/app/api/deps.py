@@ -12,9 +12,9 @@ from app.auth.initdata import InitDataError, InitDataPayload, parse_and_verify
 from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
-from app.db.org_models import Organization, set_org
 from app.db.models import User
-from app.services import display_names
+from app.db.org_models import Organization, set_org
+from app.services import display_names, org_bots, orgs
 
 
 async def db_session() -> AsyncIterator[AsyncSession]:
@@ -104,18 +104,42 @@ async def current_user(
                 raise HTTPException(
                     status.HTTP_401_UNAUTHORIZED, detail="access_token_invalid"
                 )
+            # Ссылка не говорит, чья это организация, — берём её из членства
+            # человека. Без этого онбординг создал бы сотрудника в первой
+            # (B2B_PLATFORM_PLAN, шаги 1.2 и 2.1).
+            org = await orgs.default_org_for(session, user)
+            if org is not None:
+                set_org(org.id)
             return user
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="missing_authorization")
 
     init_data = _strip_tma_prefix(authorization)
-    try:
-        payload = parse_and_verify(
-            init_data,
-            settings.bot_token,
-            max_age_seconds=settings.initdata_max_age_seconds,
-        )
-    except InitDataError as exc:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=f"initdata_invalid:{exc}") from exc
+    # Мини-апп мог быть открыт через бота ЛЮБОЙ организации: подпись `initData`
+    # считается от токена конкретного бота (B2B_PLATFORM_PLAN, шаг 1.6).
+    # Пробуем все известные токены и запоминаем, чей подошёл — это и есть
+    # организация запроса; иначе новый сотрудник второго клиента завёлся бы
+    # в первой.
+    await org_bots.ensure_loaded(session)
+    payload: InitDataPayload | None = None
+    matched_org: int | None = None
+    last_error: InitDataError | None = None
+    for token in org_bots.token_candidates():
+        try:
+            payload = parse_and_verify(
+                init_data,
+                token,
+                max_age_seconds=settings.initdata_max_age_seconds,
+            )
+        except InitDataError as exc:
+            last_error = exc
+            continue
+        matched_org = org_bots.org_for_token(token)
+        break
+    if payload is None:
+        detail = f"initdata_invalid:{last_error or 'no_token'}"
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=detail)
+    if matched_org is not None:
+        set_org(matched_org)
 
     user = await session.scalar(select(User).where(User.telegram_id == payload.user_id))
     if user is None:

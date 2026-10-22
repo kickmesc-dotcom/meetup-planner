@@ -162,6 +162,72 @@ async def default_org_for(session: AsyncSession, user: User) -> Organization | N
     )
 
 
+TOKEN_RE = re.compile(r"^[0-9]{3,}:[A-Za-z0-9_-]{10,}$")
+
+
+async def set_bot(
+    session: AsyncSession,
+    org_id: int,
+    *,
+    token: str | None,
+    username: str | None = None,
+    webhook_secret: str | None = None,
+    chat_id: int | None = None,
+) -> Organization:
+    """Подключить организации своего бота (шаг 1.6).
+
+    Три правила, без которых второй клиент сломает первого:
+
+    * бот без секрета вебхука не подключается — апдейт некуда маршрутизировать,
+      и он ушёл бы «первому совпавшему»;
+    * токен и секрет не должны повторяться у двух организаций (в базе на них
+      уникальные индексы, здесь — понятная ошибка вместо 500);
+    * пустой токен отключает своего бота и возвращает организацию на общий
+      (env), а не оставляет её без бота вовсе.
+    """
+    org = await session.get(Organization, org_id)
+    if org is None:
+        raise OrgsError("org_missing")
+
+    clean_token = (token or "").strip() or None
+    clean_secret = (webhook_secret or "").strip() or None
+    if clean_token is not None:
+        if not TOKEN_RE.match(clean_token):
+            raise OrgsError("bad_token")
+        if not clean_secret:
+            raise OrgsError("bot_needs_secret")
+        clash = await session.scalar(
+            select(Organization).where(
+                Organization.bot_token == clean_token, Organization.id != org_id
+            )
+        )
+        if clash is not None:
+            raise OrgsError("token_taken")
+        clash = await session.scalar(
+            select(Organization).where(
+                Organization.webhook_secret == clean_secret,
+                Organization.id != org_id,
+            )
+        )
+        if clash is not None:
+            raise OrgsError("secret_taken")
+
+    org.bot_token = clean_token
+    clean_username = (username or "").strip() or None if clean_token else None
+    org.bot_username = clean_username
+    org.webhook_secret = clean_secret if clean_token else None
+    org.group_chat_id = chat_id if clean_token else None
+    await session.commit()
+    await session.refresh(org)
+
+    # Реестр читается синхронно из 150 мест, поэтому после правки настроек его
+    # нужно обновить сразу — иначе бот до перезапуска останется прежним.
+    from app.services import org_bots
+
+    await org_bots.reload(session)
+    return org
+
+
 async def ensure_default(session: AsyncSession) -> Organization:
     """Гарантировать существование организации по умолчанию (тесты, dev).
 

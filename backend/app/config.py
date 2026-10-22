@@ -31,7 +31,11 @@ class Settings(BaseSettings):
     cors_origins: str = Field("*", alias="CORS_ORIGINS")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 
-    group_chat_id: int | None = Field(None, alias="GROUP_CHAT_ID")
+    # Чат ОРГАНИЗАЦИИ ПО УМОЛЧАНИЮ. У клиента со своим ботом чат лежит в
+    # `organizations.group_chat_id`, а наружу торчит свойство `group_chat_id`
+    # ниже — иначе пришлось бы править 85 вызовов `settings.group_chat_id` и
+    # надеяться, что ни один не забыт (B2B_PLATFORM_PLAN, шаг 1.6).
+    group_chat_id_env: int | None = Field(None, alias="GROUP_CHAT_ID")
     admin_tg_ids: str = Field("", alias="ADMIN_TG_IDS")
     chukhan_weights: str = Field("", alias="CHUKHAN_WEIGHTS")
     scheduler_tz: str = Field("Europe/Moscow", alias="SCHEDULER_TZ")
@@ -43,6 +47,19 @@ class Settings(BaseSettings):
     # репозитория, но с ним выше лимит GitHub и работает приватный репо.
     github_repo: str = Field(DEFAULT_REPO, alias="GITHUB_REPO")
     github_token: str = Field("", alias="GITHUB_TOKEN")
+
+    @property
+    def group_chat_id(self) -> int | None:
+        """Чат текущей организации, с откатом на env.
+
+        Свойство, а не поле: чат зависит от того, чей запрос/апдейт сейчас
+        выполняется, а не от конфигурации процесса. Реестр организаций
+        импортируется лениво — `config` читают почти все модули, и жёсткий
+        импорт дал бы цикл.
+        """
+        from app.services import org_bots
+
+        return org_bots.chat_id_for_current_org()
 
     @property
     def whitelist_pairs(self) -> list[tuple[int, str]]:

@@ -103,6 +103,11 @@ class Organization(Base):
     __table_args__ = (
         UniqueConstraint("slug", name="uq_organization_slug"),
         Index("ix_organizations_active", "is_active"),
+        # Один Telegram-бот не может обслуживать два клиента: у каждого свой
+        # токен и свой секрет вебхука. NULL'ы в PG уникальности не мешают,
+        # поэтому организация без своего бота живёт на общем (env).
+        Index("uq_organization_bot_token", "bot_token", unique=True),
+        Index("uq_organization_webhook_secret", "webhook_secret", unique=True),
     )
 
     # На проде — BIGSERIAL, в sqlite-тестах — INTEGER: BIGINT-первичник в
@@ -119,6 +124,16 @@ class Organization(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Свой бот клиента (B2B_PLATFORM_PLAN, шаг 1.6). Пусто — организация
+    # работает на боте из env (текущий контур). Токен здесь только потому, что
+    # у каждой организации свой BotFather-бот; отдавать его наружу нельзя.
+    bot_token: Mapped[str | None] = mapped_column(Text)
+    bot_username: Mapped[str | None] = mapped_column(String(64))
+    # Секрет вебхука: по нему входящий апдейт находит свою организацию, не
+    # доверяя ничему из тела запроса.
+    webhook_secret: Mapped[str | None] = mapped_column(Text)
+    # Чат, куда бот пишет отчёты и напоминания. Пусто — значение из env.
+    group_chat_id: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

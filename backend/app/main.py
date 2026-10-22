@@ -135,28 +135,65 @@ async def _register_bot_metadata() -> bool:
 
 
 async def _set_webhook() -> None:
+    """Поставить вебхук каждому боту, который мы обслуживаем.
+
+    До шага 1.6 бот был один, и здесь стоял один вызов. Теперь у организации
+    может быть свой токен: у каждого бота свой вебхук и СВОЙ секрет, по
+    которому входящий апдейт находит организацию. Если секрет не задан, бот
+    остаётся без вебхука и пишет предупреждение — иначе два бота делили бы
+    один секрет, и апдейт уходил бы «первому совпавшему».
+    """
     settings = get_settings()
+    log = structlog.get_logger()
     if not settings.public_base_url:
-        structlog.get_logger().warning("webhook.skip_no_public_base_url")
+        log.warning("webhook.skip_no_public_base_url")
         return
     url = f"{settings.public_base_url.rstrip('/')}/tg/webhook"
-    bot = get_bot()
-    await bot.set_webhook(
-        url=url,
-        secret_token=settings.tg_webhook_secret,
-        # GHG7 P5: "message_reaction" нужен, чтобы детектировать живую реакцию
-        # человека на медиа (режим wait_then_chance). Telegram НЕ шлёт апдейты,
-        # которых нет в списке — добавляем, не заменяя существующие.
-        allowed_updates=[
-            "message",
-            "callback_query",
-            "poll_answer",
-            "message_reaction",
-        ],
-        drop_pending_updates=False,
-        request_timeout=20,
-    )
-    structlog.get_logger().info("webhook.set", url=url)
+
+    from app.bot.dispatcher import bot_for_org
+    from app.db.org_models import DEFAULT_ORG_ID
+    from app.services import org_bots
+
+    targets: list[tuple[int, str]] = []
+    for cfg in org_bots.all_configs():
+        if cfg.org_id == DEFAULT_ORG_ID:
+            targets.append((cfg.org_id, cfg.webhook_secret or settings.tg_webhook_secret))
+        elif cfg.own_bot:
+            if not cfg.webhook_secret:
+                log.warning("webhook.skip_no_secret", org=cfg.slug)
+                continue
+            targets.append((cfg.org_id, cfg.webhook_secret))
+    if not targets:
+        targets = [(DEFAULT_ORG_ID, settings.tg_webhook_secret)]
+
+    failed: list[str] = []
+    for org_id, secret in targets:
+        try:
+            await bot_for_org(org_id).set_webhook(
+                url=url,
+                secret_token=secret,
+                # GHG7 P5: "message_reaction" нужен, чтобы детектировать живую
+                # реакцию человека на медиа (режим wait_then_chance). Telegram
+                # НЕ шлёт апдейтов, которых нет в списке — добавляем, не
+                # заменяя существующие.
+                allowed_updates=[
+                    "message",
+                    "callback_query",
+                    "poll_answer",
+                    "message_reaction",
+                ],
+                drop_pending_updates=False,
+                request_timeout=20,
+            )
+        except Exception as exc:  # noqa: BLE001 — один бот не должен ронять остальных
+            failed.append(f"{org_id}: {exc}")
+            log.warning("webhook.set_failed", org_id=org_id, error=str(exc))
+        else:
+            log.info("webhook.set", url=url, org_id=org_id)
+    if failed:
+        # Пусть внешний retry повторит: чаще всего это сеть, а не токен.
+        raise RuntimeError("webhook.set_failed: " + "; ".join(failed))
+
 
 async def _register_telegram_metadata_with_retry() -> None:
     """Background task: set webhook + commands + menu button, retrying on
@@ -210,6 +247,17 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             await bootstrap_from_env(session)
         except Exception as exc:  # noqa: BLE001
             structlog.get_logger().warning("proxy.bootstrap_failed", error=str(exc))
+
+        # B2B_PLATFORM_PLAN, шаг 1.6: чей бот и чей чат. Реестр наполняется до
+        # сетевых шагов — иначе первый вебхук или планировщик успел бы взять
+        # env-бота организации по умолчанию.
+        try:
+            from app.services import org_bots
+
+            count = await org_bots.reload(session)
+            structlog.get_logger().info("orgs.bots_loaded", organizations=count)
+        except Exception as exc:  # noqa: BLE001 — реестр не должен ронять старт
+            structlog.get_logger().warning("orgs.bots_failed", error=str(exc))
         
         # РЕЗЕРВНЫЙ ШАГ: Синхронизация аватарок отключена для ускорения запуска
         # try:
@@ -258,8 +306,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     await release_scheduler_leadership()
     await shutdown_scheduler()
     try:
-        bot = get_bot()
-        await bot.session.close()
+        from app.bot.dispatcher import all_bots
+
+        # Ботов теперь столько, сколько организаций со своим токеном: закрыть
+        # один значило бы оставить висящие соединения у остальных.
+        for bot in all_bots():
+            try:
+                await bot.session.close()
+            except Exception as exc:  # noqa: BLE001
+                structlog.get_logger().warning("bot.close_failed", error=str(exc))
     except Exception as exc:  # noqa: BLE001 — невалидный токен не должен ломать выход
         structlog.get_logger().warning("bot.close_failed", error=str(exc))
 

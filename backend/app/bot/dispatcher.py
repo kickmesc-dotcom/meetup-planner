@@ -27,7 +27,11 @@ from app.config import get_settings
 
 log = logging.getLogger(__name__)
 
-_bot: Bot | None = None
+# Боты по организациям (B2B_PLATFORM_PLAN, шаг 1.6). Ключ — `org_id`, а не
+# токен: токен может смениться (клиент пересоздал бота), и старый Bot остался
+# бы висеть вместе со своим пулом соединений. Диспетчер один: он не хранит
+# состояние конкретного бота, бот приходит аргументом в `feed_update`.
+_bots: dict[int, Bot] = {}
 _dispatcher: Dispatcher | None = None
 
 
@@ -328,27 +332,60 @@ def _build_session() -> AiohttpSession | None:
     return _IPv4AiohttpSession(**kwargs)
 
 
+def _build_bot(token: str) -> Bot:
+    """Новый aiogram-бот с нашим IPv4/прокси-слоем."""
+    # Token may be SecretStr in future config; keep the guard.
+    if hasattr(token, "get_secret_value"):
+        token = token.get_secret_value()
+    session = _build_session()
+    kwargs: dict = {
+        "token": str(token),
+        "default": DefaultBotProperties(parse_mode=ParseMode.HTML),
+    }
+    if session is not None:
+        kwargs["session"] = session
+    return Bot(**kwargs)
+
+
 def get_bot() -> Bot:
-    global _bot
-    if _bot is None:
-        settings = get_settings()
-        token = settings.bot_token
+    """Бот ТЕКУЩЕЙ организации.
 
-        # Token may be SecretStr in future config; keep the guard.
-        if hasattr(token, "get_secret_value"):
-            token = token.get_secret_value()
+    Чей бот вернуть, решает контекст (`current_org_id`): вебхук ставит его по
+    секрету, API — по сотруднику, планировщик живёт в организации по
+    умолчанию. Организация без своего токена работает на env-боте, поэтому
+    текущий контур ничего не замечает.
+    """
+    from app.db.org_models import current_org_id
+    from app.services import org_bots
 
-        session = _build_session()
+    org_id = current_org_id.get()
+    bot = _bots.get(org_id)
+    if bot is None:
+        token = org_bots.token_for(org_id) or get_settings().bot_token
+        bot = _build_bot(str(token))
+        _bots[org_id] = bot
+    return bot
 
-        kwargs: dict = {
-            "token": str(token),
-            "default": DefaultBotProperties(parse_mode=ParseMode.HTML),
-        }
-        if session is not None:
-            kwargs["session"] = session
 
-        _bot = Bot(**kwargs)
-    return _bot
+def bot_for_org(org_id: int) -> Bot:
+    """Бот конкретной организации (вебхук уже знает, чей апдейт пришёл)."""
+    from app.services import org_bots
+
+    bot = _bots.get(org_id)
+    if bot is None:
+        token = org_bots.token_for(org_id) or get_settings().bot_token
+        bot = _build_bot(str(token))
+        _bots[org_id] = bot
+    return bot
+
+
+def all_bots() -> list[Bot]:
+    return list(_bots.values())
+
+
+def reset_bots() -> None:
+    """Забыть ботов (тесты, смена токена). Сессии закрывает вызывающий."""
+    _bots.clear()
 
 
 def get_dispatcher() -> Dispatcher:
