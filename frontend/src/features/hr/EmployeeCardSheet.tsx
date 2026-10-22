@@ -118,9 +118,7 @@ function CardBody({ card }: { card: HrProfileCard }) {
 
       {!card.can_view ? (
         <section className="rounded-card bg-tg-secondary-bg/60 p-4 text-center">
-          <div className="text-2xl" aria-hidden>
-            🔒
-          </div>
+          <Icon name="lock" size={26} className="mx-auto text-tg-hint" />
           <div className="mt-2 text-sm font-medium text-tg-text">
             Профиль закрыт
           </div>

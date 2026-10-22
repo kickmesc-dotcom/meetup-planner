@@ -10,6 +10,7 @@ import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
+import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
@@ -82,7 +83,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-30 flex flex-col bg-tg-bg">
       <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
         <div className="min-w-0 flex-1">
-          <div className="text-base font-medium text-tg-text">🧪 Тестовый пул</div>
+          <div className="text-base font-medium text-tg-text">Тестовый пул</div>
           <div className="text-xs text-tg-hint">
             Симуляторы работы с префиксом {data?.prefix ?? "[BOT]"}
           </div>
@@ -121,7 +122,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                       : "bg-status-busy/20 text-status-busy",
                   ].join(" ")}
                 >
-                  {data.visible ? "👁 видны" : "🙈 скрыты"}
+                  {data.visible ? "видны" : "скрыты"}
                 </span>
               </div>
               <p className="mt-1 text-xs text-tg-hint">
@@ -138,7 +139,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="mt-2 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {data.visible ? "🙈 Скрыть следы" : "👁 Показать следы"}
+                {data.visible ? "Скрыть следы" : "Показать следы"}
               </button>
             </section>
 
@@ -188,7 +189,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   }}
                   className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
                 >
-                  ▶️ Симулировать 3 смены
+                  Симулировать 3 смены
                 </button>
               </div>
             </section>
@@ -211,7 +212,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
               >
-                🧹 Снести только активность
+                Снести только активность
               </button>
               <button
                 type="button"
@@ -224,7 +225,8 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-status-busy text-xs font-medium text-white disabled:opacity-50"
               >
-                🗑 Удалить сотрудников и следы
+                <Icon name="trash" size={14} className="mr-1 inline-block" />
+                Удалить сотрудников и следы
               </button>
             </section>
           </>

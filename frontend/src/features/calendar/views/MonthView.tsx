@@ -3,6 +3,7 @@ import { addMonths, format, isSameMonth, isToday, startOfMonth } from "date-fns"
 import type { AvailabilityRange, User } from "@/types";
 import type { BirthdayCalendarEntry } from "@/api/birthdays";
 import { useUI } from "@/store/ui";
+import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
 import {
   buildMonthGrid,
@@ -136,7 +137,7 @@ function MonthBlock({
               onClick={() => onDayTap(d)}
               title={
                 bdayList
-                  ? `🎂 ${bdayList.map((b) => b.display_name).join(", ")}`
+                  ? `День рождения: ${bdayList.map((b) => b.display_name).join(", ")}`
                   : undefined
               }
               className={[
@@ -167,7 +168,7 @@ function MonthBlock({
                   }}
                   className="absolute top-0.5 right-0.5 text-2xs leading-none cursor-pointer"
                 >
-                  🎂
+                  <Icon name="cake" size={12} className="text-tg-link" />
                   {bdayList.length > 1 && (
                     <span className="ml-0.5 text-3xs">×{bdayList.length}</span>
                   )}

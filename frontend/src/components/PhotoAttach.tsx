@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import { mediaUrl, uploadPhoto, type MediaItem } from "@/api/media";
 import { haptic, showAlert } from "@/tg/webapp";
+import Icon from "@/components/Icon";
 
 export interface PhotoView {
   id: number;
@@ -212,11 +213,11 @@ export function PhotoThumbs({
           <div className="flex justify-end p-3">
             <button
               type="button"
-              className="min-h-11 min-w-11 rounded-tile bg-white/10 text-lg text-white"
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-white/10 text-white"
               onClick={() => setOpen(null)}
               aria-label="Закрыть"
             >
-              ✕
+              <Icon name="close" size={18} />
             </button>
           </div>
           <div className="flex flex-1 items-center justify-center p-3">

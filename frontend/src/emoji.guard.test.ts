@@ -6,15 +6,17 @@
  * один и тот же символ рисуется по-разному (цветной/чёрно-белый, другой размер),
  * и «фирменная» строка разъезжается от устройства к устройству.
  *
- * Правило: в перечисленных экранах (то, что сотрудник видит каждый день)
- * структурные элементы — заголовки, статусы, кнопки, метаданные карточек —
- * используют `<Icon>`. Эмодзи остаются в:
+ * Правило: в разметке (`*.tsx`) структурные элементы — заголовки, статусы,
+ * кнопки, метаданные карточек — используют `<Icon>`. Эмодзи остаются в:
  *  • текстах бота и чата (там живёт собственный язык продукта);
  *  • поздравлениях и игровых формулировках (🎂, 🎉);
- *  • данных с сервера: эмодзи ачивок, подразделений, категорий проблем.
+ *  • данных: эмодзи ачивок, подразделений, категорий проблем, стандартов —
+ *    они приходят из базы или живут в `api/*.ts` как данные, а не как вёрстка.
  *
- * Комментарии из проверки исключены: пояснение «раньше тут был ⏰» полезно
- * и не попадает на экран.
+ * Проверяются ВСЕ `.tsx` вне `_legacy` и тестов: фиксированный список экранов
+ * пропускал новые файлы, и эмодзи просачивались через них. Комментарии из
+ * проверки исключены: пояснение «раньше тут был ⏰» полезно и не попадает на
+ * экран.
  */
 import { describe, expect, it } from "vitest";
 
@@ -26,37 +28,6 @@ const sources = import.meta.glob("./**/*.{ts,tsx}", {
   import: "default",
   eager: true,
 }) as Record<string, string>;
-
-function sourceOf(file: string): string {
-  return sources[`./${file}`] ?? "";
-}
-
-/** Экраны ежедневного контура: их владелец видит первыми. */
-const GUARDED = [
-  "App.tsx",
-  "features/hr/HrFeedScreen.tsx",
-  "features/hr/MyTasksScreen.tsx",
-  "features/hr/ChecklistScreen.tsx",
-  "features/hr/TeamScreen.tsx",
-  "features/hr/ReviewScreen.tsx",
-  "features/hr/HrProfileScreen.tsx",
-  "features/handovers/HandoversScreen.tsx",
-  "features/issues/IssuesScreen.tsx",
-  "features/shifts/ShiftsScreen.tsx",
-  "features/desktop/DesktopShell.tsx",
-  "features/desktop/OverviewRail.tsx",
-  // Второй проход P1.4 (22.10.2026): админка и сервисные экраны, где эмодзи
-  // соседствовали с иконками на одном экране.
-  "features/admin/ProxyScreen.tsx",
-  "features/admin/JobsQueueScreen.tsx",
-  "features/admin/BirthdaysScreen.tsx",
-  "features/admin/SpaceRestartScreen.tsx",
-  "features/calendar/BirthdayPopover.tsx",
-  "features/calendar/ParticipantRow.tsx",
-  "features/meetings/MeetingsScreen.tsx",
-  "features/hr/StandardsScreen.tsx",
-  "features/actions/AutoPickSheet.tsx",
-];
 
 // Пиктограммы, символы статусов и variation selector: всё, что рисует ОС,
 // а не наш SVG. Кириллица, тире и кавычки под правило не попадают.
@@ -72,13 +43,22 @@ function stripComments(source: string): string[] {
     .filter((line) => !line.trimStart().startsWith("//"));
 }
 
-describe("P1.4: структурный интерфейс без эмодзи", () => {
-  it.each(GUARDED)("%s рисует иконки, а не картинки ОС", (file) => {
-    const source = sourceOf(file);
-    // Если файл переименовали, страж обязан упасть, а не пройти вхолостую.
+const SCREENS = Object.keys(sources)
+  .filter((file) => file.endsWith(".tsx"))
+  .filter((file) => !file.includes(".test."))
+  .filter((file) => !file.split("/").includes("_legacy"))
+  .sort();
+
+describe("P1.4: разметка без эмодзи", () => {
+  it("сканирует все экраны, а не фиксированный список", () => {
+    // Если glob сломается, тест ниже пройдёт вхолостую — это защита.
+    expect(SCREENS.length).toBeGreaterThan(40);
+  });
+
+  it.each(SCREENS)("%s рисует иконки, а не картинки ОС", (file) => {
+    const source = sources[file] ?? "";
     expect(source, `не найден исходник ${file}`).not.toBe("");
-    const lines = stripComments(source);
-    const offenders = lines
+    const offenders = stripComments(source)
       .map((line, index) => ({ line: line.trim(), number: index + 1 }))
       .filter((row) => PICTURE.test(row.line));
     expect(

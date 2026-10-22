@@ -4,6 +4,7 @@ import { exitSimulation } from "@/api/simulation";
 import { useSimulation } from "@/store/simulation";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
+import Icon from "@/components/Icon";
 
 /**
  * Постоянная плашка режима проверки.
@@ -56,7 +57,7 @@ export default function SimulationBanner() {
       className="flex items-center gap-2 border-b border-status-busy/30 bg-status-busy/15 px-3 py-1.5 text-xs text-tg-text"
       role="status"
     >
-      <span aria-hidden>🧪</span>
+      <Icon name="bolt" size={14} className="shrink-0 text-status-busy" />
       <span className="min-w-0 flex-1 truncate">
         Режим проверки · {simulation.subjectName}
         {place}

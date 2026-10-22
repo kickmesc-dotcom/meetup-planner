@@ -10,6 +10,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 /**
@@ -298,12 +299,12 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           <Check
             checked={requiresPhoto}
             onChange={setRequiresPhoto}
-            label="📷 нужен фотоотчёт"
+            label="Нужен фотоотчёт"
           />
           <Check
             checked={requiresReview}
             onChange={setRequiresReview}
-            label="🔍 с приёмкой"
+            label="С приёмкой"
           />
         </div>
 
@@ -398,10 +399,28 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   {task.title}
                 </div>
                 <div className="mt-1 text-xs text-tg-hint">
-                  {task.due_at ? `⏰ ${formatPrecise(new Date(task.due_at))}` : "без срока"}
-                  {task.requires_photo ? " · 📷" : ""}
+                  {task.due_at ? (
+                    <>
+                      <InlineIcon name="clock" />
+                      {formatPrecise(new Date(task.due_at))}
+                    </>
+                  ) : (
+                    "без срока"
+                  )}
+                  {task.requires_photo && (
+                    <>
+                      {" · "}
+                      <InlineIcon name="camera" />
+                    </>
+                  )}
                   {task.photos?.length ? ` · фото ${task.photos.length}` : ""}
-                  {task.schedule_label ? ` · 🗓 ${task.schedule_label}` : ""}
+                  {task.schedule_label && (
+                    <>
+                      {" · "}
+                      <InlineIcon name="calendar" />
+                      {task.schedule_label}
+                    </>
+                  )}
                 </div>
               </div>
               <span className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-hint">

@@ -14,6 +14,7 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import Icon, { type IconName } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -57,7 +58,7 @@ export default function IntervalsScreen({ onBack }: Props) {
 
   if (sched.isPending || tick === null) {
     return (
-      <SubScreen title="🎛 Интервалы" subtitle="Расписание напоминаний" onBack={onBack}>
+      <SubScreen title="Интервалы" subtitle="Расписание напоминаний" onBack={onBack}>
         <ListSkeleton rows={3} />
       </SubScreen>
     );
@@ -65,12 +66,12 @@ export default function IntervalsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🎛 Интервалы"
+      title="Интервалы"
       subtitle="Как часто проверять очередь напоминаний"
       onBack={onBack}
     >
       <Block
-        icon="⏰"
+        icon="clock"
         title="Тик напоминаний"
         hint="Раз в N минут бот проверяет, кому пора напомнить о встрече."
       >
@@ -103,8 +104,19 @@ export default function IntervalsScreen({ onBack }: Props) {
           }}
           className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
         >
-          {save.isPending && <Spinner />}
-          {save.isPending ? "Сохраняем…" : dirty ? "💾 Сохранить" : "✓ Сохранено"}
+          {save.isPending && <Spinner />}            {save.isPending ? (
+              "Сохраняем…"
+            ) : dirty ? (
+              <>
+                <Icon name="save" size={16} />
+                Сохранить
+              </>
+            ) : (
+              <>
+                <Icon name="check" size={16} />
+                Сохранено
+              </>
+            )}
         </button>
       </div>
     </SubScreen>
@@ -117,7 +129,7 @@ function Block({
   hint,
   children,
 }: {
-  icon: string;
+  icon: IconName;
   title: string;
   hint: string;
   children: ReactNode;
@@ -125,7 +137,7 @@ function Block({
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-base">{icon}</span>
+        <Icon name={icon} size={18} className="shrink-0 text-tg-hint" />
         <div className="min-w-0">
           <div className="text-base font-semibold text-tg-text">{title}</div>
           <div className="text-xs text-tg-hint">{hint}</div>

@@ -3,6 +3,7 @@ import { fetchEmployee, fetchLinks } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic, WebApp } from "@/tg/webapp";
+import Icon from "@/components/Icon";
 import { useUI } from "@/store/ui";
 
 /**
@@ -47,9 +48,7 @@ export default function LinksScreen() {
           className="block w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
         >
           <div className="flex items-center gap-3">
-            <span className="text-xl" aria-hidden>
-              📚
-            </span>
+            <Icon name="book" size={20} className="shrink-0 text-tg-link" />
             <span className="min-w-0">
               <span className="block text-sm font-medium text-tg-text">
                 Материалы смены
@@ -65,9 +64,7 @@ export default function LinksScreen() {
 
         {!linksQ.isLoading && links.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-4xl" aria-hidden>
-              🔗
-            </div>
+            <Icon name="link" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               Ссылок пока нет
             </div>
@@ -95,8 +92,8 @@ export default function LinksScreen() {
             className="block w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left active:scale-[0.99] transition-transform"
           >
             <div className="flex items-center gap-3">
-              <span className="text-xl" aria-hidden>
-                {l.emoji ?? "🔗"}
+              <span className="text-xl leading-none" aria-hidden>
+                {l.emoji ?? <Icon name="link" size={18} />}
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-tg-text">

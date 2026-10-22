@@ -13,6 +13,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Icon from "@/components/Icon";
 
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
@@ -190,9 +191,9 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
           e.stopPropagation();
           onClose();
         }}
-        className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-lg text-white active:scale-95"
+        className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white active:scale-95"
       >
-        ✕
+        <Icon name="close" size={18} />
       </button>
 
       {scale > MIN_SCALE && (

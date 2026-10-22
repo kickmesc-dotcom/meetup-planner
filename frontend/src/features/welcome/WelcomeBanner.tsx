@@ -11,6 +11,7 @@
  * случайную сводку.
  */
 import { haptic, showConfirm } from "@/tg/webapp";
+import Icon from "@/components/Icon";
 
 interface Props {
   meName: string;
@@ -23,7 +24,7 @@ export default function WelcomeBanner({ meName, onHide }: Props) {
       <div className="flex min-h-11 items-center gap-1.5">
         <div className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5">
           <span className="text-base font-medium truncate">
-            Привет, {meName} 👋
+            Привет, {meName}
           </span>
         </div>
         <button
@@ -31,7 +32,7 @@ export default function WelcomeBanner({ meName, onHide }: Props) {
           onClick={async () => {
             haptic("warning");
             const ok = await showConfirm(
-              "Не показывать приветствие? Вернуть можно в настройках профиля (👤).",
+              "Не показывать приветствие? Вернуть можно в настройках профиля.",
             );
             if (ok) onHide();
           }}
@@ -39,7 +40,7 @@ export default function WelcomeBanner({ meName, onHide }: Props) {
           title="Не показывать в следующий раз"
           className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-tg-hint transition-transform hover:text-tg-text active:scale-95"
         >
-          ✕
+          <Icon name="close" size={16} />
         </button>
       </div>
     </header>

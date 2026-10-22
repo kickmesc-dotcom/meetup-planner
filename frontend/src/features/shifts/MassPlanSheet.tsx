@@ -6,6 +6,7 @@ import type {
   ShiftTemplate,
 } from "@/api/shifts";
 import { haptic } from "@/tg/webapp";
+import Icon from "@/components/Icon";
 import { addDays, formatDate, toIso, weekdaysToIso } from "./shiftDates";
 
 /**
@@ -172,7 +173,7 @@ export default function MassPlanSheet({
             className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label="Закрыть"
           >
-            ✕
+            <Icon name="close" size={16} />
           </button>
         </div>
 
@@ -209,9 +210,9 @@ export default function MassPlanSheet({
                     type="button"
                     onClick={() => onDeleteTemplate(template.id)}
                     aria-label={`Удалить шаблон ${template.name}`}
-                    className="min-h-9 min-w-9 rounded-tile bg-tg-bg/60 text-xs text-status-busy"
+                    className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-bg/60 text-status-busy"
                   >
-                    ✕
+                    <Icon name="trash" size={14} />
                   </button>
                 </div>
               ))}
@@ -401,9 +402,9 @@ export default function MassPlanSheet({
                 type="button"
                 onClick={() => setNaming(false)}
                 aria-label="Отменить сохранение шаблона"
-                className="min-h-9 min-w-9 rounded-tile bg-tg-secondary-bg/60 text-xs text-tg-text"
+                className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
               >
-                ✕
+                <Icon name="close" size={14} />
               </button>
             </div>
           ) : (

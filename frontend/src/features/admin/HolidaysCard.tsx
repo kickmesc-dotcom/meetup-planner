@@ -6,6 +6,7 @@ import {
   fetchHolidays,
 } from "@/api/game";
 import { humanizeApiError } from "@/api/client";
+import Icon from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 
 /**
@@ -58,7 +59,10 @@ export default function HolidaysCard() {
 
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-      <h2 className="text-base font-semibold">🎉 Праздники</h2>
+      <h2 className="flex items-center gap-1.5 text-base font-semibold">
+        <Icon name="sparkles" size={16} className="shrink-0 text-tg-link" />
+        Праздники
+      </h2>
       <div className="mb-2 text-xs text-tg-hint">
         В эти дни всем участникам капает +50 XP, а бот поздравляет в чате
       </div>
@@ -82,9 +86,10 @@ export default function HolidaysCard() {
                   removeMut.mutate(h.id);
                 }}
                 disabled={removeMut.isPending}
-                className="shrink-0 rounded-tile bg-tg-bg/60 px-2 py-1 text-xs text-status-busy active:scale-95 disabled:opacity-60"
+                className="grid shrink-0 place-items-center rounded-tile bg-tg-bg/60 p-1.5 text-status-busy active:scale-95 disabled:opacity-60"
+                aria-label="Удалить праздник"
               >
-                ✕
+                <Icon name="close" size={14} />
               </button>
             </li>
           ))}

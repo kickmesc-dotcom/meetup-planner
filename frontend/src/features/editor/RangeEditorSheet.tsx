@@ -6,6 +6,7 @@ import { deleteRange, fetchRanges, patchRange } from "@/api/availability";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import { addDays, format, startOfDay } from "date-fns";
+import { InlineIcon } from "@/components/Icon";
 
 interface Props {
   rangeId: number | "new";
@@ -387,7 +388,10 @@ function TimePicker({
           disabled={disabled}
           onChange={(e) => onAllDayToggle(!e.currentTarget.checked)}
         />
-        <span className="text-sm">🕓 Конкретное время</span>
+        <span className="text-sm">
+          <InlineIcon name="clock" />
+          Конкретное время
+        </span>
       </label>
       {!allDay && (
         <div className="mt-2 flex items-center gap-2">

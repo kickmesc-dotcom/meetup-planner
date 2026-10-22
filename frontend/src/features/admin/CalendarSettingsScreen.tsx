@@ -19,6 +19,7 @@ import {
   setCalendarTimelineFlag,
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
+import { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
@@ -57,13 +58,14 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="📅 Вид календаря"
+      title="Вид календаря"
       subtitle="Новый таймлайн / legacy-вид"
       onBack={onBack}
     >
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ {humanizeApiError(q.error)}
+          <InlineIcon name="alert" />
+          {humanizeApiError(q.error)}
         </div>
       )}
 

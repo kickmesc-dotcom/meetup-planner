@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useUI, type ZoomLevel } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import { InlineIcon } from "@/components/Icon";
 
 /**
  * GHG6 P3 CL13 + CL6.b + CL5: нижняя плашка управления для TimelineView.
@@ -161,7 +162,8 @@ export default function TimelineNavBar({ isOnToday }: Props) {
               : "bg-tg-secondary-bg text-tg-text active:bg-tg-button/30",
           ].join(" ")}
         >
-          📍 К сегодня
+          <InlineIcon name="pin" />
+          К сегодня
         </motion.button>
         {/* GHG11(12): эта плашка — постоянный «верх» календаря в режиме
             таймлайна (NavBar там не рисуется), поэтому тема живёт здесь. */}

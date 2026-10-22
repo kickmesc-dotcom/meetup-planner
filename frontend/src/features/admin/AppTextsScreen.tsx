@@ -20,6 +20,7 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -89,7 +90,7 @@ export default function AppTextsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="✍️ Тексты приложения"
+      title="Тексты приложения"
       subtitle="Подписи, которые видит сотрудник"
       onBack={onBack}
     >
@@ -102,7 +103,8 @@ export default function AppTextsScreen({ onBack }: Props) {
       {q.isPending && <ListSkeleton rows={4} />}
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ {humanizeApiError(q.error)}
+          <InlineIcon name="alert" />
+          {humanizeApiError(q.error)}
         </div>
       )}
 
@@ -160,7 +162,19 @@ export default function AppTextsScreen({ onBack }: Props) {
             className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
-            {save.isPending ? "Сохраняем…" : dirty ? "💾 Сохранить тексты" : "✓ Сохранено"}
+            {save.isPending ? (
+              "Сохраняем…"
+            ) : dirty ? (
+              <>
+                <Icon name="save" size={16} />
+                Сохранить тексты
+              </>
+            ) : (
+              <>
+                <Icon name="check" size={16} />
+                Сохранено
+              </>
+            )}
           </button>
         </div>
       )}

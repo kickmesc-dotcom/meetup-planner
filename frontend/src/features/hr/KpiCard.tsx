@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchMyKpi } from "@/api/hr";
 import { CardSkeleton } from "@/components/Skeleton";
+import Icon from "@/components/Icon";
 
 /**
  * KPI смены: опыт за закрытые пункты, смены и поручения.
@@ -71,7 +72,8 @@ export default function KpiCard() {
           <>
             <div className="text-tg-hint">Сотрудник недели</div>
             <div className="mt-0.5 text-tg-text">
-              🏅 {winner.display_name}
+              <Icon name="award" size={14} className="mr-1 inline-block align-[-2px]" />
+              {winner.display_name}
               {winner.department ? ` · ${winner.department}` : ""} — {winner.xp} XP
             </div>
           </>

@@ -28,12 +28,12 @@ export default function MeetingsPollsScreen({
         <SectionButton
           active={section === "meetings"}
           onClick={() => setSection("meetings")}
-          label="🤝 Встречи"
+          label="Встречи"
         />
         <SectionButton
           active={section === "polls"}
           onClick={() => setSection("polls")}
-          label="🗳️ Опросы"
+          label="Опросы"
         />
       </div>
       {section === "meetings" ? (

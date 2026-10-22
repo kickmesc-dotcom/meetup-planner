@@ -20,6 +20,7 @@ import { humanizeApiError } from "@/api/client";
 import { Checkbox, Toggle as TgToggle } from "@/components/Checkbox";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -195,9 +196,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
         />
       ) : (
         <section className="rounded-card bg-tg-secondary-bg/60 p-4 text-center">
-          <div className="text-3xl" aria-hidden>
-            🗒
-          </div>
+          <Icon name="clipboard" size={30} className="mx-auto text-tg-hint" />
           <div className="mt-1 text-sm font-semibold text-tg-text">
             Чек-листа ещё нет
           </div>
@@ -436,12 +435,22 @@ function ItemEditor({
         >
           <div className="text-sm text-tg-text">{item.title}</div>
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
-            {item.requires_photo && <span>📷 фотоотчёт</span>}
+            {item.requires_photo && (
+              <span>
+                <InlineIcon name="camera" />
+                фотоотчёт
+              </span>
+            )}
             {!item.is_mandatory && <span>(опц.)</span>}
             {item.condition_position && (
               <span>только «{item.condition_position}»</span>
             )}
-            {item.schedule_label && <span>🗓 {item.schedule_label}</span>}
+            {item.schedule_label && (
+              <span>
+                <InlineIcon name="calendar" />
+                {item.schedule_label}
+              </span>
+            )}
           </div>
         </button>
         <div className="flex shrink-0 flex-col gap-1">

@@ -9,6 +9,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import Icon from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -57,7 +58,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🕒 Пресеты времени"
+      title="Пресеты времени"
       subtitle="Что показывать при создании опроса / авто-подборе"
       onBack={onBack}
     >
@@ -91,7 +92,8 @@ export default function PollPresetsScreen({ onBack }: Props) {
               }}
               className="rounded-tile bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
             >
-              ➕ слот
+              <Icon name="plus" size={14} className="mr-1 inline-block" />
+              слот
             </button>
             <button
               type="button"
@@ -115,11 +117,24 @@ export default function PollPresetsScreen({ onBack }: Props) {
             className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
-            {save.isPending ? "Сохраняем…" : allValid ? "💾 Сохранить" : "⚠ Проверь HH:MM"}
+            {save.isPending ? (
+              "Сохраняем…"
+            ) : allValid ? (
+              <>
+                <Icon name="save" size={16} />
+                Сохранить
+              </>
+            ) : (
+              <>
+                <Icon name="alert" size={16} />
+                Проверь HH:MM
+              </>
+            )}
           </button>
           {save.isError && (
             <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-              ⚠ {humanizeApiError(save.error)}
+              <Icon name="alert" size={13} className="mr-1 inline-block align-[-2px]" />
+              {humanizeApiError(save.error)}
             </div>
           )}
         </>
@@ -165,7 +180,7 @@ function PresetRow({
           className="rounded-tile bg-status-busy/20 px-2 py-2 text-status-busy"
           aria-label="Удалить"
         >
-          ✕
+          <Icon name="close" size={14} />
         </button>
       </div>
     </section>

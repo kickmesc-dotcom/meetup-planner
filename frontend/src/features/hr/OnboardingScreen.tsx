@@ -99,9 +99,6 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {step === 0 && (
           <section className="pt-10">
-            <div className="text-4xl" aria-hidden>
-              👋
-            </div>
             <h1 className="mt-4 text-2xl font-semibold text-tg-text">
               Привет, {employee.display_name.split(" ")[0]}!
             </h1>

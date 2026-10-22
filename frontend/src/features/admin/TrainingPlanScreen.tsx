@@ -80,7 +80,7 @@ export default function TrainingPlanScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <SubScreen
-      title="🎓 Обучение и ставка"
+      title="Обучение и ставка"
       subtitle="Учебные и обычные смены, ставка сотрудника"
       onBack={onBack}
     >

@@ -4,6 +4,7 @@ import { ru } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { fetchPolls, type Poll } from "@/api/meetings";
 import ErrorState from "@/components/ErrorState";
+import Icon from "@/components/Icon";
 import type { User } from "@/types";
 
 interface Props {
@@ -28,10 +29,11 @@ export default function PollsScreen({ users, meId }: Props) {
   if (list.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-        <div className="text-4xl mb-2">🗳️</div>
+        <Icon name="clipboard" size={34} className="mb-2 text-tg-hint" />
         <div className="text-tg-hint">Опросов пока не было.</div>
         <div className="text-xs text-tg-hint mt-2">
-          Запусти из «Календарь» → ⚡ → 📊 — бот опубликует TG-опрос в чате.
+          Запусти из «Календаря»: авто-подбор → опрос — бот опубликует его в
+          чате.
         </div>
       </div>
     );
@@ -95,7 +97,7 @@ function PollCard({
               : "bg-status-free/15 text-status-free",
           ].join(" ")}
         >
-          {isClosed ? "🔒" : "🟢 идёт"}
+          {isClosed ? <Icon name="lock" size={12} /> : "идёт"}
         </div>
       </div>
 
@@ -123,7 +125,13 @@ function PollCard({
               <div className="relative flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-medium truncate">
-                    {isWinner && "🏆 "}
+                    {isWinner && (
+                      <Icon
+                        name="award"
+                        size={12}
+                        className="mr-1 inline-block align-[-2px]"
+                      />
+                    )}
                     {o.label ??
                       format(new Date(o.starts_at), "d MMM HH:mm", { locale: ru })}
                   </div>

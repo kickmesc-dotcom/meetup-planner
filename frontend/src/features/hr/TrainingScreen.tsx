@@ -10,6 +10,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
+import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
@@ -103,7 +104,7 @@ export default function TrainingScreen({
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">🎓 Обучение</div>
+          <div className="text-sm font-semibold text-tg-text">Обучение</div>
           <div className="text-xs text-tg-hint">
             Три уровня, по одному действию на экран.
           </div>
@@ -285,7 +286,11 @@ function LessonCard({
         className="flex w-full items-center gap-2 text-left"
       >
         <span className="text-lg" aria-hidden>
-          {lesson.done ? "✅" : lesson.emoji}
+          {lesson.done ? (
+            <Icon name="check" size={18} className="text-status-free" />
+          ) : (
+            lesson.emoji
+          )}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-tg-text">

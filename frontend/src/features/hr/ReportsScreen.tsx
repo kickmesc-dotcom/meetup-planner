@@ -12,6 +12,7 @@ import {
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
+import { InlineIcon } from "@/components/Icon";
 import { useUI } from "@/store/ui";
 
 /**
@@ -89,7 +90,7 @@ export default function ReportsScreen() {
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">📊 Отчёт смены</div>
+          <div className="text-sm font-semibold text-tg-text">Отчёт смены</div>
           <div className="text-xs text-tg-hint">
             {report ? fmtDate(report.work_date) : "Срез на дату"}
           </div>
@@ -219,7 +220,12 @@ export default function ReportsScreen() {
                 <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
                   {requiredStandards.length === 0
                     ? "Обязательных стандартов пока нет — отметь их в базе стандартов."
-                    : "Все обязательные стандарты сданы ✅"}
+                    : (
+                        <>
+                          <InlineIcon name="check" />
+                          Все обязательные стандарты сданы.
+                        </>
+                      )}
                 </div>
               ) : (
                 standards.map((standard) => (

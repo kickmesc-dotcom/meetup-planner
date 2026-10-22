@@ -54,10 +54,10 @@ export default function ActionBar() {
       </button>
       <ActionBtn
         onClick={tap(() => setShowAuto(true))}
-        label="🎯 Авто-подбор"
+        label="Авто-подбор"
         primary
       />
-      <ActionBtn onClick={tap(() => setShowPoll(true))} label="📊 Опрос" />
+      <ActionBtn onClick={tap(() => setShowPoll(true))} label="Опрос" />
     </div>
   );
 }

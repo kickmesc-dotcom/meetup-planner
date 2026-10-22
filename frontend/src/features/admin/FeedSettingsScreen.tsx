@@ -10,6 +10,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchFeedViewFlag, setFeedViewFlag } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
+import { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
@@ -46,13 +47,14 @@ export default function FeedSettingsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="📰 Вид ленты"
+      title="Вид ленты"
       subtitle="Компактный (новый) / классический"
       onBack={onBack}
     >
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ {humanizeApiError(q.error)}
+          <InlineIcon name="alert" />
+          {humanizeApiError(q.error)}
         </div>
       )}
 

@@ -8,6 +8,7 @@ import {
 } from "@/api/hrOps";
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
+import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -42,7 +43,7 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <SubScreen
-      title="🗂 Журнал событий"
+      title="Журнал событий"
       subtitle="Поручения: кто что сделал и что отправил планировщик"
       onBack={onBack}
     >
@@ -107,9 +108,11 @@ function JournalRow({
   return (
     <div className="px-3 py-2.5">
       <div className="flex items-start gap-2">
-        <span className="mt-0.5 text-base" aria-hidden>
-          {item.is_system ? "🤖" : "🧑"}
-        </span>
+        <Icon
+          name={item.is_system ? "bot" : "profile"}
+          size={16}
+          className="mt-0.5 shrink-0 text-tg-hint"
+        />
         <div className="min-w-0 flex-1">
           <div className="text-sm text-tg-text break-words">
             <span className="font-medium">{item.display_name ?? "Система"}</span>{" "}

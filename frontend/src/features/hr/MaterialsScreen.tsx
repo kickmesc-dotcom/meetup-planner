@@ -10,6 +10,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
+import Icon from "@/components/Icon";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 
 /**
@@ -76,9 +77,7 @@ export default function MaterialsScreen() {
 
         {!materialsQ.isLoading && materials.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <div className="text-4xl" aria-hidden>
-              📚
-            </div>
+            <Icon name="book" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               Материалов пока нет
             </div>

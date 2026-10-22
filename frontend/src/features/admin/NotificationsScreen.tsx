@@ -129,7 +129,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
 
   return (
     <SubScreen
-      title="🔔 Уведомления"
+      title="Уведомления"
       subtitle="Что ушло и что запланировано"
       onBack={onBack}
     >

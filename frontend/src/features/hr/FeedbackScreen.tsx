@@ -8,6 +8,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
+import { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 
@@ -52,7 +53,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
       <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
         <div className="min-w-0 flex-1">
           <div className="text-base font-medium text-tg-text">
-            📝 Обратная связь
+            Обратная связь
           </div>
           <div className="text-xs text-tg-hint">Как прошла смена</div>
         </div>
@@ -82,7 +83,8 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
 
         {sent && (
           <div className="rounded-card bg-status-free/10 p-3 text-center text-sm text-status-free">
-            ✓ Ответы отправлены
+            <InlineIcon name="check" />
+            Ответы отправлены
           </div>
         )}
 

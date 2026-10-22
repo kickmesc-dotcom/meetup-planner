@@ -9,6 +9,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
 import { Checkbox } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
+import Icon from "@/components/Icon";
 import BottomSheet from "./BottomSheet";
 
 interface Props {
@@ -170,7 +171,7 @@ export default function PollSheet(_props: Props) {
     (!includeTime || options.every((o) => /^\d{2}:\d{2}$/.test(o.time)));
 
   return (
-    <BottomSheet title="📊 Опрос в чат" onClose={close}>
+    <BottomSheet title="Опрос в чат" onClose={close}>
       <label className="text-sm">
         <div className="mb-1 text-xs text-tg-hint">Вопрос</div>
         <input
@@ -218,10 +219,11 @@ export default function PollSheet(_props: Props) {
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
-                  className="min-h-11 min-w-11 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy"
+                  className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-status-busy/15 text-status-busy"
                   title="Убрать"
+                  aria-label="Убрать вариант"
                 >
-                  ✕
+                  <Icon name="close" size={14} />
                 </button>
               )}
             </div>
@@ -260,7 +262,12 @@ export default function PollSheet(_props: Props) {
           className="chk-tg"
         />
         <span>
-          📌 Закрепить опрос в чате
+          <Icon
+            name="pin"
+            size={14}
+            className="mr-1 inline-block align-[-2px]"
+          />
+          Закрепить опрос в чате
           <div className="text-xs text-tg-hint">
             Сразу после публикации бот пин-нёт сообщение (без шумного
             уведомления).

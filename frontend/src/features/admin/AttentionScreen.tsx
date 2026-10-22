@@ -11,6 +11,7 @@ import { fetchAdminTasks } from "@/api/hr";
 import { fetchIssues, ISSUE_CATEGORY_ICON, ISSUE_STATUS_LABEL } from "@/api/issues";
 import { humanizeApiError } from "@/api/client";
 import { ListSkeleton } from "@/components/Skeleton";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -53,7 +54,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
 
   return (
     <SubScreen
-      title="🚨 Требует внимания"
+      title="Требует внимания"
       subtitle="Просроченные поручения и открытые проблемы"
       onBack={onBack}
     >
@@ -61,7 +62,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
         <ListSkeleton rows={4} />
       ) : problems === 0 ? (
         <section className="rounded-card bg-status-free/10 p-4 text-center">
-          <div className="text-2xl mb-1">✓</div>
+          <Icon name="check" size={28} className="mx-auto mb-1 text-status-free" />
           <div className="text-sm font-medium text-status-free">Всё под контролем</div>
           <div className="mt-1 text-xs text-tg-hint">
             Просроченных поручений нет, открытых проблем нет.
@@ -71,12 +72,14 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
         <>
           {tasks.isError && (
             <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-              ⚠ {humanizeApiError(tasks.error)}
+              <InlineIcon name="alert" />
+              {humanizeApiError(tasks.error)}
             </div>
           )}
           {issues.isError && (
             <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-              ⚠ {humanizeApiError(issues.error)}
+              <InlineIcon name="alert" />
+              {humanizeApiError(issues.error)}
             </div>
           )}
 
@@ -84,7 +87,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
             <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">
-                  📝 Поручения
+                  Поручения
                 </div>
                 {onOpenTasks && (
                   <button
@@ -130,7 +133,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
             <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">
-                  🛠 Проблемы: {openIssues.length}
+                  Проблемы: {openIssues.length}
                 </div>
                 {issues.data && issues.data.summary.attention > 0 && (
                   <span className="rounded-full bg-status-busy/15 px-2 py-0.5 text-2xs text-status-busy">

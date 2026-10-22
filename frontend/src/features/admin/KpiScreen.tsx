@@ -16,6 +16,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import { ListSkeleton } from "@/components/Skeleton";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -75,13 +76,14 @@ export default function KpiScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="🏅 KPI смены"
+      title="KPI смены"
       subtitle="Опыт за работу, рейтинг недели"
       onBack={onBack}
     >
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-          ⚠ {humanizeApiError(q.error)}
+          <InlineIcon name="alert" />
+          {humanizeApiError(q.error)}
         </div>
       )}
       {q.isLoading && <ListSkeleton rows={4} />}
@@ -137,7 +139,8 @@ export default function KpiScreen({ onBack }: Props) {
             <>
               <div className="text-tg-hint">Сотрудник недели</div>
               <div className="mt-0.5 text-tg-text">
-                🏅 {winner.display_name}
+                <Icon name="award" size={14} className="mr-1 inline-block align-[-2px]" />
+                {winner.display_name}
                 {winner.department ? ` · ${winner.department}` : ""} — {winner.xp} XP,{" "}
                 {winner.tasks_done} поруч.
               </div>
