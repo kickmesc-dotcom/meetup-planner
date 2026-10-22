@@ -82,8 +82,28 @@ async def current_user(
     session: SessionDep,
     settings: SettingsDep,
     authorization: Annotated[str | None, Header()] = None,
+    x_access_token: Annotated[str | None, Header()] = None,
 ) -> User:
+    """Кто пришёл: `initData` из Telegram или ссылка доступа из браузера.
+
+    Порядок важен. `Authorization: tma …` — это мини-апп, и он всегда главнее:
+    если человек открыл приложение внутри Telegram, локальный токен браузера
+    (мог остаться от прошлого входа) не должен подменять личность.
+
+    `X-Access-Token` — только вторая ветка, для прямой ссылки на Pages, где
+    `initData` нет вовсе. Токен проверяется по SHA-256 в базе, со сроком и
+    отзывом (`services.app_access`).
+    """
     if not authorization:
+        if x_access_token:
+            from app.services import app_access
+
+            user = await app_access.resolve(session, x_access_token)
+            if user is None:
+                raise HTTPException(
+                    status.HTTP_401_UNAUTHORIZED, detail="access_token_invalid"
+                )
+            return user
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="missing_authorization")
 
     init_data = _strip_tma_prefix(authorization)

@@ -12,6 +12,72 @@ const API_BASE_KEY = "buff.api_base";
  * поднимается заранее, а сотрудник вводит его в профиле («Сервер»), и приложение
  * продолжает работать. Это дешевле, чем выпускать новый билд в момент аварии.
  */
+/**
+ * Токен входа в веб-версию (прямая ссылка на Pages, вне Telegram).
+ *
+ * Внутри мини-аппа личность подтверждает `initData` — его подписывает бот.
+ * В обычном браузере этого нет, поэтому сервер выдаёт личный токен, а мы храним
+ * его в `localStorage`: ссылка открывается один раз, дальше работают закладка
+ * и обычные перезагрузки страницы.
+ *
+ * Токен — это пароль. Из адресной строки он сразу убирается (см.
+ * `captureAccessTokenFromUrl`), чтобы не остаться в истории, закладках и логах
+ * прокси.
+ */
+const ACCESS_TOKEN_KEY = "semitask.access_token";
+
+export function getAccessToken(): string | null {
+  try {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAccessToken(token: string): void {
+  try {
+    localStorage.setItem(ACCESS_TOKEN_KEY, token.trim());
+  } catch {
+    // приватный режим — вход будет работать до перезагрузки
+  }
+}
+
+export function clearAccessToken(): void {
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Забрать `?access=…` из адреса в `localStorage` и вычистить его из строки.
+ *
+ * Возвращает `true`, если токен пришёл: вызывающий может перерисоваться.
+ * `history.replaceState` не перезагружает страницу и не создаёт запись в
+ * истории — ссылка с секретом нигде не оседает.
+ */
+export function captureAccessTokenFromUrl(): boolean {
+  if (typeof window === "undefined") return false;
+  let url: URL;
+  try {
+    url = new URL(window.location.href);
+  } catch {
+    return false;
+  }
+  const token = url.searchParams.get("access");
+  if (!token) return false;
+  setAccessToken(token);
+  url.searchParams.delete("access");
+  try {
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(null, "", next);
+  } catch {
+    // старый webview без history API — токен уже сохранён, это главное
+  }
+  return true;
+}
+
 export function getApiBase(): string {
   try {
     const saved = localStorage.getItem(API_BASE_KEY);
@@ -200,8 +266,12 @@ export async function api<T>(
   options: { sameOrigin?: boolean } = {},
 ): Promise<T> {
   const initData = getInitData();
+  const accessToken = initData ? null : getAccessToken();
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `tma ${initData}`);
+  // Внутри Telegram главнее `initData`: локальный токен браузера (мог
+  // остаться от прошлого входа) не должен подменять личность.
+  if (initData) headers.set("Authorization", `tma ${initData}`);
+  else if (accessToken) headers.set("X-Access-Token", accessToken);
   // Режим проверки: сервер подменяет профиль на теневой. Без заголовка это
   // обычный запрос настоящего пользователя.
   const simulationId = useSimulation.getState().sessionId;
@@ -223,6 +293,9 @@ export async function api<T>(
   const res = await fetch(url, { ...init, headers });
 
   if (!res.ok) {
+    // Токен веб-версии отозвали или истёк срок: забываем его, чтобы приложение
+    // показало «нужен вход», а не долбило сервер мёртвым заголовком.
+    if (res.status === 401 && accessToken && !initData) clearAccessToken();
     let detail = res.statusText;
     try {
       const body = await res.json();

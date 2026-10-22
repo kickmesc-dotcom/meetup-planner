@@ -346,6 +346,9 @@ export default function MyTasksScreen() {
           </button>
         )}
 
+        {/* На широком экране карточки идут двумя колонками: на ПК список
+            из трёх поручений растягивался на 1000px одной узкой лентой. */}
+        <div className="space-y-3 xl:grid xl:grid-cols-2 xl:items-start xl:gap-3 xl:space-y-0">
         {tasksQ.isLoading && (
           <>
             <CardSkeleton />
@@ -354,7 +357,7 @@ export default function MyTasksScreen() {
         )}
 
         {!tasksQ.isLoading && tasks.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="flex flex-col items-center justify-center py-10 text-center xl:col-span-2">
             <Icon name="check" size={30} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
               {emptyTitle}
@@ -398,6 +401,7 @@ export default function MyTasksScreen() {
             }}
           />
         ))}
+        </div>
       </div>
     </div>
   );

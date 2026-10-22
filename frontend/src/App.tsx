@@ -28,6 +28,9 @@ import OnboardingScreen from "./features/hr/OnboardingScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import TabBar from "./features/nav/TabBar";
+import DesktopShell from "./features/desktop/DesktopShell";
+import OverviewRail from "./features/desktop/OverviewRail";
+import { useIsDesktop } from "./lib/useIsDesktop";
 import ErrorState from "./components/ErrorState";
 import TabTransition from "./components/TabTransition";
 import ThemeSwitcher from "./components/ThemeSwitcher";
@@ -71,6 +74,9 @@ export default function App() {
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
   const simulationId = useSimulation((s) => s.sessionId);
+  // Широкий экран — отдельный каркас (сайдбар + рабочая область). Нижняя
+  // полоса остаётся мобильной навигацией и на ПК не рисуется вовсе.
+  const isDesktop = useIsDesktop();
 
   // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
   // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
@@ -92,6 +98,33 @@ export default function App() {
 
   if (me.isError) {
     const status = me.error && (me.error as { status?: number }).status;
+    if (status === 401) {
+      // Прямая ссылка на Pages без Telegram: `initData` нет, а токен веб-версии
+      // не найден или отозван. Объясняем, где его взять, вместо сухого
+      // «Ошибка авторизации».
+      return (
+        <div className="flex h-full items-center justify-center px-6 text-center">
+          <div className="max-w-sm">
+            <div className="mb-2 text-3xl" aria-hidden>
+              🖥
+            </div>
+            <div className="text-lg font-medium">Нужен вход</div>
+            <p className="mt-2 text-sm text-tg-hint">
+              Открой приложение из Telegram — или возьми ссылку для компьютера
+              командой <b>/app</b> в боте. Ссылка работает как пароль и
+              открывается один раз.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-4 min-h-11 rounded-full bg-tg-button px-4 text-xs text-tg-button-text"
+            >
+              Проверить ещё раз
+            </button>
+          </div>
+        </div>
+      );
+    }
     if (status === 403) {
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">
@@ -213,9 +246,14 @@ export default function App() {
       </main>
     );
   } else if (tab === "feed") {
+    // На широком экране у ленты появляется правый рельс сводки (на мобильном
+    // он скрыт классом `hidden lg:block` внутри самого компонента).
     content = (
-      <main className="flex-1 overflow-hidden flex flex-col">
-        <HrFeedScreen />
+      <main className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <HrFeedScreen />
+        </div>
+        <OverviewRail />
       </main>
     );
   } else if (tab === "team") {
@@ -305,6 +343,28 @@ export default function App() {
           <AdminScreen users={users.data} />
         </main>
       </>
+    );
+  }
+
+  // ПК/браузер: постоянный сайдбар и широкая область. Раньше здесь была та же
+  // колонка 560px, что и на телефоне, — на мониторе половина экрана пустовала.
+  if (isDesktop) {
+    return (
+      <div className="relative flex h-full w-full bg-tg-bg">
+        <DesktopShell
+          canManage={canManage}
+          isAdmin={isAdmin}
+          meName={hrMe.data?.display_name.replace("[BOT]", "").trim() || meData.display_name}
+          meHint={
+            hrMe.data?.position ??
+            hrMe.data?.department_name ??
+            "Сотрудник"
+          }
+        >
+          <SimulationBanner />
+          <TabTransition key={tab}>{content}</TabTransition>
+        </DesktopShell>
+      </div>
     );
   }
 

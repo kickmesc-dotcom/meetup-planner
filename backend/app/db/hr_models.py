@@ -1643,3 +1643,46 @@ class RosterSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class AppAccessLink(Base):
+    """Ссылка входа в приложение из браузера (вне Telegram).
+
+    Зачем. Внутри мини-аппа личность подтверждает `initData` — подпись бота,
+    которую Telegram кладёт в WebApp. В обычном браузере (Pages по прямой
+    ссылке) этого нет, поэтому нужен свой вход. Пароль не заводим: сотруднику
+    и так выдали Telegram, и второй пароль он забудет.
+
+    Как устроено. Сервер генерирует длинный случайный токен, отдаёт его один
+    раз в ссылке `…/?access=…`, а в базе хранит только SHA-256. Утечка дампа
+    БД тогда не даёт входа. Срок жизни ограничен, ссылку можно отозвать.
+
+    `last_used_at` нужен человеку, а не серверу: в профиле видно, когда ссылку
+    последний раз использовали, — если это было не он, ссылку отзывают.
+    """
+
+    __tablename__ = "app_access_links"
+    __table_args__ = (
+        Index("ix_app_access_links_user", "user_id"),
+        Index("ix_app_access_links_expires", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # SHA-256 от токена: сам токен в базе не хранится никогда.
+    token_hash: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True
+    )
+    label: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

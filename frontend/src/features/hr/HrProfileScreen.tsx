@@ -23,6 +23,7 @@ import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
 import KpiCard from "@/features/hr/KpiCard";
 import TrainingScreen from "@/features/hr/TrainingScreen";
+import WebVersionCard from "@/features/hr/WebVersionCard";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 
@@ -220,7 +221,7 @@ export default function HrProfileScreen() {
   }
 
   return (
-    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
+    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0 lg:px-6 lg:py-5">
       {/* 1. Кто я. */}
       <section
         data-testid="profile-identity"
@@ -518,6 +519,10 @@ export default function HrProfileScreen() {
           </div>
         )}
       </section>
+
+      {/* Веб-версия: широкая ссылка для компьютера. Живёт рядом с разделами —
+          это личный доступ, а не админская настройка. */}
+      <WebVersionCard />
 
       {/* 4. Админ-инструменты: нужны редко, поэтому свёрнуты. */}
       {(me.is_admin || me.is_staff) && (

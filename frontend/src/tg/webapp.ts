@@ -12,7 +12,35 @@ export function initTelegramWebApp(): void {
   } catch {
     // outside Telegram (local dev) — ok
   }
+  requestFullscreenOnDesktop();
   installFocusScrollFix();
+}
+
+/**
+ * Широкий экран на ПК: попросить у Telegram всё доступное место.
+ *
+ * Зачем. Окно мини-аппа в Telegram Desktop по умолчанию узкое, и задать его
+ * размер из страницы нельзя — API размера окна не существует. Есть
+ * `requestFullscreen()` (Bot API 8.0): клиент разворачивает мини-апп на весь
+ * экран. На телефоне это не нужно (там уже `expand()`), поэтому просим только
+ * на широком вьюпорте.
+ *
+ * Клиенты без поддержки просто ничего не делают — вызов в `try/catch` и с
+ * проверкой типа метода. Если разворот сработал, приложение покажет каркас с
+ * сайдбаром (≥1024px); выйти можно обычным способом клиента.
+ */
+function requestFullscreenOnDesktop(): void {
+  try {
+    if (typeof window === "undefined" || window.innerWidth < 1024) return;
+    const api = WebApp as unknown as {
+      requestFullscreen?: () => void;
+      isFullscreen?: boolean;
+    };
+    if (api.isFullscreen) return;
+    if (typeof api.requestFullscreen === "function") api.requestFullscreen();
+  } catch {
+    // старый клиент/браузер без поддержки — остаёмся в обычном окне
+  }
 }
 
 /**

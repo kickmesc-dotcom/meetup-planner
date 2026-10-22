@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
     routes_admin,
+    routes_app_access,
     routes_availability,
     routes_birthdays,
     routes_calendar,
@@ -273,6 +274,8 @@ def create_app() -> FastAPI:
     )
     app.include_router(bot_webhook.router)
     app.include_router(routes_users.router, prefix="/api")
+    # Вход в веб-версию по ссылке (вне Telegram, где нет initData).
+    app.include_router(routes_app_access.router, prefix="/api")
     app.include_router(routes_availability.router, prefix="/api")
     app.include_router(routes_meetings.router, prefix="/api")
     app.include_router(routes_polls.router, prefix="/api")
