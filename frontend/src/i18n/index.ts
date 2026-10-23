@@ -3,8 +3,13 @@
  *
  * Локаль живёт в zustand, как тема: подписанные компоненты перерисовываются сами,
  * `window.location.reload()` не нужен. Выбор хранится в localStorage и
- * переживает перезапуск; по умолчанию — русский, а английский включается сам
- * только если браузер явно англоязычный.
+ * переживает перезапуск.
+ *
+ * По умолчанию — всегда русский, и язык браузера/системы его НЕ меняет.
+ * Причина не в упрямстве: английский перевод ещё неполный (экраны сотрудника
+ * пока русские), и авто-переключение давало человеку английскую шапку с
+ * русским содержимым — «я зашёл, а интерфейс сам стал наполовину английским».
+ * Английский включается только явным нажатием RU/EN.
  *
  * Тексты — в `messages.ts`. Чего здесь сознательно нет: склонений и форматов
  * дат. Для двух локалей первый шаг — статические подписи; числа и даты уже
@@ -47,17 +52,6 @@ export function applyLocale(locale: Locale): void {
   document.documentElement.lang = locale;
 }
 
-/**
- * Локаль браузера, если человек ещё ничего не выбирал. Английский — только при
- * явном `en*`: для всех остальных языков интерфейс пока русский, а не пустой.
- */
-function browserLocale(): Locale {
-  if (typeof navigator === "undefined") return DEFAULT_LOCALE;
-  return navigator.language?.toLowerCase().startsWith("en")
-    ? "en"
-    : DEFAULT_LOCALE;
-}
-
 interface LocaleState {
   locale: Locale;
   setLocale: (locale: Locale) => void;
@@ -72,9 +66,14 @@ export const useLocale = create<LocaleState>((set) => ({
   },
 }));
 
-/** Стартовая локаль: сохранённый выбор, иначе язык браузера. */
+/**
+ * Стартовая локаль: сохранённый выбор, иначе русский.
+ *
+ * Язык браузера здесь сознательно не читается — см. комментарий в начале
+ * файла: полупереведённый английский хуже, чем предсказуемый русский.
+ */
 export function initLocale(): Locale {
-  const locale = readStoredLocale() ?? browserLocale();
+  const locale = readStoredLocale() ?? DEFAULT_LOCALE;
   applyLocale(locale);
   useLocale.setState({ locale });
   return locale;

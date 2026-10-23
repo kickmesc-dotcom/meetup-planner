@@ -108,6 +108,23 @@ describe("переключение языка", () => {
     expect(useLocale.getState().locale).toBe("en");
   });
 
+  it("без выбора оставляет русский, даже если браузер английский", () => {
+    // Симптом из приложения: человек открыл мини-апп и получил английскую
+    // шапку при русском содержимом. Язык системы больше ничего не решает.
+    const original = Object.getOwnPropertyDescriptor(window, "navigator");
+    Object.defineProperty(window, "navigator", {
+      configurable: true,
+      value: { ...window.navigator, language: "en-US", languages: ["en-US"] },
+    });
+    try {
+      expect(initLocale()).toBe("ru");
+      expect(useLocale.getState().locale).toBe("ru");
+      expect(document.documentElement.lang).toBe("ru");
+    } finally {
+      if (original) Object.defineProperty(window, "navigator", original);
+    }
+  });
+
   it("отмечает выбранный язык для скринридера", () => {
     render(<LanguageSwitcher />);
     expect(
