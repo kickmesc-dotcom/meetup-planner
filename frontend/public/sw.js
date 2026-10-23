@@ -18,12 +18,15 @@
  *    баннер «доступна новая версия» не нужен: свежий HTML подхватывается сам;
  *  • файлы сборки (`/assets/…`, иконки, манифест) — из кеша, иначе сеть. У них
  *    в имени хеш, поэтому кеш не может «устареть»;
+ *  • сборка (JS/CSS) кладётся в кеш при установке: список файлов читается из
+ *    `index.html`. Без этого офлайн-старт после **первого** визита дал бы HTML
+ *    без скриптов — пустой экран вместо приложения;
  *  • иконки/манифест попадают в кеш ещё при установке.
  *
  * Обновление: при изменении этого файла браузер ставит новый SW, `activate`
  * чистит кеши прошлых версий. Версию поднимать руками при правке списка SHELL.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `semi-shell-${VERSION}`;
 const ASSET_CACHE = `semi-assets-${VERSION}`;
 
@@ -39,12 +42,49 @@ const SHELL = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL))
-      .then(() => self.skipWaiting()),
+    (async () => {
+      const shell = await caches.open(SHELL_CACHE);
+      await shell.addAll(SHELL);
+      await precacheBuild(shell);
+      await self.skipWaiting();
+    })(),
   );
 });
+
+/**
+ * Достаём хешированные `/assets/*.js|css` из сохранённого `index.html` и кладём
+ * их в кеш. Имена с хешем, поэтому список не нужно поддерживать руками — при
+ * новой сборке HTML изменится, а с ним и список. Ошибка загрузки отдельного
+ * файла не отменяет установку: лучше неполный офлайн, чем отсутствие SW.
+ */
+async function precacheBuild(shell) {
+  try {
+    const page = await shell.match("/index.html");
+    if (!page) return;
+    const html = await page.text();
+    const paths = new Set();
+    for (const [tag] of html.matchAll(/<(?:script|link)\b[^>]*>/gi)) {
+      const isScript = /^<script/i.test(tag);
+      const isStyle = /rel=["']?stylesheet/i.test(tag);
+      if (!isScript && !isStyle) continue;
+      const attr = tag.match(/(?:src|href)=["']([^"']+)["']/i);
+      if (!attr) continue;
+      const url = new URL(attr[1], self.location.origin);
+      if (url.origin !== self.location.origin) continue;
+      if (url.pathname.startsWith("/assets/")) paths.add(url.pathname);
+    }
+    const assets = await caches.open(ASSET_CACHE);
+    await Promise.all(
+      [...paths].map(async (path) => {
+        if (await assets.match(path)) return;
+        const response = await fetch(path).catch(() => null);
+        if (response && response.ok) await assets.put(path, response);
+      }),
+    );
+  } catch {
+    // Офлайн-старт без ассетов хуже, но рабочее приложение важнее установки.
+  }
+}
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -79,12 +119,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Оболочка лежит в SHELL_CACHE, сборка — в ASSET_CACHE. Проверять не тот
+  // кеш — значит при офлайне отдавать `Response.error()` для манифеста и
+  // иконок, хотя они уже сохранены.
+  if (SHELL.includes(url.pathname)) {
+    event.respondWith(cacheFirst(request, SHELL_CACHE));
+    return;
+  }
+
   if (
     url.pathname.startsWith("/assets/") ||
-    SHELL.includes(url.pathname) ||
     /\.(png|ico|svg|webmanifest|woff2?)$/.test(url.pathname)
   ) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(cacheFirst(request, ASSET_CACHE));
   }
 });
 
@@ -111,8 +158,8 @@ async function networkFirst(request) {
   }
 }
 
-async function cacheFirst(request) {
-  const cache = await caches.open(ASSET_CACHE);
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName);
   const hit = await cache.match(request);
   if (hit) return hit;
   try {

@@ -77,4 +77,16 @@ describe("service worker", () => {
     expect(swRaw).toContain("/index.html");
     expect(swRaw).toContain("activate");
   });
+
+  it("кладёт сборку в кеш при установке, а не после второго визита", () => {
+    // Иначе офлайн-старт после первого визита показал бы HTML без скриптов.
+    expect(swRaw).toContain("precacheBuild");
+    expect(swRaw).toContain('startsWith("/assets/")');
+  });
+
+  it("читает оболочку из того кеша, куда её положила установка", () => {
+    // Кеши разные: промах по ASSET_CACHE для манифеста/иконок ломает офлайн.
+    expect(swRaw).toContain("cacheFirst(request, SHELL_CACHE)");
+    expect(swRaw).toContain("cacheFirst(request, ASSET_CACHE)");
+  });
 });
