@@ -8,6 +8,7 @@ import {
 } from "@/api/access";
 import { clearAccessToken, humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
+import { copyText } from "@/lib/clipboard";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
 /**
@@ -198,33 +199,4 @@ function LinkRow({
       )}
     </li>
   );
-}
-
-/**
- * Копирование с запасным путём: в Telegram-webview `navigator.clipboard`
- * доступен не всегда (нет secure context или политика клиента).
- */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // переходим к запасному пути
-  }
-  try {
-    const area = document.createElement("textarea");
-    area.value = text;
-    area.setAttribute("readonly", "");
-    area.style.position = "fixed";
-    area.style.opacity = "0";
-    document.body.appendChild(area);
-    area.select();
-    const ok = document.execCommand("copy");
-    document.body.removeChild(area);
-    return ok;
-  } catch {
-    return false;
-  }
 }

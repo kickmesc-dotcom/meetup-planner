@@ -34,6 +34,7 @@ from app.api import (
     routes_media,
     routes_meetings,
     routes_meta,
+    routes_orgs,
     routes_polls,
     routes_reports,
     routes_reset,
@@ -350,6 +351,8 @@ def create_app() -> FastAPI:
     app.include_router(bot_webhook.router)
     # Вход по почте: регистрация, вход, сессии, сброс (B2B_PLATFORM_PLAN, 2.1).
     app.include_router(routes_auth.router, prefix="/api")
+    # Приглашения в организацию: ссылка с ролью и сроком (B2B_PLATFORM_PLAN, 2.2).
+    app.include_router(routes_orgs.router, prefix="/api")
     app.include_router(routes_users.router, prefix="/api")
     # Вход в веб-версию по ссылке (вне Telegram, где нет initData).
     app.include_router(routes_app_access.router, prefix="/api")

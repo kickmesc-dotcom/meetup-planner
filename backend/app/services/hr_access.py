@@ -33,11 +33,21 @@ from app.db.hr_models import (
     Employee,
 )
 from app.db.models import User
+from app.db.org_models import current_org_id
 
 log = structlog.get_logger()
 
 # Уровни прав: больше — шире.
 _ROLE_RANK: dict[str, int] = {ROLE_EMPLOYEE: 0, ROLE_AUP: 1, ROLE_ADMIN: 2}
+
+# Роль организации → HR-роль нового профиля. Приглашение выписывается уровнем
+# доступа («manager»), а интерфейс спрашивает HR-роль, поэтому связка должна
+# быть одна — та же, что в миграции 0056 (admin→owner, aup→manager, staff).
+_ORG_ROLE_TO_HR: dict[str, str] = {
+    "owner": ROLE_ADMIN,
+    "manager": ROLE_AUP,
+    "staff": ROLE_EMPLOYEE,
+}
 
 
 class HrAccessError(Exception):
@@ -92,20 +102,30 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
             await session.flush()
         return employee
 
+    # Почему роль берётся из членства. Приглашённого позвали управляющим —
+    # значит его HR-роль должна быть `aup`, иначе человек попадёт в приложение
+    # сотрудником без админки и менеджер будет искать причину в правах.
+    # Env-админ по-прежнему сильнее: `default_role_for` уже вернул `admin`.
+    from app.services import orgs
+
+    org_id = current_org_id.get()
+    role = default_role_for(user.telegram_id or 0)
+    if role != ROLE_ADMIN:
+        membership = await orgs.member(session, org_id=org_id, user_id=user.id)
+        role = _ORG_ROLE_TO_HR.get(
+            membership.role if membership is not None else "staff", ROLE_EMPLOYEE
+        )
+
     employee = Employee(
         user_id=user.id,
-        role=default_role_for(user.telegram_id or 0),
+        role=role,
         onboarding_state=ONBOARDING_NEW,
     )
     session.add(employee)
     await session.flush()
     # Сотрудник без членства — это сотрудник, которого не видно ни в одной
     # организации: связь создаём сразу, в организации из контекста.
-    from app.services import orgs
-
-    await orgs.ensure_member(
-        session, org_id=employee.org_id, user_id=user.id
-    )
+    await orgs.ensure_member(session, org_id=org_id, user_id=user.id)
     log.info("hr.employee_created", user_id=user.id, role=employee.role)
     return employee
 

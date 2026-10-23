@@ -173,3 +173,56 @@ class OrganizationMember(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class OrgInvitation(OrgScoped, Base):
+    """Ссылка-приглашение в организацию (B2B_PLATFORM_PLAN, шаг 2.2).
+
+    Почему ссылка, а не запись «сотрудника в ожидании». Приглашённый может
+    ещё не иметь аккаунта, и заводить ему строку `users` заранее значит плодить
+    дубли: человек зарегистрируется другой почтой или войдёт из Telegram.
+    Приглашение — это право присоединиться, а учётка появляется по факту.
+
+    В базе только SHA-256 от токена: ссылка живёт неделю, пересылается в
+    мессенджере и попадает в историю — утечка дампа не должна давать вход.
+
+    `email` необязателен. Пусто — ссылка «для всех, у кого она есть» (её кидают
+    в чат смены). Заполнен — принять сможет только владелец этой почты, и
+    письмо уходит ему.
+
+    Модель тенантная (`OrgScoped`), поэтому выборки в админке фильтруются по
+    организации автоматически. Единственное исключение — поиск по токену: он
+    идёт до того, как организация известна, и оборачивается в `all_orgs()`.
+    """
+
+    __tablename__ = "org_invitations"
+    __table_args__ = (
+        # Токен ищется глобально, пока организация неизвестна — значит и
+        # уникален он глобально, а не внутри тенанта.
+        UniqueConstraint("token_hash", name="uq_org_invitation_token"),
+        Index("ix_org_invitations_org", "org_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    email: Mapped[str | None] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="staff", server_default="staff"
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    # Принята: ссылка одноразовая, повторный переход отвечает «уже принято».
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

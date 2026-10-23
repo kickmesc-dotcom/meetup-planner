@@ -67,6 +67,9 @@ TENANT_TABLES: set[str] = {
     "employee_training_days",
     "employee_training_steps",
     "employees",
+    # Приглашение принадлежит организации, из которой выписано (шаг 2.2):
+    # именно его `org_id` решает, куда попадёт приглашённый.
+    "org_invitations",
     "event_log",
     "feedback_answers",
     "feedback_questions",
@@ -368,7 +371,11 @@ def _migration_0054():
 def test_migration_0054_covers_every_tenant_table() -> None:
     module = _migration_0054()
     already = {"departments", "employees", "organization_members"}  # получили в 0053
-    assert set(module.TENANT_TABLES) == TENANT_TABLES - already
+    # Таблицы, созданные позже 0054: у них `org_id` есть с рождения, и
+    # добавлять его миграцией 0054 было бы некуда. Список явный, чтобы новая
+    # таблица всё равно требовала решения.
+    created_later = {"org_invitations"}  # 0057
+    assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 
 def test_migration_0054_unique_swaps_match_models() -> None:

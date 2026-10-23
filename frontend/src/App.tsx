@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMe,
@@ -28,6 +28,8 @@ import OnboardingScreen from "./features/hr/OnboardingScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import AuthScreen, { NoOrgScreen } from "./features/auth/AuthScreen";
+import InviteScreen from "./features/auth/InviteScreen";
+import { clearInviteTokenFromUrl, inviteTokenFromUrl } from "./features/auth/inviteUrl";
 import TabBar from "./features/nav/TabBar";
 import DesktopShell from "./features/desktop/DesktopShell";
 import OverviewRail from "./features/desktop/OverviewRail";
@@ -90,6 +92,10 @@ export default function App() {
   // Широкий экран — отдельный каркас (сайдбар + рабочая область). Нижняя
   // полоса остаётся мобильной навигацией и на ПК не рисуется вовсе.
   const isDesktop = useIsDesktop();
+  // Ссылка-приглашение: адрес /invite?token=…, разобранный один раз.
+  // Живёт в состоянии, чтобы после принятия экран закрылся без перезагрузки
+  // истории браузера.
+  const [inviteToken, setInviteToken] = useState(() => inviteTokenFromUrl());
 
   // GHG10 (Э4.2): анонс ачивки ведёт по deep link на «свои ачивки».
   // Э20: теперь это вкладка «Лента» — там и ачивки, и остальная активность.
@@ -212,6 +218,25 @@ export default function App() {
         error={me.error}
         onRetry={() => me.refetch()}
         title="Ошибка авторизации"
+      />
+    );
+  }
+
+  // Приглашение важнее «тебя ещё не пригласили»: человек пришёл по ссылке,
+  // и показывать ему тупик было бы странно. Проверка стоит до участников —
+  // список людей требует организации, которой у приглашённого ещё нет.
+  if (inviteToken) {
+    return (
+      <InviteScreen
+        token={inviteToken}
+        onDone={() => {
+          clearInviteTokenFromUrl();
+          setInviteToken(null);
+          // Сессия на сервере уже переведена в новую организацию, но кеш
+          // запросов помнит прежнюю (и 403 org_required) — перезагрузка
+          // дешевле, чем точечно сбрасывать пять ключей.
+          window.location.reload();
+        }}
       />
     );
   }

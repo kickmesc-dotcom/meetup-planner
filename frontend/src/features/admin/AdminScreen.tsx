@@ -12,6 +12,7 @@ import ChecklistSettingsScreen from "./ChecklistSettingsScreen";
 import EmployeesScreen from "./EmployeesScreen";
 import FeedSettingsScreen from "./FeedSettingsScreen";
 import IntervalsScreen from "./IntervalsScreen";
+import InvitationsScreen from "./InvitationsScreen";
 import JobsQueueScreen from "./JobsQueueScreen";
 import JournalScreen from "./JournalScreen";
 import KpiScreen from "./KpiScreen";
@@ -45,6 +46,7 @@ type Section =
   | "journal"
   | "notifications"
   | "employees"
+  | "invitations"
   | "checklists"
   | "training-plan"
   | "feed-settings"
@@ -65,6 +67,7 @@ const VALID_SECTIONS: Section[] = [
   "journal",
   "notifications",
   "employees",
+  "invitations",
   "checklists",
   "training-plan",
   "feed-settings",
@@ -121,6 +124,13 @@ const SECTIONS: SectionDef[] = [
     icon: "team",
     title: "Пул сотрудников",
     subtitle: "Имя, должность, прогресс, увольнение и корзина",
+  },
+  {
+    id: "invitations",
+    group: GROUP_PEOPLE,
+    icon: "send",
+    title: "Приглашения",
+    subtitle: "Ссылка с ролью и сроком — вход без Telegram",
   },
   {
     id: "checklists",
@@ -306,6 +316,7 @@ export default function AdminScreen({ users }: Props) {
   if (section === "journal") return <JournalScreen onBack={back} />;
   if (section === "notifications") return <NotificationsScreen onBack={back} />;
   if (section === "employees") return <EmployeesScreen onBack={back} />;
+  if (section === "invitations") return <InvitationsScreen onBack={back} />;
   if (section === "checklists") return <ChecklistSettingsScreen onBack={back} />;
   if (section === "training-plan") return <TrainingPlanScreen onBack={back} />;
   if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;

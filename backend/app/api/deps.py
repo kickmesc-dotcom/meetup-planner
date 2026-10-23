@@ -130,6 +130,12 @@ async def current_user(
             raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="session_invalid")
         user, org_id = resolved
         session_auth.set(True)
+        if org_id is None:
+            # Сессия выдана до приглашения (или до появления членства):
+            # организацию берём из членства, иначе первый запрос после
+            # принятия ссылки ушёл бы в первую по id (шаг 2.2).
+            fallback = await orgs.default_org_for(session, user)
+            org_id = fallback.id if fallback is not None else None
         if org_id is not None:
             set_org(org_id)
         return user
