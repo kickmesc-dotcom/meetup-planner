@@ -26,7 +26,7 @@
  * Обновление: при изменении этого файла браузер ставит новый SW, `activate`
  * чистит кеши прошлых версий. Версию поднимать руками при правке списка SHELL.
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `semi-shell-${VERSION}`;
 const ASSET_CACHE = `semi-assets-${VERSION}`;
 
