@@ -3419,3 +3419,29 @@ Amvera-ботом, получала `401 access_token_invalid` — то есть
 Во время раскатки домен отдавал 503 около двух минут (старый контейнер уже
 остановлен, новый ещё не прошёл проверку) — это нормальное поведение Amvera,
 а не ошибка выкладки.
+
+## 24.10.2026: шаг 2.5 — ru/en без перезагрузки
+
+Фронт, бэкенд не менялся. Мини-апп перевыложен на CF Pages `semitaskbot`:
+бандл `index-bmumKzVu.js` (847.71 kB, gzip 241.35 kB), Function из
+`frontend/functions` собралась (`Compiled Worker successfully`).
+
+Проверка на `semitaskbot.pages.dev`:
+
+- в бандле есть переключатель (`language-switcher`) и английские тексты;
+- в браузере EN → RU меняет заголовок «Sign in» → «Вход» без навигации
+  (`performance` показывает одну запись), `document.documentElement.lang`
+  становится `ru`, выбор лежит в `localStorage`;
+- ошибок в консоли нет, кроме ожидаемых 401 у подписанного-выхода.
+
+Грабля выкладки: у `wrangler` на этой машине нет сохранённого входа
+(`whoami` — not authenticated), а токен лежит в `PROMT/semiCREDS.txt`. Рабочая
+команда — без печати значения:
+
+```bash
+export CLOUDFLARE_API_TOKEN="$(python ../../tools/creds.py get CLOUDFLARE_API_TOKEN)"
+npx wrangler pages deploy dist --project-name semitaskbot --commit-dirty=true
+```
+
+Что осталось: экраны внутри приложения (лента, задачи, табели, админка) пока
+русские — переезжают по одному на готовый `useT`, каждый со своим тестом.
