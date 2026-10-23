@@ -220,3 +220,41 @@ describe("HrFeedScreen (P1.8)", () => {
     expect(screen.getByText("Всё, что происходит на смене.")).toBeTruthy();
   });
 });
+
+describe("время и дни в ленте", () => {
+  it("у каждого события точное время с часами, минутами и секундами", async () => {
+    const at = "2026-10-22T10:07:33Z";
+    const expected = new Date(at).toLocaleTimeString("ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+    const { container } = renderFeed([item({ at, text: "закрыл чек-лист" })]);
+
+    await screen.findByText("закрыл чек-лист");
+    const time = container.querySelector("time");
+    expect(time?.textContent).toBe(expected);
+    expect(expected).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    // Машиночитаемый атрибут — тот же момент, не пересобранная строка.
+    expect(time?.getAttribute("datetime")).toBe(at);
+    // Относительных подписей в ленте быть не должно.
+    expect(container.textContent ?? "").not.toMatch(/назад|вчера|только что/i);
+  });
+
+  it("разделяет ленту по дням и пишет число в заголовке", async () => {
+    renderFeed([
+      item({ at: "2026-10-22T12:00:00Z", text: "свежее", ref_id: 1 }),
+      item({ at: "2026-10-21T12:00:00Z", text: "прошлое", ref_id: 2 }),
+    ]);
+
+    await screen.findByText("свежее");
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((node) => node.textContent ?? "");
+    expect(headings).toHaveLength(2);
+    expect(headings[0]).toContain("22 октября");
+    expect(headings[1]).toContain("21 октября");
+    // Заголовок дня — абсолютная дата, а не «Сегодня»/«Вчера».
+    expect(headings.join(" ")).not.toMatch(/Сегодня|Вчера/);
+  });
+});

@@ -78,31 +78,42 @@ const KIND_LABEL: Record<FeedKind, string> = {
   task_issue: "Проблема",
 };
 
-/** Заголовок дня для группировки: «Сегодня», «Вчера» или дата. */
+/**
+ * Заголовок дня — всегда абсолютная дата, без «сегодня»/«вчера».
+ *
+ * Относительные подписи в ленте смен сбивают: «вчера» через сутки означает
+ * уже другой день, а при разборе конфликта важно, какое именно число. Поэтому
+ * в разделителе стоит дата, а у каждой записи — точное время с секундами.
+ */
 function dayLabel(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "Без даты";
   const today = new Date();
-  const startOf = (x: Date) =>
-    new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const diffDays = Math.round((startOf(today) - startOf(d)) / 86_400_000);
-  if (diffDays === 0) return "Сегодня";
-  if (diffDays === 1) return "Вчера";
   return d.toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "long",
+    weekday: "long",
     ...(d.getFullYear() === today.getFullYear() ? {} : { year: "numeric" }),
   });
 }
 
+/** Ключ дня в местном времени: по нему идёт группировка, не по тексту. */
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "none";
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
 /** Складывает отсортированные записи в группы по календарным дням. */
-function groupByDay(items: HrFeedItem[]): { label: string; items: HrFeedItem[] }[] {
-  const groups: { label: string; items: HrFeedItem[] }[] = [];
+function groupByDay(
+  items: HrFeedItem[],
+): { key: string; label: string; items: HrFeedItem[] }[] {
+  const groups: { key: string; label: string; items: HrFeedItem[] }[] = [];
   for (const item of items) {
-    const label = dayLabel(item.at);
+    const key = dayKey(item.at);
     const last = groups[groups.length - 1];
-    if (last && last.label === label) last.items.push(item);
-    else groups.push({ label, items: [item] });
+    if (last && last.key === key) last.items.push(item);
+    else groups.push({ key, label: dayLabel(item.at), items: [item] });
   }
   return groups;
 }
@@ -126,24 +137,21 @@ function stripDemoPrefix(name: string): string {
   return clean;
 }
 
+/**
+ * Точное время события: часы, минуты и секунды.
+ *
+ * Не «5 мин назад»: в ленте смены два события могут стоять рядом, и по
+ * относительной подписи невозможно понять, что было раньше, а что позже.
+ * Секунды нужны при разборе («во сколько закрыли чек-лист») и не мешают: они
+ * моноширинно выровнены в строке.
+ */
 function fmtWhen(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const now = Date.now();
-  const diff = Math.max(0, now - d.getTime());
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "только что";
-  if (min < 60) return `${min} мин назад`;
-  const hours = Math.floor(min / 60);
-  if (hours < 24) return `${hours} ч назад`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "вчера";
-  if (days < 7) return `${days} дн. назад`;
-  return d.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
+  return d.toLocaleTimeString("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   });
 }
 
@@ -397,9 +405,12 @@ export default function HrFeedScreen() {
         )}
 
         {groupByDay(items).map((group) => (
-          <section key={group.label}>
-            <h2 className="sticky top-0 z-10 -mx-4 bg-tg-bg/95 px-4 py-1 text-xs font-medium text-tg-hint backdrop-blur">
-              {group.label}
+          <section key={group.key}>
+            {/* Разделитель дня: дата слева, линия до края. Без него две
+                соседние записи из разных суток выглядели как одна смена. */}
+            <h2 className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-tg-bg/95 px-4 py-1.5 text-xs font-medium text-tg-hint backdrop-blur">
+              <span>{group.label}</span>
+              <span aria-hidden="true" className="h-px flex-1 bg-tg-hint/25" />
             </h2>
             <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {group.items.map((item, i) => (
@@ -723,7 +734,13 @@ function FeedRow({
             {item.text}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tg-hint">
-            <span>{fmtWhen(item.at)}</span>
+            <time
+              dateTime={item.at}
+              title={new Date(item.at).toLocaleString("ru-RU")}
+              className="tabular-nums"
+            >
+              {fmtWhen(item.at)}
+            </time>
             <span>· {KIND_LABEL[item.kind]}</span>
             {departmentName && (
               // Подразделение — своей пилюлей: в ленте видно, откуда человек,
