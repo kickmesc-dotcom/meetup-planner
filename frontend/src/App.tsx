@@ -149,7 +149,12 @@ export default function App() {
       // нет — показываем форму входа. Тупик «нужен вход» остался только для
       // мини-аппа, где `initData` подписал бот, но сервер его не принял.
       if (!getInitData()) {
-        return <AuthScreen onDone={() => void me.refetch()} />;
+        return (
+          <AuthScreen
+            onDone={() => void me.refetch()}
+            invited={!!inviteToken}
+          />
+        );
       }
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">

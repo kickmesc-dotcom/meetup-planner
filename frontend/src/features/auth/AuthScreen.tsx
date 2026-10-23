@@ -44,7 +44,14 @@ const SUBMITS: Record<Mode, string> = {
   forgot: "Отправить ссылку",
 };
 
-export default function AuthScreen({ onDone }: { onDone: () => void }) {
+export default function AuthScreen({
+  onDone,
+  invited,
+}: {
+  onDone: () => void;
+  /** Человек пришёл по ссылке-приглашению: скажем, зачем его просят войти. */
+  invited?: boolean;
+}) {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -126,6 +133,12 @@ export default function AuthScreen({ onDone }: { onDone: () => void }) {
 
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
           <h1 className="text-lg font-semibold text-tg-text">{TITLES[mode]}</h1>
+          {invited && (
+            <p className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-text">
+              Тебя пригласили в команду. Войди или создай аккаунт — и сразу
+              присоединишься к организации по ссылке.
+            </p>
+          )}
           <p className="mt-1 text-xs text-tg-hint">
             {mode === "login" && "Рабочее приложение смены: задачи, чек-листы и график."}
             {mode === "register" && "Аккаунт нужен, чтобы работать с компьютера и без Telegram."}
