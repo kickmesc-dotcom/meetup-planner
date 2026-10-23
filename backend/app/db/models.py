@@ -76,6 +76,15 @@ class User(Base):
 
     ranges: Mapped[list[AvailabilityRange]] = relationship(back_populates="user")
 
+    @property
+    def email_verified(self) -> bool:
+        """Подтверждён ли адрес. Свойство, а не колонка: правда одна.
+
+        Pydantic читает его через `from_attributes`, поэтому клиенту не нужно
+        самому сравнивать `email_verified_at` с `None`.
+        """
+        return self.email_verified_at is not None
+
 
 class AvailabilityRange(OrgScoped, Base):
     __tablename__ = "availability_ranges"

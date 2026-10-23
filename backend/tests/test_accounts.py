@@ -43,6 +43,8 @@ TABLES = (
     "organization_members",
     "auth_sessions",
     "password_resets",
+    # Регистрация через ручку сразу выписывает ссылку подтверждения адреса.
+    "email_verifications",
 )
 
 PASSWORD = "correct-horse-battery"

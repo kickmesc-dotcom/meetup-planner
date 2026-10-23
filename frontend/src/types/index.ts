@@ -6,6 +6,10 @@ export interface User {
   display_name: string;
   username: string | null;
   avatar_url: string | null;
+  /** Почта — основной вход вне Telegram (шаг 2.1). */
+  email?: string | null;
+  /** Подтверждён ли адрес; false — показываем просьбу открыть письмо. */
+  email_verified?: boolean;
   color_hex: string;
   timezone: string;
   created_at: string;

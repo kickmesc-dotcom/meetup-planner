@@ -143,6 +143,28 @@ def reset_email(*, to: str, link: str, minutes: int) -> MailMessage:
     )
 
 
+def verify_email(*, to: str, link: str, hours: int) -> MailMessage:
+    """Подтверждение адреса (шаг 2.1): одна ссылка, двое суток.
+
+    Без подтверждения вход работает, но адрес нельзя считать своим: письма о
+    сбросе и приглашения уходят именно на него. Поэтому текст говорит, что
+    произойдёт, а не просто «нажмите сюда».
+    """
+    return MailMessage(
+        to=to,
+        subject="Подтвердите почту в SemiTaskBot",
+        text=(
+            "Здравствуйте!\n\n"
+            "Подтвердите адрес, чтобы получать на него вход, сброс пароля и "
+            "важные уведомления:\n\n"
+            f"{link}\n\n"
+            f"Ссылка действует {hours} ч и работает один раз. "
+            "Если вы не регистрировались — просто удалите письмо.\n\n"
+            "SemiTaskBot"
+        ),
+    )
+
+
 def notification_email(
     *, to: str, subject: str, text: str, link: str
 ) -> MailMessage:

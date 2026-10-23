@@ -74,3 +74,20 @@ export const confirmPasswordReset = (token: string, password: string) =>
     method: "POST",
     body: JSON.stringify({ token, password }),
   });
+
+/**
+ * Подтверждение адреса (шаг 2.1). Письмо приходит один раз при регистрации;
+ * эту ручку зовём, если оно потерялось или попало в спам.
+ */
+export const requestEmailVerification = () =>
+  api<{ ok: boolean; already: boolean }>("/api/auth/email/verify/request", {
+    method: "POST",
+  });
+
+/** Подтвердить по токену из письма. Вход не нужен: письмо может открыть другое
+ * устройство, где сессии ещё нет. */
+export const confirmEmailVerification = (token: string) =>
+  api<{ ok: boolean }>("/api/auth/email/verify/confirm", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });

@@ -21,6 +21,7 @@ import AchievementsCard from "@/features/hr/AchievementsCard";
 import Badge from "@/features/hr/Badge";
 import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
+import EmailVerifyCard from "@/features/hr/EmailVerifyCard";
 import KpiCard from "@/features/hr/KpiCard";
 import PushCard from "@/features/hr/PushCard";
 import TrainingScreen from "@/features/hr/TrainingScreen";
@@ -524,6 +525,9 @@ export default function HrProfileScreen() {
       {/* Веб-версия: широкая ссылка для компьютера. Живёт рядом с разделами —
           это личный доступ, а не админская настройка. */}
       <WebVersionCard />
+
+      {/* Подтверждение почты: карточка исчезает, как только адрес подтверждён. */}
+      <EmailVerifyCard />
 
       {/* Push вне Telegram: своё устройство, свой тумблер. */}
       <PushCard />

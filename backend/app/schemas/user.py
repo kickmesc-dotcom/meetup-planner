@@ -12,6 +12,9 @@ class UserOut(BaseModel):
     # None — аккаунт заведён по почте (B2B_PLATFORM_PLAN, шаг 2.1).
     telegram_id: int | None = None
     email: str | None = None
+    # Подтверждён ли адрес (шаг 2.1). False у аккаунта, заведённого по почте,
+    # пока человек не открыл ссылку из письма.
+    email_verified: bool = False
     display_name: str
     username: str | None = None
     avatar_url: str | None = None

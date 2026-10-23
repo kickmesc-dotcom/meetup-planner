@@ -33,7 +33,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.db.auth_models import AuthSession, PasswordReset
+from app.db.auth_models import AuthSession, EmailVerification, PasswordReset
 from app.db.models import User
 from app.db.seed import color_for_user
 from app.services import orgs
@@ -351,3 +351,92 @@ async def confirm_reset(
 
 def reset_link(token: str) -> str:
     return f"{get_settings().link_base}/reset?token={token}"
+
+
+# --------------------------------------------------------------------------
+# Подтверждение адреса (шаг 2.1)
+# --------------------------------------------------------------------------
+
+# Двое суток: письмо может попасть в спам или человек откроет его с рабочего
+# компьютера через день. Срок не бесконечный — ссылка всё-таки одноразовая.
+VERIFY_TTL = timedelta(days=2)
+# Больше трёх писем в час на аккаунт — уже похоже на спам чужого ящика.
+VERIFY_LIMIT_PER_HOUR = 3
+
+
+async def request_email_verification(
+    session: AsyncSession, user: User
+) -> str | None:
+    """Выпустить новую ссылку подтверждения. `None` — письмо не нужно.
+
+    `None` возвращаем, если адреса нет (вход только по Telegram) или адрес уже
+    подтверждён, и когда исчерпан лимит писем: снаружи это не различить, но
+    лишних писем не уходит.
+    """
+    if not user.email or user.email_verified_at is not None:
+        return None
+    since = _now() - timedelta(hours=1)
+    recent = await session.scalar(
+        select(func.count())
+        .select_from(EmailVerification)
+        .where(
+            EmailVerification.user_id == user.id,
+            EmailVerification.created_at >= since,
+        )
+    )
+    if (recent or 0) >= VERIFY_LIMIT_PER_HOUR:
+        return None
+
+    token = _new_token()
+    session.add(
+        EmailVerification(
+            user_id=user.id,
+            token_hash=token_hash(token),
+            expires_at=_now() + VERIFY_TTL,
+        )
+    )
+    await session.commit()
+    return token
+
+
+async def confirm_email(session: AsyncSession, token: str) -> User:
+    """Подтвердить адрес по ссылке. Повторный клик по той же ссылке — не ошибка.
+
+    Человек может открыть письмо дважды, и после первого раза адрес уже
+    подтверждён: это успех, а не «ссылка не подходит».
+    """
+    row = await session.scalar(
+        select(EmailVerification).where(
+            EmailVerification.token_hash == token_hash(token)
+        )
+    )
+    if row is None:
+        raise AccountsError("verify_invalid")
+    user = await session.get(User, row.user_id)
+    if user is None:
+        raise AccountsError("verify_invalid")
+    if row.used_at is not None:
+        if user.email_verified_at is not None:
+            return user
+        raise AccountsError("verify_invalid")
+    if _aware(row.expires_at) <= _now():
+        raise AccountsError("verify_expired")
+
+    if user.email_verified_at is None:
+        user.email_verified_at = _now()
+    # Остальные живые ссылки гасим: подтверждённый адрес не нуждается в них,
+    # а в почте не остаётся полудюжины рабочих входов.
+    others = await session.scalars(
+        select(EmailVerification).where(
+            EmailVerification.user_id == user.id,
+            EmailVerification.used_at.is_(None),
+        )
+    )
+    for other in others.all():
+        other.used_at = _now()
+    await session.commit()
+    return user
+
+
+def verify_link(token: str) -> str:
+    return f"{get_settings().link_base}/verify?token={token}"

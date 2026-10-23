@@ -8,6 +8,8 @@ import { initTheme } from "./store/theme";
 import { captureAccessTokenFromUrl } from "./api/client";
 import ResetPasswordScreen from "./features/auth/ResetPasswordScreen";
 import { clearResetTokenFromUrl, resetTokenFromUrl } from "./features/auth/resetUrl";
+import VerifyEmailScreen from "./features/auth/VerifyEmailScreen";
+import { clearVerifyTokenFromUrl, verifyTokenFromUrl } from "./features/auth/verifyUrl";
 
 // Прямая ссылка из `/app`: забираем токен в localStorage и чистим адресную
 // строку ДО первых запросов — иначе первый же `GET /api/me` ушёл бы без него.
@@ -32,6 +34,7 @@ const qc = new QueryClient({
  */
 function Root() {
   const [resetToken, setResetToken] = useState(() => resetTokenFromUrl());
+  const [verifyToken, setVerifyToken] = useState(() => verifyTokenFromUrl());
 
   if (resetToken) {
     return (
@@ -40,6 +43,20 @@ function Root() {
         onDone={() => {
           clearResetTokenFromUrl();
           setResetToken(null);
+        }}
+      />
+    );
+  }
+
+  // Подтверждение почты: ссылку открывают и без входа, поэтому отдельный
+  // маршрут до `App` — как у сброса пароля.
+  if (verifyToken) {
+    return (
+      <VerifyEmailScreen
+        token={verifyToken}
+        onDone={() => {
+          clearVerifyTokenFromUrl();
+          setVerifyToken(null);
         }}
       />
     );

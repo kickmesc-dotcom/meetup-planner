@@ -72,6 +72,40 @@ class AuthSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class EmailVerification(Base):
+    """Ссылка «подтвердить почту» (B2B_PLATFORM_PLAN, шаг 2.1).
+
+    Зачем отдельная таблица, а не флаг в `users`. Ссылку можно запросить
+    повторно с другого устройства, она живёт двое суток и должна работать
+    ровно один раз; в `users` для этого пришлось бы держать четыре поля и
+    терять историю. Здесь — как у сброса пароля: только хеш токена.
+
+    Таблица глобальная (без `org_id`): подтверждение относится к личности, а
+    организация на момент перехода по ссылке ещё может быть неизвестна.
+    """
+
+    __tablename__ = "email_verifications"
+    __table_args__ = (
+        Index("ix_email_verifications_user", "user_id"),
+        Index("ix_email_verifications_expires", "expires_at"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class PasswordReset(Base):
     """Одноразовая ссылка сброса пароля (живёт час).
 

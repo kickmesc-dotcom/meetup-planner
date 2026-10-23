@@ -34,6 +34,8 @@ _BAD_REQUEST = {
     "password_has_spaces",
     "reset_invalid",
     "reset_expired",
+    "verify_invalid",
+    "verify_expired",
 }
 
 
@@ -52,6 +54,10 @@ class SessionOut(BaseModel):
     token: str
     expires_at: str
     user: UserOut
+
+
+class VerifyIn(BaseModel):
+    token: str = Field(min_length=10, max_length=128)
 
 
 class ResetRequestIn(BaseModel):
@@ -117,7 +123,28 @@ async def register(
         )
     except accounts.AccountsError as exc:
         _raise_http(exc)
+    # Подтверждение адреса — не блокер входа: письмо может не дойти, а работа
+    # смены начинается сейчас. Отправляем сразу, чтобы человек не искал кнопку.
+    await _send_verification(session, user)
     return await _session_response(session, user, user_agent=user_agent)
+
+
+async def _send_verification(session: AsyncSession, user) -> None:  # noqa: ANN001
+    """Отправить ссылку подтверждения, если она нужна. Ошибки — только в лог."""
+    token = await accounts.request_email_verification(session, user)
+    if token is None:
+        return
+    message = mail.verify_email(
+        to=user.email or "",
+        link=accounts.verify_link(token),
+        hours=int(accounts.VERIFY_TTL.total_seconds() // 3600),
+    )
+    try:
+        await mail.send(message)
+    except mail.MailError as exc:
+        # Недоступный транспорт не должен ронять регистрацию: аккаунт уже
+        # создан, ссылку можно запросить из профиля.
+        log.warning("auth.verify_mail_failed", error=str(exc), user_id=user.id)
 
 
 @router.post("/auth/login", response_model=SessionOut)
@@ -183,6 +210,40 @@ async def revoke_device(
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="session_not_found")
     await accounts.revoke(session, target)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/auth/email/verify/request")
+async def request_email_verification(
+    session: SessionDep, user: CurrentUser
+) -> dict[str, bool]:
+    """Выслать ссылку подтверждения ещё раз. Уже подтверждённый — `already`."""
+    if user.email_verified_at is not None:
+        return {"ok": True, "already": True}
+    token = await accounts.request_email_verification(session, user)
+    if token is not None:
+        message = mail.verify_email(
+            to=user.email or "",
+            link=accounts.verify_link(token),
+            hours=int(accounts.VERIFY_TTL.total_seconds() // 3600),
+        )
+        try:
+            await mail.send(message)
+        except mail.MailError as exc:
+            log.warning("auth.verify_mail_failed", error=str(exc), user_id=user.id)
+    # Ответ одинаковый и при лимите писем: иначе ручка рассказывала бы,
+    # сколько раз человек уже нажимал кнопку.
+    return {"ok": True, "already": False}
+
+
+@router.post("/auth/email/verify/confirm")
+async def confirm_email(body: VerifyIn, session: SessionDep) -> dict[str, bool]:
+    """Подтвердить адрес по ссылке. Вход не требуется — письмо может прийти
+    на другое устройство, где сессии ещё нет."""
+    try:
+        await accounts.confirm_email(session, body.token)
+    except accounts.AccountsError as exc:
+        _raise_http(exc)
+    return {"ok": True}
 
 
 @router.post("/auth/password/reset/request")
