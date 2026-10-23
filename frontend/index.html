@@ -4,7 +4,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta
+      name="description"
+      content="Смены, задачи и чек-листы команды: вход по почте, работа с телефона и компьютера без Telegram."
+    />
     <title>SemiTaskBot — рабочий бот ресторана</title>
+
+    <!-- PWA (B2B_PLATFORM_PLAN, шаг 2.3): установка на домашний экран. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Цвет адресной строки в standalone. Две темы — как в приложении:
+         светлая кнопка #1c6fb8, тёмный фон #17212b. -->
+    <meta name="theme-color" content="#1c6fb8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#17212b" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SemiTask" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
   </head>
   <body class="bg-tg-bg text-tg-text">

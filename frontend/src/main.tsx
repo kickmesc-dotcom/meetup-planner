@@ -55,3 +55,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+/**
+ * PWA (B2B_PLATFORM_PLAN, шаг 2.3): оболочка для установки и офлайн-старта.
+ *
+ * Только в сборке: в dev service worker кешировал бы модули Vite и правки
+ * перестали бы доезжать до браузера. Ошибка регистрации ничего не ломает —
+ * приложение просто работает как обычный сайт, поэтому `catch` молчит.
+ */
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+}
