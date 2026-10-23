@@ -15,15 +15,17 @@
  * 44×44 (`-my-2` компенсирует рост, чтобы шапки не разъезжались).
  */
 import Icon from "@/components/Icon";
+import { useT } from "@/i18n";
 import { useTheme } from "@/store/theme";
 import { haptic, syncWebAppChrome } from "@/tg/webapp";
 
 export default function ThemeSwitcher({ className }: { className?: string }) {
   const theme = useTheme((s) => s.theme);
   const toggleTheme = useTheme((s) => s.toggleTheme);
+  const { t } = useT();
 
   const dark = theme === "dark";
-  const label = dark ? "Включить светлую тему" : "Включить тёмную тему";
+  const label = t(dark ? "theme.toLight" : "theme.toDark");
 
   return (
     <button

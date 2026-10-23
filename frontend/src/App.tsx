@@ -38,6 +38,8 @@ import ErrorState from "./components/ErrorState";
 import Icon from "./components/Icon";
 import TabTransition from "./components/TabTransition";
 import ThemeSwitcher from "./components/ThemeSwitcher";
+import LanguageSwitcher from "./components/LanguageSwitcher";
+import { useT } from "./i18n";
 import SimulationBanner from "./components/SimulationBanner";
 import { useSimulation } from "./store/simulation";
 import { useUI } from "./store/ui";
@@ -87,6 +89,7 @@ export default function App() {
     onSuccess: () => haptic("selection"),
   });
   const tab = useUI((s) => s.tab);
+  const { t } = useT();
   const setTab = useUI((s) => s.setTab);
   const simulationId = useSimulation((s) => s.sessionId);
   // Широкий экран — отдельный каркас (сайдбар + рабочая область). Нижняя
@@ -421,12 +424,13 @@ export default function App() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-base font-medium">
               <Icon name="profile" size={17} />
-              Профиль
+              {t("app.profile.title")}
             </div>
             <div className="text-xs text-tg-hint">
-              Подразделение, опыт и обратная связь.
+              {t("app.profile.hint")}
             </div>
           </div>
+          <LanguageSwitcher />
           <ThemeSwitcher />
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">

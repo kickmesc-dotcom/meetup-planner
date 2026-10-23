@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Icon, { type IconName } from "@/components/Icon";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useUI, type Tab } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
@@ -166,7 +167,10 @@ export default function DesktopShell({
               </div>
               <div className="truncate text-2xs text-tg-hint">{meHint}</div>
             </div>
-            <ThemeSwitcher />
+            <div className="flex shrink-0 items-center gap-1">
+              <LanguageSwitcher />
+              <ThemeSwitcher />
+            </div>
           </div>
         </div>
       </aside>

@@ -3,15 +3,23 @@ import type { ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   acceptInvitation,
-  ORG_ROLE_LABELS,
   previewInvitation,
   type OrgRole,
 } from "@/api/orgs";
 import { logoutRequest } from "@/api/auth";
-import { clearAllTokens, humanizeApiError } from "@/api/client";
+import { ApiError, clearAllTokens } from "@/api/client";
 import Icon from "@/components/Icon";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import { useErrorMessage, useT } from "@/i18n";
+import type { MessageKey } from "@/i18n/messages";
 import { haptic } from "@/tg/webapp";
+
+const ROLE_KEYS: Record<string, MessageKey> = {
+  owner: "role.owner",
+  manager: "role.manager",
+  staff: "role.staff",
+};
 
 /**
  * Принятие приглашения: `/invite?token=…` (B2B_PLATFORM_PLAN, шаг 2.2).
@@ -40,6 +48,12 @@ export default function InviteScreen({
   const [joined, setJoined] = useState<{ orgName: string; role: OrgRole } | null>(
     null,
   );
+  const { locale, t } = useT();
+  const errorText = useErrorMessage();
+  const roleLabel = (role: OrgRole) => {
+    const key = ROLE_KEYS[role];
+    return key ? t(key) : role;
+  };
 
   const preview = useQuery({
     queryKey: ["invite", token],
@@ -56,9 +70,11 @@ export default function InviteScreen({
     },
     onError: (e) => {
       haptic("error");
-      const text = humanizeApiError(e);
-      setError(text);
-      setEmailMismatch(text.includes("другую почту"));
+      // Код, а не фраза: текст зависит от языка, поведение — нет.
+      setError(errorText(e));
+      setEmailMismatch(
+        e instanceof ApiError && e.detail === "invite_email_mismatch",
+      );
     },
   });
 
@@ -80,7 +96,10 @@ export default function InviteScreen({
             <Icon name="lock" size={15} />
             <span className="text-xs">SemiTask</span>
           </div>
-          <ThemeSwitcher />
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <ThemeSwitcher />
+          </div>
         </div>
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">{children}</div>
       </div>
@@ -91,18 +110,20 @@ export default function InviteScreen({
     return card(
       <>
         <h1 className="text-lg font-semibold text-tg-text">
-          Ты в организации
+          {t("invite.joined.title")}
         </h1>
         <p className="mt-1 text-xs text-tg-hint">
-          {joined.orgName} · {ORG_ROLE_LABELS[joined.role] ?? joined.role}. Данные
-          смены появятся сразу после входа.
+          {t("invite.joined.text", {
+            org: joined.orgName,
+            role: roleLabel(joined.role),
+          })}
         </p>
         <button
           type="button"
           onClick={onDone}
           className="mt-4 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text"
         >
-          Открыть приложение
+          {t("invite.openApp")}
         </button>
       </>,
     );
@@ -122,28 +143,27 @@ export default function InviteScreen({
     return card(
       <>
         <h1 className="text-lg font-semibold text-tg-text">
-          Приглашение не открылось
+          {t("invite.error.title")}
         </h1>
         <p className="mt-1 text-xs text-tg-hint">
-          {humanizeApiError(preview.error)}
+          {errorText(preview.error)}
         </p>
         <button
           type="button"
           onClick={onDone}
           className="mt-4 min-h-11 w-full rounded-card bg-tg-secondary-bg text-sm text-tg-text"
         >
-          Перейти в приложение
+          {t("invite.error.go")}
         </button>
       </>,
     );
   }
 
   const invite = preview.data;
-  const roleLabel = ORG_ROLE_LABELS[invite.role] ?? invite.role;
-  const until = new Date(invite.expires_at).toLocaleDateString("ru-RU", {
-    day: "numeric",
-    month: "long",
-  });
+  const until = new Date(invite.expires_at).toLocaleDateString(
+    locale === "en" ? "en-GB" : "ru-RU",
+    { day: "numeric", month: "long" },
+  );
 
   return card(
     <>
@@ -152,17 +172,15 @@ export default function InviteScreen({
         <span className="text-xs">{invite.org_name}</span>
       </div>
       <h1 className="mt-1 text-lg font-semibold text-tg-text">
-        Приглашение в команду
+        {t("invite.title")}
       </h1>
       <p className="mt-1 text-xs text-tg-hint">
-        Тебе открывают доступ с ролью «{roleLabel}». Присоединиться можно до{" "}
-        {until}.
+        {t("invite.role", { role: roleLabel(invite.role), until })}
       </p>
 
       {invite.email && (
         <p className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-text">
-          Приглашение выписано на {invite.email} — оно сработает только под этим
-          адресом.
+          {t("invite.emailNote", { email: invite.email })}
         </p>
       )}
 
@@ -185,7 +203,7 @@ export default function InviteScreen({
         }}
         className="mt-3 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
-        {accept.isPending ? "Присоединяемся…" : "Присоединиться"}
+        {accept.isPending ? t("invite.joining") : t("invite.join")}
       </button>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -194,7 +212,7 @@ export default function InviteScreen({
           onClick={onDone}
           className="min-h-9 text-tg-hint"
         >
-          Не сейчас
+          {t("invite.later")}
         </button>
         {(emailMismatch || error) && (
           <button
@@ -202,7 +220,7 @@ export default function InviteScreen({
             onClick={switchAccount}
             className="min-h-9 text-tg-link"
           >
-            Войти под другой почтой
+            {t("invite.switchAccount")}
           </button>
         )}
       </div>

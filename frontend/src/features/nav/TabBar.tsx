@@ -1,11 +1,14 @@
 import { motion } from "framer-motion";
 import Icon, { type IconName } from "@/components/Icon";
+import { useT } from "@/i18n";
+import type { MessageKey } from "@/i18n/messages";
 import { useUI, type Tab } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 
 interface Item {
   id: Tab;
-  label: string;
+  /** Подпись — ключ словаря: язык переключается без перезагрузки. */
+  labelKey: MessageKey;
   /** VISUAL_AUDIT P1.4: единый SVG-набор вместо эмодзи. */
   icon: IconName;
 }
@@ -19,25 +22,25 @@ interface Item {
 // нечитаемы. «График» и «Встречи» НЕ удалены — они открываются из профиля
 // (раздел «Все разделы»), поэтому функциональность никуда не пропала.
 const BASE_ITEMS: Item[] = [
-  { id: "feed", label: "События", icon: "feed" },
-  { id: "tasks", label: "Задачи", icon: "tasks" },
-  { id: "checklist", label: "Смена", icon: "shift" },
-  { id: "shifts", label: "Табель", icon: "calendar" },
-  { id: "profile", label: "Профиль", icon: "profile" },
+  { id: "feed", labelKey: "nav.feed", icon: "feed" },
+  { id: "tasks", labelKey: "nav.tasks", icon: "tasks" },
+  { id: "checklist", labelKey: "nav.shift", icon: "shift" },
+  { id: "shifts", labelKey: "nav.table", icon: "calendar" },
+  { id: "profile", labelKey: "nav.profile", icon: "profile" },
 ];
 
 // Руководителю важнее команда, чем справочник ссылок: «Ссылки» у него
 // остаются в профиле, а на их месте — сводка смены по отделу.
 const MANAGER_ITEMS: Item[] = [
-  { id: "feed", label: "События", icon: "feed" },
-  { id: "tasks", label: "Задачи", icon: "tasks" },
-  { id: "checklist", label: "Смена", icon: "shift" },
-  { id: "shifts", label: "Табель", icon: "calendar" },
-  { id: "team", label: "Команда", icon: "team" },
-  { id: "profile", label: "Профиль", icon: "profile" },
+  { id: "feed", labelKey: "nav.feed", icon: "feed" },
+  { id: "tasks", labelKey: "nav.tasks", icon: "tasks" },
+  { id: "checklist", labelKey: "nav.shift", icon: "shift" },
+  { id: "shifts", labelKey: "nav.table", icon: "calendar" },
+  { id: "team", labelKey: "nav.team", icon: "team" },
+  { id: "profile", labelKey: "nav.profile", icon: "profile" },
 ];
 
-const ADMIN_ITEM: Item = { id: "admin", label: "Админ", icon: "admin" };
+const ADMIN_ITEM: Item = { id: "admin", labelKey: "nav.admin", icon: "admin" };
 
 export default function TabBar({
   isAdmin,
@@ -55,6 +58,7 @@ export default function TabBar({
 }) {
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
+  const { t } = useT();
   const items = [
     ...(canManage ? MANAGER_ITEMS : BASE_ITEMS),
     ...(isAdmin ? [ADMIN_ITEM] : []),
@@ -67,6 +71,7 @@ export default function TabBar({
     >
       {items.map((it) => {
         const active = tab === it.id;
+        const label = t(it.labelKey);
         return (
           <button
             key={it.id}
@@ -86,7 +91,7 @@ export default function TabBar({
             ].join(" ")}
             aria-label={
               it.id === "tasks" && openTasks > 0
-                ? `${it.label}, открытых: ${openTasks}`
+                ? t("nav.tasksOpen", { label, count: openTasks })
                 : undefined
             }
           >
@@ -100,7 +105,7 @@ export default function TabBar({
             {/* Иконка декоративная — рядом есть подпись, поэтому её не должно
                 быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
             <Icon name={it.icon} size={20} />
-            <span className="w-full truncate text-center">{it.label}</span>
+            <span className="w-full truncate text-center">{label}</span>
             {it.id === "tasks" && openTasks > 0 && (
               // Счётчик читается как «Задачи: 3 открытых» через aria-label
               // кнопки; сама цифра декоративная, иначе скринридер прочитает

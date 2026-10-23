@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { confirmEmailVerification } from "@/api/auth";
-import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import { useErrorMessage, useT } from "@/i18n";
 import { haptic } from "@/tg/webapp";
 
 /**
@@ -27,6 +28,8 @@ export default function VerifyEmailScreen({
 }) {
   const qc = useQueryClient();
   const started = useRef(false);
+  const { t } = useT();
+  const errorText = useErrorMessage();
   const confirm = useMutation({
     mutationFn: () => confirmEmailVerification(token),
     onSuccess: () => {
@@ -45,7 +48,7 @@ export default function VerifyEmailScreen({
   }, [confirm]);
 
   const failed = confirm.isError;
-  const errorText = failed ? humanizeApiError(confirm.error) : "";
+  const failure = failed ? errorText(confirm.error) : "";
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-y-auto px-4 py-6">
@@ -55,53 +58,50 @@ export default function VerifyEmailScreen({
             <Icon name="lock" size={15} />
             <span className="text-xs">SemiTask</span>
           </div>
-          <ThemeSwitcher />
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <ThemeSwitcher />
+          </div>
         </div>
 
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
           {confirm.isSuccess ? (
             <>
               <h1 className="text-lg font-semibold text-tg-text">
-                Почта подтверждена
+                {t("verify.done.title")}
               </h1>
-              <p className="mt-1 text-xs text-tg-hint">
-                Теперь на этот адрес придут вход, сброс пароля и важные
-                уведомления. Ничего больше делать не нужно.
-              </p>
+              <p className="mt-1 text-xs text-tg-hint">{t("verify.done.text")}</p>
               <button
                 type="button"
                 onClick={onDone}
                 className="mt-4 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text"
               >
-                Перейти в приложение
+                {t("verify.done.button")}
               </button>
             </>
           ) : failed ? (
             <>
               <h1 className="text-lg font-semibold text-tg-text">
-                Ссылка не подошла
+                {t("verify.error.title")}
               </h1>
-              <p className="mt-1 text-xs text-tg-hint">{errorText}</p>
+              <p className="mt-1 text-xs text-tg-hint">{failure}</p>
               <p className="mt-2 text-xs text-tg-hint">
-                Ссылка живёт двое суток и работает один раз. Попроси новую в
-                профиле: «Подтвердить почту» — и открой свежее письмо.
+                {t("verify.error.hint")}
               </p>
               <button
                 type="button"
                 onClick={onDone}
                 className="mt-4 min-h-12 w-full rounded-card bg-tg-secondary-bg text-sm font-medium text-tg-text"
               >
-                В приложение
+                {t("verify.error.button")}
               </button>
             </>
           ) : (
             <>
               <h1 className="text-lg font-semibold text-tg-text">
-                Подтверждаем почту…
+                {t("verify.title")}
               </h1>
-              <p className="mt-1 text-xs text-tg-hint">
-                Один момент — проверяем ссылку из письма.
-              </p>
+              <p className="mt-1 text-xs text-tg-hint">{t("verify.hint")}</p>
               <div
                 aria-hidden="true"
                 className="mt-4 h-1 w-full animate-pulse rounded-full bg-tg-secondary-bg"

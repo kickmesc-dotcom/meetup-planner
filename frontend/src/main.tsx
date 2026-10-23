@@ -5,6 +5,7 @@ import App from "./App";
 import "./styles.css";
 import { initTelegramWebApp, syncWebAppChrome } from "./tg/webapp";
 import { initTheme } from "./store/theme";
+import { initLocale } from "./i18n";
 import { captureAccessTokenFromUrl } from "./api/client";
 import ResetPasswordScreen from "./features/auth/ResetPasswordScreen";
 import { clearResetTokenFromUrl, resetTokenFromUrl } from "./features/auth/resetUrl";
@@ -17,6 +18,9 @@ captureAccessTokenFromUrl();
 initTelegramWebApp();
 // GHG11(11): тему наносим до первого рендера — иначе видно вспышку чужой темы.
 syncWebAppChrome(initTheme());
+// Язык — до первого рендера: иначе английский интерфейс на миг показывал бы
+// русские подписи, а `<html lang>` оставался бы пустым.
+initLocale();
 
 const qc = new QueryClient({
   defaultOptions: {

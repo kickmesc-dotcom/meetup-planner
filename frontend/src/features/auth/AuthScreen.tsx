@@ -8,14 +8,12 @@ import {
   requestPasswordReset,
   type AuthSession,
 } from "@/api/auth";
-import {
-  clearAccessToken,
-  clearAllTokens,
-  humanizeApiError,
-  setSessionToken,
-} from "@/api/client";
+import { clearAccessToken, clearAllTokens, setSessionToken } from "@/api/client";
 import Icon from "@/components/Icon";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import { useErrorMessage, useT } from "@/i18n";
+import type { MessageKey } from "@/i18n/messages";
 import { haptic } from "@/tg/webapp";
 
 /**
@@ -32,16 +30,16 @@ import { haptic } from "@/tg/webapp";
 
 type Mode = "login" | "register" | "forgot";
 
-const TITLES: Record<Mode, string> = {
-  login: "Вход",
-  register: "Новый аккаунт",
-  forgot: "Сброс пароля",
+const TITLES: Record<Mode, MessageKey> = {
+  login: "auth.login.title",
+  register: "auth.register.title",
+  forgot: "auth.forgot.title",
 };
 
-const SUBMITS: Record<Mode, string> = {
-  login: "Войти",
-  register: "Создать аккаунт",
-  forgot: "Отправить ссылку",
+const SUBMITS: Record<Mode, MessageKey> = {
+  login: "auth.login.submit",
+  register: "auth.register.submit",
+  forgot: "auth.forgot.submit",
 };
 
 export default function AuthScreen({
@@ -58,6 +56,8 @@ export default function AuthScreen({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const { t } = useT();
+  const errorText = useErrorMessage();
 
   const accept = (session: AuthSession) => {
     // Ссылка доступа из бота больше не нужна: сессия главнее и её можно отозвать.
@@ -72,7 +72,7 @@ export default function AuthScreen({
     onSuccess: accept,
     onError: (e) => {
       haptic("error");
-      setError(humanizeApiError(e));
+      setError(errorText(e));
     },
   });
 
@@ -81,7 +81,7 @@ export default function AuthScreen({
     onSuccess: accept,
     onError: (e) => {
       haptic("error");
-      setError(humanizeApiError(e));
+      setError(errorText(e));
     },
   });
 
@@ -94,7 +94,7 @@ export default function AuthScreen({
     },
     onError: (e) => {
       haptic("error");
-      setError(humanizeApiError(e));
+      setError(errorText(e));
     },
   });
 
@@ -112,7 +112,7 @@ export default function AuthScreen({
     event.preventDefault();
     setError(null);
     if (!email.trim()) {
-      setError("Введи адрес почты.");
+      setError(t("auth.emailRequired"));
       return;
     }
     if (mode === "forgot") forgot.mutate();
@@ -128,55 +128,56 @@ export default function AuthScreen({
             <Icon name="lock" size={15} />
             <span className="text-xs">SemiTask</span>
           </div>
-          <ThemeSwitcher />
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
+            <ThemeSwitcher />
+          </div>
         </div>
 
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
-          <h1 className="text-lg font-semibold text-tg-text">{TITLES[mode]}</h1>
+          <h1 className="text-lg font-semibold text-tg-text">{t(TITLES[mode])}</h1>
           {invited && (
             <p className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-text">
-              Тебя пригласили в команду. Войди или создай аккаунт — и сразу
-              присоединишься к организации по ссылке.
+              {t("auth.invited")}
             </p>
           )}
           <p className="mt-1 text-xs text-tg-hint">
-            {mode === "login" && "Рабочее приложение смены: задачи, чек-листы и график."}
-            {mode === "register" && "Аккаунт нужен, чтобы работать с компьютера и без Telegram."}
-            {mode === "forgot" && "Пришлём ссылку на почту — она живёт час и срабатывает один раз."}
+            {mode === "login" && t("auth.login.hint")}
+            {mode === "register" && t("auth.register.hint")}
+            {mode === "forgot" && t("auth.forgot.hint")}
           </p>
 
           {sent ? (
             <div className="mt-4 space-y-3">
               <p className="rounded-tile bg-tg-secondary-bg/60 p-3 text-sm text-tg-text">
-                Если адрес зарегистрирован, письмо уже в пути. Открой ссылку из
-                него и задай новый пароль.
+                {t("auth.sent")}
               </p>
               <button
                 type="button"
                 onClick={() => switchMode("login")}
                 className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text"
               >
-                Вернуться ко входу
+                {t("auth.backToLogin")}
               </button>
             </div>
           ) : (
             <form className="mt-3 space-y-2" onSubmit={submit} noValidate>
               {mode === "register" && (
                 <label className="block">
-                  <span className="text-xs text-tg-hint">Как тебя зовут</span>
+                  <span className="text-xs text-tg-hint">{t("auth.name.label")}</span>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     autoComplete="name"
                     maxLength={64}
-                    placeholder="Необязательно"
+                    placeholder={t("auth.name.placeholder")}
                     className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text placeholder:text-tg-hint"
                   />
                 </label>
               )}
 
               <label className="block">
-                <span className="text-xs text-tg-hint">Почта</span>
+                <span className="text-xs text-tg-hint">{t("auth.email.label")}</span>
                 <input
                   type="email"
                   inputMode="email"
@@ -191,14 +192,14 @@ export default function AuthScreen({
 
               {mode !== "forgot" && (
                 <label className="block">
-                  <span className="text-xs text-tg-hint">Пароль</span>
+                  <span className="text-xs text-tg-hint">{t("auth.password.label")}</span>
                   <input
                     type="password"
                     autoComplete={mode === "register" ? "new-password" : "current-password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     maxLength={128}
-                    placeholder={mode === "register" ? "Не короче 8 символов" : ""}
+                    placeholder={mode === "register" ? t("auth.password.placeholder") : ""}
                     className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text placeholder:text-tg-hint"
                   />
                 </label>
@@ -215,7 +216,7 @@ export default function AuthScreen({
                 disabled={pending}
                 className="mt-1 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {pending ? "Секунду…" : SUBMITS[mode]}
+                {pending ? t("auth.pending") : t(SUBMITS[mode])}
               </button>
             </form>
           )}
@@ -225,15 +226,15 @@ export default function AuthScreen({
               {mode === "login" ? (
                 <>
                   <button type="button" onClick={() => switchMode("forgot")} className="min-h-9 text-tg-link">
-                    Забыл пароль
+                    {t("auth.forgot")}
                   </button>
                   <button type="button" onClick={() => switchMode("register")} className="min-h-9 text-tg-link">
-                    Создать аккаунт
+                    {t("auth.create")}
                   </button>
                 </>
               ) : (
                 <button type="button" onClick={() => switchMode("login")} className="min-h-9 text-tg-link">
-                  У меня уже есть аккаунт
+                  {t("auth.haveAccount")}
                 </button>
               )}
             </div>
@@ -241,8 +242,7 @@ export default function AuthScreen({
         </div>
 
         <p className="mt-3 px-1 text-xs text-tg-hint">
-          Внутри Telegram вход не нужен: приложение открывается из бота и уже
-          знает, кто ты.
+          {t("auth.telegramNote")}
         </p>
       </div>
     </div>
@@ -258,6 +258,7 @@ export default function AuthScreen({
  */
 export function NoOrgScreen() {
   const [leaving, setLeaving] = useState(false);
+  const { t } = useT();
 
   const leave = () => {
     setLeaving(true);
@@ -271,21 +272,24 @@ export function NoOrgScreen() {
   };
 
   return (
-    <div className="flex h-full items-center justify-center px-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      <div className="mb-6 flex items-center gap-1 self-end">
+        <LanguageSwitcher />
+        <ThemeSwitcher />
+      </div>
       <div className="max-w-sm">
         <Icon name="inbox" size={30} className="mx-auto mb-2 text-tg-hint" />
-        <div className="text-lg font-medium text-tg-text">Аккаунт готов</div>
-        <p className="mt-2 text-sm text-tg-hint">
-          Осталось попасть в организацию: попроси управляющего прислать
-          приглашение на эту почту. После этого данные появятся сами.
-        </p>
+        <div className="text-lg font-medium text-tg-text">
+          {t("auth.noorg.title")}
+        </div>
+        <p className="mt-2 text-sm text-tg-hint">{t("auth.noorg.text")}</p>
         <button
           type="button"
           disabled={leaving}
           onClick={leave}
           className="mt-4 min-h-11 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-text disabled:opacity-50"
         >
-          {leaving ? "Выходим…" : "Выйти"}
+          {leaving ? t("auth.noorg.leaving") : t("auth.noorg.logout")}
         </button>
       </div>
     </div>
