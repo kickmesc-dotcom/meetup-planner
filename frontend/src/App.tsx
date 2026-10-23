@@ -27,6 +27,7 @@ import HrProfileScreen from "./features/hr/HrProfileScreen";
 import OnboardingScreen from "./features/hr/OnboardingScreen";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
+import AuthScreen, { NoOrgScreen } from "./features/auth/AuthScreen";
 import TabBar from "./features/nav/TabBar";
 import DesktopShell from "./features/desktop/DesktopShell";
 import OverviewRail from "./features/desktop/OverviewRail";
@@ -38,7 +39,7 @@ import ThemeSwitcher from "./components/ThemeSwitcher";
 import SimulationBanner from "./components/SimulationBanner";
 import { useSimulation } from "./store/simulation";
 import { useUI } from "./store/ui";
-import { getStartParam, haptic } from "./tg/webapp";
+import { getInitData, getStartParam, haptic } from "./tg/webapp";
 
 export default function App() {
   const qc = useQueryClient();
@@ -133,19 +134,26 @@ export default function App() {
 
   if (me.isError) {
     const status = me.error && (me.error as { status?: number }).status;
+    const authDetail =
+      me.error && (me.error as { detail?: string }).detail
+        ? String((me.error as { detail?: string }).detail)
+        : "";
     if (status === 401) {
-      // Прямая ссылка на Pages без Telegram: `initData` нет, а токен веб-версии
-      // не найден или отозван. Объясняем, где его взять, вместо сухого
-      // «Ошибка авторизации».
+      // Вне Telegram личность подтверждает сессия по почте (шаг 2.1). Сессии
+      // нет — показываем форму входа. Тупик «нужен вход» остался только для
+      // мини-аппа, где `initData` подписал бот, но сервер его не принял.
+      if (!getInitData()) {
+        return <AuthScreen onDone={() => void me.refetch()} />;
+      }
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div className="max-w-sm">
-            <Icon name="layout" size={30} className="mx-auto mb-2 text-tg-hint" />
-            <div className="text-lg font-medium">Нужен вход</div>
+            <Icon name="lock" size={30} className="mx-auto mb-2 text-tg-hint" />
+            <div className="text-lg font-medium">Telegram не подтвердил вход</div>
             <p className="mt-2 text-sm text-tg-hint">
-              Открой приложение из Telegram — или возьми ссылку для компьютера
-              командой <b>/app</b> в боте. Ссылка работает как пароль и
-              открывается один раз.
+              Подпись мини-аппа не принята: бот могли переподключить к другой
+              организации. Открой приложение заново из бота — или возьми ссылку
+              для компьютера командой <b>/app</b>.
             </p>
             <button
               type="button"
@@ -159,6 +167,30 @@ export default function App() {
       );
     }
     if (status === 403) {
+      // Почтовый аккаунт есть, членства в организации ещё нет (шаг 2.2).
+      // Это не «тебя уволили»: человека просто не пригласили.
+      if (authDetail === "org_required") return <NoOrgScreen />;
+      if (authDetail === "org_inactive") {
+        return (
+          <div className="flex h-full items-center justify-center px-6 text-center">
+            <div className="max-w-sm">
+              <Icon name="lock" size={30} className="mx-auto mb-2 text-tg-hint" />
+              <div className="text-lg font-medium">Организация на паузе</div>
+              <p className="mt-2 text-sm text-tg-hint">
+                Доступ приостановлен на стороне организации. Напиши управляющему:
+                когда паузу снимут, вход заработает снова — пароль менять не надо.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="mt-4 min-h-11 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-text"
+              >
+                Проверить ещё раз
+              </button>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div>

@@ -26,6 +26,46 @@ const API_BASE_KEY = "buff.api_base";
  */
 const ACCESS_TOKEN_KEY = "semitask.access_token";
 
+/**
+ * Токен сессии почтового входа (B2B_PLATFORM_PLAN, шаг 2.1).
+ *
+ * Отличие от `access` выше принципиальное: та ссылка выдаётся ботом и живёт
+ * как пароль к конкретному человеку, а здесь — сессия с паролем и сроком,
+ * которую можно отозвать. На сервер она уходит `Authorization: Bearer`, и
+ * сервер сам ставит организацию из членства.
+ */
+const SESSION_TOKEN_KEY = "semitask.session_token";
+
+export function getSessionToken(): string | null {
+  try {
+    return localStorage.getItem(SESSION_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionToken(token: string): void {
+  try {
+    localStorage.setItem(SESSION_TOKEN_KEY, token.trim());
+  } catch {
+    // приватный режим — вход будет работать до перезагрузки
+  }
+}
+
+export function clearSessionToken(): void {
+  try {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Забыть любой вход: и сессию по почте, и ссылку доступа из бота. */
+export function clearAllTokens(): void {
+  clearSessionToken();
+  clearAccessToken();
+}
+
 export function getAccessToken(): string | null {
   try {
     return localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -223,6 +263,25 @@ export function humanizeApiError(e: unknown): string {
       return "Управляющего увольняет только администратор.";
     }
     if (d === "already_done") return "Поручение уже зачтено.";
+    // Вход по почте (B2B_PLATFORM_PLAN, шаг 2.1). Сервер отдаёт коды, чтобы
+    // форму не пришлось переводить на каждом экране.
+    const auth: Record<string, string> = {
+      bad_email: "Проверь адрес почты — похоже, в нём опечатка.",
+      password_too_short: "Пароль короче 8 символов.",
+      password_too_long: "Пароль длиннее 128 символов.",
+      password_has_spaces: "Пароль не должен начинаться или заканчиваться пробелом.",
+      email_taken: "Этот адрес уже зарегистрирован — попробуй войти.",
+      invalid_credentials: "Неверная почта или пароль.",
+      password_not_set:
+        "У этого аккаунта нет пароля: войди через Telegram или запроси сброс по почте.",
+      reset_invalid: "Ссылка сброса не подходит — запроси новую.",
+      reset_expired: "Срок ссылки истёк — запроси новую.",
+      session_invalid: "Вход истёк — войди снова.",
+      org_required: "Тебя ещё не пригласили в организацию.",
+      org_inactive: "Организация заблокирована — обратись к управляющему.",
+      org_missing: "Организация не найдена — обратись к управляющему.",
+    };
+    if (d in auth) return auth[d];
     // Фото: сервер отвечает кодами, текст — здесь, чтобы человек понимал,
     // что делать дальше (особенно с HEIC из галереи iPhone).
     if (d === "not_an_image") {
@@ -266,11 +325,14 @@ export async function api<T>(
   options: { sameOrigin?: boolean } = {},
 ): Promise<T> {
   const initData = getInitData();
-  const accessToken = initData ? null : getAccessToken();
+  const sessionToken = initData ? null : getSessionToken();
+  const accessToken = initData || sessionToken ? null : getAccessToken();
   const headers = new Headers(init.headers);
-  // Внутри Telegram главнее `initData`: локальный токен браузера (мог
-  // остаться от прошлого входа) не должен подменять личность.
+  // Порядок старшинства: `initData` (мини-апп) → сессия по почте → ссылка
+  // доступа. Внутри Telegram локальный токен браузера (мог остаться от
+  // прошлого входа) не должен подменять личность.
   if (initData) headers.set("Authorization", `tma ${initData}`);
+  else if (sessionToken) headers.set("Authorization", `Bearer ${sessionToken}`);
   else if (accessToken) headers.set("X-Access-Token", accessToken);
   // Режим проверки: сервер подменяет профиль на теневой. Без заголовка это
   // обычный запрос настоящего пользователя.
@@ -294,8 +356,11 @@ export async function api<T>(
 
   if (!res.ok) {
     // Токен веб-версии отозвали или истёк срок: забываем его, чтобы приложение
-    // показало «нужен вход», а не долбило сервер мёртвым заголовком.
-    if (res.status === 401 && accessToken && !initData) clearAccessToken();
+    // показало форму входа, а не долбило сервер мёртвым заголовком.
+    if (res.status === 401 && !initData) {
+      if (sessionToken) clearSessionToken();
+      if (accessToken) clearAccessToken();
+    }
     let detail = res.statusText;
     try {
       const body = await res.json();
