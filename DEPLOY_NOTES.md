@@ -3445,3 +3445,30 @@ npx wrangler pages deploy dist --project-name semitaskbot --commit-dirty=true
 
 Что осталось: экраны внутри приложения (лента, задачи, табели, админка) пока
 русские — переезжают по одному на готовый `useT`, каждый со своим тестом.
+
+## 24.10.2026: раунд 7 — язык, плашка дня, доставка /changelog
+
+Фронт на Cloudflare Pages `semitaskbot`: бандл `index-OmxoFzbl.js`
+(848.98 kB, gzip 241.78 kB), Function собралась. Проверка живого домена:
+в `semitaskbot.pages.dev/assets/index-OmxoFzbl.js` есть `feed-prev-day`,
+а `navigator.language` больше не встречается — то есть авто-переключение
+языка уехало, а плашка дня со стрелками приехала.
+
+Бэкенд на HF Space `fryesw/meetup-planner-backend`: `deploy-hf.py all` →
+RUNNING, `/healthz` 200, `/api/meta` — 344 пути, отпечаток `7c28b43836f1`,
+head кода и БД `0059_email_verification`. В загруженном
+`app/bot/handlers/changelog.py` видны `REPLY_ATTEMPTS` и
+`render_short_fallback` — новая доставка на месте.
+
+Состояние Telegram: `getWebhookInfo` — `pending_update_count: 0`,
+`last_error_message` нет, апдейты доходят. Но сеть до Bot API остаётся
+нестабильной: сразу после рестарта контейнера (22:53:55Z) `webhook.set`
+прошёл в 22:54:27, а следующий `webhook.set_failed: Request timeout error` —
+в 22:55:14. Это ровно тот сценарий, из-за которого `/changelog` молчал:
+отправка висела до таймаута, а повторов не было.
+
+Что теперь при сбое: три попытки по 12 с, затем короткий ответ без разметки
+(три заголовка + ссылка); если не ушло ни одно — в логе `changelog.reply_lost`.
+Бот ходит в Telegram через `BOT_API_SERVER`
+(`telegram-proxy2.esw1337.workers.dev`) — если таймауты участятся, первым
+делом смотреть этот воркер, а не код команды.
