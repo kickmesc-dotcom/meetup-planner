@@ -375,7 +375,7 @@ def test_migration_0054_covers_every_tenant_table() -> None:
     # Таблицы, созданные позже 0054: у них `org_id` есть с рождения, и
     # добавлять его миграцией 0054 было бы некуда. Список явный, чтобы новая
     # таблица всё равно требовала решения.
-    created_later = {"org_invitations"}  # 0057
+    created_later = {"org_invitations", "push_subscriptions"}  # 0057, 0058
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 
