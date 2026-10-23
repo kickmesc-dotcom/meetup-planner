@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchEmployee,
@@ -262,6 +262,36 @@ export default function HrFeedScreen() {
     setSearch("");
   };
 
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Прокрутка к нужному дню по стрелкам в плашке.
+   *
+   * Считаем от текущего `scrollTop` и живого положения секции, а не по
+   * сохранённым координатам: лента перерисовывается (фильтры, новые события),
+   * и запомненный `top` устарел бы. Плавность отключаем при
+   * `prefers-reduced-motion` — как и переход вкладок.
+   */
+  const jumpToDay = (index: number) => {
+    const box = scrollerRef.current;
+    const days = box?.querySelectorAll<HTMLElement>("[data-day]");
+    const target = days?.[index];
+    if (!box || !target) return;
+    haptic("selection");
+    const next =
+      box.scrollTop +
+      target.getBoundingClientRect().top -
+      box.getBoundingClientRect().top;
+    const reduced =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (typeof box.scrollTo === "function") {
+      box.scrollTo({ top: next, behavior: reduced ? "auto" : "smooth" });
+    } else {
+      box.scrollTop = next;
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
@@ -391,7 +421,10 @@ export default function HrFeedScreen() {
         )}
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      <div
+        ref={scrollerRef}
+        className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
+      >
         {feedQ.isLoading && <ListSkeleton rows={8} />}
 
         {!feedQ.isLoading && items.length === 0 && (
@@ -404,15 +437,51 @@ export default function HrFeedScreen() {
           </div>
         )}
 
-        {groupByDay(items).map((group) => (
-          <section key={group.key}>
-            {/* Разделитель дня: дата слева, линия до края. Без него две
-                соседние записи из разных суток выглядели как одна смена. */}
-            <h2 className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-tg-bg/95 px-4 py-1.5 text-xs font-medium text-tg-hint backdrop-blur">
-              <span>{group.label}</span>
-              <span aria-hidden="true" className="h-px flex-1 bg-tg-hint/25" />
+        {groupByDay(items).map((group, index, allGroups) => (
+          <section key={group.key} data-day={group.key}>
+            {/* Плашка дня закреплена сверху и сменяется, когда начинается
+                следующая дата. Раньше это была полупрозрачная строка с
+                линией: содержимое просвечивало сквозь неё, и день читался
+                как ещё одна запись ленты. Теперь это отдельная подложка на
+                непрозрачном фоне — по ней видно, где ты находишься. */}
+            <h2 className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-tg-bg px-4 py-1">
+              <span
+                data-testid="feed-day"
+                className="flex min-w-0 items-center gap-1.5 rounded-full bg-tg-secondary-bg px-3 py-1.5 text-xs font-semibold text-tg-text shadow-sm"
+              >
+                <Icon
+                  name="calendar"
+                  size={13}
+                  className="shrink-0 text-tg-hint"
+                />
+                <span className="truncate">{group.label}</span>
+              </span>
+              <span className="ml-auto flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  data-testid="feed-prev-day"
+                  aria-label="Предыдущий день"
+                  title="Предыдущий день"
+                  disabled={index >= allGroups.length - 1}
+                  onClick={() => jumpToDay(index + 1)}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition active:scale-95 disabled:opacity-35 disabled:active:scale-100"
+                >
+                  <Icon name="back" size={16} />
+                </button>
+                <button
+                  type="button"
+                  data-testid="feed-next-day"
+                  aria-label="Следующий день"
+                  title="Следующий день"
+                  disabled={index === 0}
+                  onClick={() => jumpToDay(index - 1)}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition active:scale-95 disabled:opacity-35 disabled:active:scale-100"
+                >
+                  <Icon name="chevron" size={16} />
+                </button>
+              </span>
             </h2>
-            <div className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
+            <div className="mt-1.5 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {group.items.map((item, i) => (
                 <Fragment key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}>
                   <FeedRow

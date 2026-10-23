@@ -211,6 +211,35 @@ describe("HrFeedScreen (P1.8)", () => {
     expect(readFeedSeen(1)).not.toBeNull();
   });
 
+  it("день закреплён отдельной плашкой со стрелками соседних дней", async () => {
+    renderFeed([
+      item({ at: "2026-10-22T10:00:00Z", ref_id: 1, text: "первый день" }),
+      item({ at: "2026-10-21T10:00:00Z", ref_id: 2, text: "предыдущий день" }),
+    ]);
+
+    const plates = await screen.findAllByTestId("feed-day");
+    expect(plates).toHaveLength(2);
+    // Дата стоит в плашке, а не отдельной строкой ленты.
+    expect(plates[0].textContent).toContain("22 октября");
+    expect(plates[1].textContent).toContain("21 октября");
+    // Плашка закреплена и накрывает содержимое непрозрачным фоном (не
+    // просвечивает лентой ниже — жалоба владельца).
+    const sticky = plates[0].closest("h2") as HTMLElement;
+    expect(sticky.className).toContain("sticky");
+    expect(sticky.className).not.toContain("backdrop-blur");
+    expect(sticky.className).toContain("bg-tg-bg");
+    // Вверху ленты «следующий день» недоступен, внизу — «предыдущий».
+    const nextButtons = screen.getAllByTestId("feed-next-day") as HTMLButtonElement[];
+    const prevButtons = screen.getAllByTestId("feed-prev-day") as HTMLButtonElement[];
+    expect(nextButtons[0].disabled).toBe(true);
+    expect(prevButtons[0].disabled).toBe(false);
+    expect(prevButtons[1].disabled).toBe(true);
+
+    // Тап по «предыдущий день» не падает и листает ленту, а не выходит из неё.
+    fireEvent.click(prevButtons[0]);
+    expect(await screen.findByText("предыдущий день")).toBeTruthy();
+  });
+
   it("не повторяет область видимости в пилюле и подзаголовке (P2.13)", async () => {
     renderFeed([item()]);
 
