@@ -69,6 +69,10 @@ ENV_KEYS = (
     "CORS_ORIGINS",
     "SCHEDULER_TZ",
     "LOG_LEVEL",
+    # Web push (шаг 2.4): без пары VAPID подписка браузера не сработает.
+    "VAPID_PUBLIC_KEY",
+    "VAPID_PRIVATE_KEY",
+    "VAPID_SUBJECT",
 )
 
 

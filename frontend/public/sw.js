@@ -100,6 +100,55 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+/**
+ * Push вне Telegram (шаг 2.4). Payload — JSON от сервера: заголовок, текст,
+ * ссылка. Показываем системное уведомление; без него Chrome не даёт
+ * подписке жить (userVisibleOnly: true).
+ */
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  const title = typeof data.title === "string" ? data.title : "SemiTaskBot";
+  const body = typeof data.body === "string" ? data.body : "";
+  const url = typeof data.url === "string" ? data.url : "/";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      // Одинаковый tag заменяет прошлое уведомление, а не копит их.
+      tag: typeof data.tag === "string" ? data.tag : undefined,
+      data: { url },
+    }),
+  );
+});
+
+/**
+ * Клик по уведомлению. Если приложение уже открыто — фокусируем его вкладку,
+ * а не плодим новую: водитель не должен собирать десять копий приложения.
+ */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const raw = event.notification.data && event.notification.data.url;
+  const target = new URL(typeof raw === "string" ? raw : "/", self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of windows) {
+        if (client.url === target && "focus" in client) return client.focus();
+      }
+      return self.clients.openWindow(target);
+    })(),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;

@@ -143,6 +143,27 @@ def reset_email(*, to: str, link: str, minutes: int) -> MailMessage:
     )
 
 
+def notification_email(
+    *, to: str, subject: str, text: str, link: str
+) -> MailMessage:
+    """Важное событие смены без Telegram (шаг 2.4): срок, просрочка, эскалация.
+
+    Письмо уходит только тем, у кого нет push-подписки: дублировать одно и то
+    же в два канала — верный способ научить человека отключать оба.
+    """
+    return MailMessage(
+        to=to,
+        subject=subject,
+        text=(
+            f"{text}\n\n"
+            "Открыть приложение:\n"
+            f"{link}\n\n"
+            "Уведомления в браузере включаются в профиле — тогда письма не нужны.\n\n"
+            "SemiTaskBot"
+        ),
+    )
+
+
 def invite_email(*, to: str, org_name: str, link: str) -> MailMessage:
     """Приглашение в организацию (шаг 2.2)."""
     return MailMessage(

@@ -57,6 +57,17 @@ class Settings(BaseSettings):
     smtp_starttls: bool = Field(True, alias="SMTP_STARTTLS")
     auth_session_days: int = Field(30, alias="AUTH_SESSION_DAYS")
 
+    # --- Push вне Telegram (B2B_PLATFORM_PLAN, шаг 2.4) -------------------
+    # Пара VAPID: публичная уходит в браузер, приватная остаётся на сервере.
+    # Пусто — push выключен: кнопки в приложении нет, напоминания идут как
+    # раньше (колокольчик + Telegram), ничего не падает.
+    vapid_public_key: str = Field("", alias="VAPID_PUBLIC_KEY")
+    vapid_private_key: str = Field("", alias="VAPID_PRIVATE_KEY")
+    # Идентификатор отправителя для push-сервиса: `mailto:` или URL сайта.
+    vapid_subject: str = Field(
+        "mailto:no-reply@semitask.bot", alias="VAPID_SUBJECT"
+    )
+
     @property
     def link_base(self) -> str:
         """База для ссылок в письмах: без хвостового слэша."""

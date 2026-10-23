@@ -84,6 +84,15 @@ describe("service worker", () => {
     expect(swRaw).toContain('startsWith("/assets/")');
   });
 
+  it("показывает push и открывает приложение по клику", () => {
+    // Без обработчика push подписка `userVisibleOnly` не работает: Chrome
+    // отзывает её, если сообщение не превратилось в уведомление.
+    expect(swRaw).toContain('addEventListener("push"');
+    expect(swRaw).toContain("showNotification");
+    expect(swRaw).toContain('addEventListener("notificationclick"');
+    expect(swRaw).toContain("openWindow");
+  });
+
   it("читает оболочку из того кеша, куда её положила установка", () => {
     // Кеши разные: промах по ASSET_CACHE для манифеста/иконок ломает офлайн.
     expect(swRaw).toContain("cacheFirst(request, SHELL_CACHE)");

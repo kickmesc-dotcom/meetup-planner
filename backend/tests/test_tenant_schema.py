@@ -107,6 +107,7 @@ TENANT_TABLES: set[str] = {
     "poll_votes",
     "polls",
     "proxy_entries",
+    "push_subscriptions",
     "sheet_sources",
     "shift_hall_choices",
     "standard_checks",

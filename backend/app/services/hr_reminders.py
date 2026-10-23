@@ -38,7 +38,7 @@ from app.db.hr_models import (
     TaskReminder,
 )
 from app.db.models import User
-from app.services import hr_alerts, hr_demo, hr_notify, hr_settings, hr_tasks
+from app.services import hr_alerts, hr_demo, hr_notify, hr_settings, hr_tasks, mail, web_push
 
 log = structlog.get_logger()
 
@@ -50,6 +50,18 @@ SECOND_EVENT_COMMENT = "second_escalation_sent"
 
 # Сколько задач максимум берём за один тик — защита от лавины после простоя.
 BATCH_LIMIT = 200
+
+# Заголовки push по типу события. Короткие: заголовок уведомления обрезается
+# на телефоне раньше, чем название поручения в теле.
+PUSH_TITLES: dict[str, str] = {
+    hr_notify.KIND_TASK_DEADLINE: "Срок поручения",
+    hr_notify.KIND_TASK_OVERDUE: "Поручение просрочено",
+    hr_notify.KIND_TASK_ESCALATED: "Просрочка без реакции",
+}
+
+# Какие события дублируем письмом, если push не включён. Не всё подряд: письмо
+# на каждый чих — это спам, который быстро уводит домен в чёрный список.
+EMAIL_KINDS = frozenset(PUSH_TITLES)
 
 
 # --------------------------------------------------------------------------
@@ -282,6 +294,10 @@ async def _deliver(
     await hr_notify.notify(
         session, employees=recipients, kind=kind, text=text, payload=payload
     )
+    # Вне Telegram: push на устройства, а для важного и без подписки — письмо.
+    await deliver_external(
+        session, recipients=recipients, kind=kind, text=text, payload=payload
+    )
     if bot is None:
         return
     allowed, reason = await hr_settings.notifications_allowed(session)
@@ -293,6 +309,87 @@ async def _deliver(
         tg_id = tg_map.get(employee.user_id)
         if tg_id:
             await send_dm(bot, tg_id, text, keyboard)
+
+
+def _push_body(text: str, limit: int = 180) -> str:
+    """Тело push одной строкой: переносы в уведомлении выглядят как обрыв."""
+    flat = " ".join(text.split())
+    return flat if len(flat) <= limit else flat[: limit - 1].rstrip() + "…"
+
+
+async def _emails(session: AsyncSession, user_ids: list[int]) -> dict[int, str]:
+    """`user_id` → почта, только у кого она есть."""
+    if not user_ids:
+        return {}
+    rows = (
+        await session.execute(
+            select(User.id, User.email).where(
+                User.id.in_(user_ids), User.email.is_not(None)
+            )
+        )
+    ).all()
+    return {int(uid): str(email) for uid, email in rows if email}
+
+
+async def deliver_external(
+    session: AsyncSession,
+    *,
+    recipients: list[Employee],
+    kind: str,
+    text: str,
+    payload: dict | None = None,
+) -> None:
+    """Доставка вне Telegram: push на устройства, письмо — запасной канал.
+
+    Push получают все, у кого есть подписка. Письмо — только важные события и
+    только те, у кого подписки нет: дублировать одно событие в два канала —
+    верный способ научить человека отключить оба.
+
+    Ошибки глотаем. Уведомление — не причина уронить тик планировщика: пропуск
+    одного письма дешевле, чем неразосланные напоминания всему залу.
+    """
+    if not recipients:
+        return
+    subs: list = []
+    try:
+        subs = await web_push.subscriptions_for(
+            session, [e.user_id for e in recipients]
+        )
+        if subs:
+            task_id = (payload or {}).get("task_id")
+            await web_push.send(
+                session,
+                subscriptions=subs,
+                title=PUSH_TITLES.get(kind, "SemiTaskBot"),
+                body=_push_body(text),
+                url="/",
+                tag=f"{kind}:{task_id}" if task_id else kind,
+            )
+    except Exception as exc:  # noqa: BLE001 — push не роняет тик
+        log.warning("hr.push_failed", kind=kind, error=exc.__class__.__name__)
+
+    if kind not in EMAIL_KINDS:
+        return
+    covered = {int(sub.user_id) for sub in subs}
+    targets = [e for e in recipients if e.user_id not in covered]
+    if not targets:
+        return
+    emails = await _emails(session, [e.user_id for e in targets])
+    if not emails:
+        return
+    base = get_settings().link_base
+    for email in emails.values():
+        try:
+            await mail.send(
+                mail.notification_email(
+                    to=email,
+                    subject=PUSH_TITLES.get(kind, "SemiTaskBot"),
+                    text=text,
+                    link=f"{base}/" if base else "/",
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.info("hr.mail_failed", error=exc.__class__.__name__)
 
 
 # --------------------------------------------------------------------------

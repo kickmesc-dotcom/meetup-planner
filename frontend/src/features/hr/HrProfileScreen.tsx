@@ -22,6 +22,7 @@ import Badge from "@/features/hr/Badge";
 import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
 import KpiCard from "@/features/hr/KpiCard";
+import PushCard from "@/features/hr/PushCard";
 import TrainingScreen from "@/features/hr/TrainingScreen";
 import WebVersionCard from "@/features/hr/WebVersionCard";
 import { useUI } from "@/store/ui";
@@ -523,6 +524,9 @@ export default function HrProfileScreen() {
       {/* Веб-версия: широкая ссылка для компьютера. Живёт рядом с разделами —
           это личный доступ, а не админская настройка. */}
       <WebVersionCard />
+
+      {/* Push вне Telegram: своё устройство, свой тумблер. */}
+      <PushCard />
 
       {/* 4. Админ-инструменты: нужны редко, поэтому свёрнуты. */}
       {(me.is_admin || me.is_staff) && (

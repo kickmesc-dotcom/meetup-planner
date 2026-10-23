@@ -19,6 +19,8 @@ dependencies = [
     "apscheduler==3.10.4",
     "tzdata==2024.2",
     "aiohttp-socks==0.10.1",
+    # Web push вне Telegram (шаг 2.4): шифрование payload + подпись VAPID.
+    "pywebpush==2.0.3",
 ]
 
 [project.optional-dependencies]
