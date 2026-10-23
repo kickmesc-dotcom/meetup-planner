@@ -10,6 +10,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import VerifyEmailScreen from "./VerifyEmailScreen";
 import { confirmEmailVerification } from "@/api/auth";
+import { ApiError } from "@/api/client";
 
 vi.mock("@/api/auth", () => ({
   confirmEmailVerification: vi.fn(),
@@ -44,11 +45,13 @@ describe("VerifyEmailScreen", () => {
   });
 
   it("на протухшей ссылке объясняет, что делать", async () => {
-    confirmMock.mockRejectedValue({ status: 400, detail: "verify_expired" });
+    confirmMock.mockRejectedValue(new ApiError(400, "verify_expired"));
     renderScreen();
 
     await screen.findByText("Ссылка не подошла");
     await waitFor(() => expect(confirmMock).toHaveBeenCalledTimes(1));
+    // Не сырой код сервера: человек читает, что делать.
+    expect(screen.getByText(/Срок ссылки истёк/)).toBeTruthy();
     expect(screen.getByText(/Попроси новую в профиле/)).toBeTruthy();
   });
 
