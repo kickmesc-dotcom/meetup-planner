@@ -18,6 +18,7 @@
  */
 import { create } from "zustand";
 import { ApiError, humanizeApiError } from "@/api/client";
+import { EN_CONTENT } from "./content";
 import { en, ru, type MessageKey } from "./messages";
 
 export type Locale = "ru" | "en";
@@ -103,6 +104,38 @@ export function useT() {
     locale,
     t: (key: MessageKey, vars?: Record<string, string | number>) =>
       translate(locale, key, vars),
+  };
+}
+
+/**
+ * Текст экрана на языке интерфейса: ключ — русский оригинал (`content.ts`).
+ *
+ * Если перевода нет, возвращается сам оригинал: непереведённая строка
+ * остаётся русской, но экран не ломается и не показывает ключ вроде
+ * `feed.title`. Проверка покрытия — в `i18n/coverage.test.ts`.
+ *
+ * Подстановки (`{name}`) работают в обоих языках: русский текст тоже может
+ * содержать плейсхолдер, и он подставляется так же, как в переводе.
+ */
+export function tx(
+  locale: Locale,
+  text: string,
+  vars?: Record<string, string | number>,
+): string {
+  const template = locale === "ru" ? text : (EN_CONTENT[text] ?? text);
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
+    name in vars ? String(vars[name]) : whole,
+  );
+}
+
+/** Хук экрана: `tx` для текстов и текущая локаль для дат и чисел. */
+export function useTx() {
+  const locale = useLocale((s) => s.locale);
+  return {
+    locale,
+    tx: (text: string, vars?: Record<string, string | number>) =>
+      tx(locale, text, vars),
   };
 }
 

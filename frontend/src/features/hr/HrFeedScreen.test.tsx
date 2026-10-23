@@ -23,6 +23,7 @@ import {
   type HrFeedItem,
 } from "@/api/hr";
 import { markFeedSeen, readFeedSeen } from "@/features/hr/feedSeen";
+import { useLocale } from "@/i18n";
 
 vi.mock("@/api/hr", () => ({
   fetchHrFeed: vi.fn(),
@@ -69,6 +70,8 @@ function renderFeed(items: HrFeedItem[]) {
 }
 
 beforeEach(() => {
+  // Язык — глобальное состояние: тесты ниже ждут русский по умолчанию.
+  useLocale.setState({ locale: "ru" });
   window.localStorage.clear();
   feedMock.mockReset();
   filtersMock.mockReset();
@@ -238,6 +241,24 @@ describe("HrFeedScreen (P1.8)", () => {
     // Тап по «предыдущий день» не падает и листает ленту, а не выходит из неё.
     fireEvent.click(prevButtons[0]);
     expect(await screen.findByText("предыдущий день")).toBeTruthy();
+  });
+
+  it("на английском вся шапка и день — по-английски", async () => {
+    useLocale.setState({ locale: "en" });
+    renderFeed([
+      item({ at: "2026-10-22T10:00:00Z", display_name: "Peter", text: "closed a task" }),
+    ]);
+
+    // Ждём строку ленты: до ответа сервера шапка ещё не знает область видимости.
+    expect(await screen.findByText("Peter")).toBeTruthy();
+    expect(screen.getByText("Shift events")).toBeTruthy();
+    expect(screen.getByText("Whole company")).toBeTruthy();
+    expect(screen.getByText("Everything that happens on shift.")).toBeTruthy();
+    expect(screen.queryByText("События смены")).toBeNull();
+    // Заголовок дня в английском порядке: месяц и день, а не «22 октября».
+    const plate = await screen.findByTestId("feed-day");
+    expect(plate.textContent).toContain("October");
+    expect(plate.textContent).not.toContain("октября");
   });
 
   it("не повторяет область видимости в пилюле и подзаголовке (P2.13)", async () => {

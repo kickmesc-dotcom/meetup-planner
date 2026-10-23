@@ -24,6 +24,7 @@ import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
+import { tx, useTx, type Locale } from "@/i18n";
 import { useUI } from "@/store/ui";
 
 /**
@@ -82,11 +83,11 @@ const ISSUE_REASONS: { code: string; label: string }[] = [
 ];
 
 /** «Сегодня 18:00», «Завтра 09:30», иначе «14.05 18:00». */
-function fmtDue(iso: string | null): string {
-  if (!iso) return "без срока";
+function fmtDue(iso: string | null, locale: Locale): string {
+  if (!iso) return tx(locale, "без срока");
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "без срока";
-  const time = d.toLocaleTimeString("ru-RU", {
+  if (Number.isNaN(d.getTime())) return tx(locale, "без срока");
+  const time = d.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
     // Секунды показываем только когда они реально заданы: в обычном
@@ -97,13 +98,18 @@ function fmtDue(iso: string | null): string {
   const dayOf = (x: Date) =>
     new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((dayOf(d) - dayOf(today)) / 86_400_000);
-  if (diff === 0) return `сегодня ${time}`;
-  if (diff === 1) return `завтра ${time}`;
-  if (diff === -1) return `вчера ${time}`;
-  return `${d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" })} ${time}`;
+  if (diff === 0) return tx(locale, "сегодня {time}", { time });
+  if (diff === 1) return tx(locale, "завтра {time}", { time });
+  if (diff === -1) return tx(locale, "вчера {time}", { time });
+  const day = d.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+  return `${day} ${time}`;
 }
 
 export default function MyTasksScreen() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
   const [showClosed, setShowClosed] = useState(false);
@@ -186,7 +192,7 @@ export default function MyTasksScreen() {
               «Привет,…». Теперь приветствие — своя строка, плашка — под ним. */}
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-lg font-semibold leading-tight text-tg-text">
-              {firstName ? `Привет, ${firstName}` : "Мои задачи"}
+              {firstName ? tx("Привет, {name}", { name: firstName }) : tx("Мои задачи")}
             </h1>
             {meQ.data && (
               <div className="mt-1 flex min-w-0">
@@ -206,8 +212,8 @@ export default function MyTasksScreen() {
                 setTab("standards");
               }}
               className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
-              aria-label="База стандартов"
-              title="База стандартов"
+              aria-label={tx("База стандартов")}
+              title={tx("База стандартов")}
             >
               <Icon name="book" size={18} />
             </button>
@@ -219,8 +225,8 @@ export default function MyTasksScreen() {
                   setTab("review");
                 }}
                 className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
-                aria-label="Приёмка работ"
-                title="Приёмка работ"
+                aria-label={tx("Приёмка работ")}
+                title={tx("Приёмка работ")}
               >
                 <Icon name="search" size={18} />
               </button>
@@ -233,23 +239,23 @@ export default function MyTasksScreen() {
                 setTab("handovers");
               }}
               className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
-              aria-label="Передача смены"
-              title="Передача смены"
+              aria-label={tx("Передача смены")}
+              title={tx("Передача смены")}
             >
               <Icon name="send" size={18} />
             </button>
           </span>
         </div>
         <p className="mt-1 text-xs text-tg-hint">
-          Что нужно сделать сегодня
+          {tx("Что нужно сделать сегодня")}
           {open.length > 0
-            ? ` · задач ${open.length}${overdue ? `, просрочено ${overdue}` : ""}`
+            ? ` · ${tx("задач {count}", { count: open.length })}${overdue ? `, ${tx("просрочено {count}", { count: overdue })}` : ""}`
             : ""}
         </p>
         <div className="mt-3 flex items-center gap-1.5">
           {[
-            { v: false, label: "Активные" },
-            { v: true, label: "Все" },
+            { v: false, label: tx("Активные") },
+            { v: true, label: tx("Все") },
           ].map((o) => (
             <button
               key={String(o.v)}
@@ -283,7 +289,7 @@ export default function MyTasksScreen() {
             className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
           >
             <Icon name="alert" size={14} />
-            Проблемы
+            {tx("Проблемы")}
           </button>
         </div>
       </header>
@@ -292,7 +298,7 @@ export default function MyTasksScreen() {
         {checklist && checklist.total > 0 && (
           <section className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium text-tg-text">Смена сегодня</span>
+              <span className="text-sm font-medium text-tg-text">{tx("Смена сегодня")}</span>
               <span className="text-xs tabular-nums text-tg-hint">
                 {checklist.done}/{checklist.total}
               </span>
@@ -311,7 +317,7 @@ export default function MyTasksScreen() {
               }}
               className="mt-2 min-h-11 rounded-full bg-tg-bg px-3 text-xs text-tg-link"
             >
-              {checklist.status === "done" ? "Смена закрыта" : "Открыть чек-лист"}
+              {checklist.status === "done" ? tx("Смена закрыта") : tx("Открыть чек-лист")}
             </button>
           </section>
         )}
@@ -330,16 +336,16 @@ export default function MyTasksScreen() {
             <div className="flex items-baseline justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 text-sm font-medium text-tg-text">
                 <Icon name="alert" size={15} />
-                Проблемы
+                {tx("Проблемы")}
               </span>
               <span className="text-xs tabular-nums text-tg-hint">
-                открыто {openIssues}
+                {tx("открыто {count}", { count: openIssues })}
               </span>
             </div>
             <p className="mt-1 text-xs text-tg-hint">
               {urgentIssues > 0
-                ? `${urgentIssues} ждут внимания: срок или повтор.`
-                : "Все в работе — открой журнал, если нужен статус."}
+                ? tx("{count} ждут внимания: срок или повтор.", { count: urgentIssues })
+                : tx("Все в работе — открой журнал, если нужен статус.")}
             </p>
           </button>
         )}
@@ -358,9 +364,9 @@ export default function MyTasksScreen() {
           <div className="flex flex-col items-center justify-center py-10 text-center xl:col-span-2">
             <Icon name="check" size={30} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
-              {emptyTitle}
+              {tx(emptyTitle)}
             </div>
-            <div className="mt-1 text-xs text-tg-hint">{emptyHint}</div>
+            <div className="mt-1 text-xs text-tg-hint">{tx(emptyHint)}</div>
             {/* VISUAL_AUDIT P2.12: пустое состояние ведёт к главному делу смены,
                 а не в «События» — они и так есть в нижней полосе. */}
             <button
@@ -372,12 +378,12 @@ export default function MyTasksScreen() {
               className="mt-3 min-h-11 rounded-full bg-tg-button px-4 text-xs text-tg-button-text"
             >
               {checklist && checklist.status === "done"
-                ? "Посмотреть чек-лист"
+                ? tx("Посмотреть чек-лист")
                 : checklist && checklist.total > 0
                   ? checklist.done > 0
-                    ? "Продолжить чек-лист"
-                    : "Начать смену"
-                  : "Открыть чек-лист"}
+                    ? tx("Продолжить чек-лист")
+                    : tx("Начать смену")
+                  : tx("Открыть чек-лист")}
             </button>
           </div>
         )}
@@ -420,6 +426,7 @@ function TaskCard({
   onAction: (a: TaskAction) => void;
   onIssued: () => void;
 }) {
+  const { tx, locale } = useTx();
   const status = ownTaskStatus(task);
   const closed = status === "done" || status === "failed";
   const shift = fmtShift(task.shift_date);
@@ -444,56 +451,59 @@ function TaskCard({
             STATUS_CLASS[status],
           ].join(" ")}
         >
-          {STATUS_LABEL[status]}
+          {tx(STATUS_LABEL[status])}
         </span>
       </div>
 
       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
         <span>
           <InlineIcon name="clock" />
-          {fmtDue(task.due_at)}
+          {fmtDue(task.due_at, locale)}
         </span>
         {shift && (
           <span>
             <InlineIcon name="calendar" />
-            смена {shift}
+            {tx("смена {date}", { date: shift })}
           </span>
         )}
         {task.schedule_label && (
           <span>
             <InlineIcon name="calendar" />
-            {offSchedule ? `не сегодня · ${task.schedule_label}` : task.schedule_label}
+            {offSchedule ? tx("не сегодня · {label}", { label: task.schedule_label }) : task.schedule_label}
           </span>
         )}
         {task.priority !== "normal" && (
-          <span>приоритет: {PRIORITY_LABEL[task.priority]}</span>
+          <span>{tx("приоритет: {label}", { label: tx(PRIORITY_LABEL[task.priority]) })}</span>
         )}
         {task.requires_photo && (
           <span>
             <InlineIcon name="camera" />
-            {(task.photos?.length ?? 0) > 0 ? "фото есть" : "нужен фотоотчёт"}
+            {(task.photos?.length ?? 0) > 0 ? tx("фото есть") : tx("нужен фотоотчёт")}
           </span>
         )}
         {task.requires_review && (
           <span>
-            <InlineIcon name="checklist" /> с приёмкой
+            <InlineIcon name="checklist" />{" "}{tx("с приёмкой")}
           </span>
         )}
         {task.is_overdue && !closed && (
-          <span className="text-status-busy">просрочено</span>
+          <span className="text-status-busy">{tx("просрочено")}</span>
         )}
       </div>
 
       {group && (
         <div className="mt-1.5 text-xs text-tg-hint">
           <InlineIcon name="team" />
-          {TASK_MODE_LABEL[task.mode]} · сделали {task.progress_done} из{" "}
-          {task.progress_total}
+          {tx(TASK_MODE_LABEL[task.mode])} ·{" "}
+          {tx("сделали {done} из {total}", {
+            done: task.progress_done,
+            total: task.progress_total,
+          })}
         </div>
       )}
       {task.my_part && (
         <div className="mt-1 text-xs text-tg-text/90">
-          Моя часть: {task.my_part}
+          {tx("Моя часть:")} {task.my_part}
         </div>
       )}
 
@@ -504,7 +514,7 @@ function TaskCard({
       )}
       {task.expected_result && (
         <p className="mt-1 text-xs text-tg-hint">
-          <span className="text-tg-hint/80">Результат: </span>
+          <span className="text-tg-hint/80">{tx("Результат:")} </span>
           {task.expected_result}
         </p>
       )}
@@ -513,7 +523,7 @@ function TaskCard({
 
       {!closed && status === "on_review" && (
         <div className="mt-3 rounded-tile bg-tg-bg/60 px-2.5 py-2 text-xs text-tg-hint">
-          Работа сдана — ждёт приёмки руководителя.
+          {tx("Работа сдана — ждёт приёмки руководителя.")}
         </div>
       )}
 
@@ -521,25 +531,25 @@ function TaskCard({
         <div className="mt-3 flex flex-wrap gap-2">
           {status === "new" && (
             <ActionButton disabled={busy} onClick={() => onAction("accept")}>
-              Принять
+              {tx("Принять")}
             </ActionButton>
           )}
           {(status === "new" ||
             status === "accepted" ||
             status === "rework") && (
             <ActionButton disabled={busy} onClick={() => onAction("start")}>
-              {status === "rework" ? "Взять в работу" : "Начать"}
+              {status === "rework" ? tx("Взять в работу") : tx("Начать")}
             </ActionButton>
           )}
           {(status === "in_progress" ||
             status === "overdue" ||
             status === "rework") && (
             <ActionButton disabled={busy} onClick={() => onAction("done")}>
-              {task.requires_review ? "Сдать на проверку" : "Выполнено"}
+              {task.requires_review ? tx("Сдать на проверку") : tx("Выполнено")}
             </ActionButton>
           )}
           <ActionButton disabled={busy} variant="ghost" onClick={onToggleIssue}>
-            {issueOpen ? "Отмена" : "Не успеваю"}
+            {issueOpen ? tx("Отмена") : tx("Не успеваю")}
           </ActionButton>
         </div>
       )}
@@ -564,6 +574,7 @@ function TaskCard({
  * камеру: снимок сам закроет поручение. Загруженные фото видны сразу.
  */
 function TaskPhotos({ task, closed }: { task: HrTask; closed: boolean }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const photos = task.photos ?? [];
   const needsPhoto = task.requires_photo && photos.length === 0 && !closed;
@@ -586,12 +597,12 @@ function TaskPhotos({ task, closed }: { task: HrTask; closed: boolean }) {
           {needsPhoto && (
             <div className="mb-1 text-xs text-tg-hint">
               <InlineIcon name="camera" />
-              Фотоотчёт: сними или выбери фото — поручение закроется само.
+              {tx("Фотоотчёт: сними или выбери фото — поручение закроется само.")}
             </div>
           )}
           <PhotoAttach
             compact
-            label="Добавить фото"
+            label={tx("Добавить фото")}
             disabled={attach.isPending}
             onUploaded={(media) => attach.mutate(media)}
           />
@@ -602,6 +613,7 @@ function TaskPhotos({ task, closed }: { task: HrTask; closed: boolean }) {
 }
 
 function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
+  const { tx } = useTx();
   const [reason, setReason] = useState(ISSUE_REASONS[0].code);
   const [comment, setComment] = useState("");
   const [eta, setEta] = useState("");
@@ -616,7 +628,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
     onSuccess: () => {
       haptic("success");
       void showAlert(
-        "Руководителю отправлено объяснение. Срок отсчитывается заново.",
+        tx("Руководителю отправлено объяснение. Срок отсчитывается заново."),
       );
       onDone();
     },
@@ -626,7 +638,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
   return (
     <div className="mt-3 rounded-tile bg-tg-bg/60 p-3">
       <label className="block text-xs text-tg-hint">
-        Причина
+        {tx("Причина")}
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -634,14 +646,14 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
         >
           {ISSUE_REASONS.map((r) => (
             <option key={r.code} value={r.code}>
-              {r.label}
+              {tx(r.label)}
             </option>
           ))}
         </select>
       </label>
 
       <label className="mt-2 block text-xs text-tg-hint">
-        Когда сможешь закончить (необязательно)
+        {tx("Когда сможешь закончить (необязательно)")}
         <input
           type="datetime-local"
           value={eta}
@@ -651,13 +663,13 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
       </label>
 
       <label className="mt-2 block text-xs text-tg-hint">
-        Комментарий
+        {tx("Комментарий")}
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={2}
           maxLength={500}
-          placeholder="Что именно мешает?"
+          placeholder={tx("Что именно мешает?")}
           className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
         />
       </label>
@@ -668,7 +680,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
         onClick={() => m.mutate()}
         className="mt-3 min-h-10 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
-        Отправить руководителю
+        {tx("Отправить руководителю")}
       </button>
     </div>
   );

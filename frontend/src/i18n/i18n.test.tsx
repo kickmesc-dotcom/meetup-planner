@@ -19,9 +19,11 @@ import {
   LOCALE_STORAGE_KEY,
   initLocale,
   translate,
+  tx,
   useErrorMessage,
   useLocale,
   useT,
+  useTx,
 } from ".";
 import { en, ru } from "./messages";
 
@@ -152,5 +154,40 @@ describe("перевод ошибок", () => {
   it("незнакомый код не оставляет пустой экран", () => {
     render(<ErrorProbe error={new ApiError(500, "weird_thing")} />);
     expect(screen.getByTestId("error").textContent?.trim()).not.toBe("");
+  });
+});
+
+describe("перевод содержимого экранов", () => {
+  function ScreenProbe() {
+    const { tx: translate } = useTx();
+    return (
+      <div data-testid="probe">
+        {translate("События смены")}|{translate("задач {count}", { count: 3 })}|
+        {translate("Такого текста нет в словаре")}
+      </div>
+    );
+  }
+
+  it("переводит известный текст и подставляет значения", () => {
+    useLocale.setState({ locale: "en" });
+    render(<ScreenProbe />);
+
+    expect(screen.getByTestId("probe").textContent).toBe(
+      "Shift events|3 tasks|Такого текста нет в словаре",
+    );
+  });
+
+  it("по-русски отдаёт оригинал с подстановкой", () => {
+    render(<ScreenProbe />);
+
+    expect(screen.getByTestId("probe").textContent).toBe(
+      "События смены|задач 3|Такого текста нет в словаре",
+    );
+  });
+
+  it("неизвестная строка остаётся русской, а не превращается в ключ", () => {
+    // Главное свойство словаря: непереведённый экран читается, а не ломается.
+    expect(tx("en", "Пока без перевода")).toBe("Пока без перевода");
+    expect(tx("ru", "Пока без перевода")).toBe("Пока без перевода");
   });
 });

@@ -15,6 +15,7 @@ import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
+import { tx, useTx, type Locale } from "@/i18n";
 import {
   countFreshItems,
   markFeedSeen,
@@ -85,11 +86,14 @@ const KIND_LABEL: Record<FeedKind, string> = {
  * уже другой день, а при разборе конфликта важно, какое именно число. Поэтому
  * в разделителе стоит дата, а у каждой записи — точное время с секундами.
  */
-function dayLabel(iso: string): string {
+function dayLabel(iso: string, locale: Locale): string {
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "Без даты";
+  if (Number.isNaN(d.getTime())) return tx(locale, "Без даты");
   const today = new Date();
-  return d.toLocaleDateString("ru-RU", {
+  // Формат берём у Intl, а не склеиваем руками: в английском день недели
+  // стоит перед числом («Wednesday, 21 October»), и переставлять его
+  // вручную — это гарантированная ошибка в одном из двух языков.
+  return d.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", {
     day: "numeric",
     month: "long",
     weekday: "long",
@@ -107,13 +111,14 @@ function dayKey(iso: string): string {
 /** Складывает отсортированные записи в группы по календарным дням. */
 function groupByDay(
   items: HrFeedItem[],
+  locale: Locale,
 ): { key: string; label: string; items: HrFeedItem[] }[] {
   const groups: { key: string; label: string; items: HrFeedItem[] }[] = [];
   for (const item of items) {
     const key = dayKey(item.at);
     const last = groups[groups.length - 1];
     if (last && last.key === key) last.items.push(item);
-    else groups.push({ key, label: dayLabel(item.at), items: [item] });
+    else groups.push({ key, label: dayLabel(item.at, locale), items: [item] });
   }
   return groups;
 }
@@ -156,6 +161,7 @@ function fmtWhen(iso: string): string {
 }
 
 export default function HrFeedScreen() {
+  const { tx, locale } = useTx();
   const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [kinds, setKinds] = useState<FeedKind[]>([]);
@@ -224,7 +230,7 @@ export default function HrFeedScreen() {
           setDepartmentId(null);
           void feedQ.refetch();
         }}
-        title="Лента недоступна"
+        title={tx("Лента недоступна")}
       />
     );
   }
@@ -296,23 +302,23 @@ export default function HrFeedScreen() {
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">События смены</h1>
+          <h1 className="text-lg font-semibold text-tg-text">{tx("События смены")}</h1>
           {feed && (
             <span className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-hint">
-              {SCOPE_TITLE[feed.scope]}
+              {tx(SCOPE_TITLE[feed.scope])}
             </span>
           )}
         </div>
         <div className="mt-1 flex items-start justify-between gap-2">
           <p className="min-w-0 text-xs text-tg-hint">
-            {feed ? SCOPE_HINT[feed.scope] : "Загружаем правила видимости…"}
+            {feed ? tx(SCOPE_HINT[feed.scope]) : tx("Загружаем правила видимости…")}
           </p>
           {freshCount > 0 && (
             <span
               data-testid="feed-fresh-count"
               className="shrink-0 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs font-medium text-tg-text"
             >
-              {freshCount} новых
+              {tx("{count} новых", { count: freshCount })}
             </span>
           )}
         </div>
@@ -324,8 +330,8 @@ export default function HrFeedScreen() {
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Поиск по имени или должности"
-                aria-label="Поиск сотрудника"
+                placeholder={tx("Поиск по имени или должности")}
+                aria-label={tx("Поиск сотрудника")}
                 className="min-h-10 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
               />
               <button
@@ -338,7 +344,7 @@ export default function HrFeedScreen() {
                 className="flex min-h-10 shrink-0 items-center gap-1 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
               >
                 <Icon name="layout" size={16} />
-                Фильтр
+                {tx("Фильтр")}
                 {hasFilters && (
                   <span className="grid h-4 min-w-4 place-items-center rounded-full bg-tg-link/15 px-1 text-2xs text-tg-text">
                     {(employeeId !== null ? 1 : 0) + (departmentId !== null ? 1 : 0)}
@@ -374,7 +380,7 @@ export default function HrFeedScreen() {
                 onClick={resetFilters}
                 className="min-h-7 rounded-full px-2.5 text-xs text-tg-link"
               >
-                Сбросить фильтры
+                {tx("Сбросить фильтры")}
               </button>
             )}
 
@@ -401,7 +407,7 @@ export default function HrFeedScreen() {
                   >
                     <span className="inline-flex items-center gap-1">
                       <Icon name={KIND_ICON[k]} size={13} />
-                      {KIND_LABEL[k]}
+                      {tx(KIND_LABEL[k])}
                     </span>
                   </button>
                 );
@@ -414,8 +420,7 @@ export default function HrFeedScreen() {
           <p className="mt-2 flex items-start gap-1.5 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
             <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
             <span>
-              Видны только твои действия. Расширенные фильтры доступны
-              руководителю подразделения и управляющему.
+              {tx("Видны только твои действия. Расширенные фильтры доступны руководителю подразделения и управляющему.")}
             </span>
           </p>
         )}
@@ -430,14 +435,14 @@ export default function HrFeedScreen() {
         {!feedQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Icon name="clipboard" size={34} className="text-tg-hint" />
-            <div className="mt-2 text-sm font-medium text-tg-text">Пока тихо</div>
+            <div className="mt-2 text-sm font-medium text-tg-text">{tx("Пока тихо")}</div>
             <div className="mt-1 text-xs text-tg-hint">
-              Здесь появятся отметки и поручения.
+              {tx("Здесь появятся отметки и поручения.")}
             </div>
           </div>
         )}
 
-        {groupByDay(items).map((group, index, allGroups) => (
+        {groupByDay(items, locale).map((group, index, allGroups) => (
           <section key={group.key} data-day={group.key}>
             {/* Плашка дня закреплена сверху и сменяется, когда начинается
                 следующая дата. Раньше это была полупрозрачная строка с
@@ -460,8 +465,8 @@ export default function HrFeedScreen() {
                 <button
                   type="button"
                   data-testid="feed-prev-day"
-                  aria-label="Предыдущий день"
-                  title="Предыдущий день"
+                  aria-label={tx("Предыдущий день")}
+                  title={tx("Предыдущий день")}
                   disabled={index >= allGroups.length - 1}
                   onClick={() => jumpToDay(index + 1)}
                   className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition active:scale-95 disabled:opacity-35 disabled:active:scale-100"
@@ -471,8 +476,8 @@ export default function HrFeedScreen() {
                 <button
                   type="button"
                   data-testid="feed-next-day"
-                  aria-label="Следующий день"
-                  title="Следующий день"
+                  aria-label={tx("Следующий день")}
+                  title={tx("Следующий день")}
                   disabled={index === 0}
                   onClick={() => jumpToDay(index - 1)}
                   className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition active:scale-95 disabled:opacity-35 disabled:active:scale-100"
@@ -549,14 +554,15 @@ export default function HrFeedScreen() {
  * времени, а не действие и не тревога.
  */
 function FreshDivider({ count }: { count: number }) {
+  const { tx } = useTx();
   return (
     <div
       role="separator"
-      aria-label={`Новые события: ${count}`}
+      aria-label={tx("Новые события: {count}", { count })}
       className="flex items-center gap-2 bg-tg-link/10 px-3 py-1 text-3xs font-medium text-tg-link"
     >
       <span className="h-px flex-1 bg-tg-link/30" aria-hidden />
-      <span>Новые · {count}</span>
+      <span>{tx("Новые · {count}", { count })}</span>
       <span className="h-px flex-1 bg-tg-link/30" aria-hidden />
     </div>
   );
@@ -564,13 +570,14 @@ function FreshDivider({ count }: { count: number }) {
 
 /** Маленькая пилюля выбранного фильтра с крестиком. */
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+  const { tx } = useTx();
   return (
     <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs text-tg-text">
       <span className="truncate">{label}</span>
       <button
         type="button"
         onClick={onClear}
-        aria-label={`Убрать фильтр ${label}`}
+        aria-label={tx("Убрать фильтр {label}", { label })}
         className="shrink-0 text-tg-hint"
       >
         <Icon name="close" size={12} />
@@ -610,34 +617,35 @@ function FiltersSheet({
   onReset: () => void;
   onClose: () => void;
 }) {
+  const { tx } = useTx();
   return (
-    <div className="fixed inset-0 z-40 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label="Фильтры ленты">
+    <div className="fixed inset-0 z-40 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={tx("Фильтры ленты")}>
       <button
         type="button"
-        aria-label="Закрыть фильтры"
+        aria-label={tx("Закрыть фильтры")}
         onClick={onClose}
         className="absolute inset-0 bg-black/40"
       />
       <div className="relative max-h-[85%] overflow-y-auto rounded-t-card bg-tg-bg p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-tg-text">Фильтры</h2>
+          <h2 className="text-sm font-semibold text-tg-text">{tx("Фильтры")}</h2>
           <button
             type="button"
             onClick={onClose}
             className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
-            aria-label="Закрыть"
+            aria-label={tx("Закрыть")}
           >
             <Icon name="close" size={16} />
           </button>
         </div>
 
         <h3 className="mt-3 text-2xs font-medium uppercase tracking-wide text-tg-hint">
-          Подразделение
+          {tx("Подразделение")}
         </h3>
         <div className="mt-1 space-y-1">
           <FilterRow
             active={departmentId === null}
-            label="Все подразделения"
+            label={tx("Все подразделения")}
             onSelect={() => onDepartment(null)}
           />
           {departments.map((department) => (
@@ -652,24 +660,24 @@ function FiltersSheet({
         </div>
 
         <h3 className="mt-4 text-2xs font-medium uppercase tracking-wide text-tg-hint">
-          Сотрудник
+          {tx("Сотрудник")}
         </h3>
         <input
           type="search"
           value={search}
           onChange={(event) => onSearch(event.target.value)}
-          placeholder="Поиск по имени или должности"
-          aria-label="Поиск сотрудника в фильтре"
+          placeholder={tx("Поиск по имени или должности")}
+          aria-label={tx("Поиск сотрудника в фильтре")}
           className="mt-1 min-h-9 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
         />
         <div className="mt-1 space-y-1">
           <FilterRow
             active={employeeId === null}
-            label="Все сотрудники"
+            label={tx("Все сотрудники")}
             onSelect={() => onEmployee(null)}
           />
           {employees.length === 0 && (
-            <p className="px-2 py-1 text-xs text-tg-hint">Никого не нашли.</p>
+            <p className="px-2 py-1 text-xs text-tg-hint">{tx("Никого не нашли.")}</p>
           )}
           {employees.map((employee) => (
             <FilterRow
@@ -692,14 +700,14 @@ function FiltersSheet({
             }}
             className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm text-tg-text"
           >
-            Сбросить
+            {tx("Сбросить")}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text"
           >
-            Готово
+            {tx("Готово")}
           </button>
         </div>
       </div>
@@ -753,6 +761,7 @@ function FeedRow({
   departmentName: string | null;
   onOpen: (employeeId: number) => void;
 }) {
+  const { tx } = useTx();
   const demo = isDemoItem(item);
   const person = personTone(item.employee_id);
   const dept = departmentTone(item.department_id);
@@ -788,10 +797,10 @@ function FeedRow({
               // Одна пометка на всю строку: ни плашки, ни префикса в имени.
               <span
                 data-testid="feed-demo-mark"
-                title="Тестовый сотрудник"
+                title={tx("Тестовый сотрудник")}
                 className="inline-flex items-center rounded-full bg-tg-bg/70 px-1.5 py-0.5 align-middle text-2xs font-medium text-tg-hint"
               >
-                тест
+                {tx("тест")}
               </span>
             ) : (
               <Badge
@@ -810,7 +819,7 @@ function FeedRow({
             >
               {fmtWhen(item.at)}
             </time>
-            <span>· {KIND_LABEL[item.kind]}</span>
+            <span>· {tx(KIND_LABEL[item.kind])}</span>
             {departmentName && (
               // Подразделение — своей пилюлей: в ленте видно, откуда человек,
               // даже если у него нет плашки должности.
