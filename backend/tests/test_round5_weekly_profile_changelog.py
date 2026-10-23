@@ -13,11 +13,16 @@ from __future__ import annotations
 import os
 from datetime import date, datetime
 
+import pytest
+from aiogram.exceptions import TelegramBadRequest, TelegramNetworkError
+from aiogram.methods import SendMessage
+
 os.environ.setdefault("BOT_TOKEN", "test-token")
 os.environ.setdefault("TG_WEBHOOK_SECRET", "test-secret")
 os.environ.setdefault("MINI_APP_URL", "https://example.com")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/db")
 
+from app.bot.handlers import changelog as changelog_handler  # noqa: E402
 from app.db.hr_models import (  # noqa: E402
     ROLE_ADMIN,
     ROLE_AUP,
@@ -238,3 +243,95 @@ def test_changelog_render_is_html_escaped():
     text = changelog.render_changelog(view)
     assert "<script>" not in text
     assert "&lt;script&gt;" in text
+
+
+# --------------------------------------------------------------------------
+# Доставка /changelog: не молчать, если Telegram не принял длинный ответ
+# --------------------------------------------------------------------------
+
+
+class _FakeMessage:
+    """Заглушка сообщения: запоминает, что именно попытались отправить."""
+
+    def __init__(self, fail_first: int = 0, fail_always: bool = False) -> None:
+        self.fail_first = fail_first
+        self.fail_always = fail_always
+        self.calls: list[dict] = []
+
+    async def reply(self, text, **kwargs):  # noqa: ANN001, ANN003
+        self.calls.append({"text": text, **kwargs})
+        if self.fail_always or len(self.calls) <= self.fail_first:
+            raise TelegramNetworkError(
+                method=SendMessage(chat_id=1, text="x"), message="Request timeout"
+            )
+        return True
+
+
+@pytest.fixture(autouse=True)
+def _no_real_pause(monkeypatch):
+    """Повторы не должны спать по-настоящему: тест про поведение, не про секунды."""
+    pauses: list[float] = []
+
+    async def fake_pause(seconds: float) -> None:
+        pauses.append(seconds)
+
+    monkeypatch.setattr(changelog_handler, "_pause", fake_pause)
+    return pauses
+
+
+async def test_deliver_retries_after_network_timeout():
+    """Один таймаут отправки не должен съедать ответ: вторая попытка проходит."""
+    message = _FakeMessage(fail_first=1)
+
+    assert await changelog_handler._deliver(message, "текст") is True
+    assert len(message.calls) == 2
+    assert message.calls[-1]["parse_mode"] == "HTML"
+    assert message.calls[-1]["disable_web_page_preview"] is True
+
+
+async def test_deliver_gives_up_after_three_network_failures():
+    message = _FakeMessage(fail_always=True)
+
+    assert await changelog_handler._deliver(message, "текст") is False
+    assert len(message.calls) == changelog_handler.REPLY_ATTEMPTS
+
+
+async def test_deliver_does_not_retry_when_telegram_rejects_payload():
+    """«can't parse entities» повтором не лечится — сразу отдаём шанс короткому."""
+    message = _FakeMessage()
+    calls: list[dict] = []
+
+    class _Rejecting(_FakeMessage):
+        async def reply(self, text, **kwargs):  # noqa: ANN001, ANN003
+            calls.append(kwargs)
+            raise TelegramBadRequest(
+                method=SendMessage(chat_id=1, text="x"),
+                message="Bad Request: can't parse entities",
+            )
+
+    rejected = _Rejecting()
+    assert await changelog_handler._deliver(rejected, "<b>x</b>") is False
+    assert len(calls) == 1
+    assert message.calls == []
+
+
+def test_short_fallback_is_plain_and_has_link():
+    view = changelog.Changelog(
+        entries=[
+            changelog.EntryView(day=THURSDAY, title="Первое", body="Длинное объяснение."),
+            changelog.EntryView(day=FRIDAY, title="Второе", body=""),
+            changelog.EntryView(day=FRIDAY, title="Третье", body=""),
+            changelog.EntryView(day=FRIDAY, title="Четвёртое", body=""),
+        ],
+        repo_url="https://github.com/x/y/commits/main",
+        source_ok=True,
+    )
+    text = changelog_handler.render_short_fallback(view)
+
+    assert "Что нового" in text
+    assert "Первое" in text
+    # Короткая версия — три заголовка, без пояснений и без разметки.
+    assert "Длинное объяснение." not in text
+    assert "Четвёртое" not in text
+    assert "<" not in text and "&" not in text
+    assert "https://github.com/x/y/commits/main" in text
