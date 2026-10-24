@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 interface Props {
   title: string;
   subtitle?: string;
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function SubScreen({ title, subtitle, onBack, children }: Props) {
+  const { tx } = useTx();
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-tg-secondary-bg">
@@ -20,7 +22,7 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
             onBack();
           }}
           className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
-          aria-label="Назад"
+          aria-label={tx("Назад")}
         >
           <Icon name="back" size={20} />
         </button>

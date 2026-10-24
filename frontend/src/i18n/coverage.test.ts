@@ -39,30 +39,19 @@ const sources = import.meta.glob("../**/*.{ts,tsx}", {
  */
 const PENDING = new Set<string>([
   "api/access.ts",
-  "features/actions/ActionBar.tsx",
   "features/actions/AutoPickSheet.tsx",
   "features/actions/PollSheet.tsx",
   "features/admin/AdminScreen.tsx",
   "features/admin/AdminTasksScreen.tsx",
-  "features/admin/AppTextsScreen.tsx",
-  "features/admin/AttentionScreen.tsx",
-  "features/admin/BirthdaysScreen.tsx",
-  "features/admin/CalendarSettingsScreen.tsx",
   "features/admin/ChecklistSettingsScreen.tsx",
   "features/admin/EmployeesScreen.tsx",
-  "features/admin/FeedSettingsScreen.tsx",
-  "features/admin/HolidaysCard.tsx",
-  "features/admin/IntervalsScreen.tsx",
   "features/admin/InvitationsScreen.tsx",
   "features/admin/JobsQueueScreen.tsx",
-  "features/admin/JournalScreen.tsx",
   "features/admin/KpiScreen.tsx",
   "features/admin/NotificationsScreen.tsx",
-  "features/admin/PollPresetsScreen.tsx",
   "features/admin/ProxyScreen.tsx",
   "features/admin/RosterTools.tsx",
   "features/admin/SpaceRestartScreen.tsx",
-  "features/admin/SubScreen.tsx",
   "features/admin/TrainingPlanScreen.tsx",
 ]);
 
@@ -137,16 +126,14 @@ describe("перевод: покрытие", () => {
   });
 
   it("список непереведённого не растёт", () => {
-    // Ратчет: 26 файлов на 24.10.2026 (было 71 → 68 → 49 → 38 → 26). Закрыта
-    // вся смена сотрудника (передача, табель и шаблон, проблемы, стандарты,
-    // обучение, профиль, карточка, материалы, ссылки, знакомство, обратная
-    // связь, push, веб-версия, пул), общее (App, каркас ПК, нижняя полоса,
-    // рельс сводки, ошибка, фото, лайтбокс, прогресс, плашка проверки) и
-    // календарь со встречами: сетки и плашки, редактор доступности, дни
-    // рождения, встречи, опросы, названия месяцев и дней недели. Перевод
-    // экрана — минус строка отсюда и минус единица в пределе, а не «перевод» на
-    // словах.
-    expect(PENDING.size).toBeLessThanOrEqual(26);
+    // Ратчет: 15 файлов на 24.10.2026 (было 71 → 68 → 49 → 38 → 26 → 15).
+    // Закрыта вся смена сотрудника, общее (App, каркас ПК, нижняя полоса,
+    // рельс сводки, ошибка, фото, лайтбокс, прогресс, плашка проверки),
+    // календарь со встречами и первая часть админки: интервалы, праздники,
+    // журнал, «требует внимания», тексты приложения, вид календаря, дни
+    // рождения, пресеты опросов, вид ленты, панель действий. Перевод экрана —
+    // минус строка отсюда и минус единица в пределе, а не «перевод» на словах.
+    expect(PENDING.size).toBeLessThanOrEqual(15);
   });
 
   it("английский словарь без пустых значений", () => {

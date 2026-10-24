@@ -24,6 +24,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
@@ -31,6 +32,7 @@ interface Props {
 const TIMELINE_QUERY_KEY = ["admin", "calendar", "timeline"] as const;
 
 export default function CalendarSettingsScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
 
   const q = useQuery({
@@ -58,8 +60,8 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Вид календаря"
-      subtitle="Новый таймлайн / legacy-вид"
+      title={tx("Вид календаря")}
+      subtitle={tx("Новый таймлайн / legacy-вид")}
       onBack={onBack}
     >
       {q.isError && (
@@ -73,20 +75,26 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
         <div className="flex items-center gap-2">
           <Icon name="sparkles" size={18} className="text-tg-link" />
           <span className="text-sm font-semibold text-tg-text">
-            Новый таймлайн-вид
+            {tx("Новый таймлайн-вид")}
           </span>
         </div>
         <div className="text-xs text-tg-hint">
-          Горизонтальная лента с pinch-zoom и инерционной прокруткой. Активна
-          при увеличениях <b>день / неделя / месяц</b>. Для остальных уровней
-          (часы, 3/6 месяцев, год, все годы) используется legacy-вид независимо
-          от этого тумблера.
+          {tx(
+            "Горизонтальная лента с pinch-zoom и инерционной прокруткой. Активна при увеличениях",
+          )}{" "}
+          <b>{tx("день / неделя / месяц")}</b>
+          {". "}
+          {tx(
+            "Для остальных уровней (часы, 3/6 месяцев, год, все годы) используется legacy-вид независимо от этого тумблера.",
+          )}
         </div>
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="text-sm text-tg-text">
-            Включён
+            {tx("Включён")}
             {q.isPending && (
-              <span className="ml-2 text-xs text-tg-hint">загрузка…</span>
+              <span className="ml-2 text-xs text-tg-hint">
+                {tx("загрузка…")}
+              </span>
             )}
           </div>
           <Switch
@@ -99,8 +107,9 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
           />
         </div>
         <div className="text-2xs text-tg-hint">
-          Откат на legacy — переключить тумблер обратно. Никаких рестартов не
-          требуется.
+          {tx(
+            "Откат на legacy — переключить тумблер обратно. Никаких рестартов не требуется.",
+          )}
         </div>
       </section>
     </SubScreen>

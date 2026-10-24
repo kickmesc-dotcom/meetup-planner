@@ -23,11 +23,13 @@ import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
 
 export default function AppTextsScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin", "texts"],
@@ -74,7 +76,7 @@ export default function AppTextsScreen({ onBack }: Props) {
       haptic("success");
       qc.setQueryData(["admin", "texts"], data);
       qc.invalidateQueries({ queryKey: ["app-texts"] });
-      void showAlert("Тексты сохранены.");
+      void showAlert(tx("Тексты сохранены."));
     },
     onError: (e) => {
       haptic("error");
@@ -90,14 +92,14 @@ export default function AppTextsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Тексты приложения"
-      subtitle="Подписи, которые видит сотрудник"
+      title={tx("Тексты приложения")}
+      subtitle={tx("Подписи, которые видит сотрудник")}
       onBack={onBack}
     >
       <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
-        Меняй формулировки под свой ресторан. Пустое поле — вернуть исходный
-        текст. Кнопки и юридически значимые подписи здесь не редактируются:
-        их нельзя сломать случайной правкой.
+        {tx(
+          "Меняй формулировки под свой ресторан. Пустое поле — вернуть исходный текст. Кнопки и юридически значимые подписи здесь не редактируются: их нельзя сломать случайной правкой.",
+        )}
       </div>
 
       {q.isPending && <ListSkeleton rows={4} />}
@@ -132,7 +134,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                 <span className="text-2xs text-tg-hint">
                   {(draft[item.code] ?? "").trim()
                     ? `${(draft[item.code] ?? "").length}/600`
-                    : "по умолчанию"}
+                    : tx("по умолчанию")}
                 </span>
                 {(draft[item.code] ?? "").trim() &&
                   (draft[item.code] ?? "") !== item.value && (
@@ -142,7 +144,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                     className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
                     <InlineIcon name="refresh" />
-                    Как было
+                    {tx("Как было")}
                   </button>
                 )}
               </span>
@@ -164,16 +166,16 @@ export default function AppTextsScreen({ onBack }: Props) {
           >
             {save.isPending && <Spinner />}
             {save.isPending ? (
-              "Сохраняем…"
+              tx("Сохраняем…")
             ) : dirty ? (
               <>
                 <Icon name="save" size={16} />
-                Сохранить тексты
+                {tx("Сохранить тексты")}
               </>
             ) : (
               <>
                 <Icon name="check" size={16} />
-                Сохранено
+                {tx("Сохранено")}
               </>
             )}
           </button>

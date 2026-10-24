@@ -12,6 +12,7 @@ import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
+import { currentIntlLocale, currentLocale, tx as tr, useTx } from "@/i18n";
 /**
  * Журнал событий (админ): человекочитаемая история поручений.
  *
@@ -21,6 +22,7 @@ import SubScreen from "./SubScreen";
  * бывает, что человек реально доделал работу вне приложения.
  */
 export default function JournalScreen({ onBack }: { onBack: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin", "journal"],
@@ -30,7 +32,7 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
 
   const force = useMutation({
     mutationFn: ({ taskId, employeeId }: { taskId: number; employeeId: number }) =>
-      forceTaskDone(taskId, employeeId, "админка: зачтено вручную"),
+      forceTaskDone(taskId, employeeId, tx("админка: зачтено вручную")),
     onSuccess: () => {
       haptic("success");
       void qc.invalidateQueries({ queryKey: ["admin", "journal"] });
@@ -43,8 +45,8 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <SubScreen
-      title="Журнал событий"
-      subtitle="Поручения: кто что сделал и что отправил планировщик"
+      title={tx("Журнал событий")}
+      subtitle={tx("Поручения: кто что сделал и что отправил планировщик")}
       onBack={onBack}
     >
       {q.isLoading && <ListSkeleton rows={8} />}
@@ -54,7 +56,7 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
 
       {q.data && q.data.items.length === 0 && (
         <p className="py-8 text-center text-xs text-tg-hint">
-          Пока пусто: поручений ещё не было.
+          {tx("Пока пусто: поручений ещё не было.")}
         </p>
       )}
 
@@ -72,9 +74,13 @@ export default function JournalScreen({ onBack }: { onBack: () => void }) {
                   if (item.task_id === null || item.employee_id === null) return;
                   void (async () => {
                     const ok = await showConfirm(
-                      `Зачесть поручение «${item.task_title ?? ""}» выполненным за ${
-                        item.display_name ?? "сотрудника"
-                      }?`,
+                      tx(
+                        "Зачесть поручение «{task}» выполненным за {name}?",
+                        {
+                          task: item.task_title ?? "",
+                          name: item.display_name ?? tx("сотрудника"),
+                        },
+                      ),
                     );
                     if (ok) {
                       force.mutate({
@@ -103,6 +109,7 @@ function JournalRow({
   onForce: () => void;
   forceBusy: boolean;
 }) {
+  const { tx } = useTx();
   const canForce =
     item.kind === "failed" && item.task_id !== null && item.employee_id !== null;
   return (
@@ -115,13 +122,13 @@ function JournalRow({
         />
         <div className="min-w-0 flex-1">
           <div className="text-sm text-tg-text break-words">
-            <span className="font-medium">{item.display_name ?? "Система"}</span>{" "}
+            <span className="font-medium">{item.display_name ?? tx("Система")}</span>{" "}
             {item.text}
             {item.task_title ? ` «${item.task_title}»` : ""}
           </div>
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
             <span>{formatMoment(item.at)}</span>
-            {item.is_system && <span>· автоматически</span>}
+            {item.is_system && <span>{tx("· автоматически")}</span>}
           </div>
         </div>
         {canForce && (
@@ -134,7 +141,7 @@ function JournalRow({
             }}
             className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
           >
-            Зачесть
+            {tx("Зачесть")}
           </button>
         )}
       </div>
@@ -144,13 +151,17 @@ function JournalRow({
 
 function dayLabel(iso: string): string {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "Без даты";
+  const locale = currentLocale();
+  if (Number.isNaN(date.getTime())) return tr(locale, "Без даты");
   const startOf = (value: Date) =>
     new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
   const diff = Math.round((startOf(new Date()) - startOf(date)) / 86_400_000);
-  if (diff === 0) return "Сегодня";
-  if (diff === 1) return "Вчера";
-  return date.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+  if (diff === 0) return tr(locale, "Сегодня");
+  if (diff === 1) return tr(locale, "Вчера");
+  return date.toLocaleDateString(currentIntlLocale(), {
+    day: "numeric",
+    month: "long",
+  });
 }
 
 function groupByDay(

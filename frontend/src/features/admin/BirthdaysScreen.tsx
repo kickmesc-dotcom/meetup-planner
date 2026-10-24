@@ -17,6 +17,7 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 import HolidaysCard from "./HolidaysCard";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
@@ -24,6 +25,7 @@ interface Props {
 type Draft = Omit<BirthdayRow, "display_name">;
 
 export default function BirthdaysScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ["admin", "birthdays"], queryFn: fetchBirthdays });
 
@@ -43,8 +45,8 @@ export default function BirthdaysScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Настройки"
-      subtitle="Дни рождения и праздники в одном месте"
+      title={tx("Настройки")}
+      subtitle={tx("Дни рождения и праздники в одном месте")}
       onBack={onBack}
     >
       <BirthdaysMasterSwitch />
@@ -78,6 +80,7 @@ export default function BirthdaysScreen({ onBack }: Props) {
 // ниже не теряются — это отдельный слой; при выключенном рубильнике бот молчит
 // независимо от них.
 function BirthdaysMasterSwitch() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const sched = useQuery({
     queryKey: ["admin", "scheduled"],
@@ -114,7 +117,7 @@ function BirthdaysMasterSwitch() {
           <TgToggle
             checked={enabled}
             disabled={save.isPending}
-            label={enabled ? "Все ДР-напоминания" : "Напоминания отключены"}
+            label={enabled ? tx("Все ДР-напоминания") : tx("Напоминания отключены")}
             onChange={(v) => {
               const next = structuredClone(sched.data!);
               next.birthdays.alerts_enabled = v;
@@ -122,8 +125,9 @@ function BirthdaysMasterSwitch() {
             }}
           />
           <div className="mt-1 text-xs text-tg-hint">
-            Глобальный рубильник — гасит все ДР-уведомления у всех участников.
-            Персональные галочки ниже при этом сохраняются.
+            {tx(
+              "Глобальный рубильник — гасит все ДР-уведомления у всех участников. Персональные галочки ниже при этом сохраняются.",
+            )}
           </div>
 
         </>
@@ -141,6 +145,7 @@ function BirthdaysForm({
   isPending: boolean;
   onSave: (items: Draft[]) => void;
 }) {
+  const { tx } = useTx();
   const [draft, setDraft] = useState<Map<number, Draft>>(() => toMap(rows));
 
   useEffect(() => {
@@ -185,7 +190,9 @@ function BirthdaysForm({
 
             <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-tg-hint">Дата рождения</span>
+                <span className="text-xs text-tg-hint">
+                  {tx("Дата рождения")}
+                </span>
                 <input
                   type="date"
                   value={d.bday ?? ""}
@@ -201,34 +208,34 @@ function BirthdaysForm({
                   size="sm"
                   checked={d.year_known}
                   onChange={(v) => patch(r.user_id, { year_known: v })}
-                  label="год известен"
+                  label={tx("год известен")}
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-1">
               <TgToggle
-                label="За месяц"
+                label={tx("За месяц")}
                 checked={d.remind_month}
                 onChange={(v) => patch(r.user_id, { remind_month: v })}
               />
               <TgToggle
-                label="За неделю"
+                label={tx("За неделю")}
                 checked={d.remind_week}
                 onChange={(v) => patch(r.user_id, { remind_week: v })}
               />
               <TgToggle
-                label="За день"
+                label={tx("За день")}
                 checked={d.remind_day}
                 onChange={(v) => patch(r.user_id, { remind_day: v })}
               />
               <TgToggle
-                label="В сам день (поздравление)"
+                label={tx("В сам день (поздравление)")}
                 checked={d.remind_on_day}
                 onChange={(v) => patch(r.user_id, { remind_on_day: v })}
               />
               <TgToggle
-                label="За неделю — намёк задать встречу"
+                label={tx("За неделю — намёк задать встречу")}
                 checked={d.remind_hint_week}
                 onChange={(v) => patch(r.user_id, { remind_hint_week: v })}
               />
@@ -248,16 +255,16 @@ function BirthdaysForm({
       >
         {isPending && <Spinner />}
         {isPending ? (
-          "Сохраняем…"
+          tx("Сохраняем…")
         ) : dirty ? (
           <>
             <Icon name="save" size={16} />
-            Сохранить
+            {tx("Сохранить")}
           </>
         ) : (
           <>
             <Icon name="check" size={16} />
-            Сохранено
+            {tx("Сохранено")}
           </>
         )}
       </button>

@@ -4,6 +4,7 @@ import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import ChevronToggle from "@/components/ChevronToggle";
 
+import { useTx } from "@/i18n";
 /**
  * Кнопки действий календаря: авто-подбор и опрос по встрече.
  *
@@ -11,6 +12,7 @@ import ChevronToggle from "@/components/ChevronToggle";
  * случайные реплики, а календарь — про смены и встречи.
  */
 export default function ActionBar() {
+  const { tx } = useTx();
   // H.2 (19.06 #2): панель схлопывается в строку со стрелкой — на телефоне
   // кнопки съедали четверть экрана. По умолчанию РАЗВЁРНУТА (как приветствие).
   const [open, setOpen] = useState(true);
@@ -34,7 +36,7 @@ export default function ActionBar() {
         aria-expanded={false}
         className="flex w-full items-center justify-center gap-1.5 border-t border-tg-secondary-bg bg-tg-bg px-2 py-2 text-xs text-tg-hint"
       >
-        <ChevronToggle open={false} /> Кнопки действий — развернуть
+        <ChevronToggle open={false} /> {tx("Кнопки действий — развернуть")}
       </button>
     );
   }
@@ -48,17 +50,17 @@ export default function ActionBar() {
           setOpen(false);
         }}
         aria-expanded
-        title="Свернуть кнопки действий"
+        title={tx("Свернуть кнопки действий")}
         className="col-span-full -mt-1 flex items-center justify-center gap-1 text-2xs text-tg-hint"
       >
-        <ChevronToggle open /> свернуть кнопки
+        <ChevronToggle open /> {tx("свернуть кнопки")}
       </button>
       <ActionBtn
         onClick={tap(() => setShowAuto(true))}
-        label="Авто-подбор"
+        label={tx("Авто-подбор")}
         primary
       />
-      <ActionBtn onClick={tap(() => setShowPoll(true))} label="Опрос" />
+      <ActionBtn onClick={tap(() => setShowPoll(true))} label={tx("Опрос")} />
     </div>
   );
 }

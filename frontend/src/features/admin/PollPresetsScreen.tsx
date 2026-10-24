@@ -12,6 +12,7 @@ import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
@@ -30,6 +31,7 @@ function isValid(p: PollPreset): boolean {
 }
 
 export default function PollPresetsScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin", "poll-presets"],
@@ -58,8 +60,8 @@ export default function PollPresetsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Пресеты времени"
-      subtitle="Что показывать при создании опроса / авто-подборе"
+      title={tx("Пресеты времени")}
+      subtitle={tx("Что показывать при создании опроса / авто-подборе")}
       onBack={onBack}
     >
       {q.isPending || !q.data ? (
@@ -93,7 +95,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
               className="rounded-tile bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
             >
               <Icon name="plus" size={14} className="mr-1 inline-block" />
-              слот
+              {tx("слот")}
             </button>
             <button
               type="button"
@@ -104,7 +106,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
               className="rounded-tile bg-tg-secondary-bg/70 px-3 py-2 text-sm text-tg-text"
             >
               <InlineIcon name="refresh" />
-              дефолт
+              {tx("дефолт")}
             </button>
           </div>
 
@@ -119,16 +121,16 @@ export default function PollPresetsScreen({ onBack }: Props) {
           >
             {save.isPending && <Spinner />}
             {save.isPending ? (
-              "Сохраняем…"
+              tx("Сохраняем…")
             ) : allValid ? (
               <>
                 <Icon name="save" size={16} />
-                Сохранить
+                {tx("Сохранить")}
               </>
             ) : (
               <>
                 <Icon name="alert" size={16} />
-                Проверь HH:MM
+                {tx("Проверь HH:MM")}
               </>
             )}
           </button>
@@ -153,6 +155,7 @@ function PresetRow({
   onChange: (p: PollPreset) => void;
   onRemove: () => void;
 }) {
+  const { tx } = useTx();
   const valid = isValid(preset);
   return (
     <section
@@ -179,7 +182,7 @@ function PresetRow({
             onRemove();
           }}
           className="rounded-tile bg-status-busy/20 px-2 py-2 text-status-busy"
-          aria-label="Удалить"
+          aria-label={tx("Удалить")}
         >
           <Icon name="close" size={14} />
         </button>

@@ -14,15 +14,16 @@ import { ListSkeleton } from "@/components/Skeleton";
 import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
+import { currentIntlLocale, currentLocale, tx as tr, useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
   onOpenTasks?: () => void;
 }
 
 function fmtDue(iso: string | null): string {
-  if (!iso) return "без срока";
+  if (!iso) return tr(currentLocale(), "без срока");
   try {
-    return new Date(iso).toLocaleString("ru-RU", {
+    return new Date(iso).toLocaleString(currentIntlLocale(), {
       day: "2-digit",
       month: "2-digit",
       hour: "2-digit",
@@ -34,6 +35,7 @@ function fmtDue(iso: string | null): string {
 }
 
 export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
+  const { tx } = useTx();
   const tasks = useQuery({
     queryKey: ["admin", "tasks", "attention"],
     queryFn: () => fetchAdminTasks(),
@@ -54,8 +56,8 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
 
   return (
     <SubScreen
-      title="Требует внимания"
-      subtitle="Просроченные поручения и открытые проблемы"
+      title={tx("Требует внимания")}
+      subtitle={tx("Просроченные поручения и открытые проблемы")}
       onBack={onBack}
     >
       {tasks.isPending || issues.isPending ? (
@@ -63,9 +65,11 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
       ) : problems === 0 ? (
         <section className="rounded-card bg-status-free/10 p-4 text-center">
           <Icon name="check" size={28} className="mx-auto mb-1 text-status-free" />
-          <div className="text-sm font-medium text-status-free">Всё под контролем</div>
+          <div className="text-sm font-medium text-status-free">
+            {tx("Всё под контролем")}
+          </div>
           <div className="mt-1 text-xs text-tg-hint">
-            Просроченных поручений нет, открытых проблем нет.
+            {tx("Просроченных поручений нет, открытых проблем нет.")}
           </div>
         </section>
       ) : (
@@ -87,7 +91,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
             <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">
-                  Поручения
+                  {tx("Поручения")}
                 </div>
                 {onOpenTasks && (
                   <button
@@ -95,13 +99,13 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                     onClick={onOpenTasks}
                     className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
                   >
-                    Открыть →
+                    {tx("Открыть →")}
                   </button>
                 )}
               </div>
               {overdue.length > 0 && (
                 <div className="text-xs text-status-busy">
-                  Просрочено: {overdue.length}
+                  {tx("Просрочено: {count}", { count: overdue.length })}
                 </div>
               )}
               <div className="divide-y divide-tg-bg/40 rounded-tile bg-tg-bg/40">
@@ -116,14 +120,17 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                     <div className="text-2xs text-tg-hint">
                       {t.assignments.length
                         ? t.assignments.map((a) => a.display_name).join(", ")
-                        : `Осталось ${Math.max(0, t.progress_total - t.progress_done)} из ${t.progress_total}`}
+                        : tx("Осталось {left} из {total}", {
+                            left: Math.max(0, t.progress_total - t.progress_done),
+                            total: t.progress_total,
+                          })}
                     </div>
                   </div>
                 ))}
               </div>
               {onReview.length > 0 && (
                 <div className="text-xs text-tg-hint">
-                  Ждут приёмки: {onReview.length}
+                  {tx("Ждут приёмки: {count}", { count: onReview.length })}
                 </div>
               )}
             </section>
@@ -133,11 +140,13 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
             <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-tg-text">
-                  Проблемы: {openIssues.length}
+                  {tx("Проблемы: {count}", { count: openIssues.length })}
                 </div>
                 {issues.data && issues.data.summary.attention > 0 && (
                   <span className="rounded-full bg-status-busy/15 px-2 py-0.5 text-2xs text-status-busy">
-                    срочных: {issues.data.summary.attention}
+                    {tx("срочных: {count}", {
+                      count: issues.data.summary.attention,
+                    })}
                   </span>
                 )}
               </div>
@@ -154,7 +163,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                       </span>
                     </div>
                     <div className="text-2xs text-tg-hint">
-                      {issue.department_name ?? "без отдела"}
+                      {issue.department_name ?? tx("без отдела")}
                       {issue.assignee_name ? ` · ${issue.assignee_name}` : ""}
                       {issue.age_hours >= 24
                         ? ` · висит ${Math.floor(issue.age_hours / 24)} дн`

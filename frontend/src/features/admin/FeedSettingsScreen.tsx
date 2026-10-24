@@ -15,11 +15,13 @@ import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
 
 export default function FeedSettingsScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
 
   const q = useQuery({
@@ -47,8 +49,8 @@ export default function FeedSettingsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Вид ленты"
-      subtitle="Компактный (новый) / классический"
+      title={tx("Вид ленты")}
+      subtitle={tx("Компактный (новый) / классический")}
       onBack={onBack}
     >
       {q.isError && (
@@ -62,19 +64,21 @@ export default function FeedSettingsScreen({ onBack }: Props) {
         <div className="flex items-center gap-2">
           <Icon name="sparkles" size={18} className="text-tg-link" />
           <span className="text-sm font-semibold text-tg-text">
-            Компактный вид
+            {tx("Компактный вид")}
           </span>
         </div>
         <div className="text-xs text-tg-hint">
-          Под событием смены — миниатюры участников и бейдж «+XP». Плотнее по
-          вертикали и без отдельных блоков на каждую строку. Выключено —
-          классический вид с карточкой на событие.
+          {tx(
+            "Под событием смены — миниатюры участников и бейдж «+XP». Плотнее по вертикали и без отдельных блоков на каждую строку. Выключено — классический вид с карточкой на событие.",
+          )}
         </div>
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="text-sm text-tg-text">
-            Включён
+            {tx("Включён")}
             {q.isPending && (
-              <span className="ml-2 text-xs text-tg-hint">загрузка…</span>
+              <span className="ml-2 text-xs text-tg-hint">
+                {tx("загрузка…")}
+              </span>
             )}
           </div>
           <Switch
@@ -87,7 +91,7 @@ export default function FeedSettingsScreen({ onBack }: Props) {
           />
         </div>
         <div className="text-2xs text-tg-hint">
-          Влияет на ленту у всех участников. Откат — переключить тумблер обратно.
+          {tx("Влияет на ленту у всех участников. Откат — переключить тумблер обратно.")}
         </div>
       </section>
     </SubScreen>
