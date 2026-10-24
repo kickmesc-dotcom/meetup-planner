@@ -64,18 +64,6 @@ const PENDING = new Set<string>([
   "features/admin/SpaceRestartScreen.tsx",
   "features/admin/SubScreen.tsx",
   "features/admin/TrainingPlanScreen.tsx",
-  "features/calendar/BirthdayPopover.tsx",
-  "features/calendar/CalendarView.tsx",
-  "features/calendar/NavBar.tsx",
-  "features/calendar/ParticipantRow.tsx",
-  "features/calendar/views/MonthView.tsx",
-  "features/calendar/views/StripView.tsx",
-  "features/calendar/views/TimelineNavBar.tsx",
-  "features/calendar/views/TimelineView.tsx",
-  "features/editor/RangeEditorSheet.tsx",
-  "features/meetings/MeetingsPollsScreen.tsx",
-  "features/meetings/MeetingsScreen.tsx",
-  "features/polls/PollsScreen.tsx",
 ]);
 
 const CYRILLIC = /[А-Яа-яЁё]/;
@@ -149,14 +137,16 @@ describe("перевод: покрытие", () => {
   });
 
   it("список непереведённого не растёт", () => {
-    // Ратчет: 38 файлов на 24.10.2026 (было 71 → 68 → 49 → 38). Закрыта вся
-    // смена сотрудника (передача, табель и шаблон, проблемы, стандарты,
+    // Ратчет: 26 файлов на 24.10.2026 (было 71 → 68 → 49 → 38 → 26). Закрыта
+    // вся смена сотрудника (передача, табель и шаблон, проблемы, стандарты,
     // обучение, профиль, карточка, материалы, ссылки, знакомство, обратная
-    // связь, push, веб-версия, пул) и общее: App, каркас ПК, нижняя полоса,
-    // рельс сводки, ошибка, фото, лайтбокс, прогресс, плашка проверки, статусы
-    // календаря. Перевод экрана — минус строка отсюда и минус единица в
-    // пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(38);
+    // связь, push, веб-версия, пул), общее (App, каркас ПК, нижняя полоса,
+    // рельс сводки, ошибка, фото, лайтбокс, прогресс, плашка проверки) и
+    // календарь со встречами: сетки и плашки, редактор доступности, дни
+    // рождения, встречи, опросы, названия месяцев и дней недели. Перевод
+    // экрана — минус строка отсюда и минус единица в пределе, а не «перевод» на
+    // словах.
+    expect(PENDING.size).toBeLessThanOrEqual(26);
   });
 
   it("английский словарь без пустых значений", () => {

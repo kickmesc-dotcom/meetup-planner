@@ -5,10 +5,11 @@ import type { BirthdayCalendarEntry } from "@/api/birthdays";
 import { useUI } from "@/store/ui";
 import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
+import { useTx } from "@/i18n";
 import {
   buildMonthGrid,
-  ruMonthFull,
-  ruWeekdayShort,
+  monthFull,
+  weekdayShort,
   summarizeDay,
 } from "../dateUtils";
 
@@ -90,6 +91,7 @@ function MonthBlock({
   bdayIndex: Map<string, BirthdayCalendarEntry[]>;
   onDayTap: (d: Date) => void;
 }) {
+  const { tx } = useTx();
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
   const totalUsers = users.length || 6;
@@ -97,12 +99,12 @@ function MonthBlock({
   return (
     <div className="px-3 mb-4">
       <div className="text-base font-semibold mb-2">
-        {ruMonthFull(monthAnchor.getMonth())} {monthAnchor.getFullYear()}
+        {monthFull(monthAnchor.getMonth())} {monthAnchor.getFullYear()}
       </div>
       <div className="grid grid-cols-7 gap-px text-2xs text-tg-hint mb-1">
         {[1, 2, 3, 4, 5, 6, 0].map((d) => (
           <div key={d} className="text-center uppercase">
-            {ruWeekdayShort(d)}
+            {weekdayShort(d)}
           </div>
         ))}
       </div>
@@ -137,7 +139,9 @@ function MonthBlock({
               onClick={() => onDayTap(d)}
               title={
                 bdayList
-                  ? `День рождения: ${bdayList.map((b) => b.display_name).join(", ")}`
+                  ? tx("День рождения: {names}", {
+                      names: bdayList.map((b) => b.display_name).join(", "),
+                    })
                   : undefined
               }
               className={[
@@ -155,7 +159,9 @@ function MonthBlock({
               {bdayList && bdayList.length > 0 && (
                 <span
                   role="button"
-                  aria-label={`День рождения ${bdayList.map((b) => b.display_name).join(", ")}`}
+                  aria-label={tx("День рождения {names}", {
+                    names: bdayList.map((b) => b.display_name).join(", "),
+                  })}
                   onClick={(e) => {
                     e.stopPropagation();
                     haptic("selection");

@@ -22,7 +22,9 @@ import { humanizeApiError } from "@/api/client";
 import { Spinner } from "@/components/Spinner";
 import Icon from "@/components/Icon";
 
+import { useTx } from "@/i18n";
 export default function BirthdayPopover() {
+  const { tx } = useTx();
   const popover = useUI((s) => s.birthdayPopover);
   const setPopover = useUI((s) => s.setBirthdayPopover);
   const setPollSheet = useUI((s) => s.setShowPollSheet);
@@ -55,8 +57,8 @@ export default function BirthdayPopover() {
       haptic("success");
       void showAlert(
         resp.signed
-          ? "Запостил в чат с подписью от тебя."
-          : "Запостил в чат от лица бота.",
+          ? tx("Запостил в чат с подписью от тебя.")
+          : tx("Запостил в чат от лица бота."),
       );
     },
     onError: (e) => {
@@ -76,7 +78,9 @@ export default function BirthdayPopover() {
     haptic("selection");
     setPresetDate(popover.date);
     // P2.4.c: get-together контекст — вопрос опроса сразу про ДР.
-    setPresetQuestion(`Собираемся на ДР ${popover.displayName}?`);
+    setPresetQuestion(
+      tx("Собираемся на ДР {name}?", { name: popover.displayName }),
+    );
     setPopover(null);
     setGreeting(null);
     setPollSheet(true);
@@ -87,10 +91,10 @@ export default function BirthdayPopover() {
     try {
       await navigator.clipboard.writeText(greeting);
       haptic("success");
-      void showAlert("Скопировано в буфер.");
+      void showAlert(tx("Скопировано в буфер."));
     } catch {
       haptic("error");
-      void showAlert("Не получилось скопировать — выдели текст вручную.");
+      void showAlert(tx("Не получилось скопировать — выдели текст вручную."));
     }
   };
 
@@ -99,8 +103,8 @@ export default function BirthdayPopover() {
     haptic("selection");
     const ok = await showConfirm(
       signed
-        ? "Бот запостит этот текст в чат и подпишет, что поздравил — ты. Отправляем?"
-        : "Бот запостит этот текст в чат от своего лица. Отправляем?",
+        ? tx("Бот запостит этот текст в чат и подпишет, что поздравил — ты. Отправляем?")
+        : tx("Бот запостит этот текст в чат от своего лица. Отправляем?"),
     );
     if (!ok) return;
     postMut.mutate(signed);
@@ -124,7 +128,7 @@ export default function BirthdayPopover() {
             type="button"
             onClick={close}
             className="grid min-h-11 min-w-11 place-items-center text-tg-hint"
-            aria-label="Закрыть"
+            aria-label={tx("Закрыть")}
           >
             <Icon name="close" size={18} />
           </button>
@@ -139,7 +143,7 @@ export default function BirthdayPopover() {
           >
             {greetingMut.isPending && <Spinner size={14} />}
             <Icon name="sparkles" size={16} />
-            Креативное поздравление
+            {tx("Креативное поздравление")}
           </button>
 
           {greeting && (
@@ -157,7 +161,7 @@ export default function BirthdayPopover() {
                   className="rounded-tile bg-tg-button/80 text-tg-button-text text-xs px-2 py-1"
                 >
                   <Icon name="copy" size={14} className="mr-1 inline-block align-[-2px]" />
-                  Скопировать
+                  {tx("Скопировать")}
                 </button>
                 <button
                   type="button"
@@ -165,7 +169,7 @@ export default function BirthdayPopover() {
                   className="rounded-tile bg-tg-secondary-bg text-tg-text text-xs px-2 py-1"
                 >
                   <Icon name="refresh" size={14} className="mr-1 inline-block align-[-2px]" />
-                  Ещё вариант
+                  {tx("Ещё вариант")}
                 </button>
               </div>
               {/* GHG8 P2.4: публикация в группу. Кнопки доступны только когда
@@ -179,7 +183,7 @@ export default function BirthdayPopover() {
                 >
                   {postMut.isPending && <Spinner size={10} />}
                   <Icon name="bot" size={14} />
-                  Пост от лица бота
+                  {tx("Пост от лица бота")}
                 </button>
                 <button
                   type="button"
@@ -188,7 +192,7 @@ export default function BirthdayPopover() {
                   className="rounded-tile bg-tg-secondary-bg text-tg-text text-xs px-2 py-1 disabled:opacity-60"
                 >
                   <Icon name="edit" size={14} className="mr-1 inline-block align-[-2px]" />
-                  Пост от своего имени
+                  {tx("Пост от своего имени")}
                 </button>
               </div>
             </div>
@@ -200,7 +204,7 @@ export default function BirthdayPopover() {
             className="mt-1 rounded-tile bg-tg-secondary-bg text-tg-text py-2 px-3 text-sm font-medium active:scale-[0.98]"
           >
             <Icon name="calendar" size={15} className="mr-1 inline-block align-[-2px]" />
-            Назначить встречу
+            {tx("Назначить встречу")}
           </button>
         </div>
       </div>

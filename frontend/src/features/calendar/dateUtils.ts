@@ -357,27 +357,48 @@ export function statusLabelShort(s: 1 | 2 | 3): string {
   return tx(locale, s === 1 ? "своб." : s === 2 ? "может" : "зан.");
 }
 
-/** Вспомогательный: «1 апреля» или «1 апр» в ru-локали без подключения локали
- * для year-grid (там нужно строго коротко). */
-const RU_MONTHS_SHORT = [
-  "янв", "фев", "мар", "апр", "май", "июн",
-  "июл", "авг", "сен", "окт", "ноя", "дек",
-];
-const RU_MONTHS_FULL = [
-  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
-];
-const RU_WEEKDAYS_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+/**
+ * Названия месяцев и дней недели для сетки календаря.
+ *
+ * Списки, а не `Intl` с `month: "long"`: сетка года и плашка дня стоят в узких
+ * ячейках, и падежи (`мая`) там не нужны, зато важно, чтобы регистр и точки
+ * были такими же, как раньше в русском интерфейсе. Английский — отдельным
+ * списком, тоже без падежей.
+ */
+const MONTHS_SHORT: Record<"ru" | "en", string[]> = {
+  ru: [
+    "янв", "фев", "мар", "апр", "май", "июн",
+    "июл", "авг", "сен", "окт", "ноя", "дек",
+  ],
+  en: [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ],
+};
+const MONTHS_FULL: Record<"ru" | "en", string[]> = {
+  ru: [
+    "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+    "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  ],
+  en: [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ],
+};
+const WEEKDAYS_SHORT: Record<"ru" | "en", string[]> = {
+  ru: ["пн", "вт", "ср", "чт", "пт", "сб", "вс"],
+  en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+};
 
-export function ruMonthShort(monthIndex: number): string {
-  return RU_MONTHS_SHORT[monthIndex] ?? "";
+export function monthShort(monthIndex: number): string {
+  return MONTHS_SHORT[currentLocale()][monthIndex] ?? "";
 }
-export function ruMonthFull(monthIndex: number): string {
-  return RU_MONTHS_FULL[monthIndex] ?? "";
+export function monthFull(monthIndex: number): string {
+  return MONTHS_FULL[currentLocale()][monthIndex] ?? "";
 }
-export function ruWeekdayShort(dayOfWeek: number): string {
-  // date-fns getDay(): 0=вс, 1=пн … — а нам нужно индекс при weekStartsOn=пн.
-  return RU_WEEKDAYS_SHORT[(dayOfWeek + 6) % 7] ?? "";
+export function weekdayShort(dayOfWeek: number): string {
+  // date-fns getDay(): 0=вс, 1=пн … — а нам нужен индекс при weekStartsOn=пн.
+  return WEEKDAYS_SHORT[currentLocale()][(dayOfWeek + 6) % 7] ?? "";
 }
 
 /** Заголовок текущего вида для NavBar: «8 мая 2026 · пятница», «Май 2026», «2026» и т.д. */
@@ -386,25 +407,25 @@ export function zoomTitle(zoom: ZoomLevel, anchor: Date): string {
   switch (zoom) {
     case "hour":
     case "day": {
-      const dow = ruWeekdayShort(a.getDay());
-      return `${a.getDate()} ${ruMonthShort(a.getMonth())} ${a.getFullYear()} · ${dow}`;
+      const dow = weekdayShort(a.getDay());
+      return `${a.getDate()} ${monthShort(a.getMonth())} ${a.getFullYear()} · ${dow}`;
     }
     case "week": {
       const ws = startOfWeek(a, WEEK_OPTS);
       const we = endOfWeek(a, WEEK_OPTS);
       const sameMonth = ws.getMonth() === we.getMonth();
       if (sameMonth) {
-        return `${ws.getDate()}–${we.getDate()} ${ruMonthShort(ws.getMonth())} ${ws.getFullYear()}`;
+        return `${ws.getDate()}–${we.getDate()} ${monthShort(ws.getMonth())} ${ws.getFullYear()}`;
       }
-      return `${ws.getDate()} ${ruMonthShort(ws.getMonth())} – ${we.getDate()} ${ruMonthShort(we.getMonth())} ${we.getFullYear()}`;
+      return `${ws.getDate()} ${monthShort(ws.getMonth())} – ${we.getDate()} ${monthShort(we.getMonth())} ${we.getFullYear()}`;
     }
     case "month":
-      return `${ruMonthFull(a.getMonth())} ${a.getFullYear()}`;
+      return `${monthFull(a.getMonth())} ${a.getFullYear()}`;
     case "threeMonths":
     case "sixMonths": {
       const w = windowForZoom(zoom, a);
       const last = addDays(w.end, -1);
-      return `${ruMonthShort(w.start.getMonth())} – ${ruMonthShort(last.getMonth())} ${last.getFullYear()}`;
+      return `${monthShort(w.start.getMonth())} – ${monthShort(last.getMonth())} ${last.getFullYear()}`;
     }
     case "year":
       return `${a.getFullYear()}`;

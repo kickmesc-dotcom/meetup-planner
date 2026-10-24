@@ -4,7 +4,9 @@ import { haptic } from "@/tg/webapp";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { zoomTitle } from "./dateUtils";
 
+import { useTx } from "@/i18n";
 export default function NavBar() {
+  const { tx } = useTx();
   const zoom = useUI((s) => s.zoom);
   const anchor = useUI((s) => s.anchorDate);
   const shift = useUI((s) => s.shiftAnchor);
@@ -23,7 +25,7 @@ export default function NavBar() {
           shift(-1);
         }}
         className="w-9 h-9 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text active:scale-95 transition-transform"
-        aria-label="назад"
+        aria-label={tx("назад")}
       >
         ‹
       </button>
@@ -38,7 +40,7 @@ export default function NavBar() {
             }}
             className="text-xs text-tg-link underline-offset-2 hover:underline"
           >
-            к сегодня
+            {tx("к сегодня")}
           </button>
         )}
       </div>
@@ -49,7 +51,7 @@ export default function NavBar() {
           shift(1);
         }}
         className="w-9 h-9 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text active:scale-95 transition-transform"
-        aria-label="вперёд"
+        aria-label={tx("вперёд")}
       >
         ›
       </button>

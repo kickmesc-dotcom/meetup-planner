@@ -8,6 +8,7 @@ import { haptic } from "@/tg/webapp";
 import { addDays, format, startOfDay } from "date-fns";
 import { InlineIcon } from "@/components/Icon";
 
+import { useTx } from "@/i18n";
 interface Props {
   rangeId: number | "new";
   windowStart: Date;
@@ -30,6 +31,7 @@ interface Props {
  *   Раньше были инверсные, что вводило в заблуждение (баг наследия).
  */
 export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId }: Props) {
+  const { tx } = useTx();
   const setEditing = useUI((s) => s.setEditingRangeId);
   const qc = useQueryClient();
   const [range, setRange] = useState<AvailabilityRange | null>(null);
@@ -204,7 +206,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-tg-hint/40" />
 
-        {!range && <div className="text-tg-hint">Загрузка…</div>}
+        {!range && <div className="text-tg-hint">{tx("Загрузка…")}</div>}
 
         {range && (
           <>
@@ -247,7 +249,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
                 }}
                 className="mt-4 w-full rounded-card bg-status-busy/15 text-status-busy py-3 font-medium"
               >
-                Удалить
+                {tx("Удалить")}
               </button>
             )}
 
@@ -258,7 +260,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
               }}
               className="mt-2 w-full rounded-card bg-tg-button text-tg-button-text py-3 font-medium"
             >
-              Готово
+              {tx("Готово")}
             </button>
           </>
         )}
@@ -267,6 +269,8 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
   );
 }
 
+// Подписи — ключи словаря: переводятся в месте показа, а не при импорте
+// модуля (иначе они застыли бы на языке первой загрузки).
 const STATUSES: { value: Status; label: string; color: string }[] = [
   { value: 1, label: "Свободен", color: "bg-status-free" },
   { value: 2, label: "Может", color: "bg-status-maybe" },
@@ -282,6 +286,7 @@ function StatusPicker({
   onChange: (s: Status) => void;
   disabled?: boolean;
 }) {
+  const { tx } = useTx();
   return (
     <div className="flex gap-2 my-3">
       {STATUSES.map((s) => (
@@ -296,7 +301,7 @@ function StatusPicker({
             value === s.value ? "opacity-100" : "opacity-40",
           ].join(" ")}
         >
-          {s.label}
+          {tx(s.label)}
         </button>
       ))}
     </div>
@@ -334,10 +339,11 @@ function ConfidencePicker({
   onChange: (c: number) => void;
   disabled?: boolean;
 }) {
+  const { tx } = useTx();
   const labels = status === 2 ? CONFIDENCE_LABELS_MAYBE : CONFIDENCE_LABELS_DEFAULT;
   return (
     <div className="my-3">
-      <div className="text-xs text-tg-hint mb-1">Уверенность</div>
+      <div className="text-xs text-tg-hint mb-1">{tx("Уверенность")}</div>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((c) => (
           <button
@@ -350,7 +356,7 @@ function ConfidencePicker({
               value === c ? "bg-tg-button text-tg-button-text" : "bg-tg-secondary-bg",
             ].join(" ")}
           >
-            {labels[c]}
+            {tx(labels[c])}
           </button>
         ))}
       </div>
@@ -376,6 +382,7 @@ function TimePicker({
   onAllDayToggle: (v: boolean) => void;
   onTimeChange: (kind: "start" | "end", value: string) => void;
 }) {
+  const { tx } = useTx();
   const startHm = format(new Date(startsAt), "HH:mm");
   const endHm = format(new Date(endsAt), "HH:mm");
   return (
@@ -390,7 +397,7 @@ function TimePicker({
         />
         <span className="text-sm">
           <InlineIcon name="clock" />
-          Конкретное время
+          {tx("Конкретное время")}
         </span>
       </label>
       {!allDay && (

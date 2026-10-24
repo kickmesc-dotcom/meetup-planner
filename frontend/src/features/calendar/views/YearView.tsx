@@ -5,7 +5,7 @@ import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import {
   buildMonthGrid,
-  ruMonthFull,
+  monthFull,
   summarizeDay,
 } from "../dateUtils";
 
@@ -42,7 +42,7 @@ export default function YearView({ anchor, ranges, users }: Props) {
             className="bg-tg-secondary-bg/40 rounded-card p-2 text-left active:scale-95 transition-transform"
           >
             <div className="text-xs font-semibold mb-1 capitalize">
-              {ruMonthFull(m.getMonth())}
+              {monthFull(m.getMonth())}
             </div>
             <MiniMonth monthAnchor={m} ranges={ranges} users={users} />
           </button>

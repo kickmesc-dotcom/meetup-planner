@@ -4,6 +4,7 @@ import type { User } from "@/types";
 import MeetingsScreen from "./MeetingsScreen";
 import PollsScreen from "@/features/polls/PollsScreen";
 
+import { useTx } from "@/i18n";
 /**
  * Э21: «Встречи и опросы» — одна вкладка вместо двух.
  *
@@ -20,6 +21,7 @@ export default function MeetingsPollsScreen({
   users: User[];
   meId: number;
 }) {
+  const { tx } = useTx();
   const [section, setSection] = useState<Section>("meetings");
 
   return (
@@ -28,12 +30,12 @@ export default function MeetingsPollsScreen({
         <SectionButton
           active={section === "meetings"}
           onClick={() => setSection("meetings")}
-          label="Встречи"
+          label={tx("Встречи")}
         />
         <SectionButton
           active={section === "polls"}
           onClick={() => setSection("polls")}
-          label="Опросы"
+          label={tx("Опросы")}
         />
       </div>
       {section === "meetings" ? (

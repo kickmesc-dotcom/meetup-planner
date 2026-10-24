@@ -11,6 +11,7 @@ import { haptic } from "@/tg/webapp";
 import RangePill from "./RangePill";
 import Icon from "@/components/Icon";
 
+import { useTx } from "@/i18n";
 interface Props {
   user: User;
   isMe: boolean;
@@ -50,6 +51,7 @@ export default function ParticipantRow({
   visibleStart,
   visibleEnd,
 }: Props) {
+  const { tx } = useTx();
   const setEditing = useUI((s) => s.setEditingRangeId);
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
   const qc = useQueryClient();
@@ -264,14 +266,22 @@ export default function ParticipantRow({
                   }
                   aria-label={
                     fill
-                      ? `${statusLabel(fill.status)}, уверенность ${fill.confidence}/5${hasPartial ? " (часть дня)" : ""}`
+                      ? tx("{status}, уверенность {level}/5{partial}", {
+                          status: statusLabel(fill.status),
+                          level: fill.confidence,
+                          partial: hasPartial ? tx(" (часть дня)") : "",
+                        })
                       : `day ${i}`
                   }
                   title={
                     fill
-                      ? `${statusLabel(fill.status)} · уверенность ${fill.confidence}/5${hasPartial ? " · часть дня" : ""}`
+                      ? tx("{status} · уверенность {level}/5{partial}", {
+                          status: statusLabel(fill.status),
+                          level: fill.confidence,
+                          partial: hasPartial ? tx(" · часть дня") : "",
+                        })
                       : !covered
-                        ? "Не отмечено — считается занятым"
+                        ? tx("Не отмечено — считается занятым")
                         : undefined
                   }
                 />
@@ -305,8 +315,12 @@ export default function ParticipantRow({
                 {bday && (
                   <button
                     type="button"
-                    aria-label={`День рождения ${user.display_name}`}
-                    title={`День рождения: ${user.display_name}`}
+                    aria-label={tx("День рождения {name}", {
+                      name: user.display_name,
+                    })}
+                    title={tx("День рождения: {name}", {
+                      name: user.display_name,
+                    })}
                     onClick={(e) => {
                       e.stopPropagation();
                       haptic("selection");

@@ -4,6 +4,7 @@ import { haptic } from "@/tg/webapp";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { InlineIcon } from "@/components/Icon";
 
+import { useTx } from "@/i18n";
 /**
  * GHG6 P3 CL13 + CL6.b + CL5: нижняя плашка управления для TimelineView.
  *
@@ -31,6 +32,8 @@ const PRESET_CELL_WIDTH: Record<"day" | "week" | "month", number> = {
   month: 28, // ~30 дней
 };
 
+// Подписи — ключи словаря: переводятся в месте показа (`tx(p.label)`),
+// иначе список пришлось бы собирать внутри компонента.
 const PRESETS: Array<{ z: ZoomLevel; label: string }> = [
   { z: "day", label: "День" },
   { z: "week", label: "Неделя" },
@@ -45,6 +48,7 @@ interface Props {
 }
 
 export default function TimelineNavBar({ isOnToday }: Props) {
+  const { tx } = useTx();
   const zoom = useUI((s) => s.zoom);
   const setZoom = useUI((s) => s.setZoom);
   const shift = useUI((s) => s.shiftAnchor);
@@ -71,7 +75,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
     <div
       className="border-t border-tg-secondary-bg/80 bg-tg-bg px-2 py-2 flex flex-col gap-2"
       role="toolbar"
-      aria-label="Управление календарём"
+      aria-label={tx("Управление календарём")}
     >
       <div className="flex items-center gap-2">
         <NavBtn
@@ -80,7 +84,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
             shift(-1);
           }}
           label="←"
-          aria="Назад"
+          aria={tx("Назад")}
         />
         <div className="flex-1 grid grid-cols-5 gap-1">
           {PRESETS.map((p) => {
@@ -97,7 +101,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
                     : "bg-tg-secondary-bg text-tg-text",
                 ].join(" ")}
               >
-                {p.label}
+                {tx(p.label)}
               </button>
             );
           })}
@@ -108,7 +112,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
             shift(1);
           }}
           label="→"
-          aria="Вперёд"
+          aria={tx("Вперёд")}
         />
       </div>
 
@@ -130,7 +134,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
             }}
             onPointerUp={() => haptic("light")}
             className="flex-1 accent-tg-link"
-            aria-label="Зум таймлайна"
+            aria-label={tx("Зум таймлайна")}
           />
           <button
             type="button"
@@ -139,9 +143,9 @@ export default function TimelineNavBar({ isOnToday }: Props) {
               setCellWidth(null);
             }}
             className="text-2xs text-tg-link active:opacity-70"
-            title="Авто-ширина по контейнеру"
+            title={tx("Авто-ширина по контейнеру")}
           >
-            авто
+            {tx("авто")}
           </button>
         </div>
       )}
@@ -163,7 +167,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
           ].join(" ")}
         >
           <InlineIcon name="pin" />
-          К сегодня
+          {tx("К сегодня")}
         </motion.button>
         {/* GHG11(12): эта плашка — постоянный «верх» календаря в режиме
             таймлайна (NavBar там не рисуется), поэтому тема живёт здесь. */}

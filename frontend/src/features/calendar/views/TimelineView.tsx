@@ -2,10 +2,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { addDays, format, isToday, isWeekend, startOfDay } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
 import type { BirthdayCalendarEntry } from "@/api/birthdays";
-import { ruWeekdayShort } from "../dateUtils";
+import { weekdayShort } from "../dateUtils";
 import ParticipantRow from "../ParticipantRow";
 import { useUI } from "@/store/ui";
 
+import { useTx } from "@/i18n";
 /**
  * GHG6 P3 — горизонтальный таймлайн-вид календаря.
  *
@@ -54,6 +55,7 @@ export default function TimelineView({
   birthdays = [],
   isPending,
 }: Props) {
+  const { tx } = useTx();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // CL6.a: автоматический cellWidth — стартовое предположение 56, потом
   // ResizeObserver подгоняет под фактическую ширину контейнера.
@@ -178,7 +180,9 @@ export default function TimelineView({
           />
         ))}
         {isPending && (
-          <div className="p-3 text-center text-xs text-tg-hint">Загрузка…</div>
+          <div className="p-3 text-center text-xs text-tg-hint">
+            {tx("Загрузка…")}
+          </div>
         )}
       </div>
     </div>
@@ -239,7 +243,7 @@ function TimelineHeader({
             ].join(" ")}
           >
             <div className="text-2xs uppercase tracking-wide text-tg-hint">
-              {ruWeekdayShort(d.getDay())}
+              {weekdayShort(d.getDay())}
             </div>
             <div className="text-sm leading-none">
               {showMonth ? format(d, "d.MM") : d.getDate()}

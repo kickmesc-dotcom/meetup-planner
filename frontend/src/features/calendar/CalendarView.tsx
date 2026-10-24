@@ -23,6 +23,7 @@ import MonthView from "./views/MonthView";
 import YearView from "./views/YearView";
 import AllYearsView from "./views/AllYearsView";
 
+import { useTx } from "@/i18n";
 interface Props {
   users: User[];
   meId: number;
@@ -250,13 +251,14 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
 }
 
 function GestureHint({ edge }: { edge: "left" | "right" | "in" | "out" | null }) {
+  const { tx } = useTx();
   if (edge === null) return null;
   const common =
     "pointer-events-none absolute z-30 flex items-center justify-center rounded-full bg-tg-button/85 text-tg-button-text shadow-lg transition-opacity";
   if (edge === "left" || edge === "right") {
     const side = edge === "left" ? "right-3" : "left-3";
     const arrow = edge === "left" ? "›" : "‹";
-    const label = edge === "left" ? "вперёд" : "назад";
+    const label = tx(edge === "left" ? "вперёд" : "назад");
     return (
       <div
         className={`${common} ${side} top-1/2 -translate-y-1/2 h-12 w-12 text-2xl font-bold fade-in-soft`}
@@ -267,7 +269,7 @@ function GestureHint({ edge }: { edge: "left" | "right" | "in" | "out" | null })
     );
   }
   const icon = edge === "in" ? "+" : "−";
-  const label = edge === "in" ? "детальнее" : "общий вид";
+  const label = tx(edge === "in" ? "детальнее" : "общий вид");
   return (
     <div        className={`${common} left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-14 w-14 text-3xl font-bold fade-in-soft`}
       title={label}

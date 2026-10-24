@@ -1,18 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { enGB, ru } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { fetchPolls, type Poll } from "@/api/meetings";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import type { User } from "@/types";
 
+import { currentLocale, useTx } from "@/i18n";
 interface Props {
   users: User[];
   meId: number;
 }
 
-export default function PollsScreen({ users, meId }: Props) {
+export default function PollsScreen({ users }: Props) {
+  const { tx } = useTx();
   const polls = useQuery({
     queryKey: ["polls"],
     queryFn: fetchPolls,
@@ -30,10 +32,11 @@ export default function PollsScreen({ users, meId }: Props) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <Icon name="clipboard" size={34} className="mb-2 text-tg-hint" />
-        <div className="text-tg-hint">Опросов пока не было.</div>
+        <div className="text-tg-hint">{tx("Опросов пока не было.")}</div>
         <div className="text-xs text-tg-hint mt-2">
-          Запусти из «Календаря»: авто-подбор → опрос — бот опубликует его в
-          чате.
+          {tx(
+            "Запусти из «Календаря»: авто-подбор → опрос — бот опубликует его в чате.",
+          )}
         </div>
       </div>
     );
@@ -42,21 +45,14 @@ export default function PollsScreen({ users, meId }: Props) {
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-3">
       {list.map((p) => (
-        <PollCard key={p.id} poll={p} users={users} meId={meId} />
+        <PollCard key={p.id} poll={p} users={users} />
       ))}
     </div>
   );
 }
 
-function PollCard({
-  poll,
-  users,
-  meId,
-}: {
-  poll: Poll;
-  users: User[];
-  meId: number;
-}) {
+function PollCard({ poll, users }: { poll: Poll; users: User[] }) {
+  const { tx } = useTx();
   const usersById = new Map(users.map((u) => [u.id, u]));
   const totalVotes = poll.options.reduce((s, o) => s + o.voter_user_ids.length, 0);
   const closesAt = poll.closes_at ? new Date(poll.closes_at) : null;
@@ -83,8 +79,10 @@ function PollCard({
               <>
                 {" · "}
                 {isClosed
-                  ? "закрыт"
-                  : `до ${format(closesAt, "d MMM HH:mm", { locale: ru })}`}
+                  ? tx("закрыт")
+                  : tx("до {when}", {
+                      when: format(closesAt, "d MMM HH:mm", { locale: currentLocale() === "en" ? enGB : ru }),
+                    })}
               </>
             )}
           </div>
@@ -97,7 +95,7 @@ function PollCard({
               : "bg-status-free/15 text-status-free",
           ].join(" ")}
         >
-          {isClosed ? <Icon name="lock" size={12} /> : "идёт"}
+          {isClosed ? <Icon name="lock" size={12} /> : tx("идёт")}
         </div>
       </div>
 
@@ -133,7 +131,7 @@ function PollCard({
                       />
                     )}
                     {o.label ??
-                      format(new Date(o.starts_at), "d MMM HH:mm", { locale: ru })}
+                      format(new Date(o.starts_at), "d MMM HH:mm", { locale: currentLocale() === "en" ? enGB : ru })}
                   </div>
                   {o.voter_user_ids.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap gap-1">
@@ -172,12 +170,12 @@ function PollCard({
 
       {poll.my_vote_option_id == null && !isClosed && (
         <div className="mt-2 text-xs text-tg-hint">
-          Голосуй прямо в Telegram-чате — результат подтянется сюда.
+          {tx("Голосуй прямо в Telegram-чате — результат подтянется сюда.")}
         </div>
       )}
       {poll.my_vote_option_id != null && (
         <div className="mt-2 text-xs text-tg-link">
-          Твой голос учтён{usersById.get(meId) ? "" : ""}.
+          {tx("Твой голос учтён.")}
         </div>
       )}
     </motion.div>
@@ -185,6 +183,9 @@ function PollCard({
 }
 
 function pluralVotes(n: number): string {
+  // В английском две формы, в русском три — поэтому ветки по языку, а не
+  // перевод строки с числом: «2 голоса» и «2 votes» склоняются по-разному.
+  if (currentLocale() === "en") return n === 1 ? "vote" : "votes";
   const m100 = n % 100;
   const m10 = n % 10;
   if (m100 >= 11 && m100 <= 14) return "голосов";

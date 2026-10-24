@@ -1,9 +1,10 @@
 import { format, isToday, isWeekend, startOfDay } from "date-fns";
 import type { AvailabilityRange, User } from "@/types";
 import type { BirthdayCalendarEntry } from "@/api/birthdays";
-import { buildDaysWindow, ruWeekdayShort } from "../dateUtils";
+import { buildDaysWindow, weekdayShort } from "../dateUtils";
 import ParticipantRow from "../ParticipantRow";
 
+import { useTx } from "@/i18n";
 interface Props {
   windowStart: Date;
   span: number;
@@ -23,6 +24,7 @@ export default function StripView({
   birthdays = [],
   isPending,
 }: Props) {
+  const { tx } = useTx();
   const days = buildDaysWindow(startOfDay(windowStart), span);
 
   return (
@@ -52,7 +54,7 @@ export default function StripView({
               ].join(" ")}
             >
               <div className="text-2xs uppercase tracking-wide text-tg-hint">
-                {ruWeekdayShort(d.getDay())}
+                {weekdayShort(d.getDay())}
               </div>
               <div className="text-sm leading-none">
                 {showMonth ? format(d, "d.MM") : d.getDate()}
@@ -77,7 +79,9 @@ export default function StripView({
           />
         ))}
         {isPending && (
-          <div className="p-3 text-center text-xs text-tg-hint">Загрузка…</div>
+          <div className="p-3 text-center text-xs text-tg-hint">
+            {tx("Загрузка…")}
+          </div>
         )}
       </div>
     </>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addMonths, format } from "date-fns";
-import { ru } from "date-fns/locale";
+import { enGB, ru } from "date-fns/locale";
 import { motion } from "framer-motion";
 import {
   cancelMeeting,
@@ -15,8 +15,11 @@ import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon, { InlineIcon } from "@/components/Icon";
 
+import { currentLocale, useTx } from "@/i18n";
 // P1.4: ответ на встречу — слово, а не эмодзи. В чипе у имени текст ещё и
 // читается скринридером, в отличие от картинки ОС.
+// Подписи — ключи словаря: переводятся в месте показа, а не при импорте
+// модуля.
 const RSVP_LABELS: Record<number, string> = {
   0: "—",
   1: "идёт",
@@ -30,6 +33,7 @@ interface Props {
 }
 
 export default function MeetingsScreen({ users, meId }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const now = new Date();
   const horizon = addMonths(now, 3);
@@ -97,9 +101,11 @@ export default function MeetingsScreen({ users, meId }: Props) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <Icon name="inbox" size={34} className="mb-2 text-tg-hint" />
-        <div className="text-tg-hint">Запланированных встреч пока нет.</div>
+        <div className="text-tg-hint">
+          {tx("Запланированных встреч пока нет.")}
+        </div>
         <div className="text-xs text-tg-hint mt-2">
-          Открой «Календарь» и запусти авто-подбор лучших слотов.
+          {tx("Открой «Календарь» и запусти авто-подбор лучших слотов.")}
         </div>
       </div>
     );
@@ -141,6 +147,7 @@ function Card({
   onRsvp: (rsvp: number) => void;
   onCancel: () => void;
 }) {
+  const { tx } = useTx();
   const start = new Date(meeting.starts_at);
   const end = new Date(meeting.ends_at);
   const my = meeting.my_rsvp;
@@ -156,8 +163,8 @@ function Card({
         <div className="min-w-0">
           <div className="text-base font-semibold truncate">{meeting.title}</div>
           <div className="text-xs text-tg-hint">
-            {format(start, "EEE d MMM, HH:mm", { locale: ru })} –{" "}
-            {format(end, "HH:mm", { locale: ru })}
+            {format(start, "EEE d MMM, HH:mm", { locale: currentLocale() === "en" ? enGB : ru })} –{" "}
+            {format(end, "HH:mm", { locale: currentLocale() === "en" ? enGB : ru })}
           </div>
           {meeting.location && (
             <div className="text-xs text-tg-hint mt-0.5">
@@ -182,7 +189,7 @@ function Card({
             <div
               key={u.id}
               className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs"
-              title={`${u.display_name}: ${RSVP_LABELS[rsvp]}`}
+              title={`${u.display_name}: ${tx(RSVP_LABELS[rsvp])}`}
             >
               <span
                 className="w-4 h-4 rounded-full overflow-hidden inline-flex items-center justify-center text-white text-3xs"
@@ -197,27 +204,27 @@ function Card({
               <span className="text-tg-text/90 truncate max-w-[60px]">
                 {u.display_name.split(/\s+/)[0]}
               </span>
-              <span>{RSVP_LABELS[rsvp]}</span>
+              <span>{tx(RSVP_LABELS[rsvp])}</span>
             </div>
           );
         })}
       </div>
 
       <div className="mt-3 flex gap-1.5">
-        <RsvpBtn label="Приду" active={my === 1} onClick={() => onRsvp(1)} />
-        <RsvpBtn label="Может" active={my === 2} onClick={() => onRsvp(2)} />
-        <RsvpBtn label="Нет" active={my === 3} onClick={() => onRsvp(3)} />
+        <RsvpBtn label={tx("Приду")} active={my === 1} onClick={() => onRsvp(1)} />
+        <RsvpBtn label={tx("Может")} active={my === 2} onClick={() => onRsvp(2)} />
+        <RsvpBtn label={tx("Нет")} active={my === 3} onClick={() => onRsvp(3)} />
       </div>
 
       {isCreator && (
         <button
           type="button"
           onClick={() => {
-            if (confirm("Отменить встречу?")) onCancel();
+            if (confirm(tx("Отменить встречу?"))) onCancel();
           }}
           className="mt-2 w-full min-h-11 rounded-tile bg-status-busy/15 px-3 text-xs font-medium text-status-busy"
         >
-          Отменить встречу
+          {tx("Отменить встречу")}
         </button>
       )}
     </motion.div>
@@ -250,6 +257,7 @@ function RsvpBtn({
 }
 
 function IcalSubscribeButton() {
+  const { tx } = useTx();
   const ical = useQuery({
     queryKey: ["meetings", "ical-url"],
     queryFn: fetchIcalUrl,
@@ -272,7 +280,7 @@ function IcalSubscribeButton() {
       className="w-full min-h-11 rounded-card bg-tg-secondary-bg/60 px-3 py-2 text-sm text-tg-text active:bg-tg-secondary-bg"
     >
       <Icon name="calendar" size={15} className="mr-1 inline-block align-[-2px]" />
-      Подписаться в системный календарь
+      {tx("Подписаться в системный календарь")}
     </button>
   );
 }

@@ -7,7 +7,6 @@ import { rangeToHourRect, statusPillBg, statusLabel } from "../dateUtils";
 import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
 import { haptic } from "@/tg/webapp";
-
 interface Props {
   day: Date;
   users: User[];
