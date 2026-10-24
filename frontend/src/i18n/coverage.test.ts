@@ -94,7 +94,6 @@ const PENDING = new Set<string>([
   "features/hr/MaterialsScreen.tsx",
   "features/hr/OnboardingScreen.tsx",
   "features/hr/PushCard.tsx",
-  "features/hr/ReviewScreen.tsx",
   "features/hr/StandardsScreen.tsx",
   "features/hr/TrainingScreen.tsx",
   "features/hr/WebVersionCard.tsx",
@@ -180,9 +179,9 @@ describe("перевод: покрытие", () => {
 
   it("список непереведённого не растёт", () => {
     // Ратчет: 68 файлов на 24.10.2026 (было 71: переведены чек-лист смены,
-    // отчёт смены и «Команда»). Перевод экрана — минус строка отсюда и минус
+    // отчёт смены, «Команда» и приёмка работ). Перевод экрана — минус строка отсюда и минус
     // единица в пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(68);
+    expect(PENDING.size).toBeLessThanOrEqual(67);
   });
 
   it("английский словарь без пустых значений", () => {

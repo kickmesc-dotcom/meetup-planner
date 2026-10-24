@@ -280,4 +280,24 @@ export const EN_CONTENT: Record<string, string> = {
     "Removes open tasks and open issues. Completed tasks, KPIs and submission history stay; the test pool is reset separately.",
   "Считаем…": "Counting…",
   "Сбросить текущую работу": "Reset current work",
+
+  // -------------------------------------------------------------- приёмка --
+  "Приёмка": "Work review",
+  "Назад к задачам": "Back to tasks",
+  "Работ на проверке нет": "Nothing waiting for review",
+  "Ждут приёмки: {count}": "Waiting for review: {count}",
+  "Всё принято": "All accepted",
+  "Когда сотрудник сдаст поручение с проверкой, оно появится здесь.":
+    "When someone submits a task that needs review, it shows up here.",
+  "сдано {count}": "submitted {count}",
+  "фотоотчёт": "photo report",
+  "Все, кто сдал": "Everyone who submitted",
+  "Часть: {part}": "Part: {part}",
+  "Сдано: {when}": "Submitted: {when}",
+  "На доработку": "Send back",
+  "Что переделать — коротко и по делу": "What to redo — short and to the point",
+  "Вернуть с комментарием": "Send back with a comment",
+  "один за всех": "one for all",
+  "каждый сам": "everyone on their own",
+  "части работы": "work parts",
 };

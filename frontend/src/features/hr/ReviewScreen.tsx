@@ -14,6 +14,7 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
+import { tx, useTx, type Locale } from "@/i18n";
 
 /**
  * Приёмка работы.
@@ -24,6 +25,7 @@ import { useUI } from "@/store/ui";
  * Возврат требует комментария: «переделай» без причины сотруднику бесполезно.
  */
 export default function ReviewScreen() {
+  const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const tasksQ = useQuery({
     queryKey: ["hr-admin-tasks"],
@@ -51,19 +53,19 @@ export default function ReviewScreen() {
             setTab("tasks");
           }}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
-          aria-label="Назад к задачам"
+          aria-label={tx("Назад к задачам")}
         >
           ‹
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
             <Icon name="checklist" size={16} />
-            Приёмка
+            {tx("Приёмка")}
           </div>
           <div className="text-xs text-tg-hint">
             {waiting.length === 0
-              ? "Работ на проверке нет"
-              : `Ждут приёмки: ${waiting.length}`}
+              ? tx("Работ на проверке нет")
+              : tx("Ждут приёмки: {count}", { count: waiting.length })}
           </div>
         </div>
       </header>
@@ -80,10 +82,12 @@ export default function ReviewScreen() {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Icon name="check" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
-              Всё принято
+              {tx("Всё принято")}
             </div>
             <div className="mt-1 max-w-[280px] text-xs text-tg-hint">
-              Когда сотрудник сдаст поручение с проверкой, оно появится здесь.
+              {tx(
+                "Когда сотрудник сдаст поручение с проверкой, оно появится здесь.",
+              )}
             </div>
           </div>
         )}
@@ -105,11 +109,11 @@ export default function ReviewScreen() {
   );
 }
 
-function fmtDue(iso: string | null): string {
-  if (!iso) return "без срока";
+function fmtDue(iso: string | null, locale: Locale): string {
+  if (!iso) return tx(locale, "без срока");
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "без срока";
-  return d.toLocaleString("ru-RU", {
+  if (Number.isNaN(d.getTime())) return tx(locale, "без срока");
+  return d.toLocaleString(locale === "en" ? "en-GB" : "ru-RU", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -129,6 +133,7 @@ function ReviewCard({
   onToggle: () => void;
   onDone: () => void;
 }) {
+  const { tx, locale } = useTx();
   const waiting = task.assignments.filter((a) => a.status === "on_review");
 
   return (
@@ -139,24 +144,24 @@ function ReviewCard({
             {task.title}
           </h2>
           <span className="shrink-0 rounded-full bg-status-maybe/20 px-2 py-0.5 text-xs text-status-maybe">
-            сдано {waiting.length}
+            {tx("сдано {count}", { count: waiting.length })}
           </span>
         </div>
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
           <span>
             <InlineIcon name="clock" />
-            {fmtDue(task.due_at)}
+            {fmtDue(task.due_at, locale)}
           </span>
           {task.progress_total > 1 && (
             <span>
               <InlineIcon name="team" />
-              {TASK_MODE_LABEL[task.mode]} · {task.progress_done} из{" "}
-              {task.progress_total}
+              {tx(TASK_MODE_LABEL[task.mode])} · {task.progress_done}{" "}
+              {tx("из {count}", { count: task.progress_total })}
             </span>
           )}
           {task.requires_photo && (
             <span>
-              <InlineIcon name="camera" /> фотоотчёт
+              <InlineIcon name="camera" /> {tx("фотоотчёт")}
             </span>
           )}
         </div>
@@ -195,6 +200,7 @@ function ReviewRow({
   assignment: HrAdminTaskAssignment | null;
   onDone: () => void;
 }) {
+  const { tx, locale } = useTx();
   const qc = useQueryClient();
   const [comment, setComment] = useState("");
   const [reworkOpen, setReworkOpen] = useState(false);
@@ -221,16 +227,20 @@ function ReviewRow({
   return (
     <div className="rounded-tile bg-tg-bg/60 p-2.5">
       <div className="text-xs font-medium text-tg-text">
-        {assignment ? assignment.display_name : "Все, кто сдал"}
+        {assignment ? assignment.display_name : tx("Все, кто сдал")}
       </div>
       {assignment?.part && (
         <div className="mt-0.5 text-xs text-tg-hint">
-          Часть: {assignment.part}
+          {tx("Часть: {part}", { part: assignment.part })}
         </div>
       )}
       {assignment?.done_at && (
         <div className="mt-0.5 text-xs text-tg-hint">
-          Сдано: {new Date(assignment.done_at).toLocaleString("ru-RU")}
+          {tx("Сдано: {when}", {
+            when: new Date(assignment.done_at).toLocaleString(
+              locale === "en" ? "en-GB" : "ru-RU",
+            ),
+          })}
         </div>
       )}
 
@@ -241,7 +251,7 @@ function ReviewRow({
           onClick={() => review.mutate(true)}
           className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
         >
-          Принять
+          {tx("Принять")}
         </button>
         <button
           type="button"
@@ -252,7 +262,7 @@ function ReviewRow({
           }}
           className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
         >
-          {reworkOpen ? "Отмена" : "На доработку"}
+          {reworkOpen ? tx("Отмена") : tx("На доработку")}
         </button>
       </div>
 
@@ -263,7 +273,7 @@ function ReviewRow({
             onChange={(e) => setComment(e.target.value)}
             rows={2}
             maxLength={500}
-            placeholder="Что переделать — коротко и по делу"
+            placeholder={tx("Что переделать — коротко и по делу")}
             className="w-full rounded-tile bg-tg-secondary-bg p-2 text-xs text-tg-text"
           />
           <button
@@ -272,7 +282,7 @@ function ReviewRow({
             onClick={() => review.mutate(false)}
             className="mt-1.5 min-h-9 w-full rounded-tile bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
           >
-            Вернуть с комментарием
+            {tx("Вернуть с комментарием")}
           </button>
         </div>
       )}
