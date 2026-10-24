@@ -1,3 +1,41 @@
+# 🛠️ Перевод: первая часть админки (ЗАДЕПЛЕНО)
+
+> **Запрос оператора:** «двигайся по плану, делая проверку чтобы ничего не было
+> пропущено; после каждого большого набора правок — пуш, коммит, деплой».
+
+## Что сделано (коммит `d50e93c`)
+
+11 файлов: вид ленты, интервалы напоминаний, праздники, журнал событий,
+«требует внимания», тексты приложения, вид календаря, дни рождения, пресеты
+опросов, оболочка подэкрана и панель действий.
+
+- `fmtDue` (AttentionScreen) и `dayLabel` (JournalScreen) живут вне
+  компонентов: хук там не поставить, поэтому они берут локаль из стора
+  (`currentLocale` + `tx(locale, …)`), а даты форматируют
+  `currentIntlLocale()`. Это ровно тот случай, для которого хелперы и
+  добавлялись.
+- Список непереведённого: 26 → 15 файлов.
+
+## Проверки
+
+- `npx vitest run` — **504 passed** (55 файлов); `tsc -b --noEmit` — чисто;
+  `npm run build` — собирается.
+- CF Pages `semitaskbot` → `1629831a.semitaskbot.pages.dev`, бандл
+  `index-86yusWOd.js`; в живом бандле найдены `Feed view`, `Compact view`,
+  `Event log`, `Everything under control`, `Time presets`, `Date of birth`,
+  `Action buttons`.
+- Бэкенд не менялся.
+
+## Что дальше
+
+15 файлов админки: `AdminScreen`, `AdminTasksScreen`, `EmployeesScreen`,
+`ChecklistSettingsScreen`, `NotificationsScreen`, `ProxyScreen`, `RosterTools`,
+`JobsQueueScreen`, `KpiScreen`, `InvitationsScreen`, `TrainingPlanScreen`,
+`SpaceRestartScreen`, `AutoPickSheet`, `PollSheet` и `api/access.ts`
+(там строка уходит на сервер — её не переводим).
+
+---
+
 # 📅 Перевод: календарь, встречи и опросы (ЗАДЕПЛЕНО)
 
 > **Запрос оператора:** «двигайся по плану, делая проверку чтобы ничего не было
