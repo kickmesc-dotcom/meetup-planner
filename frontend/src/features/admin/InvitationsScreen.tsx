@@ -18,6 +18,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { fetchDepartments } from "@/api/hr";
 import SubScreen from "./SubScreen";
 
 import { currentIntlLocale, useTx } from "@/i18n";
@@ -40,6 +41,10 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<OrgRole>("staff");
   const [days, setDays] = useState(7);
+  // Должность и отдел необязательны: без них ссылка остаётся обычной
+  // «ссылкой в чат смены», с ними человек входит сразу на своё место.
+  const [position, setPosition] = useState("");
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [fresh, setFresh] = useState<OrgInvitation | null>(null);
   const [copied, setCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
@@ -82,14 +87,29 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
   const refresh = () =>
     void qc.invalidateQueries({ queryKey: ["admin", "invitations"] });
 
+  const departments = useQuery({
+    queryKey: ["hr-departments"],
+    queryFn: fetchDepartments,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+
   const create = useMutation({
     mutationFn: () =>
-      createInvitation({ email: email.trim() || null, role, days }),
+      createInvitation({
+        email: email.trim() || null,
+        role,
+        days,
+        position: position.trim() || null,
+        department_id: departmentId,
+      }),
     onSuccess: (created) => {
       haptic("success");
       setFresh(created);
       setCopied(false);
       setEmail("");
+      setPosition("");
+      setDepartmentId(null);
       refresh();
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
@@ -250,6 +270,40 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
           </label>
         </div>
 
+        <div className="flex gap-2">
+          <label className="min-w-0 flex-1">
+            <span className="text-xs text-tg-hint">{tx("Должность (необязательно)")}</span>
+            <input
+              value={position}
+              onChange={(e) => setPosition(e.target.value)}
+              maxLength={120}
+              placeholder={tx("Например, «Бармен»")}
+              aria-label={tx("Должность в приглашении")}
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
+            />
+          </label>
+          <label className="w-40">
+            <span className="text-xs text-tg-hint">{tx("Отдел (необязательно)")}</span>
+            <select
+              aria-label={tx("Отдел в приглашении")}
+              value={departmentId ?? ""}
+              onChange={(e) =>
+                setDepartmentId(
+                  e.target.value ? Number(e.target.value) : null,
+                )
+              }
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+            >
+              <option value="">{tx("Без отдела")}</option>
+              {(departments.data ?? []).map((dep) => (
+                <option key={dep.id} value={dep.id}>
+                  {dep.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <button
           type="button"
           disabled={create.isPending}
@@ -319,6 +373,14 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
                           currentIntlLocale(),
                         ),
                       })}
+                      {row.position || row.department_name ? (
+                        <span>
+                          {" · "}
+                          {[row.position, row.department_name]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <button

@@ -236,3 +236,11 @@ class OrgInvitation(OrgScoped, Base):
         BigInteger, ForeignKey("users.id", ondelete="SET NULL")
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Преднастроенная должность и отдел. Ссылка может нести не только роль:
+    # руководитель уже знает, кем человек выходит, и не должен заставлять его
+    # выбирать это заново в первый день. Применяются при создании HR-профиля
+    # (`services.hr_access.ensure_employee`) — до этого профиля может не быть.
+    position: Mapped[str | None] = mapped_column(Text)
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )

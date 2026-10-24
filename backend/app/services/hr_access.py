@@ -121,6 +121,22 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
         role=role,
         onboarding_state=ONBOARDING_NEW,
     )
+    # Приглашение могло нести должность и отдел. Профиля до этого момента не
+    # было, поэтому применить их было некуда — делаем это здесь, один раз, при
+    # создании строки.
+    from app.db.org_models import OrgInvitation
+
+    invitation = await session.scalar(
+        select(OrgInvitation)
+        .where(
+            OrgInvitation.org_id == org_id,
+            OrgInvitation.accepted_by_user_id == user.id,
+        )
+        .order_by(OrgInvitation.accepted_at.desc())
+    )
+    if invitation is not None:
+        employee.position = invitation.position
+        employee.department_id = invitation.department_id
     session.add(employee)
     await session.flush()
     # Сотрудник без членства — это сотрудник, которого не видно ни в одной

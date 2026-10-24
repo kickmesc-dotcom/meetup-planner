@@ -45,6 +45,9 @@ TABLES = (
     "password_resets",
     # Регистрация через ручку сразу выписывает ссылку подтверждения адреса.
     "email_verifications",
+    # `ensure_employee` проверяет, не несло ли приглашение должность и отдел.
+    "departments",
+    "org_invitations",
 )
 
 PASSWORD = "correct-horse-battery"

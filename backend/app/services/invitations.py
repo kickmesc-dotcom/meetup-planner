@@ -78,8 +78,15 @@ async def create(
     role: str = "staff",
     email: str | None = None,
     days: int = INVITE_TTL_DAYS,
+    position: str | None = None,
+    department_id: int | None = None,
 ) -> tuple[OrgInvitation, str]:
-    """Выписать приглашение. Возвращает (строка, токен для ссылки)."""
+    """Выписать приглашение. Возвращает (строка, токен для ссылки).
+
+    Должность и отдел необязательны, но если указаны — попадут в HR-профиль
+    при первом входе: руководитель уже знает, кем человек выходит, и не должен
+    заставлять его выбирать это заново.
+    """
     if role not in ORG_ROLES:
         raise InvitationsError("bad_role")
     if days < 1 or days > MAX_TTL_DAYS:
@@ -103,6 +110,8 @@ async def create(
         token_hash=accounts.token_hash(token),
         created_by_user_id=created_by_id,
         expires_at=_now() + timedelta(days=days),
+        position=(position or "").strip()[:120] or None,
+        department_id=department_id,
     )
     session.add(row)
     await session.commit()
@@ -182,6 +191,18 @@ async def accept(
     # живёт в пригласившей организации. Без этого `ensure_employee` создал бы
     # профиль в первой по id — ровно та ошибка, от которой защищает шаг 2.2.
     set_org(org.id)
+
+    # Если профиль уже есть (человек раньше работал в этой организации или
+    # пришёл по второй ссылке), преднастроенные поля применяем сразу. Ветка
+    # «профиля ещё нет» живёт в `hr_access.ensure_employee`.
+    from app.services import hr_access
+
+    employee = await hr_access.get_employee(session, user.id)
+    if employee is not None and employee.org_id == org.id:
+        if row.position:
+            employee.position = row.position
+        if row.department_id is not None:
+            employee.department_id = row.department_id
 
     row.accepted_at = _now()
     row.accepted_by_user_id = user.id

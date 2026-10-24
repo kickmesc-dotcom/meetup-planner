@@ -23,6 +23,9 @@ vi.mock("@/tg/webapp", () => ({
   showAlert: vi.fn(() => Promise.resolve()),
   showConfirm: vi.fn(() => Promise.resolve(true)),
 }));
+vi.mock("@/api/hr", () => ({
+  fetchDepartments: vi.fn(() => Promise.resolve([])),
+}));
 vi.mock("@/api/orgs", () => ({
   fetchInvitations: vi.fn(),
   fetchCurrentOrg: vi.fn(() =>
@@ -116,6 +119,8 @@ describe("InvitationsScreen", () => {
       email: null,
       role: "staff",
       days: 7,
+      position: null,
+      department_id: null,
     });
   });
 

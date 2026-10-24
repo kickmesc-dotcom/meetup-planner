@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import AdminDep, CurrentUser, SessionDep, current_org
-from app.db.hr_models import Employee
+from app.db.hr_models import Department, Employee
 from app.db.models import User
 from app.db.org_models import (
     INDUSTRIES,
@@ -133,12 +133,18 @@ class InvitationIn(BaseModel):
     email: str | None = Field(default=None, max_length=255)
     role: str = Field(default="staff", max_length=16)
     days: int = Field(default=invitations.INVITE_TTL_DAYS, ge=1, le=invitations.MAX_TTL_DAYS)
+    # Необязательно: ссылка без должности — это нормальная «ссылка в чат смены».
+    position: str | None = Field(default=None, max_length=120)
+    department_id: int | None = None
 
 
 class InvitationOut(BaseModel):
     id: int
     email: str | None
     role: str
+    position: str | None = None
+    department_id: int | None = None
+    department_name: str | None = None
     created_at: str | None
     expires_at: str
     # Ссылка отдаётся один раз — в ответе на создание. В списке её нет: токен
@@ -152,6 +158,8 @@ class InvitationPreview(BaseModel):
     role: str
     email: str | None
     expires_at: str
+    position: str | None = None
+    department_name: str | None = None
 
 
 class AcceptOut(BaseModel):
@@ -165,13 +173,29 @@ def _iso(value) -> str | None:  # noqa: ANN001
     return value.isoformat() if value is not None else None
 
 
-def _out(
-    row, *, link: str | None = None, mail_sent: bool = False
-) -> InvitationOut:  # noqa: ANN001
+async def _department_name(
+    session: SessionDep, department_id: int | None
+) -> str | None:
+    if department_id is None:
+        return None
+    dept = await session.get(Department, department_id)
+    return dept.name if dept is not None else None
+
+
+async def _out(
+    session: SessionDep,
+    row,  # noqa: ANN001
+    *,
+    link: str | None = None,
+    mail_sent: bool = False,
+) -> InvitationOut:
     return InvitationOut(
         id=row.id,
         email=row.email,
         role=row.role,
+        position=row.position,
+        department_id=row.department_id,
+        department_name=await _department_name(session, row.department_id),
         created_at=_iso(row.created_at),
         expires_at=_iso(row.expires_at) or "",
         link=link,
@@ -394,7 +418,7 @@ async def list_invitations(
     session: SessionDep, org: OrgDep, _admin: AdminDep
 ) -> list[InvitationOut]:
     rows = await invitations.active(session, org.id)
-    return [_out(row) for row in rows]
+    return [await _out(session, row) for row in rows]
 
 
 @router.post(
@@ -409,6 +433,14 @@ async def create_invitation(
     org: OrgDep,
     _admin: AdminDep,
 ) -> InvitationOut:
+    if body.department_id is not None:
+        dept = await session.get(Department, body.department_id)
+        # Только свой отдел: чужой id создал бы приглашение в подразделение
+        # другой организации, а человек получил бы доступ к чужой структуре.
+        if dept is None or dept.org_id != org.id:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST, detail="department_not_found"
+            )
     try:
         row, token = await invitations.create(
             session,
@@ -417,6 +449,8 @@ async def create_invitation(
             role=body.role,
             email=body.email,
             days=body.days,
+            position=body.position,
+            department_id=body.department_id,
         )
     except invitations.InvitationsError as exc:
         _fail(exc)
@@ -435,7 +469,7 @@ async def create_invitation(
             log.warning(
                 "orgs.invite_mail_failed", error=str(exc), org_id=org.id
             )
-    return _out(row, link=link, mail_sent=mail_sent)
+    return await _out(session, row, link=link, mail_sent=mail_sent)
 
 
 @router.delete(
@@ -465,6 +499,8 @@ async def preview_invitation(token: str, session: SessionDep) -> InvitationPrevi
         role=row.role,
         email=row.email,
         expires_at=_iso(row.expires_at) or "",
+        position=row.position,
+        department_name=await _department_name(session, row.department_id),
     )
 
 

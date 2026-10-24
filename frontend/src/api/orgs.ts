@@ -29,6 +29,10 @@ export interface OrgInvitation {
   id: number;
   email: string | null;
   role: OrgRole;
+  /** Преднастроенная должность: попадёт в профиль при первом входе. */
+  position?: string | null;
+  department_id?: number | null;
+  department_name?: string | null;
   created_at: string | null;
   expires_at: string;
   /** Ссылка приходит только в ответе на создание: в базе лежит её хеш. */
@@ -41,6 +45,8 @@ export interface InvitationPreview {
   role: OrgRole;
   email: string | null;
   expires_at: string;
+  position?: string | null;
+  department_name?: string | null;
 }
 
 export interface AcceptResult {
@@ -57,6 +63,8 @@ export const createInvitation = (body: {
   email: string | null;
   role: OrgRole;
   days: number;
+  position?: string | null;
+  department_id?: number | null;
 }) =>
   api<OrgInvitation>("/api/org/invitations", {
     method: "POST",

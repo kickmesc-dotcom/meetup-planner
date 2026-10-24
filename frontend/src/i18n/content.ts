@@ -1484,4 +1484,10 @@ export const EN_CONTENT: Record<string, string> = {
   "это ты": "that's you",
   "без почты": "no email",
   "Роль {name}": "Role of {name}",
+  "Например, «Бармен»": "For example, “Bartender”",
+  "Должность в приглашении": "Position in the invitation",
+  "Отдел (необязательно)": "Department (optional)",
+  "Отдел в приглашении": "Department in the invitation",
+  "Без отдела": "No department",
+  "Вас ждут: {details}": "You'll join as: {details}",
 };

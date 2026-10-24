@@ -31,6 +31,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # no
 from app.api import deps, routes_orgs  # noqa: E402
 from app.db.auth_models import AuthSession  # noqa: E402
 from app.db.base import Base  # noqa: E402
+from app.db.hr_models import Department, Employee  # noqa: E402
 from app.db.org_models import (  # noqa: E402
     DEFAULT_ORG_ID,
     Organization,
@@ -44,6 +45,7 @@ from app.services import accounts, invitations, mail, orgs  # noqa: E402
 TABLES = (
     "organizations",
     "users",
+    "departments",
     "employees",
     "organization_members",
     "auth_sessions",
@@ -340,6 +342,82 @@ async def test_accepting_manager_invite_grants_manager_rights(session) -> None:
     employee = await anext(deps.current_employee(session, user, None))
     assert employee.org_id == second.id
     assert employee.role == "aup"
+
+
+async def test_invite_carries_position_and_department_to_new_profile(
+    session,
+) -> None:
+    """Должность и отдел из ссылки попадают в профиль, созданный при входе."""
+    _first, second = await _orgs(session)
+    dept = Department(id=10, org_id=second.id, name="Бар", slug="bar")
+    session.add(dept)
+    await session.commit()
+    await session.refresh(dept)
+
+    user = await accounts.register(session, email=EMAIL, password=PASSWORD)
+    _row, token = await invitations.create(
+        session,
+        org_id=second.id,
+        created_by_id=None,
+        role="staff",
+        position="Бармен",
+        department_id=dept.id,
+    )
+    await invitations.accept(session, token=token, user=user)
+
+    employee = await anext(deps.current_employee(session, user, None))
+    assert employee.org_id == second.id
+    assert employee.position == "Бармен"
+    assert employee.department_id == dept.id
+
+
+async def test_invite_fields_update_an_existing_profile(session) -> None:
+    """Если профиль уже был, ссылка всё равно меняет должность и отдел."""
+    _first, second = await _orgs(session)
+    dept = Department(id=11, org_id=second.id, name="Кухня", slug="kitchen")
+    session.add(dept)
+    await session.commit()
+    await session.refresh(dept)
+
+    user = await accounts.register(session, email=EMAIL, password=PASSWORD)
+    employee = Employee(org_id=second.id, user_id=user.id, role="employee")
+    session.add(employee)
+    await session.commit()
+
+    _row, token = await invitations.create(
+        session,
+        org_id=second.id,
+        created_by_id=None,
+        position="Повар",
+        department_id=dept.id,
+    )
+    await invitations.accept(session, token=token, user=user)
+
+    await session.refresh(employee)
+    assert employee.position == "Повар"
+    assert employee.department_id == dept.id
+
+
+async def test_invite_rejects_department_of_another_org(session) -> None:
+    """Чужой отдел в ссылку не попадёт: иначе человек получил бы доступ к
+    структуре другой организации."""
+    first, second = await _orgs(session)
+    foreign = Department(id=12, org_id=first.id, name="Бар", slug="bar")
+    session.add(foreign)
+    await session.commit()
+    await session.refresh(foreign)
+    user = await accounts.register(session, email=EMAIL, password=PASSWORD)
+
+    with pytest.raises(HTTPException) as err:
+        await routes_orgs.create_invitation(
+            routes_orgs.InvitationIn(role="staff", department_id=foreign.id),
+            session,
+            user,
+            second,
+            None,
+        )
+    assert err.value.status_code == 400
+    assert err.value.detail == "department_not_found"
 
 
 async def test_accepting_owner_invite_grants_admin_rights(session) -> None:
