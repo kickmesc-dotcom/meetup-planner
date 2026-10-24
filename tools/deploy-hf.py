@@ -173,6 +173,20 @@ def put_secret(key: str, value: str) -> bool:
     return ok
 
 
+def existing_variables() -> set[str]:
+    """Имена Space-переменных (не секретов).
+
+    24.10.2026: попытка залить `BOT_API_SERVER` секретом, когда в Space уже
+    была одноимённая переменная, уронила Space в `CONFIG_ERROR` («Collision
+    on variables and secrets names») — бот перестал отвечать совсем.
+    Поэтому одноимённые переменные не трогаем, а говорим об этом вслух.
+    """
+    status, body = api_request(f"spaces/{SPACE_REPO}/variables", method="GET")
+    if status != 200 or not isinstance(body, dict):
+        return set()
+    return set(body)
+
+
 def cmd_env(_args) -> int:
     env = read_env_file()
     # Публичный адрес API — это сам Space: от него зависят CORS и редиректы,
@@ -180,6 +194,7 @@ def cmd_env(_args) -> int:
     env["PUBLIC_BASE_URL"] = SPACE_URL
     print(f"Заливаю секреты в {SPACE_REPO} (значения не печатаются):")
     store = _secret_store()
+    variables = existing_variables()
     missing = []
     for key in ENV_KEYS:
         value = env.get(key, "")
@@ -189,6 +204,9 @@ def cmd_env(_args) -> int:
             value = (store.get(key) or "").strip() or _single_secret(key).strip()
         if not value:
             missing.append(key)
+            continue
+        if key in variables:
+            print(f"  = {key} — уже есть переменной Space, не трогаю")
             continue
         put_secret(key, value)
     if missing:

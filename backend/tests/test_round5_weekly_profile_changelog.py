@@ -10,7 +10,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
+import time
 from datetime import date, datetime
 
 import pytest
@@ -313,6 +315,31 @@ async def test_deliver_does_not_retry_when_telegram_rejects_payload():
     assert await changelog_handler._deliver(rejected, "<b>x</b>") is False
     assert len(calls) == 1
     assert message.calls == []
+
+
+async def test_deliver_cuts_a_hanging_send_by_its_own_timeout(monkeypatch):
+    """Попытка, которая «висит», бросается через REPLY_TIMEOUT_SECONDS.
+
+    24.10.2026: `request_timeout=12` у `message.reply` на деле не работает (в
+    aiogram 3.x он уходит в поля `SendMessage`), поэтому одна отправка жила по
+    таймауту сессии. Три такие попытки = 190 с на один апдейт. Здесь
+    зафиксировано, что рвёт попытку `asyncio.wait_for`, а не везение сети.
+    """
+    monkeypatch.setattr(changelog_handler, "REPLY_TIMEOUT_SECONDS", 0.05)
+
+    class _Hanging:
+        calls = 0
+
+        async def reply(self, text, **kwargs):  # noqa: ANN001, ANN003
+            type(self).calls += 1
+            await asyncio.sleep(30)
+
+    message = _Hanging()
+    started = time.monotonic()
+    assert await changelog_handler._deliver(message, "текст") is False
+    # Три попытки по 0.05 с, а не три по 30 с.
+    assert time.monotonic() - started < 2.0
+    assert message.calls == changelog_handler.REPLY_ATTEMPTS
 
 
 def test_short_fallback_is_plain_and_has_link():

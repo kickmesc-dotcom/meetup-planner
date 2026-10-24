@@ -16,6 +16,7 @@ import pytest
 
 from app.bot.dispatcher import (
     _build_session,
+    _is_default_api,
     _make_direct_connector,
     _make_proxy_connector,
     _pool_connector_kwargs,
@@ -87,6 +88,32 @@ async def test_direct_connector_builds(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_direct_connector_family_follows_env(monkeypatch):
+    """IPv4 больше не прибит гвоздями (24.10.2026).
+
+    Пин на `AF_INET` при IPv6-only выходе контейнера давал таймаут на каждой
+    отправке в Telegram, а httpx к GitHub в том же контейнере работал — он
+    семейство не пиннит. Теперь `BOT_FORCE_IPV4=false` действительно
+    отпускает коннектор на оба семейства.
+    """
+    import socket
+
+    monkeypatch.delenv("BOT_FORCE_IPV4", raising=False)
+    c = _make_direct_connector()
+    try:
+        assert c._family == socket.AF_INET
+    finally:
+        await c.close()
+
+    monkeypatch.setenv("BOT_FORCE_IPV4", "false")
+    c2 = _make_direct_connector()
+    try:
+        assert c2._family == socket.AF_UNSPEC
+    finally:
+        await c2.close()
+
+
+@pytest.mark.asyncio
 async def test_direct_connector_force_close_builds(monkeypatch):
     monkeypatch.setenv("BOT_FORCE_CLOSE", "true")
     # Главное — НЕ ловим ValueError «keepalive_timeout cannot be set if
@@ -141,6 +168,81 @@ def test_api_server_resolves_from_env(monkeypatch):
 def test_api_server_blank_is_none(monkeypatch):
     monkeypatch.setenv("BOT_API_SERVER", "   ")
     assert _resolve_api_server() is None
+
+
+# --- обходной путь мимо BOT_API_SERVER (24.10.2026) ------------------------
+# Живой случай: контейнер перестал доходить до Telegram, каждая отправка
+# висла до таймаута, и вся очередь апдейтов встала. Теперь после сбоя
+# основной дороги делается одна короткая попытка напрямую на api.telegram.org.
+
+
+def test_is_default_api_recognises_telegram(monkeypatch):
+    monkeypatch.delenv("BOT_API_SERVER", raising=False)
+    assert _is_default_api(_resolve_api_server()) is True
+
+    monkeypatch.setenv("BOT_API_SERVER", "https://telegram-proxy.kickmesc.workers.dev")
+    assert _is_default_api(_resolve_api_server()) is False
+
+
+@pytest.mark.asyncio
+async def test_direct_fallback_skipped_when_road_is_already_direct(monkeypatch):
+    """Без BOT_API_SERVER обходной путь — тот же адрес: второй попытки нет."""
+    from aiogram.exceptions import TelegramNetworkError
+
+    from app.bot.dispatcher import _IPv4AiohttpSession
+
+    monkeypatch.delenv("BOT_API_SERVER", raising=False)
+    monkeypatch.setenv("BOT_FORCE_IPV4", "true")
+    session = _build_session()
+    assert isinstance(session, _IPv4AiohttpSession)
+    calls: list[str] = []
+
+    async def dead_pool(*args, **kwargs):  # noqa: ANN002, ANN003
+        calls.append("pool")
+        raise TelegramNetworkError(method=None, message="Request timeout error")
+
+    async def fake_fallback(exc, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        calls.append("fallback")
+        return "ok"
+
+    monkeypatch.setattr(session, "_make_request_with_pool", dead_pool)
+    monkeypatch.setattr(session, "_make_request_direct_fallback", fake_fallback)
+    try:
+        with pytest.raises(TelegramNetworkError):
+            await session.make_request(None, None)
+    finally:
+        await session.close()
+    assert calls == ["pool"]
+
+
+@pytest.mark.asyncio
+async def test_direct_fallback_rescues_custom_api_road(monkeypatch):
+    """С BOT_API_SERVER сбой основной дороги ведёт к одной попытке напрямую."""
+    from aiogram.exceptions import TelegramNetworkError
+
+    from app.bot.dispatcher import _IPv4AiohttpSession
+
+    monkeypatch.setenv("BOT_API_SERVER", "https://telegram-proxy.kickmesc.workers.dev")
+    monkeypatch.setenv("BOT_FORCE_IPV4", "true")
+    session = _build_session()
+    assert isinstance(session, _IPv4AiohttpSession)
+    calls: list[str] = []
+
+    async def dead_pool(*args, **kwargs):  # noqa: ANN002, ANN003
+        calls.append("pool")
+        raise TelegramNetworkError(method=None, message="Request timeout error")
+
+    async def fake_fallback(exc, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        calls.append("fallback")
+        return "ok"
+
+    monkeypatch.setattr(session, "_make_request_with_pool", dead_pool)
+    monkeypatch.setattr(session, "_make_request_direct_fallback", fake_fallback)
+    try:
+        assert await session.make_request(None, None) == "ok"
+    finally:
+        await session.close()
+    assert calls == ["pool", "fallback"]
 
 
 @pytest.mark.asyncio

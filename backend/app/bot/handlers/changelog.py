@@ -67,17 +67,28 @@ async def _pause(seconds: float) -> None:
 
 
 async def _deliver(message: Message, text: str, *, plain: bool = False) -> bool:
-    """Отправка с повторами. `False` — доставить не удалось (уже залогировано)."""
+    """Отправка с повторами. `False` — доставить не удалось (уже залогировано).
+
+    Таймаут держим `asyncio.wait_for`, а не `request_timeout=` у сообщения.
+    24.10.2026: `Message.reply(..., request_timeout=12)` выглядел как лимит, но
+    в aiogram 3.x этот аргумент уходит в поля `SendMessage` и на сетевой
+    таймаут не влияет — запрос жил по таймауту сессии (30–60 с). Из-за этого
+    одна попытка занимала минуту, три попытки не влезали в окно вебхука
+    Telegram, и апдейт обрабатывался по 190 с. `wait_for` рвёт попытку ровно
+    через `REPLY_TIMEOUT_SECONDS`, что бы ни происходило внутри.
+    """
     for attempt in range(1, REPLY_ATTEMPTS + 1):
         try:
-            await message.reply(
-                text,
-                # `None` (а не `Default`) — у бота разметка включена по
-                # умолчанию; здесь она не нужна, и `<` в заголовке не сломает
-                # отправку.
-                parse_mode=None if plain else "HTML",
-                disable_web_page_preview=True,
-                request_timeout=REPLY_TIMEOUT_SECONDS,
+            await asyncio.wait_for(
+                message.reply(
+                    text,
+                    # `None` (а не `Default`) — у бота разметка включена по
+                    # умолчанию; здесь она не нужна, и `<` в заголовке не
+                    # сломает отправку.
+                    parse_mode=None if plain else "HTML",
+                    disable_web_page_preview=True,
+                ),
+                timeout=REPLY_TIMEOUT_SECONDS,
             )
             return True
         except TelegramRetryAfter as exc:

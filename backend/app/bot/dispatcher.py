@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import socket
+import time
 from typing import Any
 
 import aiohttp
@@ -84,9 +85,23 @@ def _pool_connector_kwargs() -> dict[str, Any]:
     return {"keepalive_timeout": _resolve_keepalive_timeout()}
 
 
+def _connector_family() -> int:
+    """Какое семейство адресов разрешаем для Bot API.
+
+    Раньше здесь жёстко стоял `AF_INET`: у HF Spaces тогда не было рабочего
+    IPv6, и запросы через IPv6 висли. 24.10.2026 выяснилось, что стало
+    наоборот: `api.telegram.org` и `workers.dev` **не доходят через IPv4**
+    (пин на `AF_INET` давал таймаут на каждой отправке, 190 с на апдейт),
+    а тот же контейнер спокойно тянул `https://api.github.com` через
+    `httpx` — тот семейство не пиннит. Поэтому семейство теперь следует
+    за `BOT_FORCE_IPV4` (дефолт — оба), а не задаётся молча.
+    """
+    return socket.AF_INET if _env_truthy("BOT_FORCE_IPV4", True) else socket.AF_UNSPEC
+
+
 def _make_direct_connector() -> aiohttp.TCPConnector:
     return aiohttp.TCPConnector(
-        family=socket.AF_INET,
+        family=_connector_family(),
         ssl=True,
         ttl_dns_cache=300,
         limit=20,
@@ -162,6 +177,83 @@ class _IPv4AiohttpSession(AiohttpSession):
         return self._session
 
     async def make_request(self, *args: Any, **kwargs: Any) -> Any:
+        """Запрос в Bot API с резервным ПУТЁМ доступа, а не только с повтором.
+
+        Если задан `BOT_API_SERVER` (Cloudflare-воркер-реверс-прокси), то
+        именно он и только он был единственным адресом Bot API. 24.10.2026
+        выяснилось, чем это кончается: из контейнера этот путь перестал
+        отвечать (30 с таймаута на каждый запрос, `TelegramNetworkError`), и
+        бот замолчал целиком — не только `/changelog`. При этом прямой
+        `api.telegram.org` отвечал с другой машины за 1–2 с.
+
+        Поэтому после всех повторов через прокси-пул делаем ОДНУ попытку
+        напрямую, короткую (8 с): она не должна растягивать вебхук-окно
+        Telegram. Ушло — логируем, что спас обходной путь.
+        """
+        method = _method_name(args, kwargs)
+        started = time.monotonic()
+        try:
+            result = await self._make_request_with_pool(*args, **kwargs)
+        except Exception as exc:
+            # `extra=`, а не именованные поля: здесь `log` — обычный логгер из
+            # `logging`. Если передать `method=…` напрямую, stdlib бросит
+            # `TypeError: Logger._log() got an unexpected keyword argument`,
+            # и настоящая ошибка сети подменится ошибкой логирования — именно
+            # так родился лог «webhook.set_failed: Logger._log() ...».
+            log.warning(
+                "telegram.request_failed",
+                extra={
+                    "method": method,
+                    "error": exc.__class__.__name__,
+                    "detail": str(exc)[:160],
+                    "host": _api_host(self.api),
+                    "family": _family_label(),
+                    "ms": int((time.monotonic() - started) * 1000),
+                },
+            )
+            if _is_default_api(self.api):
+                # Уже ходили напрямую — второй такой же попытки не нужно.
+                raise
+            return await self._make_request_direct_fallback(exc, *args, **kwargs)
+        elapsed_ms = int((time.monotonic() - started) * 1000)
+        # Медленный, но успешный запрос — это тот же симптом, что и таймаут,
+        # только на шаг раньше. Пишем его громко, а штатные — шёпотом: иначе
+        # лог бота тонет в `getMe`.
+        slow = elapsed_ms >= SLOW_REQUEST_MS
+        getattr(log, "warning" if slow else "debug")(
+            "telegram.request_slow" if slow else "telegram.request_ok",
+            extra={
+                "method": method,
+                "host": _api_host(self.api),
+                "family": _family_label(),
+                "ms": elapsed_ms,
+            },
+        )
+        return result
+
+    async def _make_request_direct_fallback(
+        self, exc: Exception, *args: Any, **kwargs: Any
+    ) -> Any:
+        """Одна попытка мимо `BOT_API_SERVER` — прямо на api.telegram.org."""
+        fallback = AiohttpSession(timeout=self.timeout)
+        try:
+            result = await asyncio.wait_for(
+                fallback.make_request(*args, **kwargs), timeout=DIRECT_FALLBACK_SECONDS
+            )
+        except Exception:  # noqa: BLE001 — отдаём исходную ошибку, она информативнее
+            log.warning(
+                "telegram.direct_fallback_failed",
+                extra={"error": exc.__class__.__name__},
+            )
+            raise exc from None
+        finally:
+            await fallback.close()
+        log.warning(
+            "telegram.direct_fallback_ok", extra={"error": exc.__class__.__name__}
+        )
+        return result
+
+    async def _make_request_with_pool(self, *args: Any, **kwargs: Any) -> Any:
         # Импорт здесь — чтобы цикла импорта не было (proxies → db → ...).
         from app.db.base import get_sessionmaker
         from app.services.proxies import (
@@ -286,6 +378,40 @@ class _IPv4AiohttpSession(AiohttpSession):
         raise last_exc
 
 
+# С какого времени запрос к Telegram считается «медленным» (для логов).
+SLOW_REQUEST_MS = 2000
+
+# Сколько ждём единственную попытку мимо `BOT_API_SERVER`. Коротко: второй
+# такой же таймаут не должен съедать окно вебхука (60 с).
+DIRECT_FALLBACK_SECONDS = 8.0
+
+
+def _family_label() -> str:
+    """Что в логе: ходим только по IPv4 или по обоим семействам."""
+    return "ipv4" if _connector_family() == socket.AF_INET else "any"
+
+
+def _api_host(api: Any) -> str:
+    """Куда именно идёт запрос — воркер или сам Telegram (для логов)."""
+    base = str(getattr(api, "base", "") or "")
+    if not base:
+        return "api.telegram.org"
+    return base.split("//")[-1].split("/")[0]
+
+
+def _method_name(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str:
+    """Имя метода Bot API (`sendMessage`, `getMe`, …) — для логов без шума."""
+    method = args[1] if len(args) > 1 else kwargs.get("method")
+    return str(getattr(method, "__api_method__", "")) or "unknown"
+
+
+def _is_default_api(api: Any) -> bool:
+    """Это api.telegram.org (или ничего не задано)? Тогда обходной путь — тот же
+    адрес, и пробовать его второй раз бессмысленно."""
+    base = str(getattr(api, "base", "") or "")
+    return not base or base.startswith("https://api.telegram.org")
+
+
 def _proxy_pool_snapshot() -> list[Any]:
     """Вспомогательная функция — снимок пула из ProxyManager (для retry-логики)."""
     from app.services.proxies import _state
@@ -322,8 +448,11 @@ def _build_session() -> AiohttpSession | None:
     единственное рабочее место (Bot(server=...) игнорируется в aiogram 3.x).
     """
     api = _resolve_api_server()
-    force_ipv4 = _env_truthy("BOT_FORCE_IPV4", True)
-    if not force_ipv4 and api is None:
+    # `BOT_FORCE_IPV4=false` раньше отключало только сам класс сессии, а
+    # коннектор всё равно оставался IPv4 — то есть флаг не работал там, где он
+    # нужен (при заданном `BOT_API_SERVER`). Теперь семейство адресов берётся
+    # из `_connector_family()`, а сессия нужна всегда, если есть api.
+    if api is None and not _env_truthy("BOT_FORCE_IPV4", True):
         return None
     total = float(_env_int("BOT_TOTAL_TIMEOUT", 30))
     kwargs: dict = {"timeout": total}

@@ -304,6 +304,196 @@ async def _db_snapshot() -> dict[str, Any]:
     return payload
 
 
+# ----------------------------------------------------------------- сеть ----
+
+# Хосты, до которых бот обязан доходить. Порядок важен: первым Telegram.
+_NET_TARGETS = (
+    "api.telegram.org",
+    "telegram-proxy2.esw1337.workers.dev",
+    "api.github.com",
+)
+
+
+def _diag_token_ok(request: Request) -> bool:
+    """Секрет вебхука как пропуск к диагностике.
+
+    Значение знает только Telegram и мы (`TG_WEBHOOK_SECRET` уже лежит в
+    заголовке `X-Telegram-Bot-Api-Secret-Token` у каждого апдейта), поэтому
+    новый секрет заводить не нужно, а без токена ручка просто не существует
+    (404) — чтобы не светить сетевым устройством хоста.
+    """
+    import hmac
+
+    expected = (get_settings().tg_webhook_secret or "").strip()
+    given = (request.headers.get("x-diag-token") or "").strip()
+    if not expected or not given:
+        return False
+    return hmac.compare_digest(expected, given)
+
+
+async def _tls_probe(host: str, budget_s: float = 6.0, *, sni: bool = True) -> dict[str, Any]:
+    """Отдельно TLS: TCP открылся — а рукопожатие живое?
+
+    Это третий уровень, который надо отделить от TCP и от HTTP: если TCP ок,
+    а TLS вис — виноват не маршрут, а рукопожатие (сертификаты/прокси/DPI).
+    """
+    import asyncio
+    import ssl
+
+    if sni:
+        ctx = ssl.create_default_context()
+    else:
+        # Без SNI и без проверки сертификата: рукопожатие должно дойти, даже
+        # если фильтр рубит именно по имени в ClientHello.
+        ctx = ssl._create_unverified_context()
+    started = time.monotonic()
+    try:
+        _reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(
+                host, 443, ssl=ctx, server_hostname=host if sni else None
+            ),
+            timeout=budget_s,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__, "ms": int((time.monotonic() - started) * 1000)}
+    try:
+        version = writer.get_extra_info("ssl_object").version()
+    except Exception:  # noqa: BLE001
+        version = None
+    writer.close()
+    try:
+        await writer.wait_closed()
+    except Exception:  # noqa: BLE001
+        pass
+    return {"ok": True, "tls": version, "ms": int((time.monotonic() - started) * 1000)}
+
+
+async def _tcp_probe(host: str, family: int, budget_s: float = 5.0) -> dict[str, Any]:
+    """Сколько стоит открыть TCP-соединение ДО 443 конкретным семейством.
+
+    Именно это отличает «сеть умерла совсем» от «IPv4 черная дыра, а IPv6
+    живая» — таймаут на connect против «Network is unreachable».
+    """
+    import asyncio
+
+    started = time.monotonic()
+    try:
+        _reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, 443, family=family), timeout=budget_s
+        )
+    except Exception as exc:  # noqa: BLE001 — диагностика: важен класс
+        return {
+            "family": "ipv4" if family == 2 else "ipv6",
+            "error": type(exc).__name__,
+            "ms": int((time.monotonic() - started) * 1000),
+        }
+    writer.close()
+    try:
+        await writer.wait_closed()
+    except Exception:  # noqa: BLE001 — соединение уже не нужно
+        pass
+    return {
+        "family": "ipv4" if family == 2 else "ipv6",
+        "ok": True,
+        "ms": int((time.monotonic() - started) * 1000),
+    }
+
+
+@router.get("/meta/net")
+async def net_diag(request: Request) -> Any:
+    """Что именно не так с сетью контейнера (24.10.2026).
+
+    История: бот молчал, `aiohttp` к Telegram вис до таймаута по обоим путям
+    (`BOT_API_SERVER` и напрямую), а `httpx` к `api.github.com` из того же
+    контейнера отвечал 200. По логам это не различить — `http.client` и
+    `asyncio` молчат о причине. Поэтому здесь всё сразу: DNS (какие адреса
+    вообще есть), TCP-коннект по каждому семейству отдельно и оба HTTP-клиента
+    на одном и том же хосте.
+
+    Доступ — по секрету вебхука в `X-Diag-Token`.
+    """
+    import asyncio
+    import socket
+
+    from fastapi import HTTPException
+
+    if not _diag_token_ok(request):
+        raise HTTPException(status_code=404)
+
+    loop = asyncio.get_running_loop()
+    report: dict[str, Any] = {"hosts": {}, "http": {}}
+
+    for host in _NET_TARGETS:
+        entry: dict[str, Any] = {}
+        try:
+            infos = await loop.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+            entry["dns"] = sorted(
+                {
+                    "ipv4" if family == socket.AF_INET else "ipv6"
+                    for family, *_rest in infos
+                }
+            )
+            # Адреса: подмена DNS выглядит именно так — TCP открывается до
+            # чужого адреса, а дальше тишина.
+            entry["addrs"] = sorted(
+                {info[4][0] for info in infos if info[0] == socket.AF_INET}
+            )[:4]
+        except Exception as exc:  # noqa: BLE001
+            entry["dns"] = {"error": type(exc).__name__}
+        entry["tcp"] = [
+            await _tcp_probe(host, socket.AF_INET),
+            await _tcp_probe(host, socket.AF_INET6),
+        ]
+        entry["tls"] = await _tls_probe(host)
+        entry["tls_no_sni"] = await _tls_probe(host, sni=False)
+        report["hosts"][host] = entry
+
+    # aiohttp — тем же клиентом, которым ходит бот (запрос без токена: нас
+    # интересует дорога, а не ответ Bot API; 404 от Telegram — уже успех сети).
+    import aiohttp
+
+    for host in _NET_TARGETS:
+        started = time.monotonic()
+        try:
+            timeout = aiohttp.ClientTimeout(total=6)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(f"https://{host}/") as resp:
+                    report["http"][host] = {
+                        "client": "aiohttp",
+                        "status": resp.status,
+                        "ms": int((time.monotonic() - started) * 1000),
+                    }
+        except Exception as exc:  # noqa: BLE001
+            report["http"][host] = {
+                "client": "aiohttp",
+                "error": type(exc).__name__,
+                "detail": str(exc)[:120],
+                "ms": int((time.monotonic() - started) * 1000),
+            }
+
+    # httpx — базовая линия: он в этом контейнере работает (GitHub для
+    # `/changelog`). Если он тоже упал, дело не в обработчике бота.
+    try:
+        import httpx
+
+        started = time.monotonic()
+        async with httpx.AsyncClient(timeout=6) as client:
+            resp = await client.get("https://api.github.com/")
+        report["http"]["httpx:api.github.com"] = {
+            "client": "httpx",
+            "status": resp.status_code,
+            "ms": int((time.monotonic() - started) * 1000),
+        }
+    except Exception as exc:  # noqa: BLE001
+        report["http"]["httpx:api.github.com"] = {
+            "client": "httpx",
+            "error": type(exc).__name__,
+            "detail": str(exc)[:120],
+        }
+
+    return report
+
+
 @router.get("/meta")
 async def meta(request: Request) -> dict[str, Any]:
     """Паспорт живого контейнера: код, база, возможности.

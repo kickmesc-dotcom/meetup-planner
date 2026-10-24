@@ -166,3 +166,30 @@ def test_db_target_never_leaks_credentials(monkeypatch):
     }
     assert secret not in str(payload)
     assert "neondb_owner" not in str(payload)
+
+
+# --- /api/meta/net: диагностика сети (24.10.2026) --------------------------
+# Грабля, ради которой ручка появилась: бот молчал, а по логам было видно
+# только «Request timeout error». TCP-коннект до Telegram при этом открывался
+# за 80 мс, TLS не завершался — то есть виноват выход контейнера, а не код.
+# Ручка обязана быть закрытой: без секрета вебхука её как будто нет.
+
+
+def test_net_diag_hidden_without_token(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from app.config import get_settings
+
+    monkeypatch.setattr(
+        routes_meta, "get_settings", lambda: SimpleNamespace(tg_webhook_secret="s3cret")
+    )
+    app = FastAPI()
+    app.include_router(routes_meta.router, prefix="/api")
+    with TestClient(app) as client:
+        assert client.get("/api/meta/net").status_code == 404
+        assert client.get("/api/meta/net", headers={"X-Diag-Token": "wrong"}).status_code == 404
+        # Правильный токен отвечает — сеть в тесте не нужна, только форма.
+        ok = client.get("/api/meta/net", headers={"X-Diag-Token": "s3cret"})
+        assert ok.status_code == 200
+        assert "hosts" in ok.json() and "http" in ok.json()
+    assert get_settings  # noqa: B018 — импорт проверяет, что конфиг на месте
