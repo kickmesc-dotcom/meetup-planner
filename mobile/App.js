@@ -30,7 +30,9 @@ import { WebView } from "react-native-webview";
  * `EXPO_PUBLIC_APP_URL=https://… npm start`. Так тестируется локальная сборка
  * и будущий домен в зоне .ru.
  */
-const FALLBACK_URL = "https://meetup-planner1.pages.dev";
+// Боевой адрес мини-аппа: именно этот origin есть в CORS бэкенда. Второй
+// проект (`meetup-planner1.pages.dev`) — чужая сборка без доступа к API.
+const FALLBACK_URL = "https://semitaskbot.pages.dev";
 const APP_URL =
   process.env.EXPO_PUBLIC_APP_URL ||
   (Constants.expoConfig && Constants.expoConfig.extra
