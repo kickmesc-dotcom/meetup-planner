@@ -46,7 +46,7 @@ export default function AchievementsCard() {
               className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
             >
               <span aria-hidden>{a.emoji}</span>
-              <span className="truncate">{a.title}</span>
+              <span className="truncate">{tx(a.title)}</span>
             </li>
           ))}
         </ul>
@@ -60,7 +60,7 @@ export default function AchievementsCard() {
               className="flex items-center justify-between gap-2 text-xs text-tg-hint"
             >
               <span className="truncate">
-                <span aria-hidden>{g.emoji}</span> {g.title}
+                <span aria-hidden>{g.emoji}</span> {tx(g.title)}
               </span>
               <span className="shrink-0 tabular-nums">
                 {g.done}/{g.threshold}

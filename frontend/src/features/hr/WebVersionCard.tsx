@@ -10,7 +10,7 @@ import { clearAccessToken, humanizeApiError, isEndpointMissing } from "@/api/cli
 import Icon from "@/components/Icon";
 import { copyText } from "@/lib/clipboard";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-import { useTx } from "@/i18n";
+import { currentIntlLocale, useTx } from "@/i18n";
 /**
  * «Веб-версия»: открыть приложение на компьютере.
  *
@@ -96,8 +96,14 @@ export default function WebVersionCard() {
       {fresh && (
         <div className="mt-2 rounded-tile bg-tg-bg/70 p-2">
           <p className="text-2xs text-tg-hint">
-            Ссылка показывается один раз и работает как пароль — не пересылай
-            её. Действует до {new Date(fresh.expires_at).toLocaleDateString("ru-RU")}.
+            {tx(
+              "Ссылка показывается один раз и работает как пароль — не пересылай её. Действует до {date}.",
+              {
+                date: new Date(fresh.expires_at).toLocaleDateString(
+                  currentIntlLocale(),
+                ),
+              },
+            )}
           </p>
           <code className="mt-1 block break-all text-2xs text-tg-text">
             {fresh.url}
@@ -168,19 +174,23 @@ function LinkRow({
   onRevoke: () => void;
 }) {
   const { tx } = useTx();
+  // Подпись собирается здесь, а не на сервере: дата и слово «использована»
+  // должны быть на языке интерфейса, а не на языке того, кто записал ссылку.
   const used = link.last_used_at
-    ? `использована ${new Date(link.last_used_at).toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })}`
+    ? tx("использована {when}", {
+        when: new Date(link.last_used_at).toLocaleString(currentIntlLocale(), {
+          day: "2-digit",
+          month: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      })
     : tx("ещё не открывалась");
   return (
     <li className="flex items-center gap-2 rounded-tile bg-tg-bg/40 px-2 py-1.5">
       <div className="min-w-0 flex-1">
         <div className="truncate text-xs text-tg-text">
-          {link.label || tx("Ссылка")}
+          {link.label ? tx(link.label) : tx("Ссылка")}
           {link.is_current ? tx(" · это устройство") : ""}
         </div>
         <div className="truncate text-2xs text-tg-hint">

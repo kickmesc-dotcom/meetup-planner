@@ -81,6 +81,39 @@ _STATUS_TEXT: dict[str, str] = {
     TASK_FAILED: "отметил(а) поручение как невыполненное",
 }
 
+# Английские шаблоны текста ленты. Ключ — русский шаблон: так фразы в коде
+# остаются читаемыми, а язык выбирается на границе (`?lang=en`). Неизвестный
+# шаблон остаётся русским — как и содержимое, которое человек написал сам.
+SAY_EN: dict[str, str] = {
+    "закрыл(а) чек-лист «{title}»": "closed the checklist “{title}”",
+    "отметил(а) пункт «{title}»": "ticked the item “{title}”",
+    "создал(а) поручение «{title}»": "created the task “{title}”",
+    "{action}: «{title}»": "{action}: “{title}”",
+    "сменил(а) статус на «{status}»: «{title}»":
+        "changed the status to “{status}”: “{title}”",
+    "прислал(а) фотоотчёт по «{title}»": "sent a photo report for “{title}”",
+    "сообщил(а) о проблеме по «{title}»{suffix}":
+        "reported a problem with “{title}”{suffix}",
+    " (причина: {reason})": " (reason: {reason})",
+    "создано поручение": "task created",
+    "принял(а) поручение": "accepted the task",
+    "взял(а) поручение в работу": "started the task",
+    "сдал(а) работу на проверку": "submitted the work for review",
+    "получил(а) доработку по поручению": "got the task back for rework",
+    "выполнил(а) поручение": "completed the task",
+    "просрочил(а) поручение": "missed the task deadline",
+    "отметил(а) поручение как невыполненное": "marked the task as not done",
+}
+
+
+def say(lang: str, template: str, **params: object) -> str:
+    """Фраза ленты на языке интерфейса (по умолчанию — русский)."""
+    text = SAY_EN.get(template, template) if lang == "en" else template
+    if not params:
+        return text
+    return text.format(**params)
+
+
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 200
 
@@ -241,6 +274,7 @@ async def collect_items(
     since: datetime | None = None,
     limit: int = DEFAULT_LIMIT,
     excluded: set[int] | None = None,
+    lang: str = "ru",
 ) -> list[FeedItem]:
     """Собрать записи из всех источников, отфильтровать и отсортировать.
 
@@ -278,7 +312,13 @@ async def collect_items(
             if not _allowed(employee_id):
                 continue
             raw.append(
-                (at, KIND_CHECKLIST_DONE, employee_id, f"закрыл(а) чек-лист «{title}»", run_id)
+                (
+                    at,
+                    KIND_CHECKLIST_DONE,
+                    employee_id,
+                    say(lang, "закрыл(а) чек-лист «{title}»", title=title),
+                    run_id,
+                )
             )
 
     if KIND_CHECKLIST_ITEM in want:
@@ -298,7 +338,13 @@ async def collect_items(
             if not _allowed(employee_id):
                 continue
             raw.append(
-                (at, KIND_CHECKLIST_ITEM, employee_id, f"отметил(а) пункт «{title}»", comp_id)
+                (
+                    at,
+                    KIND_CHECKLIST_ITEM,
+                    employee_id,
+                    say(lang, "отметил(а) пункт «{title}»", title=title),
+                    comp_id,
+                )
             )
 
     if KIND_TASK_CREATED in want or KIND_TASK_STATUS in want:
@@ -324,11 +370,24 @@ async def collect_items(
             # выпадало из ленты.
             if comment and comment.startswith("created"):
                 kind = KIND_TASK_CREATED
-                text = f"создал(а) поручение «{title}»"
+                text = say(lang, "создал(а) поручение «{title}»", title=title)
             else:
                 kind = KIND_TASK_STATUS
-                action = _STATUS_TEXT.get(to_status, f"сменил(а) статус на «{to_status}»")
-                text = f"{action}: «{title}»"
+                action = _STATUS_TEXT.get(to_status)
+                if action is None:
+                    text = say(
+                        lang,
+                        "сменил(а) статус на «{status}»: «{title}»",
+                        status=to_status,
+                        title=title,
+                    )
+                else:
+                    text = say(
+                        lang,
+                        "{action}: «{title}»",
+                        action=say(lang, action),
+                        title=title,
+                    )
             author = by_id
             if not _allowed(author):
                 continue
@@ -350,7 +409,13 @@ async def collect_items(
             if not _allowed(employee_id):
                 continue
             raw.append(
-                (at, KIND_TASK_PHOTO, employee_id, f"прислал(а) фотоотчёт по «{title}»", task_id)
+                (
+                    at,
+                    KIND_TASK_PHOTO,
+                    employee_id,
+                    say(lang, "прислал(а) фотоотчёт по «{title}»", title=title),
+                    task_id,
+                )
             )
 
     if KIND_TASK_ISSUE in want:
@@ -369,10 +434,15 @@ async def collect_items(
         for employee_id, at, reason, title, task_id in rows.all():
             if not _allowed(employee_id):
                 continue
-            suffix = f" (причина: {reason})" if reason else ""
+            suffix = say(lang, " (причина: {reason})", reason=reason) if reason else ""
             raw.append(
                 (at, KIND_TASK_ISSUE, employee_id,
-                 f"сообщил(а) о проблеме по «{title}»{suffix}", task_id)
+                 say(
+                     lang,
+                     "сообщил(а) о проблеме по «{title}»{suffix}",
+                     title=title,
+                     suffix=suffix,
+                 ), task_id)
             )
 
     if since is not None:
@@ -412,6 +482,7 @@ async def build_feed(
     kinds: tuple[str, ...] | None = None,
     since: datetime | None = None,
     limit: int = DEFAULT_LIMIT,
+    lang: str = "ru",
 ) -> list[FeedItem]:
     """Лента для конкретного смотрящего с учётом его прав."""
     allowed = await allowed_employee_ids(session, viewer)
@@ -447,6 +518,7 @@ async def build_feed(
         since=since,
         limit=max(1, min(limit, MAX_LIMIT)),
         excluded=excluded,
+        lang=lang,
     )
     return items
 

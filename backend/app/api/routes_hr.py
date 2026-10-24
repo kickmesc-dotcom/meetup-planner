@@ -1638,6 +1638,7 @@ async def feed(
     department_id: int | None = None,
     kinds: str | None = None,
     limit: int = hr_feed.DEFAULT_LIMIT,
+    lang: str = "ru",
 ) -> FeedOut:
     """Лента действий. Кто что видит — решает сервер (см. `services/hr_feed`).
 
@@ -1658,6 +1659,9 @@ async def feed(
             department_id=department_id,
             kinds=selected_kinds,
             limit=limit,
+            # Текст записи собирает сервер, поэтому язык приходит параметром:
+            # иначе английский интерфейс показывал русские фразы в ленте.
+            lang="en" if str(lang).lower().startswith("en") else "ru",
         )
     except PermissionError as exc:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc

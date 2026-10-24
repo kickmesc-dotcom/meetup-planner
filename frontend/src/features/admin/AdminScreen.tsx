@@ -23,6 +23,7 @@ import SpaceRestartScreen from "./SpaceRestartScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
 import Icon, { type IconName } from "@/components/Icon";
+import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
 
 /**
@@ -274,6 +275,7 @@ interface Props {
 
 export default function AdminScreen({ users }: Props) {
   void users;
+  const { tx } = useTx();
   const [section, setSection] = useState<Section>("root");
   const [query, setQuery] = useState("");
   const [usage, setUsage] = useState<Record<string, number>>(readUsage);
@@ -339,9 +341,13 @@ export default function AdminScreen({ users }: Props) {
   };
 
   const needle = query.trim().toLowerCase();
+  // Ищем и по переводу: на английском человек набирает "tasks", а в коде
+  // раздел по-прежнему называется «Поручения» — без этого поиск пустел.
   const found = needle
     ? SECTIONS.filter((s) =>
-        `${s.title} ${s.subtitle} ${s.group}`.toLowerCase().includes(needle),
+        `${s.title} ${s.subtitle} ${s.group} ${tx(s.title)} ${tx(s.subtitle)} ${tx(s.group)}`
+          .toLowerCase()
+          .includes(needle),
       )
     : [];
   const frequent = needle ? [] : topFrequent(usage);
@@ -352,8 +358,8 @@ export default function AdminScreen({ users }: Props) {
     <Card
       key={s.id}
       icon={s.icon}
-      title={s.title}
-      subtitle={s.subtitle}
+      title={tx(s.title)}
+      subtitle={tx(s.subtitle)}
       onClick={() => select(s.id)}
       badge={frequentCount(s.id)}
     />
@@ -371,8 +377,8 @@ export default function AdminScreen({ users }: Props) {
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Поиск: поручения, тексты, прокси…"
-          aria-label="Поиск по разделам"
+          placeholder={tx("Поиск: поручения, тексты, прокси…")}
+          aria-label={tx("Поиск по разделам")}
           data-testid="admin-search"
           className="min-h-11 w-full rounded-tile bg-tg-secondary-bg pl-10 pr-3 text-sm text-tg-text placeholder:text-tg-hint"
         />
@@ -382,8 +388,8 @@ export default function AdminScreen({ users }: Props) {
         <>
           <p className="px-1 text-xs text-tg-hint" role="status">
             {found.length > 0
-              ? `Найдено: ${found.length}`
-              : "Ничего не нашли — попробуй другое слово."}
+              ? tx("Найдено: {count}", { count: found.length })
+              : tx("Ничего не нашли — попробуй другое слово.")}
           </p>
           {found.length > 0 && (
             <div className="space-y-2">{found.map(card)}</div>
@@ -394,14 +400,14 @@ export default function AdminScreen({ users }: Props) {
               onClick={() => setQuery("")}
               className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm text-tg-link"
             >
-              Сбросить поиск
+              {tx("Сбросить поиск")}
             </button>
           )}
         </>
       ) : (
         <>
           {frequent.length > 0 && (
-            <SectionGroup icon="clock" title="Частое">
+            <SectionGroup icon="clock" title={tx("Частое")}>
               {frequent.map(card)}
             </SectionGroup>
           )}
@@ -411,7 +417,11 @@ export default function AdminScreen({ users }: Props) {
             );
             if (items.length === 0) return null;
             return (
-              <SectionGroup key={group.title} icon={group.icon} title={group.title}>
+              <SectionGroup
+                key={group.title}
+                icon={group.icon}
+                title={tx(group.title)}
+              >
                 {items.map(card)}
               </SectionGroup>
             );

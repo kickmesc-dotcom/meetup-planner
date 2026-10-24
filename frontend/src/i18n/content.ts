@@ -978,4 +978,97 @@ export const EN_CONTENT: Record<string, string> = {
   "Полезные адреса и документы": "Useful addresses and documents",
   "Встречи и отсутствия": "Meetings and absences",
   "Сборы команды и голосования": "Team gatherings and votes",
+  // ------------------------------------ админка: список разделов --
+  "Смена и люди": "Shift and people",
+  "Опыт и результат": "Experience and results",
+  "Тексты": "Texts",
+  "Частое": "Frequent",
+  "Поиск: поручения, тексты, прокси…": "Search: tasks, texts, proxy…",
+  "Поиск по разделам": "Search sections",
+  "Найдено: {count}": "Found: {count}",
+  "Ничего не нашли — попробуй другое слово.":
+    "Nothing found — try another word.",
+  "Сбросить поиск": "Clear search",
+  "Уведомления сотрудников": "Staff notifications",
+  "Что ушло и что запланировано; мьют всех алертов":
+    "What was sent and what is scheduled; mute all alerts",
+  "Пул сотрудников": "Employee pool",
+  "Имя, должность, прогресс, увольнение и корзина":
+    "Name, position, progress, dismissal and recycle bin",
+  "Приглашения": "Invitations",
+  "Ссылка с ролью и сроком — вход без Telegram":
+    "A link with a role and an expiry — sign-in without Telegram",
+  "Чек-листы": "Checklists",
+  "Пункты по залам, закрытие смены, фотоотчёт":
+    "Items per hall, shift closing, photo report",
+  "Обучение и ставка": "Training and rate",
+  "Учебные и обычные смены по дням, полная/частичная ставка":
+    "Training and regular shifts by day, full or partial rate",
+  "Создать, назначить, срок с точностью до секунды":
+    "Create, assign, set a deadline down to the second",
+  "Поручения человеческим языком, включая автоматику":
+    "Tasks in plain words, including automation",
+  "Компактный (миниатюры участников) / классический":
+    "Compact (participant thumbnails) / classic",
+  "Опыт и сотрудник недели": "Experience and employee of the week",
+  "Сколько стоит работа · рейтинг недели":
+    "What work costs · weekly rating",
+  "Дни рождения и праздники": "Birthdays and holidays",
+  "Даты, поздравления и напоминания": "Dates, greetings and reminders",
+  "Слоты для опросов / авто-подбора (12-15, 15-18 …)":
+    "Slots for polls and auto-pick (12–15, 15–18 …)",
+  "Приветствие, подсказки и пустые состояния":
+    "Greeting, hints and empty states",
+  "Интервалы напоминаний": "Reminder intervals",
+  "Запланированные задачи": "Scheduled jobs",
+  "APScheduler-job'ы: изменить, пропустить":
+    "APScheduler jobs: edit, skip",
+  "Прокси": "Proxy",
+  "Пул прокси, индикаторы, авто-фолбэк":
+    "Proxy pool, indicators, auto fallback",
+  "Рестарт Space": "Space restart",
+  "Кнопка + расписание, если сеть зависла":
+    "A button and a schedule for when the network hangs",
+  // ------------------------- звания, ачивки и счётчики (с сервера) --
+  "Стажёр": "Trainee",
+  "Ровный ход": "Steady pace",
+  "Опора смены": "Shift anchor",
+  "Наставник": "Mentor",
+  "Мастер смены": "Shift master",
+  "до «{rank}» — {xp} XP": "{xp} XP to “{rank}”",
+  "Номинант появится, когда кто-то наберёт минимум опыта за неделю ({xp} XP).":
+    "A nominee appears once someone earns at least the weekly minimum ({xp} XP).",
+  "Первое закрытое поручение": "First completed task",
+  "10 закрытых поручений": "10 completed tasks",
+  "50 закрытых поручений": "50 completed tasks",
+  "100 закрытых поручений": "100 completed tasks",
+  "500 закрытых поручений": "500 completed tasks",
+  "1000 поручений: легенда смены": "1000 tasks: shift legend",
+  "Первая смена в системе": "First shift in the system",
+  "10 рабочих дней": "10 workdays",
+  "100 рабочих дней": "100 workdays",
+  "300 рабочих дней": "300 workdays",
+  "1000-й рабочий день": "1000th workday",
+  "10 пунктов чек-листа": "10 checklist items",
+  "100 пунктов чек-листа": "100 checklist items",
+  "1000 пунктов чек-листа": "1000 checklist items",
+  // ------------------------------------ залы чек-листа и должности --
+  "Первый зал": "First hall",
+  "Второй зал": "Second hall",
+  "Официант": "Waiter",
+  "Разработчик": "Developer",
+  "Менеджер": "Manager",
+  "Повар": "Cook",
+  "Бармен": "Bartender",
+  "Администратор зала": "Floor manager",
+  "Су-шеф": "Sous-chef",
+  "Хостес": "Host",
+  // ------------------------------------ тексты, которые правит админ --
+  "Ссылка показывается один раз и работает как пароль — не пересылай её. Действует до {date}.":
+    "The link is shown once and works like a password — don't forward it. Valid until {date}.",
+  "использована {when}": "used {when}",
+  "Открыть на компьютере": "Open on a computer",
+  "Загляни в события смены.": "Take a look at the shift events.",
+  "Фотоотчёт можно снять прямо в пункте с 📷, а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.":
+    "You can attach a photo right in a checklist item (📷), and report “running late” from the task card. The bot chat works too.",
 };

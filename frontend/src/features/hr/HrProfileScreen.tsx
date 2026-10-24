@@ -272,7 +272,9 @@ export default function HrProfileScreen() {
               </span>
             </div>
             {me.position && (
-              <div className="mt-1 text-xs text-tg-hint">{me.position}</div>
+              <div className="mt-1 text-xs text-tg-hint">
+                {tx(me.position)}
+              </div>
             )}
           </div>
           {!editing && (
@@ -752,7 +754,9 @@ export default function HrProfileScreen() {
 
       {/* Чат с ботом — тихая ссылка внизу, а не отдельная карточка. */}
       <div className="pb-2 text-center">
-        <p className="text-xs text-tg-hint">{photoHint}</p>
+        {/* Текст можно переопределить в админке; если он совпадает с
+            заводским — переводим, если написан свой — показываем как есть. */}
+        <p className="text-xs text-tg-hint">{tx(photoHint)}</p>
         <button
           type="button"
           onClick={() => {

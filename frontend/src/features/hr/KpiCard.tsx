@@ -30,7 +30,7 @@ export default function KpiCard() {
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text">{tx("Опыт смены")}</h2>
         <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-text">
-          {kpi.rank.emoji} {kpi.rank.title}
+          {kpi.rank.emoji} {tx(kpi.rank.title)}
         </span>
       </div>
 
@@ -38,7 +38,10 @@ export default function KpiCard() {
         <span className="tabular-nums">{kpi.xp} XP</span>
         {kpi.next_rank ? (
           <span>
-            до «{kpi.next_rank.title}» — {kpi.left} XP
+            {tx("до «{rank}» — {xp} XP", {
+              rank: tx(kpi.next_rank.title),
+              xp: kpi.left,
+            })}
           </span>
         ) : (
           <span>{tx("максимальное звание")}</span>
@@ -62,7 +65,11 @@ export default function KpiCard() {
         <Cell label={tx("За неделю")} value={`${kpi.week_xp} XP`} />
         <Cell
           label={tx("Место в неделе")}
-          value={place ? `${place} из ${kpi.week_total}` : "—"}
+          value={
+            place
+              ? tx("{place} из {total}", { place, total: kpi.week_total })
+              : "—"
+          }
         />
         <Cell label={tx("Пунктов чек-листа")} value={String(kpi.week_counts.checklist_items)} />
         <Cell label={tx("Поручений закрыто")} value={String(kpi.week_counts.tasks_done)} />
@@ -80,8 +87,10 @@ export default function KpiCard() {
           </>
         ) : (
           <div className="text-tg-hint">
-            Номинант появится, когда кто-то наберёт минимум опыта за неделю (
-            {kpi.rules.min_xp_winner} XP).
+            {tx(
+              "Номинант появится, когда кто-то наберёт минимум опыта за неделю ({xp} XP).",
+              { xp: kpi.rules.min_xp_winner },
+            )}
           </div>
         )}
       </div>

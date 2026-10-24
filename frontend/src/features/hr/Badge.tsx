@@ -1,3 +1,5 @@
+import { useTx } from "@/i18n";
+
 /**
  * SemiTaskBot: плашка «должность / звание» рядом с именем.
  *
@@ -23,6 +25,9 @@ export default function Badge({
   tone?: { border: string; soft: string };
   className?: string;
 }) {
+  // Подпись — содержимое, которое завёл человек: заводские должности
+  // переводятся (есть в словаре), свои остаются как есть.
+  const { tx } = useTx();
   if (!text && !demo) return null;
   return (
     <span
@@ -41,7 +46,7 @@ export default function Badge({
       }
     >
       {emoji && <span aria-hidden>{emoji}</span>}
-      {text && <span className="truncate">{text}</span>}
+      {text && <span className="truncate">{tx(text)}</span>}
       {demo && (
         // VISUAL_AUDIT P3.16: «BOT» — это подпись, а не состояние, поэтому
         // нейтральный фон: янтарный статусный цвет на плашке спорил с

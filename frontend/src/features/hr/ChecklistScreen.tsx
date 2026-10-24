@@ -133,7 +133,7 @@ export default function ChecklistScreen() {
           <div className="mt-2 flex items-center justify-between gap-2 rounded-tile bg-tg-secondary-bg/50 px-3 py-1.5">
             <span className="flex items-center gap-1.5 text-xs text-tg-text">
               <Icon name="door" size={16} />
-              {tx("Сегодня работаешь:")} <b>{data.hall_name}</b>
+              {tx("Сегодня работаешь:")} <b>{tx(data.hall_name)}</b>
             </span>
             <button
               type="button"
@@ -269,7 +269,7 @@ function HallPicker({
         >
           <span className="flex items-center gap-2">
             <Icon name="door" size={18} />
-            {hall.name}
+            {tx(hall.name)}
           </span>
           <span className="text-xs opacity-70">
             {hall.id === selectedId ? tx("выбран") : tx("выбрать")}

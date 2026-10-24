@@ -17,7 +17,7 @@ import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
-import { tx, useTx, type Locale } from "@/i18n";
+import { currentIntlLocale, tx, useTx, type Locale } from "@/i18n";
 import {
   countFreshItems,
   markFeedSeen,
@@ -220,13 +220,16 @@ export default function HrFeedScreen() {
   });
 
   const feedQ = useQuery({
-    queryKey: ["hr-feed", employeeId, departmentId, kinds.join(",")],
+    // Локаль — часть ключа: фразу записи собирает сервер, поэтому при смене
+    // языка ленту надо перезапросить, а не переводить уже полученный текст.
+    queryKey: ["hr-feed", employeeId, departmentId, kinds.join(","), locale],
     queryFn: () =>
       fetchHrFeed({
         employeeId,
         departmentId,
         kinds: kinds.length ? kinds : undefined,
         limit: 100,
+        lang: locale,
       }),
   });
 
@@ -838,7 +841,7 @@ function FeedRow({
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tg-hint">
             <time
               dateTime={item.at}
-              title={new Date(item.at).toLocaleString("ru-RU")}
+              title={new Date(item.at).toLocaleString(currentIntlLocale())}
               className="tabular-nums"
             >
               {fmtWhen(item.at)}

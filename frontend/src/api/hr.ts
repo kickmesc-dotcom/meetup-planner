@@ -649,12 +649,15 @@ export const fetchHrFeed = (
     departmentId?: number | null;
     kinds?: FeedKind[];
     limit?: number;
+    /** Язык текста записи: его собирает сервер, а не интерфейс. */
+    lang?: "ru" | "en";
   } = {},
 ) => {
   const params = new URLSearchParams();
   if (opts.employeeId) params.set("employee_id", String(opts.employeeId));
   if (opts.departmentId) params.set("department_id", String(opts.departmentId));
   if (opts.kinds?.length) params.set("kinds", opts.kinds.join(","));
+  if (opts.lang) params.set("lang", opts.lang);
   params.set("limit", String(opts.limit ?? 50));
   return api<HrFeed>(`/api/feed?${params.toString()}`);
 };
