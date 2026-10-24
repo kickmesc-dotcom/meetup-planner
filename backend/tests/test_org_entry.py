@@ -22,10 +22,14 @@ os.environ.setdefault("MINI_APP_URL", "https://example.com")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/db")
 
 import pytest  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
+from app.api import routes_orgs  # noqa: E402
 from app.db.auth_models import AuthSession  # noqa: E402
 from app.db.base import Base  # noqa: E402
+from app.db.hr_models import Employee  # noqa: E402
 from app.db.models import User  # noqa: E402
 from app.db.org_models import (  # noqa: E402
     DEFAULT_ORG_ID,
@@ -157,6 +161,145 @@ async def test_create_rejects_short_name(session) -> None:
     with pytest.raises(orgs.OrgsError) as err:
         await orgs.create_with_owner(session, user=user, name=" ")
     assert str(err.value) == "bad_name"
+
+
+async def _team(session):
+    """Организация с владельцем, сотрудником и админом-наблюдателем.
+
+    Роль меняет один, права проверяются у него же: `AdminDep` уже гарантирует,
+    что запрос пришёл от администратора.
+    """
+    owner = await _setup(session)
+    session.add_all(
+        [
+            OrganizationMember(
+                org_id=DEFAULT_ORG_ID, user_id=owner.id, role="owner"
+            ),
+            User(
+                id=2,
+                telegram_id=999002,
+                email="staff@example.com",
+                display_name="Сотрудник",
+            ),
+            OrganizationMember(
+                org_id=DEFAULT_ORG_ID, user_id=2, role="staff"
+            ),
+            Employee(
+                org_id=DEFAULT_ORG_ID, user_id=2, role="employee"
+            ),
+            User(
+                id=3,
+                telegram_id=999003,
+                email="watcher@example.com",
+                display_name="Наблюдатель",
+            ),
+            OrganizationMember(
+                org_id=DEFAULT_ORG_ID, user_id=3, role="staff"
+            ),
+            Employee(org_id=DEFAULT_ORG_ID, user_id=3, role="admin"),
+        ]
+    )
+    await session.commit()
+    org = await session.get(Organization, DEFAULT_ORG_ID)
+    assert org is not None
+    return owner, org
+
+
+async def test_member_role_updates_membership_and_hr_role(session) -> None:
+    owner, org = await _team(session)
+
+    out = await routes_orgs.set_member_role(
+        2,
+        routes_orgs.OrgMemberRoleIn(role="manager"),
+        session,
+        owner,
+        org,
+        None,
+    )
+
+    assert out.role == "manager"
+    assert out.hr_role == "aup"
+    employee = await session.scalar(
+        select(Employee).where(Employee.user_id == 2)
+    )
+    assert employee is not None
+    assert employee.role == "aup"
+    # Ручной выбор должен пережить `ensure_employee`.
+    assert employee.role_locked is True
+
+
+async def test_member_cannot_change_own_role(session) -> None:
+    owner, org = await _team(session)
+
+    with pytest.raises(HTTPException) as err:
+        await routes_orgs.set_member_role(
+            1,
+            routes_orgs.OrgMemberRoleIn(role="staff"),
+            session,
+            owner,
+            org,
+            None,
+        )
+    assert err.value.status_code == 400
+    assert err.value.detail == "self_role_change"
+
+
+async def test_last_owner_cannot_be_demoted(session) -> None:
+    _, org = await _team(session)
+    watcher = await session.get(User, 3)
+    assert watcher is not None
+
+    with pytest.raises(HTTPException) as err:
+        await routes_orgs.set_member_role(
+            1,
+            routes_orgs.OrgMemberRoleIn(role="manager"),
+            session,
+            watcher,
+            org,
+            None,
+        )
+    assert err.value.status_code == 409
+    assert err.value.detail == "last_owner"
+
+
+async def test_unknown_member_and_role_are_rejected(session) -> None:
+    owner, org = await _team(session)
+
+    with pytest.raises(HTTPException) as no_member:
+        await routes_orgs.set_member_role(
+            999,
+            routes_orgs.OrgMemberRoleIn(role="staff"),
+            session,
+            owner,
+            org,
+            None,
+        )
+    assert no_member.value.status_code == 404
+
+    with pytest.raises(HTTPException) as bad_role:
+        await routes_orgs.set_member_role(
+            2,
+            routes_orgs.OrgMemberRoleIn(role="boss"),
+            session,
+            owner,
+            org,
+            None,
+        )
+    assert bad_role.value.status_code == 400
+
+
+async def test_members_list_shows_roles_and_marks_self(session) -> None:
+    owner, org = await _team(session)
+
+    rows = await routes_orgs.list_members(session, owner, org, None)
+
+    # Владелец — первым, остальные по имени внутри своего уровня.
+    assert rows[0].user_id == 1
+    assert rows[0].role == "owner" and rows[0].is_self is True
+    by_id = {row.user_id: row for row in rows}
+    assert set(by_id) == {1, 2, 3}
+    assert by_id[2].hr_role == "employee"
+    assert by_id[2].is_self is False
 
 
 async def test_membership_rows_are_not_duplicated(session) -> None:

@@ -103,3 +103,26 @@ export const createOrganization = (name: string, industry: string) =>
 
 /** Своя организация: имя и код для приглашений. */
 export const fetchCurrentOrg = () => api<OrgInfo>("/api/org/current");
+
+export interface OrgMember {
+  user_id: number;
+  name: string;
+  email: string | null;
+  role: OrgRole;
+  /** HR-роль: что человек реально видит в приложении. */
+  hr_role: string | null;
+  is_self: boolean;
+}
+
+/** Кто имеет доступ к организации. Только своя организация. */
+export const fetchOrgMembers = () => api<OrgMember[]>("/api/org/members");
+
+/**
+ * Сменить уровень доступа. Сервер сам обновит HR-роль, поэтому «назначил
+ * управляющим» сразу даёт человеку админку, а не остаётся надписью.
+ */
+export const updateOrgMemberRole = (userId: number, role: OrgRole) =>
+  api<OrgMember>(`/api/org/members/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });

@@ -164,6 +164,15 @@ def onboarding_finished(employee: Employee) -> bool:
     return employee.onboarding_state == ONBOARDING_DONE
 
 
+def hr_role_for_org(role: str) -> str:
+    """HR-роль для уровня доступа в организации.
+
+    Публичная обёртка над таблицей соответствий: ручка смены роли участника не
+    должна тянуть приватный словарь, иначе переименование поля сломает API.
+    """
+    return _ORG_ROLE_TO_HR.get(role, ROLE_EMPLOYEE)
+
+
 def set_role(employee: Employee, role: str) -> None:
     """Сменить роль с валидацией (используется админским API).
 

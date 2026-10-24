@@ -4,9 +4,11 @@ import {
   createInvitation,
   fetchCurrentOrg,
   fetchInvitations,
+  fetchOrgMembers,
   ORG_ROLE_LABELS,
   ORG_ROLES,
   revokeInvitation,
+  updateOrgMemberRole,
   type OrgInvitation,
   type OrgRole,
 } from "@/api/orgs";
@@ -55,6 +57,26 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
     queryFn: fetchCurrentOrg,
     staleTime: 5 * 60_000,
     retry: false,
+  });
+
+  // Люди с доступом и их уровни. Роль здесь — не подпись в списке: сервер
+  // вместе с ней меняет и HR-роль человека, иначе «назначил управляющим»
+  // не давало бы ему админки.
+  const members = useQuery({
+    queryKey: ["org-members"],
+    queryFn: fetchOrgMembers,
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const changeRole = useMutation({
+    mutationFn: (input: { userId: number; role: OrgRole }) =>
+      updateOrgMemberRole(input.userId, input.role),
+    onSuccess: () => {
+      haptic("success");
+      void qc.invalidateQueries({ queryKey: ["org-members"] });
+    },
+    onError: (e) => void showAlert(humanizeApiError(e)),
   });
 
   const refresh = () =>
@@ -110,6 +132,52 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
       <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">{tx(
         "Ссылка открывает вход в организацию. Если указать почту, принять сможет только её владелец; без почты ссылку можно скинуть в чат смены. Ссылка одноразовая и перестаёт работать после присоединения.",
       )}</div>
+
+      {members.data && members.data.length > 0 && (
+        <section className="space-y-2 rounded-card bg-tg-secondary-bg/60 p-3">
+          <div className="text-sm font-semibold text-tg-text">{tx("Кто в приложении")}</div>
+          <p className="text-xs text-tg-hint">{tx(
+            "Роль меняет и доступ в админку: владелец — администратор, управляющий — руководитель. Свою роль изменить нельзя — попроси другого администратора.",
+          )}</p>
+          <ul className="divide-y divide-tg-hint/10">
+            {members.data.map((row) => (
+              <li
+                key={row.user_id}
+                className="flex items-center justify-between gap-2 py-2"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm text-tg-text">
+                    {row.name}
+                  </div>
+                  <div className="truncate text-xs text-tg-hint">
+                    {row.is_self
+                      ? tx("это ты")
+                      : (row.email ?? tx("без почты"))}
+                  </div>
+                </div>
+                <select
+                  aria-label={tx("Роль {name}", { name: row.name })}
+                  value={row.role}
+                  disabled={row.is_self || changeRole.isPending}
+                  onChange={(e) =>
+                    changeRole.mutate({
+                      userId: row.user_id,
+                      role: e.target.value as OrgRole,
+                    })
+                  }
+                  className="min-h-9 shrink-0 rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text disabled:opacity-50"
+                >
+                  {ORG_ROLES.map((value) => (
+                    <option key={value} value={value}>
+                      {ORG_ROLE_LABELS[value]}
+                    </option>
+                  ))}
+                </select>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {org.data && (
         <section className="flex items-start justify-between gap-2 rounded-card bg-tg-secondary-bg/60 p-3">

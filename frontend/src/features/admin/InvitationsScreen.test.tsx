@@ -6,14 +6,16 @@
  * только в ответе на создание (в списке её нет — сервер хранит хеш), письмо не
  * обещается, если транспорт «лог», а отзыв спрашивает подтверждение.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import InvitationsScreen from "./InvitationsScreen";
 import {
   createInvitation,
   fetchInvitations,
+  fetchOrgMembers,
   revokeInvitation,
+  updateOrgMemberRole,
 } from "@/api/orgs";
 
 vi.mock("@/tg/webapp", () => ({
@@ -26,8 +28,10 @@ vi.mock("@/api/orgs", () => ({
   fetchCurrentOrg: vi.fn(() =>
     Promise.resolve({ id: 1, slug: "kofeynya", name: "Кофейня", role: "owner" }),
   ),
+  fetchOrgMembers: vi.fn(() => Promise.resolve([])),
   createInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
+  updateOrgMemberRole: vi.fn(),
   ORG_ROLES: ["staff", "manager", "owner"],
   ORG_ROLE_LABELS: {
     owner: "Владелец",
@@ -39,6 +43,8 @@ vi.mock("@/api/orgs", () => ({
 const listMock = vi.mocked(fetchInvitations);
 const createMock = vi.mocked(createInvitation);
 const revokeMock = vi.mocked(revokeInvitation);
+const membersMock = vi.mocked(fetchOrgMembers);
+const roleMock = vi.mocked(updateOrgMemberRole);
 
 function renderScreen() {
   const onBack = vi.fn();
@@ -53,11 +59,19 @@ function renderScreen() {
   return onBack;
 }
 
+beforeEach(() => {
+  // `mockReset` в конце каждого теста снимает реализацию, а запрос участников
+  // уходит всегда: без этого в лог падало бы «query data cannot be undefined».
+  membersMock.mockResolvedValue([]);
+});
+
 afterEach(() => {
   cleanup();
   listMock.mockReset();
   createMock.mockReset();
   revokeMock.mockReset();
+  membersMock.mockReset();
+  roleMock.mockReset();
 });
 
 describe("InvitationsScreen", () => {
@@ -103,6 +117,47 @@ describe("InvitationsScreen", () => {
       role: "staff",
       days: 7,
     });
+  });
+
+  it("меняет роль участника, но не даёт менять свою", async () => {
+    listMock.mockResolvedValue([]);
+    membersMock.mockResolvedValue([
+      {
+        user_id: 1,
+        name: "Владелец",
+        email: "owner@example.com",
+        role: "owner",
+        hr_role: "admin",
+        is_self: true,
+      },
+      {
+        user_id: 2,
+        name: "Сотрудник",
+        email: "staff@example.com",
+        role: "staff",
+        hr_role: "employee",
+        is_self: false,
+      },
+    ]);
+    roleMock.mockResolvedValue({
+      user_id: 2,
+      name: "Сотрудник",
+      email: "staff@example.com",
+      role: "manager",
+      hr_role: "aup",
+      is_self: false,
+    });
+    renderScreen();
+
+    const own = await screen.findByLabelText("Роль Владелец");
+    expect((own as HTMLSelectElement).disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Роль Сотрудник"), {
+      target: { value: "manager" },
+    });
+    await waitFor(() =>
+      expect(roleMock).toHaveBeenCalledWith(2, "manager"),
+    );
   });
 
   it("просит подтверждение перед отзывом", async () => {

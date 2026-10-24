@@ -19,10 +19,18 @@ from typing import Annotated, NoReturn
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.api.deps import AdminDep, CurrentUser, SessionDep, current_org
-from app.db.org_models import INDUSTRIES, Organization
-from app.services import invitations, mail, orgs
+from app.db.hr_models import Employee
+from app.db.models import User
+from app.db.org_models import (
+    INDUSTRIES,
+    ORG_ROLES,
+    Organization,
+    OrganizationMember,
+)
+from app.services import hr_access, invitations, mail, orgs
 
 log = structlog.get_logger()
 router = APIRouter(tags=["orgs"])
@@ -50,6 +58,9 @@ _STATUS: dict[str, int] = {
     "bad_slug": status.HTTP_400_BAD_REQUEST,
     "slug_taken": status.HTTP_409_CONFLICT,
     "bad_industry": status.HTTP_400_BAD_REQUEST,
+    "member_not_found": status.HTTP_404_NOT_FOUND,
+    "self_role_change": status.HTTP_400_BAD_REQUEST,
+    "last_owner": status.HTTP_409_CONFLICT,
 }
 
 
@@ -95,6 +106,27 @@ class OrgOut(BaseModel):
     slug: str
     name: str
     role: str
+
+
+class OrgMemberOut(BaseModel):
+    """Человек с доступом к организации.
+
+    Две роли рядом не для красоты: `role` — уровень доступа к организации
+    (знаете, кого приглашать владельцем), `hr_role` — что человек видит в
+    приложении. Изменение первой меняет и вторую, иначе «назначил
+    управляющим» осталось бы словами.
+    """
+
+    user_id: int
+    name: str
+    email: str | None
+    role: str
+    hr_role: str | None
+    is_self: bool
+
+
+class OrgMemberRoleIn(BaseModel):
+    role: str = Field(min_length=1, max_length=16)
 
 
 class InvitationIn(BaseModel):
@@ -213,6 +245,148 @@ async def create_own_organization(
         _fail(exc)
     log.info("orgs.created", org_id=org.id, user_id=user.id)
     return _org_out(org, "owner")
+
+
+# Порядок в списке: владельцы, управляющие, остальные. Ровно тот же смысл,
+# что у уровней доступа, — не алфавит по имени.
+_ROLE_ORDER = {"owner": 0, "manager": 1, "staff": 2}
+
+
+def _member_out(
+    member: OrganizationMember,
+    user: User | None,
+    hr_role: str | None,
+    *,
+    me: int,
+) -> OrgMemberOut:
+    return OrgMemberOut(
+        user_id=member.user_id,
+        name=(user.display_name if user else "") or (user.email if user else "") or "—",
+        email=user.email if user else None,
+        role=member.role,
+        hr_role=hr_role,
+        is_self=member.user_id == me,
+    )
+
+
+@router.get("/org/members", response_model=list[OrgMemberOut])
+async def list_members(
+    session: SessionDep, user: CurrentUser, org: OrgDep, _admin: AdminDep
+) -> list[OrgMemberOut]:
+    """Кто имеет доступ к организации и с какими правами.
+
+    Только своя организация: `org` берётся из сотрудника запроса, а не из
+    параметров — чужой список не запросить даже зная id.
+    """
+    members = list(
+        await session.scalars(
+            select(OrganizationMember).where(
+                OrganizationMember.org_id == org.id
+            )
+        )
+    )
+    ids = [row.user_id for row in members]
+    users = (
+        {
+            row.id: row
+            for row in await session.scalars(
+                select(User).where(User.id.in_(ids))
+            )
+        }
+        if ids
+        else {}
+    )
+    hr = (
+        {
+            row.user_id: row.role
+            for row in await session.scalars(
+                select(Employee).where(
+                    Employee.org_id == org.id, Employee.user_id.in_(ids)
+                )
+            )
+        }
+        if ids
+        else {}
+    )
+    def sort_key(row: OrganizationMember) -> tuple[int, str]:
+        person = users.get(row.user_id)
+        name = ((person.display_name if person else "") or "").lower()
+        return (_ROLE_ORDER.get(row.role, 9), name)
+
+    members.sort(key=sort_key)
+    return [
+        _member_out(row, users.get(row.user_id), hr.get(row.user_id), me=user.id)
+        for row in members
+    ]
+
+
+@router.patch("/org/members/{member_user_id}", response_model=OrgMemberOut)
+async def set_member_role(
+    member_user_id: int,
+    body: OrgMemberRoleIn,
+    session: SessionDep,
+    user: CurrentUser,
+    org: OrgDep,
+    _admin: AdminDep,
+) -> OrgMemberOut:
+    """Сменить уровень доступа человека в организации.
+
+    Три запрета, без которых кнопка опасна:
+
+    * нельзя менять свою роль — иначе один случайный клик снимает доступ у
+      того, кто настраивает команду;
+    * нельзя снять последнего владельца — организация осталась бы без хозяина;
+    * роль должна быть из известного набора.
+
+    Вместе с уровнем доступа меняется и HR-роль: `manager` → `aup`,
+    `owner` → `admin`. Иначе человек с «управляющим» в списке не увидел бы
+    админку, и правка выглядела бы сломанной.
+    """
+    if body.role not in ORG_ROLES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_role")
+    if member_user_id == user.id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="self_role_change"
+        )
+    target = await orgs.member(
+        session, org_id=org.id, user_id=member_user_id
+    )
+    if target is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail="member_not_found"
+        )
+    if target.role == "owner" and body.role != "owner":
+        owners = await session.scalars(
+            select(OrganizationMember).where(
+                OrganizationMember.org_id == org.id,
+                OrganizationMember.role == "owner",
+            )
+        )
+        if len(list(owners)) <= 1:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, detail="last_owner"
+            )
+
+    target.role = body.role
+    employee = await hr_access.get_employee(session, member_user_id)
+    if employee is not None and employee.org_id == org.id:
+        hr_access.set_role(employee, hr_access.hr_role_for_org(body.role))
+    await session.commit()
+    await session.refresh(target)
+    target_user = await session.get(User, member_user_id)
+    log.info(
+        "orgs.member_role",
+        org_id=org.id,
+        user_id=member_user_id,
+        role=body.role,
+        by=user.id,
+    )
+    return _member_out(
+        target,
+        target_user,
+        employee.role if employee is not None else None,
+        me=user.id,
+    )
 
 
 @router.get("/org/invitations", response_model=list[InvitationOut])

@@ -1478,4 +1478,10 @@ export const EN_CONTENT: Record<string, string> = {
   "ID компании": "Company ID",
   "Сотрудник вводит его на первом экране — вместе с названием или вместо него. Список компаний снаружи не виден.":
     "An employee enters it on the first screen — instead of or along with the name. The list of companies is not visible from outside.",
+  "Кто в приложении": "Who has access",
+  "Роль меняет и доступ в админку: владелец — администратор, управляющий — руководитель. Свою роль изменить нельзя — попроси другого администратора.":
+    "The role also changes admin access: an owner becomes an administrator, a manager becomes a supervisor. You can't change your own role — ask another administrator.",
+  "это ты": "that's you",
+  "без почты": "no email",
+  "Роль {name}": "Role of {name}",
 };
