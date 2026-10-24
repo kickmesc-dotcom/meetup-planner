@@ -3904,3 +3904,22 @@ gzip 247.34 kB), на живом домене в бандле есть `Shift ch
 alembic `0060`), CF Pages `semitaskbot` (бандл `index-DWZqIsre.js`).
 Проверки: `pytest` 1503 passed / 11 skipped; `vitest` 516 passed; `tsc` чисто;
 `npm run build` собирается; `expo export --platform android` бандлится.
+
+## 24.10.2026: должность и отдел в приглашении
+
+- `POST /api/org/invitations` принимает `position` и `department_id`;
+  в списке и в предпросмотре ссылки они возвращаются вместе с названием отдела.
+- Миграция `0061_invite_position`: `org_invitations.position` и
+  `department_id` (FK на `departments`, `ON DELETE SET NULL`).
+- Применение: при создании HR-профиля (`hr_access.ensure_employee`) и при
+  принятии ссылки, если профиль уже существовал. Чужой отдел отвергается
+  (`department_not_found`) — id проверяется по организации приглашения.
+- Админка: в «Приглашениях» появились поля должности и отдела, а в списке
+  живых ссылок видно, кем и куда позовут. На экране приглашения — строка
+  «Вас ждут: …».
+
+Выложено: Amvera `meetup-planner` (build `eb21c816ec6b`, alembic `0061`),
+HF Space (build `b81be0aa23b1`, alembic `0061`), CF Pages `semitaskbot`
+(бандл `index-m7p5RxWP.js`). Проверки: `pytest` 1506 passed / 11 skipped;
+`vitest` 516 passed; `tsc` чисто; `npm run build` собирается;
+`tests/test_db_alembic_head.py` — 3 passed против живой Neon.
