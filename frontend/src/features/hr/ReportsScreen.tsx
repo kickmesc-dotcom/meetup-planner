@@ -14,6 +14,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { InlineIcon } from "@/components/Icon";
 import { useUI } from "@/store/ui";
+import { useTx, type Locale } from "@/i18n";
 
 /**
  * Отчёт смены.
@@ -23,6 +24,10 @@ import { useUI } from "@/store/ui";
  * которые сдал не каждый. Дата и отдел выбираются сверху; сервер сам сужает
  * срез до отдела руководителя, поэтому подмена отдела в запросе ничего не
  * откроет.
+ *
+ * Перевод (24.10.2026): подписи идут через `tx(...)`. Названия отделов и
+ * стандартов, имена людей остаются как есть — это данные управляющего, а не
+ * интерфейс. Дата форматируется по локали (`Intl`), а не по-русски всегда.
  */
 
 function todayIso(): string {
@@ -31,13 +36,18 @@ function todayIso(): string {
   return local.toISOString().slice(0, 10);
 }
 
-function fmtDate(iso: string): string {
+function fmtDate(iso: string, locale: Locale): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("ru-RU", { day: "2-digit", month: "long", year: "numeric" });
+  return d.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export default function ReportsScreen() {
+  const { tx, locale } = useTx();
   const setTab = useUI((s) => s.setTab);
   const [on, setOn] = useState<string>(todayIso());
   const [departmentId, setDepartmentId] = useState<number | null>(null);
@@ -69,9 +79,9 @@ export default function ReportsScreen() {
     try {
       haptic("light");
       const name = await downloadShiftCsv({ on, department_id: departmentId });
-      await showAlert(`Файл готов: ${name}`);
+      await showAlert(tx("Файл готов: {name}", { name }));
     } catch {
-      await showAlert("Не получилось скачать файл — попробуй ещё раз.");
+      await showAlert(tx("Не получилось скачать файл — попробуй ещё раз."));
     }
   };
 
@@ -85,14 +95,16 @@ export default function ReportsScreen() {
             setTab("profile");
           }}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
-          aria-label="Назад в профиль"
+          aria-label={tx("Назад в профиль")}
         >
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">Отчёт смены</div>
+          <div className="text-sm font-semibold text-tg-text">
+            {tx("Отчёт смены")}
+          </div>
           <div className="text-xs text-tg-hint">
-            {report ? fmtDate(report.work_date) : "Срез на дату"}
+            {report ? fmtDate(report.work_date, locale) : tx("Срез на дату")}
           </div>
         </div>
         <button
@@ -113,7 +125,7 @@ export default function ReportsScreen() {
               max={todayIso()}
               onChange={(event) => setOn(event.target.value || todayIso())}
               className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
-              aria-label="Дата смены"
+              aria-label={tx("Дата смены")}
             />
             {!!meQ.data?.is_staff && (
               <select
@@ -122,9 +134,9 @@ export default function ReportsScreen() {
                   setDepartmentId(event.target.value ? Number(event.target.value) : null)
                 }
                 className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
-                aria-label="Подразделение"
+                aria-label={tx("Подразделение")}
               >
-                <option value="">Все отделы</option>
+                <option value="">{tx("Все отделы")}</option>
                 {(departmentsQ.data ?? []).map((dept) => (
                   <option key={dept.id} value={dept.id}>
                     {dept.emoji ? `${dept.emoji} ` : ""}
@@ -137,9 +149,9 @@ export default function ReportsScreen() {
           {report && (
             <div className="mt-2 text-xs text-tg-hint">
               {report.scope === "all"
-                ? "Видно все отделы"
-                : "Видно своё подразделение"}{" "}
-              · людей {report.employees_total}
+                ? tx("Видно все отделы")
+                : tx("Видно своё подразделение")}{" "}
+              · {tx("людей {count}", { count: report.employees_total })}
             </div>
           )}
         </section>
@@ -158,44 +170,65 @@ export default function ReportsScreen() {
         {report && (
           <>
             <section className="grid grid-cols-2 gap-2">
-              <Metric label="Смен начато" value={report.shifts_started} hint={`из ${report.employees_total}`} />
-              <Metric label="Смен закрыто" value={report.shifts_done} hint="чек-лист на 100%" />
-              <Metric label="Поручений" value={report.tasks_shift} hint={`выполнено ${report.tasks_done}`} />
               <Metric
-                label="На проверке"
+                label={tx("Смен начато")}
+                value={report.shifts_started}
+                hint={tx("из {count}", { count: report.employees_total })}
+              />
+              <Metric
+                label={tx("Смен закрыто")}
+                value={report.shifts_done}
+                hint={tx("чек-лист на 100%")}
+              />
+              <Metric
+                label={tx("Поручений")}
+                value={report.tasks_shift}
+                hint={tx("выполнено {count}", { count: report.tasks_done })}
+              />
+              <Metric
+                label={tx("На проверке")}
                 value={report.tasks_on_review}
-                hint="сдано, но не принято"
+                hint={tx("сдано, но не принято")}
                 accent={report.tasks_on_review > 0}
               />
               <Metric
-                label="Просрочено"
+                label={tx("Просрочено")}
                 value={report.tasks_overdue}
-                hint="за эту смену"
+                hint={tx("за эту смену")}
                 accent={report.tasks_overdue > 0}
               />
               <Metric
-                label="Пробелы стандартов"
+                label={tx("Пробелы стандартов")}
                 value={report.required_gaps}
-                hint="обязательные не сданы"
+                hint={tx("обязательные не сданы")}
                 accent={report.required_gaps > 0}
               />
             </section>
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold text-tg-text">Сейчас в работе</h2>
+                <h2 className="text-sm font-semibold text-tg-text">
+                  {tx("Сейчас в работе")}
+                </h2>
                 <span className="text-xs text-tg-hint">
-                  {report.tasks_open} поручений · {report.issues_open} проблем
+                  {tx("{tasks} поручений · {issues} проблем", {
+                    tasks: report.tasks_open,
+                    issues: report.issues_open,
+                  })}
                 </span>
               </div>
               <div className="mt-1 text-xs text-tg-hint">
-                Новых проблем за смену: {report.issues_new}
+                {tx("Новых проблем за смену: {count}", {
+                  count: report.issues_new,
+                })}
               </div>
             </section>
 
             {report.departments.length > 1 && (
               <section className="space-y-2">
-                <h2 className="px-1 text-sm font-semibold text-tg-text">По отделам</h2>
+                <h2 className="px-1 text-sm font-semibold text-tg-text">
+                  {tx("По отделам")}
+                </h2>
                 {report.departments.map((dept) => (
                   <DepartmentCard key={dept.department_id} dept={dept} />
                 ))}
@@ -205,7 +238,7 @@ export default function ReportsScreen() {
             <section className="space-y-2">
               <div className="flex items-center justify-between px-1">
                 <h2 className="text-sm font-semibold text-tg-text">
-                  Обязательные стандарты
+                  {tx("Обязательные стандарты")}
                 </h2>
                 <label className="flex items-center gap-1 text-xs text-tg-hint">
                   <input
@@ -213,19 +246,21 @@ export default function ReportsScreen() {
                     checked={onlyGaps}
                     onChange={(event) => setOnlyGaps(event.target.checked)}
                   />
-                  только пробелы
+                  {tx("только пробелы")}
                 </label>
               </div>
               {standards.length === 0 ? (
                 <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
-                  {requiredStandards.length === 0
-                    ? "Обязательных стандартов пока нет — отметь их в базе стандартов."
-                    : (
-                        <>
-                          <InlineIcon name="check" />
-                          Все обязательные стандарты сданы.
-                        </>
-                      )}
+                  {requiredStandards.length === 0 ? (
+                    tx(
+                      "Обязательных стандартов пока нет — отметь их в базе стандартов.",
+                    )
+                  ) : (
+                    <>
+                      <InlineIcon name="check" />
+                      {tx("Все обязательные стандарты сданы.")}
+                    </>
+                  )}
                 </div>
               ) : (
                 standards.map((standard) => (
@@ -268,6 +303,7 @@ function Metric({
 }
 
 function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
+  const { tx } = useTx();
   return (
     <div className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-baseline justify-between gap-2">
@@ -276,23 +312,27 @@ function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
           {dept.name}
         </div>
         <div className="shrink-0 text-xs text-tg-hint">
-          {dept.employees} чел.
+          {tx("{count} чел.", { count: dept.employees })}
         </div>
       </div>
       <div className="mt-1 text-xs text-tg-hint">
-        Смены {dept.shifts_started}/{dept.employees} · закрыто {dept.shifts_done}
+        {tx("Смены {started}/{employees} · закрыто {done}", {
+          started: dept.shifts_started,
+          employees: dept.employees,
+          done: dept.shifts_done,
+        })}
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-tg-hint">
-        <span>поручений {dept.tasks_shift}</span>
-        <span>на проверке {dept.tasks_on_review}</span>
+        <span>{tx("поручений {count}", { count: dept.tasks_shift })}</span>
+        <span>{tx("на проверке {count}", { count: dept.tasks_on_review })}</span>
         <span className={dept.tasks_overdue > 0 ? "text-status-busy" : ""}>
-          просрочено {dept.tasks_overdue}
+          {tx("просрочено {count}", { count: dept.tasks_overdue })}
         </span>
         <span className={dept.issues_open > 0 ? "text-status-busy" : ""}>
-          проблем {dept.issues_open}
+          {tx("проблем {count}", { count: dept.issues_open })}
         </span>
         <span className={dept.required_gaps > 0 ? "text-status-busy" : ""}>
-          пробелов {dept.required_gaps}
+          {tx("пробелов {count}", { count: dept.required_gaps })}
         </span>
       </div>
     </div>
@@ -300,6 +340,7 @@ function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
 }
 
 function StandardCard({ standard }: { standard: HrStandardCoverage }) {
+  const { tx } = useTx();
   const percent =
     standard.total > 0 ? Math.round((standard.passed * 100) / standard.total) : 0;
   return (
@@ -310,7 +351,7 @@ function StandardCard({ standard }: { standard: HrStandardCoverage }) {
           {standard.title}
           {standard.required && (
             <span className="ml-1 rounded-tile bg-status-busy/15 px-1 text-2xs text-status-busy">
-              обязательный
+              {tx("обязательный")}
             </span>
           )}
         </div>
@@ -326,12 +367,14 @@ function StandardCard({ standard }: { standard: HrStandardCoverage }) {
       </div>
       {standard.missing.length > 0 && (
         <div className="mt-1.5 text-xs text-tg-hint">
-          Не сдали: {standard.missing.map((person) => person.display_name).join(", ")}
+          {tx("Не сдали: {names}", {
+            names: standard.missing.map((person) => person.display_name).join(", "),
+          })}
         </div>
       )}
       {standard.department_name && (
         <div className="mt-0.5 text-2xs text-tg-hint">
-          Только {standard.department_name}
+          {tx("Только {name}", { name: standard.department_name })}
         </div>
       )}
     </div>

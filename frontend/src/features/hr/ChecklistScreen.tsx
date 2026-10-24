@@ -17,6 +17,7 @@ import ErrorState from "@/components/ErrorState";
 import ProgressBar from "@/components/ProgressBar";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
+import { useTx } from "@/i18n";
 
 /**
  * SemiTaskBot: «Чек-лист смены».
@@ -26,6 +27,10 @@ import { haptic, showAlert } from "@/tg/webapp";
  * Выбор запоминается на смену и меняется одной кнопкой. Закрытие смены —
  * отдельная вкладка и общий чек-лист: вечером зал уже не важен. Последний
  * пункт закрытия — «показать рабочее место» с фотоотчётом.
+ *
+ * Перевод (24.10.2026): подписи идут через `tx(...)`, ключ — русский оригинал.
+ * Названия залов и пункты чек-листа приходят с сервера (их пишет управляющий в
+ * админке), поэтому они остаются как есть — переводить чужие данные нельзя.
  */
 const KIND_LABEL: Record<ChecklistKind, string> = {
   shift: "Открытие",
@@ -34,6 +39,7 @@ const KIND_LABEL: Record<ChecklistKind, string> = {
 };
 
 export default function ChecklistScreen() {
+  const { tx, locale } = useTx();
   const qc = useQueryClient();
   const emptyTitle = useAppText("checklist.empty.title", "Чек-лист не назначен");
   const [kind, setKind] = useState<ChecklistKind>("shift");
@@ -90,7 +96,9 @@ export default function ChecklistScreen() {
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">Чек-лист смены</h1>
+          <h1 className="text-lg font-semibold text-tg-text">
+            {tx("Чек-лист смены")}
+          </h1>
           {data && data.total > 0 && (
             <span className="text-xs tabular-nums text-tg-hint">
               {data.progress_text}
@@ -117,7 +125,7 @@ export default function ChecklistScreen() {
                   : "bg-tg-secondary-bg text-tg-hint",
               ].join(" ")}
             >
-              {KIND_LABEL[v]}
+              {tx(KIND_LABEL[v])}
             </button>
           ))}
         </div>
@@ -125,7 +133,7 @@ export default function ChecklistScreen() {
           <div className="mt-2 flex items-center justify-between gap-2 rounded-tile bg-tg-secondary-bg/50 px-3 py-1.5">
             <span className="flex items-center gap-1.5 text-xs text-tg-text">
               <Icon name="door" size={16} />
-              Сегодня работаешь: <b>{data.hall_name}</b>
+              {tx("Сегодня работаешь:")} <b>{data.hall_name}</b>
             </span>
             <button
               type="button"
@@ -135,7 +143,7 @@ export default function ChecklistScreen() {
               }}
               className="min-h-11 px-2 text-xs text-tg-link"
             >
-              сменить
+              {tx("сменить")}
             </button>
           </div>
         )}
@@ -170,7 +178,7 @@ export default function ChecklistScreen() {
           <ProgressBar
             value={data.done}
             total={data.total}
-            label={data.template_title ?? "Чек-лист"}
+            label={data.template_title ?? tx("Чек-лист")}
           />
         )}
 
@@ -193,6 +201,7 @@ export default function ChecklistScreen() {
                 complete.mutate({ item_id: item.id, media_id: media.id })
               }
               onSaveNote={(note) => complete.mutate({ item_id: item.id, note })}
+              locale={locale}
             />
           ))}
 
@@ -200,8 +209,9 @@ export default function ChecklistScreen() {
           <div className="flex items-center justify-center gap-1.5 rounded-card bg-status-free/10 p-3 text-center text-xs text-status-free">
             <Icon name="check" size={14} />
             <span>
-              {kind === "close" ? "Смена закрыта" : "Смена открыта"}.
-              {kind === "close" ? " Спасибо за работу!" : " Хорошей смены!"}
+              {kind === "close"
+                ? tx("Смена закрыта. Спасибо за работу!")
+                : tx("Смена открыта. Хорошей смены!")}
             </span>
           </div>
         )}
@@ -223,22 +233,25 @@ function HallPicker({
   selectedId: number | null;
   onChange: (hallId: number) => void;
 }) {
+  const { tx } = useTx();
   return (
     <div className="space-y-2">
       <div className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">
-          В каком зале работаешь?
+          {tx("В каком зале работаешь?")}
         </div>
         <div className="mt-0.5 text-xs text-tg-hint">
-          У каждого зала свой чек-лист открытия. Выбор запомнится на сегодня —
-          сменить можно в любой момент.
+          {tx(
+            "У каждого зала свой чек-лист открытия. Выбор запомнится на сегодня — сменить можно в любой момент.",
+          )}
         </div>
       </div>
       {loading && <CardSkeleton />}
       {!loading && halls.length === 0 && (
         <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
-          Залы не заведены. Попроси руководителя добавить их в разделе
-          «Чек-листы».
+          {tx(
+            "Залы не заведены. Попроси руководителя добавить их в разделе «Чек-листы».",
+          )}
         </div>
       )}
       {halls.map((hall) => (
@@ -259,7 +272,7 @@ function HallPicker({
             {hall.name}
           </span>
           <span className="text-xs opacity-70">
-            {hall.id === selectedId ? "выбран" : "выбрать"}
+            {hall.id === selectedId ? tx("выбран") : tx("выбрать")}
           </span>
         </button>
       ))}
@@ -268,18 +281,19 @@ function HallPicker({
 }
 
 function EmptyState({ title, kind }: { title: string; kind: ChecklistKind }) {
+  const { tx } = useTx();
+  const variant =
+    kind === "close"
+      ? tx("закрытия смены")
+      : kind === "shift"
+        ? tx("открытия зала")
+        : tx("первого дня");
   return (
     <div className="flex h-full flex-col items-center justify-center text-center">
       <Icon name="checklist" size={36} className="text-tg-hint" />
       <div className="mt-2 text-sm font-medium text-tg-text">{title}</div>
       <div className="mt-1 text-xs text-tg-hint">
-        Попроси руководителя назначить шаблон{" "}
-        {kind === "close"
-          ? "закрытия смены"
-          : kind === "shift"
-            ? "открытия зала"
-            : "первого дня"}
-        .
+        {tx("Попроси руководителя назначить шаблон {variant}.", { variant })}
       </div>
     </div>
   );
@@ -293,6 +307,7 @@ function ItemRow({
   onToggleNote,
   onPhoto,
   onSaveNote,
+  locale,
 }: {
   item: HrChecklistItem;
   busy: boolean;
@@ -301,7 +316,9 @@ function ItemRow({
   onToggleNote: () => void;
   onPhoto: (media: MediaItem) => void;
   onSaveNote: (note: string) => void;
+  locale: "ru" | "en";
 }) {
+  const { tx } = useTx();
   const [note, setNote] = useState(item.note ?? "");
   // Пункт с расписанием («по четвергам») виден всегда, но в остальные дни не
   // отмечается и не входит в прогресс — сервер тоже откажет.
@@ -325,10 +342,12 @@ function ItemRow({
           aria-pressed={item.done}
           aria-label={
             inactive
-              ? `Не сегодня — ${item.schedule_label ?? "по расписанию"}`
+              ? tx("Не сегодня — {label}", {
+                  label: item.schedule_label ?? tx("по расписанию"),
+                })
               : photoBlocks
-                ? "Пункт закрывается фотоотчётом"
-                : "Отметить пункт"
+                ? tx("Пункт закрывается фотоотчётом")
+                : tx("Отметить пункт")
           }
           disabled={busy || item.done || photoBlocks || inactive}
           onClick={onToggle}
@@ -355,7 +374,7 @@ function ItemRow({
           >
             {item.title}
             {!item.is_mandatory && (
-              <span className="ml-1 text-xs text-tg-hint">(опц.)</span>
+              <span className="ml-1 text-xs text-tg-hint">{tx("(опц.)")}</span>
             )}
           </div>
           {item.description && (
@@ -366,22 +385,24 @@ function ItemRow({
           {item.schedule_label && (
             <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
               <Icon name="calendar" size={11} />
-              {inactive ? `не сегодня · ${item.schedule_label}` : item.schedule_label}
+              {inactive
+                ? tx("не сегодня · {label}", { label: item.schedule_label })
+                : item.schedule_label}
             </div>
           )}
           {item.requires_photo && (
             <div className="mt-1 text-xs text-tg-hint">
               <InlineIcon name="camera" />
               {item.done
-                ? "фотоотчёт приложен"
-                : "нужен фотоотчёт: снимок с камеры или из галереи"}
+                ? tx("фотоотчёт приложен")
+                : tx("нужен фотоотчёт: снимок с камеры или из галереи")}
             </div>
           )}
           {!item.done && photoBlocks && (
             <div className="mt-2">
               <PhotoAttach
                 compact
-                label="Снять отчёт"
+                label={tx("Снять отчёт")}
                 disabled={busy}
                 onUploaded={onPhoto}
               />
@@ -394,10 +415,11 @@ function ItemRow({
           />
           {item.done_at && (
             <div className="mt-1 text-xs text-tg-hint">
-              закрыто в{" "}
-              {new Date(item.done_at).toLocaleTimeString("ru-RU", {
-                hour: "2-digit",
-                minute: "2-digit",
+              {tx("закрыто в {time}", {
+                time: new Date(item.done_at).toLocaleTimeString(
+                  locale === "en" ? "en-GB" : "ru-RU",
+                  { hour: "2-digit", minute: "2-digit" },
+                ),
               })}
             </div>
           )}
@@ -414,7 +436,7 @@ function ItemRow({
             onClick={onToggleNote}
             className="shrink-0 rounded-tile bg-tg-bg/60 px-2 py-1 text-xs text-tg-text"
           >
-            {noteOpen ? "Отмена" : "Заметка"}
+            {noteOpen ? tx("Отмена") : tx("Заметка")}
           </button>
         )}
       </div>
@@ -426,7 +448,9 @@ function ItemRow({
             onChange={(e) => setNote(e.target.value)}
             rows={2}
             maxLength={500}
-            placeholder="Например: инвентарь в порядке, не хватило 2 упаковок"
+            placeholder={tx(
+              "Например: инвентарь в порядке, не хватило 2 упаковок",
+            )}
             className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
           />
           <button
@@ -435,7 +459,7 @@ function ItemRow({
             onClick={() => onSaveNote(note.trim())}
             className="mt-2 min-h-9 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
-            Сохранить заметку
+            {tx("Сохранить заметку")}
           </button>
         </div>
       )}

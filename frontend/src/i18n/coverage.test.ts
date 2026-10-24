@@ -84,7 +84,6 @@ const PENDING = new Set<string>([
   "features/editor/RangeEditorSheet.tsx",
   "features/handovers/HandoversScreen.tsx",
   "features/hr/AchievementsCard.tsx",
-  "features/hr/ChecklistScreen.tsx",
   "features/hr/EmailVerifyCard.tsx",
   "features/hr/EmployeeCardSheet.tsx",
   "features/hr/FeedbackScreen.tsx",
@@ -95,10 +94,8 @@ const PENDING = new Set<string>([
   "features/hr/MaterialsScreen.tsx",
   "features/hr/OnboardingScreen.tsx",
   "features/hr/PushCard.tsx",
-  "features/hr/ReportsScreen.tsx",
   "features/hr/ReviewScreen.tsx",
   "features/hr/StandardsScreen.tsx",
-  "features/hr/TeamScreen.tsx",
   "features/hr/TrainingScreen.tsx",
   "features/hr/WebVersionCard.tsx",
   "features/issues/IssuesScreen.tsx",
@@ -182,9 +179,10 @@ describe("перевод: покрытие", () => {
   });
 
   it("список непереведённого не растёт", () => {
-    // Ратчет: 71 файлов на 24.10.2026. Перевод экрана — минус строка отсюда и
-    // минус единица в пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(71);
+    // Ратчет: 68 файлов на 24.10.2026 (было 71: переведены чек-лист смены,
+    // отчёт смены и «Команда»). Перевод экрана — минус строка отсюда и минус
+    // единица в пределе, а не «перевод» на словах.
+    expect(PENDING.size).toBeLessThanOrEqual(68);
   });
 
   it("английский словарь без пустых значений", () => {

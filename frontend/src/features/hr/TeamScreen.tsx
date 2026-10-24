@@ -19,6 +19,7 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
+import { useTx, type Locale } from "@/i18n";
 
 /**
  * Кабинет управляющего.
@@ -46,6 +47,7 @@ export default function TeamScreen({
   canManage: boolean;
   onBack?: () => void;
 }) {
+  const { tx, locale } = useTx();
   const dashboard = useQuery({
     queryKey: ["hr-dashboard"],
     queryFn: fetchDashboard,
@@ -86,7 +88,7 @@ export default function TeamScreen({
               onBack();
             }}
             className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
-            aria-label="Назад"
+            aria-label={tx("Назад")}
           >
             ‹
           </button>
@@ -94,14 +96,16 @@ export default function TeamScreen({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
             <Icon name="team" size={16} />
-            Команда
+            {tx("Команда")}
           </div>
           <div className="text-xs text-tg-hint">
             {dashboard.data
               ? `${dashboard.data.work_date} · ${
-                  dashboard.data.scope === "all" ? "все подразделения" : "моё подразделение"
+                  dashboard.data.scope === "all"
+                    ? tx("все подразделения")
+                    : tx("моё подразделение")
                 }`
-              : "Сводка смены"}
+              : tx("Сводка смены")}
           </div>
         </div>
         <button
@@ -125,17 +129,17 @@ export default function TeamScreen({
           <>
             <section className="grid grid-cols-2 gap-2">
               <Tile
-                label="Смена начата"
+                label={tx("Смена начата")}
                 value={`${dashboard.data.shifts_started}/${dashboard.data.total_employees}`}
               />
-              <Tile label="Закрыто" value={`${dashboard.data.shifts_done}`} />
+              <Tile label={tx("Закрыто")} value={`${dashboard.data.shifts_done}`} />
               <Tile
-                label="Просрочено"
+                label={tx("Просрочено")}
                 value={`${dashboard.data.tasks_overdue}`}
                 danger={dashboard.data.tasks_overdue > 0}
               />
               <Tile
-                label="Проблемы"
+                label={tx("Проблемы")}
                 value={`${dashboard.data.open_issues}`}
                 danger={dashboard.data.open_issues > 0}
               />
@@ -144,7 +148,7 @@ export default function TeamScreen({
             {dashboard.data.attention.length > 0 && (
               <section className="rounded-card bg-status-busy/10 p-3">
                 <h2 className="text-sm font-semibold text-status-busy">
-                  Требует внимания
+                  {tx("Требует внимания")}
                 </h2>
                 <ul className="mt-2 space-y-1.5">
                   {dashboard.data.attention.slice(0, 8).map((item, index) => (
@@ -170,17 +174,23 @@ export default function TeamScreen({
                 </ul>
                 {dashboard.data.attention.length > 8 && (
                   <div className="mt-1 text-xs text-tg-hint">
-                    и ещё {dashboard.data.attention.length - 8}
+                    {tx("и ещё {count}", {
+                      count: dashboard.data.attention.length - 8,
+                    })}
                   </div>
                 )}
               </section>
             )}
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-              <h2 className="text-sm font-semibold text-tg-text">Подразделения</h2>
+              <h2 className="text-sm font-semibold text-tg-text">
+                {tx("Подразделения")}
+              </h2>
               <div className="mt-2 space-y-2">
                 {dashboard.data.departments.length === 0 && (
-                  <div className="text-xs text-tg-hint">Подразделений пока нет.</div>
+                  <div className="text-xs text-tg-hint">
+                    {tx("Подразделений пока нет.")}
+                  </div>
                 )}
                 {dashboard.data.departments.map((department) => (
                   <DepartmentRow key={department.department_id} row={department} />
@@ -190,24 +200,32 @@ export default function TeamScreen({
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-tg-text">Сотрудники</h2>
+                <h2 className="text-sm font-semibold text-tg-text">
+                  {tx("Сотрудники")}
+                </h2>
                 <span className="text-xs tabular-nums text-tg-hint">
                   {employees.length}
-                  {needle ? ` из ${dashboard.data.employees.length}` : ""}
+                  {needle
+                    ? ` ${tx("из {count}", {
+                        count: dashboard.data.employees.length,
+                      })}`
+                    : ""}
                 </span>
               </div>
               <input
                 type="search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Найти человека или должность"
-                aria-label="Поиск по сотрудникам"
+                placeholder={tx("Найти человека или должность")}
+                aria-label={tx("Поиск по сотрудникам")}
                 className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
               />
               <div className="mt-2 space-y-1.5">
                 {employees.length === 0 && (
                   <div className="text-xs text-tg-hint">
-                    {needle ? "Никого не нашли." : "Сотрудников пока нет."}
+                    {needle
+                      ? tx("Никого не нашли.")
+                      : tx("Сотрудников пока нет.")}
                   </div>
                 )}
                 {employees.map((employee) => (
@@ -222,7 +240,9 @@ export default function TeamScreen({
 
             {dashboard.data.activity.length > 0 && (
               <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-                <h2 className="text-sm font-semibold text-tg-text">Последние действия</h2>
+                <h2 className="text-sm font-semibold text-tg-text">
+                  {tx("Последние действия")}
+                </h2>
                 <ul className="mt-2 space-y-1">
                   {dashboard.data.activity.map((item, index) => (
                     <li
@@ -234,7 +254,7 @@ export default function TeamScreen({
                         {item.text}
                       </span>
                       <span className="shrink-0 tabular-nums text-tg-hint">
-                        {formatTime(item.at)}
+                        {formatTime(item.at, locale)}
                       </span>
                     </li>
                   ))}
@@ -254,7 +274,7 @@ export default function TeamScreen({
                   className="flex w-full items-center justify-between text-left"
                 >
                   <span className="text-sm font-semibold text-tg-text">
-                    Рабочие часы и уведомления
+                    {tx("Рабочие часы и уведомления")}
                   </span>
                   <span className="text-tg-hint" aria-hidden>
                     <ChevronToggle open={showSettings} />
@@ -302,6 +322,7 @@ function Tile({
 }
 
 function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
+  const { tx } = useTx();
   const percent = row.employees ? Math.round((100 * row.done) / row.employees) : 0;
   return (
     <div className="rounded-tile bg-tg-bg/50 p-2">
@@ -321,12 +342,16 @@ function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
         />
       </div>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-tg-hint">
-        <span>закрыто {row.done}</span>
+        <span>{tx("закрыто {count}", { count: row.done })}</span>
         {row.overdue_tasks > 0 && (
-          <span className="text-status-busy">просрочено {row.overdue_tasks}</span>
+          <span className="text-status-busy">
+            {tx("просрочено {count}", { count: row.overdue_tasks })}
+          </span>
         )}
         {row.open_issues > 0 && (
-          <span className="text-status-busy">проблем {row.open_issues}</span>
+          <span className="text-status-busy">
+            {tx("проблем {count}", { count: row.open_issues })}
+          </span>
         )}
       </div>
     </div>
@@ -341,6 +366,7 @@ function EmployeeRow({
   /** Тап по человеку открывает его карточку (активность — по видимости). */
   onOpen: () => void;
 }) {
+  const { tx } = useTx();
   const meta = STATUS_META[employee.status];
   const progress =
     employee.checklist_total > 0
@@ -356,7 +382,7 @@ function EmployeeRow({
             onOpen();
           }}
           className="min-w-0 flex-1 truncate text-left text-xs text-tg-text"
-          title="Открыть карточку"
+          title={tx("Открыть карточку")}
         >
           {employee.display_name}
           {(employee.position ?? employee.badge) && (
@@ -371,7 +397,7 @@ function EmployeeRow({
         />
         <span className={`inline-flex shrink-0 items-center gap-1 text-2xs ${meta.className}`}>
           {meta.icon && <Icon name={meta.icon} size={12} />}
-          {meta.label}
+          {tx(meta.label)}
         </span>
       </div>
       <div className="mt-1 flex items-center gap-2">
@@ -396,6 +422,7 @@ function EmployeeRow({
 }
 
 function WorkHoursPanel() {
+  const { tx, locale } = useTx();
   const qc = useQueryClient();
   const settings = useQuery({ queryKey: ["hr-settings"], queryFn: fetchHrSettings });
   const [open, setOpen] = useState<string | null>(null);
@@ -421,7 +448,9 @@ function WorkHoursPanel() {
   });
 
   if (settings.isLoading || !settings.data) {
-    return <div className="mt-2 text-xs text-tg-hint">Загружаем…</div>;
+    return (
+      <div className="mt-2 text-xs text-tg-hint">{tx("Загружаем…")}</div>
+    );
   }
 
   const data = settings.data;
@@ -432,7 +461,7 @@ function WorkHoursPanel() {
     <div className="mt-2 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <label className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
-          Открытие
+          {tx("Открытие")}
           <input
             type="time"
             value={openValue}
@@ -441,7 +470,7 @@ function WorkHoursPanel() {
           />
         </label>
         <label className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
-          Закрытие
+          {tx("Закрытие")}
           <input
             type="time"
             value={closeValue}
@@ -456,11 +485,11 @@ function WorkHoursPanel() {
         onClick={() => save.mutate({ work_open: openValue, work_close: closeValue })}
         className="min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
       >
-        Сохранить часы
+        {tx("Сохранить часы")}
       </button>
 
       <label className="flex items-center justify-between rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-text">
-        <span>Алерты только в рабочее время</span>
+        <span>{tx("Алерты только в рабочее время")}</span>
         <input
           type="checkbox"
           checked={data.notify_only_work_hours}
@@ -473,7 +502,7 @@ function WorkHoursPanel() {
 
       <div className="rounded-tile bg-tg-bg/50 p-2">
         <label className="flex items-center justify-between text-xs text-tg-text">
-          <span>Вторая ступень: пинг админам</span>
+          <span>{tx("Вторая ступень: пинг админам")}</span>
           <input
             type="checkbox"
             checked={data.escalation_second_enabled}
@@ -484,7 +513,7 @@ function WorkHoursPanel() {
           />
         </label>
         <label className="mt-1.5 flex items-center justify-between gap-2 text-xs text-tg-hint">
-          <span>Если руководитель молчит</span>
+          <span>{tx("Если руководитель молчит")}</span>
           <select
             value={data.escalation_second_hours}
             disabled={!data.escalation_second_enabled || save.isPending}
@@ -492,19 +521,19 @@ function WorkHoursPanel() {
               save.mutate({ escalation_second_hours: Number(event.target.value) })
             }
             className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text disabled:opacity-50"
-            aria-label="Порог второй ступени, часы"
+            aria-label={tx("Порог второй ступени, часы")}
           >
             {[...new Set([1, 2, 4, 8, 12, 24, 48, data.escalation_second_hours])]
               .sort((a, b) => a - b)
               .map((hours) => (
               <option key={hours} value={hours}>
-                {hours} ч
+                {tx("{hours} ч", { hours })}
               </option>
               ))}
           </select>
         </label>
         <label className="mt-1.5 flex items-center justify-between gap-2 text-xs text-tg-text">
-          <span>Напоминать в каждой смене</span>
+          <span>{tx("Напоминать в каждой смене")}</span>
           <input
             type="checkbox"
             checked={data.escalation_second_repeat}
@@ -520,8 +549,10 @@ function WorkHoursPanel() {
       <div className="rounded-tile bg-tg-bg/50 p-2">
         <div className="text-xs text-tg-hint">
           {data.muted_until
-            ? `Мьют до ${formatDateTime(data.muted_until)}`
-            : "Мьют выключен"}
+            ? tx("Мьют до {when}", {
+                when: formatDateTime(data.muted_until, locale),
+              })
+            : tx("Мьют выключен")}
         </div>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           {[
@@ -537,7 +568,7 @@ function WorkHoursPanel() {
               onClick={() => mute.mutate(option.hours)}
               className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text disabled:opacity-50"
             >
-              {option.label}
+              {tx(option.label)}
             </button>
           ))}
           {data.muted_until && (
@@ -547,20 +578,22 @@ function WorkHoursPanel() {
               onClick={() => mute.mutate(0)}
               className="min-h-8 rounded-full bg-status-busy/15 px-2.5 text-xs text-status-busy disabled:opacity-50"
             >
-              Снять
+              {tx("Снять")}
             </button>
           )}
         </div>
       </div>
       <p className="text-2xs text-tg-hint">
-        Ночью уведомления не уходят в чат, но копятся в приложении — утренний
-        разбор не потеряется.
+        {tx(
+          "Ночью уведомления не уходят в чат, но копятся в приложении — утренний разбор не потеряется.",
+        )}
       </p>
     </div>
   );
 }
 
 function DangerZone() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
 
@@ -579,31 +612,39 @@ function DangerZone() {
         // Объясняем, почему нечего: обычно открытое висит в тестовом пуле,
         // а его эта кнопка не трогает (см. `hr_reset`).
         await showAlert(
-          ["Сбрасывать нечего — всё уже закрыто.", ...preview.notes].join(
+          [tx("Сбрасывать нечего — всё уже закрыто."), ...preview.notes].join(
             "\n\n",
           ),
         );
         return;
       }
       const first = await showConfirm(
-        `Удалить ${counts.tasks} поручений и ${counts.issues} проблем?\n\n${preview.scope}.`,
+        `${tx("Удалить {tasks} поручений и {issues} проблем?", {
+          tasks: counts.tasks,
+          issues: counts.issues,
+        })}\n\n${preview.scope}.`,
       );
       if (!first) return;
       const second = await showConfirm(
-        "Точно? Действие необратимо. Завершённые поручения и история останутся.",
+        tx(
+          "Точно? Действие необратимо. Завершённые поручения и история останутся.",
+        ),
       );
       if (!second) return;
       const done = await executeReset(preview.token, "СБРОС");
       haptic("success");
       await qc.invalidateQueries();
       await showAlert(
-        `Удалено: поручений ${done.tasks ?? 0}, проблем ${done.issues ?? 0}.`,
+        tx("Удалено: поручений {tasks}, проблем {issues}.", {
+          tasks: done.tasks ?? 0,
+          issues: done.issues ?? 0,
+        }),
       );
     } catch (error) {
       const text = String(error);
       await showAlert(
         text.includes("reset_preview_stale")
-          ? "Данные изменились, пока ты подтверждал. Открой сброс заново."
+          ? tx("Данные изменились, пока ты подтверждал. Открой сброс заново.")
           : humanizeApiError(error),
       );
     } finally {
@@ -614,11 +655,12 @@ function DangerZone() {
   return (
     <div className="mt-3 rounded-tile border border-status-busy/30 bg-status-busy/5 p-2">
       <div className="text-xs font-medium text-status-busy">
-        Опасная зона
+        {tx("Опасная зона")}
       </div>
       <p className="mt-0.5 text-2xs text-tg-hint">
-        Убирает незакрытые поручения и открытые проблемы. Завершённые задачи,
-        KPI и история сдач остаются; тестовый пул сбрасывается отдельно.
+        {tx(
+          "Убирает незакрытые поручения и открытые проблемы. Завершённые задачи, KPI и история сдач остаются; тестовый пул сбрасывается отдельно.",
+        )}
       </p>
       <button
         type="button"
@@ -627,11 +669,11 @@ function DangerZone() {
         className="mt-2 min-h-9 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
       >
         {busy ? (
-          "Считаем…"
+          tx("Считаем…")
         ) : (
           <span className="inline-flex items-center gap-1.5">
             <Icon name="trash" size={14} />
-            Сбросить текущую работу
+            {tx("Сбросить текущую работу")}
           </span>
         )}
       </button>
@@ -639,16 +681,19 @@ function DangerZone() {
   );
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
-function formatDateTime(iso: string): string {
+function formatDateTime(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("ru-RU", {
+  return date.toLocaleString(locale === "en" ? "en-GB" : "ru-RU", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
