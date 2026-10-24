@@ -42,9 +42,7 @@ const PENDING = new Set<string>([
   "features/actions/AutoPickSheet.tsx",
   "features/actions/PollSheet.tsx",
   "features/admin/AdminScreen.tsx",
-  "features/admin/AdminTasksScreen.tsx",
   "features/admin/ChecklistSettingsScreen.tsx",
-  "features/admin/EmployeesScreen.tsx",
   "features/admin/InvitationsScreen.tsx",
   "features/admin/JobsQueueScreen.tsx",
   "features/admin/KpiScreen.tsx",
@@ -133,7 +131,7 @@ describe("перевод: покрытие", () => {
     // журнал, «требует внимания», тексты приложения, вид календаря, дни
     // рождения, пресеты опросов, вид ленты, панель действий. Перевод экрана —
     // минус строка отсюда и минус единица в пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(15);
+    expect(PENDING.size).toBeLessThanOrEqual(13);
   });
 
   it("английский словарь без пустых значений", () => {

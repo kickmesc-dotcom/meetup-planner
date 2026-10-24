@@ -19,6 +19,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { AddPersonPanel, RosterSnapshotsPanel } from "./RosterTools";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 /**
  * Пул сотрудников: правка в одном месте.
  *
@@ -32,6 +33,7 @@ import SubScreen from "./SubScreen";
  * список заведённых ID.
  */
 export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin", "employees-pool"],
@@ -74,7 +76,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
     onSuccess: () => {
       haptic("success");
       refresh();
-      void showAlert("Прогресс знакомства обнулён.");
+      void showAlert(tx("Прогресс знакомства обнулён."));
     },
     onError,
   });
@@ -94,7 +96,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
     onSuccess: () => {
       haptic("success");
       refresh();
-      void showAlert("Сотрудник возвращён: доступ открыт.");
+      void showAlert(tx("Сотрудник возвращён: доступ открыт."));
     },
     onError,
   });
@@ -114,21 +116,29 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
   const askFire = async (card: HrEmployeeCard) => {
     haptic("medium");
     const first = await showConfirm(
-      `Уволить ${card.display_name}? Доступ в приложение и к боту закроется сразу.`,
+      tx("Уволить {name}? Доступ в приложение и к боту закроется сразу.", {
+        name: card.display_name,
+      }),
     );
     if (!first) return;
     const toTrash = await showConfirm(
-      `Что делать с данными?\n\nOK — в корзину: ${trashDays} дней можно вернуть.\nОтмена — удалить сразу и бесповоротно.`,
+      tx(
+        "Что делать с данными? OK — в корзину на {days} дней, отмена — удалить сразу и бесповоротно.",
+        { days: trashDays },
+      ),
     );
     if (toTrash) {
       const again = await showConfirm(
-        "Ещё раз: данные уедут в корзину и удалятся сами через " + trashDays + " дней. Продолжаем?",
+        tx(
+          "Ещё раз: данные уедут в корзину и удалятся сами через {days} дней. Продолжаем?",
+          { days: trashDays },
+        ),
       );
       if (again) fire.mutate({ id: card.employee_id, mode: "trash" });
       return;
     }
     const purge = await showConfirm(
-      "Ещё раз: данные сотрудника будут удалены сразу и бесповоротно. Уверен?",
+      tx("Ещё раз: данные сотрудника будут удалены сразу и бесповоротно. Уверен?"),
     );
     if (purge) fire.mutate({ id: card.employee_id, mode: "purge" });
   };
@@ -136,7 +146,10 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
   const askReset = async (card: HrEmployeeCard) => {
     haptic("medium");
     const ok = await showConfirm(
-      `Обнулить знакомство с приложением у ${card.display_name}?\n\nУроки и онбординг сбросятся, отдел и опыт останутся.`,
+      tx(
+        "Обнулить знакомство с приложением у {name}? Уроки и онбординг сбросятся, отдел и опыт останутся.",
+        { name: card.display_name },
+      ),
     );
     if (ok) reset.mutate(card.employee_id);
   };
@@ -146,16 +159,16 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <SubScreen
-      title="Пул сотрудников"
-      subtitle="Переименовать, должность, прогресс, увольнение"
+      title={tx("Пул сотрудников")}
+      subtitle={tx("Переименовать, должность, прогресс, увольнение")}
       onBack={onBack}
     >
       <input
         type="search"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
-        placeholder="Найти по имени, должности или отделу"
-        aria-label="Поиск по сотрудникам"
+        placeholder={tx("Найти по имени, должности или отделу")}
+        aria-label={tx("Поиск по сотрудникам")}
         className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
       />
 
@@ -172,7 +185,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
       {q.isError && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
 
       {q.data && visible.length === 0 && (
-        <p className="py-8 text-center text-xs text-tg-hint">Никого не нашли.</p>
+        <p className="py-8 text-center text-xs text-tg-hint">{tx("Никого не нашли.")}</p>
       )}
 
       {visible.map((card) => (
@@ -224,6 +237,7 @@ function EmployeeRow({
   onFire: () => void;
   onRestore: () => void;
 }) {
+  const { tx } = useTx();
   const [name, setName] = useState(card.display_name);
   const [position, setPosition] = useState(card.position ?? "");
   const [badge, setBadge] = useState(card.badge ?? "");
@@ -250,9 +264,9 @@ function EmployeeRow({
           <span className="block truncate text-xs text-tg-hint">
             {[card.department_name, card.position ?? card.badge]
               .filter(Boolean)
-              .join(" · ") || "без отдела"}
+              .join(" · ") || tx("без отдела")}
             {` · ${ROLE_LABEL[card.role as HrRole] ?? card.role}`}
-            {fired ? " · уволен" : ""}
+            {fired ? tx(" · уволен") : ""}
           </span>
           <span className="block truncate text-2xs text-tg-hint">
             Telegram ID {card.telegram_id}
@@ -267,16 +281,16 @@ function EmployeeRow({
         <div className="space-y-2 px-3 pb-3">
           {fired && (
             <p className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
-              Доступ закрыт.{" "}
+              {tx("Доступ закрыт.")}{" "}
               {card.purge_after
-                ? `Данные в корзине до ${formatDate(card.purge_after)}.`
-                : "Данные удалены."}
+                ? tx("Данные в корзине до {date}.", {
+                    date: formatDate(card.purge_after),
+                  })
+                : tx("Данные удалены.")}
             </p>
           )}
 
-          <label className="block text-xs text-tg-hint">
-            Имя
-            <input
+          <label className="block text-xs text-tg-hint">{tx("Имя")}<input
               type="text"
               value={name}
               maxLength={64}
@@ -284,24 +298,20 @@ function EmployeeRow({
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-xs text-tg-hint">
-            Должность (влияет на пункты чек-листа)
-            <input
+          <label className="block text-xs text-tg-hint">{tx("Должность (влияет на пункты чек-листа)")}<input
               type="text"
               value={position}
               maxLength={64}
-              placeholder="например, су-шеф"
+              placeholder={tx("например, су-шеф")}
               onChange={(event) => setPosition(event.target.value)}
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-xs text-tg-hint">
-            Плашка под именем
-            <input
+          <label className="block text-xs text-tg-hint">{tx("Плашка под именем")}<input
               type="text"
               value={badge}
               maxLength={64}
-              placeholder="например, Управляющий"
+              placeholder={tx("например, Управляющий")}
               onChange={(event) => setBadge(event.target.value)}
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
@@ -311,7 +321,7 @@ function EmployeeRow({
               было сменить только через «примерить роль» себе — выдать права
               другому из админки было нечем. */}
           <div>
-            <div className="text-xs text-tg-hint">Роль в боте</div>
+            <div className="text-xs text-tg-hint">{tx("Роль в боте")}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {(Object.keys(ROLE_LABEL) as HrRole[]).map((value) => (
                 <button
@@ -349,17 +359,13 @@ function EmployeeRow({
                 })
               }
               className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
-            >
-              Сохранить
-            </button>
+            >{tx("Сохранить")}</button>
             <button
               type="button"
               disabled={busy}
               onClick={onReset}
               className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
-            >
-              Обнулить прогресс
-            </button>
+            >{tx("Обнулить прогресс")}</button>
             {fired ? (
               card.purge_after && (
                 <button
@@ -367,9 +373,7 @@ function EmployeeRow({
                   disabled={busy}
                   onClick={onRestore}
                   className="min-h-9 rounded-tile bg-status-free/15 px-3 text-xs text-status-free disabled:opacity-50"
-                >
-                  Вернуть из корзины
-                </button>
+                >{tx("Вернуть из корзины")}</button>
               )
             ) : (
               <button
@@ -377,13 +381,14 @@ function EmployeeRow({
                 disabled={busy}
                 onClick={onFire}
                 className="min-h-9 rounded-tile bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
-              >
-                Уволить
-              </button>
+              >{tx("Уволить")}</button>
             )}
           </div>
           <p className="text-2xs text-tg-hint">
-            Увольнение даёт выбор: корзина на {trashDays} дней или удаление сразу.
+            {tx(
+              "Увольнение даёт выбор: корзина на {days} дней или удаление сразу.",
+              { days: trashDays },
+            )}
           </p>
         </div>
       )}

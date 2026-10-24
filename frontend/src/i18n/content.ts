@@ -1071,4 +1071,99 @@ export const EN_CONTENT: Record<string, string> = {
   "Загляни в события смены.": "Take a look at the shift events.",
   "Фотоотчёт можно снять прямо в пункте с 📷, а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.":
     "You can attach a photo right in a checklist item (📷), and report “running late” from the task card. The bot chat works too.",
+  // ------------------------------------------ админка: поручения --
+  "Создать и закрыть · срок с точностью до секунды":
+    "Create and close · deadline to the second",
+  "Новое поручение": "New task",
+  "Что сделать": "What to do",
+  "Проверить сроки на витрине": "Check expiry dates on the display",
+  "Отделу": "To the department",
+  "Сотруднику": "To an employee",
+  "— выбери —": "— choose —",
+  "Описание (необязательно)": "Description (optional)",
+  "Что должно получиться (необязательно)": "Expected result (optional)",
+  "Смена (необязательно)": "Shift (optional)",
+  "Приоритет": "Priority",
+  "Повторяется по дням (необязательно)": "Repeats on weekdays (optional)",
+  "В остальные дни поручение остаётся в списке, но помечено как не сегодняшнее.":
+    "On other days the task stays in the list, marked as not for today.",
+  "Ничего не выбрано — срок работает как обычно.":
+    "Nothing selected — the deadline works as usual.",
+  "Нужен фотоотчёт": "Photo report required",
+  "С приёмкой": "Needs review",
+  "Срок — дата, время и секунды. Пусто = без срока.":
+    "Deadline — date, time and seconds. Empty means no deadline.",
+  "Дата": "Date",
+  "Время": "Time",
+  "Сек.": "Sec.",
+  "Пн": "Mon",
+  "Вт": "Tue",
+  "Ср": "Wed",
+  "Чт": "Thu",
+  "Пт": "Fri",
+  "Сб": "Sat",
+  "Вс": "Sun",
+  "понедельник": "Monday",
+  "вторник": "Tuesday",
+  "среда": "Wednesday",
+  "четверг": "Thursday",
+  "пятница": "Friday",
+  "суббота": "Saturday",
+  "воскресенье": "Sunday",
+  "+30 мин": "+30 min",
+  "+1 час": "+1 hr",
+  "до конца смены": "until end of shift",
+  "завтра": "tomorrow",
+  "Срок: {when}": "Deadline: {when}",
+  "Срок не задан — планировщик не будет напоминать.":
+    "No deadline set — the scheduler won't remind anyone.",
+  "Создать поручение": "Create task",
+  "Создаю…": "Creating…",
+  "Поручение создано — сотрудник увидит его в приложении.":
+    "Task created — the employee will see it in the app.",
+  "Последние поручения": "Latest tasks",
+  " · фото {count}": " · {count} photo(s)",
+  "Зачесть выполненным": "Mark as done",
+  "Закрыть «{title}»?": "Close “{title}”?",
+  "Пока пусто — создай первое поручение выше.":
+    "Empty so far — create the first task above.",
+  "Напиши, что нужно сделать.": "Describe what needs to be done.",
+  "Выбери подразделение.": "Choose a department.",
+  "Выбери сотрудника.": "Choose an employee.",
+  "Укажи время дедлайна или очисти дату.":
+    "Set a deadline time or clear the date.",
+  // ---------------------------------------- админка: сотрудники --
+  "Переименовать, должность, прогресс, увольнение":
+    "Rename, position, progress, dismissal",
+  "Найти по имени, должности или отделу":
+    "Search by name, position or department",
+  "Имя": "Name",
+  "Должность (влияет на пункты чек-листа)":
+    "Position (affects checklist items)",
+  "Плашка под именем": "Badge under the name",
+  "например, Управляющий": "for example, Owner",
+  "например, су-шеф": "for example, sous-chef",
+  "Роль в боте": "Role in the bot",
+  "Обнулить прогресс": "Reset progress",
+  "Обнулить знакомство с приложением у {name}? Уроки и онбординг сбросятся, отдел и опыт останутся.":
+    "Reset the app onboarding for {name}? Lessons and onboarding restart; department and experience stay.",
+  "Прогресс знакомства обнулён.": "Onboarding progress reset.",
+  "Уволить": "Dismiss",
+  "Уволить {name}? Доступ в приложение и к боту закроется сразу.":
+    "Dismiss {name}? Access to the app and the bot closes immediately.",
+  "Что делать с данными? OK — в корзину на {days} дней, отмена — удалить сразу и бесповоротно.":
+    "What should happen to the data? OK — the bin for {days} days; cancel — delete immediately and for good.",
+  "Ещё раз: данные уедут в корзину и удалятся сами через {days} дней. Продолжаем?":
+    "Once more: the data goes to the bin and is deleted automatically after {days} days. Continue?",
+  "Ещё раз: данные сотрудника будут удалены сразу и бесповоротно. Уверен?":
+    "Once more: the employee's data will be deleted immediately and for good. Sure?",
+  "Увольнение даёт выбор: корзина на {days} дней или удаление сразу.":
+    "Dismissal gives a choice: the bin for {days} days or immediate deletion.",
+  "Доступ закрыт.": "Access closed.",
+  "Данные в корзине до {date}.": "Data stays in the bin until {date}.",
+  "Данные удалены.": "Data deleted.",
+  "Вернуть из корзины": "Restore from the bin",
+  " · уволен": " · dismissed",
+  "Сотрудник возвращён: доступ открыт.":
+    "Employee restored: access is open.",
 };

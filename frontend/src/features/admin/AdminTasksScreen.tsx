@@ -13,6 +13,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 /**
  * Поручения: создание и список — в приложении, без чата с ботом.
  *
@@ -26,6 +27,7 @@ import SubScreen from "./SubScreen";
  * разные приоритеты у планировщика напоминаний, а не «одно и то же».
  */
 export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const tasksQ = useQuery({
     queryKey: ["hr-admin-tasks"],
@@ -71,15 +73,15 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
 
   const create = useMutation({
     mutationFn: () => {
-      if (!title.trim()) throw new Error("Напиши, что нужно сделать.");
+      if (!title.trim()) throw new Error(tx("Напиши, что нужно сделать."));
       if (scope === "department" && !departmentId) {
-        throw new Error("Выбери подразделение.");
+        throw new Error(tx("Выбери подразделение."));
       }
       if (scope === "employee" && !assigneeId) {
-        throw new Error("Выбери сотрудника.");
+        throw new Error(tx("Выбери сотрудника."));
       }
       if (dueDate && !dueTime) {
-        throw new Error("Укажи время дедлайна или очисти дату.");
+        throw new Error(tx("Укажи время дедлайна или очисти дату."));
       }
       return createAdminTask({
         title: title.trim(),
@@ -104,7 +106,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       setDescription("");
       setExpected("");
       setTaskWeekdays([]);
-      void showAlert("Поручение создано — сотрудник увидит его в приложении.");
+      void showAlert(tx("Поручение создано — сотрудник увидит его в приложении."));
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });
@@ -130,28 +132,26 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <SubScreen
-      title="Поручения"
-      subtitle="Создать и закрыть · срок с точностью до секунды"
+      title={tx("Поручения")}
+      subtitle={tx("Создать и закрыть · срок с точностью до секунды")}
       onBack={onBack}
     >
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
-        <div className="text-sm font-semibold text-tg-text">Новое поручение</div>
+        <div className="text-sm font-semibold text-tg-text">{tx("Новое поручение")}</div>
 
-        <label className="block text-xs text-tg-hint">
-          Что сделать
-          <input
+        <label className="block text-xs text-tg-hint">{tx("Что сделать")}<input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={200}
-            placeholder="Проверить сроки на витрине"
+            placeholder={tx("Проверить сроки на витрине")}
             className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
           />
         </label>
 
-        <div className="flex gap-1.5" role="tablist" aria-label="Кому">
+        <div className="flex gap-1.5" role="tablist" aria-label={tx("Кому")}>
           {[
-            { v: "department" as const, label: "Отделу" },
-            { v: "employee" as const, label: "Сотруднику" },
+            { v: "department" as const, label: tx("Отделу") },
+            { v: "employee" as const, label: tx("Сотруднику") },
           ].map((o) => (
             <button
               key={o.v}
@@ -175,14 +175,12 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         {scope === "department" ? (
-          <label className="block text-xs text-tg-hint">
-            Подразделение
-            <select
+          <label className="block text-xs text-tg-hint">{tx("Подразделение")}<select
               value={departmentId ?? ""}
               onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
-              <option value="">— выбери —</option>
+              <option value="">{tx("— выбери —")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.emoji ? `${d.emoji} ` : ""}
@@ -192,14 +190,12 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
             </select>
           </label>
         ) : (
-          <label className="block text-xs text-tg-hint">
-            Сотрудник
-            <select
+          <label className="block text-xs text-tg-hint">{tx("Сотрудник")}<select
               value={assigneeId ?? ""}
               onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
-              <option value="">— выбери —</option>
+              <option value="">{tx("— выбери —")}</option>
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.display_name}
@@ -210,9 +206,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           </label>
         )}
 
-        <label className="block text-xs text-tg-hint">
-          Описание (необязательно)
-          <textarea
+        <label className="block text-xs text-tg-hint">{tx("Описание (необязательно)")}<textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -221,9 +215,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           />
         </label>
 
-        <label className="block text-xs text-tg-hint">
-          Что должно получиться (необязательно)
-          <input
+        <label className="block text-xs text-tg-hint">{tx("Что должно получиться (необязательно)")}<input
             value={expected}
             onChange={(e) => setExpected(e.target.value)}
             maxLength={300}
@@ -232,33 +224,29 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </label>
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="block text-xs text-tg-hint">
-            Смена (необязательно)
-            <input
+          <label className="block text-xs text-tg-hint">{tx("Смена (необязательно)")}<input
               type="date"
               value={shiftDate}
               onChange={(e) => setShiftDate(e.target.value)}
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-xs text-tg-hint">
-            Приоритет
-            <select
+          <label className="block text-xs text-tg-hint">{tx("Приоритет")}<select
               value={priority}
               onChange={(e) =>
                 setPriority(e.target.value as "low" | "normal" | "high")
               }
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
-              <option value="low">низкий</option>
-              <option value="normal">обычный</option>
-              <option value="high">высокий</option>
+              <option value="low">{tx("низкий")}</option>
+              <option value="normal">{tx("обычный")}</option>
+              <option value="high">{tx("высокий")}</option>
             </select>
           </label>
         </div>
 
         <div>
-          <div className="text-xs text-tg-hint">Повторяется по дням (необязательно)</div>
+          <div className="text-xs text-tg-hint">{tx("Повторяется по дням (необязательно)")}</div>
           <div className="mt-1 flex gap-1">
             {WEEKDAY_OPTIONS.map(({ day, short, full }) => {
               const selected = taskWeekdays.includes(day);
@@ -267,7 +255,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   key={day}
                   type="button"
                   aria-pressed={selected}
-                  aria-label={full}
+                  aria-label={tx(full)}
                   onClick={() => {
                     haptic("selection");
                     setTaskWeekdays((current) =>
@@ -283,15 +271,15 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                       : "bg-tg-bg/60 text-tg-hint",
                   ].join(" ")}
                 >
-                  {short}
+                  {tx(short)}
                 </button>
               );
             })}
           </div>
           <p className="mt-1 text-2xs text-tg-hint">
             {taskWeekdays.length
-              ? "В остальные дни поручение остаётся в списке, но помечено как не сегодняшнее."
-              : "Ничего не выбрано — срок работает как обычно."}
+              ? tx("В остальные дни поручение остаётся в списке, но помечено как не сегодняшнее.")
+              : tx("Ничего не выбрано — срок работает как обычно.")}
           </p>
         </div>
 
@@ -299,32 +287,26 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           <Check
             checked={requiresPhoto}
             onChange={setRequiresPhoto}
-            label="Нужен фотоотчёт"
+            label={tx("Нужен фотоотчёт")}
           />
           <Check
             checked={requiresReview}
             onChange={setRequiresReview}
-            label="С приёмкой"
+            label={tx("С приёмкой")}
           />
         </div>
 
         <div className="rounded-tile bg-tg-bg/50 p-2.5">
-          <div className="text-xs text-tg-hint">
-            Срок — дата, время и секунды. Пусто = без срока.
-          </div>
+          <div className="text-xs text-tg-hint">{tx("Срок — дата, время и секунды. Пусто = без срока.")}</div>
           <div className="mt-2 grid grid-cols-[1.4fr_1fr_0.7fr] gap-2">
-            <label className="block text-xs text-tg-hint">
-              Дата
-              <input
+            <label className="block text-xs text-tg-hint">{tx("Дата")}<input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
             </label>
-            <label className="block text-xs text-tg-hint">
-              Время
-              <input
+            <label className="block text-xs text-tg-hint">{tx("Время")}<input
                 type="time"
                 step={1}
                 value={dueTime}
@@ -332,9 +314,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
             </label>
-            <label className="block text-xs text-tg-hint">
-              Сек.
-              <input
+            <label className="block text-xs text-tg-hint">{tx("Сек.")}<input
                 inputMode="numeric"
                 value={dueSeconds}
                 onChange={(e) => setDueSeconds(e.target.value.replace(/\D/g, "").slice(0, 2))}
@@ -345,10 +325,10 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
 
           <div className="mt-2 flex flex-wrap gap-1.5">
             {[
-              { label: "+30 мин", min: 30 },
-              { label: "+1 час", min: 60 },
-              { label: "до конца смены", min: 8 * 60 },
-              { label: "завтра", min: 24 * 60 },
+              { label: tx("+30 мин"), min: 30 },
+              { label: tx("+1 час"), min: 60 },
+              { label: tx("до конца смены"), min: 8 * 60 },
+              { label: tx("завтра"), min: 24 * 60 },
             ].map((q) => (
               <button
                 key={q.label}
@@ -367,15 +347,13 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 setDueSeconds("00");
               }}
               className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
-            >
-              без срока
-            </button>
+            >{tx("без срока")}</button>
           </div>
 
           <div className="mt-2 text-xs text-tg-hint">
             {dueAt
-              ? `Срок: ${formatPrecise(dueAt)}`
-              : "Срок не задан — планировщик не будет напоминать."}
+              ? tx("Срок: {when}", { when: formatPrecise(dueAt) })
+              : tx("Срок не задан — планировщик не будет напоминать.")}
           </div>
         </div>
 
@@ -385,12 +363,12 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           onClick={() => create.mutate()}
           className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
-          {create.isPending ? "Создаю…" : "Создать поручение"}
+          {create.isPending ? tx("Создаю…") : tx("Создать поручение")}
         </button>
       </section>
 
       <section className="space-y-2">
-        <div className="text-sm font-semibold text-tg-text">Последние поручения</div>
+        <div className="text-sm font-semibold text-tg-text">{tx("Последние поручения")}</div>
         {(tasksQ.data ?? []).slice(0, 20).map((task) => (
           <article key={task.id} className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-start justify-between gap-2">
@@ -405,7 +383,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                       {formatPrecise(new Date(task.due_at))}
                     </>
                   ) : (
-                    "без срока"
+                    tx("без срока")
                   )}
                   {task.requires_photo && (
                     <>
@@ -413,7 +391,9 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                       <InlineIcon name="camera" />
                     </>
                   )}
-                  {task.photos?.length ? ` · фото ${task.photos.length}` : ""}
+                  {task.photos?.length
+                    ? tx(" · фото {count}", { count: task.photos.length })
+                    : ""}
                   {task.schedule_label && (
                     <>
                       {" · "}
@@ -432,20 +412,18 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 type="button"
                 disabled={close.isPending}
                 onClick={async () => {
-                  const ok = await showConfirm(`Закрыть «${task.title}»?`);
+                  const ok = await showConfirm(
+                    tx("Закрыть «{title}»?", { title: task.title }),
+                  );
                   if (ok) close.mutate(task);
                 }}
                 className="mt-2 min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text"
-              >
-                Зачесть выполненным
-              </button>
+              >{tx("Зачесть выполненным")}</button>
             )}
           </article>
         ))}
         {tasksQ.data?.length === 0 && (
-          <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
-            Пока пусто — создай первое поручение выше.
-          </div>
+          <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">{tx("Пока пусто — создай первое поручение выше.")}</div>
         )}
       </section>
     </SubScreen>
