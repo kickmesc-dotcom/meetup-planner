@@ -17,6 +17,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
 
+import { currentIntlLocale, useTx } from "@/i18n";
 /**
  * Ручное заведение по Telegram-ID.
  *
@@ -35,6 +36,7 @@ export function AddPersonPanel({
   /** Нашли существующего — открываем его карточку прямо в пуле. */
   onFound?: (employeeId: number) => void;
 }) {
+  const { tx } = useTx();
   const [open, setOpen] = useState(false);
   const [tgId, setTgId] = useState("");
   const [name, setName] = useState("");
@@ -68,7 +70,10 @@ export function AddPersonPanel({
       setRole("employee");
       onAdded();
       void showAlert(
-        `${card.display_name} заведён(а) в боте · ${ROLE_LABEL[card.role as HrRole] ?? card.role}.`,
+        tx("{name} заведён(а) в боте · {role}.", {
+          name: card.display_name,
+          role: tx(ROLE_LABEL[card.role as HrRole] ?? card.role),
+        }),
       );
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
@@ -83,12 +88,15 @@ export function AddPersonPanel({
       setOpen(false);
       onFound?.(card.employee_id);
       void showAlert(
-        `${card.display_name} уже в пуле · ${ROLE_LABEL[card.role as HrRole] ?? card.role}.`,
+        tx("{name} уже в пуле · {role}.", {
+          name: card.display_name,
+          role: tx(ROLE_LABEL[card.role as HrRole] ?? card.role),
+        }),
       );
     },
     onError: () =>
       void showAlert(
-        "Такого Telegram-ID в пуле нет. Проверь цифры или добавь человека — ID показывает команда /whoami.",
+        tx("Такого Telegram-ID в пуле нет. Проверь цифры или добавь человека — ID показывает команда /whoami."),
       ),
   });
 
@@ -104,9 +112,7 @@ export function AddPersonPanel({
         className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
       >
         <Icon name="plus" size={16} className="shrink-0 text-tg-hint" />
-        <span className="min-w-0 flex-1 text-sm font-medium text-tg-text">
-          Добавить по Telegram ID
-        </span>
+        <span className="min-w-0 flex-1 text-sm font-medium text-tg-text">{tx("Добавить по Telegram ID")}</span>
         <span className="shrink-0 text-tg-hint" aria-hidden>
           <ChevronToggle open={open} />
         </span>
@@ -120,32 +126,28 @@ export function AddPersonPanel({
               type="text"
               inputMode="numeric"
               value={tgId}
-              placeholder="например, 123456789"
+              placeholder={tx("например, 123456789")}
               onChange={(event) =>
                 setTgId(event.target.value.replace(/\D/g, "").slice(0, 15))
               }
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-xs text-tg-hint">
-            Имя (необязательно)
-            <input
+          <label className="block text-xs text-tg-hint">{tx("Имя (необязательно)")}<input
               type="text"
               value={name}
               maxLength={64}
-              placeholder="как показывать в боте"
+              placeholder={tx("как показывать в боте")}
               onChange={(event) => setName(event.target.value)}
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
-          <label className="block text-xs text-tg-hint">
-            Подразделение (необязательно)
-            <select
+          <label className="block text-xs text-tg-hint">{tx("Подразделение (необязательно)")}<select
               value={departmentId}
               onChange={(event) => setDepartmentId(event.target.value)}
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             >
-              <option value="">без подразделения</option>
+              <option value="">{tx("без подразделения")}</option>
               {(departments.data ?? []).map((department) => (
                 <option key={department.id} value={department.id}>
                   {department.emoji ? `${department.emoji} ` : ""}
@@ -154,19 +156,17 @@ export function AddPersonPanel({
               ))}
             </select>
           </label>
-          <label className="block text-xs text-tg-hint">
-            Должность (необязательно)
-            <input
+          <label className="block text-xs text-tg-hint">{tx("Должность (необязательно)")}<input
               type="text"
               value={position}
               maxLength={64}
-              placeholder="например, су-шеф"
+              placeholder={tx("например, су-шеф")}
               onChange={(event) => setPosition(event.target.value)}
               className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
             />
           </label>
           <div>
-            <div className="text-xs text-tg-hint">Должность в боте (роль)</div>
+            <div className="text-xs text-tg-hint">{tx("Должность в боте (роль)")}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {(Object.keys(ROLE_LABEL) as HrRole[]).map((value) => (
                 <button
@@ -188,10 +188,9 @@ export function AddPersonPanel({
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-2xs text-tg-hint">
-              Сотрудник видит только свои действия, руководитель — своё
-              подразделение, администратор — всё и получает кабинет.
-            </p>
+            <p className="mt-1 text-2xs text-tg-hint">{tx(
+              "Сотрудник видит только свои действия, руководитель — своё подразделение, администратор — всё и получает кабинет.",
+            )}</p>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
@@ -201,7 +200,7 @@ export function AddPersonPanel({
               onClick={() => add.mutate()}
               className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
             >
-              {add.isPending ? "Добавляем…" : "Добавить в бот"}
+              {add.isPending ? tx("Добавляем…") : tx("Добавить в бот")}
             </button>
             <button
               type="button"
@@ -209,13 +208,12 @@ export function AddPersonPanel({
               onClick={() => find.mutate()}
               className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
             >
-              {find.isPending ? "Ищем…" : "Найти по ID"}
+              {find.isPending ? tx("Ищем…") : tx("Найти по ID")}
             </button>
           </div>
-          <p className="text-2xs text-tg-hint">
-            «Найти по ID» открывает карточку того, кто уже в пуле: там же можно
-            сменить роль. Существующий профиль не перезаписывается.
-          </p>
+          <p className="text-2xs text-tg-hint">{tx(
+            "«Найти по ID» открывает карточку того, кто уже в пуле: там же можно сменить роль. Существующий профиль не перезаписывается.",
+          )}</p>
         </div>
       )}
     </section>
@@ -230,6 +228,7 @@ export function AddPersonPanel({
  * пропавших», а не «откатить всё назад».
  */
 export function RosterSnapshotsPanel() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
 
@@ -248,17 +247,23 @@ export function RosterSnapshotsPanel() {
   const create = useMutation({
     mutationFn: () =>
       createRosterSnapshot(
-        `Снимок ${new Date().toLocaleString("ru-RU", {
-          day: "2-digit",
-          month: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        })}`,
+        tx("Снимок {when}", {
+          when: new Date().toLocaleString(currentIntlLocale(), {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }),
       ),
     onSuccess: (data) => {
       haptic("success");
       refresh();
-      void showAlert(`Снимок готов: людей в составе — ${data.snapshot.people_count}.`);
+      void showAlert(
+        tx("Снимок готов: людей в составе — {count}.", {
+          count: data.snapshot.people_count,
+        }),
+      );
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
   });
@@ -269,12 +274,16 @@ export function RosterSnapshotsPanel() {
       haptic("success");
       refresh();
       const lines = [
-        `Заведено заново: ${result.created}`,
-        `Возвращено из корзины: ${result.restored}`,
-        `Не тронуто (уже есть): ${result.skipped}`,
+        tx("Заведено заново: {count}", { count: result.created }),
+        tx("Возвращено из корзины: {count}", { count: result.restored }),
+        tx("Не тронуто (уже есть): {count}", { count: result.skipped }),
       ];
       if (result.departments_missing.length > 0) {
-        lines.push(`Нет отделов: ${result.departments_missing.join(", ")}`);
+        lines.push(
+          tx("Нет отделов: {names}", {
+            names: result.departments_missing.join(", "),
+          }),
+        );
       }
       void showAlert(lines.join("\n"));
     },
@@ -290,9 +299,13 @@ export function RosterSnapshotsPanel() {
   const askRestore = async (snapshot: HrRosterSnapshot) => {
     haptic("medium");
     const ok = await showConfirm(
-      `Вернуть людей из снимка «${snapshot.label || "без названия"}» от ${formatMoment(
-        snapshot.created_at,
-      )}?\n\nАктивных сотрудников не трогаем — вернутся только пропавшие.`,
+      tx(
+        "Вернуть людей из снимка «{label}» от {when}? Активных сотрудников не трогаем — вернутся только пропавшие.",
+        {
+          label: snapshot.label || tx("без названия"),
+          when: formatMoment(snapshot.created_at),
+        },
+      ),
     );
     if (ok) restore.mutate(snapshot.id);
   };
@@ -300,7 +313,9 @@ export function RosterSnapshotsPanel() {
   const askRemove = async (snapshot: HrRosterSnapshot) => {
     haptic("medium");
     const ok = await showConfirm(
-      `Удалить снимок от ${formatMoment(snapshot.created_at)}? Восстановить по нему будет нельзя.`,
+      tx("Удалить снимок от {when}? Восстановить по нему будет нельзя.", {
+        when: formatMoment(snapshot.created_at),
+      }),
     );
     if (ok) remove.mutate(snapshot.id);
   };
@@ -320,9 +335,7 @@ export function RosterSnapshotsPanel() {
         className="flex w-full items-center gap-2 px-3 py-2.5 text-left"
       >
         <Icon name="camera" size={16} className="shrink-0 text-tg-hint" />
-        <span className="min-w-0 flex-1 text-sm font-medium text-tg-text">
-          Снапшоты состава
-        </span>
+        <span className="min-w-0 flex-1 text-sm font-medium text-tg-text">{tx("Снапшоты состава")}</span>
         <span className="shrink-0 text-tg-hint" aria-hidden>
           <ChevronToggle open={open} />
         </span>
@@ -336,21 +349,23 @@ export function RosterSnapshotsPanel() {
             onClick={() => create.mutate()}
             className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
-            {create.isPending ? "Снимаем…" : "Снять снапшот сейчас"}
+            {create.isPending ? tx("Снимаем…") : tx("Снять снапшот сейчас")}
           </button>
           <p className="text-2xs text-tg-hint">
-            Перед удалением сотрудника или очисткой тестового пула снимок
-            снимается сам. Храним последние {q.data?.max_snapshots ?? 20}.
+            {tx(
+              "Перед удалением сотрудника или очисткой тестового пула снимок снимается сам. Храним последние {count}.",
+              { count: q.data?.max_snapshots ?? 20 },
+            )}
           </p>
 
-          {q.isLoading && <p className="text-xs text-tg-hint">Загружаем…</p>}
+          {q.isLoading && <p className="text-xs text-tg-hint">{tx("Загружаем…")}</p>}
           {q.isError && (
             <p className="text-xs text-status-busy">
               {humanizeApiError(q.error)}
             </p>
           )}
           {q.data && items.length === 0 && (
-            <p className="text-xs text-tg-hint">Снимков пока нет.</p>
+            <p className="text-xs text-tg-hint">{tx("Снимков пока нет.")}</p>
           )}
 
           {items.map((snapshot) => (
@@ -360,15 +375,15 @@ export function RosterSnapshotsPanel() {
             >
               <div className="flex items-baseline gap-2">
                 <span className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text">
-                  {snapshot.label || "Без названия"}
+                  {snapshot.label || tx("Без названия")}
                 </span>
                 <span className="shrink-0 text-2xs text-tg-hint">
-                  {snapshot.people_count} чел.
+                  {tx("{count} чел.", { count: snapshot.people_count })}
                 </span>
               </div>
               <div className="text-2xs text-tg-hint">
                 {formatMoment(snapshot.created_at)}
-                {snapshot.kind === "auto" ? " · авто" : ""}
+                {snapshot.kind === "auto" ? tx(" · авто") : ""}
                 {snapshot.source ? ` · ${snapshot.source}` : ""}
               </div>
               <div className="mt-1 flex flex-wrap gap-1.5">
@@ -377,17 +392,13 @@ export function RosterSnapshotsPanel() {
                   disabled={busy}
                   onClick={() => void askRestore(snapshot)}
                   className="min-h-8 rounded-tile bg-tg-secondary-bg px-2 text-2xs text-tg-text disabled:opacity-50"
-                >
-                  Восстановить
-                </button>
+                >{tx("Восстановить")}</button>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void askRemove(snapshot)}
                   className="min-h-8 rounded-tile bg-status-busy/15 px-2 text-2xs text-status-busy disabled:opacity-50"
-                >
-                  Удалить
-                </button>
+                >{tx("Удалить")}</button>
               </div>
             </div>
           ))}

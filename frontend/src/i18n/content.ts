@@ -1166,4 +1166,316 @@ export const EN_CONTENT: Record<string, string> = {
   " · уволен": " · dismissed",
   "Сотрудник возвращён: доступ открыт.":
     "Employee restored: access is open.",
+  // ------------------------------------- админка: уведомления --
+  "Уведомления": "Notifications",
+  "Что ушло и что запланировано": "What was sent and what is scheduled",
+  "Мьют алертов": "Mute alerts",
+  "Алерты в чат идут как обычно.": "Chat alerts are running as usual.",
+  "24 ч": "24 h",
+  "Снять мьют": "Unmute",
+  "На {label}": "For {label}",
+  "Чат молчит до {when}.": "The chat stays silent until {when}.",
+  "Замьютить все алерты в чат на {label}? В приложении уведомления продолжат копиться.":
+    "Mute all chat alerts for {label}? Notifications keep piling up in the app.",
+  "Подтверди ещё раз: пока мьют активен, бот молчит про сроки и просрочки.":
+    "Confirm once more: while muted, the bot says nothing about deadlines and overdue tasks.",
+  "Мьют глушит доставку в Telegram: в приложении уведомления продолжают копиться, поэтому утренний разбор не потеряется.":
+    "Mute silences Telegram delivery only: notifications keep piling up in the app, so the morning review is not lost.",
+  "Написать сотруднику": "Message an employee",
+  "Кому отправить уведомление": "Who gets the notification",
+  "Что сказать сотруднику": "What to tell the employee",
+  "Личное уведомление в приложение. В чат не дублируем.":
+    "A personal notification in the app. Not duplicated to the chat.",
+  "Запланировано ({count})": "Scheduled ({count})",
+  "Отложенных напоминаний нет: у открытых поручений не проставлен срок.":
+    "No delayed reminders: open tasks have no deadline set.",
+  "перенесено вручную": "moved manually",
+  "напоминание о сроке": "deadline reminder",
+  "вторая ступень": "second stage",
+  "Передвинуть": "Move",
+  "Выключить": "Turn off",
+  "Выключить напоминание по «{title}»? Вернуть можно здесь же, в «Выключено».":
+    "Turn off the reminder for “{title}”? You can bring it back here, under Turned off.",
+  "Выключено ({count})": "Turned off ({count})",
+  "Напоминание о сроке не уйдёт. Вторая ступень после просрочки работает отдельно.":
+    "The deadline reminder will not be sent. The second stage after the deadline works separately.",
+  "Отправлено ({count})": "Sent ({count})",
+  "Колокольчики пока пустые.": "No bell notifications yet.",
+  "· не прочитано": "· unread",
+  "Убрать": "Remove",
+  "Убрать это уведомление из колокольчика сотрудника?":
+    "Remove this notification from the employee's bell?",
+  "без профиля": "no profile",
+  "+15 мин": "+15 min",
+  "+1 ч": "+1 hr",
+  "+3 ч": "+3 hr",
+  // ------------------------------------- админка: приглашения --
+  "Ссылка с ролью и сроком": "A link with a role and an expiry",
+  "Ссылка открывает вход в организацию. Если указать почту, принять сможет только её владелец; без почты ссылку можно скинуть в чат смены. Ссылка одноразовая и перестаёт работать после присоединения.":
+    "The link opens access to the company. With an email, only its owner can accept; without one, share the link in the shift chat. The link is single-use and stops working after joining.",
+  "Роль приглашённого": "Invitee role",
+  "Роль": "Role",
+  "Срок": "Expiry",
+  "Срок приглашения": "Invitation expiry",
+  "Почта (необязательно)": "Email (optional)",
+  "Создать ссылку": "Create link",
+  "Создаём…": "Creating…",
+  "Новая ссылка": "New link",
+  "Не получилось скопировать — выдели ссылку вручную.":
+    "Couldn't copy — select the link manually.",
+  "Письмо ушло на {email}.": "The email went to {email}.",
+  "Письмо не отправлено — почтовый транспорт на сервере не настроен. Скопируй ссылку и отправь вручную.":
+    "The email was not sent — mail transport is not configured on the server. Copy the link and send it yourself.",
+  "Почты нет — отправь ссылку в чат смены.":
+    "No email — send the link to the shift chat.",
+  "Живые ссылки ({count})": "Active links ({count})",
+  "до {date}": "until {date}",
+  "{value} дн.": "{value} days",
+  "для всех, у кого есть ссылка": "for anyone with the link",
+  "Отозвать ссылку? Она перестанет работать сразу.":
+    "Revoke the link? It stops working immediately.",
+  "Ссылок нет. Создай первую — она появится здесь до присоединения или отзыва.":
+    "No links yet. Create the first one — it shows up here until someone joins or you revoke it.",
+  // ------------------------------------------ админка: KPI смены --
+  "Опыт за работу, рейтинг недели": "Experience for work, weekly rating",
+  "Сколько стоит работа": "What work is worth",
+  "КПИ смены": "Shift KPI",
+  "KPI смены": "Shift KPI",
+  "За каждый отмеченный пункт смены": "For each ticked shift item",
+  "Закрытая смена": "Closed shift",
+  "Когда все обязательные пункты закрыты":
+    "When all required items are ticked",
+  "За закрытое поручение АУП": "For a completed management task",
+  "Надбавка, если поручение закрыто до дедлайна":
+    "Bonus when a task is closed before its deadline",
+  "В срок": "On time",
+  "Минимум для звания": "Minimum for a rank",
+  "Сколько опыта нужно за неделю, чтобы стать сотрудником недели":
+    "How much weekly experience makes someone employee of the week",
+  "Веса действуют сразу: опыт пересчитывается из уже записанных смен и поручений, передеплой не нужен.":
+    "Weights apply immediately: experience is recalculated from existing shifts and tasks, no redeploy needed.",
+  "За эту неделю ещё нет закрытых смен и поручений.":
+    "No shifts or tasks closed this week yet.",
+  "Пока никто не набрал минимум опыта — звание свободно. Это нормально в начале недели.":
+    "Nobody has reached the minimum yet — the title is open. That is normal early in the week.",
+  "Тестовый пул `[BOT]` в рейтинг не попадает: звание — для живых людей.":
+    "The `[BOT]` test pool never appears in the rating: the title is for real people.",
+  "{from} — {to} · Mon–Sun": "{from} — {to} · Mon–Sun",
+  "{count} tasks": "{count} tasks",
+  // -------------------------------------- админка: рестарт Space --
+  "Принудительный перезапуск backend-контейнера на HF":
+    "Forced restart of the backend container on HF",
+  "Лечит зависшие сетевые состояния (дохлый keep-alive-пул). Mini App переключается бесшовно; бот восстанавливает вебхук ~5–7 минут.":
+    "Heals stuck network states (a dead keep-alive pool). The mini app switches seamlessly; the bot restores its webhook in about 5–7 minutes.",
+  "Анти-луп: не чаще раза в 30 минут (после ручного — тоже).":
+    "Anti-loop: at most once every 30 minutes (after a manual restart too).",
+  "Один раз": "Once",
+  "По расписанию": "On schedule",
+  "Сейчас": "Now",
+  "Выкл": "Off",
+  "Каждые N ч": "Every N hours",
+  "Дата и время (локальные)": "Date and time (local)",
+  "Сохранить расписание": "Save schedule",
+  "1 ч … 168 ч (неделя). Отсчёт — от последнего рестарта.":
+    "1 h … 168 h (a week). Counted from the last restart.",
+  "Каждые {hours} ч": "Every {hours} h",
+  "Последний рестарт: {when}": "Last restart: {when}",
+  "Следующий рестарт: {when}": "Next restart: {when}",
+  "Перезапустить Space? Бот будет молчать ~5–7 минут.":
+    "Restart the Space? The bot will be silent for about 5–7 minutes.",
+  "Space перезапускается. Mini App почти не заметит, но бот будет ":
+    "The Space is restarting. The mini app barely notices, but the bot will be ",
+  "молчать ~5–7 минут, пока вебхук переустановится.":
+    "silent for about 5–7 minutes while the webhook is reinstalled.",
+  "не задан в настройках Space — рестарт недоступен. Добавь write-токен HF в секреты Space.":
+    "is not set in the Space settings — restart is unavailable. Add an HF write token to the Space secrets.",
+  // ------------------------------------- админка: обучение и ставка --
+  "Учебные и обычные смены, ставка сотрудника":
+    "Training and regular shifts, employee rate",
+  "Ближайшие две недели": "Next two weeks",
+  "Ставка": "Rate",
+  "Полная ставка": "Full rate",
+  "Частичная ставка": "Partial rate",
+  "Учебных смен по табелю": "Training shifts per timesheet",
+  "Больше учебных смен": "More training shifts",
+  "Меньше учебных смен": "Fewer training shifts",
+  "Вернуть правило": "Restore rule",
+  "Учебные смены считаются по табелю: первые N отработанных смен. Больничный или пропуск учебную не съедает, перенесённая смена остаётся в счёте. Пока табель пуст, работает старый расчёт по дате найма. Любой день можно переключить вручную.":
+    "Training shifts are counted from the timesheet: the first N worked shifts. Sick leave or a missed day does not consume one, and a moved shift still counts. While the timesheet is empty, the old hire-date calculation applies. Any day can be switched manually.",
+  "Обычная смена — нажми, чтобы сделать учебной":
+    "Regular shift — tap to make it a training one",
+  "Учебная смена — нажми, чтобы сделать обычной":
+    "Training shift — tap to make it regular",
+  "Синее — учебная смена, серое — обычная. Точка — день задан вручную, буква — статус в табеле (Р работа, П план, Б больничный, Н не пришёл, В выходной, О отпуск).":
+    "Blue is a training shift, grey a regular one. A dot marks a manually set day; the letter is the timesheet status (W worked, P planned, S sick, A absent, D day off, V vacation).",
+  "табель пуст · с {date}": "timesheet empty · since {date}",
+  "табель пуст · включено «учимся вместе»":
+    "timesheet empty · learning together is on",
+  "считаем отработанные смены": "counting worked shifts",
+  "Без должности": "No position",
+  "Сотрудников в твоём подразделении нет.":
+    "There are no employees in your department.",
+  "· учебных {training} из {total}": "· {training} of {total} training",
+  "· {count} вручную": "· {count} manual",
+  "· табель пуст": "· timesheet empty",
+  "учебная": "training",
+  "обычная": "regular",
+  "П": "P",
+  "Р": "W",
+  "Б": "S",
+  "Н": "A",
+  "В": "D",
+  "О": "V",
+  // ------------------------------------ админка: снапшоты состава --
+  "Снапшоты состава": "Roster snapshots",
+  "Сотрудник видит только свои действия, руководитель — своё подразделение, администратор — всё и получает кабинет.":
+    "An employee sees only their own actions, a manager sees their department, an admin sees everything and gets the console.",
+  "Добавить в бот": "Add to the bot",
+  "Добавить по Telegram ID": "Add by Telegram ID",
+  "как показывать в боте": "how to show it in the bot",
+  "Должность в боте (роль)": "Position in the bot (role)",
+  "Имя (необязательно)": "Name (optional)",
+  "Должность (необязательно)": "Position (optional)",
+  "Подразделение (необязательно)": "Department (optional)",
+  "например, 123456789": "for example, 123456789",
+  "Добавляем…": "Adding…",
+  "Ищем…": "Searching…",
+  "Найти по ID": "Find by ID",
+  "без подразделения": "no department",
+  "«Найти по ID» открывает карточку того, кто уже в пуле: там же можно сменить роль. Существующий профиль не перезаписывается.":
+    "“Find by ID” opens the card of someone already in the pool: the role can be changed there too. An existing profile is not overwritten.",
+  "Такого Telegram-ID в пуле нет. Проверь цифры или добавь человека — ID показывает команда /whoami.":
+    "No such Telegram ID in the pool. Check the digits or add the person — /whoami shows the ID.",
+  "{name} заведён(а) в боте · {role}.": "{name} added to the bot · {role}.",
+  "{name} уже в пуле · {role}.": "{name} is already in the pool · {role}.",
+  "Снимок {when}": "Snapshot {when}",
+  "Снять снапшот сейчас": "Take a snapshot now",
+  "Снимков пока нет.": "No snapshots yet.",
+  "Снимок готов: людей в составе — {count}.":
+    "Snapshot ready: {count} people in the roster.",
+  "Заведено заново: {count}": "Created anew: {count}",
+  "Возвращено из корзины: {count}": "Restored from the bin: {count}",
+  "Не тронуто (уже есть): {count}": "Untouched (already exist): {count}",
+  "Нет отделов: {names}": "Missing departments: {names}",
+  "Вернуть людей из снимка «{label}» от {when}? Активных сотрудников не трогаем — вернутся только пропавшие.":
+    "Bring people back from the snapshot “{label}” of {when}? Active employees stay untouched — only missing ones return.",
+  "Удалить снимок от {when}? Восстановить по нему будет нельзя.":
+    "Delete the snapshot of {when}? It cannot be used to restore afterwards.",
+  "Восстановить": "Restore",
+  "Без названия": "Untitled",
+  "без названия": "untitled",
+  " · авто": " · auto",
+  "Перед удалением сотрудника или очисткой тестового пула снимок снимается сам. Храним последние {count}.":
+    "A snapshot is taken automatically before deleting an employee or clearing the test pool. We keep the latest {count}.",
+  // -------------------------------------- админка: очередь задач --
+  "Очередь задач": "Job queue",
+  "APScheduler-job'ы + напоминания встреч":
+    "APScheduler jobs + meeting reminders",
+  "Очередь": "Queue",
+  "Обновить и опрашивать чаще 3 минуты": "Refresh and poll more often than 3 minutes",
+  "тик 5с": "tick 5s",
+  "тик 10м": "tick 10m",
+  "— подвинуть время ближайшего запуска.":
+    "— move the time of the next run.",
+  "— пропустить ближайший запуск (recurring остаётся, one-shot/reminder удаляются).":
+    "— skip the next run (recurring stays, one-shot/reminder jobs are deleted).",
+  "Схлопнуть все запланированные авто-задачи":
+    "Collapse all scheduled auto-jobs",
+  "Схлопнуть ВСЕ запланированные авто-задачи? Планировщик пересоберётся с нуля, как после рестарта.":
+    "Collapse ALL scheduled auto-jobs? The scheduler rebuilds from scratch, as after a restart.",
+  "Пересобираем…": "Rebuilding…",
+  "Планировщик пересобран: {count} задач.":
+    "Scheduler rebuilt: {count} jobs.",
+  "Очередь пуста.": "The queue is empty.",
+  "Изменить время": "Change time",
+  "Сохранить время": "Save time",
+  "Некорректное время": "Invalid time",
+  "Пропустить ближайший запуск": "Skip the next run",
+  "Удалить «{label}»?": "Delete “{label}”?",
+  "Пропустить ближайший запуск «{label}»?":
+    "Skip the next run of “{label}”?",
+  // ----------------------------------- админка: чек-листы и залы --
+  "Пункты дня, залы и фотоотчёты":
+    "Daily items, halls and photo reports",
+  "Вид чек-листа": "Checklist type",
+  "Название чек-листа": "Checklist name",
+  "Залы ресторана": "Restaurant halls",
+  "Название нового зала": "New hall name",
+  "Название зала {name}": "Hall name {name}",
+  "Создать чек-лист": "Create checklist",
+  "Чек-листа ещё нет": "No checklist yet",
+  "Зал": "Hall",
+  "Общий": "General",
+  "Общий (все залы)": "General (all halls)",
+  "Открытие — {hall}": "Opening — {hall}",
+  "Закрытие смены": "Shift closing",
+  "Пункт": "Item",
+  "Обязательный пункт": "Required item",
+  "Закрывается только фотоотчётом": "Closed only by a photo report",
+  "Включён у сотрудников": "Enabled for staff",
+  "Вкл": "On",
+  "Выключен": "Off",
+  "Выше": "Up",
+  "Ниже": "Down",
+  "Пояснение (необязательно)": "Hint (optional)",
+  "В какие дни нужен пункт": "Which days need this item",
+  "Ничего не выбрано — каждый день.": "Nothing selected — every day.",
+  "{label}. В другие дни пункт виден, но неактивен.":
+    "{label}. On other days the item is visible but inactive.",
+  "Что сделать? Например: протереть столы 400–500":
+    "What to do? For example: wipe tables 400–500",
+  "＋ Добавить пункт": "+ Add item",
+  "Пока ни одного пункта. Добавь первый — иначе сотрудник увидит пустой экран.":
+    "No items yet. Add the first one or staff will see an empty screen.",
+  "Удалить пункт «{title}»? Отметки в уже пройденных сменах исчезнут.":
+    "Delete the item “{title}”? Ticks in past shifts disappear.",
+  "{hall} · {kind}. Создай шаблон и добавь пункты — они сразу появятся у сотрудников.":
+    "{hall} · {kind}. Create a template and add items — staff see them right away.",
+  "После заведения зала создай для него чек-лист открытия: выбери зал выше и нажми «Создать чек-лист».":
+    "After adding a hall, create its opening checklist: pick the hall above and press “Create checklist”.",
+  "«Общий» — шаблон-подстраховка, если для зала своего нет. Закрытие смены всегда общее.":
+    "“General” is the fallback template when a hall has none of its own. Shift closing is always shared.",
+  "Закрытие смены — общий чек-лист: один на все залы. Последний пункт обычно с фотоотчётом.":
+    "Shift closing is a shared checklist: one for all halls. The last item usually needs a photo report.",
+  "Чек-лист первого дня показывается новичку; зала у него нет.":
+    "The first-day checklist is shown to newcomers; they have no hall.",
+  "{count} залов · от них зависит выбор у официанта":
+    "{count} halls · the waiter's choice depends on them",
+  "{count} пунктов · фотоотчёт обязателен у {photos}":
+    "{count} items · photo report required for {photos}",
+  "только «{position}»": "only “{position}”",
+  // --- Первый запуск: сотрудник или руководитель ---
+  SemiWorkBot: "SemiWorkBot",
+  "Кто вы в компании?": "Who are you at the company?",
+  "Сотрудник присоединяется к готовой команде по коду от руководителя. Руководитель создаёт организацию и приглашает людей сам.":
+    "An employee joins an existing team with a code from their manager. A manager creates the organization and invites people.",
+  "Я сотрудник": "I'm an employee",
+  "Присоединиться к команде: нужен код компании или её точное название.":
+    "Join the team: you'll need the company code or its exact name.",
+  "Я руководитель": "I'm a manager",
+  "Создать организацию, пригласить сотрудников и настроить отделы.":
+    "Create an organization, invite employees and set up departments.",
+  "Вход в организацию": "Join an organization",
+  "Руководитель видит код компании в разделе «Приглашения». Если кода нет, подойдёт точное название — слово в слово, как в приложении.":
+    "Your manager sees the company code in the Invitations section. Without a code, the exact name works — word for word as it appears in the app.",
+  "Код или название компании": "Company code or name",
+  "ID или название": "ID or name",
+  "Проверяем…": "Checking…",
+  "Присоединиться": "Join",
+  "Если код не подходит, попросите у руководителя ссылку-приглашение — она сразу откроет нужную организацию.":
+    "If the code doesn't work, ask your manager for an invitation link — it opens the right organization right away.",
+  "Новая организация": "New organization",
+  "Вы станете её владельцем. После этого — короткая настройка: отделы и разделы приложения.":
+    "You'll become its owner. After that comes a short setup: departments and app sections.",
+  "Название компании": "Company name",
+  "Например, «Кофейня на углу»": "For example, “The Corner Café”",
+  "Направление": "Industry",
+  "Создать организацию": "Create organization",
+  "Сотрудников можно пригласить сразу после настройки — ссылкой или кодом компании.":
+    "You can invite employees right after setup — with a link or the company code.",
+  "Выйти из аккаунта": "Sign out",
+  "Выходим…": "Signing out…",
+  "ID компании": "Company ID",
+  "Сотрудник вводит его на первом экране — вместе с названием или вместо него. Список компаний снаружи не виден.":
+    "An employee enters it on the first screen — instead of or along with the name. The list of companies is not visible from outside.",
 };

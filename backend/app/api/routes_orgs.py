@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Annotated, NoReturn
 
 import structlog
@@ -20,8 +21,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import AdminDep, CurrentUser, SessionDep, current_org
-from app.db.org_models import Organization
-from app.services import invitations, mail
+from app.db.org_models import INDUSTRIES, Organization
+from app.services import invitations, mail, orgs
 
 log = structlog.get_logger()
 router = APIRouter(tags=["orgs"])
@@ -43,12 +44,57 @@ _STATUS: dict[str, int] = {
     "invite_revoked": status.HTTP_410_GONE,
     "invite_email_mismatch": status.HTTP_403_FORBIDDEN,
     "org_inactive": status.HTTP_403_FORBIDDEN,
+    "org_not_found": status.HTTP_404_NOT_FOUND,
+    "org_missing": status.HTTP_404_NOT_FOUND,
+    "bad_name": status.HTTP_400_BAD_REQUEST,
+    "bad_slug": status.HTTP_400_BAD_REQUEST,
+    "slug_taken": status.HTTP_409_CONFLICT,
+    "bad_industry": status.HTTP_400_BAD_REQUEST,
 }
 
 
-def _fail(exc: invitations.InvitationsError) -> NoReturn:
+def _fail(exc: Exception) -> NoReturn:
     code = str(exc)
     raise HTTPException(_STATUS.get(code, status.HTTP_400_BAD_REQUEST), detail=code)
+
+
+# Подбор кода организации — это и есть «пароль» на вход. Ограничение попыток
+# делает перебор названий невыгодным, при этом не мешает человеку, который
+# просто опечатался. Счётчик в памяти процесса: одна реплика API, а при
+# нескольких — попытки всё равно ограничены сетью и задержкой ответа.
+_JOIN_WINDOW = 10 * 60.0
+_JOIN_LIMIT = 8
+_join_attempts: dict[int, list[float]] = {}
+
+
+def _join_allowed(user_id: int) -> bool:
+    now = time.monotonic()
+    window = [t for t in _join_attempts.get(user_id, []) if now - t < _JOIN_WINDOW]
+    if len(window) >= _JOIN_LIMIT:
+        _join_attempts[user_id] = window
+        return False
+    window.append(now)
+    _join_attempts[user_id] = window
+    return True
+
+
+class OrgCodeIn(BaseModel):
+    """Точный код (slug) или точное название организации."""
+
+    code: str = Field(min_length=1, max_length=120)
+
+
+class OrgCreateIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    slug: str | None = Field(default=None, max_length=64)
+    industry: str = Field(default="restaurant", max_length=32)
+
+
+class OrgOut(BaseModel):
+    id: int
+    slug: str
+    name: str
+    role: str
 
 
 class InvitationIn(BaseModel):
@@ -99,6 +145,74 @@ def _out(
         link=link,
         mail_sent=mail_sent,
     )
+
+
+def _org_out(org: Organization, role: str) -> OrgOut:
+    return OrgOut(id=org.id, slug=org.slug, name=org.name, role=role)
+
+
+@router.get("/org/current", response_model=OrgOut)
+async def current_organization(
+    session: SessionDep, user: CurrentUser, org: OrgDep
+) -> OrgOut:
+    """Своя организация: имя и код, который руководитель передаёт сотрудникам.
+
+    Только про себя: список всех организаций платформы наружу не отдаётся ни
+    этой ручкой, ни какой-либо другой.
+    """
+    row = await orgs.member(session, org_id=org.id, user_id=user.id)
+    return _org_out(org, row.role if row is not None else "staff")
+
+
+@router.post("/org/join", response_model=OrgOut)
+async def join_organization(
+    body: OrgCodeIn, session: SessionDep, user: CurrentUser
+) -> OrgOut:
+    """Присоединиться к существующей организации по коду или названию."""
+    if not _join_allowed(user.id):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, detail="join_rate_limited"
+        )
+    try:
+        org, role = await orgs.join_by_code(
+            session, user=user, code=body.code
+        )
+    except orgs.OrgsError as exc:
+        _fail(exc)
+    log.info("orgs.join", org_id=org.id, user_id=user.id, role=role)
+    return _org_out(org, role)
+
+
+@router.post(
+    "/org/create",
+    response_model=OrgOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_own_organization(
+    body: OrgCreateIn, session: SessionDep, user: CurrentUser
+) -> OrgOut:
+    """Руководитель заводит свою организацию и становится её владельцем.
+
+    Проверять права не у кого: организации ещё нет. Роль `owner` выдаётся
+    здесь же, поэтому дальше человек попадает в мастер настройки, а не в
+    экран «тебя не пригласили».
+    """
+    if body.industry not in INDUSTRIES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="bad_industry"
+        )
+    try:
+        org = await orgs.create_with_owner(
+            session,
+            user=user,
+            name=body.name,
+            industry=body.industry,
+            slug=body.slug,
+        )
+    except orgs.OrgsError as exc:
+        _fail(exc)
+    log.info("orgs.created", org_id=org.id, user_id=user.id)
+    return _org_out(org, "owner")
 
 
 @router.get("/org/invitations", response_model=list[InvitationOut])

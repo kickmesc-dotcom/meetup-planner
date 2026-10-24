@@ -61,7 +61,17 @@ def reset_org(token: Token[int]) -> None:
 
 # Отрасли, под которые есть (или будут) пакеты. Строка, а не enum: новый пакет
 # не должен требовать миграции.
-INDUSTRIES: tuple[str, ...] = ("restaurant", "salon", "autoservice", "retail", "other")
+# «cafe» есть в мастере настройки (`services/org_setup`), поэтому должен быть и
+# здесь: иначе организация кофейни создаётся, а `create_org` считает отрасль
+# неизвестной.
+INDUSTRIES: tuple[str, ...] = (
+    "restaurant",
+    "cafe",
+    "salon",
+    "autoservice",
+    "retail",
+    "other",
+)
 
 # Роли внутри организации. Не путать с HR-ролью сотрудника
 # (`employee`/`aup`/`admin`): здесь — уровень доступа к самой организации.

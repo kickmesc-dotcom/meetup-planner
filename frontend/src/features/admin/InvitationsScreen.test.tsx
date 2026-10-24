@@ -23,6 +23,9 @@ vi.mock("@/tg/webapp", () => ({
 }));
 vi.mock("@/api/orgs", () => ({
   fetchInvitations: vi.fn(),
+  fetchCurrentOrg: vi.fn(() =>
+    Promise.resolve({ id: 1, slug: "kofeynya", name: "Кофейня", role: "owner" }),
+  ),
   createInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
   ORG_ROLES: ["staff", "manager", "owner"],
@@ -74,6 +77,7 @@ describe("InvitationsScreen", () => {
     // выпадающем списке формы, и тест прошёл бы до загрузки данных.
     expect(await screen.findByText("Живые ссылки (1)")).toBeTruthy();
     expect(screen.getByText("для всех, у кого есть ссылка")).toBeTruthy();
+    expect(await screen.findByText("kofeynya")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Отозвать" })).toBeTruthy();
   });
 

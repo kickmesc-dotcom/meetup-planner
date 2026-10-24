@@ -34,7 +34,8 @@ import OrgSetupScreen from "./features/hr/OrgSetupScreen";
 import { sectionEnabled } from "./features/hr/sections";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
-import AuthScreen, { NoOrgScreen } from "./features/auth/AuthScreen";
+import AuthScreen from "./features/auth/AuthScreen";
+import StartScreen from "./features/auth/StartScreen";
 import InviteScreen from "./features/auth/InviteScreen";
 import { clearInviteTokenFromUrl, inviteTokenFromUrl } from "./features/auth/inviteUrl";
 import TabBar from "./features/nav/TabBar";
@@ -202,8 +203,14 @@ export default function App() {
     }
     if (status === 403) {
       // Почтовый аккаунт есть, членства в организации ещё нет (шаг 2.2).
-      // Это не «тебя уволили»: человека просто не пригласили.
-      if (authDetail === "org_required") return <NoOrgScreen />;
+      // Это не «тебя уволили» — человека ещё не пригласили. Теперь здесь не
+      // тупик, а выбор: сотрудник входит по коду от руководителя, руководитель
+      // заводит организацию сам.
+      if (authDetail === "org_required") {
+        return (
+          <StartScreen onDone={() => window.location.reload()} />
+        );
+      }
       if (authDetail === "org_inactive") {
         return (
           <div className="flex h-full items-center justify-center px-6 text-center">

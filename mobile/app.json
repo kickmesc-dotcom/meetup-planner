@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "SemiWorkBot",
+    "slug": "semiworkbot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "semiworkbot",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#ffffff",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "tech.semitask.semiworkbot"
+    },
+    "android": {
+      "package": "tech.semitask.semiworkbot",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "extra": {
+      "appUrl": "https://meetup-planner1.pages.dev"
+    }
+  }
+}

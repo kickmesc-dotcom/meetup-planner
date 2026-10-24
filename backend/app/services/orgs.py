@@ -26,6 +26,7 @@ from app.db.org_models import (
     ORG_ROLES,
     Organization,
     OrganizationMember,
+    set_org,
 )
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$")
@@ -246,6 +247,149 @@ async def set_bot(
     from app.services import org_bots
 
     await org_bots.reload(session)
+    return org
+
+
+# Латиница для короткого адреса: имя компании почти всегда русское, а `slug`
+# попадает в ссылки и потому обязан быть латинским. Простая таблица покрывает
+# бытовые названия; чего нет — выпадает, и адрес достраивается цифрами.
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e",
+    "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k",
+    "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+    "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "ts",
+    "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
+    "э": "e", "ю": "yu", "я": "ya",
+}
+
+
+def slug_from_name(name: str) -> str:
+    """Черновой код из названия: «Кофейня №1» → `kofeynya-1`.
+
+    Пустой результат (название из иероглифов или знаков) не ошибка: вызывающий
+    подставит запасной код. Здесь важно не упасть, а дать человеку читаемый
+    адрес, который он потом увидит как ID компании.
+    """
+    mapped = "".join(
+        _TRANSLIT.get(ch, ch) if ch.isalpha() else ch for ch in name.lower()
+    )
+    cleaned = re.sub(r"[^a-z0-9]+", "-", mapped).strip("-")
+    cleaned = re.sub(r"-{2,}", "-", cleaned)
+    if len(cleaned) < 2:
+        cleaned = f"org-{abs(hash(name)) % 100000:05d}"
+    return cleaned[:56].strip("-") or "org"
+
+
+async def _free_slug(session: AsyncSession, base: str) -> str:
+    """Свободный код: `kofeynya`, `kofeynya-2`, `kofeynya-3`…
+
+    Уникальность проверяется запросом, а не перебором исключений: 409 от базы
+    после `commit` оставил бы сессию в нерабочем состоянии.
+    """
+    candidate = base
+    suffix = 2
+    while await by_slug(session, candidate) is not None:
+        candidate = f"{base[:56]}-{suffix}"
+        suffix += 1
+    return candidate
+
+
+async def _move_sessions(
+    session: AsyncSession, *, user_id: int, org_id: int
+) -> None:
+    """Перевести живые входы человека в организацию (как при принятии ссылки).
+
+    Сессия помнит организацию на момент входа. Без этого следующий запрос
+    с другого устройства продолжал бы смотреть в прежний тенант.
+    """
+    from app.db.auth_models import AuthSession
+
+    live = await session.scalars(
+        select(AuthSession).where(
+            AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None)
+        )
+    )
+    for row in live:
+        row.org_id = org_id
+    await session.commit()
+
+
+async def join_by_code(
+    session: AsyncSession, *, user: User, code: str
+) -> tuple[Organization, str]:
+    """Войти в организацию по точному коду или точному названию.
+
+    Почему только точное совпадение. Список организаций — внутренняя информация
+    платформы: по нему видно, кто уже клиент. Поэтому здесь нет поиска, подсказок
+    и «похожих» — только строка, которую человек получил от своего руководителя.
+    Совпадение по названию регистронезависимо, но пробелы по краям не спасают:
+    «Кофейня» и «Кофейня на углу» — разные организации.
+
+    Роль при входе — `staff`: код не даёт прав управления. Повысить может
+    руководитель в своём разделе команды.
+    """
+    raw = (code or "").strip()
+    if len(raw) < 2:
+        raise OrgsError("org_not_found")
+
+    org = await by_slug(session, raw.lower())
+    if org is None:
+        # Сравнение имён — в Python, а не `lower()` в SQL: в sqlite `lower`
+        # сворачивает только латиницу, и кириллическое название перестало бы
+        # находиться в тестах, работая на PostgreSQL. Таблица организаций
+        # маленькая (строка на клиента), поэтому выборка целиком дешевле
+        # разъезжающегося поведения двух СУБД.
+        wanted = raw.lower()
+        rows = await session.scalars(select(Organization))
+        org = next(
+            (row for row in rows if row.name.strip().lower() == wanted), None
+        )
+    if org is None:
+        # Один и тот же ответ на «нет такой» и «не то название»: иначе по
+        # разнице кодов можно перебирать названия клиентов.
+        raise OrgsError("org_not_found")
+    if not org.is_active:
+        raise OrgsError("org_inactive")
+
+    existing = await member(session, org_id=org.id, user_id=user.id)
+    if existing is None:
+        existing = await add_member(
+            session, org_id=org.id, user_id=user.id, role="staff"
+        )
+    set_org(org.id)
+    await _move_sessions(session, user_id=user.id, org_id=org.id)
+    return org, existing.role
+
+
+async def create_with_owner(
+    session: AsyncSession,
+    *,
+    user: User,
+    name: str,
+    industry: str = "restaurant",
+    slug: str | None = None,
+) -> Organization:
+    """Завести организацию и сделать человека её владельцем.
+
+    Владелец — не «ещё одна роль»: именно он получает админку и мастер первой
+    настройки. Поэтому членство `owner` создаётся здесь же, до первого запроса
+    приложения: иначе `ensure_employee` увидел бы `staff` и спрятал настройку.
+    """
+    clean_name = (name or "").strip()
+    if len(clean_name) < 2:
+        raise OrgsError("bad_name")
+    base = normalize_slug(slug) if slug else slug_from_name(clean_name)
+    org = await create_org(
+        session,
+        slug=await _free_slug(session, base),
+        name=clean_name,
+        industry=industry,
+    )
+    await add_member(
+        session, org_id=org.id, user_id=user.id, role="owner"
+    )
+    set_org(org.id)
+    await _move_sessions(session, user_id=user.id, org_id=org.id)
     return org
 
 

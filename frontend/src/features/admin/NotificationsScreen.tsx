@@ -16,6 +16,7 @@ import ErrorState from "@/components/ErrorState";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 /**
  * Центр уведомлений (админ): что уже ушло и что ещё сработает.
  *
@@ -29,6 +30,7 @@ import SubScreen from "./SubScreen";
  * Об этом честно написано под кнопками.
  */
 export default function NotificationsScreen({ onBack }: { onBack: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin", "notifications"],
@@ -117,11 +119,14 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
   const muteAll = async (hours: number, label: string) => {
     haptic("medium");
     const first = await showConfirm(
-      `Замьютить все алерты в чат на ${label}?\n\nВ приложении уведомления продолжат копиться.`,
+      tx(
+        "Замьютить все алерты в чат на {label}? В приложении уведомления продолжат копиться.",
+        { label },
+      ),
     );
     if (!first) return;
     const second = await showConfirm(
-      "Подтверди ещё раз: пока мьют активен, бот молчит про сроки и просрочки.",
+      tx("Подтверди ещё раз: пока мьют активен, бот молчит про сроки и просрочки."),
     );
     if (!second) return;
     mute.mutate(hours);
@@ -129,23 +134,23 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
 
   return (
     <SubScreen
-      title="Уведомления"
-      subtitle="Что ушло и что запланировано"
+      title={tx("Уведомления")}
+      subtitle={tx("Что ушло и что запланировано")}
       onBack={onBack}
     >
       <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-        <div className="text-sm font-semibold text-tg-text">Мьют алертов</div>
+        <div className="text-sm font-semibold text-tg-text">{tx("Мьют алертов")}</div>
         <p className="mt-1 text-xs text-tg-hint">
           {muted
-            ? `Чат молчит до ${formatMoment(muted)}.`
-            : "Алерты в чат идут как обычно."}
+            ? tx("Чат молчит до {when}.", { when: formatMoment(muted) })
+            : tx("Алерты в чат идут как обычно.")}
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {[
-            { label: "24 ч", hours: 24 },
-            { label: "3 дня", hours: 72 },
-            { label: "7 дней", hours: 168 },
-            { label: "30 дней", hours: 720 },
+            { label: tx("24 ч"), hours: 24 },
+            { label: tx("3 дня"), hours: 72 },
+            { label: tx("7 дней"), hours: 168 },
+            { label: tx("30 дней"), hours: 720 },
           ].map((option) => (
             <button
               key={option.hours}
@@ -154,7 +159,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
               onClick={() => void muteAll(option.hours, option.label)}
               className="min-h-9 rounded-full bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
             >
-              На {option.label}
+              {tx("На {label}", { label: option.label })}
             </button>
           ))}
           {muted && (
@@ -166,33 +171,26 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                 mute.mutate(0);
               }}
               className="min-h-9 rounded-full bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
-            >
-              Снять мьют
-            </button>
+            >{tx("Снять мьют")}</button>
           )}
         </div>
-        <p className="mt-2 text-2xs text-tg-hint">
-          Мьют глушит доставку в Telegram: в приложении уведомления продолжают
-          копиться, поэтому утренний разбор не потеряется.
-        </p>
+        <p className="mt-2 text-2xs text-tg-hint">{tx(
+          "Мьют глушит доставку в Telegram: в приложении уведомления продолжают копиться, поэтому утренний разбор не потеряется.",
+        )}</p>
       </section>
 
       <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-        <div className="text-sm font-semibold text-tg-text">
-          Написать сотруднику
-        </div>
-        <p className="mt-1 text-xs text-tg-hint">
-          Личное уведомление в приложение. В чат не дублируем.
-        </p>
+        <div className="text-sm font-semibold text-tg-text">{tx("Написать сотруднику")}</div>
+        <p className="mt-1 text-xs text-tg-hint">{tx("Личное уведомление в приложение. В чат не дублируем.")}</p>
         <select
-          aria-label="Кому отправить уведомление"
+          aria-label={tx("Кому отправить уведомление")}
           value={target ?? ""}
           onChange={(event) =>
             setTarget(event.target.value ? Number(event.target.value) : null)
           }
           className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
         >
-          <option value="">Выбери сотрудника</option>
+          <option value="">{tx("Выбери сотрудника")}</option>
           {people.map((card) => (
             <option key={card.employee_id} value={card.employee_id}>
               {card.display_name}
@@ -205,7 +203,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
           onChange={(event) => setText(event.target.value)}
           rows={2}
           maxLength={400}
-          placeholder="Что сказать сотруднику"
+          placeholder={tx("Что сказать сотруднику")}
           className="mt-2 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text placeholder:text-tg-hint"
         />
         <button
@@ -216,9 +214,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             send.mutate();
           }}
           className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
-        >
-          Отправить
-        </button>
+        >{tx("Отправить")}</button>
       </section>
 
       {q.isLoading && <ListSkeleton rows={6} />}
@@ -228,13 +224,12 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         <>
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-tg-text">
-              Запланировано ({q.data.pending.length})
+              {tx("Запланировано ({count})", { count: q.data.pending.length })}
             </h2>
             {q.data.pending.length === 0 && (
-              <p className="text-xs text-tg-hint">
-                Отложенных напоминаний нет: у открытых поручений не проставлен
-                срок.
-              </p>
+              <p className="text-xs text-tg-hint">{tx(
+                "Отложенных напоминаний нет: у открытых поручений не проставлен срок.",
+              )}</p>
             )}
             <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {q.data.pending.map((item) => (
@@ -245,12 +240,10 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                   <div className="text-sm text-tg-text">
                     <span className="font-medium">{item.display_name}</span> ·{" "}
                     {item.kind === "deadline"
-                      ? "напоминание о сроке"
-                      : "вторая ступень"}
+                      ? tx("напоминание о сроке")
+                      : tx("вторая ступень")}
                     {item.moved && (
-                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">
-                        перенесено вручную
-                      </span>
+                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">{tx("перенесено вручную")}</span>
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-tg-hint">
@@ -261,9 +254,9 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                       {moving === item.task_id ? (
                         <>
                           {[
-                            { label: "+15 мин", minutes: 15 },
-                            { label: "+1 ч", minutes: 60 },
-                            { label: "+3 ч", minutes: 180 },
+                            { label: tx("+15 мин"), minutes: 15 },
+                            { label: tx("+1 ч"), minutes: 60 },
+                            { label: tx("+3 ч"), minutes: 180 },
                           ].map((option) => (
                             <button
                               key={option.minutes}
@@ -285,9 +278,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                             type="button"
                             onClick={() => setMoving(null)}
                             className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-hint"
-                          >
-                            Отмена
-                          </button>
+                          >{tx("Отмена")}</button>
                         </>
                       ) : (
                         <button
@@ -298,9 +289,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                             setMoving(item.task_id);
                           }}
                           className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-text disabled:opacity-50"
-                        >
-                          Передвинуть
-                        </button>
+                        >{tx("Передвинуть")}</button>
                       )}
                       <button
                         type="button"
@@ -309,15 +298,16 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                           haptic("medium");
                           void (async () => {
                             const ok = await showConfirm(
-                              `Выключить напоминание по «${item.task_title}»?\n\nВернуть можно здесь же, в «Выключено».`,
+                              tx(
+                                "Выключить напоминание по «{title}»? Вернуть можно здесь же, в «Выключено».",
+                                { title: item.task_title },
+                              ),
                             );
                             if (ok) skip.mutate(item.task_id);
                           })();
                         }}
                         className="min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-status-busy disabled:opacity-50"
-                      >
-                        Выключить
-                      </button>
+                      >{tx("Выключить")}</button>
                     </div>
                   )}
                 </div>
@@ -327,7 +317,9 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             {(q.data.disabled ?? []).length > 0 && (
               <div className="space-y-2">
                 <h2 className="text-sm font-semibold text-tg-text">
-                  Выключено ({q.data.disabled.length})
+                  {tx("Выключено ({count})", {
+                    count: q.data.disabled.length,
+                  })}
                 </h2>
                 <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
                   {q.data.disabled.map((item) => (
@@ -340,10 +332,9 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                           <span className="font-medium">{item.display_name}</span>{" "}
                           · «{item.task_title}»
                         </div>
-                        <div className="mt-0.5 text-xs text-tg-hint">
-                          Напоминание о сроке не уйдёт. Вторая ступень после
-                          просрочки работает отдельно.
-                        </div>
+                        <div className="mt-0.5 text-xs text-tg-hint">{tx(
+                          "Напоминание о сроке не уйдёт. Вторая ступень после просрочки работает отдельно.",
+                        )}</div>
                       </div>
                       <button
                         type="button"
@@ -353,9 +344,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                           restore.mutate(item.task_id);
                         }}
                         className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
-                      >
-                        Вернуть
-                      </button>
+                      >{tx("Вернуть")}</button>
                     </div>
                   ))}
                 </div>
@@ -365,10 +354,10 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
 
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-tg-text">
-              Отправлено ({q.data.items.length})
+              {tx("Отправлено ({count})", { count: q.data.items.length })}
             </h2>
             {q.data.items.length === 0 && (
-              <p className="text-xs text-tg-hint">Колокольчики пока пустые.</p>
+              <p className="text-xs text-tg-hint">{tx("Колокольчики пока пустые.")}</p>
             )}
             <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
               {q.data.items.map((item) => (
@@ -378,10 +367,10 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                       {item.text}
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
-                      <span>{item.display_name ?? "без профиля"}</span>
+                      <span>{item.display_name ?? tx("без профиля")}</span>
                       <span>· {formatMoment(item.created_at)}</span>
                       {item.department_name && <span>· {item.department_name}</span>}
-                      {item.read_at === null && <span>· не прочитано</span>}
+                      {item.read_at === null && <span>{tx("· не прочитано")}</span>}
                     </div>
                   </div>
                   <button
@@ -391,15 +380,13 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                       haptic("medium");
                       void (async () => {
                         const ok = await showConfirm(
-                          "Убрать это уведомление из колокольчика сотрудника?",
+                          tx("Убрать это уведомление из колокольчика сотрудника?"),
                         );
                         if (ok) drop.mutate(item.id);
                       })();
                     }}
                     className="shrink-0 min-h-8 rounded-full bg-tg-bg/60 px-2.5 text-xs text-status-busy disabled:opacity-50"
-                  >
-                    Убрать
-                  </button>
+                  >{tx("Убрать")}</button>
                 </div>
               ))}
             </div>

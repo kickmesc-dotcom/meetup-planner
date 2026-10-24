@@ -25,6 +25,7 @@ import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 /**
  * Админка → «Чек-листы».
  *
@@ -62,6 +63,7 @@ function parseWeekdays(value: string | null | undefined): number[] {
 }
 
 export default function ChecklistSettingsScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const deps = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
   const hallsQ = useQuery({
@@ -98,8 +100,8 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
 
   const hallName =
     effectiveHall === "common"
-      ? "Общий (все залы)"
-      : (halls.find((h) => h.id === effectiveHall)?.name ?? "Зал");
+      ? tx("Общий (все залы)")
+      : (halls.find((h) => h.id === effectiveHall)?.name ?? tx("Зал"));
 
   const invalidate = () => {
     haptic("success");
@@ -113,10 +115,10 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
         department_id: departmentId!,
         title:
           kind === "close"
-            ? "Закрытие смены"
+            ? tx("Закрытие смены")
             : kind === "first_day"
-              ? "Первый день"
-              : `Открытие — ${hallName}`,
+              ? tx("Первый день")
+              : tx("Открытие — {hall}", { hall: hallName }),
         kind,
         hall_id: effectiveHall === "common" ? null : effectiveHall,
       }),
@@ -126,14 +128,12 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Чек-листы"
-      subtitle="Пункты дня, залы и фотоотчёты"
+      title={tx("Чек-листы")}
+      subtitle={tx("Пункты дня, залы и фотоотчёты")}
       onBack={onBack}
     >
       <section className="space-y-2">
-        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
-          Подразделение
-        </div>
+        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">{tx("Подразделение")}</div>
         <Chips
           options={(deps.data ?? []).map((d) => ({
             value: d.id,
@@ -146,9 +146,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
       </section>
 
       <section className="space-y-2">
-        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
-          Вид чек-листа
-        </div>
+        <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">{tx("Вид чек-листа")}</div>
         <Chips
           options={(Object.keys(KIND_LABEL) as AdminChecklistKind[]).map((k) => ({
             value: k,
@@ -163,27 +161,24 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
 
       {kind === "shift" ? (
         <section className="space-y-2">
-          <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
-            Зал
-          </div>
+          <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">{tx("Зал")}</div>
           <Chips
             options={[
-              { value: "common" as const, label: "Общий" },
+              { value: "common" as const, label: tx("Общий") },
               ...halls.map((h) => ({ value: h.id, label: h.name })),
             ]}
             value={hallSel}
             onChange={(v) => setHallSel(v)}
           />
-          <div className="px-1 text-xs text-tg-hint">
-            «Общий» — шаблон-подстраховка, если для зала своего нет. Закрытие
-            смены всегда общее.
-          </div>
+          <div className="px-1 text-xs text-tg-hint">{tx(
+            "«Общий» — шаблон-подстраховка, если для зала своего нет. Закрытие смены всегда общее.",
+          )}</div>
         </section>
       ) : (
         <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
           {kind === "close"
-            ? "Закрытие смены — общий чек-лист: один на все залы. Последний пункт обычно с фотоотчётом."
-            : "Чек-лист первого дня показывается новичку; зала у него нет."}
+            ? tx("Закрытие смены — общий чек-лист: один на все залы. Последний пункт обычно с фотоотчётом.")
+            : tx("Чек-лист первого дня показывается новичку; зала у него нет.")}
         </div>
       )}
 
@@ -198,12 +193,12 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
       ) : (
         <section className="rounded-card bg-tg-secondary-bg/60 p-4 text-center">
           <Icon name="clipboard" size={30} className="mx-auto text-tg-hint" />
-          <div className="mt-1 text-sm font-semibold text-tg-text">
-            Чек-листа ещё нет
-          </div>
+          <div className="mt-1 text-sm font-semibold text-tg-text">{tx("Чек-листа ещё нет")}</div>
           <div className="mt-1 text-xs text-tg-hint">
-            {hallName} · {KIND_LABEL[kind]}. Создай шаблон и добавь пункты — они
-            сразу появятся у сотрудников.
+            {tx(
+              "{hall} · {kind}. Создай шаблон и добавь пункты — они сразу появятся у сотрудников.",
+              { hall: hallName, kind: tx(KIND_LABEL[kind]) },
+            )}
           </div>
           <button
             type="button"
@@ -214,7 +209,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
             }}
             className="mt-3 min-h-11 rounded-tile bg-tg-button px-4 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
-            {createTpl.isPending ? "Создаю…" : "Создать чек-лист"}
+            {createTpl.isPending ? tx("Создаю…") : tx("Создать чек-лист")}
           </button>
         </section>
       )}
@@ -235,6 +230,7 @@ function TemplateEditor({
   template: AdminChecklistTemplate;
   onSaved: () => void;
 }) {
+  const { tx } = useTx();
   const [title, setTitle] = useState(template.title);
   const [adding, setAdding] = useState(false);
 
@@ -271,18 +267,20 @@ function TemplateEditor({
             }}
             maxLength={200}
             className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-3 py-2 text-sm font-semibold text-tg-text"
-            aria-label="Название чек-листа"
+            aria-label={tx("Название чек-листа")}
           />
           {saveTpl.isPending && <Spinner />}
         </div>
         <TgToggle
           checked={template.is_active}
-          label={template.is_active ? "Включён у сотрудников" : "Выключен"}
+          label={template.is_active ? tx("Включён у сотрудников") : tx("Выключен")}
           onChange={(v) => saveTpl.mutate({ is_active: v })}
         />
         <div className="text-xs text-tg-hint">
-          {items.length} пунктов · фотоотчёт обязателен у{" "}
-          {items.filter((i) => i.requires_photo).length}
+          {tx("{count} пунктов · фотоотчёт обязателен у {photos}", {
+            count: items.length,
+            photos: items.filter((i) => i.requires_photo).length,
+          })}
         </div>
       </section>
 
@@ -312,10 +310,9 @@ function TemplateEditor({
           />
         ))}
         {items.length === 0 && (
-          <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
-            Пока ни одного пункта. Добавь первый — иначе сотрудник увидит пустой
-            экран.
-          </div>
+          <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">{tx(
+            "Пока ни одного пункта. Добавь первый — иначе сотрудник увидит пустой экран.",
+          )}</div>
         )}
       </section>
 
@@ -335,9 +332,7 @@ function TemplateEditor({
             setAdding(true);
           }}
           className="min-h-11 w-full rounded-card border border-dashed border-tg-hint/40 text-sm text-tg-text"
-        >
-          ＋ Добавить пункт
-        </button>
+        >{tx("＋ Добавить пункт")}</button>
       )}
     </>
   );
@@ -352,6 +347,7 @@ function AddItemForm({
   onCancel: () => void;
   onSubmit: (title: string, requiresPhoto: boolean) => void;
 }) {
+  const { tx } = useTx();
   const [title, setTitle] = useState("");
   const [photo, setPhoto] = useState(false);
   return (
@@ -361,12 +357,12 @@ function AddItemForm({
         onChange={(e) => setTitle(e.target.value)}
         rows={2}
         maxLength={500}
-        placeholder="Что сделать? Например: протереть столы 400–500"
+        placeholder={tx("Что сделать? Например: протереть столы 400–500")}
         className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
       />
       <TgToggle
         checked={photo}
-        label="Закрывается только фотоотчётом"
+        label={tx("Закрывается только фотоотчётом")}
         onChange={setPhoto}
       />
       <div className="flex gap-2">
@@ -375,16 +371,12 @@ function AddItemForm({
           disabled={busy || !title.trim()}
           onClick={() => onSubmit(title.trim(), photo)}
           className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-        >
-          Добавить
-        </button>
+        >{tx("Добавить")}</button>
         <button
           type="button"
           onClick={onCancel}
           className="min-h-11 rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
-        >
-          Отмена
-        </button>
+        >{tx("Отмена")}</button>
       </div>
     </section>
   );
@@ -403,6 +395,7 @@ function ItemEditor({
   onSaved: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
+  const { tx } = useTx();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [description, setDescription] = useState(item.description ?? "");
@@ -438,13 +431,13 @@ function ItemEditor({
           <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
             {item.requires_photo && (
               <span>
-                <InlineIcon name="camera" />
-                фотоотчёт
-              </span>
+                <InlineIcon name="camera" />{tx("фотоотчёт")}</span>
             )}
-            {!item.is_mandatory && <span>(опц.)</span>}
+            {!item.is_mandatory && <span>{tx("(опц.)")}</span>}
             {item.condition_position && (
-              <span>только «{item.condition_position}»</span>
+              <span>{tx("только «{position}»", {
+                position: item.condition_position,
+              })}</span>
             )}
             {item.schedule_label && (
               <span>
@@ -457,7 +450,7 @@ function ItemEditor({
         <div className="flex shrink-0 flex-col gap-1">
           <button
             type="button"
-            aria-label="Выше"
+            aria-label={tx("Выше")}
             disabled={isFirst}
             onClick={() => onMove(-1)}
             className="h-11 w-11 rounded-tile bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
@@ -466,7 +459,7 @@ function ItemEditor({
           </button>
           <button
             type="button"
-            aria-label="Ниже"
+            aria-label={tx("Ниже")}
             disabled={isLast}
             onClick={() => onMove(1)}
             className="h-11 w-11 rounded-tile bg-tg-bg/60 text-xs text-tg-text disabled:opacity-30"
@@ -484,7 +477,7 @@ function ItemEditor({
             rows={2}
             maxLength={500}
             className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-            placeholder="Пункт"
+            placeholder={tx("Пункт")}
           />
           <textarea
             value={description}
@@ -492,16 +485,16 @@ function ItemEditor({
             rows={2}
             maxLength={1000}
             className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-            placeholder="Пояснение (необязательно)"
+            placeholder={tx("Пояснение (необязательно)")}
           />
           <TgToggle
             checked={item.requires_photo}
-            label="Закрывается только фотоотчётом"
+            label={tx("Закрывается только фотоотчётом")}
             onChange={(v) => save.mutate({ requires_photo: v })}
           />
           <TgToggle
             checked={item.is_mandatory}
-            label="Обязательный пункт"
+            label={tx("Обязательный пункт")}
             onChange={(v) => save.mutate({ is_mandatory: v })}
           />
 
@@ -509,7 +502,7 @@ function ItemEditor({
               четвергам» остаётся в списке всегда, но в другие дни неактивен и
               не входит в прогресс. */}
           <div>
-            <div className="text-xs text-tg-hint">В какие дни нужен пункт</div>
+            <div className="text-xs text-tg-hint">{tx("В какие дни нужен пункт")}</div>
             <div className="mt-1 flex gap-1">
               {WEEKDAYS.map(({ day, short, full }) => {
                 const selected = parseWeekdays(item.weekdays).includes(day);
@@ -518,7 +511,7 @@ function ItemEditor({
                     key={day}
                     type="button"
                     aria-pressed={selected}
-                    aria-label={full}
+                    aria-label={tx(full)}
                     disabled={save.isPending}
                     onClick={() => {
                       haptic("selection");
@@ -535,15 +528,17 @@ function ItemEditor({
                         : "bg-tg-bg/60 text-tg-text",
                     ].join(" ")}
                   >
-                    {short}
+                    {tx(short)}
                   </button>
                 );
               })}
             </div>
             <div className="mt-1 text-2xs text-tg-hint">
               {item.schedule_label
-                ? `${item.schedule_label[0].toUpperCase()}${item.schedule_label.slice(1)}. В другие дни пункт виден, но неактивен.`
-                : "Ничего не выбрано — каждый день."}
+                ? tx("{label}. В другие дни пункт виден, но неактивен.", {
+                    label: `${item.schedule_label[0].toUpperCase()}${item.schedule_label.slice(1)}`,
+                  })
+                : tx("Ничего не выбрано — каждый день.")}
             </div>
           </div>
           <div className="flex gap-2">
@@ -557,22 +552,20 @@ function ItemEditor({
                 })
               }
               className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-            >
-              Сохранить
-            </button>
+            >{tx("Сохранить")}</button>
             <button
               type="button"
               disabled={remove.isPending}
               onClick={async () => {
                 const ok = await showConfirm(
-                  `Удалить пункт «${item.title}»? Отметки в уже пройденных сменах исчезнут.`,
+                  tx("Удалить пункт «{title}»? Отметки в уже пройденных сменах исчезнут.", {
+                    title: item.title,
+                  }),
                 );
                 if (ok) remove.mutate();
               }}
               className="min-h-11 rounded-tile bg-status-busy/15 px-3 text-sm text-status-busy"
-            >
-              Удалить
-            </button>
+            >{tx("Удалить")}</button>
           </div>
         </div>
       )}
@@ -585,6 +578,7 @@ function ItemEditor({
 // ---------------------------------------------------------------------------
 
 function HallsCard() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const hallsQ = useQuery({
     queryKey: ["admin", "halls"],
@@ -631,9 +625,11 @@ function HallsCard() {
         className="flex w-full items-center justify-between text-left"
       >
         <div>
-          <div className="text-sm font-semibold text-tg-text">Залы ресторана</div>
+          <div className="text-sm font-semibold text-tg-text">{tx("Залы ресторана")}</div>
           <div className="text-xs text-tg-hint">
-            {hallsQ.data?.length ?? 0} залов · от них зависит выбор у официанта
+            {tx("{count} залов · от них зависит выбор у официанта", {
+              count: hallsQ.data?.length ?? 0,
+            })}
           </div>
         </div>
         <ChevronToggle open={open} className="text-tg-hint" />
@@ -656,11 +652,11 @@ function HallsCard() {
                 }}
                 maxLength={120}
                 className="min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 py-1 text-sm text-tg-text"
-                aria-label={`Название зала ${hall.name}`}
+                aria-label={tx("Название зала {name}", { name: hall.name })}
               />
               <Checkbox
                 checked={hall.is_active}
-                label="Вкл"
+                label={tx("Вкл")}
                 onChange={(v) =>
                   patch.mutate({ id: hall.id, body: { is_active: v } })
                 }
@@ -672,7 +668,7 @@ function HallsCard() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={120}
-              placeholder="Название нового зала"
+              placeholder={tx("Название нового зала")}
               className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-3 py-2 text-sm text-tg-text"
             />
             <button
@@ -684,10 +680,9 @@ function HallsCard() {
               ＋
             </button>
           </div>
-          <div className="text-xs text-tg-hint">
-            После заведения зала создай для него чек-лист открытия: выбери зал
-            выше и нажми «Создать чек-лист».
-          </div>
+          <div className="text-xs text-tg-hint">{tx(
+            "После заведения зала создай для него чек-лист открытия: выбери зал выше и нажми «Создать чек-лист».",
+          )}</div>
         </div>
       )}
     </section>

@@ -41,16 +41,8 @@ const PENDING = new Set<string>([
   "api/access.ts",
   "features/actions/AutoPickSheet.tsx",
   "features/actions/PollSheet.tsx",
-  "features/admin/AdminScreen.tsx",
   "features/admin/ChecklistSettingsScreen.tsx",
-  "features/admin/InvitationsScreen.tsx",
-  "features/admin/JobsQueueScreen.tsx",
-  "features/admin/KpiScreen.tsx",
-  "features/admin/NotificationsScreen.tsx",
   "features/admin/ProxyScreen.tsx",
-  "features/admin/RosterTools.tsx",
-  "features/admin/SpaceRestartScreen.tsx",
-  "features/admin/TrainingPlanScreen.tsx",
 ]);
 
 const CYRILLIC = /[А-Яа-яЁё]/;
@@ -131,7 +123,7 @@ describe("перевод: покрытие", () => {
     // журнал, «требует внимания», тексты приложения, вид календаря, дни
     // рождения, пресеты опросов, вид ленты, панель действий. Перевод экрана —
     // минус строка отсюда и минус единица в пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(13);
+    expect(PENDING.size).toBeLessThanOrEqual(5);
   });
 
   it("английский словарь без пустых значений", () => {

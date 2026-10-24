@@ -15,6 +15,7 @@ import ErrorState from "@/components/ErrorState";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
+import { currentIntlLocale, useTx } from "@/i18n";
 /**
  * Расписание обучения: какие смены у новичка ещё учебные, а какие обычные.
  *
@@ -26,6 +27,7 @@ import SubScreen from "./SubScreen";
  * одинаково в учебный и обычный день — меняется только сопровождение.
  */
 export default function TrainingPlanScreen({ onBack }: { onBack: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [openId, setOpenId] = useState<number | null>(null);
   const q = useQuery({
@@ -75,28 +77,25 @@ export default function TrainingPlanScreen({ onBack }: { onBack: () => void }) {
   });
 
   const labels = q.data?.rate_labels ?? {
-    full: "Полная ставка",
-    partial: "Частичная ставка",
+    full: tx("Полная ставка"),
+    partial: tx("Частичная ставка"),
   };
 
   return (
     <SubScreen
-      title="Обучение и ставка"
-      subtitle="Учебные и обычные смены, ставка сотрудника"
+      title={tx("Обучение и ставка")}
+      subtitle={tx("Учебные и обычные смены, ставка сотрудника")}
       onBack={onBack}
     >
-      <p className="text-xs text-tg-hint">
-        Учебные смены считаются по табелю: первые N отработанных смен. Больничный
-        или пропуск учебную не съедает, перенесённая смена остаётся в счёте. Пока
-        табель пуст, работает старый расчёт по дате найма. Любой день можно
-        переключить вручную.
-      </p>
+      <p className="text-xs text-tg-hint">{tx(
+        "Учебные смены считаются по табелю: первые N отработанных смен. Больничный или пропуск учебную не съедает, перенесённая смена остаётся в счёте. Пока табель пуст, работает старый расчёт по дате найма. Любой день можно переключить вручную.",
+      )}</p>
 
       {q.isLoading && <ListSkeleton rows={5} />}
       {q.isError && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
 
       {q.data && q.data.items.length === 0 && (
-        <p className="text-xs text-tg-hint">Сотрудников в твоём подразделении нет.</p>
+        <p className="text-xs text-tg-hint">{tx("Сотрудников в твоём подразделении нет.")}</p>
       )}
 
       {q.data && (
@@ -163,6 +162,7 @@ function PlanCard({
   onToggleDay: (day: string, isTraining: boolean) => void;
   onResetDay: (day: string) => void;
 }) {
+  const { tx } = useTx();
   const trainingCount = plan.days.filter((item) => item.is_training).length;
   const explicit = plan.days.filter((item) => item.explicit);
   const newcomer =
@@ -181,22 +181,25 @@ function PlanCard({
               {plan.display_name}
             </span>
             {newcomer && (
-              <span className="rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">
-                новичок
-              </span>
+              <span className="rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">{tx("новичок")}</span>
             )}
           </div>
           <div className="mt-0.5 truncate text-xs text-tg-hint">
             {[plan.position, plan.department_name].filter(Boolean).join(" · ") ||
-              "Без должности"}
+              tx("Без должности")}
           </div>
           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-tg-hint">
             <span className="text-tg-text">{labels[plan.rate_type] ?? plan.rate_type}</span>
             <span>
-              · учебных {trainingCount} из {plan.days.length}
+              {tx("· учебных {training} из {total}", {
+                training: trainingCount,
+                total: plan.days.length,
+              })}
             </span>
-            {explicit.length > 0 && <span>· {explicit.length} вручную</span>}
-            {!plan.has_shifts && <span>· табель пуст</span>}
+            {explicit.length > 0 && (
+              <span>{tx("· {count} вручную", { count: explicit.length })}</span>
+            )}
+            {!plan.has_shifts && <span>{tx("· табель пуст")}</span>}
           </div>
         </div>
         <ChevronToggle open={open} className="mt-0.5 text-tg-hint" />
@@ -205,7 +208,7 @@ function PlanCard({
       {open && (
         <div className="space-y-3 border-t border-tg-bg/50 px-3 py-3">
           <div>
-            <div className="text-xs font-medium text-tg-hint">Ставка</div>
+            <div className="text-xs font-medium text-tg-hint">{tx("Ставка")}</div>
             <div className="mt-1 flex gap-1.5">
               {(["full", "partial"] as HrRateType[]).map((rate) => (
                 <button
@@ -226,16 +229,14 @@ function PlanCard({
           </div>
 
           <div>
-            <div className="text-xs font-medium text-tg-hint">
-              Учебных смен по табелю
-            </div>
+            <div className="text-xs font-medium text-tg-hint">{tx("Учебных смен по табелю")}</div>
             <div className="mt-1 flex items-center gap-2">
               <button
                 type="button"
                 disabled={busy || plan.training_days <= 0}
                 onClick={() => onTrainingDays(Math.max(0, plan.training_days - 1))}
                 className="min-h-11 min-w-11 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
-                aria-label="Меньше учебных смен"
+                aria-label={tx("Меньше учебных смен")}
               >
                 −
               </button>
@@ -247,24 +248,24 @@ function PlanCard({
                 disabled={busy || plan.training_days >= 30}
                 onClick={() => onTrainingDays(Math.min(30, plan.training_days + 1))}
                 className="min-h-11 min-w-11 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
-                aria-label="Больше учебных смен"
+                aria-label={tx("Больше учебных смен")}
               >
                 +
               </button>
               <span className="text-2xs text-tg-hint">
                 {plan.has_shifts
-                  ? "считаем отработанные смены"
+                  ? tx("считаем отработанные смены")
                   : plan.hire_date
-                    ? `табель пуст · с ${formatDate(plan.hire_date)}`
-                    : "табель пуст · включено «учимся вместе»"}
+                    ? tx("табель пуст · с {date}", {
+                        date: formatDate(plan.hire_date),
+                      })
+                    : tx("табель пуст · включено «учимся вместе»")}
               </span>
             </div>
           </div>
 
           <div>
-            <div className="text-xs font-medium text-tg-hint">
-              Ближайшие две недели
-            </div>
+            <div className="text-xs font-medium text-tg-hint">{tx("Ближайшие две недели")}</div>
             <div className="mt-1 grid grid-cols-7 gap-1">
               {plan.days.map((item) => (
                 <button
@@ -274,8 +275,8 @@ function PlanCard({
                   onClick={() => onToggleDay(item.day, !item.is_training)}
                   title={
                     item.is_training
-                      ? "Учебная смена — нажми, чтобы сделать обычной"
-                      : "Обычная смена — нажми, чтобы сделать учебной"
+                      ? tx("Учебная смена — нажми, чтобы сделать обычной")
+                      : tx("Обычная смена — нажми, чтобы сделать учебной")
                   }
                   className={`relative min-h-11 rounded-tile px-1 py-1 text-center text-2xs leading-tight transition-colors disabled:opacity-50 ${
                     item.is_training
@@ -287,7 +288,7 @@ function PlanCard({
                   <div className="text-sm tabular-nums">{dayNumber(item.day)}</div>
                   {item.shift_status && (
                     <div className="text-3xs opacity-70">
-                      {SHIFT_CHAR[item.shift_status] ?? "·"}
+                      {tx(SHIFT_CHAR[item.shift_status] ?? "·")}
                     </div>
                   )}
                   {item.explicit && (
@@ -301,11 +302,9 @@ function PlanCard({
                 </button>
               ))}
             </div>
-            <div className="mt-1 text-2xs text-tg-hint">
-              Синее — учебная смена, серое — обычная. Точка — день задан вручную,
-              буква — статус в табеле (Р работа, П план, Б больничный, Н не пришёл,
-              В выходной, О отпуск).
-            </div>
+            <div className="mt-1 text-2xs text-tg-hint">{tx(
+              "Синее — учебная смена, серое — обычная. Точка — день задан вручную, буква — статус в табеле (Р работа, П план, Б больничный, Н не пришёл, В выходной, О отпуск).",
+            )}</div>
           </div>
 
           {explicit.length > 0 && (
@@ -317,16 +316,14 @@ function PlanCard({
                 >
                   <span className="min-w-0 flex-1 text-tg-text">
                     {formatDate(item.day)} —{" "}
-                    {item.is_training ? "учебная" : "обычная"} (вручную)
+                    {item.is_training ? tx("учебная") : tx("обычная")} (вручную)
                   </span>
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => onResetDay(item.day)}
                     className="min-h-8 shrink-0 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
-                  >
-                    Вернуть правило
-                  </button>
+                  >{tx("Вернуть правило")}</button>
                 </div>
               ))}
             </div>
@@ -337,6 +334,8 @@ function PlanCard({
   );
 }
 
+// Буквы табеля: в русской версии это первые буквы статусов, в английской —
+// свои; сама таблица остаётся русской, а переводятся буквы при показе.
 const SHIFT_CHAR: Record<string, string> = {
   planned: "П",
   worked: "Р",
@@ -353,13 +352,13 @@ function parseDay(day: string): Date {
 function formatDate(day: string): string {
   const date = parseDay(day);
   if (Number.isNaN(date.getTime())) return day;
-  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  return date.toLocaleDateString(currentIntlLocale(), { day: "2-digit", month: "2-digit" });
 }
 
 function weekday(day: string): string {
   const date = parseDay(day);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("ru-RU", { weekday: "short" }).slice(0, 2);
+  return date.toLocaleDateString(currentIntlLocale(), { weekday: "short" });
 }
 
 function dayNumber(day: string): string {

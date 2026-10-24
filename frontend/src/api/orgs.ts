@@ -1,21 +1,29 @@
 import { api } from "./client";
 
 /**
- * Приглашения в организацию (B2B_PLATFORM_PLAN, шаг 2.2).
+ * Организации: приглашения, вход по коду и создание своей.
  *
- * Ссылка отдаётся ровно один раз — в ответе на создание: сервер хранит только
- * SHA-256 от токена, восстановить его нельзя. Поэтому в списке `link` нет.
+ * Ручки `/api/invitations/*` не требуют организации — токен и есть пропуск.
+ * Ручки `/api/org/*` работают от имени вошедшего человека: список клиентов
+ * платформы наружу не отдаётся, вход возможен только по точному коду или
+ * точному названию, которое человек получил от своего руководителя.
  */
 
-export type OrgRole = "owner" | "manager" | "staff";
+export type OrgRole = "staff" | "manager" | "owner";
 
+/** Роли от младшей к старшей: в форме приглашения первым стоит «сотрудник». */
+export const ORG_ROLES: OrgRole[] = ["staff", "manager", "owner"];
+
+/**
+ * Подписи ролей. Русские ключи сознательно: экран приглашений показывает их
+ * как есть, а перевод — задача `tx(...)` в месте показа, когда дойдёт очередь
+ * этого экрана.
+ */
 export const ORG_ROLE_LABELS: Record<OrgRole, string> = {
   owner: "Владелец",
   manager: "Управляющий",
   staff: "Сотрудник",
 };
-
-export const ORG_ROLES: OrgRole[] = ["staff", "manager", "owner"];
 
 export interface OrgInvitation {
   id: number;
@@ -23,6 +31,7 @@ export interface OrgInvitation {
   role: OrgRole;
   created_at: string | null;
   expires_at: string;
+  /** Ссылка приходит только в ответе на создание: в базе лежит её хеш. */
   link?: string | null;
   mail_sent?: boolean;
 }
@@ -44,29 +53,53 @@ export interface AcceptResult {
 export const fetchInvitations = () =>
   api<OrgInvitation[]>("/api/org/invitations");
 
-export const createInvitation = (input: {
-  email?: string | null;
+export const createInvitation = (body: {
+  email: string | null;
   role: OrgRole;
   days: number;
 }) =>
   api<OrgInvitation>("/api/org/invitations", {
     method: "POST",
-    body: JSON.stringify({
-      email: input.email?.trim() || null,
-      role: input.role,
-      days: input.days,
-    }),
+    body: JSON.stringify(body),
   });
 
 export const revokeInvitation = (id: number) =>
   api<void>(`/api/org/invitations/${id}`, { method: "DELETE" });
 
-/** Что за организация зовёт — доступно до входа, токен и есть пропуск. */
 export const previewInvitation = (token: string) =>
   api<InvitationPreview>(`/api/invitations/${encodeURIComponent(token)}`);
 
 export const acceptInvitation = (token: string) =>
-  api<AcceptResult>(
-    `/api/invitations/${encodeURIComponent(token)}/accept`,
-    { method: "POST" },
-  );
+  api<AcceptResult>(`/api/invitations/${encodeURIComponent(token)}/accept`, {
+    method: "POST",
+  });
+
+/**
+ * Организация с точки зрения человека: имя, код и его роль.
+ *
+ * Код (`slug`) — тот самый «ID компании», который руководитель передаёт
+ * сотруднику.
+ */
+export interface OrgInfo {
+  id: number;
+  slug: string;
+  name: string;
+  role: string;
+}
+
+/** Присоединиться по точному коду или названию. Роль при входе — `staff`. */
+export const joinOrganization = (code: string) =>
+  api<OrgInfo>("/api/org/join", {
+    method: "POST",
+    body: JSON.stringify({ code: code.trim() }),
+  });
+
+/** Завести свою организацию: человек сразу становится её владельцем. */
+export const createOrganization = (name: string, industry: string) =>
+  api<OrgInfo>("/api/org/create", {
+    method: "POST",
+    body: JSON.stringify({ name: name.trim(), industry }),
+  });
+
+/** Своя организация: имя и код для приглашений. */
+export const fetchCurrentOrg = () => api<OrgInfo>("/api/org/current");

@@ -20,6 +20,7 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
@@ -49,6 +50,7 @@ const FIELDS: { key: keyof HrKpiRules; label: string; hint: string }[] = [
 ];
 
 export default function KpiScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["admin", "kpi"],
@@ -76,8 +78,8 @@ export default function KpiScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="KPI смены"
-      subtitle="Опыт за работу, рейтинг недели"
+      title={tx("KPI смены")}
+      subtitle={tx("Опыт за работу, рейтинг недели")}
       onBack={onBack}
     >
       {q.isError && (
@@ -90,19 +92,18 @@ export default function KpiScreen({ onBack }: Props) {
 
       {rules && (
         <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-          <div className="text-sm font-semibold text-tg-text">Сколько стоит работа</div>
-          <div className="text-xs text-tg-hint">
-            Веса действуют сразу: опыт пересчитывается из уже записанных смен и
-            поручений, передеплой не нужен.
-          </div>
+          <div className="text-sm font-semibold text-tg-text">{tx("Сколько стоит работа")}</div>
+          <div className="text-xs text-tg-hint">{tx(
+            "Веса действуют сразу: опыт пересчитывается из уже записанных смен и поручений, передеплой не нужен.",
+          )}</div>
           {FIELDS.map((field) => (
             <label
               key={field.key}
               className="flex items-center justify-between gap-3 rounded-tile bg-tg-bg/50 p-2"
             >
               <span className="min-w-0">
-                <span className="block text-xs text-tg-text">{field.label}</span>
-                <span className="block text-2xs text-tg-hint">{field.hint}</span>
+                <span className="block text-xs text-tg-text">{tx(field.label)}</span>
+                <span className="block text-2xs text-tg-hint">{tx(field.hint)}</span>
               </span>
               <input
                 type="number"
@@ -122,41 +123,41 @@ export default function KpiScreen({ onBack }: Props) {
             </label>
           ))}
           {mut.isPending && (
-            <div className="text-xs text-tg-hint">Сохраняем…</div>
+            <div className="text-xs text-tg-hint">{tx("Сохраняем…")}</div>
           )}
         </section>
       )}
 
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-        <div className="text-sm font-semibold text-tg-text">Неделя</div>
+        <div className="text-sm font-semibold text-tg-text">{tx("Неделя")}</div>
         {q.data && (
           <div className="text-xs text-tg-hint">
-            {q.data.week_start} — {q.data.week_end} · пн–вс
+            {tx("{from} — {to} · Mon–Sun", {
+              from: q.data.week_start,
+              to: q.data.week_end,
+            })}
           </div>
         )}
         <div className="rounded-tile bg-tg-bg/50 p-2 text-xs">
           {winner ? (
             <>
-              <div className="text-tg-hint">Сотрудник недели</div>
+              <div className="text-tg-hint">{tx("Сотрудник недели")}</div>
               <div className="mt-0.5 text-tg-text">
                 <Icon name="award" size={14} className="mr-1 inline-block align-[-2px]" />
                 {winner.display_name}
                 {winner.department ? ` · ${winner.department}` : ""} — {winner.xp} XP,{" "}
-                {winner.tasks_done} поруч.
+                {tx("{count} tasks", { count: winner.tasks_done })}
               </div>
             </>
           ) : (
-            <div className="text-tg-hint">
-              Пока никто не набрал минимум опыта — звание свободно. Это нормально
-              в начале недели.
-            </div>
+            <div className="text-tg-hint">{tx(
+              "Пока никто не набрал минимум опыта — звание свободно. Это нормально в начале недели.",
+            )}</div>
           )}
         </div>
 
         {board.length === 0 && !q.isLoading ? (
-          <div className="text-xs text-tg-hint">
-            За эту неделю ещё нет закрытых смен и поручений.
-          </div>
+          <div className="text-xs text-tg-hint">{tx("За эту неделю ещё нет закрытых смен и поручений.")}</div>
         ) : (
           <ul className="space-y-1">
             {board.slice(0, 10).map((row) => (
@@ -178,9 +179,9 @@ export default function KpiScreen({ onBack }: Props) {
             ))}
           </ul>
         )}
-        <div className="text-2xs text-tg-hint">
-          Тестовый пул `[BOT]` в рейтинг не попадает: звание — для живых людей.
-        </div>
+        <div className="text-2xs text-tg-hint">{tx(
+          "Тестовый пул `[BOT]` в рейтинг не попадает: звание — для живых людей.",
+        )}</div>
       </section>
     </SubScreen>
   );

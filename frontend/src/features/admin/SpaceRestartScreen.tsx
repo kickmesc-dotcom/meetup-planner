@@ -20,6 +20,7 @@ import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
@@ -27,6 +28,7 @@ interface Props {
 const QK = ["admin", "space-restart"] as const;
 
 export default function SpaceRestartScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
 
   const q = useQuery({ queryKey: QK, queryFn: fetchSpaceRestartSettings });
@@ -51,8 +53,8 @@ export default function SpaceRestartScreen({ onBack }: Props) {
     onSuccess: () => {
       haptic("success");
       void showAlert(
-        "Space перезапускается. Mini App почти не заметит, но бот будет " +
-          "молчать ~5–7 минут, пока вебхук переустановится.",
+        tx("Space перезапускается. Mini App почти не заметит, но бот будет ") +
+          tx("молчать ~5–7 минут, пока вебхук переустановится."),
       );
       void qc.invalidateQueries({ queryKey: QK });
     },
@@ -79,11 +81,11 @@ export default function SpaceRestartScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Рестарт Space"
-      subtitle="Принудительный перезапуск backend-контейнера на HF"
+      title={tx("Рестарт Space")}
+      subtitle={tx("Принудительный перезапуск backend-контейнера на HF")}
       onBack={onBack}
     >
-      {q.isPending && <div className="text-xs text-tg-hint">Загрузка…</div>}
+      {q.isPending && <div className="text-xs text-tg-hint">{tx("Загрузка…")}</div>}
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           <InlineIcon name="alert" />
@@ -94,41 +96,37 @@ export default function SpaceRestartScreen({ onBack }: Props) {
       {q.data && !available && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           <InlineIcon name="alert" />
-          Env <code>HF_TOKEN</code> не задан в настройках Space — рестарт
-          недоступен. Добавь write-токен HF в секреты Space.
-        </div>
+          Env <code>HF_TOKEN</code>{tx(
+            "не задан в настройках Space — рестарт недоступен. Добавь write-токен HF в секреты Space.",
+          )}</div>
       )}
 
       {q.data && (
         <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
-            <Icon name="bolt" size={15} className="shrink-0" />
-            Сейчас
-          </div>
-          <div className="text-xs text-tg-hint">
-            Лечит зависшие сетевые состояния (дохлый keep-alive-пул).
-            Mini App переключается бесшовно; бот восстанавливает вебхук
-            ~5–7 минут.
-          </div>
+            <Icon name="bolt" size={15} className="shrink-0" />{tx("Сейчас")}</div>
+          <div className="text-xs text-tg-hint">{tx(
+            "Лечит зависшие сетевые состояния (дохлый keep-alive-пул). Mini App переключается бесшовно; бот восстанавливает вебхук ~5–7 минут.",
+          )}</div>
           <button
             type="button"
             disabled={!available || restart.isPending}
             onClick={async () => {
               haptic("medium");
               const ok = await showConfirm(
-                "Перезапустить Space? Бот будет молчать ~5–7 минут.",
+                tx("Перезапустить Space? Бот будет молчать ~5–7 минут."),
               );
               if (ok) restart.mutate();
             }}
             className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             {restart.isPending && <Spinner />}
-            <Icon name="refresh" size={16} />
-            Рестарт Space
-          </button>
+            <Icon name="refresh" size={16} />{tx("Рестарт Space")}</button>
           {q.data.last_restart_at && (
             <div className="text-xs text-tg-hint">
-              Последний рестарт: {fmtDt(q.data.last_restart_at)}
+              {tx("Последний рестарт: {when}", {
+                when: fmtDt(q.data.last_restart_at),
+              })}
             </div>
           )}
         </section>
@@ -139,21 +137,17 @@ export default function SpaceRestartScreen({ onBack }: Props) {
           <div>
             <div className="text-sm font-semibold text-tg-text">
               <span className="inline-flex items-center gap-1.5">
-                <Icon name="calendar" size={15} />
-                По расписанию
-              </span>
+                <Icon name="calendar" size={15} />{tx("По расписанию")}</span>
             </div>
-            <div className="text-xs text-tg-hint">
-              Анти-луп: не чаще раза в 30 минут (после ручного — тоже).
-            </div>
+            <div className="text-xs text-tg-hint">{tx("Анти-луп: не чаще раза в 30 минут (после ручного — тоже).")}</div>
           </div>
 
           <div className="flex rounded-tile bg-tg-bg/60 p-0.5 text-xs">
             {(
               [
-                ["off", "Выкл"],
-                ["once", "Один раз"],
-                ["interval", "Каждые N ч"],
+                ["off", tx("Выкл")],
+                ["once", tx("Один раз")],
+                ["interval", tx("Каждые N ч")],
               ] as const
             ).map(([mode, label]) => (
               <button
@@ -182,9 +176,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
 
           {draft.mode === "once" && (
             <div>
-              <div className="text-xs text-tg-hint mb-1">
-                Дата и время (локальные)
-              </div>
+              <div className="text-xs text-tg-hint mb-1">{tx("Дата и время (локальные)")}</div>
               <input
                 type="datetime-local"
                 value={isoToLocalInput(draft.at)}
@@ -204,7 +196,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
           {draft.mode === "interval" && (
             <div>
               <div className="text-xs text-tg-hint mb-1">
-                Каждые {draft.every_hours ?? 24} ч
+                {tx("Каждые {hours} ч", { hours: draft.every_hours ?? 24 })}
               </div>
               <input
                 type="range"
@@ -217,15 +209,15 @@ export default function SpaceRestartScreen({ onBack }: Props) {
                 }
                 className="w-full accent-tg-button"
               />
-              <div className="mt-1 text-2xs text-tg-hint">
-                1 ч … 168 ч (неделя). Отсчёт — от последнего рестарта.
-              </div>
+              <div className="mt-1 text-2xs text-tg-hint">{tx("1 ч … 168 ч (неделя). Отсчёт — от последнего рестарта.")}</div>
             </div>
           )}
 
           {q.data?.next_restart_at && q.data.schedule.mode !== "off" && (
             <div className="rounded-tile bg-tg-bg/40 p-2 text-xs text-tg-text">
-              Следующий рестарт: {fmtDt(q.data.next_restart_at)}
+              {tx("Следующий рестарт: {when}", {
+                when: fmtDt(q.data.next_restart_at),
+              })}
             </div>
           )}
 
@@ -239,9 +231,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
-            <Icon name="save" size={16} />
-            Сохранить расписание
-          </button>
+            <Icon name="save" size={16} />{tx("Сохранить расписание")}</button>
         </section>
       )}
     </SubScreen>

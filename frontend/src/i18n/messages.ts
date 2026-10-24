@@ -136,6 +136,13 @@ export const ru = {
   "error.invite_email_mismatch": "Приглашение выписано на другую почту — войди под тем адресом, на который его прислали.",
   "error.invite_limit": "Слишком много активных приглашений — отзови лишние и попробуй снова.",
   "error.bad_invite_ttl": "Срок приглашения — от 1 до 30 дней.",
+  "error.org_not_found":
+    "Такой компании нет. Проверь код или название — регистр не важен, но слова должны совпадать.",
+  "error.join_rate_limited":
+    "Слишком много попыток. Подожди десять минут или попроси ссылку-приглашение.",
+  "error.bad_name": "Название компании слишком короткое.",
+  "error.bad_slug":
+    "Короткий адрес — только латиница, цифры и дефис.",
 } as const;
 
 export type MessageKey = keyof typeof ru;
@@ -255,4 +262,10 @@ export const en: Record<MessageKey, string> = {
   "error.invite_email_mismatch": "The invitation was issued for another email — sign in with the address it was sent to.",
   "error.invite_limit": "Too many active invitations — revoke some and try again.",
   "error.bad_invite_ttl": "Invitation lifetime is 1 to 30 days.",
+  "error.org_not_found":
+    "No such company. Check the code or name — case doesn't matter, but the words must match.",
+  "error.join_rate_limited":
+    "Too many attempts. Wait ten minutes or ask for an invitation link.",
+  "error.bad_name": "The company name is too short.",
+  "error.bad_slug": "The short address allows only latin letters, digits and hyphens.",
 };

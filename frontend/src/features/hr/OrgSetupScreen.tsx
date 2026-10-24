@@ -9,6 +9,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ProgressBar from "@/components/ProgressBar";
 import { OPTIONAL_SECTIONS } from "@/features/hr/sections";
 import { haptic } from "@/tg/webapp";
@@ -29,6 +30,10 @@ import { useTx } from "@/i18n";
  *
  * Пропустить можно в любой момент — настройки по умолчанию рабочие, а мастер
  * остаётся доступным из админки.
+ *
+ * Переключатель языка живёт в шапке мастера на всех пяти шагах. Раньше он был
+ * только в профиле: человек, впервые открывший приложение, проходил настройку
+ * на языке, который не выбирал, и не мог это исправить на месте.
  */
 export default function OrgSetupScreen({
   setup,
@@ -169,10 +174,10 @@ export default function OrgSetupScreen({
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
-              <Icon name="admin" size={16} />
-              {tx("Настроим под вас")}
+              <Icon name="admin" size={16} className="shrink-0" />
+              <span className="truncate">{tx("Настроим под вас")}</span>
             </div>
-            <div className="text-xs text-tg-hint">
+            <div className="truncate text-xs text-tg-hint">
               {tx("Шаг {step} из {total}: {title}", {
                 step: step + 1,
                 total: steps.length,
@@ -180,14 +185,19 @@ export default function OrgSetupScreen({
               })}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={skip}
-            disabled={save.isPending}
-            className="min-h-9 shrink-0 rounded-tile px-2 text-xs text-tg-link disabled:opacity-50"
-          >
-            {tx("Пропустить")}
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Язык — на каждом шаге: мастер открывается первым, и менять язык
+                через профиль на этом экране было невозможно. */}
+            <LanguageSwitcher />
+            <button
+              type="button"
+              onClick={skip}
+              disabled={save.isPending}
+              className="min-h-9 rounded-tile px-2 text-xs text-tg-link disabled:opacity-50"
+            >
+              {tx("Пропустить")}
+            </button>
+          </div>
         </div>
         <div className="mt-2">
           <ProgressBar value={step + 1} total={steps.length} size="sm" />

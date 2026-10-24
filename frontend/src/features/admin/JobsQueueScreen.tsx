@@ -30,6 +30,7 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
+import { useTx } from "@/i18n";
 const JOBS_IDLE_INTERVAL_MS = 10 * 60_000;
 const JOBS_HOT_INTERVAL_MS = 5_000;
 const JOBS_HOT_DURATION_MS = 3 * 60_000;
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export default function JobsQueueScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [jobsHotUntil, setJobsHotUntil] = useState(0);
   const hotTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,20 +95,22 @@ export default function JobsQueueScreen({ onBack }: Props) {
       haptic("success");
       enterHotMode();
       qc.invalidateQueries({ queryKey: ["admin", "jobs"] });
-      void showAlert(`Планировщик пересобран: ${res.jobs} задач.`);
+      void showAlert(
+        tx("Планировщик пересобран: {count} задач.", { count: res.jobs }),
+      );
     },
     onError: errAlert,
   });
 
   return (
     <SubScreen
-      title="Очередь задач"
-      subtitle="APScheduler-job'ы + напоминания встреч"
+      title={tx("Очередь задач")}
+      subtitle={tx("APScheduler-job'ы + напоминания встреч")}
       onBack={onBack}
     >
       <section className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-start justify-between gap-2 mb-1">
-          <div className="text-base font-semibold">Очередь</div>
+          <div className="text-base font-semibold">{tx("Очередь")}</div>
           <button
             type="button"
             onClick={() => {
@@ -115,24 +119,24 @@ export default function JobsQueueScreen({ onBack }: Props) {
               jobs.refetch();
             }}
             className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint active:scale-95 transition-transform"
-            title="Обновить и опрашивать чаще 3 минуты"
+            title={tx("Обновить и опрашивать чаще 3 минуты")}
           >
             <Icon name="refresh" size={13} className="mr-1 inline-block" />
-            {isHot ? "тик 5с" : "тик 10м"}
+            {isHot ? tx("тик 5с") : tx("тик 10м")}
           </button>
         </div>
         <div className="text-xs text-tg-hint mb-2">
-          <InlineIcon name="edit" /> — подвинуть время ближайшего запуска.{" "}
-          <InlineIcon name="close" /> — пропустить ближайший запуск (recurring
-          остаётся, one-shot/reminder удаляются).
-        </div>
+          <InlineIcon name="edit" /> {tx("— подвинуть время ближайшего запуска.")}{" "}
+          <InlineIcon name="close" />{tx(
+            "— пропустить ближайший запуск (recurring остаётся, one-shot/reminder удаляются).",
+          )}</div>
         {/* GHG11(3): аварийная мастер-кнопка — пересобрать планировщик с нуля. */}
         <button
           type="button"
           onClick={() => {
             if (
               confirm(
-                "Схлопнуть ВСЕ запланированные авто-задачи? Планировщик пересоберётся с нуля, как после рестарта.",
+                tx("Схлопнуть ВСЕ запланированные авто-задачи? Планировщик пересоберётся с нуля, как после рестарта."),
               )
             ) {
               haptic("medium");
@@ -143,18 +147,16 @@ export default function JobsQueueScreen({ onBack }: Props) {
           className="mb-2 w-full rounded-tile bg-status-busy/15 px-3 py-2 text-xs font-semibold text-status-busy active:scale-[0.99] disabled:opacity-50"
         >
           {collapse.isPending
-            ? "Пересобираем…"
+            ? tx("Пересобираем…")
             : (
                 <>
-                  <Icon name="bolt" size={14} className="mr-1 inline-block" />
-                  Схлопнуть все запланированные авто-задачи
-                </>
+                  <Icon name="bolt" size={14} className="mr-1 inline-block" />{tx("Схлопнуть все запланированные авто-задачи")}</>
               )}
         </button>
         {jobs.isPending ? (
           <ListSkeleton rows={4} />
         ) : (jobs.data ?? []).length === 0 ? (
-          <div className="text-xs text-tg-hint">Очередь пуста.</div>
+          <div className="text-xs text-tg-hint">{tx("Очередь пуста.")}</div>
         ) : (
           <div className="space-y-1.5">
             {(jobs.data ?? []).map((j) => (
@@ -166,8 +168,10 @@ export default function JobsQueueScreen({ onBack }: Props) {
                   if (
                     confirm(
                       j.trigger_kind === "date" || j.kind === "reminder"
-                        ? `Удалить «${j.label}»?`
-                        : `Пропустить ближайший запуск «${j.label}»?`,
+                        ? tx("Удалить «{label}»?", { label: j.label })
+                        : tx("Пропустить ближайший запуск «{label}»?", {
+                            label: j.label,
+                          }),
                     )
                   ) {
                     cancel.mutate(j.id);
@@ -194,6 +198,7 @@ function JobRow({
   onCancel: () => void;
   onReschedule: (utcIso: string) => void;
 }) {
+  const { tx } = useTx();
   const [editing, setEditing] = useState(false);
   const [localValue, setLocalValue] = useState<string>(() => toLocalInput(job.next_run_at));
 
@@ -209,8 +214,8 @@ function JobRow({
     kindLabel === "date" || job.kind === "reminder";
   const cancelTitle =
     kindLabel === "date" || job.kind === "reminder"
-      ? "Удалить"
-      : "Пропустить ближайший запуск";
+      ? tx("Удалить")
+      : tx("Пропустить ближайший запуск");
 
   return (
     <div className="rounded-tile bg-tg-bg/50 px-2 py-1.5">
@@ -246,8 +251,8 @@ function JobRow({
               }}
               disabled={pending}
               className="min-h-11 min-w-11 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-text border border-tg-hint/30 disabled:opacity-40"
-              title="Изменить время"
-              aria-label="Изменить время"
+              title={tx("Изменить время")}
+              aria-label={tx("Изменить время")}
             >
               <Icon name="edit" size={16} />
             </button>
@@ -281,7 +286,7 @@ function JobRow({
             onClick={() => {
               const iso = fromLocalInput(localValue);
               if (!iso) {
-                void showAlert("Некорректное время");
+                void showAlert(tx("Некорректное время"));
                 return;
               }
               haptic("medium");
@@ -290,8 +295,8 @@ function JobRow({
             }}
             disabled={pending}
             className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40            active:scale-[0.98] transition-transform"
-            aria-label="Сохранить время"
-            title="Сохранить время"
+            aria-label={tx("Сохранить время")}
+            title={tx("Сохранить время")}
           >
             <Icon name="save" size={16} />
           </button>
