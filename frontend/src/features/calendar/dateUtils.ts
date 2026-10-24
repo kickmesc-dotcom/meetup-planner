@@ -11,6 +11,7 @@ import {
   startOfYear,
 } from "date-fns";
 
+import { currentLocale, tx } from "@/i18n";
 import type { ZoomLevel } from "@/store/ui";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -193,8 +194,15 @@ export function statusPillBg(status: 1 | 2 | 3): string {
   }
 }
 
+/** Подпись статуса на языке интерфейса.
+ *
+ * Локаль читается из стора, а не приходит аргументом: функцию зовут из четырёх
+ * видов календаря и из `title` пилюли, и протаскивать туда локаль означало бы
+ * поменять десяток вызовов ради строки в три слова.
+ */
 export function statusLabel(s: 1 | 2 | 3): string {
-  return s === 1 ? "свободен" : s === 2 ? "может" : "занят";
+  const locale = currentLocale();
+  return tx(locale, s === 1 ? "свободен" : s === 2 ? "может" : "занят");
 }
 
 /**
@@ -345,7 +353,8 @@ function pickConfidenceColor(status: 1 | 2 | 3, confidence: number): string {
 /** Короткое читаемое сокращение для пилюли/ячейки.
  * Никаких «сво…» и «з…» — слово целиком либо нормальное сокращение. */
 export function statusLabelShort(s: 1 | 2 | 3): string {
-  return s === 1 ? "своб." : s === 2 ? "может" : "зан.";
+  const locale = currentLocale();
+  return tx(locale, s === 1 ? "своб." : s === 2 ? "может" : "зан.");
 }
 
 /** Вспомогательный: «1 апреля» или «1 апр» в ru-локали без подключения локали

@@ -6,7 +6,7 @@ import Icon, { type IconName } from "@/components/Icon";
 import ProgressBar from "@/components/ProgressBar";
 import { useUI, type Tab } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
-
+import { useTx } from "@/i18n";
 /**
  * Правый рельс сводки на широком экране.
  *
@@ -19,6 +19,7 @@ import { haptic } from "@/tg/webapp";
  * открывает уже загруженный экран без повторного запроса.
  */
 export default function OverviewRail() {
+  const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
 
   const checklistQ = useQuery({
@@ -50,52 +51,58 @@ export default function OverviewRail() {
 
   return (
     <aside
-      aria-label="Сводка смены"
+      aria-label={tx("Сводка смены")}
       data-testid="overview-rail"
       className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-tg-hint/10 px-4 py-4 lg:block"
     >
       <h2 className="text-2xs font-semibold uppercase tracking-wide text-tg-hint">
-        Сводка смены
+        {tx("Сводка смены")}
       </h2>
 
       <Card
         icon="clipboard"
-        title="Чек-лист"
+        title={tx("Чек-лист")}
         action={
           <RailLink onClick={() => go("checklist")}>
-            {shift && shift.total > 0 ? "Открыть" : "Начать"}
+            {shift && shift.total > 0 ? tx("Открыть") : tx("Начать")}
           </RailLink>
         }
       >
         {checklistQ.isLoading ? (
-          <Muted>Загружаем…</Muted>
+          <Muted>{tx("Загружаем…")}</Muted>
         ) : shift && shift.total > 0 ? (
           <ProgressBar
             value={shift.done}
             total={shift.total}
-            label={shift.status === "done" ? "Смена закрыта" : "Выполнено"}
+            label={
+              shift.status === "done"
+                ? tx("Смена закрыта")
+                : tx("Выполнено")
+            }
             tone={shift.status === "done" ? "muted" : "brand"}
           />
         ) : (
-          <Muted>Пунктов на сегодня нет</Muted>
+          <Muted>{tx("Пунктов на сегодня нет")}</Muted>
         )}
       </Card>
 
       <Card
         icon="tasks"
-        title="Поручения"
-        action={<RailLink onClick={() => go("tasks")}>Мои задачи</RailLink>}
+        title={tx("Поручения")}
+        action={
+          <RailLink onClick={() => go("tasks")}>{tx("Мои задачи")}</RailLink>
+        }
       >
         {tasksQ.isLoading ? (
-          <Muted>Загружаем…</Muted>
+          <Muted>{tx("Загружаем…")}</Muted>
         ) : tasksQ.isError ? (
-          <Muted>Не удалось загрузить</Muted>
+          <Muted>{tx("Не удалось загрузить")}</Muted>
         ) : (
           <div className="flex items-end gap-4">
-            <Figure value={openCount} caption="открыто" />
+            <Figure value={openCount} caption={tx("открыто")} />
             <Figure
               value={overdue}
-              caption="просрочено"
+              caption={tx("просрочено")}
               tone={overdue > 0 ? "alert" : "muted"}
             />
           </div>
@@ -104,33 +111,33 @@ export default function OverviewRail() {
 
       <Card
         icon="alert"
-        title="Проблемы"
-        action={<RailLink onClick={() => go("issues")}>Журнал</RailLink>}
+        title={tx("Проблемы")}
+        action={<RailLink onClick={() => go("issues")}>{tx("Журнал")}</RailLink>}
       >
         {issuesQ.isLoading ? (
-          <Muted>Загружаем…</Muted>
+          <Muted>{tx("Загружаем…")}</Muted>
         ) : problems ? (
           <div className="flex items-end gap-4">
-            <Figure value={problems.total_open ?? 0} caption="открыто" />
+            <Figure value={problems.total_open ?? 0} caption={tx("открыто")} />
             <Figure
               value={problems.attention ?? 0}
-              caption="требуют внимания"
+              caption={tx("требуют внимания")}
               tone={(problems.attention ?? 0) > 0 ? "alert" : "muted"}
             />
           </div>
         ) : (
-          <Muted>Нет данных</Muted>
+          <Muted>{tx("Нет данных")}</Muted>
         )}
       </Card>
 
       <h2 className="mt-5 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
-        Быстрый переход
+        {tx("Быстрый переход")}
       </h2>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <Quick tab="shifts" icon="calendar" label="Табель" onClick={go} />
-        <Quick tab="materials" icon="book" label="Материалы" onClick={go} />
-        <Quick tab="team" icon="team" label="Команда" onClick={go} />
-        <Quick tab="calendar" icon="clock" label="Календарь" onClick={go} />
+        <Quick tab="shifts" icon="calendar" label={tx("Табель")} onClick={go} />
+        <Quick tab="materials" icon="book" label={tx("Материалы")} onClick={go} />
+        <Quick tab="team" icon="team" label={tx("Команда")} onClick={go} />
+        <Quick tab="calendar" icon="clock" label={tx("Календарь")} onClick={go} />
       </div>
     </aside>
   );

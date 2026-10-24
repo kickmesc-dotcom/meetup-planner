@@ -38,13 +38,7 @@ const sources = import.meta.glob("../**/*.{ts,tsx}", {
  * следит и за размером). Пополняется только новыми экранами, и то осознанно.
  */
 const PENDING = new Set<string>([
-  "App.tsx",
   "api/access.ts",
-  "components/ErrorState.tsx",
-  "components/MediaLightbox.tsx",
-  "components/PhotoAttach.tsx",
-  "components/ProgressBar.tsx",
-  "components/SimulationBanner.tsx",
   "features/actions/ActionBar.tsx",
   "features/actions/AutoPickSheet.tsx",
   "features/actions/PollSheet.tsx",
@@ -74,18 +68,14 @@ const PENDING = new Set<string>([
   "features/calendar/CalendarView.tsx",
   "features/calendar/NavBar.tsx",
   "features/calendar/ParticipantRow.tsx",
-  "features/calendar/dateUtils.ts",
   "features/calendar/views/MonthView.tsx",
   "features/calendar/views/StripView.tsx",
   "features/calendar/views/TimelineNavBar.tsx",
   "features/calendar/views/TimelineView.tsx",
-  "features/desktop/DesktopShell.tsx",
-  "features/desktop/OverviewRail.tsx",
   "features/editor/RangeEditorSheet.tsx",
   "features/meetings/MeetingsPollsScreen.tsx",
   "features/meetings/MeetingsScreen.tsx",
   "features/polls/PollsScreen.tsx",
-  "store/ui.ts",
 ]);
 
 const CYRILLIC = /[А-Яа-яЁё]/;
@@ -159,13 +149,14 @@ describe("перевод: покрытие", () => {
   });
 
   it("список непереведённого не растёт", () => {
-    // Ратчет: 49 файлов на 24.10.2026 (было 71, потом 68, потом 49). Закрыта
-    // вся смена сотрудника: передача смены, табель и шаблон недели, проблемы,
-    // стандарты, обучение, профиль, карточка, материалы, ссылки, знакомство,
-    // обратная связь, push и веб-версия, тестовый пул, приветствие. Перевод
-    // экрана — минус строка отсюда и минус единица в пределе, а не «перевод»
-    // на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(49);
+    // Ратчет: 38 файлов на 24.10.2026 (было 71 → 68 → 49 → 38). Закрыта вся
+    // смена сотрудника (передача, табель и шаблон, проблемы, стандарты,
+    // обучение, профиль, карточка, материалы, ссылки, знакомство, обратная
+    // связь, push, веб-версия, пул) и общее: App, каркас ПК, нижняя полоса,
+    // рельс сводки, ошибка, фото, лайтбокс, прогресс, плашка проверки, статусы
+    // календаря. Перевод экрана — минус строка отсюда и минус единица в
+    // пределе, а не «перевод» на словах.
+    expect(PENDING.size).toBeLessThanOrEqual(38);
   });
 
   it("английский словарь без пустых значений", () => {

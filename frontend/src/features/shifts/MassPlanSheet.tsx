@@ -8,7 +8,6 @@ import type {
 import { haptic } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import { addDays, formatDate, toIso, weekdaysToIso } from "./shiftDates";
-
 import { useTx } from "@/i18n";
 /**
  * Шаблон недели и массовые правки табеля.

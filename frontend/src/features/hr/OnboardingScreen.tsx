@@ -12,7 +12,6 @@ import ThemeSwitcher from "@/components/ThemeSwitcher";
 import TrainingScreen from "@/features/hr/TrainingScreen";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * Первый экран нового сотрудника: «Привет! Давай освоимся».

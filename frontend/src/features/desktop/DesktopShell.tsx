@@ -4,7 +4,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useUI, type Tab } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
-
+import { useTx } from "@/i18n";
 /**
  * Каркас широкого экрана (≥1024px).
  *
@@ -67,6 +67,7 @@ export default function DesktopShell({
   openTasks?: number;
   children: ReactNode;
 }) {
+  const { tx } = useTx();
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
 
@@ -83,18 +84,29 @@ export default function DesktopShell({
   ];
 
   const groups: NavGroup[] = [
-    { title: "Смена", items: WORK },
-    { title: "Команда", items: team },
-    { title: "Сервис", items: [...SERVICE, PROFILE] },
+    { title: tx("Смена"), items: WORK },
+    { title: tx("Команда"), items: team },
+    { title: tx("Сервис"), items: [...SERVICE, PROFILE] },
     ...(isAdmin
-      ? [{ title: "Управление", items: [{ id: "admin" as Tab, label: "Админка", icon: "admin" as IconName }] }]
+      ? [
+          {
+            title: tx("Управление"),
+            items: [
+              {
+                id: "admin" as Tab,
+                label: tx("Админка"),
+                icon: "admin" as IconName,
+              },
+            ],
+          },
+        ]
       : []),
   ];
 
   return (
     <div className="flex h-full min-h-0 w-full" data-testid="desktop-shell">
       <aside
-        aria-label="Разделы приложения"
+        aria-label={tx("Разделы приложения")}
         className="flex h-full w-64 shrink-0 flex-col border-r border-tg-hint/10 bg-tg-secondary-bg/30"
       >
         <div className="flex items-center gap-2 px-4 pb-3 pt-4">
@@ -106,7 +118,7 @@ export default function DesktopShell({
               SemiTask
             </div>
             <div className="truncate text-2xs text-tg-hint">
-              Смена и команда
+              {tx("Смена и команда")}
             </div>
           </div>
         </div>
@@ -139,7 +151,7 @@ export default function DesktopShell({
                       >
                         <Icon name={item.icon} size={18} />
                         <span className="min-w-0 flex-1 truncate">
-                          {item.label}
+                          {tx(item.label)}
                         </span>
                         {item.id === "tasks" && openTasks > 0 && (
                           <span

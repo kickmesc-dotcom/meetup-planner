@@ -18,7 +18,6 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
-
 import { useTx } from "@/i18n";
 /**
  * База стандартов: как мы моем руки, подаём блюдо, тушим сковороду.

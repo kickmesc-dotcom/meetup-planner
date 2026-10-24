@@ -44,8 +44,9 @@ import SimulationBanner from "./components/SimulationBanner";
 import { useSimulation } from "./store/simulation";
 import { useUI } from "./store/ui";
 import { getInitData, getStartParam, haptic } from "./tg/webapp";
-
+import { useTx } from "@/i18n";
 export default function App() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: fetchMe });
   const users = useQuery({ queryKey: ["users"], queryFn: fetchUsers });
@@ -163,18 +164,21 @@ export default function App() {
         <div className="flex h-full items-center justify-center px-6 text-center">
           <div className="max-w-sm">
             <Icon name="lock" size={30} className="mx-auto mb-2 text-tg-hint" />
-            <div className="text-lg font-medium">Telegram не подтвердил вход</div>
+            <div className="text-lg font-medium">
+              {tx("Telegram не подтвердил вход")}
+            </div>
             <p className="mt-2 text-sm text-tg-hint">
-              Подпись мини-аппа не принята: бот могли переподключить к другой
-              организации. Открой приложение заново из бота — или возьми ссылку
-              для компьютера командой <b>/app</b>.
+              {tx(
+                "Подпись мини-аппа не принята: бот могли переподключить к другой организации. Открой приложение заново из бота — или возьми ссылку для компьютера командой",
+              )}{" "}
+              <b>/app</b>.
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
               className="mt-4 min-h-11 rounded-full bg-tg-button px-4 text-xs text-tg-button-text"
             >
-              Проверить ещё раз
+              {tx("Проверить ещё раз")}
             </button>
           </div>
         </div>
@@ -189,17 +193,20 @@ export default function App() {
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div className="max-w-sm">
               <Icon name="lock" size={30} className="mx-auto mb-2 text-tg-hint" />
-              <div className="text-lg font-medium">Организация на паузе</div>
+              <div className="text-lg font-medium">
+                {tx("Организация на паузе")}
+              </div>
               <p className="mt-2 text-sm text-tg-hint">
-                Доступ приостановлен на стороне организации. Напиши управляющему:
-                когда паузу снимут, вход заработает снова — пароль менять не надо.
+                {tx(
+                  "Доступ приостановлен на стороне организации. Напиши управляющему: когда паузу снимут, вход заработает снова — пароль менять не надо.",
+                )}
               </p>
               <button
                 type="button"
                 onClick={() => window.location.reload()}
                 className="mt-4 min-h-11 rounded-full bg-tg-secondary-bg px-4 text-xs text-tg-text"
               >
-                Проверить ещё раз
+                {tx("Проверить ещё раз")}
               </button>
             </div>
           </div>
@@ -213,9 +220,11 @@ export default function App() {
               size={30}
               className="mx-auto mb-2 text-status-busy"
             />
-            <div className="text-lg font-medium">Тебя нет в списке шестёрки</div>
+            <div className="text-lg font-medium">
+              {tx("Тебя нет в списке шестёрки")}
+            </div>
             <div className="text-tg-hint mt-2 text-sm">
-              Скинь админу свой Telegram ID командой /whoami боту.
+              {tx("Скинь админу свой Telegram ID командой /whoami боту.")}
             </div>
           </div>
         </div>
@@ -225,7 +234,7 @@ export default function App() {
       <ErrorState
         error={me.error}
         onRetry={() => me.refetch()}
-        title="Ошибка авторизации"
+        title={tx("Ошибка авторизации")}
       />
     );
   }
@@ -254,7 +263,7 @@ export default function App() {
       <ErrorState
         error={users.error}
         onRetry={() => users.refetch()}
-        title="Не удалось загрузить участников"
+        title={tx("Не удалось загрузить участников")}
       />
     );
   }
@@ -318,10 +327,10 @@ export default function App() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-base font-medium">
               <Icon name="clock" size={17} />
-              Встречи и опросы
+              {tx("Встречи и опросы")}
             </div>
             <div className="text-xs text-tg-hint">
-              RSVP по встречам и голосования за слот — всё в одном месте.
+              {tx("RSVP по встречам и голосования за слот — всё в одном месте.")}
             </div>
           </div>
           <ThemeSwitcher />
@@ -445,10 +454,10 @@ export default function App() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-base font-medium">
               <Icon name="admin" size={17} />
-              Админка
+              {tx("Админка")}
             </div>
             <div className="text-xs text-tg-hint">
-              Люди, смены и правила — только для управляющих.
+              {tx("Люди, смены и правила — только для управляющих.")}
             </div>
           </div>
           <ThemeSwitcher />
@@ -473,7 +482,7 @@ export default function App() {
           meHint={
             hrMe.data?.position ??
             hrMe.data?.department_name ??
-            "Сотрудник"
+            tx("Сотрудник")
           }
         >
           <SimulationBanner />

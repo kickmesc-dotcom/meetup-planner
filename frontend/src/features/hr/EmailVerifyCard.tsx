@@ -5,7 +5,6 @@ import { fetchMe } from "@/api/availability";
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * «Подтвердите почту» — только пока адрес не подтверждён.

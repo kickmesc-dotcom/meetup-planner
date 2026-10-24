@@ -1,7 +1,7 @@
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
-
+import { useTx } from "@/i18n";
 interface Props {
   error: unknown;
   onRetry?: () => void;
@@ -15,15 +15,15 @@ interface Props {
  * `p-6 text-status-busy` — «Ошибка: Error: ...». Здесь сообщение проходит через
  * `humanizeApiError`, есть иконка и повтор запроса.
  */
-export default function ErrorState({
-  error,
-  onRetry,
-  title = "Что-то пошло не так",
-}: Props) {
+export default function ErrorState({ error, onRetry, title }: Props) {
+  const { tx } = useTx();
+
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
       <Icon name="alert" size={34} className="mb-2 text-status-busy" />
-      <div className="text-base font-semibold text-tg-text">{title}</div>
+      <div className="text-base font-semibold text-tg-text">
+        {title ?? tx("Что-то пошло не так")}
+      </div>
       <div className="mt-1 text-sm text-tg-hint break-words">
         {humanizeApiError(error)}
       </div>
@@ -36,7 +36,7 @@ export default function ErrorState({
           }}
           className="mt-4 min-h-11 rounded-tile bg-tg-button px-4 text-sm font-medium text-tg-button-text active:scale-[0.98] transition-transform"
         >
-          Повторить
+          {tx("Повторить")}
         </button>
       )}
     </div>

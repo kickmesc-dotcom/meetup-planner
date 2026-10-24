@@ -28,7 +28,6 @@ import TrainingScreen from "@/features/hr/TrainingScreen";
 import WebVersionCard from "@/features/hr/WebVersionCard";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: «Профиль».

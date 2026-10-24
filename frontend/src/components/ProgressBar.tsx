@@ -1,3 +1,5 @@
+import { useTx } from "@/i18n";
+
 /**
  * Единый прогресс-бар для опыта и прогресса ачивок.
  *
@@ -32,6 +34,7 @@ export default function ProgressBar({
   size = "md",
   className = "",
 }: Props) {
+  const { tx } = useTx();
   const safeValue = Math.max(0, value);
   const pct =
     total > 0 ? Math.min(100, Math.round((safeValue / total) * 100)) : 100;
@@ -58,7 +61,7 @@ export default function ProgressBar({
         aria-valuenow={safeValue}
         aria-valuemin={0}
         aria-valuemax={total}
-        aria-label={label ?? `${safeValue} из ${total}`}
+        aria-label={label ?? tx("{done} из {total}", { done: safeValue, total })}
       >
         <div
           className={["h-full rounded-full transition-[width] duration-300", fill].join(" ")}
@@ -79,6 +82,7 @@ export function InlineProgress({
   total: number;
   className?: string;
 }) {
+  const { tx } = useTx();
   const safeValue = Math.max(0, value);
   const pct = total > 0 ? Math.min(100, Math.round((safeValue / total) * 100)) : 100;
   return (
@@ -89,7 +93,7 @@ export function InlineProgress({
         aria-valuenow={safeValue}
         aria-valuemin={0}
         aria-valuemax={total}
-        aria-label={`${safeValue} из ${total}`}
+        aria-label={tx("{done} из {total}", { done: safeValue, total })}
       >
         <div
           className="h-full rounded-full bg-tg-button transition-[width] duration-300"

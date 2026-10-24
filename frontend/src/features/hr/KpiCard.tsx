@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMyKpi } from "@/api/hr";
 import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
-
 import { useTx } from "@/i18n";
 /**
  * KPI смены: опыт за закрытые пункты, смены и поручения.

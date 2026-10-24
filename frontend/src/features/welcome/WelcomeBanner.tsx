@@ -12,7 +12,6 @@
  */
 import { haptic, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
-
 import { useTx } from "@/i18n";
 interface Props {
   meName: string;

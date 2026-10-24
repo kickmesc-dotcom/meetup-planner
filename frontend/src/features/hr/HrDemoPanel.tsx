@@ -12,7 +12,6 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: админский экран тестового пула `[BOT]`.

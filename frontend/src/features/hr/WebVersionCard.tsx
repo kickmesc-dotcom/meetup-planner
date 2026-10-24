@@ -10,7 +10,6 @@ import { clearAccessToken, humanizeApiError, isEndpointMissing } from "@/api/cli
 import Icon from "@/components/Icon";
 import { copyText } from "@/lib/clipboard";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * «Веб-версия»: открыть приложение на компьютере.

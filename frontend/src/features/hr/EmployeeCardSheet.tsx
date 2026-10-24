@@ -6,7 +6,6 @@ import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import { haptic } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * Карточка коллеги: тап по имени в ленте, табеле или «Команде».

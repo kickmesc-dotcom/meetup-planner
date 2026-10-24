@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
-
+import { useTx } from "@/i18n";
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
 
@@ -29,6 +29,8 @@ function clampScale(v: number): number {
 }
 
 export default function MediaLightbox({ src, alt = "", onClose }: Props) {
+  // `tx` здесь занято сдвигом картинки по X, поэтому перевод — `tr`.
+  const { tx: tr } = useTx();
   const [scale, setScale] = useState(1);
   const [tx, setTx] = useState(0);
   const [ty, setTy] = useState(0);
@@ -185,7 +187,7 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
     >
       <button
         type="button"
-        aria-label="Закрыть просмотр"
+        aria-label={tr("Закрыть просмотр")}
         data-testid="media-lightbox-close"
         onClick={(e) => {
           e.stopPropagation();
@@ -199,20 +201,20 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
       {scale > MIN_SCALE && (
         <button
           type="button"
-          aria-label="Сбросить масштаб"
+          aria-label={tr("Сбросить масштаб")}
           onClick={(e) => {
             e.stopPropagation();
             reset();
           }}
           className="absolute left-3 top-3 z-10 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white active:scale-95"
         >
-          {scale.toFixed(1)}× · сбросить
+          {scale.toFixed(1)}× · {tr("сбросить")}
         </button>
       )}
 
       {failed ? (
         <div className="px-6 text-center text-sm text-white/80">
-          Картинка не открылась — превью недоступно.
+          {tr("Картинка не открылась — превью недоступно.")}
         </div>
       ) : (
         <img
@@ -236,7 +238,7 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
       )}
 
       <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center text-xs text-white/60">
-        Двойной тап или колесо — зум · тяни, чтобы сдвинуть · тап по фону — закрыть
+        {tr("Двойной тап или колесо — зум · тяни, чтобы сдвинуть · тап по фону — закрыть")}
       </div>
     </div>,
     document.body,

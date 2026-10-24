@@ -11,7 +11,6 @@ import ErrorState from "@/components/ErrorState";
 import { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: «Обратная связь» после смены.

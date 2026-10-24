@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchAchievements } from "@/api/hr";
 import Icon from "@/components/Icon";
-
 import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: скрытый блок «личный прогресс» в профиле.

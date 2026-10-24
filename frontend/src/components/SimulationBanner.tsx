@@ -5,7 +5,7 @@ import { useSimulation } from "@/store/simulation";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import Icon from "@/components/Icon";
-
+import { useTx } from "@/i18n";
 /**
  * Постоянная плашка режима проверки.
  *
@@ -16,6 +16,7 @@ import Icon from "@/components/Icon";
  * остался бы в настоящей истории.
  */
 export default function SimulationBanner() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
   const simulation = useSimulation();
@@ -29,8 +30,11 @@ export default function SimulationBanner() {
       void qc.invalidateQueries();
       void showAlert(
         result.already_ended
-          ? "Сеанс уже был закрыт."
-          : `Вышли из режима проверки. Удалено: задач ${result.tasks}, смен ${result.runs}, проблем ${result.issues}.`,
+          ? tx("Сеанс уже был закрыт.")
+          : tx(
+              "Вышли из режима проверки. Удалено: задач {tasks}, смен {runs}, проблем {issues}.",
+              { tasks: result.tasks, runs: result.runs, issues: result.issues },
+            ),
       );
     },
     onError: (error) => {
@@ -59,7 +63,7 @@ export default function SimulationBanner() {
     >
       <Icon name="bolt" size={14} className="shrink-0 text-status-busy" />
       <span className="min-w-0 flex-1 truncate">
-        Режим проверки · {simulation.subjectName}
+        {tx("Режим проверки")} · {simulation.subjectName}
         {place}
       </span>
       <button
@@ -68,7 +72,7 @@ export default function SimulationBanner() {
         onClick={() => exit.mutate()}
         className="min-h-7 shrink-0 rounded-full bg-tg-bg px-2.5 text-xs font-medium text-tg-link disabled:opacity-50"
       >
-        {exit.isPending ? "Чистим…" : "Выйти"}
+        {exit.isPending ? tx("Чистим…") : tx("Выйти")}
       </button>
     </div>
   );

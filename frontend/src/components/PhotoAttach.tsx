@@ -4,7 +4,7 @@ import { humanizeApiError } from "@/api/client";
 import { mediaUrl, uploadPhoto, type MediaItem } from "@/api/media";
 import { haptic, showAlert } from "@/tg/webapp";
 import Icon, { InlineIcon } from "@/components/Icon";
-
+import { useTx } from "@/i18n";
 export interface PhotoView {
   id: number;
   url: string;
@@ -22,7 +22,7 @@ export interface PhotoView {
  */
 export default function PhotoAttach({
   onUploaded,
-  label = "Прикрепить фото",
+  label,
   compact = false,
   disabled = false,
 }: {
@@ -32,6 +32,8 @@ export default function PhotoAttach({
   compact?: boolean;
   disabled?: boolean;
 }) {
+  const { tx } = useTx();
+  const attachLabel = label ?? tx("Прикрепить фото");
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +67,7 @@ export default function PhotoAttach({
         accept="image/*"
         capture="environment"
         className="hidden"
-        aria-label="Сделать фото"
+        aria-label={tx("Сделать фото")}
         onChange={(e) => {
           pick(e.target.files?.[0]);
           e.target.value = "";
@@ -76,7 +78,7 @@ export default function PhotoAttach({
         type="file"
         accept="image/*"
         className="hidden"
-        aria-label="Выбрать фото из галереи"
+        aria-label={tx("Выбрать фото из галереи")}
         onChange={(e) => {
           pick(e.target.files?.[0]);
           e.target.value = "";
@@ -93,11 +95,11 @@ export default function PhotoAttach({
         className={`${buttonClass} disabled:opacity-50`}
       >
         {upload.isPending ? (
-          "Загружаю…"
+          tx("Загружаю…")
         ) : (
           <>
             <InlineIcon name="camera" />
-            {compact ? "Снять" : label}
+            {compact ? tx("Снять") : attachLabel}
           </>
         )}
       </button>
@@ -111,7 +113,7 @@ export default function PhotoAttach({
         className={`${buttonClass} disabled:opacity-50`}
       >
         <InlineIcon name="image" />
-        {compact ? "Галерея" : "Из галереи"}
+        {compact ? tx("Галерея") : tx("Из галереи")}
       </button>
     </div>
   );
@@ -139,6 +141,7 @@ function ImgWithRetry({
   className?: string;
   style?: React.CSSProperties;
 }) {
+  const { tx } = useTx();
   const [attempt, setAttempt] = useState(0);
   if (attempt > 2) {
     return (
@@ -146,7 +149,7 @@ function ImgWithRetry({
         className="grid place-items-center bg-tg-secondary-bg px-1 text-center text-2xs leading-tight text-tg-hint"
         style={size ? { width: size, height: size } : undefined}
       >
-        Фото не открылось
+        {tx("Фото не открылось")}
       </span>
     );
   }
@@ -178,6 +181,7 @@ export function PhotoThumbs({
   photos: PhotoView[];
   size?: number;
 }) {
+  const { tx } = useTx();
   const [open, setOpen] = useState<PhotoView | null>(null);
   if (photos.length === 0) return null;
 
@@ -196,11 +200,11 @@ export function PhotoThumbs({
                 setOpen(photo);
               }}
               className="overflow-hidden rounded-tile bg-tg-bg/60"
-              aria-label="Открыть фото"
+              aria-label={tx("Открыть фото")}
             >
               <ImgWithRetry
                 src={src}
-                alt="Фотоотчёт"
+                alt={tx("Фотоотчёт")}
                 size={size}
                 className="object-cover"
                 style={{ width: size, height: size }}
@@ -214,7 +218,7 @@ export function PhotoThumbs({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Просмотр фото"
+          aria-label={tx("Просмотр фото")}
           className="fixed inset-0 z-50 flex flex-col bg-black/90"
           onClick={() => setOpen(null)}
         >
@@ -223,7 +227,7 @@ export function PhotoThumbs({
               type="button"
               className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-white/10 text-white"
               onClick={() => setOpen(null)}
-              aria-label="Закрыть"
+              aria-label={tx("Закрыть")}
             >
               <Icon name="close" size={18} />
             </button>
@@ -231,7 +235,7 @@ export function PhotoThumbs({
           <div className="flex flex-1 items-center justify-center p-3">
             <ImgWithRetry
               src={mediaUrl(open.url) ?? ""}
-              alt="Фотоотчёт"
+              alt={tx("Фотоотчёт")}
               className="max-h-full max-w-full object-contain"
             />
           </div>

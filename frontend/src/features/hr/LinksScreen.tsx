@@ -5,7 +5,6 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { haptic, WebApp } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import { useUI } from "@/store/ui";
-
 import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: «Полезные ссылки».

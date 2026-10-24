@@ -13,7 +13,6 @@ import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * Обучение пользованию приложением — отдельный этап онбординга.

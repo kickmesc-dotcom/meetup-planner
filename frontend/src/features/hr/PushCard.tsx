@@ -11,7 +11,6 @@ import {
 import { humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
-
 import { useTx } from "@/i18n";
 /**
  * «Уведомления в браузере» — push без Telegram.

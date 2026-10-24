@@ -1,3 +1,4 @@
+import { useTx } from "@/i18n";
 import { useUI, ZOOM_LABELS, type ZoomLevel } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 
@@ -13,6 +14,7 @@ const COMPACT_ORDER: ZoomLevel[] = [
 ];
 
 export default function ZoomController() {
+  const { tx } = useTx();
   const zoom = useUI((s) => s.zoom);
   const setZoom = useUI((s) => s.setZoom);
 
@@ -33,7 +35,7 @@ export default function ZoomController() {
             ].join(" ")}
             aria-pressed={z === zoom}
           >
-            {ZOOM_LABELS[z]}
+            {tx(ZOOM_LABELS[z])}
           </button>
         ))}
       </div>
