@@ -25,6 +25,8 @@ vi.mock("@/api/hr", () => ({
   fetchEmployee: vi.fn(),
   fetchDepartments: vi.fn(),
   fetchTraining: vi.fn(),
+  fetchOrgSetup: vi.fn(),
+  setProfilePrivacy: vi.fn(),
   fetchAdminEmployees: vi.fn(),
   submitOnboarding: vi.fn(),
   switchMyRole: vi.fn(),

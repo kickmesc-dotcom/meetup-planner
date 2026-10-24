@@ -3,6 +3,7 @@ import Icon, { type IconName } from "@/components/Icon";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { useUI, type Tab } from "@/store/ui";
+import { sectionEnabled } from "@/features/hr/sections";
 import { haptic } from "@/tg/webapp";
 
 interface Item {
@@ -45,11 +46,14 @@ const ADMIN_ITEM: Item = { id: "admin", labelKey: "nav.admin", icon: "admin" };
 export default function TabBar({
   isAdmin,
   canManage = false,
+  sections,
   openTasks = 0,
 }: {
   isAdmin: boolean;
   /** Руководитель или прописанный админ — видит сводку по команде. */
   canManage?: boolean;
+  /** Разделы из настройки организации (undefined — ничего не прячем). */
+  sections?: string[];
   /**
    * Открытые поручения для счётчика на «Задачах». Приём из соцсетей: число
    * на разделе видно до перехода, без открытия экрана.
@@ -62,7 +66,7 @@ export default function TabBar({
   const items = [
     ...(canManage ? MANAGER_ITEMS : BASE_ITEMS),
     ...(isAdmin ? [ADMIN_ITEM] : []),
-  ];
+  ].filter((item) => !sections || sectionEnabled(item.id, sections));
 
   return (
     <nav

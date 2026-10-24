@@ -4,7 +4,9 @@ import {
   fetchAdminEmployees,
   fetchDepartments,
   fetchEmployee,
+  fetchOrgSetup,
   fetchTraining,
+  setProfilePrivacy,
   setProfileVisibility,
   submitOnboarding,
   switchMyRole,
@@ -21,6 +23,7 @@ import AchievementsCard from "@/features/hr/AchievementsCard";
 import Badge from "@/features/hr/Badge";
 import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
+import OrgSetupScreen from "@/features/hr/OrgSetupScreen";
 import EmailVerifyCard from "@/features/hr/EmailVerifyCard";
 import KpiCard from "@/features/hr/KpiCard";
 import PushCard from "@/features/hr/PushCard";
@@ -132,6 +135,27 @@ export default function HrProfileScreen() {
       void qc.invalidateQueries({ queryKey: ["hr-feed"] });
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+  // Две личные галочки: последний заход и последнее медиа. Сервер может
+  // отказать в выключении — тогда он вернёт фактическое состояние, и тумблер
+  // останется включённым (это не ошибка клиента, а политика руководства).
+  const privacy = useMutation({
+    mutationFn: (body: { show_last_seen?: boolean; show_last_media?: boolean }) =>
+      setProfilePrivacy(body),
+    onSuccess: (data) => {
+      haptic("success");
+      qc.setQueryData(["hr-employee"], data);
+      void qc.invalidateQueries({ queryKey: ["hr-profile-card"] });
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+  // Мастер организации: вход для руководителя, повторный проход не запрещён.
+  const [orgSetupOpen, setOrgSetupOpen] = useState(false);
+  const orgSetupQ = useQuery({
+    queryKey: ["org-setup"],
+    queryFn: fetchOrgSetup,
+    enabled: orgSetupOpen,
+    staleTime: 60_000,
   });
 
   // Админ может примерить любую роль, не теряя кабинет (`is_staff`).
@@ -317,7 +341,7 @@ export default function HrProfileScreen() {
             type="button"
             role="switch"
             aria-checked={me.profile_public}
-            disabled={visibility.isPending}
+            disabled={visibility.isPending || me.profile_locked}
             onClick={() => visibility.mutate(!me.profile_public)}
             className={[
               "min-h-9 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
@@ -326,9 +350,63 @@ export default function HrProfileScreen() {
                 : "bg-tg-secondary-bg text-tg-text",
             ].join(" ")}
           >
-            {me.profile_public ? tx("Открыт") : tx("Закрыт")}
+            {me.profile_locked
+              ? tx("Так решили")
+              : me.profile_public
+                ? tx("Открыт")
+                : tx("Закрыт")}
           </button>
         </div>
+
+        {/* Что именно видят коллеги — двумя отдельными пунктами. Раньше это
+            было спрятано за одним «профиль открыт», и человек не мог оставить
+            историю смены, но убрать отметку «когда заходил». */}
+        <div className="mt-2 space-y-1">
+          <PrivacyRow
+            title={tx("Последний заход")}
+            hint={
+              me.can_toggle_last_seen
+                ? tx("Коллеги видят, когда ты последний раз открывал приложение.")
+                : tx("Включено руководителем — выключить нельзя.")
+            }
+            value={me.show_last_seen}
+            locked={!me.can_toggle_last_seen}
+            busy={privacy.isPending}
+            onToggle={() => privacy.mutate({ show_last_seen: !me.show_last_seen })}
+          />
+          <PrivacyRow
+            title={tx("Последнее медиа")}
+            hint={
+              me.can_toggle_last_media
+                ? tx("Коллеги видят твоё последнее фото из отчёта.")
+                : tx("Включено руководителем — выключить нельзя.")
+            }
+            value={me.show_last_media}
+            locked={!me.can_toggle_last_media}
+            busy={privacy.isPending}
+            onToggle={() => privacy.mutate({ show_last_media: !me.show_last_media })}
+          />
+        </div>
+
+        {(me.is_aup || me.is_staff) && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic("light");
+              setOrgSetupOpen(true);
+            }}
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg/60 px-2 text-left text-xs text-tg-text active:bg-tg-bg/60"
+          >
+            <Icon name="admin" size={16} className="text-tg-hint" />
+            <span className="min-w-0 flex-1">
+              {tx("Настройка организации")}
+              <span className="block text-2xs text-tg-hint">
+                {tx("Разделы, подразделения и кто что видит")}
+              </span>
+            </span>
+            <Icon name="chevron" size={14} className="shrink-0 text-tg-hint" />
+          </button>
+        )}
 
         {editing && (
           <div className="mt-3 border-t border-tg-hint/10 pt-3">
@@ -697,6 +775,32 @@ export default function HrProfileScreen() {
           <TrainingScreen onClose={() => setShowTraining(false)} />
         </div>
       )}
+
+      {orgSetupOpen && !orgSetupQ.data && (
+        <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-[560px] flex-col items-center justify-center gap-2 bg-tg-bg">
+          <CardSkeleton />
+          <button
+            type="button"
+            onClick={() => setOrgSetupOpen(false)}
+            className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
+          >
+            {tx("Отмена")}
+          </button>
+        </div>
+      )}
+
+      {orgSetupOpen && orgSetupQ.data && (
+        <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-[560px] bg-tg-bg">
+          <OrgSetupScreen
+            setup={{ ...orgSetupQ.data, done: false }}
+            onClose={() => {
+              haptic("success");
+              setOrgSetupOpen(false);
+              void qc.invalidateQueries({ queryKey: ["org-setup"] });
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -737,6 +841,56 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="text-tg-hint">{label}</div>
       <div className="text-tg-text">{value}</div>
+    </div>
+  );
+}
+
+/** Личная галочка приватности: включена/выключена и, если политика
+ * организации, — «заперто руководителем», без лживого «выключено». */
+function PrivacyRow({
+  title,
+  hint,
+  value,
+  locked,
+  busy,
+  onToggle,
+}: {
+  title: string;
+  hint: string;
+  value: boolean;
+  locked: boolean;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  const { tx } = useTx();
+  return (
+    <div className="flex items-center gap-2 rounded-tile bg-tg-bg/50 p-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1 text-xs text-tg-text">
+          {title}
+          {locked && <Icon name="lock" size={11} className="text-tg-hint" />}
+        </div>
+        <div className="text-2xs text-tg-hint">{hint}</div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-label={title}
+        disabled={locked || busy}
+        onClick={() => {
+          haptic("light");
+          onToggle();
+        }}
+        className={[
+          "min-h-9 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
+          value
+            ? "bg-tg-button text-tg-button-text"
+            : "bg-tg-secondary-bg text-tg-text",
+        ].join(" ")}
+      >
+        {value ? tx("Видно") : tx("Скрыто")}
+      </button>
     </div>
   );
 }

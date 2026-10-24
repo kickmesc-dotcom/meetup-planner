@@ -204,7 +204,11 @@ def _commit(sha: str, message: str) -> changelog.Commit:
 
 
 def test_changelog_uses_editorial_entries_and_skips_covered_commits():
-    covered = changelog.editorial.ENTRIES[0].commits[0]
+    # Запись без списка коммитов (например, редакторская сводка релиза) не
+    # покрывает ничего — для проверки «покрытый коммит не дублируется» берём
+    # первую запись, у которой хеши есть.
+    entry = next(item for item in changelog.editorial.ENTRIES if item.commits)
+    covered = entry.commits[0]
     view = changelog.build_view(
         [
             _commit(covered, "fix(ui): уже описано человеческим языком"),
@@ -213,7 +217,7 @@ def test_changelog_uses_editorial_entries_and_skips_covered_commits():
         source_ok=True,
     )
     titles = [entry.title for entry in view.entries]
-    assert changelog.editorial.ENTRIES[0].title in titles
+    assert entry.title in titles
     # Покрытый редактором коммит второй раз не появляется.
     assert "уже описано человеческим языком" not in " ".join(titles)
     # Новый — появляется, и он помечен как автоматический.

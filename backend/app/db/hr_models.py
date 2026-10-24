@@ -391,6 +391,18 @@ class Employee(OrgScoped, Base):
     profile_public: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Последний заход в приложение. Пишется лениво (не чаще раза в пару минут)
+    # из `/api/hr/me/employee`, поэтому не создаёт нагрузку на каждый запрос.
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Две галочки приватности из профиля: показывать ли коллегам последний
+    # заход и последнее медиа. Руководство может запретить их выключать —
+    # тогда политика организации сильнее личного выбора (`services/org_setup`).
+    show_last_seen: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    show_last_media: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     # Ставка: полная или частичная (`RATES`). Видна управляющему в расписании
     # обучения и самому сотруднику в профиле.
     rate_type: Mapped[str] = mapped_column(

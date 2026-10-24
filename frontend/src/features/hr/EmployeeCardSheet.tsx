@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchEmployeeCard, type HrProfileCard } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
+import MediaLightbox from "@/components/MediaLightbox";
 import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
 import { departmentTone, personTone } from "@/features/hr/tone";
@@ -81,6 +83,7 @@ function CardBody({ card }: { card: HrProfileCard }) {
   const { tx } = useTx();
   const person = personTone(card.employee_id);
   const dept = departmentTone(card.department_id);
+  const [lightbox, setLightbox] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
@@ -157,6 +160,64 @@ function CardBody({ card }: { card: HrProfileCard }) {
             </div>
           </section>
 
+          {/* Два «живых» блока карточки: чем человек занят прямо сейчас.
+              Оба отключаются в его профиле, а руководство может запретить
+              отключение — тогда блок показывается всегда и честно об этом
+              говорит, если данные скрыты не им. */}
+          <section className="grid grid-cols-2 gap-2">
+            <div className="rounded-card bg-tg-secondary-bg/60 p-3">
+              <div className="flex items-center gap-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+                <Icon name="clock" size={12} />
+                {tx("Последний вход")}
+              </div>
+              {!card.show_last_seen ? (
+                <div className="mt-1 text-xs text-tg-hint">
+                  {tx("Скрыто настройками профиля")}
+                </div>
+              ) : card.last_seen_at ? (
+                <div className="mt-1 text-sm text-tg-text">
+                  {lastSeenLabel(card.last_seen_at, tx)}
+                </div>
+              ) : (
+                <div className="mt-1 text-xs text-tg-hint">
+                  {tx("Ещё не заходил(а)")}
+                </div>
+              )}
+            </div>
+            <div className="rounded-card bg-tg-secondary-bg/60 p-3">
+              <div className="flex items-center gap-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+                <Icon name="camera" size={12} />
+                {tx("Последнее медиа")}
+              </div>
+              {!card.show_last_media ? (
+                <div className="mt-1 text-xs text-tg-hint">
+                  {tx("Скрыто настройками профиля")}
+                </div>
+              ) : card.last_media ? (
+                <button
+                  type="button"
+                  onClick={() => setLightbox(card.last_media!.url)}
+                  className="mt-1 block w-full overflow-hidden rounded-tile active:opacity-80"
+                  aria-label={tx("Открыть последнее фото")}
+                >
+                  <img
+                    src={card.last_media.url}
+                    alt={card.last_media.caption}
+                    className="h-24 w-full object-cover"
+                    loading="lazy"
+                  />
+                  <span className="mt-1 block truncate text-2xs text-tg-hint">
+                    {card.last_media.caption} · {formatWhen(card.last_media.at)}
+                  </span>
+                </button>
+              ) : (
+                <div className="mt-1 text-xs text-tg-hint">
+                  {tx("Фотоотчётов пока нет")}
+                </div>
+              )}
+            </div>
+          </section>
+
           <section>
             <h2 className="px-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">{tx("Последние действия")}</h2>
             {card.activity.length === 0 ? (
@@ -182,8 +243,27 @@ function CardBody({ card }: { card: HrProfileCard }) {
           "Профиль закрыт для коллег, но тебе он виден: ты руководитель или администратор.",
         )}</p>
       )}
+
+      {lightbox && (
+        <MediaLightbox src={lightbox} onClose={() => setLightbox(null)} />
+      )}
     </div>
   );
+}
+
+/** «10 минут назад» — карточку открывают, чтобы понять «он ещё здесь?». */
+function lastSeenLabel(
+  iso: string,
+  tx: (text: string, params?: Record<string, string | number>) => string,
+): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 1) return tx("только что");
+  if (minutes < 60) return tx("{count} мин назад", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return tx("{count} ч назад", { count: hours });
+  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

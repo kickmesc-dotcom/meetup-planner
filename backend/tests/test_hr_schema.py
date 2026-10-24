@@ -57,6 +57,7 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0054_tenant_columns.py",
     "0055_org_bot.py",
     "0056_accounts.py",
+    "0060_hr_presence_privacy.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).

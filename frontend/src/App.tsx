@@ -14,7 +14,12 @@ import MyTasksScreen from "./features/hr/MyTasksScreen";
 import ChecklistScreen from "./features/hr/ChecklistScreen";
 import ShiftsScreen from "./features/shifts/ShiftsScreen";
 import TeamScreen from "./features/hr/TeamScreen";
-import { countOpenTasks, fetchEmployee, fetchTasks } from "./api/hr";
+import {
+  countOpenTasks,
+  fetchEmployee,
+  fetchOrgSetup,
+  fetchTasks,
+} from "./api/hr";
 import HrFeedScreen from "./features/hr/HrFeedScreen";
 import IssuesScreen from "./features/issues/IssuesScreen";
 import HandoversScreen from "./features/handovers/HandoversScreen";
@@ -25,6 +30,8 @@ import LinksScreen from "./features/hr/LinksScreen";
 import MaterialsScreen from "./features/hr/MaterialsScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
 import OnboardingScreen from "./features/hr/OnboardingScreen";
+import OrgSetupScreen from "./features/hr/OrgSetupScreen";
+import { sectionEnabled } from "./features/hr/sections";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 import AdminScreen from "./features/admin/AdminScreen";
 import AuthScreen, { NoOrgScreen } from "./features/auth/AuthScreen";
@@ -68,6 +75,15 @@ export default function App() {
     enabled: hrMe.data?.onboarding_state === "done",
     staleTime: 60_000,
     retry: false,
+  });
+  // Настройка организации: от неё зависят и разделы в каркасе, и правила
+  // приватности. Читают все, меняет руководитель — поэтому запрос не под
+  // условием роли.
+  const orgSetup = useQuery({
+    queryKey: ["org-setup"],
+    queryFn: fetchOrgSetup,
+    retry: false,
+    staleTime: 5 * 60_000,
   });
   const uiPrefs = useQuery({ queryKey: ["ui-prefs"], queryFn: fetchUiPrefs });
   const hideGreeting = useMutation({
@@ -275,6 +291,20 @@ export default function App() {
   // Открытые поручения — одно число на оба каркаса (нижняя полоса и сайдбар).
   const { open: openTasks } = countOpenTasks(tasksQ.data ?? []);
 
+  // Сначала — настройка организации для руководителя (это про предприятие
+  // целиком), потом личное знакомство сотрудника.
+  if (orgSetup.data?.can_edit && !orgSetup.data.done && hrMe.data) {
+    return (
+      <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+        <SimulationBanner />
+        <OrgSetupScreen
+          setup={orgSetup.data}
+          onClose={() => void orgSetup.refetch()}
+        />
+      </div>
+    );
+  }
+
   // Онбординг — первая точка входа, а не форма внутри профиля.
   const onboarding = !!hrMe.data && hrMe.data.onboarding_state !== "done";
   if (onboarding) {
@@ -295,6 +325,13 @@ export default function App() {
   }
   if (tab === "review" && !canManage) {
     setTab("tasks");
+  }
+  // Раздел выключен в настройке организации — возвращаем на события. Данные
+  // грузятся один раз, поэтому до ответа ничего не прячем (иначе вкладки
+  // мигали бы).
+  const sections = orgSetup.data?.sections ?? null;
+  if (sections !== null && !sectionEnabled(tab, sections)) {
+    setTab("feed");
   }
 
   const greetingHidden = uiPrefs.data?.hide_greeting === true;
@@ -477,6 +514,7 @@ export default function App() {
         <DesktopShell
           canManage={canManage}
           isAdmin={isAdmin}
+          sections={sections ?? undefined}
           openTasks={openTasks}
           meName={hrMe.data?.display_name.replace("[BOT]", "").trim() || meData.display_name}
           meHint={
@@ -501,7 +539,12 @@ export default function App() {
       <SimulationBanner />
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
       <TabTransition key={tab}>{content}</TabTransition>
-      <TabBar isAdmin={isAdmin} canManage={canManage} openTasks={openTasks} />
+      <TabBar
+        isAdmin={isAdmin}
+        canManage={canManage}
+        sections={sections ?? undefined}
+        openTasks={openTasks}
+      />
     </div>
   );
 }

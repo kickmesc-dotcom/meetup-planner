@@ -36,6 +36,15 @@ export interface HrEmployee {
   is_demo: boolean;
   /** Профиль открыт: коллеги видят активность и цифры в карточке. */
   profile_public: boolean;
+  /** Показывать ли коллегам последний заход / последнее медиа. */
+  show_last_seen: boolean;
+  show_last_media: boolean;
+  /** Руководство разрешает выключать эти галочки (иначе они заперты). */
+  can_toggle_last_seen: boolean;
+  can_toggle_last_media: boolean;
+  /** Руководство обязало держать профиль открытым — тумблер заперт. */
+  profile_locked: boolean;
+  last_seen_at: string | null;
 }
 
 export interface HrDepartment {
@@ -228,6 +237,21 @@ export const setProfileVisibility = (isPublic: boolean) =>
     body: JSON.stringify({ is_public: isPublic }),
   });
 
+/**
+ * Личные галочки карточки: показывать ли последний заход и последнее медиа.
+ *
+ * Сервер может не принять `false` — если руководство запретило скрывать, он
+ * вернёт фактическое состояние, и UI покажет именно его.
+ */
+export const setProfilePrivacy = (body: {
+  show_last_seen?: boolean;
+  show_last_media?: boolean;
+}) =>
+  api<HrEmployee>("/api/me/privacy", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 // --- Карточка коллеги -------------------------------------------------------
 
 export interface HrProfileActivity {
@@ -243,6 +267,14 @@ export interface HrProfileActivity {
  * Цифры и активность приходят только при `can_view`: закрытый профиль отдаёт
  * имя, отдел и плашку — они и так видны в ленте.
  */
+export interface HrProfileMedia {
+  id: number;
+  url: string;
+  at: string;
+  caption: string;
+  source: "task" | "checklist";
+}
+
 export interface HrProfileCard {
   employee_id: number;
   display_name: string;
@@ -258,6 +290,12 @@ export interface HrProfileCard {
   can_manage: boolean;
   profile_open: boolean;
   can_view: boolean;
+  show_last_seen: boolean;
+  show_last_media: boolean;
+  can_toggle_last_seen: boolean;
+  can_toggle_last_media: boolean;
+  last_seen_at: string | null;
+  last_media: HrProfileMedia | null;
   xp: number;
   rank_title: string;
   rank_emoji: string;
@@ -287,6 +325,86 @@ export const submitOnboarding = (body: {
   });
 
 export const fetchDepartments = () => api<HrDepartment[]>("/api/departments");
+
+// --- Дашборд подразделения --------------------------------------------------
+
+export interface DepartmentPerson {
+  employee_id: number;
+  display_name: string;
+  badge: string | null;
+  badge_emoji: string | null;
+  position: string | null;
+  role: "employee" | "aup" | "admin";
+  is_demo: boolean;
+  is_self: boolean;
+  shift_status:
+    | "planned"
+    | "worked"
+    | "sick"
+    | "absent"
+    | "dayoff"
+    | "vacation"
+    | null;
+  checklist_done: number;
+  checklist_total: number;
+  tasks_open: number;
+  tasks_overdue: number;
+  last_seen_at: string | null;
+  profile_public: boolean;
+}
+
+export interface DepartmentOverview {
+  department_id: number;
+  department_name: string;
+  department_emoji: string | null;
+  can_manage: boolean;
+  show_presence: boolean;
+  on_shift: number;
+  overdue: number;
+  people: DepartmentPerson[];
+}
+
+export const fetchDepartmentOverview = (departmentId: number) =>
+  api<DepartmentOverview>(`/api/departments/${departmentId}/overview`);
+
+// --- Настройка организации (мастер руководителя) ---------------------------
+
+export type OrgProfileVisibility = "colleagues" | "managers" | "all_open";
+
+export interface OrgSetup {
+  done: boolean;
+  industry: string;
+  headcount: string;
+  departments: string[];
+  sections: string[];
+  profile_visibility: OrgProfileVisibility;
+  cross_department_watch: boolean;
+  allow_hide_last_seen: boolean;
+  allow_hide_media: boolean;
+  presets: { name: string; emoji: string }[];
+  can_edit: boolean;
+}
+
+export interface OrgSetupPatch {
+  industry?: string;
+  headcount?: string;
+  departments?: string[];
+  create_departments?: boolean;
+  sections?: string[];
+  profile_visibility?: OrgProfileVisibility;
+  cross_department_watch?: boolean;
+  allow_hide_last_seen?: boolean;
+  allow_hide_media?: boolean;
+  done?: boolean;
+}
+
+export const fetchOrgSetup = () => api<OrgSetup>("/api/org-setup");
+
+export const saveOrgSetup = (body: OrgSetupPatch) =>
+  api<OrgSetup>("/api/org-setup", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 
 // --- Обучение пользованию приложением (этап онбординга) ---
 

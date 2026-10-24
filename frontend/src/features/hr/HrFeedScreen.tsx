@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  fetchDepartments,
   fetchEmployee,
   fetchFeedFilters,
   fetchHrFeed,
@@ -10,6 +11,7 @@ import {
 } from "@/api/hr";
 import Badge from "@/features/hr/Badge";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
+import DepartmentScreen from "@/features/hr/DepartmentScreen";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
@@ -173,6 +175,8 @@ export default function HrFeedScreen() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   // Чью карточку открыли (null — оверлей закрыт).
   const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
+  // Какое подразделение открыли дашбордом (тап по плашке в ленте).
+  const [cardDepartmentId, setCardDepartmentId] = useState<number | null>(null);
 
   // Чей это просмотр: отметка «новое» хранится на сотрудника, а не на
   // устройство — за одним компьютером могут работать двое.
@@ -204,6 +208,14 @@ export default function HrFeedScreen() {
   const filtersQ = useQuery({
     queryKey: ["hr-feed-filters"],
     queryFn: fetchFeedFilters,
+    staleTime: 5 * 60 * 1000,
+  });
+  // Справочник подразделений нужен и сотруднику: список фильтров у него пуст
+  // (фильтровать нечего), но плашка отдела в строке должна открывать дашборд
+  // своего подразделения. Имя отдела берём из этого справочника.
+  const depsQ = useQuery({
+    queryKey: ["hr-departments"],
+    queryFn: fetchDepartments,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -494,9 +506,12 @@ export default function HrFeedScreen() {
                     departmentName={
                       filters?.departments.find(
                         (d) => d.id === item.department_id,
-                      )?.name ?? null
+                      )?.name ??
+                      depsQ.data?.find((d) => d.id === item.department_id)?.name ??
+                      null
                     }
                     onOpen={setCardEmployeeId}
+                    onOpenDepartment={setCardDepartmentId}
                   />
                   {/* Разделитель стоит после последнего нового события, а не
                       после первого: читаешь сверху вниз и видишь границу. */}
@@ -540,6 +555,13 @@ export default function HrFeedScreen() {
         <EmployeeCardSheet
           employeeId={cardEmployeeId}
           onClose={() => setCardEmployeeId(null)}
+        />
+      )}
+
+      {cardDepartmentId !== null && (
+        <DepartmentScreen
+          departmentId={cardDepartmentId}
+          onClose={() => setCardDepartmentId(null)}
         />
       )}
     </div>
@@ -756,10 +778,12 @@ function FeedRow({
   item,
   departmentName,
   onOpen,
+  onOpenDepartment,
 }: {
   item: HrFeedItem;
   departmentName: string | null;
   onOpen: (employeeId: number) => void;
+  onOpenDepartment: (departmentId: number) => void;
 }) {
   const { tx } = useTx();
   const demo = isDemoItem(item);
@@ -821,14 +845,24 @@ function FeedRow({
             </time>
             <span>· {tx(KIND_LABEL[item.kind])}</span>
             {departmentName && (
-              // Подразделение — своей пилюлей: в ленте видно, откуда человек,
-              // даже если у него нет плашки должности.
-              <span
-                className="inline-flex max-w-full items-center rounded-full px-1.5 text-2xs text-tg-text"
+              // Подразделение — своей пилюлей и КНОПКОЙ: тап открывает
+              // дашборд отдела (кто в смене, у кого что не закрыто). Раньше
+              // это был просто текст, и из ленты нельзя было перейти к людям.
+              <button
+                type="button"
+                disabled={item.department_id === null}
+                onClick={() => {
+                  if (item.department_id === null) return;
+                  haptic("selection");
+                  onOpenDepartment(item.department_id);
+                }}
+                className="inline-flex max-w-full items-center gap-0.5 rounded-full px-1.5 text-2xs text-tg-text active:opacity-70 disabled:active:opacity-100"
                 style={{ backgroundColor: dept.soft, border: `1px solid ${dept.border}` }}
+                aria-label={tx("Открыть подразделение {name}", { name: departmentName })}
               >
                 <span className="truncate">{departmentName}</span>
-              </span>
+                <Icon name="chevron" size={10} className="shrink-0 opacity-60" />
+              </button>
             )}
           </div>
         </div>

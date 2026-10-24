@@ -15,6 +15,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HrFeedScreen from "./HrFeedScreen";
 import {
+  fetchDepartmentOverview,
+  fetchDepartments,
   fetchEmployee,
   fetchEmployeeCard,
   fetchFeedFilters,
@@ -30,12 +32,16 @@ vi.mock("@/api/hr", () => ({
   fetchFeedFilters: vi.fn(),
   fetchEmployeeCard: vi.fn(),
   fetchEmployee: vi.fn(),
+  fetchDepartments: vi.fn(),
+  fetchDepartmentOverview: vi.fn(),
 }));
 
 const feedMock = vi.mocked(fetchHrFeed);
 const filtersMock = vi.mocked(fetchFeedFilters);
 const cardMock = vi.mocked(fetchEmployeeCard);
 const meMock = vi.mocked(fetchEmployee);
+const depsMock = vi.mocked(fetchDepartments);
+const overviewMock = vi.mocked(fetchDepartmentOverview);
 
 function item(overrides: Partial<HrFeedItem> = {}): HrFeedItem {
   return {
@@ -84,6 +90,9 @@ beforeEach(() => {
     employees: [],
     kinds: [],
   } as unknown as Awaited<ReturnType<typeof fetchFeedFilters>>);
+  depsMock.mockReset();
+  depsMock.mockResolvedValue([]);
+  overviewMock.mockReset();
 });
 afterEach(cleanup);
 
@@ -123,6 +132,28 @@ describe("HrFeedScreen (P1.8)", () => {
     expect(screen.queryByTestId("feed-demo-mark")).toBeNull();
   });
 
+  it("плашка подразделения открывает дашборд отдела", async () => {
+    depsMock.mockResolvedValue([
+      { id: 1, name: "Кухня", slug: "kuhnya", emoji: null, sort_order: 0 },
+    ]);
+    overviewMock.mockResolvedValue({
+      department_id: 1,
+      department_name: "Кухня",
+      department_emoji: null,
+      can_manage: false,
+      show_presence: false,
+      on_shift: 0,
+      overdue: 0,
+      people: [],
+    });
+    renderFeed([item()]);
+
+    fireEvent.click(
+      await screen.findByLabelText("Открыть подразделение Кухня"),
+    );
+    expect(await screen.findByText("В отделе пока никого")).toBeTruthy();
+  });
+
   it("имя — пилюля с цветным аутлайном, по тапу открывается карточка", async () => {
     cardMock.mockResolvedValue({
       employee_id: 1,
@@ -139,6 +170,12 @@ describe("HrFeedScreen (P1.8)", () => {
       can_manage: false,
       profile_open: true,
       can_view: true,
+      show_last_seen: true,
+      show_last_media: true,
+      can_toggle_last_seen: true,
+      can_toggle_last_media: true,
+      last_seen_at: null,
+      last_media: null,
       xp: 12,
       rank_title: "Стажёр",
       rank_emoji: "🌱",

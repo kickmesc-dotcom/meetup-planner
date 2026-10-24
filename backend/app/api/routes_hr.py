@@ -50,10 +50,12 @@ from app.services import (
     hr_kpi,
     hr_links,
     hr_media,
+    hr_people,
     hr_profile,
     hr_tasks,
     hr_training,
     hr_training_plan,
+    org_setup,
     weekdays,
 )
 
@@ -93,6 +95,14 @@ class EmployeeOut(BaseModel):
     # «Профиль открыт»: коллеги видят карточку с активностью. Управляющий и
     # администратор видят её в любом случае.
     profile_public: bool = True
+    # Приватность карточки: личные галочки и разрешение руководства их менять.
+    show_last_seen: bool = True
+    show_last_media: bool = True
+    can_toggle_last_seen: bool = True
+    can_toggle_last_media: bool = True
+    # Профиль обязан быть открытым (решение руководства) — тумблер заперт.
+    profile_locked: bool = False
+    last_seen_at: datetime | None = None
 
 
 class OnboardingIn(BaseModel):
@@ -116,6 +126,16 @@ class ProfileActivityOut(BaseModel):
     ref_id: int | None = None
 
 
+class ProfileMediaOut(BaseModel):
+    """Последнее медиа сотрудника: готовый адрес картинки и подпись."""
+
+    id: int
+    url: str
+    at: datetime
+    caption: str
+    source: Literal["task", "checklist"]
+
+
 class ProfileCardOut(BaseModel):
     """Карточка коллеги: кто он и что делал. Цифры — только если видно."""
 
@@ -135,6 +155,13 @@ class ProfileCardOut(BaseModel):
     profile_open: bool
     # Смотрящему доступна активность и цифры.
     can_view: bool
+    # Приватность: что показывать и что разрешено менять самому человеку.
+    show_last_seen: bool = True
+    show_last_media: bool = True
+    can_toggle_last_seen: bool = True
+    can_toggle_last_media: bool = True
+    last_seen_at: datetime | None = None
+    last_media: ProfileMediaOut | None = None
     xp: int = 0
     rank_title: str = ""
     rank_emoji: str = ""
@@ -149,6 +176,75 @@ class ProfileCardOut(BaseModel):
 
 class ProfileVisibilityIn(BaseModel):
     is_public: bool
+
+
+class ProfilePrivacyIn(BaseModel):
+    """Личные тумблеры карточки. `None` — не трогать этот пункт."""
+
+    show_last_seen: bool | None = None
+    show_last_media: bool | None = None
+
+
+class DepartmentPersonOut(BaseModel):
+    employee_id: int
+    display_name: str
+    badge: str | None = None
+    badge_emoji: str | None = None
+    position: str | None = None
+    role: str
+    is_demo: bool = False
+    is_self: bool = False
+    shift_status: str | None = None
+    checklist_done: int = 0
+    checklist_total: int = 0
+    tasks_open: int = 0
+    tasks_overdue: int = 0
+    last_seen_at: datetime | None = None
+    profile_public: bool = True
+
+
+class DepartmentOverviewOut(BaseModel):
+    department_id: int
+    department_name: str
+    department_emoji: str | None = None
+    can_manage: bool = False
+    show_presence: bool = False
+    on_shift: int = 0
+    overdue: int = 0
+    people: list[DepartmentPersonOut] = []
+
+
+class OrgSetupOut(BaseModel):
+    """Настройка организации: ответы мастера и вытекающие из них правила."""
+
+    done: bool = False
+    industry: str = "restaurant"
+    headcount: str = "10_30"
+    departments: list[str] = []
+    sections: list[str] = []
+    profile_visibility: str = "colleagues"
+    cross_department_watch: bool = False
+    allow_hide_last_seen: bool = True
+    allow_hide_media: bool = True
+    # Подсказки для шага «подразделения» — под выбранную отрасль.
+    presets: list[dict[str, str]] = []
+    # Может ли смотрящий менять настройку (мастер открыт только им).
+    can_edit: bool = False
+
+
+class OrgSetupIn(BaseModel):
+    """Частичный ответ мастера: присылается по шагам, а не целиком."""
+
+    industry: str | None = None
+    headcount: str | None = None
+    departments: list[str] | None = None
+    create_departments: bool = False
+    sections: list[str] | None = None
+    profile_visibility: Literal["colleagues", "managers", "all_open"] | None = None
+    cross_department_watch: bool | None = None
+    allow_hide_last_seen: bool | None = None
+    allow_hide_media: bool | None = None
+    done: bool | None = None
 
 
 class DepartmentOut(BaseModel):
@@ -326,6 +422,7 @@ async def _employee_out(
     owner = user
     if int(employee.user_id) != int(user.id):
         owner = await session.get(User, employee.user_id) or user
+    preferences = await org_setup.load(session)
     return EmployeeOut(
         id=employee.id,
         user_id=employee.user_id,
@@ -342,6 +439,14 @@ async def _employee_out(
         onboarding_state=employee.onboarding_state,
         learning_mode=bool(employee.learning_mode),
         profile_public=bool(employee.profile_public),
+        # Тумблер включён, только если его вообще разрешено трогать: иначе UI
+        # рисовал бы переключатель, который сервер молча откатит.
+        show_last_seen=bool(employee.show_last_seen),
+        show_last_media=bool(employee.show_last_media),
+        can_toggle_last_seen=preferences.allow_hide_last_seen,
+        can_toggle_last_media=preferences.allow_hide_media,
+        profile_locked=preferences.profile_visibility == "all_open",
+        last_seen_at=employee.last_seen_at,
         is_aup=hr_access.is_aup(employee),
         is_admin=hr_access.is_admin(employee),
         is_staff=hr_access.is_staff(employee, user),
@@ -520,6 +625,9 @@ def _checklist_out(view: hr_checklists.ChecklistView) -> ChecklistOut:
 async def me_employee(
     session: SessionDep, user: CurrentUser, employee: EmployeeDep
 ) -> EmployeeOut:
+    # Заход в приложение: отметка нужна карточке коллеги («был 10 минут назад»).
+    # Пишется лениво, не чаще раза в две минуты — см. `hr_profile.touch_seen`.
+    await hr_profile.touch_seen(session, employee)
     return await _employee_out(session, employee, user)
 
 
@@ -552,6 +660,22 @@ async def employee_card(
         can_manage=card.can_manage,
         profile_open=card.profile_open,
         can_view=card.can_view,
+        show_last_seen=card.show_last_seen,
+        show_last_media=card.show_last_media,
+        can_toggle_last_seen=card.can_toggle_last_seen,
+        can_toggle_last_media=card.can_toggle_last_media,
+        last_seen_at=card.last_seen_at,
+        last_media=(
+            ProfileMediaOut(
+                id=card.last_media.id,
+                url=card.last_media.url,
+                at=card.last_media.at,
+                caption=card.last_media.caption,
+                source=card.last_media.source,  # type: ignore[arg-type]
+            )
+            if card.last_media is not None
+            else None
+        ),
         xp=card.xp,
         rank_title=card.rank_title,
         rank_emoji=card.rank_emoji,
@@ -576,7 +700,36 @@ async def set_profile_visibility(
     employee: EmployeeDep,
 ) -> EmployeeOut:
     """Открыть или закрыть свой профиль для коллег (не для руководителя)."""
-    await hr_profile.set_visibility(session, employee, is_public=body.is_public)
+    try:
+        await hr_profile.set_visibility(session, employee, is_public=body.is_public)
+    except PermissionError as exc:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, detail="profile_visibility_locked_by_org"
+        ) from exc
+    return await _employee_out(session, employee, user)
+
+
+@router.post("/me/privacy", response_model=EmployeeOut)
+async def set_privacy(
+    body: ProfilePrivacyIn,
+    session: SessionDep,
+    user: CurrentUser,
+    employee: EmployeeDep,
+) -> EmployeeOut:
+    """Личные тумблеры «последний заход» и «последнее медиа».
+
+    Если руководство запретило выключение, сервер оставит их включёнными и
+    вернёт фактическое состояние — UI покажет именно его, а не тот `false`,
+    который прислал клиент.
+    """
+    if body.show_last_seen is None and body.show_last_media is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="nothing_to_update")
+    await hr_profile.set_privacy(
+        session,
+        employee,
+        show_last_seen=body.show_last_seen,
+        show_last_media=body.show_last_media,
+    )
     return await _employee_out(session, employee, user)
 
 
@@ -786,6 +939,158 @@ async def departments(session: SessionDep, _: CurrentUser) -> list[DepartmentOut
         )
         for d in rows
     ]
+
+
+@router.get(
+    "/departments/{department_id}/overview", response_model=DepartmentOverviewOut
+)
+async def department_overview(
+    department_id: int, session: SessionDep, employee: EmployeeDep
+) -> DepartmentOverviewOut:
+    """Дашборд подразделения: кто в смене, у кого не закрыто, что горит.
+
+    Открывается тапом по плашке подразделения в ленте. Область видимости
+    считает сервер (`hr_people`): сотрудник — только свой отдел и без личных
+    отметок времени, руководитель — свои (или все, если так настроили),
+    администратор — все.
+    """
+    try:
+        view = await hr_people.overview(session, employee, department_id)
+    except hr_people.DepartmentAccessError as exc:
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if str(exc) == "department_not_found"
+            else status.HTTP_403_FORBIDDEN
+        )
+        raise HTTPException(code, detail=str(exc)) from exc
+    return DepartmentOverviewOut(
+        department_id=view.department_id,
+        department_name=view.department_name,
+        department_emoji=view.department_emoji,
+        can_manage=view.can_manage,
+        show_presence=view.show_presence,
+        on_shift=view.on_shift,
+        overdue=view.overdue,
+        people=[
+            DepartmentPersonOut(
+                employee_id=row.employee_id,
+                display_name=row.display_name,
+                badge=row.badge,
+                badge_emoji=row.badge_emoji,
+                position=row.position,
+                role=row.role,
+                is_demo=row.is_demo,
+                is_self=row.is_self,
+                shift_status=row.shift_status,
+                checklist_done=row.checklist_done,
+                checklist_total=row.checklist_total,
+                tasks_open=row.tasks_open,
+                tasks_overdue=row.tasks_overdue,
+                last_seen_at=row.last_seen_at,
+                profile_public=row.profile_public,
+            )
+            for row in view.people
+        ],
+    )
+
+
+# --------------------------------------------------------------------------
+# Онбординг организации (мастер руководителя)
+# --------------------------------------------------------------------------
+
+
+def _org_setup_out(
+    setup: org_setup.OrgSetup, *, can_edit: bool
+) -> OrgSetupOut:
+    return OrgSetupOut(
+        done=setup.done,
+        industry=setup.industry,
+        headcount=setup.headcount,
+        departments=list(setup.departments),
+        sections=list(setup.sections),
+        profile_visibility=setup.profile_visibility,
+        cross_department_watch=setup.cross_department_watch,
+        allow_hide_last_seen=setup.allow_hide_last_seen,
+        allow_hide_media=setup.allow_hide_media,
+        presets=org_setup.presets_for(setup.industry),
+        can_edit=can_edit,
+    )
+
+
+def _may_edit_setup(employee: Employee, user: User) -> bool:
+    return (
+        not employee.is_simulation
+        and (
+            hr_access.is_aup(employee)
+            or hr_access.is_staff(employee, user)
+        )
+    )
+
+
+@router.get("/org-setup", response_model=OrgSetupOut)
+async def get_org_setup(
+    session: SessionDep, user: CurrentUser, employee: EmployeeDep
+) -> OrgSetupOut:
+    """Настройка организации — читать можно всем.
+
+    Именно читать: от неё зависят разделы в нижней полосе и правила
+    приватности, а не только экран мастера. Менять — лишь руководителю.
+    """
+    setup = await org_setup.load(session)
+    return _org_setup_out(setup, can_edit=_may_edit_setup(employee, user))
+
+
+@router.post("/org-setup", response_model=OrgSetupOut)
+async def save_org_setup(
+    body: OrgSetupIn,
+    session: SessionDep,
+    user: CurrentUser,
+    employee: EmployeeDep,
+) -> OrgSetupOut:
+    """Сохранить ответы мастера (можно по шагам) и завести подразделения.
+
+    Подразделения создаются только по явному флагу `create_departments`:
+    мастер можно пройти повторно и поправить политику, не плодя дубликаты
+    отделов с теми же именами.
+    """
+    if not _may_edit_setup(employee, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="managers_only")
+
+    current = await org_setup.load(session)
+    updated = org_setup.apply_answers(
+        current,
+        industry=body.industry,
+        headcount=body.headcount,
+        departments=body.departments,
+        sections=body.sections,
+        profile_visibility=body.profile_visibility,
+        cross_department_watch=body.cross_department_watch,
+        allow_hide_last_seen=body.allow_hide_last_seen,
+        allow_hide_media=body.allow_hide_media,
+        done=body.done,
+    )
+
+    if body.create_departments and body.departments is not None:
+        existing = {
+            dept.name.strip().lower()
+            for dept in await hr_departments.list_departments(
+                session, active_only=False
+            )
+        }
+        presets = {
+            item["name"].strip().lower(): item["emoji"]
+            for item in org_setup.presets_for(updated.industry)
+        }
+        for name in updated.departments:
+            if name.strip().lower() in existing:
+                continue
+            await hr_departments.create_department(
+                session, name=name, emoji=presets.get(name.strip().lower())
+            )
+            existing.add(name.strip().lower())
+
+    await org_setup.save(session, updated)
+    return _org_setup_out(updated, can_edit=True)
 
 
 # --------------------------------------------------------------------------

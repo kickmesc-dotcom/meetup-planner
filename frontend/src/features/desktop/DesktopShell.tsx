@@ -3,6 +3,7 @@ import Icon, { type IconName } from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useUI, type Tab } from "@/store/ui";
+import { sectionEnabled } from "@/features/hr/sections";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
 /**
@@ -55,10 +56,13 @@ export default function DesktopShell({
   meName,
   meHint,
   openTasks = 0,
+  sections,
   children,
 }: {
   /** Руководитель или прописанный админ: видны «Команда», приёмка и отчёты. */
   canManage: boolean;
+  /** Разделы из настройки организации (undefined — ничего не прячем). */
+  sections?: string[];
   /** Полный админ — виден раздел «Управление». */
   isAdmin: boolean;
   meName: string;
@@ -83,10 +87,12 @@ export default function DesktopShell({
     { id: "handovers", label: "Передачи смены", icon: "repeat" },
   ];
 
+  const keep = (items: NavItem[]) =>
+    sections ? items.filter((item) => sectionEnabled(item.id, sections)) : items;
   const groups: NavGroup[] = [
-    { title: tx("Смена"), items: WORK },
-    { title: tx("Команда"), items: team },
-    { title: tx("Сервис"), items: [...SERVICE, PROFILE] },
+    { title: tx("Смена"), items: keep(WORK) },
+    { title: tx("Команда"), items: keep(team) },
+    { title: tx("Сервис"), items: keep([...SERVICE, PROFILE]) },
     ...(isAdmin
       ? [
           {
