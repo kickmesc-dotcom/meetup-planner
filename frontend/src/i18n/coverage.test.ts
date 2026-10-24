@@ -82,28 +82,9 @@ const PENDING = new Set<string>([
   "features/desktop/DesktopShell.tsx",
   "features/desktop/OverviewRail.tsx",
   "features/editor/RangeEditorSheet.tsx",
-  "features/handovers/HandoversScreen.tsx",
-  "features/hr/AchievementsCard.tsx",
-  "features/hr/EmailVerifyCard.tsx",
-  "features/hr/EmployeeCardSheet.tsx",
-  "features/hr/FeedbackScreen.tsx",
-  "features/hr/HrDemoPanel.tsx",
-  "features/hr/HrProfileScreen.tsx",
-  "features/hr/KpiCard.tsx",
-  "features/hr/LinksScreen.tsx",
-  "features/hr/MaterialsScreen.tsx",
-  "features/hr/OnboardingScreen.tsx",
-  "features/hr/PushCard.tsx",
-  "features/hr/StandardsScreen.tsx",
-  "features/hr/TrainingScreen.tsx",
-  "features/hr/WebVersionCard.tsx",
-  "features/issues/IssuesScreen.tsx",
   "features/meetings/MeetingsPollsScreen.tsx",
   "features/meetings/MeetingsScreen.tsx",
   "features/polls/PollsScreen.tsx",
-  "features/shifts/MassPlanSheet.tsx",
-  "features/shifts/ShiftsScreen.tsx",
-  "features/welcome/WelcomeBanner.tsx",
   "store/ui.ts",
 ]);
 
@@ -178,10 +159,13 @@ describe("перевод: покрытие", () => {
   });
 
   it("список непереведённого не растёт", () => {
-    // Ратчет: 68 файлов на 24.10.2026 (было 71: переведены чек-лист смены,
-    // отчёт смены, «Команда» и приёмка работ). Перевод экрана — минус строка отсюда и минус
-    // единица в пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(67);
+    // Ратчет: 49 файлов на 24.10.2026 (было 71, потом 68, потом 49). Закрыта
+    // вся смена сотрудника: передача смены, табель и шаблон недели, проблемы,
+    // стандарты, обучение, профиль, карточка, материалы, ссылки, знакомство,
+    // обратная связь, push и веб-версия, тестовый пул, приветствие. Перевод
+    // экрана — минус строка отсюда и минус единица в пределе, а не «перевод»
+    // на словах.
+    expect(PENDING.size).toBeLessThanOrEqual(49);
   });
 
   it("английский словарь без пустых значений", () => {

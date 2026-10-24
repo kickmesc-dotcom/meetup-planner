@@ -129,6 +129,23 @@ export function tx(
   );
 }
 
+/**
+ * Текущая локаль вне компонента.
+ *
+ * Нужна там, где текст собирается в обычной функции (`fmtDue`, описание
+ * события в журнале), а не в разметке: хук туда не поставить. Локаль читается
+ * из того же стора, поэтому смена языка перерисовывает и такие места — их
+ * вызывают из компонента.
+ */
+export function currentLocale(): Locale {
+  return useLocale.getState().locale;
+}
+
+/** Тег `Intl` для текущей локали: `en-GB` (день до месяца) или `ru-RU`. */
+export function currentIntlLocale(): string {
+  return currentLocale() === "en" ? "en-GB" : "ru-RU";
+}
+
 /** Хук экрана: `tx` для текстов и текущая локаль для дат и чисел. */
 export function useTx() {
   const locale = useLocale((s) => s.locale);

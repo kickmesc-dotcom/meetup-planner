@@ -12,6 +12,7 @@ import { humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * «Уведомления в браузере» — push без Telegram.
  *
@@ -24,6 +25,7 @@ import { haptic, showAlert } from "@/tg/webapp";
  * кнопка, которая гарантированно падает, хуже её отсутствия.
  */
 export default function PushCard() {
+  const { tx } = useTx();
   const supported =
     typeof window !== "undefined" &&
     "serviceWorker" in navigator &&
@@ -88,7 +90,7 @@ export default function PushCard() {
       if (permission !== "granted") {
         setDenied(permission === "denied");
         await showAlert(
-          "Браузер не разрешил уведомления. Это меняется в настройках сайта — тогда вернись и включи снова.",
+          tx("Браузер не разрешил уведомления. Это меняется в настройках сайта — тогда вернись и включи снова."),
         );
         return;
       }
@@ -124,13 +126,10 @@ export default function PushCard() {
       <div className="flex items-start gap-2">
         <Icon name="bell" size={18} className="mt-0.5 text-tg-hint" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-tg-text">
-            Уведомления в браузере
-          </h3>
-          <p className="mt-1 text-xs text-tg-hint">
-            Напоминание о сроке придёт на телефон, даже если приложение закрыто.
-            Telegram для этого не нужен.
-          </p>
+          <h3 className="text-sm font-semibold text-tg-text">{tx("Уведомления в браузере")}</h3>
+          <p className="mt-1 text-xs text-tg-hint">{tx(
+            "Напоминание о сроке придёт на телефон, даже если приложение закрыто. Telegram для этого не нужен.",
+          )}</p>
         </div>
       </div>
 
@@ -141,17 +140,16 @@ export default function PushCard() {
         className="mt-2 min-h-11 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-60"
       >
         {busy
-          ? "Подожди…"
+          ? tx("Подожди…")
           : subscribed
-            ? "Выключить на этом устройстве"
-            : "Включить уведомления"}
+            ? tx("Выключить на этом устройстве")
+            : tx("Включить уведомления")}
       </button>
 
       {denied && (
-        <p className="mt-2 text-2xs text-tg-hint">
-          Разрешение уже запрещено в браузере. Открой настройки сайта и разреши
-          уведомления — кнопка выше сработает.
-        </p>
+        <p className="mt-2 text-2xs text-tg-hint">{tx(
+          "Разрешение уже запрещено в браузере. Открой настройки сайта и разреши уведомления — кнопка выше сработает.",
+        )}</p>
       )}
 
       {subscribed && (
@@ -167,16 +165,14 @@ export default function PushCard() {
                   haptic("success");
                   return showAlert(
                     res.sent > 0
-                      ? "Проверочное уведомление отправлено."
-                      : "Подписка сохранена, но push-сервис не принял отправку. Попробуй выключить и включить снова.",
+                      ? tx("Проверочное уведомление отправлено.")
+                      : tx("Подписка сохранена, но push-сервис не принял отправку. Попробуй выключить и включить снова."),
                   );
                 })
                 .catch((e) => showAlert(humanizeApiError(e)));
             }}
             className="min-h-8 shrink-0 rounded-full px-2 text-2xs text-tg-link"
-          >
-            Проверить
-          </button>
+          >{tx("Проверить")}</button>
         </div>
       )}
     </section>

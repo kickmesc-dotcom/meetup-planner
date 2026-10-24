@@ -23,6 +23,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
+import { currentIntlLocale, useTx } from "@/i18n";
 /**
  * Передача смены.
  *
@@ -46,7 +47,7 @@ const BOX_OPTIONS: { value: HandoverBox; label: string }[] = [
 function fmtMoment(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("ru-RU", {
+  return d.toLocaleString(currentIntlLocale(), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -61,6 +62,7 @@ function itemIcon(item: HrHandoverItem): IconName {
 }
 
 export default function HandoversScreen() {
+  const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const qc = useQueryClient();
   const [box, setBox] = useState<HandoverBox>("all");
@@ -81,7 +83,7 @@ export default function HandoversScreen() {
       <ErrorState
         error={handoversQ.error}
         onRetry={() => void handoversQ.refetch()}
-        title="Передача смены не открылась"
+        title={tx("Передача смены не открылась")}
       />
     );
   }
@@ -101,21 +103,21 @@ export default function HandoversScreen() {
               setTab("tasks");
             }}
             className="-ml-1 min-h-11 min-w-11 rounded-tile text-lg text-tg-hint"
-            aria-label="Назад к задачам"
+            aria-label={tx("Назад к задачам")}
           >
             ‹
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
-              <Icon name="send" size={18} />
-              Передача смены
-            </h1>
+              <Icon name="send" size={18} />{tx("Передача смены")}</h1>
             <p className="mt-0.5 text-xs text-tg-hint">
               {summary
                 ? summary.pending > 0
-                  ? `Тебе передали смену: ${summary.pending} — нужно подтвердить.`
-                  : "Чужих хвостов на тебе нет. Сдай свои, когда уходишь."
-                : "Что осталось открытым и кому это передали."}
+                  ? tx("Тебе передали смену: {count} — нужно подтвердить.", {
+                      count: summary.pending,
+                    })
+                  : tx("Чужих хвостов на тебе нет. Сдай свои, когда уходишь.")
+                : tx("Что осталось открытым и кому это передали.")}
             </p>
           </div>
           <button
@@ -125,9 +127,7 @@ export default function HandoversScreen() {
               setCreating(true);
             }}
             className="min-h-9 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
-          >
-            Сдать смену
-          </button>
+          >{tx("Сдать смену")}</button>
         </div>
 
         <div className="mt-3 flex gap-1.5">
@@ -146,7 +146,7 @@ export default function HandoversScreen() {
                   : "bg-tg-secondary-bg text-tg-hint",
               ].join(" ")}
             >
-              {option.label}
+              {tx(option.label)}
               {option.value === "incoming" && summary?.pending
                 ? ` · ${summary.pending}`
                 : ""}
@@ -166,13 +166,10 @@ export default function HandoversScreen() {
         {!handoversQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
             <Icon name="send" size={34} className="text-tg-hint" />
-            <div className="mt-2 text-sm font-medium text-tg-text">
-              Передач пока нет
-            </div>
-            <div className="mt-1 text-xs text-tg-hint">
-              Нажми «Сдать смену»: приложение соберёт открытые поручения и
-              проблемы, а следующий человек подтвердит приём.
-            </div>
+            <div className="mt-2 text-sm font-medium text-tg-text">{tx("Передач пока нет")}</div>
+            <div className="mt-1 text-xs text-tg-hint">{tx(
+              "Нажми «Сдать смену»: приложение соберёт открытые поручения и проблемы, а следующий человек подтвердит приём.",
+            )}</div>
           </div>
         )}
 
@@ -206,6 +203,7 @@ function HandoverCard({
   handover: HrHandover;
   onChanged: () => void;
 }) {
+  const { tx } = useTx();
   const [expanded, setExpanded] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
@@ -247,7 +245,10 @@ function HandoverCard({
             {handover.from_name ?? "—"} → {handover.to_name ?? "—"}
           </div>
           <div className="mt-0.5 text-xs text-tg-hint">
-            смена {handover.shift_date} · {fmtMoment(handover.created_at)}
+            {tx("смена {date} · {when}", {
+              date: handover.shift_date,
+              when: fmtMoment(handover.created_at),
+            })}
             {handover.department_name ? ` · ${handover.department_name}` : ""}
           </div>
         </div>
@@ -257,7 +258,7 @@ function HandoverCard({
             STATUS_CLASS[handover.status],
           ].join(" ")}
         >
-          {HANDOVER_STATUS_LABEL[handover.status]}
+          {tx(HANDOVER_STATUS_LABEL[handover.status])}
         </span>
       </div>
 
@@ -271,14 +272,14 @@ function HandoverCard({
         className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-tile bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
       >
         {handover.items_count > 0
-          ? `Открытых пунктов: ${handover.items_count}`
-          : "Открытых пунктов нет"}
+          ? tx("Открытых пунктов: {count}", { count: handover.items_count })
+          : tx("Открытых пунктов нет")}
         <ChevronToggle open={expanded} size={12} />
       </button>
 
       {expanded && (
         <div className="mt-2 space-y-1.5">
-          {detailQ.isLoading && <div className="text-xs text-tg-hint">Загружаю…</div>}
+          {detailQ.isLoading && <div className="text-xs text-tg-hint">{tx("Загружаю…")}</div>}
           {card.items.map((item) => (
             <div
               key={`${item.kind}-${item.ref_id ?? item.id}-${item.id}`}
@@ -295,9 +296,7 @@ function HandoverCard({
             </div>
           ))}
           {!detailQ.isLoading && card.items.length === 0 && (
-            <div className="text-xs text-tg-hint">
-              На момент сдачи открытых пунктов не было.
-            </div>
+            <div className="text-xs text-tg-hint">{tx("На момент сдачи открытых пунктов не было.")}</div>
           )}
         </div>
       )}
@@ -309,13 +308,15 @@ function HandoverCard({
       )}
       {handover.reject_reason && (
         <p className="mt-2 rounded-tile bg-status-busy/10 px-2.5 py-1.5 text-xs text-status-busy">
-          Возвращено: {handover.reject_reason}
+          {tx("Возвращено: {reason}", { reason: handover.reject_reason })}
         </p>
       )}
       {handover.accepted_at && (
         <div className="mt-1 text-xs text-tg-hint">
-          Принял(а): {handover.accepted_by_name ?? handover.to_name} ·{" "}
-          {fmtMoment(handover.accepted_at)}
+          {tx("Принял(а): {name} · {when}", {
+            name: handover.accepted_by_name ?? handover.to_name ?? "—",
+            when: fmtMoment(handover.accepted_at),
+          })}
         </div>
       )}
 
@@ -326,9 +327,7 @@ function HandoverCard({
             disabled={busy}
             onClick={() => acceptM.mutate()}
             className="min-h-10 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
-          >
-            Принять смену
-          </button>
+          >{tx("Принять смену")}</button>
           <button
             type="button"
             disabled={busy}
@@ -338,7 +337,7 @@ function HandoverCard({
             }}
             className="min-h-10 rounded-tile bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text disabled:opacity-50"
           >
-            {rejecting ? "Отмена" : "Вернуть"}
+            {rejecting ? tx("Отмена") : tx("Вернуть")}
           </button>
         </div>
       )}
@@ -350,7 +349,7 @@ function HandoverCard({
             onChange={(e) => setReason(e.target.value)}
             rows={2}
             maxLength={2000}
-            placeholder="Почему не принимаешь? Без причины вернуть нельзя."
+            placeholder={tx("Почему не принимаешь? Без причины вернуть нельзя.")}
             className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
           />
           <button
@@ -358,9 +357,7 @@ function HandoverCard({
             disabled={rejectM.isPending || reason.trim().length === 0}
             onClick={() => rejectM.mutate()}
             className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
-          >
-            Вернуть с причиной
-          </button>
+          >{tx("Вернуть с причиной")}</button>
         </div>
       )}
     </article>
@@ -374,6 +371,7 @@ function CreateHandoverSheet({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { tx } = useTx();
   const [toId, setToId] = useState<number | null>(null);
   const [note, setNote] = useState("");
 
@@ -399,15 +397,13 @@ function CreateHandoverSheet({
   const colleagues = colleaguesQ.data ?? [];
 
   return (
-    <BottomSheet title="Сдать смену" onClose={onClose}>
-      <div className="text-xs text-tg-hint">Кому передаёшь</div>
+    <BottomSheet title={tx("Сдать смену")} onClose={onClose}>
+      <div className="text-xs text-tg-hint">{tx("Кому передаёшь")}</div>
       {colleaguesQ.isLoading && (
-        <div className="mt-1 text-xs text-tg-hint">Загружаю коллег…</div>
+        <div className="mt-1 text-xs text-tg-hint">{tx("Загружаю коллег…")}</div>
       )}
       {!colleaguesQ.isLoading && colleagues.length === 0 && (
-        <div className="mt-1 text-xs text-status-busy">
-          Некому передать: в отделе нет других активных сотрудников.
-        </div>
+        <div className="mt-1 text-xs text-status-busy">{tx("Некому передать: в отделе нет других активных сотрудников.")}</div>
       )}
       <div className="mt-1 flex flex-wrap gap-1.5">
         {colleagues.map((c) => (
@@ -431,14 +427,17 @@ function CreateHandoverSheet({
       </div>
 
       <div className="mt-3 text-xs text-tg-hint">
-        Что уйдёт в сдачу
+        {tx("Что уйдёт в сдачу")}
         {previewQ.data
-          ? ` — поручений ${previewQ.data.tasks}, проблем ${previewQ.data.issues}`
+          ? tx(" — поручений {tasks}, проблем {issues}", {
+              tasks: previewQ.data.tasks,
+              issues: previewQ.data.issues,
+            })
           : ""}
       </div>
       <div className="mt-1 space-y-1.5">
         {previewQ.isLoading && (
-          <div className="text-xs text-tg-hint">Собираю открытые пункты…</div>
+          <div className="text-xs text-tg-hint">{tx("Собираю открытые пункты…")}</div>
         )}
         {(previewQ.data?.items ?? []).map((item) => (
           <div
@@ -456,20 +455,16 @@ function CreateHandoverSheet({
           </div>
         ))}
         {previewQ.data && previewQ.data.items.length === 0 && (
-          <div className="text-xs text-tg-hint">
-            Открытых пунктов нет — передашь только заметку.
-          </div>
+          <div className="text-xs text-tg-hint">{tx("Открытых пунктов нет — передашь только заметку.")}</div>
         )}
       </div>
 
-      <label className="mt-3 block text-xs text-tg-hint">
-        Заметка следующему (необязательно)
-        <textarea
+      <label className="mt-3 block text-xs text-tg-hint">{tx("Заметка следующему (необязательно)")}<textarea
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
           maxLength={2000}
-          placeholder="Что важно знать: ключи, гости, недоделанное"
+          placeholder={tx("Что важно знать: ключи, гости, недоделанное")}
           className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
         />
       </label>
@@ -480,12 +475,11 @@ function CreateHandoverSheet({
         onClick={() => m.mutate()}
         className="mt-4 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
-        {m.isPending ? "Передаю…" : "Передать смену"}
+        {m.isPending ? tx("Передаю…") : tx("Передать смену")}
       </button>
-      <p className="mt-2 text-center text-xs text-tg-hint">
-        Принимающий получит уведомление и подтвердит приём — или вернёт с
-        причиной. Снимок открытых пунктов сохранится в истории.
-      </p>
+      <p className="mt-2 text-center text-xs text-tg-hint">{tx(
+        "Принимающий получит уведомление и подтвердит приём — или вернёт с причиной. Снимок открытых пунктов сохранится в истории.",
+      )}</p>
     </BottomSheet>
   );
 }

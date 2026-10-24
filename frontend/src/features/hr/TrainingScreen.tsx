@@ -14,6 +14,7 @@ import Icon from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * Обучение пользованию приложением — отдельный этап онбординга.
  *
@@ -34,6 +35,7 @@ export default function TrainingScreen({
   onFinish?: (learningMode: boolean) => void;
   finishing?: boolean;
 }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const training = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
@@ -45,7 +47,7 @@ export default function TrainingScreen({
       qc.setQueryData(["hr-training"], data);
       void qc.invalidateQueries({ queryKey: ["hr-employee"] });
       setOpenCode(null);
-      void showAlert("Курс сброшен — можно пройти заново с первого урока.");
+      void showAlert(tx("Курс сброшен — можно пройти заново с первого урока."));
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
   });
@@ -59,7 +61,7 @@ export default function TrainingScreen({
       // дальше вместе или переходим в обычный режим (см. блок ниже).
       void qc.invalidateQueries({ queryKey: ["hr-employee"] });
       if (data.complete) {
-        void showAlert("Курс пройден. Осталось выбрать, как продолжим.");
+        void showAlert(tx("Курс пройден. Осталось выбрать, как продолжим."));
       }
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
@@ -99,16 +101,14 @@ export default function TrainingScreen({
               onClose();
             }}
             className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
-            aria-label="Назад"
+            aria-label={tx("Назад")}
           >
             ‹
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-tg-text">Обучение</div>
-          <div className="text-xs text-tg-hint">
-            Три уровня, по одному действию на экран.
-          </div>
+          <div className="text-sm font-semibold text-tg-text">{tx("Обучение")}</div>
+          <div className="text-xs text-tg-hint">{tx("Три уровня, по одному действию на экран.")}</div>
         </div>
         {training.data && (
           <span className="rounded-full bg-tg-bg/60 px-2 py-1 text-xs tabular-nums text-tg-hint">
@@ -129,26 +129,20 @@ export default function TrainingScreen({
           <>
             {training.data.today_training && (
               <section className="rounded-card bg-tg-link/10 p-3">
-                <div className="text-sm font-semibold text-tg-text">
-                  Сегодня учебная смена
-                </div>
+                <div className="text-sm font-semibold text-tg-text">{tx("Сегодня учебная смена")}</div>
                 <p className="mt-1 text-xs text-tg-hint">
                   Идём по программе вместе. Обязательные чек-листы и поручения
                   работают как обычно.{" "}
                   {training.data.rate_type === "partial"
-                    ? "Ставка частичная."
-                    : "Ставка полная."}
+                    ? tx("Ставка частичная.")
+                    : tx("Ставка полная.")}
                 </p>
               </section>
             )}
             {done && onFinish && (
               <section className="rounded-card bg-status-free/10 p-3">
-                <div className="text-sm font-semibold text-tg-text">
-                  Отлично, первый этап пройден.
-                </div>
-                <p className="mt-1 text-xs text-tg-hint">
-                  Теперь решим, как продолжим в следующую смену.
-                </p>
+                <div className="text-sm font-semibold text-tg-text">{tx("Отлично, первый этап пройден.")}</div>
+                <p className="mt-1 text-xs text-tg-hint">{tx("Теперь решим, как продолжим в следующую смену.")}</p>
                 <div className="mt-3 space-y-2">
                   <button
                     type="button"
@@ -158,9 +152,7 @@ export default function TrainingScreen({
                       onFinish(true);
                     }}
                     className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-                  >
-                    Повторим вместе
-                  </button>
+                  >{tx("Повторим вместе")}</button>
                   <button
                     type="button"
                     disabled={finishing}
@@ -169,13 +161,9 @@ export default function TrainingScreen({
                       onFinish(false);
                     }}
                     className="min-h-11 w-full rounded-card bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
-                  >
-                    Я уже запомнил
-                  </button>
+                  >{tx("Я уже запомнил")}</button>
                 </div>
-                <p className="mt-2 text-xs text-tg-hint">
-                  Обязательные чек-листы и поручения остаются в любом режиме.
-                </p>
+                <p className="mt-2 text-xs text-tg-hint">{tx("Обязательные чек-листы и поручения остаются в любом режиме.")}</p>
               </section>
             )}
 
@@ -192,8 +180,10 @@ export default function TrainingScreen({
               </div>
               <div className="mt-2 text-xs text-tg-hint">
                 {done
-                  ? "Готово. Можно возвращаться к смене."
-                  : `Осталось ${training.data.total - training.data.done}. Уроки можно проходить в любом порядке.`}
+                  ? tx("Готово. Можно возвращаться к смене.")
+                  : tx("Осталось {count}. Уроки можно проходить в любом порядке.", {
+                      count: training.data.total - training.data.done,
+                    })}
               </div>
             </div>
 
@@ -227,30 +217,27 @@ export default function TrainingScreen({
             {/* Сброс доступен всегда: и сотруднику (повторить материал), и
                 разработчику (проверить сценарий «как у новичка»). */}
             <section className="rounded-card border border-tg-hint/20 p-3">
-              <div className="text-sm font-medium text-tg-text">
-                Пройти курс заново
-              </div>
-              <p className="mt-1 text-xs text-tg-hint">
-                Снимет отметки уроков, но оставит подразделение и опыт. Смена,
-                задачи и отметки чек-листа не затрагиваются.
-              </p>
+              <div className="text-sm font-medium text-tg-text">{tx("Пройти курс заново")}</div>
+              <p className="mt-1 text-xs text-tg-hint">{tx(
+                "Снимет отметки уроков, но оставит подразделение и опыт. Смена, задачи и отметки чек-листа не затрагиваются.",
+              )}</p>
               <button
                 type="button"
                 disabled={reset.isPending}
                 onClick={async () => {
                   haptic("light");
                   const ok = await showConfirm(
-                    "Сбросить прогресс обучения и начать курс заново?",
+                    tx("Сбросить прогресс обучения и начать курс заново?"),
                   );
                   if (!ok) return;
                   const sure = await showConfirm(
-                    "Точно? Отметки уроков будут удалены.",
+                    tx("Точно? Отметки уроков будут удалены."),
                   );
                   if (sure) reset.mutate();
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-tg-secondary-bg text-sm text-tg-text disabled:opacity-50"
               >
-                {reset.isPending ? "Сбрасываю…" : "Сбросить прогресс обучения"}
+                {reset.isPending ? tx("Сбрасываю…") : tx("Сбросить прогресс обучения")}
               </button>
             </section>
           </>
@@ -273,6 +260,7 @@ function LessonCard({
   onComplete: () => void;
   busy: boolean;
 }) {
+  const { tx } = useTx();
   return (
     <section
       className={[
@@ -325,11 +313,9 @@ function LessonCard({
                 onComplete();
               }}
               className="min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
-            >
-              Понятно, отметил
-            </button>
+            >{tx("Понятно, отметил")}</button>
           ) : (
-            <div className="text-xs text-status-free">Пройдено</div>
+            <div className="text-xs text-status-free">{tx("Пройдено")}</div>
           )}
         </div>
       )}

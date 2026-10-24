@@ -29,6 +29,7 @@ import WebVersionCard from "@/features/hr/WebVersionCard";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: «Профиль».
  *
@@ -68,6 +69,7 @@ interface RowItem {
 }
 
 export default function HrProfileScreen() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
   const photoHint = useAppText(
@@ -168,8 +170,8 @@ export default function HrProfileScreen() {
       setEditingOverride(false);
       void showAlert(
         data.onboarding_state === "done"
-          ? "Профиль готов. Смена начнётся с чек-листа."
-          : "Сохранили — остался один шаг.",
+          ? tx("Профиль готов. Смена начнётся с чек-листа.")
+          : tx("Сохранили — остался один шаг."),
       );
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
@@ -243,7 +245,7 @@ export default function HrProfileScreen() {
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <Badge text={me.badge} emoji={me.badge_emoji} demo={me.is_demo} />
               <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
-                {ROLE_LABEL[me.role]}
+                {tx(ROLE_LABEL[me.role])}
               </span>
             </div>
             {me.position && (
@@ -258,8 +260,8 @@ export default function HrProfileScreen() {
                 setEditingOverride(true);
               }}
               className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded-tile bg-tg-bg/60 text-tg-link"
-              aria-label="Изменить мои данные"
-              title="Изменить"
+              aria-label={tx("Изменить мои данные")}
+              title={tx("Изменить")}
             >
               <Icon name="edit" size={18} />
             </button>
@@ -269,47 +271,47 @@ export default function HrProfileScreen() {
         {staffView ? (
           <div className="mt-2 text-xs">
             <Info
-              label="Доступ"
-              value={me.department_name ?? "все подразделения"}
+              label={tx("Доступ")}
+              value={tx(me.department_name ?? "все подразделения")}
             />
           </div>
         ) : (
           <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
             <Info
-              label="Подразделение"
+              label={tx("Подразделение")}
               value={
                 me.department_name ??
-                (onboarding ? "выбери ниже" : "не выбрано")
+                tx(onboarding ? "выбери ниже" : "не выбрано")
               }
             />
             <Info
-              label="Опыт"
+              label={tx("Опыт")}
               value={
                 me.experience === "new"
-                  ? "новичок"
+                  ? tx("новичок")
                   : me.experience === "experienced"
-                    ? "с опытом"
+                    ? tx("с опытом")
                     : onboarding
-                      ? "выбери ниже"
-                      : "не указан"
+                      ? tx("выбери ниже")
+                      : tx("не указан")
               }
             />
           </div>
         )}
 
-        <p className="mt-2 text-xs text-tg-hint">{ROLE_HINT[me.role]}</p>
+        <p className="mt-2 text-xs text-tg-hint">{tx(ROLE_HINT[me.role])}</p>
 
         {/* Видимость профиля — рядом с «кто я», а не в глубине настроек: именно
             здесь человек отвечает на вопрос «что обо мне видят коллеги». */}
         <div className="mt-2 flex items-center gap-2 rounded-tile bg-tg-bg/50 p-2">
           <div className="min-w-0 flex-1">
             <div className="text-xs text-tg-text">
-              {me.profile_public ? "Профиль открыт" : "Профиль закрыт"}
+              {me.profile_public ? tx("Профиль открыт") : tx("Профиль закрыт")}
             </div>
             <div className="text-2xs text-tg-hint">
               {me.profile_public
-                ? "Коллеги видят твою активность и цифры. Руководитель видит их всегда."
-                : "Коллеги видят только имя и отдел. Руководитель и админ — всё."}
+                ? tx("Коллеги видят твою активность и цифры. Руководитель видит их всегда.")
+                : tx("Коллеги видят только имя и отдел. Руководитель и админ — всё.")}
             </div>
           </div>
           <button
@@ -325,23 +327,22 @@ export default function HrProfileScreen() {
                 : "bg-tg-secondary-bg text-tg-text",
             ].join(" ")}
           >
-            {me.profile_public ? "Открыт" : "Закрыт"}
+            {me.profile_public ? tx("Открыт") : tx("Закрыт")}
           </button>
         </div>
 
         {editing && (
           <div className="mt-3 border-t border-tg-hint/10 pt-3">
             <h2 className="text-xs font-medium text-tg-text">
-              {onboarding ? "Закончим знакомство" : "Мои данные"}
+              {onboarding ? tx("Закончим знакомство") : tx("Мои данные")}
             </h2>
-            <p className="mt-1 text-xs text-tg-hint">
-              Подразделение определяет чек-листы, поручения и ссылки, которые
-              тебе приходят.
-            </p>
+            <p className="mt-1 text-xs text-tg-hint">{tx(
+              "Подразделение определяет чек-листы, поручения и ссылки, которые тебе приходят.",
+            )}</p>
 
             <div className="mt-2 flex flex-wrap gap-1.5">
               {depsQ.isLoading && (
-                <div className="text-xs text-tg-hint">Загружаем…</div>
+                <div className="text-xs text-tg-hint">{tx("Загружаем…")}</div>
               )}
               {deps.map((d) => {
                 const active = pickedDept === d.id;
@@ -390,7 +391,7 @@ export default function HrProfileScreen() {
                         : "bg-tg-bg/60 text-tg-text",
                     ].join(" ")}
                   >
-                    {o.label}
+                    {tx(o.label)}
                   </button>
                 );
               })}
@@ -407,9 +408,7 @@ export default function HrProfileScreen() {
                     setEditingOverride(false);
                   }}
                   className="min-h-11 rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
-                >
-                  Отмена
-                </button>
+                >{tx("Отмена")}</button>
               )}
               <button
                 type="button"
@@ -422,7 +421,7 @@ export default function HrProfileScreen() {
                 }
                 className="min-h-11 flex-1 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {onboarding ? "Продолжить" : "Сохранить"}
+                {onboarding ? tx("Продолжить") : tx("Сохранить")}
               </button>
             </div>
           </div>
@@ -433,24 +432,21 @@ export default function HrProfileScreen() {
           KpiCard и AchievementsCard — самостоятельные карточки, поэтому здесь
           общий заголовок, а не карточка в карточке. */}
       <div data-testid="profile-progress" className="space-y-2">
-        <h2 className="px-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">
-          Опыт и обучение
-        </h2>
+        <h2 className="px-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">{tx("Опыт и обучение")}</h2>
         <KpiCard />
 
         <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-tg-text">Курс</h3>
+            <h3 className="text-sm font-semibold text-tg-text">{tx("Курс")}</h3>
             <span className="text-xs tabular-nums text-tg-hint">
               {trainingQ.data
                 ? `${trainingQ.data.done}/${trainingQ.data.total}`
                 : "…"}
             </span>
           </div>
-          <p className="mt-1 text-xs text-tg-hint">
-            Три уровня от знакомства до самостоятельной работы — по одному
-            действию на урок.
-          </p>
+          <p className="mt-1 text-xs text-tg-hint">{tx(
+            "Три уровня от знакомства до самостоятельной работы — по одному действию на урок.",
+          )}</p>
 
           <div className="mt-2 flex gap-2">
             <button
@@ -465,7 +461,9 @@ export default function HrProfileScreen() {
                   : "bg-tg-bg/60 text-tg-text",
               ].join(" ")}
             >
-              {me.learning_mode ? "Учимся вместе · вкл" : "Учимся вместе · выкл"}
+              {me.learning_mode
+                ? tx("Учимся вместе · вкл")
+                : tx("Учимся вместе · выкл")}
             </button>
             <button
               type="button"
@@ -475,7 +473,7 @@ export default function HrProfileScreen() {
               }}
               className="min-h-10 flex-1 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text"
             >
-              {trainingQ.data?.complete ? "Открыть курс" : "Продолжить курс"}
+              {trainingQ.data?.complete ? tx("Открыть курс") : tx("Продолжить курс")}
             </button>
           </div>
         </section>
@@ -498,9 +496,7 @@ export default function HrProfileScreen() {
           className="flex min-h-12 w-full items-center gap-2 rounded-card px-3 text-left"
         >
           <Icon name="layout" size={18} className="text-tg-hint" />
-          <span className="flex-1 text-sm font-semibold text-tg-text">
-            Все разделы
-          </span>
+          <span className="flex-1 text-sm font-semibold text-tg-text">{tx("Все разделы")}</span>
           <span className="text-xs tabular-nums text-tg-hint">
             {sections.length}
           </span>
@@ -546,9 +542,7 @@ export default function HrProfileScreen() {
             className="flex min-h-12 w-full items-center gap-2 rounded-card px-3 text-left"
           >
             <Icon name="admin" size={18} className="text-tg-hint" />
-            <span className="flex-1 text-sm font-semibold text-tg-text">
-              Для администратора
-            </span>
+            <span className="flex-1 text-sm font-semibold text-tg-text">{tx("Для администратора")}</span>
             <Icon
               name="chevron"
               size={16}
@@ -562,13 +556,10 @@ export default function HrProfileScreen() {
           {showAdmin && (
             <div id="profile-admin" className="space-y-4 border-t border-tg-hint/10 p-3">
               <div>
-                <h3 className="text-xs font-medium text-tg-text">
-                  Примерить роль
-                </h3>
-                <p className="mt-1 text-xs text-tg-hint">
-                  Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ
-                  в админку остаётся — вернуть себя можно этой же кнопкой.
-                </p>
+                <h3 className="text-xs font-medium text-tg-text">{tx("Примерить роль")}</h3>
+                <p className="mt-1 text-xs text-tg-hint">{tx(
+                  "Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ в админку остаётся — вернуть себя можно этой же кнопкой.",
+                )}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {(
                     [
@@ -592,7 +583,7 @@ export default function HrProfileScreen() {
                             : "bg-tg-bg/60 text-tg-text",
                         ].join(" ")}
                       >
-                        {option.label}
+                        {tx(option.label)}
                       </button>
                     );
                   })}
@@ -600,15 +591,12 @@ export default function HrProfileScreen() {
               </div>
 
               <div className="border-t border-tg-hint/10 pt-3">
-                <h3 className="text-xs font-medium text-tg-text">
-                  Режим проверки
-                </h3>
-                <p className="mt-1 text-xs text-tg-hint">
-                  Открой приложение глазами сотрудника. Тестовые задачи и смены
-                  удалятся при выходе — настоящие данные не изменятся.
-                </p>
+                <h3 className="text-xs font-medium text-tg-text">{tx("Режим проверки")}</h3>
+                <p className="mt-1 text-xs text-tg-hint">{tx(
+                  "Открой приложение глазами сотрудника. Тестовые задачи и смены удалятся при выходе — настоящие данные не изменятся.",
+                )}</p>
                 <select
-                  aria-label="Кого проверяем"
+                  aria-label={tx("Кого проверяем")}
                   value={simulationTarget ?? ""}
                   onChange={(event) =>
                     setSimulationTarget(
@@ -617,7 +605,7 @@ export default function HrProfileScreen() {
                   }
                   className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg px-2 text-xs text-tg-text"
                 >
-                  <option value="">Выбери сотрудника</option>
+                  <option value="">{tx("Выбери сотрудника")}</option>
                   {(employeesQ.data ?? []).map((person) => (
                     <option key={person.id} value={person.id}>
                       {person.display_name}
@@ -642,7 +630,7 @@ export default function HrProfileScreen() {
                           : "bg-tg-bg/60 text-tg-text",
                       ].join(" ")}
                     >
-                      {option.label}
+                      {tx(option.label)}
                     </button>
                   ))}
                 </div>
@@ -653,20 +641,17 @@ export default function HrProfileScreen() {
                   className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
                 >
                   {simulationStart.isPending
-                    ? "Открываем…"
-                    : "Открыть как сотрудник"}
+                    ? tx("Открываем…")
+                    : tx("Открыть как сотрудник")}
                 </button>
               </div>
 
               {me.is_admin && (
                 <div className="border-t border-tg-hint/10 pt-3">
-                  <h3 className="text-xs font-medium text-tg-text">
-                    Тестовый пул
-                  </h3>
-                  <p className="mt-1 text-xs text-tg-hint">
-                    Сотрудники `[BOT]` для проверки сценариев. Настоящие данные
-                    не затрагиваются.
-                  </p>
+                  <h3 className="text-xs font-medium text-tg-text">{tx("Тестовый пул")}</h3>
+                  <p className="mt-1 text-xs text-tg-hint">{tx(
+                    "Сотрудники `[BOT]` для проверки сценариев. Настоящие данные не затрагиваются.",
+                  )}</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -674,9 +659,7 @@ export default function HrProfileScreen() {
                       setShowDemo(true);
                     }}
                     className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg/60 text-xs text-tg-text"
-                  >
-                    Открыть тестовый пул
-                  </button>
+                  >{tx("Открыть тестовый пул")}</button>
                 </div>
               )}
 
@@ -701,9 +684,7 @@ export default function HrProfileScreen() {
             app.close?.();
           }}
           className="mt-2 min-h-11 rounded-tile px-3 text-xs font-medium text-tg-link"
-        >
-          Вернуться в чат с ботом
-        </button>
+        >{tx("Вернуться в чат с ботом")}</button>
       </div>
 
       {showDemo && <HrDemoPanel onClose={() => setShowDemo(false)} />}
@@ -722,14 +703,14 @@ export default function HrProfileScreen() {
 }
 
 function ServerSwitch() {
+  const { tx } = useTx();
   const [value, setValue] = useState(getApiBase());
   return (
     <div>
-      <h3 className="text-xs font-medium text-tg-text">Сервер</h3>
-      <p className="mt-1 text-xs text-tg-hint">
-        Если основной адрес недоступен, укажи резервный — приложение продолжит
-        работать без переустановки. Пусто — адрес из сборки.
-      </p>
+      <h3 className="text-xs font-medium text-tg-text">{tx("Сервер")}</h3>
+      <p className="mt-1 text-xs text-tg-hint">{tx(
+        "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.",
+      )}</p>
       <input
         value={value}
         onChange={(e) => setValue(e.target.value.trim())}
@@ -747,9 +728,7 @@ function ServerSwitch() {
           window.location.reload();
         }}
         className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text"
-      >
-        Сохранить и перезагрузить
-      </button>
+      >{tx("Сохранить и перезагрузить")}</button>
     </div>
   );
 }
@@ -765,6 +744,7 @@ function Info({ label, value }: { label: string; value: string }) {
 
 /** Строка списка разделов: иконка, подпись, шеврон. */
 function Row({ icon, label, onSelect }: RowItem) {
+  const { tx } = useTx();
   return (
     <button
       type="button"
@@ -775,7 +755,7 @@ function Row({ icon, label, onSelect }: RowItem) {
       className="flex min-h-11 w-full items-center gap-2 rounded-tile px-2 text-left text-sm text-tg-text active:bg-tg-bg/60"
     >
       <Icon name={icon} size={18} className="text-tg-hint" />
-      <span className="flex-1 truncate">{label}</span>
+      <span className="flex-1 truncate">{tx(label)}</span>
       <Icon name="chevron" size={14} className="text-tg-hint" />
     </button>
   );

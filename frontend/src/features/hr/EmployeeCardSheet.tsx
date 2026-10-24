@@ -7,6 +7,7 @@ import Badge from "@/features/hr/Badge";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import { haptic } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * Карточка коллеги: тап по имени в ленте, табеле или «Команде».
  *
@@ -25,6 +26,7 @@ export default function EmployeeCardSheet({
   employeeId: number;
   onClose: () => void;
 }) {
+  const { tx } = useTx();
   const q = useQuery({
     queryKey: ["hr-profile-card", employeeId],
     queryFn: () => fetchEmployeeCard(employeeId),
@@ -36,7 +38,7 @@ export default function EmployeeCardSheet({
       className="fixed inset-0 z-50 mx-auto flex w-full max-w-[560px] flex-col bg-tg-bg"
       role="dialog"
       aria-modal="true"
-      aria-label="Карточка сотрудника"
+      aria-label={tx("Карточка сотрудника")}
     >
       <header className="flex items-center gap-2 border-b border-tg-secondary-bg px-3 py-2">
         <button
@@ -46,16 +48,16 @@ export default function EmployeeCardSheet({
             onClose();
           }}
           className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-link"
-          aria-label="Закрыть карточку"
+          aria-label={tx("Закрыть карточку")}
         >
           <Icon name="back" size={20} />
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-tg-text">
-            {q.data?.display_name ?? "Карточка сотрудника"}
+            {q.data?.display_name ?? tx("Карточка сотрудника")}
           </div>
           <div className="truncate text-xs text-tg-hint">
-            {q.data?.department_name ?? "что делал на смене"}
+            {q.data?.department_name ?? tx("что делал на смене")}
           </div>
         </div>
       </header>
@@ -77,6 +79,7 @@ export default function EmployeeCardSheet({
 }
 
 function CardBody({ card }: { card: HrProfileCard }) {
+  const { tx } = useTx();
   const person = personTone(card.employee_id);
   const dept = departmentTone(card.department_id);
 
@@ -119,49 +122,46 @@ function CardBody({ card }: { card: HrProfileCard }) {
       {!card.can_view ? (
         <section className="rounded-card bg-tg-secondary-bg/60 p-4 text-center">
           <Icon name="lock" size={26} className="mx-auto text-tg-hint" />
-          <div className="mt-2 text-sm font-medium text-tg-text">
-            Профиль закрыт
-          </div>
+          <div className="mt-2 text-sm font-medium text-tg-text">{tx("Профиль закрыт")}</div>
           <p className="mt-1 text-xs text-tg-hint">
             {card.is_self
-              ? "Тебя никто не видит в карточке — открой профиль в настройках."
-              : "Человек сам решает, показывать ли активность и цифры. Руководитель и администратор видят её всегда."}
+              ? tx("Тебя никто не видит в карточке — открой профиль в настройках.")
+              : tx("Человек сам решает, показывать ли активность и цифры. Руководитель и администратор видят её всегда.")}
           </p>
         </section>
       ) : (
         <>
           <section className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold text-tg-text">Опыт</h2>
+              <h2 className="text-sm font-semibold text-tg-text">{tx("Опыт")}</h2>
               <span className="text-xs text-tg-hint">
                 {card.rank_emoji} {card.rank_title}
               </span>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-              <Stat label="Всего опыта" value={`${card.xp} XP`} />
-              <Stat label="За неделю" value={`${card.week_xp} XP`} />
+              <Stat label={tx("Всего опыта")} value={`${card.xp} XP`} />
+              <Stat label={tx("За неделю")} value={`${card.week_xp} XP`} />
               <Stat
-                label="Место в неделе"
+                label={tx("Место в неделе")}
                 value={
                   card.week_place && card.week_total
-                    ? `${card.week_place} из ${card.week_total}`
+                    ? tx("{place} из {total}", {
+                        place: card.week_place,
+                        total: card.week_total,
+                      })
                     : "—"
                 }
               />
-              <Stat label="Смен закрыто" value={String(card.shifts_done)} />
-              <Stat label="Пунктов чек-листа" value={String(card.checklist_items)} />
-              <Stat label="Поручений закрыто" value={String(card.tasks_done)} />
+              <Stat label={tx("Смен закрыто")} value={String(card.shifts_done)} />
+              <Stat label={tx("Пунктов чек-листа")} value={String(card.checklist_items)} />
+              <Stat label={tx("Поручений закрыто")} value={String(card.tasks_done)} />
             </div>
           </section>
 
           <section>
-            <h2 className="px-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">
-              Последние действия
-            </h2>
+            <h2 className="px-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">{tx("Последние действия")}</h2>
             {card.activity.length === 0 ? (
-              <p className="mt-2 rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
-                Пока пусто: человек ещё ничего не отмечал.
-              </p>
+              <p className="mt-2 rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">{tx("Пока пусто: человек ещё ничего не отмечал.")}</p>
             ) : (
               <ul className="mt-1 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
                 {card.activity.map((item) => (
@@ -179,10 +179,9 @@ function CardBody({ card }: { card: HrProfileCard }) {
       )}
 
       {!card.profile_open && card.can_view && !card.is_self && (
-        <p className="px-1 text-2xs text-tg-hint">
-          Профиль закрыт для коллег, но тебе он виден: ты руководитель или
-          администратор.
-        </p>
+        <p className="px-1 text-2xs text-tg-hint">{tx(
+          "Профиль закрыт для коллег, но тебе он виден: ты руководитель или администратор.",
+        )}</p>
       )}
     </div>
   );

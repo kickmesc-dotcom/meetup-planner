@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchAchievements } from "@/api/hr";
 import Icon from "@/components/Icon";
 
+import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: скрытый блок «личный прогресс» в профиле.
  *
@@ -15,6 +16,7 @@ import Icon from "@/components/Icon";
  * чек-листа) — шуточный контур в этот контур не входит.
  */
 export default function AchievementsCard() {
+  const { tx } = useTx();
   const q = useQuery({
     queryKey: ["hr-achievements"],
     queryFn: fetchAchievements,
@@ -28,17 +30,14 @@ export default function AchievementsCard() {
     <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
-          <Icon name="award" size={15} className="shrink-0 text-tg-link" />
-          Личный прогресс
-        </h2>
+          <Icon name="award" size={15} className="shrink-0 text-tg-link" />{tx("Личный прогресс")}</h2>
         <span className="text-xs text-tg-hint">
-          {awarded.length ? `${awarded.length} шт.` : "пока пусто"}
+          {awarded.length ? tx("{count} шт.", { count: awarded.length }) : tx("пока пусто")}
         </span>
       </div>
-      <p className="mt-1 text-xs text-tg-hint">
-        Счётчик для себя: он растёт от закрытых поручений и отработанных смен.
-        Гостям и коллегам блок пока не виден.
-      </p>
+      <p className="mt-1 text-xs text-tg-hint">{tx(
+        "Счётчик для себя: он растёт от закрытых поручений и отработанных смен. Гостям и коллегам блок пока не виден.",
+      )}</p>
 
       {awarded.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1.5">
@@ -74,9 +73,9 @@ export default function AchievementsCard() {
 
       {Object.keys(stats).length > 0 && (
         <div className="mt-2 grid grid-cols-3 gap-1.5 text-center text-xs">
-          <Stat label="поручений" value={stats.tasks_done ?? 0} />
-          <Stat label="рабочих дней" value={stats.shift_days ?? 0} />
-          <Stat label="пунктов" value={stats.checklist_items ?? 0} />
+          <Stat label={tx("поручений")} value={stats.tasks_done ?? 0} />
+          <Stat label={tx("рабочих дней")} value={stats.shift_days ?? 0} />
+          <Stat label={tx("пунктов")} value={stats.checklist_items ?? 0} />
         </div>
       )}
     </section>

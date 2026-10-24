@@ -11,6 +11,7 @@ import Icon from "@/components/Icon";
 import { copyText } from "@/lib/clipboard";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * «Веб-версия»: открыть приложение на компьютере.
  *
@@ -25,6 +26,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
  * поэтому есть запасной путь через скрытую textarea.
  */
 export default function WebVersionCard() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [fresh, setFresh] = useState<{ url: string; expires_at: string } | null>(
     null,
@@ -73,16 +75,13 @@ export default function WebVersionCard() {
       <div className="flex items-start gap-2">
         <Icon name="layout" size={18} className="mt-0.5 text-tg-hint" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-tg-text">Веб-версия</h3>
-          <p className="mt-1 text-xs text-tg-hint">
-            На компьютере окно Telegram узкое. Открой ссылку в браузере — там
-            широкий экран с разделами и сводкой смены.
-          </p>
-          <p className="mt-1 text-2xs text-tg-hint">
-            На телефоне ссылку можно поставить на домашний экран: в Safari —
-            «Поделиться → На экран Домой», в Chrome — «Установить приложение».
-            Откроется без адресной строки, как обычная программа.
-          </p>
+          <h3 className="text-sm font-semibold text-tg-text">{tx("Веб-версия")}</h3>
+          <p className="mt-1 text-xs text-tg-hint">{tx(
+            "На компьютере окно Telegram узкое. Открой ссылку в браузере — там широкий экран с разделами и сводкой смены.",
+          )}</p>
+          <p className="mt-1 text-2xs text-tg-hint">{tx(
+            "На телефоне ссылку можно поставить на домашний экран: в Safari — «Поделиться → На экран Домой», в Chrome — «Установить приложение». Откроется без адресной строки, как обычная программа.",
+          )}</p>
         </div>
       </div>
 
@@ -92,7 +91,7 @@ export default function WebVersionCard() {
         onClick={() => create.mutate()}
         className="mt-2 min-h-11 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-60"
       >
-        {create.isPending ? "Готовлю ссылку…" : "Создать ссылку для компьютера"}
+        {create.isPending ? tx("Готовлю ссылку…") : tx("Создать ссылку для компьютера")}
       </button>
 
       {fresh && (
@@ -115,16 +114,14 @@ export default function WebVersionCard() {
               }}
               className="min-h-9 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
             >
-              {copied ? "Скопировано" : "Скопировать"}
+              {copied ? tx("Скопировано") : tx("Скопировать")}
             </button>
             <a
               href={fresh.url}
               target="_blank"
               rel="noreferrer"
               className="grid min-h-9 flex-1 place-items-center rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-link"
-            >
-              Открыть
-            </a>
+            >{tx("Открыть")}</a>
           </div>
         </div>
       )}
@@ -138,7 +135,7 @@ export default function WebVersionCard() {
               busy={revoke.isPending}
               onRevoke={async () => {
                 const ok = await showConfirm(
-                  "Отозвать ссылку? Браузер, где она открыта, потеряет доступ.",
+                  tx("Отозвать ссылку? Браузер, где она открыта, потеряет доступ."),
                 );
                 if (ok) revoke.mutate(link.id);
               }}
@@ -156,9 +153,7 @@ export default function WebVersionCard() {
             window.location.reload();
           }}
           className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-hint"
-        >
-          Выйти из веб-версии на этом устройстве
-        </button>
+        >{tx("Выйти из веб-версии на этом устройстве")}</button>
       )}
     </section>
   );
@@ -173,6 +168,7 @@ function LinkRow({
   busy: boolean;
   onRevoke: () => void;
 }) {
+  const { tx } = useTx();
   const used = link.last_used_at
     ? `использована ${new Date(link.last_used_at).toLocaleString("ru-RU", {
         day: "2-digit",
@@ -180,16 +176,16 @@ function LinkRow({
         hour: "2-digit",
         minute: "2-digit",
       })}`
-    : "ещё не открывалась";
+    : tx("ещё не открывалась");
   return (
     <li className="flex items-center gap-2 rounded-tile bg-tg-bg/40 px-2 py-1.5">
       <div className="min-w-0 flex-1">
         <div className="truncate text-xs text-tg-text">
-          {link.label || "Ссылка"}
-          {link.is_current ? " · это устройство" : ""}
+          {link.label || tx("Ссылка")}
+          {link.is_current ? tx(" · это устройство") : ""}
         </div>
         <div className="truncate text-2xs text-tg-hint">
-          {link.is_active ? used : "отозвана"}
+          {link.is_active ? used : tx("отозвана")}
         </div>
       </div>
       {link.is_active && (
@@ -198,9 +194,7 @@ function LinkRow({
           disabled={busy}
           onClick={onRevoke}
           className="min-h-8 shrink-0 rounded-full px-2 text-2xs text-tg-hint disabled:opacity-50"
-        >
-          Отозвать
-        </button>
+        >{tx("Отозвать")}</button>
       )}
     </li>
   );

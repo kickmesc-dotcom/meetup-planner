@@ -23,6 +23,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { useTx } from "@/i18n";
 import MassPlanSheet, {
   type MassPlanInput,
   type TemplateSaveInput,
@@ -46,6 +47,7 @@ import {
  * их считает план обучения по фактическим сменам, а не по календарю.
  */
 export default function ShiftsScreen() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [departmentId, setDepartmentId] = useState<number | null>(null);
@@ -112,7 +114,9 @@ export default function ShiftsScreen() {
   /** «Записано 5, пропущено 2» — без чисел результат массовой правки не понять. */
   const bulkText = (result: BulkResult, verb: string) =>
     `${verb}: ${result.saved}` +
-    (result.skipped ? ` · пропущено занятых: ${result.skipped}` : "");
+    (result.skipped
+      ? ` · ${tx("пропущено занятых: {count}", { count: result.skipped })}`
+      : "");
 
   const bulk = useMutation({
     mutationFn: (input: MassPlanInput) =>
@@ -129,7 +133,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(bulkText(result, "Записано смен"));
+      void showAlert(bulkText(result, tx("Записано смен")));
     },
     onError,
   });
@@ -145,7 +149,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(bulkText(result, "Скопировано смен"));
+      void showAlert(bulkText(result, tx("Скопировано смен")));
     },
     onError,
   });
@@ -181,7 +185,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(bulkText(result, "Записано смен"));
+      void showAlert(bulkText(result, tx("Записано смен")));
     },
     onError,
   });
@@ -234,18 +238,16 @@ export default function ShiftsScreen() {
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
-              <Icon name="calendar" size={16} />
-              Табель смен
-            </div>
+              <Icon name="calendar" size={16} />{tx("Табель смен")}</div>
             <div className="text-xs text-tg-hint">
-              {rangeLabel(days)} · {canEdit ? "можно править" : "твой отдел"}
+              {rangeLabel(days)} · {canEdit ? tx("можно править") : tx("твой отдел")}
             </div>
           </div>
           <button
             type="button"
             onClick={() => stepWeek(-1)}
             className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
-            aria-label="Предыдущая неделя"
+            aria-label={tx("Предыдущая неделя")}
           >
             ‹
           </button>
@@ -256,14 +258,12 @@ export default function ShiftsScreen() {
               setWeekStart(mondayOf(new Date()));
             }}
             className="min-h-9 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
-          >
-            Сегодня
-          </button>
+          >{tx("Сегодня")}</button>
           <button
             type="button"
             onClick={() => stepWeek(1)}
             className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
-            aria-label="Следующая неделя"
+            aria-label={tx("Следующая неделя")}
           >
             ›
           </button>
@@ -273,7 +273,7 @@ export default function ShiftsScreen() {
           <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
             <FilterChip
               active={departmentId === null}
-              label="Все отделы"
+              label={tx("Все отделы")}
               onClick={() => {
                 haptic("selection");
                 setDepartmentId(null);
@@ -302,9 +302,7 @@ export default function ShiftsScreen() {
             }}
             className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-secondary-bg/60 text-xs font-medium text-tg-text"
           >
-            <Icon name="clipboard" size={16} />
-            Шаблон недели и массовые правки
-          </button>
+            <Icon name="clipboard" size={16} />{tx("Шаблон недели и массовые правки")}</button>
         )}
       </header>
 
@@ -320,9 +318,7 @@ export default function ShiftsScreen() {
         )}
 
         {q.data && q.data.people.length === 0 && (
-          <p className="p-4 text-center text-xs text-tg-hint">
-            В этом отделе пока нет сотрудников.
-          </p>
+          <p className="p-4 text-center text-xs text-tg-hint">{tx("В этом отделе пока нет сотрудников.")}</p>
         )}
 
         {q.data && q.data.people.length > 0 && (
@@ -334,9 +330,9 @@ export default function ShiftsScreen() {
                   gridTemplateColumns: "minmax(104px, 1.25fr) repeat(7, minmax(40px, 1fr))",
                 }}
                 role="table"
-                aria-label="Табель смен на неделю"
+                aria-label={tx("Табель смен на неделю")}
               >
-                <div className="px-1 py-1 text-2xs text-tg-hint">Сотрудник</div>
+                <div className="px-1 py-1 text-2xs text-tg-hint">{tx("Сотрудник")}</div>
                 {days.map((day) => {
                   const iso = toIso(day);
                   const isToday = iso === todayIso;
@@ -377,8 +373,7 @@ export default function ShiftsScreen() {
                 </span>
               ))}
               <span>
-                <b className="text-tg-link">у</b> — учебная смена
-              </span>
+                <b className="text-tg-link">{tx("у")}</b>{tx("— учебная смена")}</span>
             </div>
           </>
         )}
@@ -407,14 +402,16 @@ export default function ShiftsScreen() {
           onSaveTemplate={(input) => saveTemplate.mutate(input)}
           onDeleteTemplate={(templateId) => {
             void (async () => {
-              const ok = await showConfirm("Удалить шаблон недели?");
+              const ok = await showConfirm(tx("Удалить шаблон недели?"));
               if (ok) removeTemplate.mutate(templateId);
             })();
           }}
           onClear={(input) => {
             void (async () => {
               const count = input.employeeIds.length * input.days.length;
-              const ok = await showConfirm(`Снять смены с выбранных клеток (${count})?`);
+              const ok = await showConfirm(
+                tx("Снять смены с выбранных клеток ({count})?", { count }),
+              );
               if (ok) clearCells.mutate(input);
             })();
           }}
@@ -431,7 +428,7 @@ export default function ShiftsScreen() {
           onSave={(input) => save.mutate(input)}
           onDelete={(shiftId) => {
             void (async () => {
-              const ok = await showConfirm("Удалить смену из табеля?");
+              const ok = await showConfirm(tx("Удалить смену из табеля?"));
               if (ok) remove.mutate(shiftId);
             })();
           }}
@@ -445,7 +442,7 @@ export default function ShiftsScreen() {
 function groupedPeople(week: ShiftWeek): [string | null, ShiftPerson[]][] {
   const groups = new Map<string | null, ShiftPerson[]>();
   for (const person of week.people) {
-    const key = person.department_name ?? "Без подразделения";
+    const key = person.department_name ?? "";
     const list = groups.get(key) ?? [];
     list.push(person);
     groups.set(key, list);
@@ -470,13 +467,14 @@ function GroupRows({
   canEdit: boolean;
   onOpen: (state: SheetState) => void;
 }) {
+  const { tx } = useTx();
   return (
     <>
       <div
         className="col-span-8 mt-2 px-1 pt-1 text-2xs font-medium uppercase tracking-wide text-tg-hint"
         style={{ gridColumn: "1 / -1" }}
       >
-        {group}
+        {group || tx("Без подразделения")}
       </div>
       {people.map((person) => (
         <div key={person.employee_id} className="contents">
@@ -537,16 +535,17 @@ function Cell({
   canEdit: boolean;
   onClick: () => void;
 }) {
+  const { tx } = useTx();
   return (
     <button
       type="button"
       onClick={onClick}
       title={
         shift
-          ? `${shift.status_label}${shift.is_training ? " · учебная" : ""}${
+          ? `${tx(shift.status_label)}${shift.is_training ? tx(" · учебная") : ""}${
               shift.starts_at ? ` · ${shift.starts_at}` : ""
             }${shift.ends_at ? `–${shift.ends_at}` : ""}`
-          : "Смены нет"
+          : tx("Смены нет")
       }
       className={`relative flex min-h-11 flex-col items-center justify-center rounded-tile text-xs leading-none transition-transform active:scale-95 ${
         shift
@@ -561,9 +560,7 @@ function Cell({
             <span className="mt-0.5 text-3xs opacity-80">{shift.starts_at}</span>
           )}
           {shift.is_training && (
-            <span className="absolute right-0.5 top-0.5 text-3xs font-semibold">
-              у
-            </span>
+            <span className="absolute right-0.5 top-0.5 text-3xs font-semibold">{tx("у")}</span>
           )}
         </>
       ) : (
@@ -606,6 +603,7 @@ function ShiftSheet({
   onSave: (input: SheetInput) => void;
   onDelete: (shiftId: number) => void;
 }) {
+  const { tx } = useTx();
   const [status, setStatus] = useState<ShiftStatus>(
     state.shift?.status ?? "planned",
   );
@@ -628,9 +626,11 @@ function ShiftSheet({
               {state.person.display_name} · {formatDate(state.day)}
             </div>
             <div className="text-xs text-tg-hint">
-              {state.person.department_name ?? "Без подразделения"}
+              {state.person.department_name ?? tx("Без подразделения")}
               {state.shift?.moved_from
-                ? ` · перенесена с ${formatDate(state.shift.moved_from)}`
+                ? tx(" · перенесена с {date}", {
+                    date: formatDate(state.shift.moved_from),
+                  })
                 : ""}
             </div>
           </div>
@@ -638,7 +638,7 @@ function ShiftSheet({
             type="button"
             onClick={onClose}
             className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
-            aria-label="Закрыть"
+            aria-label={tx("Закрыть")}
           >
             <Icon name="close" size={16} />
           </button>
@@ -646,20 +646,17 @@ function ShiftSheet({
 
         {!canEdit && (
           <div className="mt-3 space-y-1 text-xs text-tg-text">
-            <div>
-              Статус: <b>{state.shift?.status_label ?? "смены нет"}</b>
-              {state.shift?.is_training ? " · учебная" : ""}
+            <div>{tx("Статус:")}<b>{tx(state.shift?.status_label ?? "смены нет")}</b>
+              {state.shift?.is_training ? tx(" · учебная") : ""}
             </div>
             {state.shift?.starts_at && (
               <div>
-                Часы: {state.shift.starts_at}
+                {tx("Часы:")} {state.shift.starts_at}
                 {state.shift.ends_at ? `–${state.shift.ends_at}` : ""}
               </div>
             )}
-            {state.shift?.note && <div>Заметка: {state.shift.note}</div>}
-            <p className="pt-2 text-xs text-tg-hint">
-              Править табель может руководитель подразделения.
-            </p>
+            {state.shift?.note && <div>{tx("Заметка:")} {state.shift.note}</div>}
+            <p className="pt-2 text-xs text-tg-hint">{tx("Править табель может руководитель подразделения.")}</p>
           </div>
         )}
 
@@ -686,18 +683,14 @@ function ShiftSheet({
             </div>
 
             <div className="mt-2 flex items-center gap-2">
-              <label className="flex-1 text-xs text-tg-hint">
-                Начало
-                <input
+              <label className="flex-1 text-xs text-tg-hint">{tx("Начало")}<input
                   type="time"
                   value={startsAt}
                   onChange={(event) => setStartsAt(event.target.value)}
                   className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
                 />
               </label>
-              <label className="flex-1 text-xs text-tg-hint">
-                Конец
-                <input
+              <label className="flex-1 text-xs text-tg-hint">{tx("Конец")}<input
                   type="time"
                   value={endsAt}
                   onChange={(event) => setEndsAt(event.target.value)}
@@ -710,13 +703,11 @@ function ShiftSheet({
               value={note}
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
-              placeholder="Заметка (необязательно)"
+              placeholder={tx("Заметка (необязательно)")}
               className="mt-2 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
             />
 
-            <label className="mt-2 block text-xs text-tg-hint">
-              Перенести на дату (необязательно)
-              <input
+            <label className="mt-2 block text-xs text-tg-hint">{tx("Перенести на дату (необязательно)")}<input
                 type="date"
                 value={moveTo}
                 onChange={(event) => setMoveTo(event.target.value)}
@@ -742,7 +733,11 @@ function ShiftSheet({
                 }}
                 className="min-h-11 flex-1 rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {busy ? "Сохраняем…" : `Сохранить · ${statusMeta?.label ?? status}`}
+                {busy
+                  ? tx("Сохраняем…")
+                  : tx("Сохранить · {status}", {
+                      status: tx(statusMeta?.label ?? status),
+                    })}
               </button>
               {state.shift && (
                 <button
@@ -750,9 +745,7 @@ function ShiftSheet({
                   disabled={busy}
                   onClick={() => onDelete(state.shift!.id)}
                   className="min-h-11 rounded-card bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
-                >
-                  Удалить
-                </button>
+                >{tx("Удалить")}</button>
               )}
             </div>
           </>

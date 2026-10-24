@@ -6,6 +6,7 @@ import { haptic, WebApp } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import { useUI } from "@/store/ui";
 
+import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: «Полезные ссылки».
  *
@@ -14,6 +15,7 @@ import { useUI } from "@/store/ui";
  * своего подразделения — отбор делает сервер, клиент просто рисует список.
  */
 export default function LinksScreen() {
+  const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const linksQ = useQuery({ queryKey: ["hr-links"], queryFn: fetchLinks });
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
@@ -28,11 +30,13 @@ export default function LinksScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <h1 className="text-lg font-semibold text-tg-text">Полезные ссылки</h1>
+        <h1 className="text-lg font-semibold text-tg-text">{tx("Полезные ссылки")}</h1>
         <p className="mt-1 text-xs text-tg-hint">
           {meQ.data?.department_name
-            ? `Общие и для подразделения «${meQ.data.department_name}»`
-            : "Инструкции, регламенты и рабочие сервисы"}
+            ? tx("Общие и для подразделения «{name}»", {
+                name: meQ.data.department_name,
+              })
+            : tx("Инструкции, регламенты и рабочие сервисы")}
         </p>
       </header>
 
@@ -50,12 +54,8 @@ export default function LinksScreen() {
           <div className="flex items-center gap-3">
             <Icon name="book" size={20} className="shrink-0 text-tg-link" />
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-tg-text">
-                Материалы смены
-              </span>
-              <span className="block text-xs text-tg-hint">
-                График, меню и методички — открываются без Google
-              </span>
+              <span className="block text-sm font-medium text-tg-text">{tx("Материалы смены")}</span>
+              <span className="block text-xs text-tg-hint">{tx("График, меню и методички — открываются без Google")}</span>
             </span>
           </div>
         </button>
@@ -65,12 +65,8 @@ export default function LinksScreen() {
         {!linksQ.isLoading && links.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Icon name="link" size={34} className="text-tg-hint" />
-            <div className="mt-2 text-sm font-medium text-tg-text">
-              Ссылок пока нет
-            </div>
-            <div className="mt-1 text-xs text-tg-hint">
-              Руководитель добавит их в админке — здесь появится список.
-            </div>
+            <div className="mt-2 text-sm font-medium text-tg-text">{tx("Ссылок пока нет")}</div>
+            <div className="mt-1 text-xs text-tg-hint">{tx("Руководитель добавит их в админке — здесь появится список.")}</div>
           </div>
         )}
 

@@ -13,6 +13,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 
+import { currentLocale, tx as txIn, useTx } from "@/i18n";
 /**
  * «Материалы смены»: график, меню и бар из Google Sheets.
  *
@@ -22,10 +23,11 @@ import { haptic, showAlert, WebApp } from "@/tg/webapp";
  * если последнее обновление не удалось (показываем последнюю рабочую версию).
  */
 export default function MaterialsScreen() {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const hint = useAppText(
     "materials.hint",
-    "График, меню и методички. Показываем копию с сервера — Google открывать не нужно.",
+    tx("График, меню и методички. Показываем копию с сервера — Google открывать не нужно."),
   );
   const materialsQ = useQuery({
     queryKey: ["hr-materials"],
@@ -63,7 +65,7 @@ export default function MaterialsScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <h1 className="text-lg font-semibold text-tg-text">Материалы смены</h1>
+        <h1 className="text-lg font-semibold text-tg-text">{tx("Материалы смены")}</h1>
         <p className="mt-1 text-xs text-tg-hint">{hint}</p>
       </header>
 
@@ -78,12 +80,8 @@ export default function MaterialsScreen() {
         {!materialsQ.isLoading && materials.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Icon name="book" size={34} className="text-tg-hint" />
-            <div className="mt-2 text-sm font-medium text-tg-text">
-              Материалов пока нет
-            </div>
-            <div className="mt-1 max-w-[280px] text-xs text-tg-hint">
-              Руководитель добавит таблицы — они появятся здесь.
-            </div>
+            <div className="mt-2 text-sm font-medium text-tg-text">{tx("Материалов пока нет")}</div>
+            <div className="mt-1 max-w-[280px] text-xs text-tg-hint">{tx("Руководитель добавит таблицы — они появятся здесь.")}</div>
           </div>
         )}
 
@@ -116,9 +114,9 @@ export default function MaterialsScreen() {
               <>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-tg-hint">
                   <span>
-                    Обновлено: {active.synced_at ? fmtStamp(active.synced_at) : "ещё ни разу"}
+                    Обновлено: {active.synced_at ? fmtStamp(active.synced_at) : tx("ещё ни разу")}
                   </span>
-                  {active.stale && <span className="text-status-maybe">· устарело</span>}
+                  {active.stale && <span className="text-status-maybe">{tx("· устарело")}</span>}
                   {canRefresh && (
                     <button
                       type="button"
@@ -126,16 +124,14 @@ export default function MaterialsScreen() {
                       onClick={() => refresh.mutate(active.id)}
                       className="ml-auto min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text disabled:opacity-50"
                     >
-                      {refresh.isPending ? "Обновляю…" : "⟳ Обновить"}
+                      {refresh.isPending ? tx("Обновляю…") : tx("⟳ Обновить")}
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={() => openExternal(active.url)}
                     className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
-                  >
-                    Открыть таблицу
-                  </button>
+                  >{tx("Открыть таблицу")}</button>
                 </div>
 
                 {active.sync_error && (
@@ -146,10 +142,9 @@ export default function MaterialsScreen() {
                 )}
 
                 {active.rows.length === 0 ? (
-                  <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
-                    Данных ещё нет: таблица не отдала CSV. Проверь, что доступ
-                    «всем, у кого есть ссылка».
-                  </div>
+                  <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">{tx(
+                    "Данных ещё нет: таблица не отдала CSV. Проверь, что доступ «всем, у кого есть ссылка».",
+                  )}</div>
                 ) : (
                   <SheetTable rows={active.rows} columns={active.columns} />
                 )}
@@ -177,13 +172,14 @@ function SheetTable({
   rows: string[][];
   columns: number;
 }) {
+  const { tx } = useTx();
   const header = useMemo(() => (rows.length > 0 && looksLikeHeader(rows[0]) ? rows[0] : null), [rows]);
   const body = header ? rows.slice(1) : rows;
 
   return (
     <div className="overflow-x-auto rounded-card border border-tg-secondary-bg">
       <table className="min-w-full border-collapse text-xs">
-        <caption className="sr-only">Таблица материалов смены</caption>
+        <caption className="sr-only">{tx("Таблица материалов смены")}</caption>
         {header && (
           <thead>
             <tr>
@@ -230,9 +226,16 @@ function fmtStamp(iso: string): string {
 }
 
 function humanizeSheetError(code: string): string {
-  if (code === "access_denied") return "нет доступа к таблице";
-  if (code.startsWith("http_")) return `Google ответил ${code.slice(5)}`;
-  if (code.startsWith("network:")) return "сервер не достучался до Google";
+  const locale = currentLocale();
+  if (code === "access_denied") {
+    return txIn(locale, "нет доступа к таблице");
+  }
+  if (code.startsWith("http_")) {
+    return txIn(locale, "Google ответил {code}", { code: code.slice(5) });
+  }
+  if (code.startsWith("network:")) {
+    return txIn(locale, "сервер не достучался до Google");
+  }
   return code;
 }
 

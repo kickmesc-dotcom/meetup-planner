@@ -13,6 +13,7 @@ import TrainingScreen from "@/features/hr/TrainingScreen";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * Первый экран нового сотрудника: «Привет! Давай освоимся».
  *
@@ -26,6 +27,7 @@ import { haptic, showAlert } from "@/tg/webapp";
  * чек-листы, поручения и требования безопасности.
  */
 export default function OnboardingScreen({ employee }: { employee: HrEmployee }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
   const departmentsQ = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
@@ -82,7 +84,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
       <ErrorState
         error={departmentsQ.error}
         onRetry={() => void departmentsQ.refetch()}
-        title="Не загрузилось"
+        title={tx("Не загрузилось")}
       />
     );
   }
@@ -91,7 +93,9 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
     <div className="mx-auto flex h-full w-full max-w-[560px] flex-col bg-tg-bg">
       <header className="flex items-center justify-between px-5 pb-2 pt-4">
         <span className="text-xs text-tg-hint">
-          {step < 3 ? `Шаг ${step + 1} из 3` : "Знакомство"}
+          {step < 3
+            ? tx("Шаг {step} из {total}", { step: step + 1, total: 3 })
+            : tx("Знакомство")}
         </span>
         <ThemeSwitcher />
       </header>
@@ -102,9 +106,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
             <h1 className="mt-4 text-2xl font-semibold text-tg-text">
               Привет, {employee.display_name.split(" ")[0]}!
             </h1>
-            <p className="mt-2 text-sm text-tg-hint">
-              Пара шагов — и можно начинать смену.
-            </p>
+            <p className="mt-2 text-sm text-tg-hint">{tx("Пара шагов — и можно начинать смену.")}</p>
             <button
               type="button"
               onClick={() => {
@@ -112,18 +114,14 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                 setStep(1);
               }}
               className="mt-8 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text"
-            >
-              Начать
-            </button>
+            >{tx("Начать")}</button>
           </section>
         )}
 
         {step === 1 && (
           <section className="pt-6">
-            <h1 className="text-xl font-semibold text-tg-text">Где ты работаешь?</h1>
-            <p className="mt-1 text-sm text-tg-hint">
-              От этого зависят чек-лист смены и задачи.
-            </p>
+            <h1 className="text-xl font-semibold text-tg-text">{tx("Где ты работаешь?")}</h1>
+            <p className="mt-1 text-sm text-tg-hint">{tx("От этого зависят чек-лист смены и задачи.")}</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {departments.map((item) => {
                 const active = departmentId === item.id;
@@ -162,22 +160,26 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
               }
               className="mt-6 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
-              {save.isPending ? "Сохраняем…" : "Продолжить"}
+              {save.isPending ? tx("Сохраняем…") : tx("Продолжить")}
             </button>
           </section>
         )}
 
         {step === 2 && (
           <section className="pt-6">
-            <h1 className="text-xl font-semibold text-tg-text">Как давно ты в деле?</h1>
+            <h1 className="text-xl font-semibold text-tg-text">{tx("Как давно ты в деле?")}</h1>
             <div className="mt-4 space-y-2">
               {(
                 [
-                  { value: "new" as const, title: "Я только начинаю", hint: "Покажем всё по шагам" },
+                  {
+                    value: "new" as const,
+                    title: tx("Я только начинаю"),
+                    hint: tx("Покажем всё по шагам"),
+                  },
                   {
                     value: "experienced" as const,
-                    title: "Уже освоился",
-                    hint: "Сразу к работе",
+                    title: tx("Уже освоился"),
+                    hint: tx("Сразу к работе"),
                   },
                 ]
               ).map((option) => {
@@ -215,7 +217,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
               }
               className="mt-6 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
-              {save.isPending ? "Сохраняем…" : "Продолжить"}
+              {save.isPending ? tx("Сохраняем…") : tx("Продолжить")}
             </button>
           </section>
         )}
@@ -223,7 +225,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
         {step === 3 && (
           <section className="-mx-5 flex min-h-0 flex-col">
             <div className="px-5 pb-2">
-              <h1 className="text-xl font-semibold text-tg-text">Освоимся за пару минут</h1>
+              <h1 className="text-xl font-semibold text-tg-text">{tx("Освоимся за пару минут")}</h1>
               <p className="mt-1 text-sm text-tg-hint">
                 {department ? `${department.emoji ?? ""} ${department.name} · ` : ""}
                 короткое знакомство с приложением.
@@ -245,12 +247,8 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                   disabled={finish.isPending}
                   onClick={() => finish.mutate(false)}
                   className="min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-                >
-                  Я уже запомнил
-                </button>
-                <p className="pb-2 text-center text-xs text-tg-hint">
-                  Обязательные чек-листы и задачи это не отменяет.
-                </p>
+                >{tx("Я уже запомнил")}</button>
+                <p className="pb-2 text-center text-xs text-tg-hint">{tx("Обязательные чек-листы и задачи это не отменяет.")}</p>
               </div>
             )}
           </section>

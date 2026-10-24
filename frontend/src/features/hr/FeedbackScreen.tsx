@@ -12,6 +12,7 @@ import { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: «Обратная связь» после смены.
  *
@@ -21,6 +22,7 @@ import { haptic, showAlert } from "@/tg/webapp";
  * не уходят, а сервер сам проверяет обязательные.
  */
 export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
+  const { tx } = useTx();
   const q = useQuery({
     queryKey: ["hr-feedback-questions"],
     queryFn: fetchFeedbackQuestions,
@@ -33,7 +35,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
     onSuccess: () => {
       haptic("success");
       setSent(true);
-      void showAlert("Спасибо! Ответы ушли руководителю.");
+      void showAlert(tx("Спасибо! Ответы ушли руководителю."));
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });
@@ -52,10 +54,8 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-30 flex flex-col bg-tg-bg">
       <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
         <div className="min-w-0 flex-1">
-          <div className="text-base font-medium text-tg-text">
-            Обратная связь
-          </div>
-          <div className="text-xs text-tg-hint">Как прошла смена</div>
+          <div className="text-base font-medium text-tg-text">{tx("Обратная связь")}</div>
+          <div className="text-xs text-tg-hint">{tx("Как прошла смена")}</div>
         </div>
         <button
           type="button"
@@ -64,9 +64,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
             onClose();
           }}
           className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
-        >
-          Закрыть
-        </button>
+        >{tx("Закрыть")}</button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -83,15 +81,11 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
 
         {sent && (
           <div className="rounded-card bg-status-free/10 p-3 text-center text-sm text-status-free">
-            <InlineIcon name="check" />
-            Ответы отправлены
-          </div>
+            <InlineIcon name="check" />{tx("Ответы отправлены")}</div>
         )}
 
         {q.data?.length === 0 && (
-          <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-center text-xs text-tg-hint">
-            Вопросов пока нет — администратор их ещё не завёл.
-          </div>
+          <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-center text-xs text-tg-hint">{tx("Вопросов пока нет — администратор их ещё не завёл.")}</div>
         )}
 
         {q.data?.map((question) => (
@@ -161,7 +155,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
                 maxLength={2000}
                 value={answers[question.id]?.value_text ?? ""}
                 onChange={(e) => set(question, { value_text: e.target.value })}
-                placeholder="Пара слов своими словами"
+                placeholder={tx("Пара слов своими словами")}
                 className="mt-2 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
               />
             )}
@@ -175,7 +169,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
             onClick={() => send.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
-            {send.isPending ? "Отправляем…" : "Отправить"}
+            {send.isPending ? tx("Отправляем…") : tx("Отправить")}
           </button>
         )}
       </div>

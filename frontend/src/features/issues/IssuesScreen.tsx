@@ -26,6 +26,12 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
+import {
+  currentIntlLocale,
+  currentLocale,
+  tx as txIn,
+  useTx,
+} from "@/i18n";
 /**
  * Журнал операционных проблем смены.
  *
@@ -63,24 +69,29 @@ const VIEW_OPTIONS: { value: View; label: string }[] = [
 
 /** «4 ч», «3 дня» — сколько карточка висит. */
 function fmtAge(hours: number): string {
-  if (hours < 1) return "меньше часа";
-  if (hours < 24) return `${Math.round(hours)} ч`;
+  const locale = currentLocale();
+  if (hours < 1) return txIn(locale, "меньше часа");
+  if (hours < 24) return `${Math.round(hours)} ${txIn(locale, "ч")}`;
   const days = Math.round(hours / 24);
   const mod10 = days % 10;
   const mod100 = days % 100;
+  // В английском две формы; в русском — три. Формы живут в словаре, чтобы
+  // «days» не появлялся из кода, который не знает про локаль.
   const word =
-    mod10 === 1 && mod100 !== 11
-      ? "день"
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-        ? "дня"
-        : "дней";
+    locale === "en"
+      ? txIn(locale, days === 1 ? "день" : "дней")
+      : mod10 === 1 && mod100 !== 11
+        ? txIn(locale, "день")
+        : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
+          ? txIn(locale, "дня")
+          : txIn(locale, "дней");
   return `${days} ${word}`;
 }
 
 function fmtMoment(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("ru-RU", {
+  return d.toLocaleString(currentIntlLocale(), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -89,6 +100,7 @@ function fmtMoment(iso: string): string {
 }
 
 export default function IssuesScreen() {
+  const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const qc = useQueryClient();
   const [view, setView] = useState<View>("open");
@@ -114,7 +126,7 @@ export default function IssuesScreen() {
       <ErrorState
         error={issuesQ.error}
         onRetry={() => void issuesQ.refetch()}
-        title="Журнал проблем не открылся"
+        title={tx("Журнал проблем не открылся")}
       />
     );
   }
@@ -134,19 +146,17 @@ export default function IssuesScreen() {
               setTab("tasks");
             }}
             className="-ml-1 min-h-11 min-w-11 rounded-tile text-lg text-tg-hint"
-            aria-label="Назад к задачам"
+            aria-label={tx("Назад к задачам")}
           >
             ‹
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
-              <Icon name="alert" size={18} />
-              Журнал проблем
-            </h1>
+              <Icon name="alert" size={18} />{tx("Журнал проблем")}</h1>
             <p className="mt-0.5 text-xs text-tg-hint">
               {summary
                 ? summarize(summary.total_open, summary.attention)
-                : "Что на смене пошло не так — и кто это закрывает."}
+                : tx("Что на смене пошло не так — и кто это закрывает.")}
             </p>
           </div>
           <button
@@ -156,9 +166,7 @@ export default function IssuesScreen() {
               setCreating(true);
             }}
             className="min-h-9 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
-          >
-            + Сообщить
-          </button>
+          >{tx("+ Сообщить")}</button>
         </div>
 
         <div className="mt-3 flex gap-1.5">
@@ -177,7 +185,7 @@ export default function IssuesScreen() {
                   : "bg-tg-secondary-bg text-tg-hint",
               ].join(" ")}
             >
-              {option.label}
+              {tx(option.label)}
             </button>
           ))}
         </div>
@@ -195,12 +203,11 @@ export default function IssuesScreen() {
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
             <Icon name="alert" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">
-              {view === "mine" ? "У тебя открытых проблем нет" : "Журнал пуст"}
+              {view === "mine" ? tx("У тебя открытых проблем нет") : tx("Журнал пуст")}
             </div>
-            <div className="mt-1 text-xs text-tg-hint">
-              Сломалось оборудование, закончились расходники, гость недоволен —
-              заведи карточку, чтобы смена не теряла проблему.
-            </div>
+            <div className="mt-1 text-xs text-tg-hint">{tx(
+              "Сломалось оборудование, закончились расходники, гость недоволен — заведи карточку, чтобы смена не теряла проблему.",
+            )}</div>
           </div>
         )}
 
@@ -241,16 +248,20 @@ export default function IssuesScreen() {
 }
 
 function summarize(open: number, attention: number): string {
-  if (open === 0) return "Открытых проблем нет — смена чистая.";
+  const locale = currentLocale();
+  if (open === 0) return txIn(locale, "Открытых проблем нет — смена чистая.");
   return [
-    `Открыто: ${open}`,
-    attention ? `требуют внимания: ${attention}` : null,
+    txIn(locale, "Открыто: {count}", { count: open }),
+    attention
+      ? txIn(locale, "требуют внимания: {count}", { count: attention })
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");
 }
 
 function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) {
+  const { tx } = useTx();
   const closed = issue.status === "resolved" || issue.status === "cancelled";
   return (
     <button
@@ -278,7 +289,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
                 STATUS_CLASS[issue.status],
               ].join(" ")}
             >
-              {ISSUE_STATUS_LABEL[issue.status]}
+              {tx(ISSUE_STATUS_LABEL[issue.status])}
             </span>
           </div>
 
@@ -289,20 +300,24 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
                 SEVERITY_CLASS[issue.severity],
               ].join(" ")}
             >
-              {ISSUE_SEVERITY_LABEL[issue.severity]}
+              {tx(ISSUE_SEVERITY_LABEL[issue.severity])}
             </span>
-            <span>{ISSUE_CATEGORY_LABEL[issue.category]}</span>
+            <span>{tx(ISSUE_CATEGORY_LABEL[issue.category])}</span>
             {issue.zone && <span>· {issue.zone}</span>}
             {issue.department_name && <span>· {issue.department_name}</span>}
           </div>
 
           <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-tg-hint">
-            <span>висит {fmtAge(issue.age_hours)}</span>
-            {issue.created_by_name && <span>· завёл {issue.created_by_name}</span>}
-            {issue.assignee_name && (
-              <span className="text-tg-text/80">· на {issue.assignee_name}</span>
+            <span>{tx("висит {age}", { age: fmtAge(issue.age_hours) })}</span>
+            {issue.created_by_name && (
+              <span>{tx("· завёл {name}", { name: issue.created_by_name })}</span>
             )}
-            {issue.task_id && <span>· из поручения</span>}
+            {issue.assignee_name && (
+              <span className="text-tg-text/80">
+                {tx("· на {name}", { name: issue.assignee_name })}
+              </span>
+            )}
+            {issue.task_id && <span>{tx("· из поручения")}</span>}
           </div>
         </div>
       </div>
@@ -317,6 +332,7 @@ function CreateIssueSheet({
   onClose: () => void;
   onCreated: (issue: HrIssueDetail) => void;
 }) {
+  const { tx } = useTx();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<IssueCategory>("equipment");
   const [severity, setSeverity] = useState<IssueSeverity>("normal");
@@ -340,19 +356,17 @@ function CreateIssueSheet({
   });
 
   return (
-    <BottomSheet title="Новая проблема" onClose={onClose}>
-      <label className="block text-xs text-tg-hint">
-        Что случилось
-        <input
+    <BottomSheet title={tx("Новая проблема")} onClose={onClose}>
+      <label className="block text-xs text-tg-hint">{tx("Что случилось")}<input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
-          placeholder="Например: не работает терминал на баре"
+          placeholder={tx("Например: не работает терминал на баре")}
           className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
         />
       </label>
 
-      <div className="mt-3 text-xs text-tg-hint">Категория</div>
+      <div className="mt-3 text-xs text-tg-hint">{tx("Категория")}</div>
       <div className="mt-1 flex flex-wrap gap-1.5">
         {CATEGORIES.map((c) => (
           <button
@@ -369,12 +383,12 @@ function CreateIssueSheet({
                 : "bg-tg-secondary-bg text-tg-hint",
             ].join(" ")}
           >
-            {ISSUE_CATEGORY_ICON[c]} {ISSUE_CATEGORY_LABEL[c]}
+            {ISSUE_CATEGORY_ICON[c]} {tx(ISSUE_CATEGORY_LABEL[c])}
           </button>
         ))}
       </div>
 
-      <div className="mt-3 text-xs text-tg-hint">Насколько срочно</div>
+      <div className="mt-3 text-xs text-tg-hint">{tx("Насколько срочно")}</div>
       <div className="mt-1 grid grid-cols-4 gap-1.5">
         {SEVERITIES.map((s) => (
           <button
@@ -391,30 +405,26 @@ function CreateIssueSheet({
                 : "bg-tg-secondary-bg text-tg-hint",
             ].join(" ")}
           >
-            {ISSUE_SEVERITY_LABEL[s]}
+            {tx(ISSUE_SEVERITY_LABEL[s])}
           </button>
         ))}
       </div>
 
-      <label className="mt-3 block text-xs text-tg-hint">
-        Где (необязательно)
-        <input
+      <label className="mt-3 block text-xs text-tg-hint">{tx("Где (необязательно)")}<input
           value={zone}
           onChange={(e) => setZone(e.target.value)}
           maxLength={64}
-          placeholder="Зал, кухня, бар, склад…"
+          placeholder={tx("Зал, кухня, бар, склад…")}
           className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
         />
       </label>
 
-      <label className="mt-3 block text-xs text-tg-hint">
-        Подробности (необязательно)
-        <textarea
+      <label className="mt-3 block text-xs text-tg-hint">{tx("Подробности (необязательно)")}<textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
           maxLength={2000}
-          placeholder="Что уже пробовали, кому сказали, что нужно для решения"
+          placeholder={tx("Что уже пробовали, кому сказали, что нужно для решения")}
           className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
         />
       </label>
@@ -425,12 +435,11 @@ function CreateIssueSheet({
         onClick={() => m.mutate()}
         className="mt-4 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
-        {m.isPending ? "Записываю…" : "Завести карточку"}
+        {m.isPending ? tx("Записываю…") : tx("Завести карточку")}
       </button>
-      <p className="mt-2 text-center text-xs text-tg-hint">
-        Руководитель отдела увидит проблему в колокольчике и в журнале. В чат
-        сообщение не уходит — это не срочный алерт.
-      </p>
+      <p className="mt-2 text-center text-xs text-tg-hint">{tx(
+        "Руководитель отдела увидит проблему в колокольчике и в журнале. В чат сообщение не уходит — это не срочный алерт.",
+      )}</p>
     </BottomSheet>
   );
 }
@@ -442,6 +451,7 @@ function IssueSheet({
   issueId: number;
   onClose: () => void;
 }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [comment, setComment] = useState("");
 
@@ -485,7 +495,7 @@ function IssueSheet({
   const busy = statusM.isPending || commentM.isPending || assignM.isPending;
 
   return (
-    <BottomSheet title={issue?.title ?? "Проблема"} onClose={onClose}>
+    <BottomSheet title={issue?.title ?? tx("Проблема")} onClose={onClose}>
       {detailQ.isLoading && <CardSkeleton />}
       {detailQ.isError && (
         <ErrorState
@@ -503,7 +513,7 @@ function IssueSheet({
                 STATUS_CLASS[issue.status],
               ].join(" ")}
             >
-              {ISSUE_STATUS_LABEL[issue.status]}
+              {tx(ISSUE_STATUS_LABEL[issue.status])}
             </span>
             <span
               className={[
@@ -511,11 +521,11 @@ function IssueSheet({
                 SEVERITY_CLASS[issue.severity],
               ].join(" ")}
             >
-              {ISSUE_SEVERITY_LABEL[issue.severity]}
+              {tx(ISSUE_SEVERITY_LABEL[issue.severity])}
             </span>
             <span>
               {ISSUE_CATEGORY_ICON[issue.category]}{" "}
-              {ISSUE_CATEGORY_LABEL[issue.category]}
+              {tx(ISSUE_CATEGORY_LABEL[issue.category])}
             </span>
             {issue.zone && <span>· {issue.zone}</span>}
             {issue.department_name && <span>· {issue.department_name}</span>}
@@ -528,9 +538,14 @@ function IssueSheet({
           )}
 
           <div className="mt-2 text-xs text-tg-hint">
-            Завёл {issue.created_by_name ?? "—"} · смена {issue.shift_date} ·
-            висит {fmtAge(issue.age_hours)}
-            {issue.assignee_name ? ` · ответственный: ${issue.assignee_name}` : ""}
+            {tx("Завёл {name} · смена {date} · висит {age}", {
+              name: issue.created_by_name ?? "—",
+              date: issue.shift_date,
+              age: fmtAge(issue.age_hours),
+            })}
+            {issue.assignee_name
+              ? tx(" · ответственный: {name}", { name: issue.assignee_name })
+              : ""}
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -538,9 +553,7 @@ function IssueSheet({
               <ActionButton
                 disabled={busy}
                 onClick={() => statusM.mutate("in_progress")}
-              >
-                Взять в работу
-              </ActionButton>
+              >{tx("Взять в работу")}</ActionButton>
             )}
             {issue.can_close &&
               (issue.status === "open" || issue.status === "in_progress") && (
@@ -548,16 +561,12 @@ function IssueSheet({
                   <ActionButton
                     disabled={busy}
                     onClick={() => statusM.mutate("resolved")}
-                  >
-                    Решено
-                  </ActionButton>
+                  >{tx("Решено")}</ActionButton>
                   <ActionButton
                     variant="ghost"
                     disabled={busy}
                     onClick={() => statusM.mutate("cancelled")}
-                  >
-                    Снять
-                  </ActionButton>
+                  >{tx("Снять")}</ActionButton>
                 </>
               )}
             {issue.can_reopen &&
@@ -565,9 +574,7 @@ function IssueSheet({
                 <ActionButton
                   disabled={busy}
                   onClick={() => statusM.mutate("open")}
-                >
-                  Переоткрыть
-                </ActionButton>
+                >{tx("Переоткрыть")}</ActionButton>
               )}
             {meId !== null &&
               issue.assignee_employee_id !== meId &&
@@ -577,13 +584,11 @@ function IssueSheet({
                   variant="ghost"
                   disabled={busy}
                   onClick={() => assignM.mutate(meId)}
-                >
-                  Назначить на себя
-                </ActionButton>
+                >{tx("Назначить на себя")}</ActionButton>
               )}
           </div>
 
-          <h3 className="mt-4 text-sm font-semibold text-tg-text">История</h3>
+          <h3 className="mt-4 text-sm font-semibold text-tg-text">{tx("История")}</h3>
           <ol className="mt-2 space-y-2">
             {issue.events.map((event) => (
               <li
@@ -591,7 +596,7 @@ function IssueSheet({
                 className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-xs"
               >
                 <div className="text-xs text-tg-hint">
-                  {fmtMoment(event.at)} · {event.by_name ?? "система"}
+                  {fmtMoment(event.at)} · {event.by_name ?? tx("система")}
                 </div>
                 <div className="mt-0.5 text-tg-text">
                   {describeEvent(event)}
@@ -607,7 +612,7 @@ function IssueSheet({
                 onChange={(e) => setComment(e.target.value)}
                 rows={2}
                 maxLength={2000}
-                placeholder="Добавить комментарий"
+                placeholder={tx("Добавить комментарий")}
                 className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
               />
               <button
@@ -615,9 +620,7 @@ function IssueSheet({
                 disabled={commentM.isPending || comment.trim().length === 0}
                 onClick={() => commentM.mutate()}
                 className="mt-2 min-h-10 w-full rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
-              >
-                Отправить
-              </button>
+              >{tx("Отправить")}</button>
             </div>
           )}
         </>
@@ -629,18 +632,28 @@ function IssueSheet({
 function describeEvent(event: HrIssueDetail["events"][number]): string {
   switch (event.kind) {
     case "created":
-      return "Завёл карточку";
+      return txIn(currentLocale(), "Завёл карточку");
     case "status":
-      return `${ISSUE_STATUS_LABEL[event.from_status ?? "open"]} → ${
-        ISSUE_STATUS_LABEL[event.to_status ?? "open"]
-      }${event.comment ? `: ${event.comment}` : ""}`;
+      return `${txIn(
+        currentLocale(),
+        ISSUE_STATUS_LABEL[event.from_status ?? "open"],
+      )} → ${txIn(
+        currentLocale(),
+        ISSUE_STATUS_LABEL[event.to_status ?? "open"],
+      )}${event.comment ? `: ${event.comment}` : ""}`;
     case "assignee":
-      if (!event.comment) return "Сменил ответственного";
-      if (event.comment === "снят") return "Снял ответственного";
-      if (event.comment.startsWith("назначен:")) return "Назначил ответственного";
+      if (!event.comment) return txIn(currentLocale(), "Сменил ответственного");
+      if (event.comment === "снят") {
+        return txIn(currentLocale(), "Снял ответственного");
+      }
+      if (event.comment.startsWith("назначен:")) {
+        return txIn(currentLocale(), "Назначил ответственного");
+      }
       return event.comment;
     case "edited":
-      return `Поправил карточку${event.comment ? `: ${event.comment}` : ""}`;
+      return `${txIn(currentLocale(), "Поправил карточку")}${
+        event.comment ? `: ${event.comment}` : ""
+      }`;
     case "comment":
       return event.comment ?? "";
     default:

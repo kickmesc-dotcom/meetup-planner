@@ -13,6 +13,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 
+import { useTx } from "@/i18n";
 /**
  * SemiTaskBot: админский экран тестового пула `[BOT]`.
  *
@@ -25,6 +26,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
  * подтверждение и предупреждаем текстом, что именно уйдёт.
  */
 export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["hr-demo"], queryFn: fetchDemoState });
 
@@ -60,7 +62,10 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
       haptic("success");
       invalidate();
       void showAlert(
-        `Сгенерировали: смен ${counts.checklist_runs ?? 0}, поручений ${counts.tasks ?? 0}.`,
+        tx("Сгенерировали: смен {shifts}, поручений {tasks}.", {
+          shifts: counts.checklist_runs ?? 0,
+          tasks: counts.tasks ?? 0,
+        }),
       );
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
@@ -71,7 +76,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
     onSuccess: () => {
       haptic("warning");
       invalidate();
-      void showAlert("Следы тестового пула удалены.");
+      void showAlert(tx("Следы тестового пула удалены."));
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });
@@ -83,7 +88,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-30 flex flex-col bg-tg-bg">
       <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
         <div className="min-w-0 flex-1">
-          <div className="text-base font-medium text-tg-text">Тестовый пул</div>
+          <div className="text-base font-medium text-tg-text">{tx("Тестовый пул")}</div>
           <div className="text-xs text-tg-hint">
             Симуляторы работы с префиксом {data?.prefix ?? "[BOT]"}
           </div>
@@ -95,9 +100,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
             onClose();
           }}
           className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
-        >
-          Закрыть
-        </button>
+        >{tx("Закрыть")}</button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -113,7 +116,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
           <>
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-semibold text-tg-text">Следы пула</div>
+                <div className="text-sm font-semibold text-tg-text">{tx("Следы пула")}</div>
                 <span
                   className={[
                     "rounded-full px-2 py-0.5 text-xs",
@@ -122,13 +125,12 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                       : "bg-status-busy/20 text-status-busy",
                   ].join(" ")}
                 >
-                  {data.visible ? "видны" : "скрыты"}
+                  {data.visible ? tx("видны") : tx("скрыты")}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-tg-hint">
-                Тумблер прячет пул из ленты, списков и отчётов, не удаляя данные.
-                Один тап — и боевая картина чистая.
-              </p>
+              <p className="mt-1 text-xs text-tg-hint">{tx(
+                "Тумблер прячет пул из ленты, списков и отчётов, не удаляя данные. Один тап — и боевая картина чистая.",
+              )}</p>
               <button
                 type="button"
                 disabled={busy}
@@ -139,7 +141,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="mt-2 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {data.visible ? "Скрыть следы" : "Показать следы"}
+                {data.visible ? tx("Скрыть следы") : tx("Показать следы")}
               </button>
             </section>
 
@@ -149,7 +151,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
               </div>
               <div className="mt-2 space-y-1">
                 {data.employees.length === 0 && (
-                  <div className="text-xs text-tg-hint">Пул не заведён.</div>
+                  <div className="text-xs text-tg-hint">{tx("Пул не заведён.")}</div>
                 )}
                 {data.employees.map((e) => (
                   <div key={e.employee_id} className="flex items-center gap-2 text-xs">
@@ -164,9 +166,9 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-                <Metric label="Смен" value={data.activity.checklist_runs} />
-                <Metric label="Поручений" value={data.activity.tasks} />
-                <Metric label="Ответов ОС" value={data.activity.feedback_answers} />
+                <Metric label={tx("Смен")} value={data.activity.checklist_runs} />
+                <Metric label={tx("Поручений")} value={data.activity.tasks} />
+                <Metric label={tx("Ответов ОС")} value={data.activity.feedback_answers} />
               </div>
               <div className="mt-3 space-y-2">
                 <button
@@ -178,9 +180,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   }}
                   className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
                 >
-                  <Icon name="plus" size={14} className="mr-1 inline-block" />
-                  Завести пул
-                </button>
+                  <Icon name="plus" size={14} className="mr-1 inline-block" />{tx("Завести пул")}</button>
                 <button
                   type="button"
                   disabled={busy || data.employees.length === 0}
@@ -189,46 +189,38 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                     simulate.mutate();
                   }}
                   className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
-                >
-                  Симулировать 3 смены
-                </button>
+                >{tx("Симулировать 3 смены")}</button>
               </div>
             </section>
 
             <section className="rounded-card border border-status-busy/30 p-3">
-              <div className="text-sm font-semibold text-tg-text">Удаление</div>
-              <p className="mt-1 text-xs text-tg-hint">
-                Обратной операции нет. «Активность» убирает смены, поручения и
-                ответы, а «вместе с сотрудниками» удаляет и самих тестовых людей
-                с их строками в базе.
-              </p>
+              <div className="text-sm font-semibold text-tg-text">{tx("Удаление")}</div>
+              <p className="mt-1 text-xs text-tg-hint">{tx(
+                "Обратной операции нет. «Активность» убирает смены, поручения и ответы, а «вместе с сотрудниками» удаляет и самих тестовых людей с их строками в базе.",
+              )}</p>
               <button
                 type="button"
                 disabled={busy}
                 onClick={async () => {
                   const ok = await showConfirm(
-                    "Снести всю активность тестового пула? Сотрудники останутся.",
+                    tx("Снести всю активность тестового пула? Сотрудники останутся."),
                   );
                   if (ok) purge.mutate(false);
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
-              >
-                Снести только активность
-              </button>
+              >{tx("Снести только активность")}</button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={async () => {
                   const ok = await showConfirm(
-                    "Удалить тестовых сотрудников вместе со всей их активностью?",
+                    tx("Удалить тестовых сотрудников вместе со всей их активностью?"),
                   );
                   if (ok) purge.mutate(true);
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-status-busy text-xs font-medium text-white disabled:opacity-50"
               >
-                <Icon name="trash" size={14} className="mr-1 inline-block" />
-                Удалить сотрудников и следы
-              </button>
+                <Icon name="trash" size={14} className="mr-1 inline-block" />{tx("Удалить сотрудников и следы")}</button>
             </section>
           </>
         )}

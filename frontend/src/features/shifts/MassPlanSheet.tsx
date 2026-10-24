@@ -9,6 +9,7 @@ import { haptic } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import { addDays, formatDate, toIso, weekdaysToIso } from "./shiftDates";
 
+import { useTx } from "@/i18n";
 /**
  * Шаблон недели и массовые правки табеля.
  *
@@ -89,6 +90,7 @@ export default function MassPlanSheet({
   onSaveTemplate: (input: TemplateSaveInput) => void;
   onDeleteTemplate: (templateId: number) => void;
 }) {
+  const { tx } = useTx();
   // По умолчанию выбраны все, кто виден в текущем фильтре отдела: чаще всего
   // шаблон ставят всему подразделению. Дни — наоборот, пустые.
   const [picked, setPicked] = useState<number[]>(() =>
@@ -156,22 +158,22 @@ export default function MassPlanSheet({
         className="mx-auto max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-card bg-tg-bg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}
         role="dialog"
-        aria-label="Шаблон недели"
+        aria-label={tx("Шаблон недели")}
       >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-tg-text">Шаблон недели</div>
+            <div className="text-sm font-semibold text-tg-text">{tx("Шаблон недели")}</div>
             <div className="text-xs text-tg-hint">
               {`${formatDate(toIso(weekStart))} — ${formatDate(
                 toIso(addDays(weekStart, 6)),
-              )} · смена сразу на много клеток`}
+              )}${tx(" · смена сразу на много клеток")}`}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
-            aria-label="Закрыть"
+            aria-label={tx("Закрыть")}
           >
             <Icon name="close" size={16} />
           </button>
@@ -181,9 +183,7 @@ export default function MassPlanSheet({
             зависят от выбранных ниже дней — только от людей. */}
         {templates.length > 0 && (
           <div className="mt-3">
-            <div className="text-xs font-medium text-tg-text">
-              Шаблоны подразделения
-            </div>
+            <div className="text-xs font-medium text-tg-text">{tx("Шаблоны подразделения")}</div>
             <div className="mt-1 space-y-1.5">
               {templates.map((template) => (
                 <div
@@ -203,9 +203,7 @@ export default function MassPlanSheet({
                     disabled={picked.length === 0 || templateBusy}
                     onClick={() => onApplyTemplate(template.id, picked)}
                     className="min-h-9 rounded-tile bg-tg-link/15 px-2 text-xs font-medium text-tg-text disabled:opacity-40"
-                  >
-                    Применить
-                  </button>
+                  >{tx("Применить")}</button>
                   <button
                     type="button"
                     onClick={() => onDeleteTemplate(template.id)}
@@ -222,13 +220,13 @@ export default function MassPlanSheet({
 
         {/* 1. Кому. */}
         <div className="mt-3 flex items-baseline justify-between gap-2">
-          <span className="text-xs font-medium text-tg-text">Кому</span>
+          <span className="text-xs font-medium text-tg-text">{tx("Кому")}</span>
           <button
             type="button"
             onClick={toggleAllPeople}
             className="min-h-9 text-xs text-tg-link"
           >
-            {allPicked ? "Снять всех" : "Выбрать всех"}
+            {allPicked ? tx("Снять всех") : tx("Выбрать всех")}
           </button>
         </div>
         <div className="mt-1 flex flex-wrap gap-1.5">
@@ -254,7 +252,7 @@ export default function MassPlanSheet({
         </div>
 
         {/* 2. В какие дни. */}
-        <div className="mt-3 text-xs font-medium text-tg-text">В какие дни</div>
+        <div className="mt-3 text-xs font-medium text-tg-text">{tx("В какие дни")}</div>
         <div className="mt-1 flex gap-1.5">
           {WEEKDAYS.map((day) => {
             const active = days.includes(day.value);
@@ -271,15 +269,15 @@ export default function MassPlanSheet({
                     : "bg-tg-secondary-bg/60 text-tg-hint",
                 ].join(" ")}
               >
-                {day.label}
+                {tx(day.label)}
               </button>
             );
           })}
         </div>
         <div className="mt-1 text-2xs text-tg-hint">
           {dayIsos.length === 0
-            ? "Выбери хотя бы один день — без этого записывать нечего."
-            : `Дней выбрано: ${dayIsos.length}`}
+            ? tx("Выбери хотя бы один день — без этого записывать нечего.")
+            : tx("Дней выбрано: {count}", { count: dayIsos.length })}
         </div>
 
         {/* 3. Что именно. */}
@@ -306,18 +304,14 @@ export default function MassPlanSheet({
         </div>
 
         <div className="mt-2 flex items-center gap-2">
-          <label className="flex-1 text-xs text-tg-hint">
-            Начало
-            <input
+          <label className="flex-1 text-xs text-tg-hint">{tx("Начало")}<input
               type="time"
               value={startsAt}
               onChange={(event) => setStartsAt(event.target.value)}
               className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
             />
           </label>
-          <label className="flex-1 text-xs text-tg-hint">
-            Конец
-            <input
+          <label className="flex-1 text-xs text-tg-hint">{tx("Конец")}<input
               type="time"
               value={endsAt}
               onChange={(event) => setEndsAt(event.target.value)}
@@ -330,7 +324,7 @@ export default function MassPlanSheet({
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={200}
-          placeholder="Заметка (необязательно)"
+          placeholder={tx("Заметка (необязательно)")}
           className="mt-2 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
         />
 
@@ -341,11 +335,7 @@ export default function MassPlanSheet({
             checked={overwrite}
             onChange={(event) => setOverwrite(event.target.checked)}
           />
-          <span>
-            Заменить уже поставленные смены
-            <span className="block text-2xs text-tg-hint">
-              Выключено — заполняем только пустые клетки.
-            </span>
+          <span>{tx("Заменить уже поставленные смены")}<span className="block text-2xs text-tg-hint">{tx("Выключено — заполняем только пустые клетки.")}</span>
           </span>
         </label>
 
@@ -367,15 +357,18 @@ export default function MassPlanSheet({
           className="mt-3 min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
           {busy
-            ? "Записываем…"
-            : `Применить${sameHours ? ` · ${sameHours}` : ""} · ${
-                statusMeta?.label ?? status
-              }`}
+            ? tx("Записываем…")
+            : `${tx("Применить")}${sameHours ? ` · ${sameHours}` : ""} · ${tx(
+                statusMeta?.label ?? status,
+              )}`}
         </button>
         <div className="mt-1 text-center text-2xs text-tg-hint">
           {ready
-            ? `${picked.length} чел. × ${dayIsos.length} дн.`
-            : "Выбери людей и дни"}
+            ? tx("{people} чел. × {days} дн.", {
+                people: picked.length,
+                days: dayIsos.length,
+              })
+            : tx("Выбери людей и дни")}
         </div>
 
         {/* Сохранить текущую подборку как шаблон отдела. */}
@@ -386,8 +379,8 @@ export default function MassPlanSheet({
                 value={templateName}
                 onChange={(event) => setTemplateName(event.target.value)}
                 maxLength={64}
-                placeholder="Название шаблона"
-                aria-label="Название шаблона"
+                placeholder={tx("Название шаблона")}
+                aria-label={tx("Название шаблона")}
                 className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
               />
               <button
@@ -396,12 +389,12 @@ export default function MassPlanSheet({
                 onClick={saveTemplate}
                 className="min-h-9 rounded-tile bg-tg-button px-2 text-xs text-tg-button-text disabled:opacity-40"
               >
-                {templateBusy ? "Сохраняем…" : "Сохранить"}
+                {templateBusy ? tx("Сохраняем…") : tx("Сохранить")}
               </button>
               <button
                 type="button"
                 onClick={() => setNaming(false)}
-                aria-label="Отменить сохранение шаблона"
+                aria-label={tx("Отменить сохранение шаблона")}
                 className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
               >
                 <Icon name="close" size={14} />
@@ -413,9 +406,7 @@ export default function MassPlanSheet({
               disabled={!ready || templateBusy}
               onClick={() => setNaming(true)}
               className="min-h-9 text-xs text-tg-link disabled:opacity-40"
-            >
-              Сохранить подборку как шаблон
-            </button>
+            >{tx("Сохранить подборку как шаблон")}</button>
           )}
         </div>
 
@@ -427,7 +418,7 @@ export default function MassPlanSheet({
             onClick={() => onCopyPrevious(picked)}
             className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text disabled:opacity-40"
           >
-            {copyBusy ? "Копируем…" : "Скопировать прошлую неделю"}
+            {copyBusy ? tx("Копируем…") : tx("Скопировать прошлую неделю")}
           </button>
           <button
             type="button"
@@ -435,14 +426,12 @@ export default function MassPlanSheet({
             onClick={() => onClear({ employeeIds: picked, days: dayIsos })}
             className="min-h-11 rounded-tile bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-40"
           >
-            {clearBusy ? "Снимаем…" : "Снять смены"}
+            {clearBusy ? tx("Снимаем…") : tx("Снять смены")}
           </button>
         </div>
-        <p className="mt-2 text-2xs text-tg-hint">
-          Копирование переносит прошлую неделю на эту и не затирает занятые дни.
-          «Снять смены» трогает только выбранные дни. Шаблон применяется своим
-          рисунком недели — выбранные дни для него не важны.
-        </p>
+        <p className="mt-2 text-2xs text-tg-hint">{tx(
+          "Копирование переносит прошлую неделю на эту и не затирает занятые дни. «Снять смены» трогает только выбранные дни. Шаблон применяется своим рисунком недели — выбранные дни для него не важны.",
+        )}</p>
       </div>
     </div>
   );

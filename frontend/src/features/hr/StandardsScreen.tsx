@@ -19,6 +19,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
+import { useTx } from "@/i18n";
 /**
  * База стандартов: как мы моем руки, подаём блюдо, тушим сковороду.
  *
@@ -28,6 +29,7 @@ import { useUI } from "@/store/ui";
  * запросе нельзя.
  */
 export default function StandardsScreen() {
+  const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const [openId, setOpenId] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
@@ -55,18 +57,14 @@ export default function StandardsScreen() {
             setTab("tasks");
           }}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
-          aria-label="Назад к задачам"
+          aria-label={tx("Назад к задачам")}
         >
           ‹
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
-            <Icon name="book" size={15} className="shrink-0" />
-            Стандарты
-          </div>
-          <div className="text-xs text-tg-hint">
-            Инструкции и короткие тесты по ним
-          </div>
+            <Icon name="book" size={15} className="shrink-0" />{tx("Стандарты")}</div>
+          <div className="text-xs text-tg-hint">{tx("Инструкции и короткие тесты по ним")}</div>
         </div>
         {meQ.data?.is_aup && (
           <button
@@ -77,7 +75,7 @@ export default function StandardsScreen() {
             }}
             className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-text"
           >
-            {adding ? "Отмена" : "+ Стандарт"}
+            {adding ? tx("Отмена") : tx("+ Стандарт")}
           </button>
         )}
       </header>
@@ -91,6 +89,7 @@ export default function StandardsScreen() {
 }
 
 function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
+  const { tx } = useTx();
   const listQ = useQuery({ queryKey: ["hr-standards"], queryFn: fetchStandards });
 
   if (listQ.isError) {
@@ -112,12 +111,10 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Icon name="book" size={34} className="text-tg-hint" />
-        <div className="mt-2 text-sm font-medium text-tg-text">
-          Стандартов пока нет
-        </div>
-        <div className="mt-1 max-w-[280px] text-xs text-tg-hint">
-          Руководитель добавит инструкции — здесь появятся они и тесты к ним.
-        </div>
+        <div className="mt-2 text-sm font-medium text-tg-text">{tx("Стандартов пока нет")}</div>
+        <div className="mt-1 max-w-[280px] text-xs text-tg-hint">{tx(
+          "Руководитель добавит инструкции — здесь появятся они и тесты к ним.",
+        )}</div>
       </div>
     );
   }
@@ -135,7 +132,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
     <div className="space-y-4">
       <div className="rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="flex items-baseline justify-between text-xs">
-          <span className="text-tg-hint">Сдано стандартов</span>
+          <span className="text-tg-hint">{tx("Сдано стандартов")}</span>
           <span className="font-medium text-tg-text">
             {data.passed} из {data.total}
           </span>
@@ -187,7 +184,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
                           : "bg-tg-bg/70 text-tg-hint",
                       ].join(" ")}
                     >
-                      {item.passed ? "сдано" : "не сдано"}
+                      {item.passed ? tx("сдано") : tx("не сдано")}
                     </span>
                   </span>
                   {item.summary && (
@@ -217,6 +214,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
 }
 
 function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [result, setResult] = useState<HrCheckResult | null>(null);
@@ -267,18 +265,21 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
           type="button"
           onClick={onBack}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
-          aria-label="Назад к списку"
+          aria-label={tx("Назад к списку")}
         >
           ‹
         </button>
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-tg-text">
             {standard?.emoji ? `${standard.emoji} ` : ""}
-            {standard?.title ?? "Стандарт"}
+            {standard?.title ?? tx("Стандарт")}
           </div>
           <div className="text-xs text-tg-hint">
             {standard
-              ? `${STANDARD_CATEGORY_LABEL[standard.category]} · порог ${standard.pass_percent}%`
+              ? tx("{category} · порог {percent}%", {
+                  category: tx(STANDARD_CATEGORY_LABEL[standard.category]),
+                  percent: standard.pass_percent,
+                })
               : "…"}
           </div>
         </div>
@@ -312,8 +313,8 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
           >
             <span>
               {standard.is_required
-                ? "Обязательный: не сдавшие попадают в отчёт смены"
-                : "Сделать обязательным для отчёта смены"}
+                ? tx("Обязательный: не сдавшие попадают в отчёт смены")
+                : tx("Сделать обязательным для отчёта смены")}
             </span>
             {standard.is_required && (
               <Icon
@@ -326,9 +327,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         )}
 
         {standard && questions.length === 0 && (
-          <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
-            Теста к этому стандарту нет — достаточно прочитать инструкцию.
-          </div>
+          <div className="rounded-card bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">{tx("Теста к этому стандарту нет — достаточно прочитать инструкцию.")}</div>
         )}
 
         {questions.map((q, index) => (
@@ -368,9 +367,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               })}
             </div>
             {result?.wrong_indexes.includes(index) && (
-              <div className="mt-1.5 text-xs text-status-busy">
-                Ответ неверный — вернись к инструкции выше.
-              </div>
+              <div className="mt-1.5 text-xs text-status-busy">{tx("Ответ неверный — вернись к инструкции выше.")}</div>
             )}
           </section>
         ))}
@@ -386,18 +383,14 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
           >
             {result.passed ? (
               <>
-                <InlineIcon name="check" />
-                Сдано
-              </>
+                <InlineIcon name="check" />{tx("Сдано")}</>
             ) : (
               <>
-                <InlineIcon name="close" />
-                Пока не сдано
-              </>
+                <InlineIcon name="close" />{tx("Пока не сдано")}</>
             )}
             : {result.correct} из{" "}
             {result.total} верно ({result.percent}%, нужно {result.pass_percent}%).
-            {!result.passed && " Перечитай инструкцию и попробуй снова."}
+            {!result.passed && tx(" Перечитай инструкцию и попробуй снова.")}
           </div>
         )}
 
@@ -411,7 +404,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
             }}
             className="min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
-            {result ? "Попробовать снова" : "Проверить ответы"}
+            {result ? tx("Попробовать снова") : tx("Проверить ответы")}
           </button>
         )}
       </div>
@@ -432,6 +425,7 @@ const EMPTY_QUESTION = (): DraftQuestion => ({
 });
 
 function AddStandardForm({ onDone }: { onDone: () => void }) {
+  const { tx } = useTx();
   const qc = useQueryClient();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -481,36 +475,30 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="mb-4 rounded-card bg-tg-secondary-bg/60 p-3">
-      <h2 className="text-sm font-semibold text-tg-text">Новый стандарт</h2>
-      <p className="mt-0.5 text-xs text-tg-hint">
-        Пиши как для нового сотрудника: что сделать, в каком порядке и почему.
-      </p>
+      <h2 className="text-sm font-semibold text-tg-text">{tx("Новый стандарт")}</h2>
+      <p className="mt-0.5 text-xs text-tg-hint">{tx(
+        "Пиши как для нового сотрудника: что сделать, в каком порядке и почему.",
+      )}</p>
 
-      <label className="mt-3 block text-xs text-tg-hint">
-        Название
-        <input
+      <label className="mt-3 block text-xs text-tg-hint">{tx("Название")}<input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
-          placeholder="Гигиена рук перед сменой"
+          placeholder={tx("Гигиена рук перед сменой")}
           className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
         />
       </label>
 
       <div className="mt-2 flex gap-2">
-        <label className="w-16 shrink-0 text-xs text-tg-hint">
-          Значок
-          <input
+        <label className="w-16 shrink-0 text-xs text-tg-hint">{tx("Значок")}<input
             value={emoji}
             onChange={(e) => setEmoji(e.target.value)}
             maxLength={4}
-            placeholder="Значок"
+            placeholder={tx("Значок")}
             className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
           />
         </label>
-        <label className="min-w-0 flex-1 text-xs text-tg-hint">
-          Категория
-          <select
+        <label className="min-w-0 flex-1 text-xs text-tg-hint">{tx("Категория")}<select
             value={category}
             onChange={(e) => setCategory(e.target.value as StandardCategory)}
             className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
@@ -526,9 +514,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         </label>
       </div>
 
-      <label className="mt-2 block text-xs text-tg-hint">
-        Короткое описание (для списка)
-        <input
+      <label className="mt-2 block text-xs text-tg-hint">{tx("Короткое описание (для списка)")}<input
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
           maxLength={200}
@@ -536,13 +522,11 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         />
       </label>
 
-      <label className="mt-2 block text-xs text-tg-hint">
-        Инструкция
-        <textarea
+      <label className="mt-2 block text-xs text-tg-hint">{tx("Инструкция")}<textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={5}
-          placeholder="1. Помой руки…"
+          placeholder={tx("1. Помой руки…")}
           className="mt-1 w-full rounded-tile bg-tg-bg/70 p-2 text-sm text-tg-text"
         />
       </label>
@@ -567,15 +551,11 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => setIsRequired(e.target.checked)}
           className="mt-0.5"
         />
-        <span>
-          Обязательный: не сдавшие попадут в пробелы отчёта смены.
-        </span>
+        <span>{tx("Обязательный: не сдавшие попадут в пробелы отчёта смены.")}</span>
       </label>
 
       <div className="mt-3 space-y-2">
-        <div className="text-xs uppercase tracking-wide text-tg-hint">
-          Тест
-        </div>
+        <div className="text-xs uppercase tracking-wide text-tg-hint">{tx("Тест")}</div>
         {questions.map((q, index) => (
           <div key={index} className="rounded-tile bg-tg-bg/60 p-2">
             <div className="flex items-center gap-2">
@@ -588,7 +568,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                     ),
                   )
                 }
-                placeholder={`Вопрос ${index + 1}`}
+                placeholder={tx("Вопрос {number}", { number: index + 1 })}
                 className="min-h-9 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
               />
               {questions.length > 1 && (
@@ -598,7 +578,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                     setQuestions((prev) => prev.filter((_, i) => i !== index))
                   }
                   className="min-h-11 min-w-11 rounded-tile text-xs text-tg-hint"
-                  aria-label="Удалить вопрос"
+                  aria-label={tx("Удалить вопрос")}
                 >
                   <Icon name="close" size={14} />
                 </button>
@@ -620,7 +600,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                       ),
                     )
                   }
-                  aria-label="Верный вариант"
+                  aria-label={tx("Верный вариант")}
                 />
                 <input
                   value={option}
@@ -639,7 +619,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                     )
                   }
                   placeholder={
-                    optionIndex === 0 ? "Верный вариант" : "Вариант"
+                    optionIndex === 0 ? tx("Верный вариант") : tx("Вариант")
                   }
                   className="min-h-8 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text"
                 />
@@ -651,9 +631,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           type="button"
           onClick={() => setQuestions((prev) => [...prev, EMPTY_QUESTION()])}
           className="min-h-9 w-full rounded-tile bg-tg-secondary-bg text-xs text-tg-text"
-        >
-          + Вопрос
-        </button>
+        >{tx("+ Вопрос")}</button>
       </div>
 
       <button
@@ -661,9 +639,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         disabled={!canSave}
         onClick={() => save.mutate()}
         className="mt-3 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-      >
-        Сохранить стандарт
-      </button>
+      >{tx("Сохранить стандарт")}</button>
     </section>
   );
 }
