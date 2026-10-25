@@ -234,6 +234,20 @@ const GROUPS: { title: string; icon: IconName }[] = [
   { title: GROUP_SYSTEM, icon: "admin" },
 ];
 
+/**
+ * Разделы платформы, а не клиента: прокси, рестарт Space, тексты, интервалы
+ * напоминаний и очередь задач. Владелец организации — администратор своей
+ * компании (чек-листы, люди, приглашения), но не хозяин сервера: эти карточки
+ * ему не нужны и только пугают.
+ */
+const PLATFORM_SECTIONS: Section[] = [
+  "texts",
+  "intervals",
+  "jobs",
+  "proxy",
+  "space-restart",
+];
+
 /** Сколько частых разделов поднимаем наверх: больше — уже не «частое». */
 const FREQUENT_LIMIT = 3;
 const USAGE_KEY = "admin.usage.v1";
@@ -263,19 +277,27 @@ function writeUsage(usage: Record<string, number>): void {
   }
 }
 
-function topFrequent(usage: Record<string, number>): SectionDef[] {
-  return SECTIONS.filter((s) => (usage[s.id] ?? 0) > 0)
+function topFrequent(
+  usage: Record<string, number>,
+  sections: SectionDef[] = SECTIONS,
+): SectionDef[] {
+  return sections.filter((s) => (usage[s.id] ?? 0) > 0)
     .sort((a, b) => (usage[b.id] ?? 0) - (usage[a.id] ?? 0))
     .slice(0, FREQUENT_LIMIT);
 }
 
 interface Props {
   users: User[];
+  /** Прописанный админ платформы: видит системные разделы. */
+  platform?: boolean;
 }
 
-export default function AdminScreen({ users }: Props) {
+export default function AdminScreen({ users, platform = false }: Props) {
   void users;
   const { tx } = useTx();
+  const sections = platform
+    ? SECTIONS
+    : SECTIONS.filter((s) => !PLATFORM_SECTIONS.includes(s.id));
   const [section, setSection] = useState<Section>("root");
   const [query, setQuery] = useState("");
   const [usage, setUsage] = useState<Record<string, number>>(readUsage);
@@ -344,13 +366,13 @@ export default function AdminScreen({ users }: Props) {
   // Ищем и по переводу: на английском человек набирает "tasks", а в коде
   // раздел по-прежнему называется «Поручения» — без этого поиск пустел.
   const found = needle
-    ? SECTIONS.filter((s) =>
+    ? sections.filter((s) =>
         `${s.title} ${s.subtitle} ${s.group} ${tx(s.title)} ${tx(s.subtitle)} ${tx(s.group)}`
           .toLowerCase()
           .includes(needle),
       )
     : [];
-  const frequent = needle ? [] : topFrequent(usage);
+  const frequent = needle ? [] : topFrequent(usage, sections);
   const lifted = new Set(frequent.map((s) => s.id));
   const frequentCount = (s: Section) => (s === "attention" ? attentionCount : undefined);
 
@@ -412,7 +434,7 @@ export default function AdminScreen({ users }: Props) {
             </SectionGroup>
           )}
           {GROUPS.map((group) => {
-            const items = SECTIONS.filter(
+            const items = sections.filter(
               (s) => s.group === group.title && !lifted.has(s.id),
             );
             if (items.length === 0) return null;

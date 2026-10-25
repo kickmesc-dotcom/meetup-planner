@@ -269,7 +269,9 @@ function EmployeeRow({
             {fired ? tx(" · уволен") : ""}
           </span>
           <span className="block truncate text-2xs text-tg-hint">
-            Telegram ID {card.telegram_id}
+            {card.telegram_id === null
+              ? tx("вход по почте")
+              : `Telegram ID ${card.telegram_id}`}
           </span>
         </span>
         <span className="shrink-0 text-tg-hint" aria-hidden>

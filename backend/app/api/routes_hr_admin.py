@@ -279,7 +279,8 @@ class EmployeeAdminOut(BaseModel):
     id: int
     user_id: int
     display_name: str
-    telegram_id: int
+    # None — аккаунт заведён по почте: Telegram к нему не привязан.
+    telegram_id: int | None = None
     department_id: int | None
     # Подразделение рядом с именем: в списках из 60 человек без тега не видно,
     # кто из какого отдела. Пусто, если отдел еще не выбран.
@@ -1401,7 +1402,8 @@ async def put_kpi_rules(
 
 class DemoEmployeeOut(BaseModel):
     employee_id: int
-    telegram_id: int
+    # None — аккаунт заведён по почте: Telegram к нему не привязан.
+    telegram_id: int | None = None
     display_name: str
     badge: str | None
     badge_emoji: str | None

@@ -238,6 +238,11 @@ export const EN_CONTENT: Record<string, string> = {
   "Подразделения": "Departments",
   "Подразделений пока нет.": "No departments yet.",
   "Сотрудники": "Employees",
+  "Позвать в команду": "Invite to the team",
+  "Ссылка-приглашение или код компании: человек входит сам и сразу попадает в свой отдел.":
+    "An invite link or the company code: the person signs up alone and lands in their department right away.",
+  "Пригласить сотрудника": "Invite an employee",
+  "вход по почте": "signs in by email",
   "Найти человека или должность": "Find a person or position",
   "Поиск по сотрудникам": "Search employees",
   "Сотрудников пока нет.": "No employees yet.",

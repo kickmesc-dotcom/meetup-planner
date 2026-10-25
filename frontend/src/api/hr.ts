@@ -15,7 +15,8 @@ export interface HrEmployee {
   id: number;
   user_id: number;
   display_name: string;
-  telegram_id: number;
+  /** `null` — человек входит по почте, Telegram к аккаунту не привязан. */
+  telegram_id: number | null;
   department_id: number | null;
   department_name: string | null;
   position: string | null;
@@ -550,7 +551,8 @@ export const fetchReviewQueue = () => api<HrTask[]>("/api/tasks/review-queue");
 
 export interface HrDemoEmployee {
   employee_id: number;
-  telegram_id: number;
+  /** `null` — человек входит по почте, Telegram не привязан. */
+  telegram_id: number | null;
   display_name: string;
   badge: string | null;
   badge_emoji: string | null;
@@ -693,7 +695,8 @@ export interface HrAdminEmployee {
   id: number;
   user_id: number;
   display_name: string;
-  telegram_id: number;
+  /** `null` — человек входит по почте, Telegram не привязан. */
+  telegram_id: number | null;
   department_id: number | null;
   department_name: string | null;
   department_emoji: string | null;
@@ -941,7 +944,8 @@ export const updateKpiRules = (body: Partial<HrKpiRules>) =>
 export interface HrDashboardEmployee {
   employee_id: number;
   display_name: string;
-  telegram_id: number;
+  /** `null` — человек входит по почте, Telegram не привязан. */
+  telegram_id: number | null;
   department_id: number | null;
   department_name: string | null;
   department_emoji: string | null;

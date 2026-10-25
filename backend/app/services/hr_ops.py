@@ -59,7 +59,7 @@ SEVERITY_MEDIUM = "medium"
 class EmployeeStatus:
     employee_id: int
     display_name: str
-    telegram_id: int
+    telegram_id: int | None
     department_id: int | None
     department_name: str | None
     department_emoji: str | None
@@ -328,7 +328,7 @@ async def build_dashboard(
             EmployeeStatus(
                 employee_id=int(employee.id),
                 display_name=user.display_name,
-                telegram_id=int(user.telegram_id),
+                telegram_id=user.telegram_id,
                 department_id=int(employee.department_id) if employee.department_id else None,
                 department_name=department.name if department else None,
                 department_emoji=department.emoji if department else None,

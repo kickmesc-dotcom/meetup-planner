@@ -184,7 +184,7 @@ async def hidden_employee_ids(session: AsyncSession) -> set[int]:
 @dataclass(frozen=True)
 class DemoEmployeeRow:
     employee_id: int
-    telegram_id: int
+    telegram_id: int | None
     display_name: str
     badge: str | None
     badge_emoji: str | None
@@ -222,7 +222,7 @@ async def overview(session: AsyncSession) -> DemoOverview:
         employees=[
             DemoEmployeeRow(
                 employee_id=int(employee.id),
-                telegram_id=int(user.telegram_id),
+                telegram_id=user.telegram_id,
                 display_name=str(user.display_name),
                 badge=employee.badge,
                 badge_emoji=employee.badge_emoji,

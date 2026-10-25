@@ -25,13 +25,18 @@ const issuesMock = vi.mocked(fetchIssues);
 
 const USAGE_KEY = "admin.usage.v1";
 
-function renderScreen() {
+/**
+ * `platform: true` — глазa админа платформы (видны системные разделы). По
+ * умолчанию кабинет открывается владельцу организации, и системных карточек
+ * там нет: см. отдельный тест ниже.
+ */
+function renderScreen(platform = true) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={qc}>
-      <AdminScreen users={[]} />
+      <AdminScreen users={[]} platform={platform} />
     </QueryClientProvider>,
   );
 }
@@ -80,6 +85,16 @@ describe("AdminScreen (P1.9)", () => {
     // Раздел переехал, а не скопировался: одна карточка и нет пустой группы.
     expect(screen.getAllByText("Тексты приложения")).toHaveLength(1);
     expect(screen.queryByText("Тексты")).toBeNull();
+  });
+
+  it("владельцу организации не показывает системные разделы платформы", () => {
+    renderScreen(false);
+
+    expect(screen.getByText("Чек-листы")).toBeTruthy();
+    expect(screen.getByText("Приглашения")).toBeTruthy();
+    expect(screen.queryByText("Прокси")).toBeNull();
+    expect(screen.queryByText("Рестарт Space")).toBeNull();
+    expect(screen.queryByText("Тексты приложения")).toBeNull();
   });
 
   it("запоминает открытый раздел в localStorage", () => {

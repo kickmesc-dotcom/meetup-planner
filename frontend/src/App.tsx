@@ -172,7 +172,14 @@ export default function App() {
       if (!getInitData()) {
         return (
           <AuthScreen
-            onDone={() => void me.refetch()}
+            // Пока человек вводил пароль, `/users` и `/me/ui-prefs` уже
+            // запросили API без токена и попали в ошибку. Без сброса кеша
+            // после входа экран показывал «Не удалось загрузить участников /
+            // Нет доступа», и надо было догадаться нажать «Повторить».
+            onDone={() => {
+              void qc.invalidateQueries();
+              void me.refetch();
+            }}
             invited={!!inviteToken}
           />
         );
@@ -293,7 +300,12 @@ export default function App() {
 
   const meData = me.data!;
   // В режиме проверки админка скрыта: смотрим ровно глазами сотрудника.
-  const isAdmin = !!meData.is_admin && !simulationId;
+  //
+  // Владелец организации — администратор своей компании, даже если он вошёл
+  // по почте и его Telegram-ID нет в списке платформы. Раньше кабинет
+  // открывался только прописанным админам: B2B-клиент не видел ни чек-листов,
+  // ни отделов, ни приглашений — а именно там они и живут.
+  const isAdmin = !!(meData.is_admin || hrMe.data?.is_admin) && !simulationId;
   const canManage = !!(hrMe.data?.is_aup || hrMe.data?.is_staff);
   // Открытые поручения — одно число на оба каркаса (нижняя полоса и сайдбар).
   const { open: openTasks } = countOpenTasks(tasksQ.data ?? []);
@@ -306,7 +318,16 @@ export default function App() {
         <SimulationBanner />
         <OrgSetupScreen
           setup={orgSetup.data}
-          onClose={() => void orgSetup.refetch()}
+          onClose={() => {
+            void orgSetup.refetch();
+            // Мастер закрыл знакомство руководителя на сервере — без
+            // обновления `hr-employee` в кеше приложение ещё минуту показывало
+            // бы анкету сотрудника «где ты работаешь».
+            void qc.invalidateQueries({ queryKey: ["hr-employee"] });
+            // Следующий шаг руководителя — люди, а не пустая лента: «Команда»
+            // держит приглашение и код компании.
+            setTab("team");
+          }}
         />
       </div>
     );
@@ -507,7 +528,7 @@ export default function App() {
           <ThemeSwitcher />
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
-          <AdminScreen users={users.data} />
+          <AdminScreen users={users.data} platform={meData.is_admin} />
         </main>
       </>
     );

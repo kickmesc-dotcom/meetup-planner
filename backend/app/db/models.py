@@ -1145,7 +1145,16 @@ def _user_default_color(_mapper, _conn, target: User) -> None:
     if not target.color_hex:
         from app.db.seed import color_for_user  # ленивый импорт, цикл
 
-        target.color_hex = color_for_user(target.telegram_id)
+        # Аккаунт по почте: Telegram ID нет. Цвет всё равно нужен — берём
+        # стабильный от адреса, иначе `color_for_user(None)` падал с TypeError
+        # на вставке первого B2B-пользователя.
+        seed = target.telegram_id
+        if seed is None:
+            import hashlib  # локально: модуль читают почти все, лишний импорт ни к чему
+
+            raw = (target.email or target.display_name or "user").encode()
+            seed = int.from_bytes(hashlib.sha256(raw).digest()[:6], "big")
+        target.color_hex = color_for_user(seed)
 
 
 # HR-ядро SemiTaskBot (Этап 1 MVP): подразделения, сотрудники, чек-листы,

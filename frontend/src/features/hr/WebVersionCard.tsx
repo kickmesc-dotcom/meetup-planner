@@ -9,7 +9,7 @@ import {
 import { clearAccessToken, humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
 import { copyText } from "@/lib/clipboard";
-import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { getInitData, haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { currentIntlLocale, useTx } from "@/i18n";
 /**
  * «Веб-версия»: открыть приложение на компьютере.
@@ -62,6 +62,11 @@ export default function WebVersionCard() {
   // Старый бэкенд (до пересборки) отвечает 404 — карточку просто не рисуем,
   // чтобы не показывать кнопку, которая гарантированно упадёт.
   if (linksQ.isError && isEndpointMissing(linksQ.error)) return null;
+
+  // Ссылку для компьютера выпускают только из Telegram: ручка требует
+  // подписи `initData` (иначе украденный токен продлевал бы сам себя). В вебе
+  // карточка бесполезна: человек уже в браузере, а кнопка ответила бы 403.
+  if (!getInitData()) return null;
 
   const links = linksQ.data ?? [];
   const current = links.find((l) => l.is_current);

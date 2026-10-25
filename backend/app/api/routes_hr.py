@@ -71,7 +71,9 @@ class EmployeeOut(BaseModel):
     id: int
     user_id: int
     display_name: str
-    telegram_id: int
+    # Пусто у тех, кто зашёл по почте: у аккаунта без Telegram нет ID, и это
+    # нормально — раньше схема требовала int и роняла `/me/employee` в 500.
+    telegram_id: int | None = None
     department_id: int | None
     department_name: str | None
     position: str | None
@@ -1088,6 +1090,25 @@ async def save_org_setup(
                 session, name=name, emoji=presets.get(name.strip().lower())
             )
             existing.add(name.strip().lower())
+
+    if updated.done:
+        # Организация без единого подразделения — тупик, а не «пустая
+        # настройка»: выбрать отдел при первом запуске не из чего, а профиль
+        # без отдела нельзя закрыть (см. `/me/onboarding`). Мастер можно
+        # пропустить, поэтому страховка живёт на сервере, а не в кнопке.
+        existing_count = await hr_departments.list_departments(
+            session, active_only=False
+        )
+        if not existing_count:
+            await hr_departments.create_department(
+                session, name="Общее", emoji="🏢"
+            )
+        # Мастер — это и есть первый запуск руководителя: он только что назвал
+        # отрасль, отделы и правила. Спрашивать следом «где ты работаешь» и
+        # «как давно ты в деле» — это второй онбординг подряд, а у владельца
+        # организации ещё и нет отдела, где он «работает».
+        if employee.onboarding_state != ONBOARDING_DONE:
+            employee.onboarding_state = ONBOARDING_DONE
 
     await org_setup.save(session, updated)
     return _org_setup_out(updated, can_edit=True)

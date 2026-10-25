@@ -155,7 +155,7 @@ def parse_hire_date(value: object) -> date | None:
 
 def person_entry(
     *,
-    telegram_id: int,
+    telegram_id: int | None,
     display_name: str,
     username: str | None,
     position: str | None,
@@ -176,7 +176,7 @@ def person_entry(
     поле-объект сломало бы JSONB молча и необратимо.
     """
     return {
-        "telegram_id": int(telegram_id),
+        "telegram_id": telegram_id,
         "display_name": display_name,
         "username": username,
         "position": position,
@@ -254,7 +254,7 @@ async def capture(
 
     people = [
         person_entry(
-            telegram_id=int(user.telegram_id),
+            telegram_id=user.telegram_id,
             display_name=str(user.display_name),
             username=user.username,
             position=employee.position,

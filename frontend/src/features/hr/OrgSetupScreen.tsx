@@ -138,7 +138,11 @@ export default function OrgSetupScreen({
     setError(null);
     if (target <= 4) {
       try {
-        await save.mutateAsync(patchForStep(Math.min(target, 3)));
+        // Сохраняем ответы ТОГО шага, с которого уходим. Раньше здесь стоял
+        // `patchForStep(target)`, то есть патч следующего шага: отрасль и
+        // подразделения молча не доезжали до сервера — человек видел их в
+        // итоговой сводке, а следующий экран показывал пустой список отделов.
+        await save.mutateAsync(patchForStep(step));
       } catch {
         return; // ошибка уже в состоянии мутации и на экране
       }
@@ -149,7 +153,7 @@ export default function OrgSetupScreen({
   const finish = async () => {
     haptic("success");
     try {
-      const data = await save.mutateAsync({ ...patchForStep(3), done: true });
+      const data = await save.mutateAsync({ ...patchForStep(step), done: true });
       qc.setQueryData(["org-setup"], data);
       onClose();
     } catch {

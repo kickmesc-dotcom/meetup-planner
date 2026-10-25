@@ -8,6 +8,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import WebVersionCard from "./WebVersionCard";
 import * as accessApi from "@/api/access";
 
+// Подпись Telegram есть только в мини-аппе: снаружи карточка скрыта, потому что
+// ручка выпуска ссылок отвечает 403 без `initData`.
+let initData: string | null = "hash=rehearsal";
+vi.mock("@/tg/webapp", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/tg/webapp")>();
+  return { ...actual, getInitData: () => initData };
+});
+
 function renderCard() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -20,6 +28,7 @@ function renderCard() {
 }
 
 beforeEach(() => {
+  initData = "hash=rehearsal";
   vi.spyOn(accessApi, "fetchAccessLinks").mockResolvedValue([]);
   vi.spyOn(accessApi, "createAccessLink").mockResolvedValue({
     id: 5,
@@ -52,5 +61,12 @@ describe("WebVersionCard", () => {
     renderCard();
     await screen.findByRole("button", { name: /Создать ссылку/ });
     expect(screen.queryByText("Отозвать")).toBeNull();
+  });
+
+  it("вне Telegram карточки нет: ссылку выпускают только из мини-аппа", () => {
+    initData = null;
+    renderCard();
+    expect(screen.queryByTestId("web-version-card")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Создать ссылку/ })).toBeNull();
   });
 });

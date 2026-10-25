@@ -19,6 +19,7 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
+import InvitationsScreen from "@/features/admin/InvitationsScreen";
 import { useTx, type Locale } from "@/i18n";
 
 /**
@@ -60,6 +61,13 @@ export default function TeamScreen({
   // Карточка человека: тап по имени в сводке (активность — по видимости
   // профиля, решает сервер).
   const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
+  // Приглашения — здесь, а не только в админке: руководитель ищет людей в
+  // «Команде», а кабинет платформы клиенту недоступен (и не должен быть).
+  const [showInvites, setShowInvites] = useState(false);
+
+  if (showInvites) {
+    return <InvitationsScreen onBack={() => setShowInvites(false)} />;
+  }
 
   if (dashboard.isError) {
     return (
@@ -181,6 +189,27 @@ export default function TeamScreen({
                 )}
               </section>
             )}
+
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
+              <h2 className="text-sm font-semibold text-tg-text">
+                {tx("Позвать в команду")}
+              </h2>
+              <p className="mt-1 text-xs text-tg-hint">
+                {tx(
+                  "Ссылка-приглашение или код компании: человек входит сам и сразу попадает в свой отдел.",
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  haptic("selection");
+                  setShowInvites(true);
+                }}
+                className="mt-2 min-h-11 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text"
+              >
+                {tx("Пригласить сотрудника")}
+              </button>
+            </section>
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <h2 className="text-sm font-semibold text-tg-text">

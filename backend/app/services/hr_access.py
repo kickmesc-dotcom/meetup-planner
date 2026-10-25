@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -137,8 +138,20 @@ async def ensure_employee(session: AsyncSession, user: User) -> Employee:
     if invitation is not None:
         employee.position = invitation.position
         employee.department_id = invitation.department_id
-    session.add(employee)
-    await session.flush()
+    try:
+        # Гонка первого захода. Человек открыл приложение, и два запроса
+        # (`/me` и `/me/employee`) пришли одновременно — оба не нашли строку и
+        # оба вставили её. Без savepoint второй падал бы с `IntegrityError` и
+        # отдавал 500 ровно в момент первого знакомства; вместо этого берём
+        # строку, которую успел создать соседний запрос.
+        async with session.begin_nested():
+            session.add(employee)
+            await session.flush()
+    except IntegrityError:
+        existing = await get_employee(session, user.id)
+        if existing is None:
+            raise
+        return existing
     # Сотрудник без членства — это сотрудник, которого не видно ни в одной
     # организации: связь создаём сразу, в организации из контекста.
     await orgs.ensure_member(session, org_id=org_id, user_id=user.id)
