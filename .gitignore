@@ -36,3 +36,8 @@ phrase-drop-*.json
 # Живой смоук вне Telegram: настоящий initData на время проверки (GHG11) —
 # это учётные данные, в репозиторий не попадают.
 frontend/.devinit-tmp.txt
+
+# Локальная база репетиции первого запуска (tools/rehearsal.py)
+.rehearsal.db
+.rehearsal.db-wal
+.rehearsal.db-shm

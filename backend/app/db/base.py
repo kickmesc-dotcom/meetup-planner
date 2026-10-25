@@ -96,13 +96,22 @@ def get_engine() -> AsyncEngine:
             # Небольшой таймаут на выполнение команд, чтобы не висеть вечно
             connect_args["command_timeout"] = 60
 
+        # Пул соединений настраивается только для сетевых баз. SQLite в
+        # SQLAlchemy живёт на `NullPool` и на `pool_size`/`max_overflow`
+        # падает с `TypeError` — а README обещает локальный запуск на SQLite.
+        pool_kwargs: dict[str, Any] = {}
+        if "sqlite" not in url:
+            pool_kwargs = {
+                "pool_pre_ping": True,  # живое ли соединение перед использованием
+                "pool_size": 5,
+                "max_overflow": 10,
+                "pool_recycle": 300,  # пересоздаёт соединения каждые 5 минут
+            }
+
         _engine = create_async_engine(
             url,
-            pool_pre_ping=True,  # Проверяет живое ли соединение перед использованием
-            pool_size=5,
-            max_overflow=10,
-            pool_recycle=300,    # Пересоздает соединения каждые 5 минут
             connect_args=connect_args,
+            **pool_kwargs,
         )
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
         # Диагностика «куда мы на самом деле подключились» — без пароля и DSN:

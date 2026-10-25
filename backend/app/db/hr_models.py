@@ -278,7 +278,12 @@ class Department(OrgScoped, Base):
         Index("ix_departments_active_sort", "is_active", "sort_order"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # На проде BIGSERIAL, в sqlite-тестах INTEGER — как у `employees.id`.
+    # Без варианта отдел нельзя завести, не задав id вручную, а мастер
+    # настройки создаёт его именно вставкой без id.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
     name: Mapped[str] = mapped_column(Text, nullable=False)
     slug: Mapped[str] = mapped_column(String(64), nullable=False)
     emoji: Mapped[str | None] = mapped_column(String(16))
