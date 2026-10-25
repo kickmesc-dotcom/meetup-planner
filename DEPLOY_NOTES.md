@@ -3923,3 +3923,32 @@ HF Space (build `b81be0aa23b1`, alembic `0061`), CF Pages `semitaskbot`
 (бандл `index-m7p5RxWP.js`). Проверки: `pytest` 1506 passed / 11 skipped;
 `vitest` 516 passed; `tsc` чисто; `npm run build` собирается;
 `tests/test_db_alembic_head.py` — 3 passed против живой Neon.
+
+## 25.10.2026: репетиция первого запуска и её результаты
+
+- Новый инструмент `tools/rehearsal.py` (`fresh`, `new-staff`, `rerun`,
+  `onboarding`, `status`) поднимает отдельную SQLite-базу и подменяет
+  `BOT_TOKEN`, поэтому прогон первого запуска повторяем и не касается боевых
+  данных. Сценарий — `docs/FIRST_RUN_REHEARSAL.md`.
+- Аудит двух персон (новичок-бариста, руководитель 40+) — 
+  `docs/USABILITY_FIRST_RUN.md`. Найдено: мастер терял отрасль и
+  подразделения, организация оставалась без отделов (общий тупик), владелец
+  без Telegram-ID не получал кабинет, а любой почтовый аккаунт ронял
+  `/api/me/employee` в 500 из-за обязательного `telegram_id`.
+- Правки: патч текущего шага мастера; страховочное «Общее» подразделение;
+  знакомство владельца закрывается мастером; кабинет открыт администратору
+  организации с фильтром системных разделов; приглашение — в «Команде»;
+  `telegram_id` необязателен во всех HR-схемах; гонка первого захода в
+  `ensure_employee` больше не даёт 500; SQLite-движок не падает на параметрах
+  пула; `departments.id` получил Integer-вариант для SQLite.
+- Тесты: `backend/tests/test_org_setup_route.py`,
+  `backend/tests/test_rehearsal_tool.py`,
+  `frontend/src/features/hr/OrgSetupScreen.test.tsx`,
+  `frontend/src/features/admin/AdminScreen.test.tsx`.
+
+Выложено: Amvera `meetup-planner` (354 пути, alembic `0061`, в `/openapi.json`
+`telegram_id` — `integer | null`), HF Space `fryesw/meetup-planner-backend`
+(354 пути, head `0061`), CF Pages `semitaskbot` (бандл `index-D9xcDHxB.js`,
+в бандле «Позвать в команду», «Пригласить сотрудника», «вход по почте»).
+Проверки: `pytest` 1512 passed / 11 skipped; `vitest` 520 passed;
+`tsc` чисто; `npm run build` собирается.
