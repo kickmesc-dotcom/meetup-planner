@@ -3,6 +3,13 @@
 URL подписки: `webcal://{host}/api/meetings/ical/{user_id}.ics?t={token}`.
 Token = HMAC(tg_webhook_secret, user_id) — стабилен, можно копировать раз
 и больше не трогать. Если секрет поменяется — все ссылки протухнут.
+
+Про длину подписи (аудит 26.10.2026, S-10). Раньше токен обрезался до 16
+hex-символов, то есть 64 бита, и жил вечно: ссылка попадает в логи почтовых
+клиентов и прокси, а отозвать её нельзя иначе как сменой секрета вебхука (а это
+ломает и сам вебхук, и все прочие подписки). Теперь новые ссылки подписаны
+32 символами (128 бит), а ссылки прежней длины **принимаются** — уже
+подключённые календари не должны отвалиться.
 """
 from __future__ import annotations
 
@@ -15,15 +22,34 @@ from app.config import get_settings
 from app.db.models import Meeting
 
 _LINE_LIMIT = 73  # RFC 5545: 75 octets max, минус CRLF + folding space.
+# Сколько символов подписи отдаём сейчас и сколько принимаем как «старый формат».
+TOKEN_LENGTH = 32
+LEGACY_TOKEN_LENGTH = 16
+
+
+def _signature(user_id: int, length: int) -> str:
+    secret = get_settings().tg_webhook_secret.encode("utf-8")
+    digest = hmac.new(secret, str(user_id).encode("utf-8"), sha256).hexdigest()
+    return digest[:length]
 
 
 def make_token(user_id: int) -> str:
-    secret = get_settings().tg_webhook_secret.encode("utf-8")
-    return hmac.new(secret, str(user_id).encode("utf-8"), sha256).hexdigest()[:16]
+    """Подпись ссылки: 128 бит. Меняется вместе с секретом вебхука."""
+    return _signature(user_id, TOKEN_LENGTH)
 
 
 def verify_token(user_id: int, token: str) -> bool:
-    return hmac.compare_digest(make_token(user_id), token)
+    """Проверить подпись. Принимаем и новый формат, и прежний 64-битный.
+
+    Сравнение — `compare_digest` и без ранних выходов: обе длины проверяются
+    всегда, иначе по времени ответа было бы видно, какой формат угадан.
+    """
+    given = (token or "").strip().encode("utf-8")
+    current_ok = hmac.compare_digest(_signature(user_id, TOKEN_LENGTH).encode(), given)
+    legacy_ok = hmac.compare_digest(
+        _signature(user_id, LEGACY_TOKEN_LENGTH).encode(), given
+    )
+    return current_ok or legacy_ok
 
 
 def _escape(text: str) -> str:

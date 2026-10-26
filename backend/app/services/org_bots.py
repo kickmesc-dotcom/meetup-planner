@@ -23,6 +23,7 @@ B2B это стоп-фактор — клиент приходит со свои
 
 from __future__ import annotations
 
+import hmac
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -157,18 +158,39 @@ def chat_id_for_current_org() -> int | None:
 
 
 def org_for_webhook_secret(secret: str) -> int | None:
-    """Организация по секрету вебхука. `None` — такого бота мы не обслуживаем."""
-    for cfg in _registry.values():
-        if cfg.webhook_secret and cfg.webhook_secret == secret:
-            return cfg.org_id
-    return None
+    """Организация по секрету вебхука. `None` — такого бота мы не обслуживаем.
+
+    Сравнение — `hmac.compare_digest`, а не `==` (аудит 26.10.2026, S-13):
+    обычное сравнение строк выходит на первом различии, и по времени ответа
+    секрет в теории можно подобрать посимвольно. По сети это почти неизмеримо,
+    но правильная функция здесь стоит ровно столько же, сколько неправильная.
+    """
+    return _org_by_secret_value(secret, key="webhook_secret")
 
 
 def org_for_token(token: str) -> int | None:
+    """Чей это токен бота. Сравнение — тоже constant-time."""
+    return _org_by_secret_value(token, key="token")
+
+
+def _org_by_secret_value(value: str, *, key: str) -> int | None:
+    """Найти организацию, у которой секрет/токен совпадает с `value`.
+
+    Перебираем все записи без ранних выходов: выход по `return` внутри цикла
+    сам по себе сообщает, на каком месте совпало.
+    """
+    found: int | None = None
+    raw = (value or "").encode("utf-8")
     for cfg in _registry.values():
-        if cfg.token and cfg.token == token:
-            return cfg.org_id
-    return None
+        candidate = getattr(cfg, key)
+        if not candidate or not raw:
+            continue
+        # Сравниваем байты, а не строки: `compare_digest` для `str` принимает
+        # только ASCII, а в заголовке от чужого клиента может прийти что угодно —
+        # тогда был бы `TypeError` и 500 вместо честного 403.
+        if hmac.compare_digest(candidate.encode("utf-8"), raw):
+            found = cfg.org_id
+    return found
 
 
 def token_candidates() -> list[str]:

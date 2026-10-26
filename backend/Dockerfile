@@ -42,4 +42,8 @@ EXPOSE 7860
 # CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
 # CMD ["sh", "-c", "alembic upgrade head; python3 -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --log-level debug"]
 
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# Миграции идут через `app.db.migrate`: перед DDL берётся advisory-lock в
+# Postgres, чтобы два контейнера (Amvera и HF Space) на одной базе не
+# применяли миграции одновременно (аудит 26.10.2026, S-14). Если база не
+# Postgres — поведение прежнее.
+CMD ["sh", "-c", "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
