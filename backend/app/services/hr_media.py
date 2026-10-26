@@ -25,7 +25,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import io
+import os
 import struct
+import time
+from datetime import UTC, datetime
 
 import structlog
 from fastapi import HTTPException, UploadFile, status
@@ -51,6 +54,53 @@ class MediaError(Exception):
     """Понятный клиенту отказ: код, а не текст."""
 
 
+# Срок жизни ссылки на фото (аудит 26.10.2026, S-11). Раньше ссылка была
+# вечной: фотоотчёт со смены открывался по ней навсегда и любым, у кого она
+# есть, — в том числе после увольнения сотрудника. Отозвать её можно было
+# только сменой токена бота, а это ломает и самого бота.
+#
+# Срок выбирается не «чем короче, тем лучше», а вместе с кэшем: страницу фото
+# отдаёт не только бэкенд, но и прокси на краю Cloudflare
+# (`frontend/functions/api/media/[[path]].ts`), и его кэш считается по полному
+# адресу вместе с подписью. Если бы срок считался от «сейчас с точностью до
+# часа», адрес менялся бы ежечасно и кэш края не работал бы вообще — каждое
+# фото тянулось бы из контейнера (в РФ медленно). Поэтому срок округляется
+# ВНИЗ до суток: адрес стабилен в течение дня, а срок всё равно ограничен.
+#
+# Само ограничение — не замена отзыву (для отзыва нужен ключ на организацию),
+# а граница: утёкшая ссылка живёт не «вечно», а известный срок.
+DEFAULT_LINK_TTL_DAYS = 90
+# Старые ссылки (подпись без срока). Принимаем их до этой даты, чтобы не гасить
+# фото в уже открытых вкладках и в сообщениях: срок фиксирован и проверяется
+# тестом, поэтому «временно» не станет «навсегда».
+DEFAULT_LEGACY_SIG_UNTIL = "2026-12-31"
+_OFF_VALUES = {"0", "off", "no", "false", "none"}
+
+
+def link_ttl_days() -> int:
+    """Срок жизни ссылки в днях. `0` — бессрочно (нужно тестам и разбору)."""
+    raw = (os.getenv("MEDIA_LINK_TTL_DAYS") or "").strip()
+    if not raw:
+        return DEFAULT_LINK_TTL_DAYS
+    if raw.lower() in _OFF_VALUES:
+        return 0
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return DEFAULT_LINK_TTL_DAYS
+
+
+def _legacy_sig_until() -> datetime | None:
+    """До какого момента принимаем подписи старого формата (без срока)."""
+    raw = (os.getenv("MEDIA_LEGACY_SIG_UNTIL") or "").strip() or DEFAULT_LEGACY_SIG_UNTIL
+    if raw.lower() in _OFF_VALUES:
+        return None
+    try:
+        return datetime.fromisoformat(raw).replace(tzinfo=UTC)
+    except ValueError:
+        return datetime.fromisoformat(DEFAULT_LEGACY_SIG_UNTIL).replace(tzinfo=UTC)
+
+
 def _key() -> bytes:
     """Ключ подписи. Отдельного секрета в конфиге нет — берём токен бота.
 
@@ -59,15 +109,69 @@ def _key() -> bytes:
     return get_settings().bot_token.encode("utf-8")
 
 
-def sign(kind: str, value: int) -> str:
+def _mac(kind: str, value: int, expires: int) -> str:
+    """HMAC от «вид:id:срок». Срок входит в подпись — его нельзя продлить правкой URL."""
+    payload = f"{kind}:{value}:{expires}".encode()
+    return hmac.new(_key(), payload, hashlib.sha256).hexdigest()[:32]
+
+
+def _expiry(now: float | None = None) -> int:
+    """Момент окончания действия, округлённый вниз до суток (`0` — бессрочно)."""
+    days = link_ttl_days()
+    if days <= 0:
+        return 0
+    moment = time.time() if now is None else now
+    return int((moment + days * 86400) // 86400 * 86400)
+
+
+def sign(kind: str, value: int, *, expires: int | None = None) -> str:
+    """Подпись ссылки: `<срок>.<hmac>`. Срок — часть подписи, а не отдельное поле."""
+    exp = _expiry() if expires is None else expires
+    return f"{exp}.{_mac(kind, value, exp)}"
+
+
+def _legacy_sign(kind: str, value: int) -> str:
+    """Подпись прежнего формата: HMAC от «вид:id», без срока."""
     payload = f"{kind}:{value}".encode()
     return hmac.new(_key(), payload, hashlib.sha256).hexdigest()[:32]
 
 
 def verify(kind: str, value: int, signature: str | None) -> bool:
-    if not signature:
+    """Годится ли подпись из URL.
+
+    Новый формат: проверяем HMAC и срок. Старый (без точки) — принимаем только
+    до `MEDIA_LEGACY_SIG_UNTIL`, и о каждой такой ссылке пишем в лог: если они
+    ещё ходят, это видно до того, как окно закроется.
+    """
+    given = (signature or "").strip()
+    if not given:
         return False
-    return hmac.compare_digest(sign(kind, value), signature)
+    # Сравниваем БАЙТЫ, а не строки: `compare_digest` для `str` принимает только
+    # ASCII, а в адресном параметре может прийти что угодно (в том числе после
+    # percent-декодирования) — на строке с кириллицей было бы `TypeError` и `500`
+    # вместо честного `403`. Та же ошибка ловилась в сравнении секретов бота
+    # (S-13); здесь её нашёл собственный тест на «мусорную» подпись.
+    given_raw = given.encode("utf-8")
+    if "." not in given:
+        until = _legacy_sig_until()
+        if until is None or datetime.now(UTC) > until:
+            return False
+        ok = hmac.compare_digest(_legacy_sign(kind, value).encode(), given_raw)
+        if ok:
+            log.warning("media.legacy_signature_used", kind=kind, value=value)
+        return ok
+    raw_exp, _, mac = given.partition(".")
+    try:
+        expires = int(raw_exp)
+    except ValueError:
+        return False
+    # Порядок важен: сначала подпись, потом срок — срок без подписи ничего не значит.
+    if not hmac.compare_digest(_mac(kind, value, expires).encode(), mac.encode("utf-8")):
+        return False
+    if expires and time.time() > expires:
+        log.info("media.link_expired", kind=kind, value=value)
+        return False
+    return True
 
 
 def url_for(blob_id: int) -> str:

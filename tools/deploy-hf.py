@@ -336,8 +336,11 @@ def cmd_status(_args) -> int:
             f"/api/meta: путей {code_info.get('routes')} · отпечаток {code_info.get('fingerprint')}"
             f" · head кода {code_info.get('alembic_head')} (локально {_local_head()})"
         )
+        # Имя базы, порт и версия СУБД убраны из публичного `/api/meta`
+        # намеренно (аудит 26.10.2026, S-12) — для сверки хватает провайдера,
+        # хоста с маской и версии миграций.
         print(
-            f"           база {db.get('provider')} · {db.get('host')} · {db.get('name')}"
+            f"           база {db.get('provider')} · {db.get('host')}"
             f" · миграции в БД {db.get('alembic_version')}"
         )
     else:
