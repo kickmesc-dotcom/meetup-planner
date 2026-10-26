@@ -18,12 +18,16 @@ export interface ServerMetaCode {
 
 export interface ServerMetaDb {
   provider: "neon" | "amvera" | "local" | "other" | string;
+  /** Адрес базы с маской: `ep-cool-union-….neon.tech`. Без идентификатора проекта. */
   host: string | null;
-  port: number | null;
-  name: string | null;
   alembic_version?: string | null;
-  server_version?: string | null;
   error?: string;
+  /**
+   * Порт, имя базы и версия СУБД отсюда убраны намеренно (аудит 26.10.2026,
+   * S-12): ручка публичная, а версия СУБД с точностью до патча — подсказка
+   * «какую уязвимость пробовать». Для диагностики они доступны в
+   * `/api/meta/net` по секрету в `X-Diag-Token`.
+   */
 }
 
 export interface ServerMeta {

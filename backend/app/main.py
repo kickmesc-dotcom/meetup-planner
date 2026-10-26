@@ -63,20 +63,16 @@ from app.api.guards import (
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_seed import seed_hr
+from app.log_redaction import log_processors
 from app.api.deps import session_auth
 from app.db.org_models import DEFAULT_ORG_ID, reset_org, set_org
 from app.db.seed import seed_users
 
 
 def _configure_logging(level: str) -> None:
+    """Одна цепочка логов на все процессы: см. `app/log_redaction.py`."""
     logging.basicConfig(level=level.upper())
-    structlog.configure(
-        processors=[
-            structlog.processors.add_log_level,
-            structlog.processors.TimeStamper(fmt="iso"),
-            structlog.processors.JSONRenderer(),
-        ],
-    )
+    structlog.configure(processors=log_processors())
 
 
 # Срок проверки базы в `/readyz`. Две секунды — это уже плохо (нормальный

@@ -46,4 +46,9 @@ EXPOSE 7860
 # Postgres, чтобы два контейнера (Amvera и HF Space) на одной базе не
 # применяли миграции одновременно (аудит 26.10.2026, S-14). Если база не
 # Postgres — поведение прежнее.
-CMD ["sh", "-c", "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# `--no-server-header` убирает заголовок `server: uvicorn` из ответов (аудит
+# 26.10.2026, S-15). Смысл небольшой, но бесплатный: заголовок сообщает всем
+# желающим, что за сервер и на чём написан. Убирается на уровне uvicorn, а не
+# middleware — иначе он остался бы на ответах, которые middleware не проходит
+# (404 от самого сервера, ответы на ошибки до приложения).
+CMD ["sh", "-c", "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --no-server-header"]

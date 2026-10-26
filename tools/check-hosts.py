@@ -66,15 +66,52 @@ def _local_fingerprint() -> tuple[dict[str, Any], list[str]]:
     return code_fingerprint(app), available_features(app)
 
 
-def _fetch_json(url: str) -> tuple[int, dict[str, Any] | None]:
+def _fetch_json(
+    url: str, headers: dict[str, str] | None = None
+) -> tuple[int, dict[str, Any] | None]:
+    request = urllib.request.Request(url, headers=headers or {})
     try:
-        with urllib.request.urlopen(url, timeout=TIMEOUT) as resp:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=TIMEOUT) as resp:  # noqa: S310
             return resp.status, json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         return exc.code, None
     except Exception as exc:  # noqa: BLE001
         print(f"    ! сеть: {type(exc).__name__}: {exc}")
         return 0, None
+
+
+def _env_secret(key: str) -> str | None:
+    """Секрет из окружения или `backend/.env` — как это делают другие tools."""
+    value = (os.environ.get(key) or "").strip()
+    if value:
+        return value
+    env_file = BACKEND / ".env"
+    if not env_file.exists():
+        return None
+    for line in env_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, raw = line.partition("=")
+        if name.strip() == key:
+            return raw.strip().strip('"').strip("'")
+    return None
+
+
+def _db_details(base: str) -> dict[str, Any]:
+    """То, чего больше нет в публичном `/api/meta` (S-12): порт, имя базы, версия СУБД.
+
+    Живёт за секретом в `X-Diag-Token`. Секрета нет (или он не подошёл) — вернём
+    пусто: сверка контуров без него всё равно работает по замаскированному хосту
+    и миграциям.
+    """
+    token = _env_secret("TG_WEBHOOK_SECRET")
+    if not token:
+        return {}
+    status, body = _fetch_json(f"{base}/api/meta/net", {"X-Diag-Token": token})
+    if status != 200 or not body:
+        return {}
+    return body.get("db") or {}
 
 
 def _path_count(base: str) -> int | None:
@@ -110,13 +147,22 @@ def main() -> int:
 
         code = body.get("code", {})
         db = body.get("db", {})
+        details = _db_details(base)
         features = body.get("features", [])
         same = code.get("fingerprint") == local_fp["fingerprint"]
 
         print(f"  код:      роутов {code.get('routes')} · отпечаток {code.get('fingerprint')}"
               f" · head миграций (код) {code.get('alembic_head')}")
-        print(f"  база:     {db.get('provider')} · {db.get('host')} · {db.get('name')}"
-              f" · миграции в БД: {db.get('alembic_version')} · сервер {db.get('server_version')}")
+        print(f"  база:     {db.get('provider')} · {db.get('host')}"
+              f" · миграции в БД: {db.get('alembic_version')}")
+        # Порт, имя базы и версия СУБД — только по секрету (S-12): в публичном
+        # ответе их нет намеренно, но для сверки контуров они нужны.
+        if details:
+            print(f"            {details.get('name')} · порт {details.get('port')}"
+                  f" · сервер {details.get('server_version')}")
+        else:
+            print("            (порт, имя базы и версия СУБД — за секретом"
+                  " TG_WEBHOOK_SECRET в /api/meta/net)")
         if db.get("error"):
             print(f"  ⚠️  база не ответила: {db['error']}")
         print(f"  возможностей: {len(features)}")

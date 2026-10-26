@@ -421,7 +421,13 @@ async def net_diag(request: Request) -> Any:
         raise HTTPException(status_code=404)
 
     loop = asyncio.get_running_loop()
-    report: dict[str, Any] = {"hosts": {}, "http": {}}
+    report: dict[str, Any] = {
+        "hosts": {},
+        "http": {},
+        # То, что убрано из публичного `/api/meta` (S-12): версия СУБД, порт и имя
+        # базы. Здесь они под секретом, потому что нужны для сверки контуров.
+        "db": await _db_diagnostics(),
+    }
 
     for host in _NET_TARGETS:
         entry: dict[str, Any] = {}
@@ -501,9 +507,19 @@ async def meta(request: Request) -> dict[str, Any]:
     Берём именно `request.app`, а не модульный `app`: в тестах приложение
     создаётся заново через `create_app()`, и отпечаток должен отражать его,
     а не соседний инстанс.
+
+    **Ручка публичная, поэтому в ответе нет ничего, что помогает выбирать цель
+    для атаки** (аудит 26.10.2026, S-12). Убрано при правке: `db.port`,
+    `db.name` и `db.server_version` — версия СУБД с точностью до патча это
+    готовая подсказка «какую уязвимость пробовать», а нам она нужна только для
+    диагностики. Остались те поля, по которым мы сами сверяем хосты: отпечаток
+    кода, head миграций в коде и в БД, провайдер и адрес базы с маской
+    (в маске нет ни идентификатора проекта, ни имени пользователя).
+    Убранные поля отдаёт `/api/meta/net` — он требует секрет в `X-Diag-Token`.
     """
     fastapi_app: FastAPI = request.app
-    db = {**db_target(), **await _db_snapshot()}
+    target = db_target()
+    snapshot = await _db_snapshot()
     return {
         "status": "ok",
         "code": {
@@ -511,6 +527,33 @@ async def meta(request: Request) -> dict[str, Any]:
             "alembic_head": _code_alembic_head(),
             **build_marker(),
         },
-        "db": db,
+        "db": {
+            "provider": target.get("provider"),
+            "host": target.get("host"),
+            "alembic_version": snapshot.get("alembic_version"),
+            **(
+                {"error": snapshot["error"]}
+                if snapshot.get("error") is not None
+                else {}
+            ),
+        },
         "features": available_features(fastapi_app),
+    }
+
+
+async def _db_diagnostics() -> dict[str, Any]:
+    """Подробности о базе для диагностики: то, чего нет в публичном `/api/meta`.
+
+    Доступ — только по секрету в `X-Diag-Token` (см. `_diag_token_ok`): порт,
+    имя базы и версия сервера нужны, когда сверяешь, на какой именно контур
+    смотрит контейнер (задача `switch-db.py`), а не посетителю приложения.
+    Запрос к базе всё равно нужен один раз — берём его из того же кэша, что и
+    `/api/meta` (`_db_snapshot`), поэтому диагностика не стоит лишнего запроса.
+    """
+    target = db_target()
+    snapshot = await _db_snapshot()
+    return {
+        "port": target.get("port"),
+        "name": target.get("name"),
+        "server_version": snapshot.get("server_version"),
     }
