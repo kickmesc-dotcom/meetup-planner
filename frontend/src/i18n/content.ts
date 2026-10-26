@@ -19,6 +19,22 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ------------------------------------------------- первый запуск -------
+  // Экран «Первая смена» заменил стену из семи уроков на входе. Курс остался,
+  // но открывается кнопкой.
+  "Первая смена": "First shift",
+  "Вот что будет сегодня.": "Here's what today looks like.",
+  "Отмечаешь пункты по одному — по мере того, как сделал.":
+    "You tick the items off one at a time as you go.",
+  "Если руководитель что-то поручит, оно придёт сюда и напомнит о сроке.":
+    "If your manager assigns something, it lands here and reminds you about the deadline.",
+  "В конце дня приложение попросит закрыть смену.":
+    "At the end of the day the app will ask you to close the shift.",
+  "Открыть смену": "Open the shift",
+  "Хочу посмотреть, как всё устроено": "Show me how it all works",
+  "Как устроено приложение": "How the app works",
+  "Короткие уроки — по одному действию на экран. Можно прервать.":
+    "Short lessons — one action per screen. You can stop any time.",
   // ---------------------------------------------------------------- лента --
   "События смены": "Shift events",
   "Мои действия": "My actions",

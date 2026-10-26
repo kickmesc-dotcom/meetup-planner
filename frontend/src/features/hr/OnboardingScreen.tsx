@@ -1,18 +1,44 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  fetchDepartments,
-  fetchTraining,
-  submitOnboarding,
-  type HrEmployee,
-} from "@/api/hr";
+import { fetchDepartments, submitOnboarding, type HrEmployee } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
+import Icon, { type IconName } from "@/components/Icon";
 import TrainingScreen from "@/features/hr/TrainingScreen";
 import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useTx } from "@/i18n";
+
+/**
+ * Три вещи, которые ждут новичка в первую смену.
+ *
+ * Тексты держим таблицей, а оборачиваем в `tx(...)` на месте показа — как
+ * `MyTasksScreen` со своими статусами: словарь перевода видит литералы
+ * `tx("…")`, а не константы. Иконки вместо эмодзи — правило `emoji.guard`.
+ */
+const FIRST_DAY_STEPS: readonly {
+  icon: IconName;
+  title: string;
+  hint: string;
+}[] = [
+  {
+    icon: "checklist",
+    title: "Чек-лист смены",
+    hint: "Отмечаешь пункты по одному — по мере того, как сделал.",
+  },
+  {
+    icon: "tasks",
+    title: "Поручения",
+    hint: "Если руководитель что-то поручит, оно придёт сюда и напомнит о сроке.",
+  },
+  {
+    icon: "clock",
+    title: "Закрытие смены",
+    hint: "В конце дня приложение попросит закрыть смену.",
+  },
+];
+
 /**
  * Первый экран нового сотрудника: «Привет! Давай освоимся».
  *
@@ -21,16 +47,23 @@ import { useTx } from "@/i18n";
  *  2. выбрать подразделение;
  *  3. ответить, есть ли опыт.
  *
- * После этого — короткое знакомство с приложением (уроки) и сразу рабочая
- * смена. «Я уже запомнил» закрывает обучение, но не отменяет рабочие
- * чек-листы, поручения и требования безопасности.
+ * Дальше — не курс, а один экран «Первая смена»: три вещи, которые сегодня
+ * спросит приложение, и кнопка «Открыть смену». Репетиция первого запуска
+ * показала, почему так: на этапе обучения новичок видел список из семи уроков,
+ * счётчик «0/7» и кнопку «Сбросить прогресс обучения» — и справедливо решал,
+ * что от него требуют что-то уже знать. Курс никуда не делся: он открывается
+ * по кнопке «Хочу посмотреть, как всё устроено» и из профиля, то есть по
+ * желанию, а не стеной на входе. Обязательные чек-листы и поручения обучение не
+ * отменяет — оно лишь показывает, как их закрывать.
  */
 export default function OnboardingScreen({ employee }: { employee: HrEmployee }) {
   const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
   const departmentsQ = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
-  const trainingQ = useQuery({ queryKey: ["hr-training"], queryFn: fetchTraining });
+  // Курс открывается по кнопке: держим выбор в состоянии экрана, а не в
+  // URL — знакомство прерывать некуда, это один проход.
+  const [showCourse, setShowCourse] = useState(false);
 
   const initialStep = useMemo(() => {
     if (employee.onboarding_state === "training") return 3;
@@ -60,11 +93,17 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
     },
   });
 
-  // «Повторим вместе» (true) — знакомство закрыто, обучение продолжается в
-  // рабочих сменах; «Я уже запомнил» (false) — обычный рабочий режим.
+  // Закрыть знакомство и уйти на смену. Режим обучения не трогаем: его
+  // выбирают в профиле («Обучение в сменах»), а на первом экране этот выбор
+  // был бы вопросом без контекста. Курс, если его открыли, передаёт `true`
+  // («повторим вместе») или `false` («я уже запомнил») сам.
   const finish = useMutation({
-    mutationFn: (learningMode: boolean) =>
-      submitOnboarding({ finish: true, learning_mode: learningMode }),
+    mutationFn: (learningMode?: boolean) =>
+      submitOnboarding(
+        learningMode === undefined
+          ? { finish: true }
+          : { finish: true, learning_mode: learningMode },
+      ),
     onSuccess: (data) => {
       haptic("success");
       qc.setQueryData(["hr-employee"], data);
@@ -76,7 +115,6 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
 
   const departments = departmentsQ.data ?? [];
   const department = departments.find((d) => d.id === departmentId);
-  const trainingDone = trainingQ.data?.complete === true;
 
   if (departmentsQ.isError) {
     return (
@@ -94,7 +132,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
         <span className="text-xs text-tg-hint">
           {step < 3
             ? tx("Шаг {step} из {total}", { step: step + 1, total: 3 })
-            : tx("Знакомство")}
+            : tx("Первый день")}
         </span>
         <ThemeSwitcher />
       </header>
@@ -221,37 +259,70 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
           </section>
         )}
 
-        {step === 3 && (
-          <section className="-mx-5 flex min-h-0 flex-col">
-            <div className="px-5 pb-2">
-              <h1 className="text-xl font-semibold text-tg-text">{tx("Освоимся за пару минут")}</h1>
-              <p className="mt-1 text-sm text-tg-hint">
+        {step === 3 &&
+          (showCourse ? (
+            <section className="-mx-5 flex min-h-0 flex-col">
+              <div className="px-5 pb-2">
+                <h1 className="text-xl font-semibold text-tg-text">{tx("Как устроено приложение")}</h1>
+                <p className="mt-1 text-sm text-tg-hint">
+                  {tx("Короткие уроки — по одному действию на экран. Можно прервать.")}
+                </p>
+              </div>
+              <div className="min-h-[320px] flex-1">
+                <TrainingScreen
+                  onFinish={(learningMode) => finish.mutate(learningMode)}
+                  finishing={finish.isPending}
+                />
+              </div>
+            </section>
+          ) : (
+            <section className="pt-4">
+              <h1 className="text-2xl font-semibold text-tg-text">
+                {tx("Первая смена")}
+              </h1>
+              <p className="mt-2 text-sm text-tg-hint">
                 {department ? `${department.emoji ?? ""} ${department.name} · ` : ""}
-                короткое знакомство с приложением.
+                {tx("Вот что будет сегодня.")}
               </p>
-            </div>
-            <div className="min-h-[320px] flex-1">
-              <TrainingScreen
-                onFinish={(learningMode) => finish.mutate(learningMode)}
-                finishing={finish.isPending}
-              />
-            </div>
-            {/* Кто не хочет уроков сейчас — закрывает знакомство кнопкой; кто
-                прошёл курс — выбирает режим в самом курсе («Повторим вместе» /
-                «Я уже запомнил»), поэтому вторая кнопка не дублируется. */}
-            {!trainingDone && (
-              <div className="space-y-2 px-5 pt-3">
+              <ul className="mt-6 space-y-3">
+                {FIRST_DAY_STEPS.map((item) => (
+                  <li
+                    key={item.title}
+                    className="flex gap-3 rounded-card bg-tg-secondary-bg p-4"
+                  >
+                    <Icon name={item.icon} size={20} className="shrink-0 text-tg-link" />
+                    <div>
+                      <div className="text-sm font-medium text-tg-text">
+                        {tx(item.title)}
+                      </div>
+                      <div className="mt-1 text-xs text-tg-hint">{tx(item.hint)}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-6 space-y-2 pb-2">
                 <button
                   type="button"
                   disabled={finish.isPending}
-                  onClick={() => finish.mutate(false)}
+                  onClick={() => finish.mutate(undefined)}
                   className="min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-                >{tx("Я уже запомнил")}</button>
-                <p className="pb-2 text-center text-xs text-tg-hint">{tx("Обязательные чек-листы и задачи это не отменяет.")}</p>
+                >
+                  {finish.isPending ? tx("Открываем…") : tx("Открыть смену")}
+                </button>
+                <button
+                  type="button"
+                  disabled={finish.isPending}
+                  onClick={() => {
+                    haptic("light");
+                    setShowCourse(true);
+                  }}
+                  className="min-h-11 w-full rounded-card bg-tg-secondary-bg text-sm text-tg-text disabled:opacity-50"
+                >
+                  {tx("Хочу посмотреть, как всё устроено")}
+                </button>
               </div>
-            )}
-          </section>
-        )}
+            </section>
+          ))}
       </div>
     </div>
   );
