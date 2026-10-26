@@ -16,11 +16,21 @@
 точкой отказа: не прошёл он — и человек не увидел даже «нет истории». Поэтому
 теперь отправка повторяется, а последним шагом уходит короткая версия без
 разметки: три заголовка и ссылка. Пусть лучше меньше текста, чем тишина.
+
+Почему у команды появился бюджет (26.10.2026). Владелец написал, что ответ
+«залипает»: то не приходит вовсе, то приходит через час или шесть. Отгадка
+была не в истории, а в арифметике доставки: четыре уровня по три попытки с
+таймаутом 12 с — до 154 с на один апдейт. Telegram ждёт ответ на вебхук 60 с
+и, не дождавшись, повторяет апдейт — вот откуда и «через шесть часов», и
+вторая копия ответа, и полная тишина, когда повтор тоже не уложился. Теперь у
+каждого уровня свой срез времени (см. `LEVEL_*_SECONDS`), и вся команда
+укладывается в `TOTAL_BUDGET_SECONDS` секунд.
 """
 
 from __future__ import annotations
 
 import asyncio
+import time
 
 import structlog
 from aiogram import Router
@@ -46,10 +56,40 @@ router = Router()
 # Телеграм-лимит — 4096 символов; держим запас, чтобы HTML-разметка не обрезала
 # текст на середине тега.
 MAX_MESSAGE_CHARS = 3800
-# Сколько раз пробуем доставить полный ответ и сколько ждём одну попытку.
-# 3 × 12 с + запас на GitHub (6 с) укладывается в вебхук-окно Telegram (60 с).
+
+# Сколько раз пробуем доставить текст и сколько ждём одну попытку.
 REPLY_ATTEMPTS = 3
-REPLY_TIMEOUT_SECONDS = 12
+REPLY_TIMEOUT_SECONDS = 5
+
+# --- Бюджет команды по уровням (26.10.2026) --------------------------------
+# Замер до правки: четыре уровня по три попытки с таймаутом 12 с давали до
+# **154 секунд** на один `/changelog`. Telegram ждёт ответ на вебхук 60 с и,
+# не дождавшись, повторяет апдейт — отсюда «ответ через час или шесть». Теперь
+# у каждого уровня СВОЙ срез времени, поэтому худший случай конечен и равен
+# сумме срезов (≈ 23.5 с вместе с запросом к GitHub), а не произведению
+# «уровни × попытки × таймаут». Срезы заданы заранее, а не считаются на ходу:
+# последний уровень («не молчать») обязан получить своё время при любом
+# развитии событий, а не остаться без него, как вышло бы при вычитании «что
+# осталось».
+LEVEL_FULL_SECONDS = 10.0
+# Короткая версия уходит дважды — ответом и обычной отправкой (чат мог запретить
+# reply), поэтому в худшем случае этот срез тратится два раза.
+LEVEL_SHORT_SECONDS = 4.0
+LEVEL_SILENCE_SECONDS = 4.0
+
+
+class _Deadline:
+    """Монотонный срез времени на один уровень доставки.
+
+    Монотонные часы, а не системные: перевод времени в контейнере не должен
+    ни съедать бюджет, ни делать его бесконечным.
+    """
+
+    def __init__(self, seconds: float) -> None:
+        self._end = time.monotonic() + max(0.0, seconds)
+
+    def left(self) -> float:
+        return self._end - time.monotonic()
 
 
 def render_short_fallback(view: Changelog) -> str:
@@ -95,7 +135,12 @@ async def _send(
 
 
 async def _deliver(
-    message: Message, text: str, *, plain: bool = False, as_reply: bool = True
+    message: Message,
+    text: str,
+    *,
+    plain: bool = False,
+    as_reply: bool = True,
+    budget_seconds: float = LEVEL_FULL_SECONDS,
 ) -> bool:
     """Отправка с повторами. `False` — доставить не удалось (уже залогировано).
 
@@ -110,27 +155,44 @@ async def _deliver(
     `as_reply=False` — обычная отправка в чат. Нужна как отдельный запасной
     путь: если чат запрещает ответы на сообщения, `reply` отваливается с
     `BadRequest`, хотя отправка в тот же чат разрешена.
+
+    `budget_seconds` — срез времени на ЭТОТ уровень. Он ограничивает и паузы
+    между попытками, и ожидание `retry_after`: просьба Telegram «подожди 30 с»
+    внутри 6-секундного среза означает «этот способ сейчас не сработает», и
+    честнее отдать остаток бюджета следующему уровню, чем проспать его.
     """
+    deadline = _Deadline(budget_seconds)
     for attempt in range(1, REPLY_ATTEMPTS + 1):
+        left = deadline.left()
+        if left <= 0:
+            log.warning(
+                "changelog.reply_budget_exhausted", attempt=attempt, plain=plain
+            )
+            return False
         try:
             await asyncio.wait_for(
                 _send(message, text, plain=plain, as_reply=as_reply),
-                timeout=REPLY_TIMEOUT_SECONDS,
+                timeout=min(REPLY_TIMEOUT_SECONDS, left),
             )
             return True
         except TelegramRetryAfter as exc:
-            # Telegram сам просит подождать — ждём ровно столько, сколько просят.
+            # Telegram сам просит подождать — ждём столько, сколько просят, но
+            # не дольше остатка своего среза.
+            pause = min(exc.retry_after, REPLY_TIMEOUT_SECONDS, deadline.left())
             log.warning(
-                "changelog.reply_retry_after", attempt=attempt, seconds=exc.retry_after
+                "changelog.reply_retry_after",
+                attempt=attempt,
+                seconds=exc.retry_after,
+                pause_sec=round(max(0.0, pause), 3),
             )
-            await _pause(min(exc.retry_after, REPLY_TIMEOUT_SECONDS))
+            await _pause(max(0.0, pause))
         except (TelegramNetworkError, TimeoutError) as exc:
             log.warning(
                 "changelog.reply_network",
                 attempt=attempt,
                 error=exc.__class__.__name__,
             )
-            await _pause(0.8 * attempt)
+            await _pause(max(0.0, min(0.8 * attempt, deadline.left())))
         except TelegramAPIError as exc:
             # Это не сеть: «can't parse entities», «message is too long»,
             # «not enough rights to reply» и прочее. Повтор того же текста
@@ -150,6 +212,18 @@ async def _deliver(
 # всегда. Ждать 6 секунд ради свежих коммитов, которые всё равно не факт что
 # попадут в первые строки, — плохой размен: вебхук-окно у Telegram конечно.
 GITHUB_BUDGET_SECONDS = 1.5
+
+# Худший случай команды целиком: GitHub + четыре попытки доставки (полная,
+# короткая ответом, короткая отправкой, «не молчать»). Ограничение проверяется
+# тестом (`test_webhook_budget.py::test_changelog_budget_fits_the_webhook_window`)
+# — иначе однажды кто-то снова добавит «ещё одну попытку», и ответ опять начнёт
+# опаздывать на часы.
+TOTAL_BUDGET_SECONDS = (
+    GITHUB_BUDGET_SECONDS
+    + LEVEL_FULL_SECONDS
+    + 2 * LEVEL_SHORT_SECONDS
+    + LEVEL_SILENCE_SECONDS
+)
 
 SILENCE_FALLBACK = (
     "🧩 Что нового\n\n"
@@ -188,19 +262,33 @@ async def on_changelog(message: Message) -> None:
 
     if view is not None:
         text = render_changelog(view)[:MAX_MESSAGE_CHARS]
-        if await _deliver(message, text):
+        if await _deliver(message, text, budget_seconds=LEVEL_FULL_SECONDS):
             return
         # Полный ответ не прошёл — пробуем короткий и без разметки: и
         # ответом, и обычной отправкой (чат мог запретить reply).
         short = render_short_fallback(view)
-        if await _deliver(message, short, plain=True):
+        if await _deliver(
+            message, short, plain=True, budget_seconds=LEVEL_SHORT_SECONDS
+        ):
             return
-        if await _deliver(message, short, plain=True, as_reply=False):
+        if await _deliver(
+            message,
+            short,
+            plain=True,
+            as_reply=False,
+            budget_seconds=LEVEL_SHORT_SECONDS,
+        ):
             return
 
     # Последний уровень не зависит ни от сети, ни от разметки, ни от разбора
     # истории: если не ушло и это, в логах будет `changelog.reply_lost`, а не
     # тишина без следа.
-    if await _deliver(message, SILENCE_FALLBACK, plain=True, as_reply=False):
+    if await _deliver(
+        message,
+        SILENCE_FALLBACK,
+        plain=True,
+        as_reply=False,
+        budget_seconds=LEVEL_SILENCE_SECONDS,
+    ):
         return
     log.error("changelog.reply_lost", entries=len(view.entries) if view else 0)

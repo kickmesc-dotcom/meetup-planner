@@ -615,7 +615,12 @@ class ChecklistTemplate(OrgScoped, Base):
         Index("ix_checklist_templates_hall", "hall_id", "kind", "is_active"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # На проде BIGSERIAL, в sqlite-тестах INTEGER — как у `departments.id`.
+    # Без варианта шаблон нельзя завести, не задав id вручную, а стартовую пару
+    # шаблонов мастер создаёт именно вставкой без id.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
     department_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False
     )
@@ -658,7 +663,10 @@ class ChecklistItem(OrgScoped, Base):
         Index("ix_checklist_items_template", "template_id", "sort_order"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # На проде BIGSERIAL, в sqlite-тестах INTEGER — как у `checklist_templates.id`.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
     template_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey("checklist_templates.id", ondelete="CASCADE"),

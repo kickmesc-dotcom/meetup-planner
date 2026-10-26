@@ -34,7 +34,18 @@ from app.db.hr_models import (  # noqa: E402
 from app.db.models import User  # noqa: E402
 from app.db.org_models import DEFAULT_ORG_ID, Organization, reset_org, set_org  # noqa: E402
 
-TABLES = ("organizations", "users", "employees", "departments", "admin_config")
+# Чек-листы в списке не для галочки: мастер заводит вместе с подразделениями
+# стартовую пару шаблонов (открытие и закрытие смены), и без этих таблиц
+# проверять ему пришлось бы не то, что делает он, а то, что смогло записаться.
+TABLES = (
+    "organizations",
+    "users",
+    "employees",
+    "departments",
+    "admin_config",
+    "checklist_templates",
+    "checklist_items",
+)
 
 
 @pytest.fixture()

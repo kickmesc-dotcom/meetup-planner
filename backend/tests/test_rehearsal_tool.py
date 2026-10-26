@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,13 @@ PYTHON = sys.executable
 
 
 def run(db: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    # Инструмент печатает по-русски. Без явной кодировки подпроцесс на Windows
+    # выводит текст в локальной кодировке (cp1251), и проверка «видно ли
+    # название организации»
+    # сравнивала бы кириллицу с «крякозябрами» — тест падал бы от локали
+    # машины, а не от поломки инструмента. Кодировку задаём здесь, а не в самом
+    # инструменте: человеку в консоли нужна локальная кодировка, тесту — utf-8.
+    env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
     return subprocess.run(
         [PYTHON, str(TOOL), "--db", str(db), *args],
         cwd=REPO,
@@ -31,6 +39,7 @@ def run(db: Path, *args: str) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
         timeout=120,
+        env=env,
     )
 
 

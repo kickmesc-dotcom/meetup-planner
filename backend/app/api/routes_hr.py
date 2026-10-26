@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
+import structlog
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -58,6 +59,8 @@ from app.services import (
     org_setup,
     weekdays,
 )
+
+log = structlog.get_logger()
 
 router = APIRouter(tags=["hr"])
 
@@ -1109,6 +1112,21 @@ async def save_org_setup(
         # организации ещё и нет отдела, где он «работает».
         if employee.onboarding_state != ONBOARDING_DONE:
             employee.onboarding_state = ONBOARDING_DONE
+
+    if body.create_departments or updated.done:
+        # Новая организация приходит без единого шаблона чек-листа, и первый же
+        # рабочий экран сотрудника говорит «попроси руководителя назначить
+        # шаблон». Руководителя рядом нет, что просить — непонятно, и рабочий
+        # день начинается не с работы, а с переписки. Поэтому вместе с
+        # подразделениями мастер заводит стартовую пару: «Открытие смены» и
+        # «Закрытие смены». Функция ничего не трогает там, где шаблон уже есть.
+        created = await hr_checklists.ensure_starter_templates_for_all(session)
+        if created:
+            log.info(
+                "org_setup.starter_templates",
+                count=len(created),
+                department_ids=sorted({t.department_id for t in created}),
+            )
 
     await org_setup.save(session, updated)
     return _org_setup_out(updated, can_edit=True)

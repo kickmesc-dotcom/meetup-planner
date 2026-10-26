@@ -587,3 +587,118 @@ async def build_view(
         hall_id=hall.id if hall is not None else None,
         hall_name=hall.name if hall is not None else None,
     )
+
+
+# --------------------------------------------------------------------------
+# Стартовые шаблоны новой организации (26.10.2026)
+# --------------------------------------------------------------------------
+#
+# Зачем это здесь. Репетиция первого запуска показала: корпоративная
+# организация создаётся «с нуля» — в ней нет ни одного шаблона чек-листа, и
+# первый же рабочий экран нового сотрудника говорит «Чек-лист не назначен,
+# попроси руководителя назначить шаблон». Руководителя рядом нет, что просить
+# — непонятно, и первый день начинается не с работы, а с переписки.
+#
+# Поэтому вместе с организацией (точнее — вместе с её подразделениями, потому
+# что шаблон принадлежит подразделению) заводится пара коротких списков:
+# открытие смены и закрытие. Пункты нарочно простые и отраслевые «в общем»:
+# включить оборудование, проверить чистоту, проверить расходники. Их правит
+# руководитель — но правит уже готовое, а не чистый лист.
+#
+# Хостес и официантов из `db/hr_seed` сюда не тянем: там содержимое из DOCX
+# владельца для его ресторана, оно и остаётся засевом для его контура. Здесь —
+# общий стартовый набор любого бизнеса.
+
+# Открытие смены. `True` — пункт нужно закрыть фотографией.
+STARTER_OPENING_ITEMS: tuple[tuple[str, bool], ...] = (
+    ("Включить свет и оборудование, проверить, что всё работает", False),
+    ("Проверить чистоту зала и рабочих мест", True),
+    ("Проверить, что расходники на месте и их хватает на смену", False),
+    ("Подготовить рабочее место: касса, терминал, форма", False),
+    ("Проверить, что цены и вывески актуальны", False),
+    ("Отметить начало смены в приложении", False),
+)
+
+# Закрытие смены.
+STARTER_CLOSING_ITEMS: tuple[tuple[str, bool], ...] = (
+    ("Убрать зал и рабочие места", True),
+    ("Выключить оборудование и свет", False),
+    ("Закрыть кассу, сдать выручку", False),
+    ("Написать, что закончилось и что нужно купить", False),
+)
+
+STARTER_OPENING_TITLE = "Открытие смены"
+STARTER_CLOSING_TITLE = "Закрытие смены"
+
+
+async def ensure_starter_templates(
+    session: AsyncSession, *, department_id: int
+) -> list[ChecklistTemplate]:
+    """Завести стартовую пару шаблонов подразделению, если их ещё нет.
+
+    Идемпотентно и неразрушающе: если у подразделения уже есть свой шаблон
+    нужного вида (хоть один, даже пустой) — не трогаем ничего. Это важно, потому
+    что мастер настройки можно пройти повторно, и он не должен ни плодить
+    дубликаты, ни возвращать удалённые администратором шаблоны.
+
+    Возвращает созданные шаблоны (пусто — подразделению ничего не нужно было).
+    """
+    created: list[ChecklistTemplate] = []
+    for kind, title, items in (
+        (TEMPLATE_SHIFT, STARTER_OPENING_TITLE, STARTER_OPENING_ITEMS),
+        (TEMPLATE_CLOSE, STARTER_CLOSING_TITLE, STARTER_CLOSING_ITEMS),
+    ):
+        exists = await session.scalar(
+            select(ChecklistTemplate.id)
+            .where(
+                ChecklistTemplate.department_id == department_id,
+                ChecklistTemplate.kind == kind,
+                ChecklistTemplate.hall_id.is_(None),
+            )
+            .limit(1)
+        )
+        if exists is not None:
+            continue
+        template = ChecklistTemplate(
+            department_id=department_id,
+            title=title,
+            kind=kind,
+            sort_order=0,
+        )
+        session.add(template)
+        await session.flush()
+        for order, (item_title, requires_photo) in enumerate(items):
+            session.add(
+                ChecklistItem(
+                    template_id=template.id,
+                    title=item_title,
+                    requires_photo=requires_photo,
+                    is_mandatory=True,
+                    sort_order=order,
+                )
+            )
+        created.append(template)
+    if created:
+        await session.flush()
+    return created
+
+
+async def ensure_starter_templates_for_all(
+    session: AsyncSession,
+) -> list[ChecklistTemplate]:
+    """Стартовая пара — всем подразделениям организации, у кого её нет.
+
+    Именно «всем», а не «одному»: у кофейни и салона подразделений несколько
+    (зал, кухня, администраторы), и смену открывает каждое своё. Пока шаблона
+    нет ни у одного, любой сотрудник видит пустой экран.
+    """
+    from app.services import hr_departments
+
+    created: list[ChecklistTemplate] = []
+    for department in await hr_departments.list_departments(
+        session, active_only=False
+    ):
+        created.extend(
+            await ensure_starter_templates(session, department_id=department.id)
+        )
+    return created

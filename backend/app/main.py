@@ -309,6 +309,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Отпускаем лиз лидерства до общего shutdown — второй инстанс подхватит сразу.
     await release_scheduler_leadership()
     await shutdown_scheduler()
+    # Апдейты, которые после ответа Telegram докручиваются в фоне (см.
+    # `bot/webhook.py`), добираем до конца: мы уже сказали Telegram «ок», и
+    # повторной доставки не будет — потерять работу на середине нельзя.
+    try:
+        from app.bot.webhook import wait_pending_tasks
+
+        await wait_pending_tasks()
+    except Exception:  # noqa: BLE001 — остановка не должна падать из-за дренажа
+        structlog.get_logger().warning("webhook.drain_failed")
     try:
         from app.bot.dispatcher import all_bots
 
