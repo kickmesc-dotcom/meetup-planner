@@ -24,8 +24,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 
 from app.api.deps import EmployeeDep, SessionDep
-from app.db.tenancy import all_orgs
 from app.db.push_models import PushSubscription
+from app.db.tenancy import all_orgs
 from app.services import web_push
 
 log = structlog.get_logger()
@@ -79,9 +79,24 @@ async def push_config(_: EmployeeDep) -> PushConfigOut:
 async def subscribe_push(
     body: PushSubscribeIn, session: SessionDep, employee: EmployeeDep
 ) -> PushStatusOut:
-    """Сохранить (или обновить) подписку этого браузера."""
+    """Сохранить (или обновить) подписку этого браузера.
+
+    Адрес проверяется до записи (аудит 26.10.2026, S-8): по этой строке потом
+    ходит СЕРВЕР, поэтому подписка на внутренний адрес хостинга или на IP
+    облачных метаданных — это попытка использовать нас как средство доступа в
+    чужую сеть, а не подписка.
+    """
     if not web_push.enabled():
         raise HTTPException(status.HTTP_409_CONFLICT, detail="push_disabled")
+    if not web_push.endpoint_is_allowed(body.endpoint):
+        log.warning(
+            "push.endpoint_rejected",
+            user_id=employee.user_id,
+            host=(body.endpoint.split("/")[2] if "//" in body.endpoint else "?")[:80],
+        )
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="push_endpoint_rejected"
+        )
     digest = web_push.endpoint_hash(body.endpoint)
     # Endpoint уникален глобально, а строка могла остаться от прежней
     # организации того же браузера. Без `all_orgs()` выборка её не увидит и

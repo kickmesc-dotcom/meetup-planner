@@ -29,9 +29,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import ipaddress
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 import structlog
 from sqlalchemy import select, update
@@ -57,6 +59,63 @@ def enabled() -> bool:
 def endpoint_hash(endpoint: str) -> str:
     """Стабильный ключ подписки: endpoint длинный, индекс — короткий."""
     return hashlib.sha256(endpoint.encode("utf-8")).hexdigest()
+
+
+# Куда серверу разрешено ходить по адресу из подписки.
+#
+# Почему это вообще проверяется (аудит 26.10.2026, S-8). `endpoint` задаёт
+# клиент, а запрос по нему делает СЕРВЕР (`pywebpush`) — из контейнера, с нашими
+# исходящими адресами и заголовками. Без проверки подписка на
+# `http://169.254.169.254/…` или на внутренний адрес хостинга превращает сервер
+# в инструмент разведки чужой сети (SSRF). Список хостов намеренно белый:
+# это три публичных push-сервиса, которые реально используются браузерами.
+ALLOWED_PUSH_HOSTS: tuple[str, ...] = (
+    "fcm.googleapis.com",
+    "updates.push.services.mozilla.com",
+    "push.services.mozilla.com",
+    "web.push.apple.com",
+    "push.apple.com",
+    ".notify.windows.com",
+    ".push.apple.com",
+    ".googleapis.com",
+    ".mozilla.com",
+    ".windows.com",
+    ".microsoft.com",
+)
+
+
+def endpoint_is_allowed(endpoint: str) -> bool:
+    """Годится ли адрес push-подписки для серверного запроса.
+
+    Разрешаем: только `https`, без логина/пароля в URL, без своего порта, с
+    публичным хостом по DNS-имени (без IP-литералов вообще — адрес вида
+    `https://10.0.0.5/` не должен проходить, даже если кто-то выпустил на него
+    сертификат) и только из белого списка push-сервисов.
+    """
+    raw = (endpoint or "").strip()
+    if len(raw) > 2000:
+        return False
+    parts = urlsplit(raw)
+    if parts.scheme != "https":
+        return False
+    if parts.username or parts.password:
+        return False
+    if parts.port not in (None, 443):
+        return False
+    host = (parts.hostname or "").strip().strip(".").lower()
+    if not host or not parts.path:
+        return False
+    # IP-литерал (в том числе `[::1]`) — отказ: push-сервисы по IP не живут.
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        return False
+    return any(
+        host == allowed.lstrip(".") if not allowed.startswith(".") else host.endswith(allowed)
+        for allowed in ALLOWED_PUSH_HOSTS
+    )
 
 
 @dataclass(frozen=True)
@@ -144,6 +203,12 @@ async def send(
     добавлены в неё).
     """
     if not subscriptions or not enabled():
+        return 0
+    # Проверка на отправке, а не только на подписке: строки могли быть заведены
+    # до проверки адреса, а схема «сервер сам ходит по строке из базы» требует
+    # одного и того же правила в обоих местах (аудит 26.10.2026, S-8).
+    subscriptions = [sub for sub in subscriptions if endpoint_is_allowed(sub.endpoint)]
+    if not subscriptions:
         return 0
     payload = PushPayload(title=title, body=body, url=url, tag=tag).as_json()
     results = await asyncio.gather(

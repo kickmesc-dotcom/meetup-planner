@@ -45,7 +45,13 @@ TABLES = (
     "push_subscriptions",
 )
 
-ENDPOINT = "https://push.example.com/send/abcdef123456"
+# Адрес push-сервиса из белого списка (`web_push.ALLOWED_PUSH_HOSTS`):
+# с 26.10.2026 подписка на произвольный хост не принимается — по этому адресу
+# сервер ходит САМ, поэтому это защита от SSRF (S-8), а не формальность.
+ENDPOINT = "https://fcm.googleapis.com/fcm/send/abcdef123456"
+# Тот же сервис, но подпись «мертва»: push-сервис ответит 410 (приложение
+# удалено, разрешение отозвано).
+DEAD_ENDPOINT = "https://fcm.googleapis.com/fcm/send/dead"
 
 
 @pytest.fixture()
@@ -159,7 +165,7 @@ async def test_unsubscribe_removes_only_own_device(session) -> None:
 async def test_send_deletes_gone_subscription(session, monkeypatch) -> None:
     await _person(session)
     alive = _sub(1, ENDPOINT)
-    dead = _sub(1, ENDPOINT + "dead")
+    dead = _sub(1, DEAD_ENDPOINT)
     session.add_all([alive, dead])
     await session.commit()
 

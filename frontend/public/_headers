@@ -1,0 +1,46 @@
+# Заголовки безопасности для статики Cloudflare Pages.
+#
+# Зачем это нужно (аудит 26.10.2026, находка S-7). Токен сессии и ссылка доступа
+# лежат в `localStorage` (см. `src/api/client.ts`): пока у страницы нет CSP, любая
+# инъекция скрипта — кривое расширение, рекламный скрипт, поле из админки,
+# отрисованное как разметка — читает этот токен и забирает аккаунт вместе с
+# правами управляющего. CSP здесь не «галочка», а единственный барьер между
+# чужой строкой в документе и входом в чужой аккаунт.
+#
+# Что чем закрыто:
+#
+# * `script-src 'self' https://telegram.org` — исполняется только наш бандл и
+#   скрипт Telegram WebApp. Проверено по сборке: в `dist/assets/index-*.js` нет
+#   ни `eval(`, ни `new Function(`, поэтому `'unsafe-eval'` не нужен (иначе CSP
+#   перестала бы защищать от инъекции почти полностью).
+# * `style-src 'self' 'unsafe-inline'` — вынужденная уступка: React и
+#   framer-motion ставят инлайн-стили атрибутом. Инъекция CSS опасна на порядки
+#   меньше инъекции скрипта, а без этого правила вёрстка рассыпается.
+# * `connect-src 'self' https:` — адрес API можно сменить прямо в приложении
+#   (поле «Сервер» в профиле — резервный контур на случай блокировки домена),
+#   поэтому список хостов здесь не сузить.
+# * `img-src … https:` — аватарки и фото приходят и с нашего API, и с HF.
+# * `frame-ancestors 'self' https://*.telegram.org` — мини-апп открывается внутри
+#   веб-версии Telegram (web.telegram.org, webk/webz). Всё остальное — нельзя.
+#   По этой же причине здесь НЕТ `X-Frame-Options`: он запрещает любые iframe и
+#   сломал бы открытие приложения в Telegram.
+# * `object-src 'none'`, `base-uri 'self'`, `form-action 'self'` — закрывают
+#   классические обходы через плагины, подмену `<base>` и отправку формы на чужой
+#   адрес.
+#
+# Отдельно: COOP (`Cross-Origin-Opener-Policy`) здесь сознательно не выставлен —
+# он изолирует окно от родителя и может сломать обмен сообщениями мини-аппа с
+# клиентом Telegram.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: geolocation=(), microphone=(), payment=(), camera=(self)
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' blob: https:; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self' https://oauth.telegram.org https://*.telegram.org; frame-ancestors 'self' https://telegram.org https://*.telegram.org; base-uri 'self'; form-action 'self'; object-src 'none'
+
+# Ассеты с хешем в имени неизменны: их можно кэшировать надолго, а заодно
+# закрыть от индексации — это не страницы.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  X-Robots-Tag: noindex
