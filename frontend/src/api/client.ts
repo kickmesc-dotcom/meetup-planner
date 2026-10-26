@@ -176,6 +176,16 @@ export function isEndpointMissing(e: unknown): boolean {
 export function humanizeApiError(e: unknown): string {
   if (e instanceof ApiError) {
     const d = e.detail || "";
+    // Предохранители периметра (аудит 26.10.2026). Сервер отдаёт коды, текст
+    // живёт здесь: без этого перевода человек увидел бы «429: rate_limited:42».
+    if (d.startsWith("rate_limited:")) {
+      const sec = Number(d.split(":")[1] ?? 0);
+      if (sec > 60) return `Слишком много попыток — подожди ${Math.ceil(sec / 60)} мин.`;
+      return `Слишком много попыток — подожди ${Math.max(1, sec)} с.`;
+    }
+    if (d === "body_too_large") {
+      return "Файл слишком большой для загрузки. Сожми его или выбери другой.";
+    }
     // Пул сотрудников: ручное заведение по ID и снапшоты состава. Коды
     // серверные, поэтому текст живёт здесь — одна правка на все экраны.
     const roster: Record<string, string> = {

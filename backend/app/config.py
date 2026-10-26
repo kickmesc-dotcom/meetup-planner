@@ -1,11 +1,34 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import urlsplit
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_REPO = "kickmesc-dotcom/meetup-planner"
+
+# Origin превью-развёртываний Cloudflare Pages (<hash>.semitaskbot.pages.dev)
+# и локальной разработки. Вынесено из среды в код, потому что забытая строка
+# здесь ломает не безопасность, а работу: мини-апп на свежем превью перестал бы
+# ходить в API. Список продуктовых доменов сюда не входит — они берутся из
+# `MINI_APP_URL`/`APP_PUBLIC_URL` и `CORS_ORIGINS`.
+DEFAULT_CORS_ORIGIN_REGEX = (
+    r"https://([a-z0-9-]+\.)*semitaskbot\.pages\.dev"
+    r"|http://localhost(:\d+)?"
+    r"|http://127\.0\.0\.1(:\d+)?"
+)
+
+
+def origin_of_url(url: str) -> str:
+    """`https://host:port` из адреса или `""`, если адреса нет/он не абсолютный."""
+    raw = (url or "").strip()
+    if not raw:
+        return ""
+    parts = urlsplit(raw)
+    if not parts.scheme or not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}"
 
 
 class Settings(BaseSettings):
@@ -29,6 +52,10 @@ class Settings(BaseSettings):
     )
 
     cors_origins: str = Field("*", alias="CORS_ORIGINS")
+    # Origin превью-развёртываний Pages и локальной разработки. Регулярка, а не
+    # список: у Cloudflare Pages адрес превью меняется на каждую сборку
+    # (`<hash>.semitaskbot.pages.dev`), и перечислять их поимённо бессмысленно.
+    cors_origin_regex: str = Field(DEFAULT_CORS_ORIGIN_REGEX, alias="CORS_ORIGIN_REGEX")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 
     # Чат ОРГАНИЗАЦИИ ПО УМОЛЧАНИЮ. У клиента со своим ботом чат лежит в
@@ -111,6 +138,57 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [s.strip() for s in self.cors_origins.split(",") if s.strip()]
+
+    @property
+    def cors_allow_all(self) -> bool:
+        """Разрешены ли все Origin (в `CORS_ORIGINS` стоит `*` или пусто)."""
+        origins = self.cors_origin_list
+        return not origins or "*" in origins
+
+    @property
+    def cors_own_origins(self) -> list[str]:
+        """Origin, с которых работает наше же приложение.
+
+        Мини-апп и веб-версия живут на этих адресах, и запросы к API уходят
+        именно с них. Поэтому они разрешены всегда, независимо от того, что
+        лежит в `CORS_ORIGINS`: иначе приложение сломалось бы от того, что
+        владелец забыл вписать свой домен в переменную.
+        """
+        out: list[str] = []
+        for raw in (self.mini_app_url, self.app_public_url):
+            origin = origin_of_url(raw)
+            if origin and origin not in out:
+                out.append(origin)
+        return out
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        """Итоговый белый список Origin для CORSMiddleware."""
+        if self.cors_allow_all:
+            return ["*"]
+        merged = [*self.cors_origin_list, *self.cors_own_origins]
+        # `dict.fromkeys` — дедуликация с сохранением порядка для читаемого конфига.
+        return list(dict.fromkeys(merged))
+
+    @property
+    def cors_origin_regex_or_none(self) -> str | None:
+        """Регулярка превью/локалки. `""` или `off` — выключено."""
+        raw = (self.cors_origin_regex or "").strip()
+        if not raw or raw.lower() in {"off", "none", "false"}:
+            return None
+        return raw
+
+    @property
+    def cors_credentials_allowed(self) -> bool:
+        """Можно ли разрешать `credentials` при таком списке Origin.
+
+        `*` вместе с `allow_credentials=True` — это не «звёздочка в ответе»:
+        Starlette в этом случае подставляет в `Access-Control-Allow-Origin`
+        Origin запроса, то есть разрешает любой сайт. Прод-проба 26.10.2026
+        это подтвердила (см. `docs/AUDIT_SECURITY_STABILITY.md`, S-1), поэтому
+        при `*` credentials выключаются принудительно.
+        """
+        return not self.cors_allow_all
 
     @property
     def admin_tg_id_set(self) -> set[int]:

@@ -22,6 +22,10 @@ class Base(DeclarativeBase):
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
+# Проверять ли сертификат базы. `None` — ещё не решено: значение выясняется
+# либо из env, либо пробой на старте (см. `probe_ssl_verification`), потому что
+# движок создаётся лениво и менять SSL-контекст у живого пула нельзя.
+_ssl_verify: bool | None = None
 
 # Параметры DSN, которые понимает libpq/psycopg, но НЕ понимает asyncpg: он
 # падает на них с `TypeError: connect() got an unexpected keyword argument`.
@@ -77,8 +81,151 @@ def _ssl_enabled_for(url: str) -> bool:
     return not ("localhost" in host or "127.0.0.1" in host or "::1" in host)
 
 
+def ssl_verify_requested() -> bool:
+    """Проверять ли сертификат базы (режим `DB_SSL_VERIFY`, по умолчанию `auto`).
+
+    * `auto` — проверить; если сертификат действительно невалиден (локальная или
+      самоподписанная managed-база), перейти в непроверенный режим с громкой
+      ошибкой в логе (см. `probe_ssl_verification`);
+    * `require`/`on`/`true` — только с проверкой (не пройдёт — не подключимся);
+    * `off`/`disable`/`false` — без проверки, осознанный выбор для своей базы.
+    """
+    mode = os.getenv("DB_SSL_VERIFY", "auto").strip().lower()
+    if mode in {"off", "disable", "disabled", "false", "no", "0"}:
+        return False
+    if mode in {"require", "required", "on", "true", "yes", "1"}:
+        return True
+    return True  # auto — начинаем с проверки, откатываемся только по факту
+
+
+def ssl_verify_enabled() -> bool:
+    """Проверять ли сертификат базы. Решается один раз за процесс."""
+    global _ssl_verify
+    if _ssl_verify is None:
+        _ssl_verify = ssl_verify_requested()
+    return _ssl_verify
+
+
+def _ssl_context(verify: bool) -> ssl.SSLContext:
+    """SSL-контекст для соединения с базой.
+
+    До аудита 26.10.2026 контекст ВСЕГДА создавался с `CERT_NONE` и
+    `check_hostname=False`: канал шифровался, но собеседник не проверялся — кто
+    встал между контейнером и базой (провайдер, прокси, отравленный DNS), читал
+    и подменял запросы и ответы. Проверка сертификата включена по умолчанию
+    ради именно этого; исключение — явный `DB_SSL_VERIFY=off` и разовый откат
+    в `auto`, если сертификат невалиден по факту.
+    """
+    ctx = ssl.create_default_context()
+    if not verify:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    return ctx
+
+
+# Признаки того, что сорвалась именно ПРОВЕРКА сертификата, а не связь с базой.
+# Разница принципиальная: невалидный сертификат — повод осознанно перейти в
+# непроверенный режим, а таймаут или отказ в доступе — нет (иначе мы бы молча
+# сняли защиту из-за сетевого блипа).
+_CERT_ERROR_MARKERS = (
+    "certificate verify failed",
+    "self-signed certificate",
+    "self signed certificate",
+    "certificate_verify_failed",
+    "sslcertverificationerror",
+    "hostname mismatch",
+    "doesn't match",
+)
+
+
+def _is_cert_error(exc: BaseException) -> bool:
+    """Есть ли в цепочке исключений ошибка проверки сертификата."""
+    seen: set[int] = set()
+    cursor: BaseException | None = exc
+    while cursor is not None and id(cursor) not in seen:
+        seen.add(id(cursor))
+        if isinstance(cursor, ssl.SSLCertVerificationError):
+            return True
+        text = f"{type(cursor).__name__}: {cursor}".lower()
+        if any(marker in text for marker in _CERT_ERROR_MARKERS):
+            return True
+        cursor = cursor.__cause__ or cursor.__context__
+    return False
+
+
+def set_ssl_verify(value: bool) -> None:
+    """Сменить режим проверки сертификата и пересоздать движок.
+
+    Живому пулу SSL-контекст не поменять, поэтому движок выбрасывается целиком и
+    создастся заново при следующем обращении (см. `get_engine`).
+    """
+    global _engine, _sessionmaker, _ssl_verify
+    if _ssl_verify == value:
+        return
+    _ssl_verify = value
+    if _engine is not None:
+        _engine = None
+        _sessionmaker = None
+
+
+async def probe_ssl_verification() -> bool:
+    """Пробная проверка сертификата на старте. Возвращает итоговый режим.
+
+    Аудит 26.10.2026 (S-4): проверка сертификата базы была выключена жёстко
+    (`CERT_NONE`), чтобы не упасть на сертификате managed-базы. Правильное
+    решение — проверить и откатиться ТОЛЬКО если сертификат в самом деле
+    невалиден, сообщив об этом в логе. Так боевые Neon/Amvera работают с
+    проверкой, а своя самоподписанная база продолжает подниматься — но теперь
+    это видно в логе, а не является общим поведением для всех.
+
+    Вызывается из `lifespan` ДО первого обращения к базе. В режимах `require` и
+    `off` ничего не делает: там решение принято человеком.
+    """
+    global _engine
+    mode = (os.getenv("DB_SSL_VERIFY") or "auto").strip().lower()
+    if mode not in {"", "auto"}:
+        return ssl_verify_enabled()
+    url = _normalize_url(get_settings().database_url)
+    if "asyncpg" not in url or not _ssl_enabled_for(url):
+        # SQLite/локальная база без SSL: проверять нечего.
+        return ssl_verify_enabled()
+
+    from sqlalchemy import text as sa_text
+    from sqlalchemy.pool import NullPool
+
+    probe = create_async_engine(
+        url,
+        connect_args={"ssl": _ssl_context(True), "command_timeout": 10},
+        poolclass=NullPool,
+    )
+    try:
+        async with probe.connect() as conn:
+            await conn.execute(sa_text("SELECT 1"))
+    except Exception as exc:  # noqa: BLE001 — решаем по типу ошибки
+        if _is_cert_error(exc):
+            structlog.get_logger().error(
+                "db.ssl_verify_fallback",
+                host=url.split("@")[-1].split("/")[0],
+                error=str(exc),
+                hint="сертификат базы не прошёл проверку: соединение без проверки, "
+                "тушить это можно через DB_SSL_VERIFY=require",
+            )
+            set_ssl_verify(False)
+        else:
+            # Не сеть и не сертификат — скорее всего база ещₑ не принимает нас.
+            # Режим не меняем: ошибку покажет первый реальный запрос.
+            structlog.get_logger().warning(
+                "db.ssl_probe_inconclusive", error=str(exc)
+            )
+    else:
+        structlog.get_logger().info("db.ssl_verified")
+    finally:
+        await probe.dispose()
+    return ssl_verify_enabled()
+
+
 def get_engine() -> AsyncEngine:
-    global _engine, _sessionmaker
+    global _engine, _sessionmaker, _ssl_verify
     if _engine is None:
         settings = get_settings()
         url = _normalize_url(settings.database_url)
@@ -87,12 +234,7 @@ def get_engine() -> AsyncEngine:
         
         if "asyncpg" in url:
             if _ssl_enabled_for(url):
-                # Создаем SSL-контекст: Neon требует SSL, а сам сертификат
-                # (managed-база) не всегда в системных корнях.
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                connect_args["ssl"] = ctx
+                connect_args["ssl"] = _ssl_context(ssl_verify_enabled())
             # Небольшой таймаут на выполнение команд, чтобы не висеть вечно
             connect_args["command_timeout"] = 60
 
@@ -120,6 +262,8 @@ def get_engine() -> AsyncEngine:
             "db.engine_created",
             host=url.split("@")[-1].split("/")[0],
             ssl="ssl" in connect_args,
+            # Видно в логе контейнера: шифрование есть и сертификат проверяется?
+            ssl_verify=ssl_verify_enabled() if "ssl" in connect_args else None,
         )
     return _engine
 

@@ -166,8 +166,33 @@ async def store_bytes(
 
 
 async def store_upload(session: AsyncSession, upload: UploadFile) -> MediaBlob:
-    raw = await upload.read()
+    """Принять снимок с ограничением по размеру ВО ВРЕМЯ чтения.
+
+    Раньше здесь стоял `await upload.read()` без ограничения, а правило «до 8 МБ»
+    проверялось позже, в `store_bytes`, — то есть уже после того, как тело целиком
+    легло в память или во временный файл. Теперь чтение обрывается на первом же
+    куске, который выводит нас за предел: загрузка на гигабайт больше не может
+    занять диск контейнера (ауд. 26.10.2026, S-2). Отдельный предохранитель по
+    `Content-Length` живёт в `app/api/guards.py`; здесь — защита в глубину на
+    случай chunked-тела, у которого длины нет вовсе.
+    """
+    raw = await read_capped(upload)
     return await store_bytes(session, raw, mime=upload.content_type)
+
+
+async def read_capped(upload: UploadFile, limit: int = MAX_BYTES) -> bytes:
+    """Прочитать тело порциями, оборвавшись на превышении предела."""
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await upload.read(64 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > limit:
+            raise MediaError("file_too_large")
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 async def cache_telegram_photo(

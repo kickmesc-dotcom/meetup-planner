@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,7 @@ from aiogram.types import (
 )
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api import (
     routes_admin,
@@ -53,6 +55,11 @@ from app.bot.scheduler import (
     run_scheduler_leadership,
     shutdown_scheduler,
 )
+from app.api.guards import (
+    BodySizeLimitMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.config import get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_seed import seed_hr
@@ -70,6 +77,20 @@ def _configure_logging(level: str) -> None:
             structlog.processors.JSONRenderer(),
         ],
     )
+
+
+# Срок проверки базы в `/readyz`. Две секунды — это уже плохо (нормальный
+# `SELECT 1` на Neon — единицы миллисекунд), но ещₑ не «база лежит».
+READY_DB_TIMEOUT_SECONDS = 2.0
+
+
+async def _db_ping() -> None:
+    """Самый дешёвый запрос к базе: ответила — контейнер готов к трафику."""
+    from sqlalchemy import text
+
+    sm = get_sessionmaker()
+    async with sm() as session:
+        await session.execute(text("SELECT 1"))
 
 async def _register_bot_metadata() -> bool:
     """Команды и кнопка меню. Возвращает `True`, если команды встали.
@@ -233,7 +254,17 @@ async def _register_telegram_metadata_with_retry() -> None:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     _configure_logging(settings.log_level)
-    
+
+    # 0. Проверка сертификата базы (аудит 26.10.2026, S-4). До первого обращения к
+    # базе: если сертификат действительно невалиден, движок пересоздастся без
+    # проверки и в логе будет громкая ошибка. Иначе — работаем с проверкой.
+    try:
+        from app.db.base import probe_ssl_verification
+
+        await probe_ssl_verification()
+    except Exception as exc:  # noqa: BLE001 — старт важнее диагностики
+        structlog.get_logger().warning("db.ssl_probe_failed", error=str(exc))
+
     # 1. Сидинг пользователей (Локальная операция с БД)
     sm = get_sessionmaker()
     async with sm() as session:
@@ -351,12 +382,40 @@ def create_app() -> FastAPI:
             session_auth.reset(auth_token)
             reset_org(token)
 
+    # Предохранители периметра (аудит 26.10.2026, находки S-1…S-3).
+    #
+    # Порядок важен и не случаен: `add_middleware` в Starlette вставляет каждое
+    # следующее middleware НАРУЖУ, поэтому пишем их от внутреннего к внешнему.
+    # Цепочка получается такая:
+    #
+    #   security headers → CORS → лимит частоты → лимит размера → маршруты
+    #
+    # Почему так: CORS должен быть снаружи лимитов, иначе браузер не прочтёт
+    # `429` (ответ без CORS-заголовков выглядит для страницы сетевой ошибкой, и
+    # человек вместо «слишком много попыток» увидит «что-то пошло не так»).
+    # Лимит размера тела — внутри лимита частоты: отказанному запросу незачем
+    # читать тело вообще.
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origin_list or ["*"],
-        allow_credentials=True,
+        # Белый список, а не `*`: прод-проба 26.10.2026 показала, что с `*` и
+        # `allow_credentials=True` Starlette отражает в ответ ЛЮБОЙ Origin
+        # запроса (`access-control-allow-origin: https://evil.example`).
+        allow_origins=settings.cors_allowed_origins,
+        allow_origin_regex=settings.cors_origin_regex_or_none,
+        allow_credentials=settings.cors_credentials_allowed,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+    if settings.cors_allow_all and settings.cors_credentials_allowed:  # pragma: no cover - защита
+        structlog.get_logger().warning("cors.wide_open_with_credentials")
+    structlog.get_logger().info(
+        "cors.configured",
+        origins=settings.cors_allowed_origins,
+        regex=bool(settings.cors_origin_regex_or_none),
+        credentials=settings.cors_credentials_allowed,
     )
     app.include_router(bot_webhook.router)
     # Вход по почте: регистрация, вход, сессии, сброс (B2B_PLATFORM_PLAN, 2.1).
@@ -408,7 +467,49 @@ def create_app() -> FastAPI:
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
+        """Живой ли процесс. Ничего не проверяет — для этого есть `/readyz`.
+
+        Разделение намеренное: оркестратор по `/healthz` решает, перезапускать
+        ли контейнер (упавший процесс — да, упавшая база — нет), а по `/readyz`
+        — пускать ли в него трафик.
+        """
         return {"status": "ok"}
+
+    @app.get("/readyz")
+    async def readyz() -> JSONResponse:
+        """Готов ли контейнер работать: отвечает ли база.
+
+        Зачем (аудит 26.10.2026, S-5): `/healthz` возвращал `ok` без единого
+        обращения к БД, поэтому оркестратор и наши скрипты выкладки считали
+        контейнер здоровым, пока все ручки отдавали 500. Здесь один дешёвый
+        `SELECT 1` с коротким сроком: недоступная база — честный `503` с
+        причиной, а не «ок».
+        """
+        started = time.monotonic()
+        try:
+            await asyncio.wait_for(_db_ping(), timeout=READY_DB_TIMEOUT_SECONDS)
+        except (TimeoutError, asyncio.TimeoutError):
+            structlog.get_logger().warning("readyz.db_timeout")
+            return JSONResponse(
+                {"status": "degraded", "db": "timeout"}, status_code=503
+            )
+        except Exception as exc:  # noqa: BLE001 — любая причина недоступности
+            structlog.get_logger().warning("readyz.db_failed", error=str(exc))
+            return JSONResponse(
+                {
+                    "status": "degraded",
+                    "db": "error",
+                    "reason": type(exc).__name__,
+                },
+                status_code=503,
+            )
+        return JSONResponse(
+            {
+                "status": "ok",
+                "db": "ok",
+                "ms": round((time.monotonic() - started) * 1000, 1),
+            }
+        )
 
     return app
 
