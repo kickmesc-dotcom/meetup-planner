@@ -24,7 +24,7 @@ import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
-import { tx, useTx, type Locale } from "@/i18n";
+import { intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 import { useUI } from "@/store/ui";
 
 /**
@@ -87,7 +87,7 @@ function fmtDue(iso: string | null, locale: Locale): string {
   if (!iso) return tx(locale, "без срока");
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return tx(locale, "без срока");
-  const time = d.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", {
+  const time = d.toLocaleTimeString(intlLocaleFor(locale), {
     hour: "2-digit",
     minute: "2-digit",
     // Секунды показываем только когда они реально заданы: в обычном
@@ -101,7 +101,7 @@ function fmtDue(iso: string | null, locale: Locale): string {
   if (diff === 0) return tx(locale, "сегодня {time}", { time });
   if (diff === 1) return tx(locale, "завтра {time}", { time });
   if (diff === -1) return tx(locale, "вчера {time}", { time });
-  const day = d.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", {
+  const day = d.toLocaleDateString(intlLocaleFor(locale), {
     day: "2-digit",
     month: "2-digit",
   });

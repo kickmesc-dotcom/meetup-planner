@@ -17,6 +17,7 @@ import { ApiError } from "@/api/client";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   LOCALE_STORAGE_KEY,
+  currentIntlLocale,
   initLocale,
   translate,
   tx,
@@ -31,7 +32,9 @@ const reload = vi.fn();
 
 beforeEach(() => {
   localStorage.clear();
-  useLocale.setState({ locale: "ru" });
+  // Пакет сбрасываем вместе с локалью: иначе тест, выключивший узбекский,
+  // влиял бы на следующий — и проверка «третий язык есть» падала бы через раз.
+  useLocale.setState({ locale: "ru", uzPackAvailable: true });
   Object.defineProperty(window, "location", {
     configurable: true,
     value: { ...window.location, reload },
@@ -136,6 +139,76 @@ describe("переключение языка", () => {
     expect(
       screen.getByRole("button", { name: "English" }).getAttribute("aria-pressed"),
     ).toBe("true");
+  });
+});
+
+describe("узбекский пакет организации", () => {
+  it("третий язык есть, пока пакет включён", () => {
+    render(<LanguageSwitcher />);
+    expect(screen.getByRole("button", { name: "Oʻzbekcha" })).toBeTruthy();
+  });
+
+  it("выключенный пакет прячет язык, а не гасит кнопку", () => {
+    // «Есть, но не для тебя» — вопрос без ответа внутри приложения. Поэтому
+    // кнопки просто нет.
+    useLocale.setState({ uzPackAvailable: false });
+    render(<LanguageSwitcher />);
+    expect(screen.queryByRole("button", { name: "Oʻzbekcha" })).toBeNull();
+    expect(screen.getByRole("button", { name: "English" })).toBeTruthy();
+  });
+
+  it("выключение пакета возвращает человека на русский сразу", () => {
+    useLocale.getState().setLocale("uz");
+    expect(document.documentElement.lang).toBe("uz");
+
+    useLocale.getState().setUzPackAvailable(false);
+
+    expect(useLocale.getState().locale).toBe("ru");
+    expect(document.documentElement.lang).toBe("ru");
+    // И в хранилище: иначе после перезапуска человек снова оказался бы на
+    // языке, которого организация больше не обещает.
+    expect(localStorage.getItem(LOCALE_STORAGE_KEY)).toBe("ru");
+  });
+
+  it("переводит интерфейс без перезагрузки", () => {
+    render(
+      <>
+        <LanguageSwitcher />
+        <Probe />
+      </>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Oʻzbekcha" }));
+    expect(screen.getByTestId("probe").textContent).toBe("Voqealar");
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("переводит тексты экранов, а непереведённое оставляет русским", () => {
+    expect(tx("uz", "Открыть чек-лист")).toBe("Chek-listni ochish");
+    expect(tx("uz", "Чек-лист смены")).toBe("Smena chek-listi");
+    // Строка без перевода — русская, а не ключ и не пустота.
+    expect(tx("uz", "Строка, которой нет в пакете")).toBe(
+      "Строка, которой нет в пакете",
+    );
+  });
+
+  it("даты и числа идут по узбекской локали", () => {
+    const original = Object.getOwnPropertyDescriptor(window, "navigator");
+    Object.defineProperty(window, "navigator", {
+      configurable: true,
+      value: { ...window.navigator, language: "uz-UZ", languages: ["uz-UZ"] },
+    });
+    try {
+      useLocale.getState().setLocale("uz");
+      expect(currentIntlLocale()).toBe("uz-UZ");
+      // Январь узбекского календаря — не «январь» и не «January».
+      const month = new Date(2026, 0, 15).toLocaleDateString(
+        currentIntlLocale(),
+        { month: "long" },
+      );
+      expect(month.toLowerCase()).toContain("yanvar");
+    } finally {
+      if (original) Object.defineProperty(window, "navigator", original);
+    }
   });
 });
 

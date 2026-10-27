@@ -1542,4 +1542,33 @@ export const EN_CONTENT: Record<string, string> = {
   "Открыть поручения": "Open tasks",
   "Числа считаются по тем же правилам видимости, что журнал и задачи: чужого здесь не показывается.":
     "The numbers follow the same visibility rules as the journal and tasks: nothing foreign is shown here.",
+  // Языковой пакет (план, 8.3): админский экран «Языки» и его тексты.
+  "Языки": "Languages",
+  "Языковой пакет для команды: включён по умолчанию":
+    "Uzbek pack: on by default",
+  "Языковой пакет команды": "The team language pack",
+  "Узбекский язык": "Uzbek",
+  "Переведены рабочие экраны смены: чек-лист и мои задачи. Остальное остаётся русским — непереведённая строка читается, а не превращается в код.":
+    "The shift screens are translated: the checklist and my tasks. The rest stays Russian — an untranslated line still reads as text, not as a key.",
+  "Влияет на всех: узбекский появляется в переключателе языка у каждого сотрудника. Выключено — в переключателе остаются русский и английский.":
+    "Affects everyone: Uzbek appears in every employee's language switcher. When off, the switcher keeps Russian and English.",
+  "Решает владелец организации: языковой пакет — часть тарифа, а не настройка смены.":
+    "Decided by the organization owner: the language pack is part of the plan, not a shift setting.",
+  "Менять может только владелец организации: языковой пакет — часть тарифа. Попроси его включить перевод.":
+    "Only the organization owner can change this: the language pack is part of the plan. Ask them to turn the translation on.",
+  "Как работает перевод": "How the translation works",
+  // Единицы для «4 ч», «3 дня» в экране проблем. Ключи были только
+  // русскими: `txIn` их берёт, а страж покрытия видит только `tx(...)`.
+  // Появились вместе с узбекским пакетом — и заодно починили английский.
+  "день": "day",
+  "дня": "days",
+  "дней": "days",
+  "ч": "h",
+  "меньше часа": "less than an hour",
+  "Сотрудник выбирает язык сам кнопками RU / EN / UZ — выбор хранится в его устройстве и переживает перезапуск. Организация решает только, доступен ли узбекский.":
+    "Each employee picks the language with the RU / EN / UZ buttons — the choice is stored on their device and survives a restart. The organization only decides whether Uzbek is available.",
+  "Русский — оригинал и запасной вариант: если строки нет в пакете, она показывается по-русски. Поэтому пакет можно включать по мере перевода, а не «когда всё готово».":
+    "Russian is both the original and the fallback: if a line is missing from the pack, it shows in Russian. That means the pack can be enabled as translation proceeds, not only when everything is done.",
+  "Выключили пакет — те, у кого был выбран узбекский, сразу возвращаются на русский: остаться на языке, которого организация больше не обещает, выглядит как сбой.":
+    "Turn the pack off and anyone who had Uzbek selected returns to Russian right away: staying on a language the organization no longer offers looks like a bug.",
 };

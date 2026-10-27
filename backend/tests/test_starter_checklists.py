@@ -43,6 +43,10 @@ from app.services import hr_checklists  # noqa: E402
 
 TABLES = (
     "organizations",
+    # Членство в организации нужно чтению настроек: по нему решается, может ли
+    # человек менять языковой пакет (`organization_members.role`). Без таблицы
+    # падало бы не право, а сам запрос — и не только про язык.
+    "organization_members",
     "users",
     "employees",
     "departments",

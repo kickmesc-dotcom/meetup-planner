@@ -14,7 +14,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { InlineIcon } from "@/components/Icon";
 import { useUI } from "@/store/ui";
-import { useTx, type Locale } from "@/i18n";
+import { intlLocaleFor, useTx, type Locale } from "@/i18n";
 
 /**
  * Отчёт смены.
@@ -39,7 +39,7 @@ function todayIso(): string {
 function fmtDate(iso: string, locale: Locale): string {
   const d = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", {
+  return d.toLocaleDateString(intlLocaleFor(locale), {
     day: "2-digit",
     month: "long",
     year: "numeric",

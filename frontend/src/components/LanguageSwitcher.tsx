@@ -1,21 +1,28 @@
 /**
- * Переключатель языка: RU / EN, без перезагрузки.
+ * Переключатель языка: RU / EN / UZ, без перезагрузки.
  *
- * Две кнопки вместо выпадающего списка: языков ровно два, а список на экране
+ * Кнопки вместо выпадающего списка: языков максимум три, а список на экране
  * входа — лишний тап и лишний слой. Выбранный язык подсвечен, `aria-pressed`
  * говорит то же скринридеру.
+ *
+ * Узбекский — не всегда: это языковой пакет организации (план, 8.3), и когда
+ * владелец его выключил, кнопки просто нет. Показывать её серой нельзя:
+ * «есть, но не для тебя» — это вопрос, на который сотрудник не найдёт ответа
+ * в приложении.
  */
-import { useT, useLocale, type Locale } from "@/i18n";
+import { useT, useLocale, localesFor, type Locale, type MessageKey } from "@/i18n";
 import { haptic } from "@/tg/webapp";
 
-const OPTIONS: { value: Locale; label: "locale.ru" | "locale.en" }[] = [
-  { value: "ru", label: "locale.ru" },
-  { value: "en", label: "locale.en" },
-];
+const LABELS: Record<Locale, MessageKey> = {
+  ru: "locale.ru",
+  en: "locale.en",
+  uz: "locale.uz",
+};
 
 export default function LanguageSwitcher({ className }: { className?: string }) {
   const { locale, t } = useT();
   const setLocale = useLocale((s) => s.setLocale);
+  const uzPackAvailable = useLocale((s) => s.uzPackAvailable);
 
   return (
     <div
@@ -24,26 +31,26 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
       data-testid="language-switcher"
       className={["flex items-center gap-0.5 rounded-full bg-tg-secondary-bg/70 p-0.5", className ?? ""].join(" ")}
     >
-      {OPTIONS.map((option) => {
-        const active = option.value === locale;
+      {localesFor(uzPackAvailable).map((option) => {
+        const active = option === locale;
         return (
           <button
-            key={option.value}
+            key={option}
             type="button"
             aria-pressed={active}
-            aria-label={t(option.label)}
-            title={t(option.label)}
+            aria-label={t(LABELS[option])}
+            title={t(LABELS[option])}
             onClick={() => {
               if (active) return;
               haptic("selection");
-              setLocale(option.value);
+              setLocale(option);
             }}
             className={[
               "min-h-8 min-w-9 rounded-full px-2 text-2xs font-semibold uppercase transition-colors",
               active ? "bg-tg-bg text-tg-text" : "text-tg-hint",
             ].join(" ")}
           >
-            {option.value}
+            {option}
           </button>
         );
       })}

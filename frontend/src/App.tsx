@@ -48,7 +48,7 @@ import Icon from "./components/Icon";
 import TabTransition from "./components/TabTransition";
 import ThemeSwitcher from "./components/ThemeSwitcher";
 import LanguageSwitcher from "./components/LanguageSwitcher";
-import { useT } from "./i18n";
+import { useLocale, useT } from "./i18n";
 import SimulationBanner from "./components/SimulationBanner";
 import { useSimulation } from "./store/simulation";
 import { useUI } from "./store/ui";
@@ -125,6 +125,16 @@ export default function App() {
     const start = getStartParam();
     if (start === "achievements" || start === "feed") setTab("feed");
   }, [setTab]);
+
+  // Языковой пакет (план, 8.3): включён ли узбекский в этой организации.
+  // Флаг приходит вместе с настройками, которые читает каждый вошедший. Если
+  // пакет выключили, пока человек был внутри, его вернут на русский сразу -
+  // иначе экран оставался бы на языке, которого организация больше не обещает.
+  const setUzPackAvailable = useLocale((s) => s.setUzPackAvailable);
+  const uzPack = orgSetup.data?.uz_pack;
+  useEffect(() => {
+    if (typeof uzPack === "boolean") setUzPackAvailable(uzPack);
+  }, [uzPack, setUzPackAvailable]);
 
   if (me.isPending || users.isPending) {
     // На ПК скелет тоже широкий: иначе при загрузке на секунду мелькала бы

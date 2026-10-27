@@ -1,3 +1,4 @@
+import { type Locale } from "@/i18n";
 import { getInitData } from "@/tg/webapp";
 
 import { api, apiPublicUrl } from "./client";
@@ -403,8 +404,11 @@ export interface OrgSetup {
   cross_department_watch: boolean;
   allow_hide_last_seen: boolean;
   allow_hide_media: boolean;
+  /** Языковой пакет (узбекский): включён по умолчанию, решает владелец. */
+  uz_pack: boolean;
   presets: { name: string; emoji: string }[];
   can_edit: boolean;
+  can_manage_packs: boolean;
 }
 
 export interface OrgSetupPatch {
@@ -417,6 +421,7 @@ export interface OrgSetupPatch {
   cross_department_watch?: boolean;
   allow_hide_last_seen?: boolean;
   allow_hide_media?: boolean;
+  uz_pack?: boolean;
   done?: boolean;
 }
 
@@ -672,8 +677,15 @@ export const fetchHrFeed = (
     departmentId?: number | null;
     kinds?: FeedKind[];
     limit?: number;
-    /** Язык текста записи: его собирает сервер, а не интерфейс. */
-    lang?: "ru" | "en";
+    /**
+     * Язык текста записи: его собирает СЕРВЕР, а не интерфейс.
+     *
+     * Узбекский принимается, но серверный текст записей пока только русский
+     * и английский: он отдаёт русский. Это не потеря — запись всё равно
+     * читается, — но замечать это надо: «лента на узбекском» ещё не готова,
+     * интерфейс вокруг неё — да.
+     */
+    lang?: Locale;
   } = {},
 ) => {
   const params = new URLSearchParams();

@@ -81,6 +81,11 @@ class OrgSetup:
     # Сотрудник может сам выключить «последний заход» / «последнее медиа».
     allow_hide_last_seen: bool = True
     allow_hide_media: bool = True
+    # Языковой пакет (узбекский). Включён по умолчанию: часть команды — узбеки,
+    # и выключенный по умолчанию перевод означал бы, что его не найдут.
+    # Выключает владелец организации — в будущем это платная опция тарифа,
+    # поэтому решение про деньги здесь, а не у руководителя смены.
+    uz_pack: bool = True
 
     @property
     def can_toggle_last_seen(self) -> bool:
@@ -121,6 +126,9 @@ def _parse(raw: str | None) -> OrgSetup:
     if not isinstance(data, dict):
         return OrgSetup()
     visibility = str(data.get("profile_visibility") or "colleagues")
+    # Строго `isinstance(bool)`, а не `bool(...)`: строка "false" в старом
+    # JSON-значении дала бы True, и выключенный пакет молча ожил бы.
+    pack = data.get("uz_pack")
     return OrgSetup(
         done=bool(data.get("done")),
         industry=str(data.get("industry") or "restaurant"),
@@ -133,6 +141,9 @@ def _parse(raw: str | None) -> OrgSetup:
         cross_department_watch=bool(data.get("cross_department_watch")),
         allow_hide_last_seen=bool(data.get("allow_hide_last_seen", True)),
         allow_hide_media=bool(data.get("allow_hide_media", True)),
+        # Строго `isinstance(bool)`, а не `bool(...)`: строка "false" в старом
+        # JSON-значении дала бы True, и выключённый пакет молча ожил бы.
+        uz_pack=pack if isinstance(pack, bool) else True,
     )
 
 
@@ -153,6 +164,7 @@ async def save(session: AsyncSession, setup: OrgSetup, *, commit: bool = True) -
         "cross_department_watch": setup.cross_department_watch,
         "allow_hide_last_seen": setup.allow_hide_last_seen,
         "allow_hide_media": setup.allow_hide_media,
+        "uz_pack": setup.uz_pack,
     }
     key = _key()
     row = await session.get(AdminConfig, key)
@@ -179,6 +191,7 @@ def apply_answers(
     cross_department_watch: bool | None = None,
     allow_hide_last_seen: bool | None = None,
     allow_hide_media: bool | None = None,
+    uz_pack: bool | None = None,
     done: bool | None = None,
 ) -> OrgSetup:
     """Собрать новое состояние из частичного ответа мастера.
@@ -208,6 +221,8 @@ def apply_answers(
         )
     if allow_hide_media is not None:
         next_setup = replace(next_setup, allow_hide_media=bool(allow_hide_media))
+    if uz_pack is not None:
+        next_setup = replace(next_setup, uz_pack=bool(uz_pack))
     if done is not None:
         next_setup = replace(next_setup, done=bool(done))
     return next_setup

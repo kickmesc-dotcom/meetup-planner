@@ -11,7 +11,7 @@ import {
   startOfYear,
 } from "date-fns";
 
-import { currentLocale, tx } from "@/i18n";
+import { currentLocale, tx, type Locale } from "@/i18n";
 import type { ZoomLevel } from "@/store/ui";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -365,7 +365,7 @@ export function statusLabelShort(s: 1 | 2 | 3): string {
  * были такими же, как раньше в русском интерфейсе. Английский — отдельным
  * списком, тоже без падежей.
  */
-const MONTHS_SHORT: Record<"ru" | "en", string[]> = {
+const MONTHS_SHORT: Record<Locale, string[]> = {
   ru: [
     "янв", "фев", "мар", "апр", "май", "июн",
     "июл", "авг", "сен", "окт", "ноя", "дек",
@@ -374,8 +374,12 @@ const MONTHS_SHORT: Record<"ru" | "en", string[]> = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
   ],
+  uz: [
+    "yan", "fev", "mar", "apr", "may", "iyn",
+    "iyl", "avg", "sen", "okt", "noy", "dek",
+  ],
 };
-const MONTHS_FULL: Record<"ru" | "en", string[]> = {
+const MONTHS_FULL: Record<Locale, string[]> = {
   ru: [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
@@ -384,10 +388,17 @@ const MONTHS_FULL: Record<"ru" | "en", string[]> = {
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
   ],
+  // Узбекские месяцы — латиницей, как в официальном календаре Узбекистана.
+  // Это не подпись интерфейса, а данные: их не переводят через `tx`.
+  uz: [
+    "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+    "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr",
+  ],
 };
-const WEEKDAYS_SHORT: Record<"ru" | "en", string[]> = {
+const WEEKDAYS_SHORT: Record<Locale, string[]> = {
   ru: ["пн", "вт", "ср", "чт", "пт", "сб", "вс"],
   en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  uz: ["Dsh", "Ssh", "Chor", "Pay", "Jum", "Shan", "Yak"],
 };
 
 export function monthShort(monthIndex: number): string {

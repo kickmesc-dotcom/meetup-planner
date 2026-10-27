@@ -17,7 +17,7 @@ import ErrorState from "@/components/ErrorState";
 import ProgressBar from "@/components/ProgressBar";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
-import { useTx } from "@/i18n";
+import { intlLocaleFor, useTx, type Locale } from "@/i18n";
 
 /**
  * SemiTaskBot: «Чек-лист смены».
@@ -316,7 +316,9 @@ function ItemRow({
   onToggleNote: () => void;
   onPhoto: (media: MediaItem) => void;
   onSaveNote: (note: string) => void;
-  locale: "ru" | "en";
+  // Локаль целиком, а не «ru | en»: иначе узбекский не смог бы прийти сюда,
+  // и время закрытия пункта печаталось бы по-русски на узбекском экране.
+  locale: Locale;
 }) {
   const { tx } = useTx();
   const [note, setNote] = useState(item.note ?? "");
@@ -417,7 +419,7 @@ function ItemRow({
             <div className="mt-1 text-xs text-tg-hint">
               {tx("закрыто в {time}", {
                 time: new Date(item.done_at).toLocaleTimeString(
-                  locale === "en" ? "en-GB" : "ru-RU",
+                  intlLocaleFor(locale),
                   { hour: "2-digit", minute: "2-digit" },
                 ),
               })}

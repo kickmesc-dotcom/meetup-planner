@@ -17,7 +17,7 @@ import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
-import { currentIntlLocale, tx, useTx, type Locale } from "@/i18n";
+import { currentIntlLocale, intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 import {
   countFreshItems,
   markFeedSeen,
@@ -95,7 +95,7 @@ function dayLabel(iso: string, locale: Locale): string {
   // Формат берём у Intl, а не склеиваем руками: в английском день недели
   // стоит перед числом («Wednesday, 21 October»), и переставлять его
   // вручную — это гарантированная ошибка в одном из двух языков.
-  return d.toLocaleDateString(locale === "en" ? "en-GB" : "ru-RU", {
+  return d.toLocaleDateString(intlLocaleFor(locale), {
     day: "numeric",
     month: "long",
     weekday: "long",

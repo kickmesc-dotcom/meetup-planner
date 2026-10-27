@@ -29,6 +29,8 @@ const SETUP: OrgSetup = {
   cross_department_watch: false,
   allow_hide_last_seen: true,
   allow_hide_media: true,
+  uz_pack: true,
+  can_manage_packs: true,
   presets: [
     { name: "Кухня", emoji: "🍳" },
     { name: "Бариста", emoji: "☕" },

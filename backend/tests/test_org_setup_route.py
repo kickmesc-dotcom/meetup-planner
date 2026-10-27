@@ -32,13 +32,23 @@ from app.db.hr_models import (  # noqa: E402
     Employee,
 )
 from app.db.models import User  # noqa: E402
-from app.db.org_models import DEFAULT_ORG_ID, Organization, reset_org, set_org  # noqa: E402
+from app.db.org_models import (  # noqa: E402
+    DEFAULT_ORG_ID,
+    Organization,
+    OrganizationMember,
+    reset_org,
+    set_org,
+)
 
 # Чек-листы в списке не для галочки: мастер заводит вместе с подразделениями
 # стартовую пару шаблонов (открытие и закрытие смены), и без этих таблиц
 # проверять ему пришлось бы не то, что делает он, а то, что смогло записаться.
 TABLES = (
     "organizations",
+    # Членство в организации: по нему решается право на языковой пакет
+    # (`organization_members.role`), а не по HR-роли. Без таблицы чтение
+    # настроек падало бы целиком — вместе с мастером и политикой приватности.
+    "organization_members",
     "users",
     "employees",
     "departments",
@@ -139,3 +149,70 @@ async def test_unfinished_setup_keeps_the_wizard_open(session) -> None:
     await session.refresh(employee)
     assert employee.onboarding_state == ONBOARDING_NEW
     assert (await session.scalars(select(Department))).all() == []
+
+
+# --------------------------------------------------------------------------
+# Языковой пакет (план, 8.3)
+# --------------------------------------------------------------------------
+
+
+async def _add_member(session, *, role: str) -> None:
+    """Строка членства в организации с нужной ролью.
+
+    Отдельно от `_owner`: HR-роль (`admin`) и роль в организации (`owner`) —
+    разные вещи, и пакет решается именно второй.
+    """
+    session.add(
+        OrganizationMember(
+            org_id=DEFAULT_ORG_ID, user_id=1, role=role
+        )
+    )
+    await session.commit()
+
+
+async def test_uz_pack_is_on_by_default_and_visible_to_everyone(session) -> None:
+    """По умолчанию перевод включён, и его видит любой сотрудник.
+
+    По умолчанию именно включён: часть команды — узбеки, и если пакет надо
+    сначала найти в настройках, им никто не воспользуется.
+    """
+    user, employee = await _owner(session)
+
+    out = await routes_hr.get_org_setup(session, user, employee)
+
+    assert out.uz_pack is True
+    # Владельца ещё нет в `organization_members` — тумблер закрыт, но сам
+    # факт включённости от этого не меняется.
+    assert out.can_manage_packs is False
+
+
+async def test_owner_can_turn_the_pack_off(session) -> None:
+    user, employee = await _owner(session)
+    await _add_member(session, role="owner")
+
+    out = await routes_hr.save_org_setup(
+        routes_hr.OrgSetupIn(uz_pack=False), session, user, employee
+    )
+
+    assert out.uz_pack is False
+    assert out.can_manage_packs is True
+    # Выключение переживает следующее сохранение мастера: руководитель,
+    # поправивший отрасли, не должен вернуть пакет обратно.
+    await routes_hr.save_org_setup(
+        routes_hr.OrgSetupIn(industry="cafe"), session, user, employee
+    )
+    assert (await routes_hr.get_org_setup(session, user, employee)).uz_pack is False
+
+
+async def test_manager_cannot_change_the_pack(session) -> None:
+    """Руководитель правит мастер, но не тариф: 403 и явный код."""
+    user, employee = await _owner(session)
+    await _add_member(session, role="manager")
+
+    with pytest.raises(Exception) as caught:
+        await routes_hr.save_org_setup(
+            routes_hr.OrgSetupIn(uz_pack=False), session, user, employee
+        )
+
+    assert getattr(caught.value, "detail", None) == "owner_only"
+    assert (await routes_hr.get_org_setup(session, user, employee)).uz_pack is True

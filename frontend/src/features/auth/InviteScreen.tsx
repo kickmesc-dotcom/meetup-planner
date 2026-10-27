@@ -11,7 +11,7 @@ import { ApiError, clearAllTokens } from "@/api/client";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
-import { useErrorMessage, useT, useTx } from "@/i18n";
+import { intlLocaleFor, useErrorMessage, useT, useTx } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
 import { haptic } from "@/tg/webapp";
 
@@ -173,7 +173,7 @@ export default function InviteScreen({
 
   const invite = preview.data;
   const until = new Date(invite.expires_at).toLocaleDateString(
-    locale === "en" ? "en-GB" : "ru-RU",
+    intlLocaleFor(locale),
     { day: "numeric", month: "long" },
   );
 

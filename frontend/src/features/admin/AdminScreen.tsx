@@ -21,6 +21,7 @@ import PollPresetsScreen from "./PollPresetsScreen";
 import ProxyScreen from "./ProxyScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
+import LanguagesScreen from "./LanguagesScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
@@ -56,6 +57,7 @@ type Section =
   | "birthdays"
   | "poll-presets"
   | "texts"
+  | "languages"
   | "intervals"
   | "proxy"
   | "jobs"
@@ -160,6 +162,17 @@ const SECTIONS: SectionDef[] = [
     icon: "layout",
     title: "Вид ленты",
     subtitle: "Компактный (миниатюры участников) / классический",
+  },
+  {
+    // Группа «Смена и люди», а не «Тексты»: пакет — про людей в команде, и
+    // решает его владелец, а не тот, кто правит подписи. В «Текстах» он ещё
+    // и ломал бы вид группы: она бы перестала быть пустой при переносе
+    // «Текстов приложения» в частое.
+    id: "languages",
+    group: GROUP_PEOPLE,
+    icon: "globe",
+    title: "Языки",
+    subtitle: "Узбекский пакет для команды: включён по умолчанию",
   },
   {
     id: "kpi",
@@ -349,6 +362,7 @@ export default function AdminScreen({ users, platform = false }: Props) {
   if (section === "birthdays") return <BirthdaysScreen onBack={back} />;
   if (section === "poll-presets") return <PollPresetsScreen onBack={back} />;
   if (section === "texts") return <AppTextsScreen onBack={back} />;
+  if (section === "languages") return <LanguagesScreen onBack={back} />;
   if (section === "intervals") return <IntervalsScreen onBack={back} />;
   if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;

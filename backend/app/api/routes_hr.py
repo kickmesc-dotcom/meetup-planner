@@ -58,6 +58,7 @@ from app.services import (
     hr_training,
     hr_training_plan,
     org_setup,
+    orgs,
     weekdays,
 )
 
@@ -232,10 +233,16 @@ class OrgSetupOut(BaseModel):
     cross_department_watch: bool = False
     allow_hide_last_seen: bool = True
     allow_hide_media: bool = True
+    # Языковой пакет (узбекский), включён по умолчанию. Поле отдаётся всем:
+    # от него зависит, есть ли в переключателе третий язык.
+    uz_pack: bool = True
     # Подсказки для шага «подразделения» — под выбранную отрасль.
     presets: list[dict[str, str]] = []
     # Может ли смотрящий менять настройку (мастер открыт только им).
     can_edit: bool = False
+    # Языковой пакет — решение владельца (будущая платная опция тарифа),
+    # поэтому у руководителя смены тумблер виден, но неактивен.
+    can_manage_packs: bool = False
 
 
 class OrgSetupIn(BaseModel):
@@ -250,6 +257,7 @@ class OrgSetupIn(BaseModel):
     cross_department_watch: bool | None = None
     allow_hide_last_seen: bool | None = None
     allow_hide_media: bool | None = None
+    uz_pack: bool | None = None
     done: bool | None = None
 
 
@@ -1006,7 +1014,7 @@ async def department_overview(
 
 
 def _org_setup_out(
-    setup: org_setup.OrgSetup, *, can_edit: bool
+    setup: org_setup.OrgSetup, *, can_edit: bool, can_manage_packs: bool = False
 ) -> OrgSetupOut:
     return OrgSetupOut(
         done=setup.done,
@@ -1018,8 +1026,10 @@ def _org_setup_out(
         cross_department_watch=setup.cross_department_watch,
         allow_hide_last_seen=setup.allow_hide_last_seen,
         allow_hide_media=setup.allow_hide_media,
+        uz_pack=setup.uz_pack,
         presets=org_setup.presets_for(setup.industry),
         can_edit=can_edit,
+        can_manage_packs=can_manage_packs,
     )
 
 
@@ -1033,6 +1043,25 @@ def _may_edit_setup(employee: Employee, user: User) -> bool:
     )
 
 
+async def _may_manage_packs(
+    session: SessionDep, employee: Employee, user: User
+) -> bool:
+    """Может ли человек включать/выключать языковой пакет.
+
+    Только владелец организации, а не руководитель смены. Причина не в
+    строгости: языковой пакет — это будущая платная опция тарифа, то есть
+    решение про деньги. Руководитель смены настраивает работу зала, а цену
+    подписки берёт на себя тот, кто организацию завёл.
+
+    Роль берётся из `organization_members`, а не из HR-роли: HR-роли меняются
+    по сменам, а владелец — нет.
+    """
+    if employee.is_simulation:
+        return False
+    row = await orgs.member(session, org_id=employee.org_id, user_id=user.id)
+    return row is not None and row.role == "owner"
+
+
 @router.get("/org-setup", response_model=OrgSetupOut)
 async def get_org_setup(
     session: SessionDep, user: CurrentUser, employee: EmployeeDep
@@ -1043,7 +1072,11 @@ async def get_org_setup(
     приватности, а не только экран мастера. Менять — лишь руководителю.
     """
     setup = await org_setup.load(session)
-    return _org_setup_out(setup, can_edit=_may_edit_setup(employee, user))
+    return _org_setup_out(
+        setup,
+        can_edit=_may_edit_setup(employee, user),
+        can_manage_packs=await _may_manage_packs(session, employee, user),
+    )
 
 
 @router.post("/org-setup", response_model=OrgSetupOut)
@@ -1062,6 +1095,15 @@ async def save_org_setup(
     if not _may_edit_setup(employee, user):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="managers_only")
 
+    # Языковой пакет проверяется отдельно от остальных полей: руководитель
+    # правит политику смены (и это его право), а пакет — решение владельца.
+    # Иначе тумблер, выключенный владельцем, вернул бы первый же сохранённый
+    # руководителем шаг мастера — причём молча, вместе с другими ответами.
+    if body.uz_pack is not None and not await _may_manage_packs(
+        session, employee, user
+    ):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="owner_only")
+
     current = await org_setup.load(session)
     updated = org_setup.apply_answers(
         current,
@@ -1073,6 +1115,7 @@ async def save_org_setup(
         cross_department_watch=body.cross_department_watch,
         allow_hide_last_seen=body.allow_hide_last_seen,
         allow_hide_media=body.allow_hide_media,
+        uz_pack=body.uz_pack,
         done=body.done,
     )
 
@@ -1130,7 +1173,11 @@ async def save_org_setup(
             )
 
     await org_setup.save(session, updated)
-    return _org_setup_out(updated, can_edit=True)
+    return _org_setup_out(
+        updated,
+        can_edit=True,
+        can_manage_packs=await _may_manage_packs(session, employee, user),
+    )
 
 
 # --------------------------------------------------------------------------

@@ -14,7 +14,7 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
-import { tx, useTx, type Locale } from "@/i18n";
+import { intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 
 /**
  * Приёмка работы.
@@ -113,7 +113,7 @@ function fmtDue(iso: string | null, locale: Locale): string {
   if (!iso) return tx(locale, "без срока");
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return tx(locale, "без срока");
-  return d.toLocaleString(locale === "en" ? "en-GB" : "ru-RU", {
+  return d.toLocaleString(intlLocaleFor(locale), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -238,7 +238,7 @@ function ReviewRow({
         <div className="mt-0.5 text-xs text-tg-hint">
           {tx("Сдано: {when}", {
             when: new Date(assignment.done_at).toLocaleString(
-              locale === "en" ? "en-GB" : "ru-RU",
+              intlLocaleFor(locale),
             ),
           })}
         </div>

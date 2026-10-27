@@ -21,6 +21,7 @@ export const ru = {
   "locale.label": "Язык",
   "locale.ru": "Русский",
   "locale.en": "English",
+  "locale.uz": "Oʻzbekcha",
 
   // --- Вход, регистрация, сброс ---
   "auth.login.title": "Вход",
@@ -155,6 +156,7 @@ export const en: Record<MessageKey, string> = {
   "locale.label": "Language",
   "locale.ru": "Русский",
   "locale.en": "English",
+  "locale.uz": "Oʻzbekcha",
 
   "auth.login.title": "Sign in",
   "auth.register.title": "New account",
@@ -268,4 +270,138 @@ export const en: Record<MessageKey, string> = {
     "Too many attempts. Wait ten minutes or ask for an invitation link.",
   "error.bad_name": "The company name is too short.",
   "error.bad_slug": "The short address allows only latin letters, digits and hyphens.",
+};
+
+/**
+ * Узбекский словарь (план, 8.3). Латинская графика — официальная в Узбекистане.
+ *
+ * Почему это отдельный пакет, а не «ещё два словаря рядом». Узбекский нужен
+ * части команды, но не всем и не всегда: в одной сети смены говорят
+ * по-русски, в другой половина зала — узбеки. Поэтому его включает
+ * организация (флаг `uz_pack` в настройках, по умолчанию включён), а тарифное
+ * будущее этой опции — отдельный вопрос, который к самой архитектуре перевода
+ * отношения не имеет.
+ *
+ * Тип `Record<MessageKey, string>` здесь так же строг, как у `en`: новый
+ * ключ без перевода не соберётся. Это важно именно для узбекского —
+ * полупереведённая навигация хуже непереведённой.
+ */
+export const uz: Record<MessageKey, string> = {
+  "locale.label": "Til",
+  "locale.ru": "Русский",
+  "locale.en": "English",
+  "locale.uz": "Oʻzbekcha",
+
+  "auth.login.title": "Kirish",
+  "auth.register.title": "Yangi akkaunt",
+  "auth.forgot.title": "Parolni tiklash",
+  "auth.login.submit": "Kirish",
+  "auth.register.submit": "Akkaunt ochish",
+  "auth.forgot.submit": "Havolani yuborish",
+  "auth.invited": "Sizni jamoaga taklif qilishdi. Kiring yoki akkaunt oching — va darhol tashkilotga qoʻshilasiz.",
+  "auth.login.hint": "Smena ilovasi: vazifalar, chek-listlar va jadval.",
+  "auth.register.hint": "Akkaunt kompyuterdan va Telegramʼsiz ishlash uchun kerak.",
+  "auth.forgot.hint": "Pochtaga havola yuboramiz — u bir soat yashaydi va bir marta ishlaydi.",
+  "auth.sent": "Manzil roʻyxatdan oʻtgan boʻlsa, xat yoʻlda. Havolani oching va yangi parol qoʻying.",
+  "auth.backToLogin": "Kirishga qaytish",
+  "auth.name.label": "Ismingiz",
+  "auth.name.placeholder": "Majburiy emas",
+  "auth.email.label": "Pochta",
+  "auth.password.label": "Parol",
+  "auth.password.placeholder": "Kamida 8 belgi",
+  "auth.emailRequired": "Pochta manzilini kiriting.",
+  "auth.pending": "Bir soniya…",
+  "auth.forgot": "Parolni esdan chiqardim",
+  "auth.create": "Akkaunt ochish",
+  "auth.haveAccount": "Akkauntim bor",
+  "auth.telegramNote": "Telegram ichida kirish shart emas: ilova botdan ochiladi va kim ekaningizni biladi.",
+  "auth.noorg.title": "Akkaunt tayyor",
+  "auth.noorg.text": "Tashkilotga qoʻshilish qoldi: rahbardan shu pochtaga taklif yuborishni soʻrang. Shundan keyin maʼlumotlar oʻzi paydo boʻladi.",
+  "auth.noorg.leaving": "Chiqamiz…",
+  "auth.noorg.logout": "Chiqish",
+
+  "invite.joined.title": "Siz tashkilotdasiz",
+  "invite.joined.text": "{org} · {role}. Smena maʼlumotlari kirgandan keyin darhol paydo boʻladi.",
+  "invite.error.title": "Taklif ochilmadi",
+  "invite.error.go": "Ilovaga oʻtish",
+  "invite.title": "Jamoaga taklif",
+  "invite.role": "Sizga «{role}» roli bilan kirish ochiladi. {until} gacha qoʻshilish mumkin.",
+  "invite.emailNote": "Taklif {email} uchun yozilgan — faqat shu manzil orqali ishlaydi.",
+  "invite.joining": "Qoʻshilamiz…",
+  "invite.join": "Qoʻshilish",
+  "invite.later": "Hozir emas",
+  "invite.switchAccount": "Boshqa pochta bilan kirish",
+  "invite.openApp": "Ilovani ochish",
+  "role.owner": "Egasi",
+  "role.manager": "Boshqaruvchi",
+  "role.staff": "Xodim",
+
+  "reset.done.title": "Parol yangilandi",
+  "reset.done.text": "Barcha oldingi kirishlar yopildi — bu havolani boshqa birov koʻrgan boʻlsa, himoya.",
+  "reset.done.button": "Yangi parol bilan kirish",
+  "reset.title": "Yangi parol",
+  "reset.hint": "Kamida 8 belgidan iborat parol oʻylab toping. Saqlangandan keyin barcha qurilmalar akkauntdan chiqadi.",
+  "reset.password": "Parol",
+  "reset.password.placeholder": "Kamida 8 belgi",
+  "reset.repeat": "Yana bir marta",
+  "reset.save": "Parolni saqlash",
+  "reset.saving": "Saqlayapmiz…",
+  "reset.short": "Parol 8 belgidan qisqa.",
+  "reset.mismatch": "Parollar mos kelmadi.",
+  "reset.needNew": "Havola toʻgʻri kelmadimi? Yangisini soʻrang",
+
+  "verify.title": "Pochtani tasdiqlayapmiz…",
+  "verify.hint": "Bir soniya — xatdagi havolani tekshiramiz.",
+  "verify.done.title": "Pochta tasdiqlandi",
+  "verify.done.text": "Endi bu manzilga kirish, parolni tiklash va muhim xabarlar keladi. Boshqa hech narsa qilish shart emas.",
+  "verify.done.button": "Ilovaga oʻtish",
+  "verify.error.title": "Havola toʻgʻri kelmadi",
+  "verify.error.hint": "Havola ikki kun yashaydi va bir marta ishlaydi. Profilda yangisini soʻrang: «Pochtani tasdiqlash» — va yangi xatni oching.",
+  "verify.error.button": "Ilovaga",
+
+  "nav.feed": "Voqealar",
+  "nav.tasks": "Vazifalar",
+  "nav.shift": "Smena",
+  "nav.table": "Jadval",
+  "nav.team": "Jamoa",
+  "nav.admin": "Admin",
+  "nav.profile": "Profil",
+  "nav.tasksOpen": "{label}, ochiq: {count}",
+
+  "app.profile.title": "Profil",
+  "app.profile.hint": "Boʻlim, tajriba va fikr-mulohaza.",
+
+  "theme.toDark": "Tungi mavzuni yoqish",
+  "theme.toLight": "Kunduzgi mavzuni yoqish",
+
+  "error.bad_email": "Manzilda xato borga oʻxshaydi.",
+  "error.invalid_credentials": "Pochta yoki parol xato.",
+  "error.email_taken": "Bu manzil allaqachon roʻyxatdan oʻtgan — kirishga urinib koʻring.",
+  "error.password_too_short": "Parol 8 belgidan qisqa.",
+  "error.password_too_long": "Parol 128 belgidan uzun.",
+  "error.password_has_spaces": "Parol boʻsh joy bilan boshlanmasligi yoki tugamasligi kerak.",
+  "error.password_not_set": "Bu akkauntda parol yoʻq: Telegram orqali kiring yoki pochta orqali tiklang.",
+  "error.session_invalid": "Kirish muddati tugadi — qaytadan kiring.",
+  "error.reset_invalid": "Tiklash havolasi toʻgʻri kelmadi — yangisini soʻrang.",
+  "error.reset_expired": "Havola muddati tugadi — yangisini soʻrang.",
+  "error.verify_invalid": "Tasdiqlash havolasi toʻgʻri kelmadi — profilda yangisini soʻrang.",
+  "error.verify_expired": "Havola muddati tugadi (ikki kun) — profilda yangisini soʻrang.",
+  "error.org_required": "Sizni hali tashkilotga taklif qilishmagan.",
+  "error.org_inactive": "Tashkilot bloklangan — rahbarga murojaat qiling.",
+  "error.org_missing": "Tashkilot topilmadi — rahbarga murojaat qiling.",
+  "error.invite_invalid": "Havola toʻgʻri kelmadi — rahbardan yangisini soʻrang.",
+  "error.invite_expired": "Taklif muddati tugadi — yangi havola soʻrang.",
+  "error.invite_used": "Bu havoladan allaqachon foydalanishgan.",
+  "error.invite_revoked": "Taklif bekor qilindi.",
+  "error.invite_not_found": "Taklif allaqachon oʻchirilgan.",
+  "error.invite_already_accepted": "Bu havola orqali allaqachon qoʻshilishgan.",
+  "error.invite_email_mismatch": "Taklif boshqa pochtaga yozilgan — u yuborilgan manzil bilan kiring.",
+  "error.invite_limit": "Faol takliflar juda koʻp — ortiqchalarini bekor qilib, qayta urinib koʻring.",
+  "error.bad_invite_ttl": "Taklif muddati — 1 kundan 30 kungacha.",
+  "error.org_not_found":
+    "Bunday kompaniya yoʻq. Kod yoki nomni tekshiring — registr muhim emas, lekin soʻzlar mos kelishi kerak.",
+  "error.join_rate_limited":
+    "Urinishlar juda koʻp. Oʻn daqiqa kuting yoki taklif havolasini soʻrang.",
+  "error.bad_name": "Kompaniya nomi juda qisqa.",
+  "error.bad_slug": "Qisqa manzil — faqat lotin harflari, raqamlar va chiziqcha.",
 };
