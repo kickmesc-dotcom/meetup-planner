@@ -24,6 +24,8 @@ interface Props {
   ranges: AvailabilityRange[];
   users: User[];
   birthdays?: BirthdayCalendarEntry[];
+  /** Первая загрузка отметок: сетка уже настоящая, а плотность ещё неизвестна. */
+  isPending?: boolean;
 }
 
 export default function MonthView({
@@ -32,6 +34,7 @@ export default function MonthView({
   ranges,
   users,
   birthdays = [],
+  isPending = false,
 }: Props) {
   const setZoom = useUI((s) => s.setZoom);
   const setAnchor = useUI((s) => s.setAnchorDate);
@@ -72,6 +75,7 @@ export default function MonthView({
           users={users}
           bdayIndex={bdayIndex}
           onDayTap={onDayTap}
+          isPending={isPending}
         />
       ))}
     </div>
@@ -84,12 +88,14 @@ function MonthBlock({
   users,
   bdayIndex,
   onDayTap,
+  isPending,
 }: {
   monthAnchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
   bdayIndex: Map<string, BirthdayCalendarEntry[]>;
   onDayTap: (d: Date) => void;
+  isPending: boolean;
 }) {
   const { tx } = useTx();
   const setBirthdayPopover = useUI((s) => s.setBirthdayPopover);
@@ -120,8 +126,12 @@ function MonthBlock({
           const ratioFree = totalUsers > 0 ? sum.free / totalUsers : 0;
           const ratioMaybe = totalUsers > 0 ? sum.maybe / totalUsers : 0;
           const ratioBusy = totalUsers > 0 ? effectiveBusy / totalUsers : 0;
-          const bg =
-            ratioFree >= 0.66
+          // Пока отметки едут, плотность НЕ рисуем: правило «не размечено =
+          // занят» покрасило бы весь месяц в «занято», и человек ушёл бы с
+          // экрана с неверным выводом. Нейтральный фон честнее.
+          const bg = isPending
+            ? "bg-tg-secondary-bg/40"
+            : ratioFree >= 0.66
               ? "bg-status-free/30"
               : ratioFree >= 0.34
                 ? "bg-status-free/15"
@@ -181,15 +191,24 @@ function MonthBlock({
                 </span>
               )}
               <div className="flex gap-0.5 mt-auto pb-0.5">
-                {Array.from({ length: Math.min(sum.free, 3) }).map((_, i) => (
+                {isPending && (
+                  <span
+                    data-testid="month-day-skeleton"
+                    aria-hidden
+                    className="h-1 w-4 animate-pulse motion-reduce:animate-none rounded-full bg-tg-hint/20"
+                  />
+                )}
+                {!isPending && Array.from({ length: Math.min(sum.free, 3) }).map((_, i) => (
                   <span key={`f${i}`} className="w-1 h-1 rounded-full bg-status-free" />
                 ))}
-                {Array.from({ length: Math.min(sum.maybe, 3) }).map((_, i) => (
-                  <span key={`m${i}`} className="w-1 h-1 rounded-full bg-status-maybe" />
-                ))}
-                {Array.from({ length: Math.min(effectiveBusy, 3) }).map((_, i) => (
-                  <span key={`b${i}`} className="w-1 h-1 rounded-full bg-status-busy" />
-                ))}
+                {!isPending &&
+                  Array.from({ length: Math.min(sum.maybe, 3) }).map((_, i) => (
+                    <span key={`m${i}`} className="w-1 h-1 rounded-full bg-status-maybe" />
+                  ))}
+                {!isPending &&
+                  Array.from({ length: Math.min(effectiveBusy, 3) }).map((_, i) => (
+                    <span key={`b${i}`} className="w-1 h-1 rounded-full bg-status-busy" />
+                  ))}
               </div>
             </button>
           );

@@ -104,7 +104,7 @@ export default function VerifyEmailScreen({
               <p className="mt-1 text-xs text-tg-hint">{t("verify.hint")}</p>
               <div
                 aria-hidden="true"
-                className="mt-4 h-1 w-full animate-pulse rounded-full bg-tg-secondary-bg"
+                className="mt-4 h-1 w-full animate-pulse motion-reduce:animate-none rounded-full bg-tg-secondary-bg"
               />
             </>
           )}

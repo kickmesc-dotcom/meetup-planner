@@ -531,7 +531,7 @@ function StatusBadge({ statusQ }: { statusQ: ReturnType<typeof useQuery<any, any
   if (statusQ.isPending || !statusQ.data) {
     return (
       <div className="flex items-center gap-2 text-sm">
-        <span className="inline-block h-3 w-3 rounded-full bg-tg-hint animate-pulse" />
+        <span className="inline-block h-3 w-3 rounded-full bg-tg-hint animate-pulse motion-reduce:animate-none" />
         <span className="text-tg-hint">Проверяем статус бота…</span>
       </div>
     );

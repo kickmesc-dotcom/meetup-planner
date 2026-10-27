@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchDepartments, submitOnboarding, type HrEmployee } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
+import { SkeletonTiles } from "@/components/Skeleton";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import Icon, { type IconName } from "@/components/Icon";
 import TrainingScreen from "@/features/hr/TrainingScreen";
@@ -160,6 +161,14 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
             <h1 className="text-xl font-semibold text-tg-text">{tx("Где ты работаешь?")}</h1>
             <p className="mt-1 text-sm text-tg-hint">{tx("От этого зависят чек-лист смены и задачи.")}</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
+              {/* Пока отделы едут, на их месте стоят плитки того же размера:
+                  пустая сетка с заблокированной кнопкой «Продолжить» выглядела
+                  как «в вашей организации нет подразделений». */}
+              {departmentsQ.isPending && departments.length === 0 && (
+                <div className="col-span-2" data-testid="onboarding-departments-skeleton">
+                  <SkeletonTiles count={4} className="grid-cols-2" />
+                </div>
+              )}
               {departments.map((item) => {
                 const active = departmentId === item.id;
                 return (

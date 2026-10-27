@@ -11,6 +11,7 @@ import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ProgressBar from "@/components/ProgressBar";
+import { SkeletonChips } from "@/components/Skeleton";
 import { OPTIONAL_SECTIONS } from "@/features/hr/sections";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
@@ -272,6 +273,14 @@ export default function OrgSetupScreen({
                 {tx("Выберите отделы — они появятся в приложении. Свои можно добавить позже в админке.")}
               </p>
             </div>
+            {/* Пока отделы едут, на их месте — таблетки того же размера.
+                Пустой блок выглядел как «отделов нет» и толкал руководителя
+                нажимать «Пропустить» на самом важном шаге. */}
+            {depsQ.isPending && departmentOptions.length === 0 && (
+              <div data-testid="org-setup-departments-skeleton">
+                <SkeletonChips count={6} />
+              </div>
+            )}
             <div className="flex flex-wrap gap-1.5">
               {departmentOptions.map(([name, emoji]) => {
                 const active = pickedDepartments.includes(name);

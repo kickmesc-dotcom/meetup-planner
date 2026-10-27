@@ -1116,6 +1116,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Отделу": "To the department",
   "Сотруднику": "To an employee",
   "— выбери —": "— choose —",
+  "— загружаем список —": "— loading the list —",
   "Описание (необязательно)": "Description (optional)",
   "Что должно получиться (необязательно)": "Expected result (optional)",
   "Смена (необязательно)": "Shift (optional)",

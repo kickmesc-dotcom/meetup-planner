@@ -141,6 +141,33 @@ export function SkeletonTiles({
 }
 
 /**
+ * Ряд «таблеток» — выбор отделов, фильтры, теги. Ширины разные, потому что
+ * настоящие подписи разной длины; одинаковые выглядели бы как полоса загрузки.
+ */
+export function SkeletonChips({
+  count = 6,
+  className,
+}: {
+  count?: number;
+  className?: string;
+}) {
+  const widths = ["w-20", "w-16", "w-24", "w-14", "w-20", "w-16"];
+  return (
+    <div className={[PULSE, "flex flex-wrap gap-1.5", className ?? ""].join(" ")}>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          className={[
+            "h-9 rounded-full bg-tg-secondary-bg",
+            widths[index % widths.length],
+          ].join(" ")}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
  * Плитки на горизонтальной ленте (день недели / слоты времени).
  */
 export function SkeletonStrip({ tiles = 5 }: { tiles?: number }) {

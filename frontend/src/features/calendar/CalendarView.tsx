@@ -203,10 +203,13 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
         ranges={data}
         users={users}
         birthdays={bdays}
+        isPending={isPending}
       />
     );
   } else if (zoom === "year") {
-    body = <YearView anchor={anchor} ranges={data} users={users} />;
+    body = (
+      <YearView anchor={anchor} ranges={data} users={users} isPending={isPending} />
+    );
   } else if (zoom === "allYears") {
     body = <AllYearsView anchor={anchor} />;
   }

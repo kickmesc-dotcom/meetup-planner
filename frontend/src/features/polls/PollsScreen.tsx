@@ -200,7 +200,7 @@ function PollsSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-sm animate-pulse"
+          className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-sm animate-pulse motion-reduce:animate-none"
         >
           <div className="h-4 w-2/3 rounded-tile bg-tg-bg/60" />
           <div className="mt-2 h-3 w-1/3 rounded-tile bg-tg-bg/40" />

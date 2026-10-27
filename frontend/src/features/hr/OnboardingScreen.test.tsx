@@ -13,7 +13,7 @@
  *  - курс никуда не делся: он открывается кнопкой, по желанию.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import OnboardingScreen from "./OnboardingScreen";
 import {
@@ -124,6 +124,30 @@ describe("OnboardingScreen: первая смена", () => {
     // Кнопки первого экрана уступили место курсу — двух конкурирующих
     // «продолжить» на экране не остаётся.
     expect(screen.queryByRole("button", { name: "Открыть смену" })).toBeNull();
+  });
+
+  it("пока отделы едут, шаг выбора показывает каркас, а не пустую сетку", async () => {
+    // Первый день на медленном контуре: пустая сетка + заблокированная
+    // «Продолжить» = «в вашей организации нет подразделений». Каркас объясняет,
+    // что список сейчас приедет.
+    type Deps = Awaited<ReturnType<typeof fetchDepartments>>;
+    let resolveDeps: (value: Deps) => void = () => undefined;
+    departmentsMock.mockReturnValue(
+      new Promise<Deps>((resolve) => {
+        resolveDeps = resolve;
+      }),
+    );
+
+    renderScreen({ onboarding_state: "department", department_id: null });
+
+    expect(screen.getByText("Где ты работаешь?")).toBeTruthy();
+    expect(await screen.findByTestId("onboarding-departments-skeleton")).toBeTruthy();
+
+    resolveDeps([{ id: 1, name: "Бариста", emoji: "☕" } as Deps[number]]);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Бариста/ })).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("onboarding-departments-skeleton")).toBeNull();
   });
 
   it("кто уже ответил на шаги — попадает сразу на первую смену", () => {

@@ -36,18 +36,19 @@ const SETUP: OrgSetup = {
   can_edit: true,
 };
 
-function renderScreen() {
+function renderScreen(setup: OrgSetup = SETUP) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const Screen = OrgSetupScreenLazy;
   return render(
     <QueryClientProvider client={qc}>
-      <OrgSetupScreenLazy />
+      <Screen setup={setup} onClose={() => undefined} />
     </QueryClientProvider>,
   );
 }
 
-let OrgSetupScreenLazy: () => JSX.Element;
+let OrgSetupScreenLazy: typeof import("./OrgSetupScreen").default;
 
 beforeEach(async () => {
   saveOrgSetup.mockReset();
@@ -57,7 +58,7 @@ beforeEach(async () => {
     ...patch,
   }));
   const mod = await import("./OrgSetupScreen");
-  OrgSetupScreenLazy = () => <mod.default setup={SETUP} onClose={() => undefined} />;
+  OrgSetupScreenLazy = mod.default;
 });
 
 afterEach(() => {
@@ -75,6 +76,39 @@ describe("OrgSetupScreen", () => {
       industry: "cafe",
       headcount: "10_30",
     });
+  });
+
+  it("пока отделы едут, на шаге «Подразделения» виден каркас, а не пустота", async () => {
+    // Медленный контур: список отделов отвечает не сразу. Пустой блок в этот
+    // момент читался как «отделов нет» — и руководитель жал «Пропустить» на
+    // самом важном шаге мастера.
+    type Deps = Awaited<ReturnType<typeof fetchDepartments>>;
+    let resolveDeps: (value: Deps) => void = () => undefined;
+    fetchDepartments.mockReturnValue(
+      new Promise<Deps>((resolve) => {
+        resolveDeps = resolve;
+      }),
+    );
+
+    // Организация без подсказок сервера: ни готовых отделов, ни пресетов —
+    // единственный случай, когда шаг остался бы пустым без каркаса. Сохранение
+    // первого шага тоже возвращает ответ без пресетов (иначе `setDraft`
+    // вернул бы подсказки из фикстуры и шаг перестал бы быть пустым).
+    saveOrgSetup.mockImplementation(async (patch: Record<string, unknown>) => ({
+      ...SETUP,
+      presets: [],
+      ...patch,
+    }));
+    renderScreen({ ...SETUP, presets: [] });
+    fireEvent.click(await screen.findByRole("button", { name: "Далее" }));
+
+    // Статика шага уже на экране, пока данных нет.
+    expect(await screen.findByText("Из кого состоит команда?")).toBeTruthy();
+    expect(await screen.findByTestId("org-setup-departments-skeleton")).toBeTruthy();
+
+    resolveDeps([{ id: 7, name: "Бар", emoji: "🍸" } as Deps[number]]);
+    await waitFor(() => expect(screen.getByRole("button", { name: /Бар/ })).toBeTruthy());
+    expect(screen.queryByTestId("org-setup-departments-skeleton")).toBeNull();
   });
 
   it("с шага «Подразделения» отделы уходят вместе с флагом создания", async () => {

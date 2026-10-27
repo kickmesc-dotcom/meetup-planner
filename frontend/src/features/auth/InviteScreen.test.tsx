@@ -56,6 +56,19 @@ afterEach(() => {
 });
 
 describe("InviteScreen", () => {
+  it("пока ответа нет, приглашение уже названо — без пустого экрана", async () => {
+    // На медленном контуре превью отвечает секундами. Заголовок приглашения от
+    // сервера не зависит: он обязан быть в первом кадре, иначе человек смотрит
+    // на серые прямоугольники и не знает, зачем он здесь.
+    previewMock.mockReturnValue(new Promise(() => undefined));
+    renderScreen();
+
+    expect(screen.getByText("Приглашение в команду")).toBeTruthy();
+    expect(screen.getByText("SemiTask")).toBeTruthy();
+    // Кнопки ещё нет: присоединиться нельзя, пока не известно, куда.
+    expect(screen.queryByRole("button", { name: "Присоединиться" })).toBeNull();
+  });
+
   it("показывает организацию, роль и срок", async () => {
     previewMock.mockResolvedValue({
       org_name: "Салон «Красота»",

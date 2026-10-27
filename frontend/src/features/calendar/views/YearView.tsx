@@ -13,9 +13,11 @@ interface Props {
   anchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
+  /** Первая загрузка отметок: сетки месяцев уже настоящие, плотность — нет. */
+  isPending?: boolean;
 }
 
-export default function YearView({ anchor, ranges, users }: Props) {
+export default function YearView({ anchor, ranges, users, isPending = false }: Props) {
   const setZoom = useUI((s) => s.setZoom);
   const setAnchor = useUI((s) => s.setAnchorDate);
 
@@ -44,7 +46,12 @@ export default function YearView({ anchor, ranges, users }: Props) {
             <div className="text-xs font-semibold mb-1 capitalize">
               {monthFull(m.getMonth())}
             </div>
-            <MiniMonth monthAnchor={m} ranges={ranges} users={users} />
+            <MiniMonth
+              monthAnchor={m}
+              ranges={ranges}
+              users={users}
+              isPending={isPending}
+            />
           </button>
         ))}
       </div>
@@ -56,10 +63,12 @@ function MiniMonth({
   monthAnchor,
   ranges,
   users,
+  isPending,
 }: {
   monthAnchor: Date;
   ranges: AvailabilityRange[];
   users: User[];
+  isPending: boolean;
 }) {
   const grid = useMemo(() => buildMonthGrid(monthAnchor), [monthAnchor]);
   const total = users.length || 6;
@@ -70,8 +79,11 @@ function MiniMonth({
         const today = isToday(d);
         const sum = summarizeDay(d, ranges);
         const ratio = total > 0 ? sum.free / total : 0;
-        const bg =
-          ratio >= 0.66
+        // Пока отметки едут — никакого цвета: пустая ячейка читается как
+        // «ещё не знаем», а не как «никто не свободен».
+        const bg = isPending
+          ? "bg-tg-hint/10 animate-pulse motion-reduce:animate-none"
+          : ratio >= 0.66
             ? "bg-status-free"
             : ratio >= 0.34
               ? "bg-status-free/50"

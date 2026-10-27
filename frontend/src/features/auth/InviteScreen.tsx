@@ -131,12 +131,23 @@ export default function InviteScreen({
   }
 
   if (preview.isPending) {
+    // Заголовок приглашения не зависит от ответа сервера — он и есть первый
+    // кадр. Ждём только название компании, роль и срок: именно они приходят
+    // из базы, а на медленном контуре это секунды.
     return card(
-      <div className="animate-pulse space-y-2">
-        <div className="h-5 w-1/2 rounded-tile bg-tg-bg/50" />
-        <div className="h-3 w-3/4 rounded-tile bg-tg-bg/40" />
-        <div className="h-11 rounded-tile bg-tg-bg/40" />
-      </div>,
+      <>
+        <div className="flex items-center gap-2 animate-pulse motion-reduce:animate-none">
+          <div className="h-4 w-4 rounded-tile bg-tg-bg/50" />
+          <div className="h-3 w-24 rounded-tile bg-tg-bg/40" />
+        </div>
+        <h1 className="mt-1 text-lg font-semibold text-tg-text">
+          {t("invite.title")}
+        </h1>
+        <div className="mt-1 animate-pulse motion-reduce:animate-none space-y-2">
+          <div className="h-3 w-3/4 rounded-tile bg-tg-bg/40" />
+          <div className="h-11 rounded-tile bg-tg-bg/40" />
+        </div>
+      </>
     );
   }
 

@@ -178,9 +178,13 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           <label className="block text-xs text-tg-hint">{tx("Подразделение")}<select
               value={departmentId ?? ""}
               onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              disabled={departmentsQ.isPending}
+              aria-busy={departmentsQ.isPending}
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text disabled:opacity-60"
             >
-              <option value="">{tx("— выбери —")}</option>
+              <option value="">
+                {departmentsQ.isPending ? tx("— загружаем список —") : tx("— выбери —")}
+              </option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.emoji ? `${d.emoji} ` : ""}
@@ -193,9 +197,13 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           <label className="block text-xs text-tg-hint">{tx("Сотрудник")}<select
               value={assigneeId ?? ""}
               onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              disabled={employeesQ.isPending}
+              aria-busy={employeesQ.isPending}
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text disabled:opacity-60"
             >
-              <option value="">{tx("— выбери —")}</option>
+              <option value="">
+                {employeesQ.isPending ? tx("— загружаем список —") : tx("— выбери —")}
+              </option>
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.display_name}

@@ -131,7 +131,7 @@ export default function App() {
     // мобильная колонка 560px, а потом каркас «прыгал» в дэшборд.
     if (isDesktop) {
       return (
-        <div className="flex h-full w-full animate-pulse">
+        <div className="flex h-full w-full animate-pulse motion-reduce:animate-none">
           <div className="w-64 shrink-0 space-y-3 border-r border-tg-hint/10 bg-tg-secondary-bg/30 p-4">
             <div className="h-9 rounded-tile bg-tg-secondary-bg/70" />
             <div className="h-4 rounded-tile bg-tg-secondary-bg/50" />
@@ -151,7 +151,7 @@ export default function App() {
       );
     }
     return (
-      <div className="mx-auto flex h-full w-full max-w-[560px] flex-col p-4 gap-3 animate-pulse">
+      <div className="mx-auto flex h-full w-full max-w-[560px] flex-col p-4 gap-3 animate-pulse motion-reduce:animate-none">
         <div className="h-12 rounded-card bg-tg-secondary-bg/60" />
         <div className="h-24 rounded-card bg-tg-secondary-bg/60" />
         <div className="h-24 rounded-card bg-tg-secondary-bg/60" />
