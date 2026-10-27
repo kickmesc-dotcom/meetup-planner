@@ -4297,7 +4297,8 @@ head `0061`), CF Pages `semitaskbot` (бандл `index-JHp6d4Za.js`, в бан�
 minute=30, timezone=SCHEDULER_TZ)`, а не «на первом тике после 8:30»: тик ходит
 каждые 15 минут и дёргает базу, а сводка нужна один раз и до открытия смены.
 
-**API.** `GET /api/hr/digest` (только `aup`/`admin`, иначе 403 `manager_only`).
+**API.** `GET /api/digest` (роутер HR-ядра монтируется в `/api` без префикса `hr`,
+как `/api/departments`; только `aup`/`admin`, иначе 403 `manager_only`).
 
 **Фронт.** Экран `features/hr/DigestScreen.tsx` — те же числа с переходами в
 разделы и списком просроченного; вход — кнопка «Сводка дня» в шапке «Команды».

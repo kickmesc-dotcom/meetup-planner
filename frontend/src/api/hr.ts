@@ -249,7 +249,8 @@ export interface HrDigest {
   calm: boolean;
 }
 
-export const fetchDigest = () => api<HrDigest>("/api/hr/digest");
+// Роутер HR-ядра монтируется в `/api` без префикса `hr` — как `/api/departments`.
+export const fetchDigest = () => api<HrDigest>("/api/digest");
 
 /** Открыть или закрыть свой профиль для коллег. */
 export const setProfileVisibility = (isPublic: boolean) =>
