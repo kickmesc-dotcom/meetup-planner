@@ -24,6 +24,7 @@ import HrFeedScreen from "./features/hr/HrFeedScreen";
 import IssuesScreen from "./features/issues/IssuesScreen";
 import HandoversScreen from "./features/handovers/HandoversScreen";
 import StandardsScreen from "./features/hr/StandardsScreen";
+import AskScreen from "./features/hr/AskScreen";
 import ReviewScreen from "./features/hr/ReviewScreen";
 import ReportsScreen from "./features/hr/ReportsScreen";
 import LinksScreen from "./features/hr/LinksScreen";
@@ -460,6 +461,14 @@ export default function App() {
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
         <StandardsScreen />
+      </main>
+    );
+  } else if (tab === "ask") {
+    // Поиск по знаниям: из него открываются «Стандарты» и «Смена», поэтому
+    // он сам — отдельный экран, а не строка внутри одного из них.
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <AskScreen />
       </main>
     );
   } else if (tab === "review") {

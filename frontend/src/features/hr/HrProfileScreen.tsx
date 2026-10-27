@@ -225,6 +225,9 @@ export default function HrProfileScreen() {
   // Семь разделов уже есть в нижней полосе (задачи, смена, табель, события,
   // команда, админ). Второй вход в то же место только путал.
   const sections: RowItem[] = [
+    // Поиск стоит первым: у нового сотрудника вопрос «где это написано»
+    // возникает раньше, чем желание открыть раздел и листать его.
+    { icon: "search", label: "Спросить", onSelect: () => setTab("ask") },
     { icon: "book", label: "Материалы смены", onSelect: () => setTab("materials") },
     { icon: "globe", label: "Ссылки", onSelect: () => setTab("links") },
     { icon: "checklist", label: "Стандарты", onSelect: () => setTab("standards") },

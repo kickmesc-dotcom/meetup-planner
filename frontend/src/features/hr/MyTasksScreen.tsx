@@ -205,6 +205,20 @@ export default function MyTasksScreen() {
             )}
           </div>
           <span className="flex shrink-0 items-center gap-1.5">
+            {/* «Спросить» в шапке смены: вопрос возникает в работе, а не в
+                профиле, поэтому вход должен быть здесь. */}
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setTab("ask");
+              }}
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
+              aria-label={tx("Спросить: поиск по инструкциям")}
+              title={tx("Спросить: поиск по инструкциям")}
+            >
+              <Icon name="search" size={18} />
+            </button>
             <button
               type="button"
               onClick={() => {

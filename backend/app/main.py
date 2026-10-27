@@ -41,6 +41,7 @@ from app.api import (
     routes_push,
     routes_reports,
     routes_reset,
+    routes_knowledge,
     routes_shifts,
     routes_simulation,
     routes_standards,
@@ -450,6 +451,9 @@ def create_app() -> FastAPI:
     app.include_router(routes_issues.router, prefix="/api")
     # База стандартов и проверка знаний (сотрудник + наполнение АУП/админом).
     app.include_router(routes_standards.router, prefix="/api")
+    # Поиск по знаниям (стандарты + пункты чек-листов): один вход на вопрос
+    # сотрудника вместо обхода двух разделов.
+    app.include_router(routes_knowledge.router, prefix="/api")
     app.include_router(routes_handovers.router, prefix="/api")
     # Табель смен: сотруднику — своё подразделение, управляющему — все.
     app.include_router(routes_shifts.router, prefix="/api")
