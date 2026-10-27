@@ -98,20 +98,25 @@ def _env_secret(key: str) -> str | None:
     return None
 
 
-def _db_details(base: str) -> dict[str, Any]:
-    """То, чего больше нет в публичном `/api/meta` (S-12): порт, имя базы, версия СУБД.
+def _diag_body(base: str) -> dict[str, Any]:
+    """Диагностика хоста за секретом в `X-Diag-Token`.
 
-    Живёт за секретом в `X-Diag-Token`. Секрета нет (или он не подошёл) — вернём
-    пусто: сверка контуров без него всё равно работает по замаскированному хосту
-    и миграциям.
+    Оттуда берётся то, чего нет в публичном `/api/meta`: порт, имя и версия
+    СУБД (S-12), а также эффективная политика CORS (S-1b). Секрета нет (или он
+    не подошёл) — вернём пусто: сверка контуров без него всё равно работает по
+    замаскированному хосту и миграциям.
     """
     token = _env_secret("TG_WEBHOOK_SECRET")
     if not token:
+        print("            (секрета TG_WEBHOOK_SECRET нет ни в env, ни в backend/.env)")
         return {}
     status, body = _fetch_json(f"{base}/api/meta/net", {"X-Diag-Token": token})
     if status != 200 or not body:
+        # `404` здесь — не ошибка адреса, а несовпадение секрета: ручки нет
+        # ровно для того, у кого нет ключа. Закрытый вопрос, а не ошибка.
+        print(f"            (/api/meta/net → HTTP {status}: секрета нет, детали скрыты)")
         return {}
-    return body.get("db") or {}
+    return body
 
 
 def _path_count(base: str) -> int | None:
@@ -147,7 +152,9 @@ def main() -> int:
 
         code = body.get("code", {})
         db = body.get("db", {})
-        details = _db_details(base)
+        diag = _diag_body(base)
+        details = diag.get("db") or {}
+        cors = diag.get("cors") or {}
         features = body.get("features", [])
         same = code.get("fingerprint") == local_fp["fingerprint"]
 
@@ -165,6 +172,13 @@ def main() -> int:
                   " TG_WEBHOOK_SECRET в /api/meta/net)")
         if db.get("error"):
             print(f"  ⚠️  база не ответила: {db['error']}")
+        if cors:
+            # Здесь и видно S-1b: широкая регулярка, забытая в переменных
+            # Space, делала из API «открытый для любого сайта» — но только там.
+            state = "ОТКЛОНЕНА как широкая, взята встроенная" if cors.get("regex_rejected") else "применена"
+            print(f"  CORS:     origin-белый-список {cors.get('origins')}"
+                  f" · credentials {cors.get('credentials')}")
+            print(f"            регулярка {state}")
         print(f"  возможностей: {len(features)}")
 
         if same:

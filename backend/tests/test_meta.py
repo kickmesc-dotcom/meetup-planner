@@ -180,8 +180,20 @@ def test_net_diag_hidden_without_token(monkeypatch):
 
     from app.config import get_settings
 
+    # Заглушка настроек обязана покрывать всё, что читает ручка: с пакетом 6
+    # она отдаёт ещё и эффективную политику CORS (`_cors_diagnostics`), поэтому
+    # поля перечислены явно — иначе тест проверял бы не ручку, а падение на
+    # отсутствующем атрибуте.
     monkeypatch.setattr(
-        routes_meta, "get_settings", lambda: SimpleNamespace(tg_webhook_secret="s3cret")
+        routes_meta,
+        "get_settings",
+        lambda: SimpleNamespace(
+            tg_webhook_secret="s3cret",
+            cors_allowed_origins=["https://app.example.com"],
+            cors_credentials_allowed=True,
+            cors_origin_regex_or_none=r"https://([a-z0-9-]+\.)*semitaskbot\.pages\.dev",
+            cors_origin_regex_rejected=False,
+        ),
     )
     app = FastAPI()
     app.include_router(routes_meta.router, prefix="/api")
@@ -192,4 +204,12 @@ def test_net_diag_hidden_without_token(monkeypatch):
         ok = client.get("/api/meta/net", headers={"X-Diag-Token": "s3cret"})
         assert ok.status_code == 200
         assert "hosts" in ok.json() and "http" in ok.json()
+        # Политика CORS видна только по секрету — иначе карта «кому можно ходить
+        # в API» была бы публичной (S-1b).
+        assert ok.json()["cors"] == {
+            "origins": ["https://app.example.com"],
+            "credentials": True,
+            "regex": r"https://([a-z0-9-]+\.)*semitaskbot\.pages\.dev",
+            "regex_rejected": False,
+        }
     assert get_settings  # noqa: B018 — импорт проверяет, что конфиг на месте

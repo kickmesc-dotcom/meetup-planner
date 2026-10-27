@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from urllib.parse import urlsplit
 
@@ -18,6 +19,43 @@ DEFAULT_CORS_ORIGIN_REGEX = (
     r"|http://localhost(:\d+)?"
     r"|http://127\.0\.0\.1(:\d+)?"
 )
+
+# Чужие Origin-«ловушки» для проверки заданной извне регулярки CORS.
+#
+# История (аудит 26.10.2026, S-1b). В коде белый список Origin уже был: при
+# `CORS_ORIGINS` со списком `*` не применяется, а с `*` выключаются credentials.
+# Но живая проба на боевом Space 26.10.2026 всё равно получила
+# `access-control-allow-origin: https://evil.example.com` вместе с
+# `allow-credentials: true`. Причина — переменная окружения `CORS_ORIGIN_REGEX`,
+# оставшаяся с прошлых запусков: широкий шаблон вроде `https://.*` заставляет
+# Starlette отражать ЛЮБОЙ сайт. То есть одна забытая переменная молча обнуляла
+# защиту, и по коду этого не было видно. Поэтому чужой шаблон теперь проверяется
+# на ловушках и, если он их пускает, в дело не идёт.
+CORS_ORIGIN_CANARIES = (
+    "https://evil.example.com",
+    "http://evil.example.com",
+    "https://cors-canary.invalid",
+)
+
+
+def cors_regex_allows_foreign(pattern: str) -> bool:
+    """Пустит ли эта регулярка хоть один чужой Origin.
+
+    Невалидную регулярку тоже считаем опасной: разобрать её смысл нельзя, а
+    Starlette на битом шаблоне не падает — просто не пускает никого, и внешне
+    это выглядит как «CORS сломался», что диагностируется часами.
+    """
+    try:
+        compiled = re.compile(pattern)
+    except re.error:
+        return True
+    for canary in CORS_ORIGIN_CANARIES:
+        # `fullmatch` — семантика свежего Starlette (`is_allowed_origin`),
+        # `match` — на случай версии, которая сверяет только начало строки:
+        # обе должны быть безопасны, иначе `https://.*` снова открыл бы всех.
+        if compiled.fullmatch(canary) or compiled.match(canary):
+            return True
+    return False
 
 
 def origin_of_url(url: str) -> str:
@@ -171,11 +209,34 @@ class Settings(BaseSettings):
         return list(dict.fromkeys(merged))
 
     @property
+    def cors_origin_regex_rejected(self) -> bool:
+        """Отброшена ли заданная извне регулярка как «пускающая всех».
+
+        Отдельным свойством, а не только логом: значение видно в диагностике
+        (`/api/meta/net`), поэтому на вопрос «почему на хосте CORS шире, чем в
+        коде» отвечает сам хост, а не догадка.
+        """
+        raw = (self.cors_origin_regex or "").strip()
+        if not raw or raw.lower() in {"off", "none", "false"}:
+            return False
+        return cors_regex_allows_foreign(raw)
+
+    @property
     def cors_origin_regex_or_none(self) -> str | None:
-        """Регулярка превью/локалки. `""` или `off` — выключено."""
+        """Регулярка превью/локалки. `""` или `off` — выключено.
+
+        Регулярка, пришедшая из среды, проходит проверку на ловушках (см.
+        `cors_regex_allows_foreign`): широкая вроде `https://.*` вернула бы
+        отражение любого Origin, поэтому вместо неё берётся встроенный шаблон.
+        Полезного при этом не теряем: превью-развёртывания Pages и локальную
+        разработку встроенный шаблон разрешает сам (см.
+        `DEFAULT_CORS_ORIGIN_REGEX`).
+        """
         raw = (self.cors_origin_regex or "").strip()
         if not raw or raw.lower() in {"off", "none", "false"}:
             return None
+        if self.cors_origin_regex_rejected:
+            return DEFAULT_CORS_ORIGIN_REGEX
         return raw
 
     @property

@@ -67,12 +67,30 @@ ENV_KEYS = (
     "WHITELIST_TG_IDS",
     "WHITELIST_NAMES",
     "CORS_ORIGINS",
+    # Забытая широкая регулярка здесь обнуляет белый список Origin целиком:
+    # живая проба 26.10.2026 получила на Space `allow-origin: https://evil.example.com`
+    # вместе с `allow-credentials: true` (аудит S-1b). В коде такое значение уже
+    # отбрасывается, но и в Space ему делать нечего — поэтому ключ уезжает вместе
+    # с остальными, а не только тогда, когда о нём вспомнят руками.
+    "CORS_ORIGIN_REGEX",
     "SCHEDULER_TZ",
     "LOG_LEVEL",
     # Web push (шаг 2.4): без пары VAPID подписка браузера не сработает.
     "VAPID_PUBLIC_KEY",
     "VAPID_PRIVATE_KEY",
     "VAPID_SUBJECT",
+)
+
+
+# Безопасная регулярка Origin — та же, что в коде по умолчанию
+# (`backend/app/config.py:DEFAULT_CORS_ORIGIN_REGEX`). Дублируется здесь
+# намеренно: деплой-инструмент не импортирует приложение (оно тянет за собой
+# весь venv), а расхождение ловит тест
+# `test_cors_policy.py::test_deploy_default_regex_matches_code`.
+SAFE_CORS_ORIGIN_REGEX = (
+    r"https://([a-z0-9-]+\.)*semitaskbot\.pages\.dev"
+    r"|http://localhost(:\d+)?"
+    r"|http://127\.0\.0\.1(:\d+)?"
 )
 
 
@@ -192,6 +210,11 @@ def cmd_env(_args) -> int:
     # Публичный адрес API — это сам Space: от него зависят CORS и редиректы,
     # поэтому берём его не из старого `.env`, а из фактического адреса.
     env["PUBLIC_BASE_URL"] = SPACE_URL
+    # Если владелец не задал регулярку Origin сам, в Space уходит безопасная.
+    # Так закрывается случай, из-за которого 26.10.2026 на Space (и только там)
+    # отражался любой чужой Origin: в Space с прошлых запусков лежала широкая
+    # `CORS_ORIGIN_REGEX`, а `cmd_env` её не трогал — её просто не было в списке.
+    env.setdefault("CORS_ORIGIN_REGEX", SAFE_CORS_ORIGIN_REGEX)
     print(f"Заливаю секреты в {SPACE_REPO} (значения не печатаются):")
     store = _secret_store()
     variables = existing_variables()

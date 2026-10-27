@@ -41,3 +41,9 @@ frontend/.devinit-tmp.txt
 .rehearsal.db
 .rehearsal.db-wal
 .rehearsal.db-shm
+
+# Файловая база из живых тестов периметра (tests/test_cors_policy.py)
+.test_cors.db
+.test_cors.db-wal
+.test_cors.db-shm
+.corsprobe.db

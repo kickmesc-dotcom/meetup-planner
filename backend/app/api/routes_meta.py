@@ -427,6 +427,12 @@ async def net_diag(request: Request) -> Any:
         # То, что убрано из публичного `/api/meta` (S-12): версия СУБД, порт и имя
         # базы. Здесь они под секретом, потому что нужны для сверки контуров.
         "db": await _db_diagnostics(),
+        # Эффективная политика CORS (S-1b). Живая проба 26.10.2026 на Space
+        # получила `access-control-allow-origin: https://evil.example.com`:
+        # белый список в коде был, а широкая регулярка из переменных среды —
+        # нет, и по ответу это было не видно. Теперь видно: `regex_rejected`
+        # говорит, что значение из среды не применили как небезопасное.
+        "cors": _cors_diagnostics(),
     }
 
     for host in _NET_TARGETS:
@@ -538,6 +544,22 @@ async def meta(request: Request) -> dict[str, Any]:
             ),
         },
         "features": available_features(fastapi_app),
+    }
+
+
+def _cors_diagnostics() -> dict[str, Any]:
+    """Что middleware реально применил к Origin (аудит 26.10.2026, S-1b).
+
+    Цена — ноль запросов: всё берётся из уже прочитанных настроек. Ручка под
+    секретом (`_diag_token_ok`), потому что список Origin — это карта того, кому
+    разрешено ходить в API, а публичному посетителю она не нужна.
+    """
+    settings = get_settings()
+    return {
+        "origins": settings.cors_allowed_origins,
+        "credentials": settings.cors_credentials_allowed,
+        "regex": settings.cors_origin_regex_or_none,
+        "regex_rejected": settings.cors_origin_regex_rejected,
     }
 
 

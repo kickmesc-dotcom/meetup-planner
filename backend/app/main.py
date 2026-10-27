@@ -407,10 +407,19 @@ def create_app() -> FastAPI:
     )
     if settings.cors_allow_all and settings.cors_credentials_allowed:  # pragma: no cover - защита
         structlog.get_logger().warning("cors.wide_open_with_credentials")
+    if settings.cors_origin_regex_rejected:
+        # Не тихий случай: значение из среды не применили, и об этом надо знать
+        # тому, кто его туда положил. Само значение печатаем (это не секрет),
+        # но обрезаем: случайная гигантская регулярка не должна лить логи.
+        structlog.get_logger().warning(
+            "cors.origin_regex_rejected",
+            pattern=(settings.cors_origin_regex or "")[:120],
+        )
     structlog.get_logger().info(
         "cors.configured",
         origins=settings.cors_allowed_origins,
         regex=bool(settings.cors_origin_regex_or_none),
+        regex_rejected=settings.cors_origin_regex_rejected,
         credentials=settings.cors_credentials_allowed,
     )
     app.include_router(bot_webhook.router)
