@@ -4409,3 +4409,18 @@ CSS, JS не изменился.
 добавлена таблица `organization_members`: без неё падал бы сам запрос настроек);
 `vitest` — **67 файлов / 572 теста**; `tsc --noEmit` чисто; сборка ок, бандл
 `index-BCo29XyH.js`, CSS `index-uZLtZCfE.css` (+0.4 kB gzip).
+
+**Выложено (28.10.2026).** Коммит `efd854e`, пуш в `origin/main`.
+
+- Мини-апп: CF Pages `semitaskbot` → `8278f3b9.semitaskbot.pages.dev`,
+  бандл `index-BCo29XyH.js`. В живом бандле есть `Oʻzbekcha`, `Voqealar`,
+  `Chek-listni ochish`, `uzPackAvailable`, `uz_pack`, `can_manage_packs`.
+- API: HF Space (пересобран, `RUNNING`) и Amvera (пересобран, `RUNNING`);
+  `/api/org-setup` без авторизации → 401 на обоих.
+- **Как проверялось, что крутится именно новый код.** Маркер сборки
+  `/api/meta → code.build` (хеш исходников) для этого не годится: на хостах
+  файлы приезжают с другими переводами строк, и хеш расходится с локальным даже
+  на свежем коде (локально `9f7dc4bdaa6e`, в Space `7eab36a32cb5`, на Amvera
+  `2bc2b52c3023`). Рабочая проверка — схема живой ручки: `GET /openapi.json`,
+  `OrgSetupIn.uz_pack` / `OrgSetupOut.uz_pack` / `can_manage_packs` присутствуют
+  на обоих хостах.
