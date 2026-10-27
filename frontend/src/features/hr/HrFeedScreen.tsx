@@ -11,6 +11,7 @@ import {
 } from "@/api/hr";
 import Badge from "@/features/hr/Badge";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
+import KudosCard from "@/features/hr/KudosCard";
 import DepartmentScreen from "@/features/hr/DepartmentScreen";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
@@ -70,6 +71,7 @@ const KIND_ICON: Record<FeedKind, IconName> = {
   task_status: "repeat",
   task_photo: "camera",
   task_issue: "alert",
+  kudos: "sparkles",
 };
 
 const KIND_LABEL: Record<FeedKind, string> = {
@@ -79,6 +81,7 @@ const KIND_LABEL: Record<FeedKind, string> = {
   task_status: "Статус поручения",
   task_photo: "Фотоотчёт",
   task_issue: "Проблема",
+  kudos: "Поблагодарил(а) коллегу",
 };
 
 /**
@@ -460,6 +463,11 @@ export default function HrFeedScreen() {
             </div>
           </div>
         )}
+
+        {/* Благодарности — над лентой: за неделю их немного, и они мотивируют
+            сильнее, чем ещё одна строка в потоке событий. Карточка идёт после
+            пустого состояния, чтобы не сдвигать его вниз при пустой ленте. */}
+        {!feedQ.isLoading && <KudosCard />}
 
         {groupByDay(items, locale).map((group, index, allGroups) => (
           <section key={group.key} data-day={group.key}>

@@ -41,6 +41,7 @@ from app.db.hr_models import (
     ChecklistTemplate,
     Department,
     Employee,
+    Kudos,
     Task,
     TaskEvent,
     TaskIssue,
@@ -59,6 +60,9 @@ KIND_TASK_CREATED = "task_created"
 KIND_TASK_STATUS = "task_status"
 KIND_TASK_PHOTO = "task_photo"
 KIND_TASK_ISSUE = "task_issue"
+# Благодарность коллеге. Единственный источник — своя таблица (`hr_kudos`),
+# а не событие чужой сущности: спасибо говорят и за то, чего в системе нет.
+KIND_KUDOS = "kudos"
 
 ALL_KINDS: tuple[str, ...] = (
     KIND_CHECKLIST_DONE,
@@ -67,6 +71,7 @@ ALL_KINDS: tuple[str, ...] = (
     KIND_TASK_STATUS,
     KIND_TASK_PHOTO,
     KIND_TASK_ISSUE,
+    KIND_KUDOS,
 )
 
 # Человеческие подписи переходов статуса (для текста записи).
@@ -95,6 +100,8 @@ SAY_EN: dict[str, str] = {
     "сообщил(а) о проблеме по «{title}»{suffix}":
         "reported a problem with “{title}”{suffix}",
     " (причина: {reason})": " (reason: {reason})",
+    "поблагодарил(а) {name}{suffix}": "thanked {name}{suffix}",
+    ": «{message}»": ": “{message}”",
     "создано поручение": "task created",
     "принял(а) поручение": "accepted the task",
     "взял(а) поручение в работу": "started the task",
@@ -443,6 +450,45 @@ async def collect_items(
                      title=title,
                      suffix=suffix,
                  ), task_id)
+            )
+
+    if KIND_KUDOS in want:
+        rows = await session.execute(
+            select(
+                Kudos.from_employee_id,
+                Kudos.to_employee_id,
+                Kudos.created_at,
+                Kudos.id,
+                Kudos.message,
+                User.display_name,
+            )
+            .join(Employee, Employee.id == Kudos.to_employee_id)
+            .join(User, User.id == Employee.user_id)
+            .order_by(Kudos.created_at.desc())
+            .limit(limit)
+        )
+        for from_id, to_id, at, kudos_id, message, to_name in rows.all():
+            # Запись видит и тот, кто сказал, и тот, кому сказали: получивший
+            # благодарность должен найти её в своей ленте, а не только
+            # в колокольчике, который однажды прочитают.
+            if not (_allowed(from_id) or _allowed(to_id)):
+                continue
+            suffix = (
+                say(lang, ": «{message}»", message=message) if message else ""
+            )
+            raw.append(
+                (
+                    at,
+                    KIND_KUDOS,
+                    from_id,
+                    say(
+                        lang,
+                        "поблагодарил(а) {name}{suffix}",
+                        name=to_name,
+                        suffix=suffix,
+                    ),
+                    kudos_id,
+                )
             )
 
     if since is not None:

@@ -204,7 +204,9 @@ export type FeedKind =
   | "task_created"
   | "task_status"
   | "task_photo"
-  | "task_issue";
+  | "task_issue"
+  // План, 8.4: благодарность коллеге — такой же вид записи в ленте.
+  | "kudos";
 
 export interface HrFeedItem {
   at: string;

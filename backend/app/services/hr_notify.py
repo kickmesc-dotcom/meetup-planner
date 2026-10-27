@@ -33,6 +33,9 @@ KIND_ISSUE_ASSIGNED = "issue_assigned"
 KIND_HANDOVER_SENT = "handover_sent"
 KIND_HANDOVER_ACCEPTED = "handover_accepted"
 KIND_HANDOVER_REJECTED = "handover_rejected"
+# «Спасибо коллеге»: без этого сообщения благодарность видит только тот, кто
+# её сказал — признание, о котором не узнали, не работает.
+KIND_KUDOS = "kudos"
 
 _TZ = UTC
 
@@ -354,6 +357,32 @@ async def notify_overdue(
         kind=KIND_TASK_OVERDUE,
         text=task_overdue_text(task),
         payload={"task_id": task.id},
+    )
+
+
+def kudos_text(*, from_name: str, message: str | None) -> str:
+    """Текст благодарности: от кого и за что.
+
+    Записи может не быть — тогда остаётся только «спасибо», и это нормально:
+    механика не должна требовать объяснения, иначе ею перестанут пользоваться.
+    """
+    tail = f": «{message}»" if message else ""
+    return f"🙌 {from_name} сказал(а) тебе спасибо{tail}. Открой ленту — там видно неделю."
+
+
+async def notify_kudos(
+    session: AsyncSession,
+    recipient: Employee,
+    *,
+    from_name: str,
+    message: str | None = None,
+) -> int:
+    return await notify(
+        session,
+        employees=[recipient],
+        kind=KIND_KUDOS,
+        text=kudos_text(from_name=from_name, message=message),
+        payload={"kind": "kudos"},
     )
 
 

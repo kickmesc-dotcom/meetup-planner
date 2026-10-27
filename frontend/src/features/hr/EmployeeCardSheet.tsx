@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import MediaLightbox from "@/components/MediaLightbox";
 import { CardSkeleton } from "@/components/Skeleton";
 import Badge from "@/features/hr/Badge";
+import { KudosSheet } from "@/features/hr/KudosCard";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
@@ -28,6 +29,9 @@ export default function EmployeeCardSheet({
   onClose: () => void;
 }) {
   const { tx } = useTx();
+  // Кому сказать спасибо — открывается прямо из карточки: человек смотрит на
+  // коллегу, когда хочет его поблагодарить, а не ищет ради этого ленту.
+  const [thanks, setThanks] = useState<number | null>(null);
   const q = useQuery({
     queryKey: ["hr-profile-card", employeeId],
     queryFn: () => fetchEmployeeCard(employeeId),
@@ -73,13 +77,23 @@ export default function EmployeeCardSheet({
         {q.isError && (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         )}
-        {q.data && <CardBody card={q.data} />}
+        {q.data && <CardBody card={q.data} onThanks={setThanks} />}
       </div>
+
+      {thanks !== null && (
+        <KudosSheet initialEmployeeId={thanks} onClose={() => setThanks(null)} />
+      )}
     </div>
   );
 }
 
-function CardBody({ card }: { card: HrProfileCard }) {
+function CardBody({
+  card,
+  onThanks,
+}: {
+  card: HrProfileCard;
+  onThanks: (employeeId: number) => void;
+}) {
   const { tx } = useTx();
   const person = personTone(card.employee_id);
   const dept = departmentTone(card.department_id);
@@ -119,6 +133,23 @@ function CardBody({ card }: { card: HrProfileCard }) {
             </div>
           </div>
         </div>
+
+        {/* Кнопка есть у любой чужой карточки, а можно ли именно этому
+            человеку — решает сервер: свой отказ он называет словами («он не в
+            твоей команде»), а не молчит, как будто нажатие потерялось. */}
+        {!card.is_self && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic("light");
+              onThanks(card.employee_id);
+            }}
+            className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-bg/70 text-sm font-medium text-tg-link"
+          >
+            <Icon name="sparkles" size={16} />
+            {tx("Сказать спасибо")}
+          </button>
+        )}
       </section>
 
       {!card.can_view ? (

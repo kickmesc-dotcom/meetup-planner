@@ -1559,6 +1559,63 @@ class EmployeeAchievement(OrgScoped, Base):
 
 
 # --------------------------------------------------------------------------
+class Kudos(OrgScoped, Base):
+    """«Спасибо коллеге» — благодарность, которую видно в ленте.
+
+    Отдельная таблица, а не поле у поручения: поблагодарить можно и за то, чего
+    в системе нет — за подмену, за спокойную смену, за помощь с гостем. Из этой
+    же таблицы считается недельный топ, поэтому агрегат не расходится с лентой:
+    источник один.
+
+    Анти-накрутка выражена схемой, а не только проверкой в коде:
+    `unique(from_employee_id, to_employee_id, day)` не даёт набить топ повторными
+    нажатиями (в том числе двумя одновременными запросами), а дневной лимит
+    отправителя не даёт раздать «спасибо» всем подряд: награда, которую выдают
+    каждому, перестаёт что-либо значить.
+    """
+
+    __tablename__ = "hr_kudos"
+    __table_args__ = (
+        UniqueConstraint(
+            "from_employee_id",
+            "to_employee_id",
+            "day",
+            name="uq_kudos_pair_day",
+        ),
+        CheckConstraint(
+            "from_employee_id <> to_employee_id", name="ck_kudos_not_self"
+        ),
+        Index("ix_hr_kudos_to_day", "to_employee_id", "day"),
+        Index("ix_hr_kudos_from_day", "from_employee_id", "day"),
+    )
+
+    # `with_variant(Integer, "sqlite")` — как у остальных таблиц, которые
+    # пишутся без заранее известного id: в SQLite только `INTEGER PRIMARY KEY`
+    # получает автоинкремент, `BIGINT PRIMARY KEY` — нет, и вторая строка
+    # падала бы на «дубле» NULL-ключа.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    from_employee_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("employees.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    to_employee_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("employees.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Дата по часам заведения, а не UTC-дата: смена кончается после полуночи, и
+    # «спасибо за смену» не должно уезжать во вчера.
+    day: Mapped[date] = mapped_column(Date, nullable=False)
+    message: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
 # Обучение пользованию приложением (шаг онбординга)
 # --------------------------------------------------------------------------
 

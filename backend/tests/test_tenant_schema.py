@@ -86,6 +86,9 @@ TENANT_TABLES: set[str] = {
     "hr_handovers",
     "hr_issue_events",
     "hr_issues",
+    # Благодарности — данные организации: в одной сети спасибо говорят
+    # по-узбекски, в другой по-русски, но топ чужой команды видеть нельзя.
+    "hr_kudos",
     "hr_roster_snapshots",
     "hr_shift_templates",
     "hr_shifts",
@@ -378,7 +381,11 @@ def test_migration_0054_covers_every_tenant_table() -> None:
     # Таблицы, созданные позже 0054: у них `org_id` есть с рождения, и
     # добавлять его миграцией 0054 было бы некуда. Список явный, чтобы новая
     # таблица всё равно требовала решения.
-    created_later = {"org_invitations", "push_subscriptions"}  # 0057, 0058
+    created_later = {
+        "org_invitations",
+        "push_subscriptions",
+        "hr_kudos",  # 0062
+    }  # 0057, 0058, 0062
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 

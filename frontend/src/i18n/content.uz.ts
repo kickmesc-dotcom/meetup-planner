@@ -127,4 +127,51 @@ export const UZ_CONTENT: Record<string, string> = {
   "дней": "kun",
   "ч": "soat",
   "меньше часа": "bir soatdan kam",
+
+  // ------ «Спасибо коллеге» (план, 8.4): карточка недели и лист ------ 
+  "Спасибо на этой неделе":
+    "Bu haftadagi rahmatlar",
+  "Ты на {place} месте":
+    "Siz {place}-oʻrindasiz",
+  "Получено":
+    "Olingan",
+  "Сказал(а)":
+    "Aytilgan",
+  "Осталось сегодня":
+    "Bugun qoldi",
+  "{count} спасибо":
+    "{count} rahmat",
+  "Пока некого благодарить — коллег в твоём подразделении нет.":
+    "Hozircha rahmat aytadigan odam yoʻq — boʻlimingizda hamkasblar yoʻq.",
+  "Сказать спасибо":
+    "Rahmat aytish",
+  "Кому сказать спасибо":
+    "Kimga rahmat aytish",
+  "Поиск по имени":
+    "Ism boʻyicha qidirish",
+  "Никого не нашли":
+    "Hech kim topilmadi",
+  "Что сделал(а) — необязательно":
+    "Nima qildi — majburiy emas",
+  "Спасибо за смену":
+    "Smena uchun rahmat",
+  "Не удалось сказать спасибо.":
+    "Rahmat aytib boʻlmadi.",
+  "Благодарности сейчас не загрузились — остальное в ленте работает.":
+    "Rahmatlar yuklanmadi — lentaning qolgani ishlayapti.",
+  "Себе спасибо не говорят — выбери коллегу.":
+    "Oʻzingizga rahmat aytilmaydi — hamkasbni tanlang.",
+  "Этому человеку сказать спасибо нельзя: он не в твоей команде.":
+    "Bu odamga rahmat aytib boʻlmaydi: u sizning jamoangizda emas.",
+  "Сегодня ты уже благодарил(а) этого человека — завтра можно снова.":
+    "Bugun bu odamga allaqachon rahmat aytdingiz — ertaga yana mumkin.",
+  "На сегодня лимит благодарностей исчерпан. Вернись к этому завтра.":
+    "Bugun uchun rahmatlar chegarasi tugadi. Ertaga qaytib keling.",
+  "Слишком длинная запись — хватит одной фразы.":
+    "Yozuv juda uzun — bir jumla yetarli.",
+  "Поблагодарил(а) коллегу":
+    "Hamkasbga rahmat aytdi",
+
+  "Не удалось сказать спасибо. Попробуй ещё раз.":
+    "Rahmat aytib boʻlmadi. Yana urinib koʻring.",
 };

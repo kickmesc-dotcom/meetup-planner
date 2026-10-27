@@ -36,6 +36,28 @@ vi.mock("@/api/hr", () => ({
   fetchDepartmentOverview: vi.fn(),
 }));
 
+// Карточка благодарностей (план, 8.4) живёт в ленте и ходит своим запросом.
+// Здесь она не предмет проверки, но без ответа тянула бы реальную сеть —
+// тест ленты стал бы зависеть от того, отвечает ли дев-сервер.
+vi.mock("@/api/kudos", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/kudos")>();
+  return {
+    ...actual,
+    fetchKudosWeek: vi.fn().mockResolvedValue({
+      since: "2026-10-26",
+      until: "2026-11-01",
+      top: [],
+      received: 0,
+      given: 0,
+      my_place: null,
+      today_left: 5,
+      max_per_day: 5,
+      can_thank: 0,
+    }),
+    fetchKudosPeople: vi.fn().mockResolvedValue([]),
+  };
+});
+
 const feedMock = vi.mocked(fetchHrFeed);
 const filtersMock = vi.mocked(fetchFeedFilters);
 const cardMock = vi.mocked(fetchEmployeeCard);
@@ -337,6 +359,9 @@ describe("время и дни в ленте", () => {
     await screen.findByText("свежее");
     const headings = screen
       .getAllByRole("heading", { level: 2 })
+      // Карточка благодарностей (план, 8.4) — тоже заголовок второго уровня,
+      // но она не про дни: считаем только заголовки дней.
+      .filter((node) => node.textContent !== "Спасибо на этой неделе")
       .map((node) => node.textContent ?? "");
     expect(headings).toHaveLength(2);
     expect(headings[0]).toContain("22 октября");

@@ -1571,4 +1571,52 @@ export const EN_CONTENT: Record<string, string> = {
     "Russian is both the original and the fallback: if a line is missing from the pack, it shows in Russian. That means the pack can be enabled as translation proceeds, not only when everything is done.",
   "Выключили пакет — те, у кого был выбран узбекский, сразу возвращаются на русский: остаться на языке, которого организация больше не обещает, выглядит как сбой.":
     "Turn the pack off and anyone who had Uzbek selected returns to Russian right away: staying on a language the organization no longer offers looks like a bug.",
+
+  // ------ «Спасибо коллеге» (план, 8.4): карточка недели и лист ------ 
+  "Спасибо на этой неделе":
+    "Thanks this week",
+  "Ты на {place} месте":
+    "You're #{place}",
+  "Получено":
+    "Received",
+  "Сказал(а)":
+    "Given",
+  "Осталось сегодня":
+    "Left today",
+  "{count} спасибо":
+    "{count} thanks",
+  "Пока некого благодарить — коллег в твоём подразделении нет.":
+    "Nobody to thank yet — there are no colleagues in your department.",
+  "Сказать спасибо":
+    "Say thanks",
+  "Кому сказать спасибо":
+    "Who to thank",
+  "Поиск по имени":
+    "Search by name",
+  "Никого не нашли":
+    "No one found",
+  "Что сделал(а) — необязательно":
+    "What they did — optional",
+  "Спасибо за смену":
+    "Thanks for the shift",
+  "Не удалось сказать спасибо.":
+    "The thanks didn't send.",
+  "Благодарности сейчас не загрузились — остальное в ленте работает.":
+    "Thanks didn't load right now — the rest of the feed still works.",
+  "Себе спасибо не говорят — выбери коллегу.":
+    "You can't thank yourself — pick a colleague.",
+  "Этому человеку сказать спасибо нельзя: он не в твоей команде.":
+    "You can't thank this person: they aren't in your team.",
+  "Сегодня ты уже благодарил(а) этого человека — завтра можно снова.":
+    "You already thanked this person today — you can do it again tomorrow.",
+  "На сегодня лимит благодарностей исчерпан. Вернись к этому завтра.":
+    "Today's limit of thanks is used up. Come back tomorrow.",
+  "Слишком длинная запись — хватит одной фразы.":
+    "The note is too long — one sentence is enough.",
+  "Поблагодарил(а) коллегу":
+    "Thanked a colleague",
+
+  // Общий отказ, когда сервер назвал код, которого клиент не знает.
+  "Не удалось сказать спасибо. Попробуй ещё раз.":
+    "The thanks didn't send. Try again.",
 };

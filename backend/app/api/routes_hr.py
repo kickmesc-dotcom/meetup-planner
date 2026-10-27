@@ -50,8 +50,10 @@ from app.services import (
     hr_feed,
     hr_feedback,
     hr_kpi,
+    hr_kudos,
     hr_links,
     hr_media,
+    hr_notify,
     hr_people,
     hr_profile,
     hr_tasks,
@@ -1816,3 +1818,164 @@ async def my_digest(
         problems_attention=digest.problems_attention,
         calm=digest.calm,
     )
+
+
+# --- «Спасибо коллеге» (план, 8.4) -----------------------------------------
+
+
+class KudosTopOut(BaseModel):
+    employee_id: int
+    display_name: str
+    department_id: int | None = None
+    count: int
+
+
+class KudosWeekOut(BaseModel):
+    """Неделя благодарностей глазами смотрящего: топ, личные числа, лимит."""
+
+    since: date
+    until: date
+    top: list[KudosTopOut]
+    received: int
+    given: int
+    my_place: int | None
+    today_left: int
+    max_per_day: int
+    # Скольким людям вообще можно сказать спасибо. Ноль — это не ошибка:
+    # у сотрудника без подразделения коллег нет, и интерфейс честно молчит,
+    # а не показывает кнопку в пустоту.
+    can_thank: int
+
+
+class KudosIn(BaseModel):
+    to_employee_id: int
+    # Ограничение шире сервисного (`MAX_MESSAGE`): длинное сообщение должно
+    # вернуть понятный код ошибки, а не «422» от валидатора схемы.
+    message: str | None = Field(default=None, max_length=400)
+
+
+async def _kudos_week_out(
+    session: AsyncSession, employee: Employee
+) -> KudosWeekOut:
+    week = await hr_kudos.weekly(session, employee)
+    thankable = await hr_kudos.thankable_ids(session, employee)
+    return KudosWeekOut(
+        since=week.since,
+        until=week.until,
+        top=[
+            KudosTopOut(
+                employee_id=row.employee_id,
+                display_name=row.display_name,
+                department_id=row.department_id,
+                count=row.count,
+            )
+            for row in week.top
+        ],
+        received=week.received,
+        given=week.given,
+        my_place=week.my_place,
+        today_left=week.today_left,
+        max_per_day=hr_kudos.MAX_PER_DAY,
+        can_thank=len(thankable),
+    )
+
+
+@router.get("/kudos/week", response_model=KudosWeekOut)
+async def kudos_week(
+    session: SessionDep, employee: EmployeeDep
+) -> KudosWeekOut:
+    """Недельный топ благодарностей и личные числа — открыто всем.
+
+    Это мотивационный блок, а не отчёт: сотрудник видит, сколько сказал и
+    сколько получил, руководитель — топ своего подразделения. Область видимости
+    та же, что у ленты (`hr_feed`), поэтому топ не становится способом узнать
+    чужие имена в обход правил.
+    """
+    return await _kudos_week_out(session, employee)
+
+
+@router.post("/kudos", response_model=KudosWeekOut)
+async def give_kudos(
+    body: KudosIn,
+    session: SessionDep,
+    user: CurrentUser,
+    employee: EmployeeDep,
+) -> KudosWeekOut:
+    """Сказать спасибо коллеге.
+
+    Отвечаем не «ок», а всей неделей сразу: экран обновляется одним запросом,
+    и человек видит, что его спасибо попало в топ, а не просто «сохранено».
+    Уведомление получателю пишется в той же транзакции — благодарность без
+    сообщения человек просто не заметит.
+    """
+    recipient = await session.get(Employee, body.to_employee_id)
+    if recipient is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND, detail=hr_kudos.ERR_OUT_OF_SCOPE
+        )
+    message = (body.message or "").strip() or None
+    try:
+        await hr_kudos.give(
+            session,
+            sender=employee,
+            to_employee_id=body.to_employee_id,
+            message=message,
+        )
+    except hr_kudos.KudosError as exc:
+        await session.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=exc.code) from exc
+    await hr_notify.notify_kudos(
+        session,
+        recipient,
+        from_name=user.display_name,
+        message=message,
+    )
+    await session.commit()
+    return await _kudos_week_out(session, employee)
+
+
+class KudosPersonOut(BaseModel):
+    employee_id: int
+    display_name: str
+    department_id: int | None = None
+    position: str | None = None
+    badge: str | None = None
+
+
+@router.get("/kudos/people", response_model=list[KudosPersonOut])
+async def kudos_people(
+    session: SessionDep, employee: EmployeeDep
+) -> list[KudosPersonOut]:
+    """Кому этот человек может сказать спасибо — список для выбора.
+
+    Отдельная ручка, а не `/feed/filters`: там люди отдаются только тем, кто
+    вправе фильтровать ленту, а поблагодарить коллегу нужно каждому, включая
+    рядового сотрудника. Правило берётся из `hr_kudos.thankable_ids` — то же
+    самое, что и в самой благодарности, поэтому список и проверка не могут
+    разойтись.
+    """
+    ids = await hr_kudos.thankable_ids(session, employee)
+    if not ids:
+        return []
+    rows = await session.execute(
+        select(
+            Employee.id,
+            User.display_name,
+            Employee.department_id,
+            Employee.position,
+            Employee.badge,
+        )
+        .join(User, User.id == Employee.user_id)
+        .where(Employee.id.in_(ids))
+        .order_by(User.display_name)
+    )
+    return [
+        KudosPersonOut(
+            employee_id=int(eid),
+            display_name=str(name),
+            department_id=did,
+            position=position,
+            badge=badge,
+        )
+        for eid, name, did, position, badge in rows.all()
+    ]
