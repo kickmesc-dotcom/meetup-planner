@@ -98,7 +98,8 @@ body {
 /* DESIGN_SYSTEM §7: мягкое появление оверлеев. Раньше здесь были Tailwind-классы
    `animate-in fade-in zoom-in` — но `tailwindcss-animate` не установлен, поэтому
    они резолвились в animation-name:none (проверено в браузере). Анимируем только
-   opacity: transform-анимация сломала бы центрирование через -translate-*/. */
+   opacity: transform-анимация сломала бы центрирование через утилиты
+   `translate-x/y`. */
 @keyframes fade-in-soft {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -278,7 +279,11 @@ button:not([data-no-press]),
 .press-icon,
 .press-row,
 .lift {
-  transition-property: scale, opacity, background-color, translate, box-shadow;
+  /* `color` в списке не для красоты: класс `transition-colors` в разметке
+     (вкладки, сегменты, строки) наша специфичность перебивает целиком, и без
+     него текст переключался бы рывком. */
+  transition-property: scale, opacity, background-color, color, translate,
+    box-shadow;
   transition-duration: 120ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -352,7 +357,7 @@ button[aria-disabled="true"],
   .press-icon,
   .press-row,
   .lift {
-    transition-property: opacity, background-color;
+    transition-property: opacity, background-color, color;
   }
   button:not([data-no-press]):active,
   [role="button"]:active,
