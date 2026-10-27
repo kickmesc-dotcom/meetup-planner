@@ -176,6 +176,12 @@ input {
 .chk-tg:active {
   transform: scale(0.92);
 }
+
+/* Флажок — такая же кнопка по смыслу, поэтому сжимается теми же 120 мс, а не
+   рывком: рядом с остальными кнопками мгновенное сжатие читалось как лаг. */
+.chk-tg {
+  transition: transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
 .chk-tg:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -369,5 +375,9 @@ button[aria-disabled="true"],
   .lift:hover {
     translate: 0 0;
     box-shadow: none;
+  }
+  /* «Меньше движения» распространяется и на флажок: он тоже сжимался. */
+  .chk-tg:active {
+    transform: none;
   }
 }

@@ -4353,3 +4353,8 @@ CSS, JS не изменился.
 Перевыложено: `semitaskbot.pages.dev` → `index-C6BNgtFn.js`,
 `index-CX7YH84a.css`; в живом CSS `transition-property` содержит `color`.
 `press.guard.test.ts` — 3/3, `tsc` чисто, сборка ок.
+
+И ещё одно место того же рода: флажок `.chk-tg` сжимался мгновенно
+(`transform` без перехода) — теперь те же 120 мс, а при `prefers-reduced-motion`
+не сжимается вовсе. Живой CSS: `index-NWiL7HWd.css`,
+`.chk-tg{transition:transform .12s cubic-bezier(.22,1,.36,1)}`.
