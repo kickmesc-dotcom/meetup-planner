@@ -231,6 +231,26 @@ export interface HrFeed {
 
 export const fetchEmployee = () => api<HrEmployee>("/api/me/employee");
 
+/**
+ * Утренняя сводка руководителю (план, 8.2).
+ *
+ * Те же числа приходят в Telegram в 08:30; экран нужен, чтобы открыть его
+ * днём — когда сообщение уже утонуло в чате.
+ */
+export interface HrDigest {
+  day: string;
+  overdue_tasks: number;
+  overdue_titles: string[];
+  planned_today: number;
+  not_started: number;
+  open_runs: number;
+  problems_open: number;
+  problems_attention: number;
+  calm: boolean;
+}
+
+export const fetchDigest = () => api<HrDigest>("/api/hr/digest");
+
 /** Открыть или закрыть свой профиль для коллег. */
 export const setProfileVisibility = (isPublic: boolean) =>
   api<HrEmployee>("/api/me/profile-visibility", {

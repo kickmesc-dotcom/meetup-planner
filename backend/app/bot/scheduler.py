@@ -177,6 +177,7 @@ JOB_GAME_VOICE = "game_voice_tick"  # GHG10 Э14
 JOB_GAME_MUSIC = "game_music_weekly"  # GHG10 Э15
 JOB_GAME_MUSIC_GAME = "game_music_game_weekly"  # GHG10 Э16
 JOB_WATCHDOG = "scheduler_watchdog"  # GHG11(3): схлопывание зависших задач
+JOB_HR_DIGEST = "hr_morning_digest"  # план 8.2: сводка руководителю в 08:30
 JOB_HR_TASKS = "hr_tasks_tick"  # SemiTaskBot: напоминания о сроке + эскалация просрочки
 
 def _env_int(name: str, default: int) -> int:
@@ -1058,6 +1059,28 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=900,
+    )
+
+    # План 8.2: утренняя сводка руководителю. Отдельный cron, а не «на первом
+    # тике после 8:30»: тик напоминаний ходит каждые 15 минут и дёргает базу,
+    # а сводка нужна один раз и в конкретное время — до открытия смены.
+    async def _hr_digest_job(*, bot: Bot) -> None:
+        from app.db.base import get_sessionmaker
+        from app.services.hr_digest import send_morning
+
+        sm = get_sessionmaker()
+        async with sm() as session:
+            await send_morning(session, bot=bot, app_url=settings.mini_app_url)
+
+    sched.add_job(
+        _logged_job(JOB_HR_DIGEST, _hr_digest_job),
+        CronTrigger(hour=8, minute=30, timezone=settings.scheduler_tz),
+        kwargs={"bot": bot},
+        id=JOB_HR_DIGEST,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600,
     )
 
     sched.start()

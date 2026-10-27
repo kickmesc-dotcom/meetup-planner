@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -47,6 +47,11 @@ KEY_NOTIFY_LEAD_MINUTES = "hr.notify.lead_minutes"
 KEY_NOTIFY_TAIL_MINUTES = "hr.notify.tail_minutes"
 # Глобальный мьют управляющего: до какого момента не слать ничего.
 KEY_NOTIFY_MUTED_UNTIL = "hr.notify.muted_until"
+# Утренняя сводка руководителю (план, 8.2): включена ли и за какое число уже
+# отправлена. Второй ключ — защита от двойной отправки при перезапуске
+# планировщика: «утро» должно приходить один раз, а не раз на рестарт.
+KEY_DIGEST_ENABLED = "hr.digest.enabled"
+KEY_DIGEST_LAST_SENT = "hr.digest.last_sent"
 
 # Значения по умолчанию подобраны под смену ресторана: напомнить за час,
 # проверять раз в 15 минут. Тик достаточно частый, потому что срок поручения
@@ -169,6 +174,32 @@ async def get_tick_minutes(session: AsyncSession) -> int:
     return clamp_tick_minutes(
         await _get_int(session, KEY_TICK_MINUTES, DEFAULT_TICK_MINUTES)
     )
+
+
+async def get_digest_enabled(session: AsyncSession) -> bool:
+    return await _get_bool(session, KEY_DIGEST_ENABLED, True)
+
+
+async def set_digest_enabled(session: AsyncSession, value: bool) -> bool:
+    await _set(session, KEY_DIGEST_ENABLED, "true" if value else "false")
+    return value
+
+
+async def get_digest_sent_on(session: AsyncSession) -> date | None:
+    """За какое число сводка уже ушла (None — ни разу)."""
+    raw = await _get(session, KEY_DIGEST_LAST_SENT)
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw.strip())
+    except ValueError:
+        # Кривое значение не должно блокировать сводку навсегда: считаем, что
+        # отправки не было, и перезаписываем ключ при следующей.
+        return None
+
+
+async def set_digest_sent_on(session: AsyncSession, day: date) -> None:
+    await _set(session, KEY_DIGEST_LAST_SENT, day.isoformat())
 
 
 async def get_demo_visible(session: AsyncSession) -> bool:

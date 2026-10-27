@@ -1527,4 +1527,19 @@ export const EN_CONTENT: Record<string, string> = {
   "Отдел в приглашении": "Department in the invitation",
   "Без отдела": "No department",
   "Вас ждут: {details}": "You'll join as: {details}",
+  // Утренняя сводка руководителю (план, 8.2): экран и вход в него из «Команды».
+  "Сводка дня": "Daily summary",
+  "Обновить": "Refresh",
+  "То же, что приходит в 08:30 — без поиска по чату":
+    "The same thing that arrives at 08:30 — without scrolling the chat",
+  "Всё спокойно": "All calm",
+  "Просрочек и срочных проблем нет — можно заниматься сменой.":
+    "No overdue items or urgent problems — you can get on with the shift.",
+  "Не открыли чек-лист": "Checklist not opened",
+  "из {count} смен": "of {count} shifts",
+  "чек-листов сейчас": "checklists right now",
+  "Что просрочено": "What is overdue",
+  "Открыть поручения": "Open tasks",
+  "Числа считаются по тем же правилам видимости, что журнал и задачи: чужого здесь не показывается.":
+    "The numbers follow the same visibility rules as the journal and tasks: nothing foreign is shown here.",
 };

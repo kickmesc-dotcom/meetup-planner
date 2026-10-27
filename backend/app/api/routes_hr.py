@@ -46,6 +46,7 @@ from app.services import (
     hr_achievements,
     hr_checklists,
     hr_departments,
+    hr_digest,
     hr_feed,
     hr_feedback,
     hr_kpi,
@@ -1723,4 +1724,48 @@ async def feed(
             )
             for item in items
         ],
+    )
+
+
+# --- Утренняя сводка (план, 8.2) -------------------------------------------
+
+
+class DigestOut(BaseModel):
+    """Числа утра. Ровно то, что приходит руководителю в Telegram."""
+
+    day: date
+    overdue_tasks: int
+    overdue_titles: list[str]
+    planned_today: int
+    not_started: int
+    open_runs: int
+    problems_open: int
+    problems_attention: int
+    calm: bool
+
+
+@router.get("/digest", response_model=DigestOut)
+async def my_digest(
+    session: SessionDep,
+    employee: EmployeeDep,
+) -> DigestOut:
+    """Сводка дня для руководителя.
+
+    Сотруднику без прав она не отдаётся: числа собираются по правилам
+    видимости журнала, но сама ручка — управленческая. Пустые числа при этом
+    не ошибка: «всё спокойно» — это валидный ответ.
+    """
+    if not hr_access.is_aup(employee):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="manager_only")
+    digest = await hr_digest.build(session, employee)
+    return DigestOut(
+        day=digest.day,
+        overdue_tasks=digest.overdue_tasks,
+        overdue_titles=list(digest.overdue_titles),
+        planned_today=digest.planned_today,
+        not_started=digest.not_started,
+        open_runs=digest.open_runs,
+        problems_open=digest.problems_open,
+        problems_attention=digest.problems_attention,
+        calm=digest.calm,
     )

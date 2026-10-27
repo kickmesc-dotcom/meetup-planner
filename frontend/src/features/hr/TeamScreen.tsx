@@ -19,6 +19,7 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton, SkeletonText } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
+import DigestScreen from "@/features/hr/DigestScreen";
 import InvitationsScreen from "@/features/admin/InvitationsScreen";
 import { useTx, type Locale } from "@/i18n";
 
@@ -64,9 +65,16 @@ export default function TeamScreen({
   // Приглашения — здесь, а не только в админке: руководитель ищет людей в
   // «Команде», а кабинет платформы клиенту недоступен (и не должен быть).
   const [showInvites, setShowInvites] = useState(false);
+  // Сводка дня — то же, что приходит в Telegram в 08:30. Отдельный экран, а не
+  // повтор плиток в шапке: к обеду сообщение тонет в чате, а здесь оно ждёт
+  // вместе с переходами в разделы.
+  const [showDigest, setShowDigest] = useState(false);
 
   if (showInvites) {
     return <InvitationsScreen onBack={() => setShowInvites(false)} />;
+  }
+  if (showDigest) {
+    return <DigestScreen onBack={() => setShowDigest(false)} />;
   }
 
   if (dashboard.isError) {
@@ -118,8 +126,19 @@ export default function TeamScreen({
         </div>
         <button
           type="button"
+          onClick={() => {
+            haptic("light");
+            setShowDigest(true);
+          }}
+          className="min-h-11 rounded-tile px-2 text-xs text-tg-link"
+        >
+          {tx("Сводка дня")}
+        </button>
+        <button
+          type="button"
           onClick={() => void dashboard.refetch()}
           className="min-h-11 min-w-11 rounded-tile px-2 text-xs text-tg-link"
+          aria-label={tx("Обновить")}
         >
           ⟳
         </button>
