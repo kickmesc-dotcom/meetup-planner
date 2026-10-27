@@ -257,6 +257,11 @@ def db_target() -> dict[str, Any]:
     try:
         parts = urlsplit(settings.database_url)
         host, port, name = parts.hostname, parts.port, (parts.path or "").lstrip("/")
+        if port is None and (parts.scheme or "").startswith("postgres"):
+            # В DSN порт часто не пишут (у Neon его нет): без явного значения
+            # драйвер идёт на 5432. Отдаём это число, а не `None` — иначе сверка
+            # контуров печатает «порт None» и вопрос остаётся без ответа.
+            port = 5432
     except Exception:  # noqa: BLE001
         host, port, name = None, None, ""
     return {

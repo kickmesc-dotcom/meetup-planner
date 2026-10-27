@@ -50,28 +50,48 @@ def _local_fingerprint() -> tuple[dict[str, Any], list[str]]:
 
     Приложение импортируется с заглушками в env: реальные секреты для этого не
     нужны, а подключение к базе ленивое (get_engine создаётся при первом запросе).
+
+    Заглушки снимаются в `finally`: иначе `TG_WEBHOOK_SECRET=x` остаётся в
+    окружении и `_env_secret` берёт его вместо файла `backend/.env` — так сверка
+    «порт, имя базы и версия СУБД» молча терялась (проверено на живом хосте).
     """
-    for key, value in {
+    stubs = {
         "BOT_TOKEN": "x",
         "TG_WEBHOOK_SECRET": "x",
         "MINI_APP_URL": "https://x.test",
         "DATABASE_URL": "postgresql+asyncpg://u:p@localhost/db",
-    }.items():
+        # Без этого локальный эталон строится с `CORS_ORIGINS=*` и в лог
+        # попадает `cors.configured origins=['*']` — читается как «на проде
+        # открыто всем», хотя это заглушка эталона, а не хоста.
+        "CORS_ORIGINS": "https://x.test",
+    }
+    added = [key for key in stubs if key not in os.environ]
+    for key, value in stubs.items():
         os.environ.setdefault(key, value)
 
     sys.path.insert(0, str(BACKEND))
-    from app.api.routes_meta import available_features, code_fingerprint
-    from app.main import app
+    try:
+        from app.api.routes_meta import available_features, code_fingerprint
+        from app.main import app
 
-    return code_fingerprint(app), available_features(app)
+        return code_fingerprint(app), available_features(app)
+    finally:
+        for key in added:
+            os.environ.pop(key, None)
+
+
+# `/api/meta/net` сам ходит по сети (TCP/TLS до Telegram и БД), поэтому ему
+# нужен отдельный, более длинный срок: с общим 30 с он стабильно обрывался
+# «TimeoutError», и сверка деталей базы выглядела как «секрет не подошёл».
+NET_DIAG_TIMEOUT = 90
 
 
 def _fetch_json(
-    url: str, headers: dict[str, str] | None = None
+    url: str, headers: dict[str, str] | None = None, timeout: int = TIMEOUT
 ) -> tuple[int, dict[str, Any] | None]:
     request = urllib.request.Request(url, headers=headers or {})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as resp:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
             return resp.status, json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         return exc.code, None
@@ -110,11 +130,21 @@ def _diag_body(base: str) -> dict[str, Any]:
     if not token:
         print("            (секрета TG_WEBHOOK_SECRET нет ни в env, ни в backend/.env)")
         return {}
-    status, body = _fetch_json(f"{base}/api/meta/net", {"X-Diag-Token": token})
+    status, body = _fetch_json(
+        f"{base}/api/meta/net", {"X-Diag-Token": token}, timeout=NET_DIAG_TIMEOUT
+    )
     if status != 200 or not body:
-        # `404` здесь — не ошибка адреса, а несовпадение секрета: ручки нет
-        # ровно для того, у кого нет ключа. Закрытый вопрос, а не ошибка.
-        print(f"            (/api/meta/net → HTTP {status}: секрета нет, детали скрыты)")
+        # Разные причины — разные сообщения, иначе не отличить запрет от сети.
+        # `404` — не ошибка адреса, а несовпадение секрета: ручки нет ровно для
+        # того, у кого нет ключа. `0` — хост не ответил вовсе (диагностика сама
+        # ходит по сети и может не уложиться в срок).
+        if status == 0:
+            print(
+                f"            (/api/meta/net не ответил за {NET_DIAG_TIMEOUT} с"
+                " — детали базы и CORS пропущены)"
+            )
+        else:
+            print(f"            (/api/meta/net → HTTP {status}: секрет из backend/.env хосту не подошёл)")
         return {}
     return body
 

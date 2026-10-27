@@ -145,6 +145,36 @@ def test_provider_detection():
     assert _provider(None) == "local"
 
 
+def test_db_target_defaults_postgres_port(monkeypatch):
+    """DSN без порта — это 5432, а не `None`.
+
+    У Neon в строке подключения порта нет (он у них не пишется), и сверка
+    контуров печатала «порт None». Сверять нечего — значит, вопрос оставался
+    без ответа. Драйвер в этом случае идёт на 5432, это и показываем.
+    """
+    monkeypatch.setattr(
+        routes_meta,
+        "get_settings",
+        lambda: SimpleNamespace(
+            database_url=(
+                "postgresql+asyncpg://neondb_owner:pw"
+                "@ep-dry-cherry-baraqxe8-pooler.c-8.eu-central-1.aws.neon.tech/neondb"
+            )
+        ),
+    )
+    assert db_target()["port"] == 5432
+    # Драйвер без явного порта тоже получает значение по умолчанию.
+    monkeypatch.setattr(
+        routes_meta, "get_settings", lambda: SimpleNamespace(database_url="postgresql://u:p@db/db")
+    )
+    assert db_target()["port"] == 5432
+    # А вот у sqlite порта нет и быть не должно.
+    monkeypatch.setattr(
+        routes_meta, "get_settings", lambda: SimpleNamespace(database_url="sqlite+aiosqlite:///./x.db")
+    )
+    assert db_target()["port"] is None
+
+
 def test_db_target_never_leaks_credentials(monkeypatch):
     secret = "npg_GuSFzjs2L6ny"
     monkeypatch.setattr(
