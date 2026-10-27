@@ -269,11 +269,12 @@ def test_achievement_routes_are_registered():
     from app.main import create_app
 
     app = create_app()
-    paths = {
-        (method, getattr(route, "path", ""))
-        for route in app.routes
-        for method in (getattr(route, "methods", None) or set())
-    }
+    # Пути берём из `_iter_routes`: в Starlette 1.x `app.routes` больше не
+    # разворачивается в плоский список, и прямой обход молча дал бы пустое
+    # множество (аудит 26.10.2026, S-18).
+    from app.api.routes_meta import _iter_routes
+
+    paths = set(_iter_routes(app))
     expected = {
         ("GET", "/api/me/achievements"),
         ("GET", "/api/admin/employees/{employee_id}/achievements"),

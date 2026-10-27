@@ -47,6 +47,59 @@ def test_fingerprint_is_stable_and_route_sensitive():
     assert other["routes"] == 3
 
 
+# --- S-18: перечисление роутов не должно зависеть от раскладки app.routes ------
+
+def test_path_converter_is_normalised_like_openapi():
+    """`{job_id:path}` и `{job_id}` — один и тот же роут.
+
+    В схеме OpenAPI конвертер отбрасывается, в `app.router.routes` — остаётся.
+    Без нормализации объединение двух источников удваивало бы роут и меняло
+    отпечаток на ровном месте.
+    """
+    assert routes_meta._normalise_path("/api/admin/jobs/{job_id:path}") == (
+        "/api/admin/jobs/{job_id}"
+    )
+    assert routes_meta._normalise_path("/api/hr/{employee_id}/tasks") == (
+        "/api/hr/{employee_id}/tasks"
+    )
+
+
+def test_routes_survive_flat_router_regression(monkeypatch):
+    """Главная проверка S-18: список ручек берётся из схемы, а не из `app.routes`.
+
+    В Starlette 1.x включённые роутеры перестают разворачиваться в плоский
+    список — `app.router.routes` отдаёт несколько объектов вместо сотен. Тогда
+    отпечаток ловил бы ложное изменение, а `features` (по которому фронт прячет
+    разделы) — опустел бы. Симулируем это, подменив `router.routes` огрызком.
+    """
+    from starlette.routing import Route
+
+    app = _app_with(
+        [
+            ("GET", "/api/hr/me"),
+            ("POST", "/api/hr/tasks"),
+            ("GET", "/api/admin/people"),
+        ]
+    )
+    full = set(routes_meta._iter_routes(app))
+    assert full == {
+        ("GET", "/api/hr/me"),
+        ("POST", "/api/hr/tasks"),
+        ("GET", "/api/admin/people"),
+    }
+
+    # Схема к этому моменту уже построена (её собрал первый вызов) и живёт в
+    # `app.openapi_schema` — именно на неё и опирается сверка после регрессии.
+    monkeypatch.setattr(
+        app.router,
+        "routes",
+        [Route("/api/hr/me", endpoint=lambda request: None, methods=["GET"])],
+    )
+    after = set(routes_meta._iter_routes(app))
+    # Схема помнит все три — значит, подмена `app.routes` не теряет ручки.
+    assert after == full
+
+
 def test_fingerprint_ignores_service_routes_and_head():
     plain = code_fingerprint(_app_with([("GET", "/api/x")]))
     noisy = code_fingerprint(

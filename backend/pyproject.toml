@@ -4,7 +4,17 @@ version = "0.1.0"
 description = "Telegram Mini App backend: bot + REST API"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "fastapi==0.115.6",
+    # Аудит 26.10.2026 (S-18): fastapi 0.115.6 / starlette 0.41.3 тянули 14
+    # advisories Starlette. Подъём был задержан не тестами, а тем, что в
+    # Starlette 1.x `app.routes` больше не разворачивается в плоский список
+    # (33 объекта вместо 359), а на этом списке жили `/api/meta` и проверки прав.
+    # Перечисление переписано на схему OpenAPI (`routes_meta._routes_from_schema`)
+    # и `app/routing.iter_route_objects`, после чего подъём стало можно измерить:
+    # 354 ручки, тот же состав `features`, полный `pytest` зелёный.
+    "fastapi==0.162.0",
+    # Пин явный: FastAPI разрешает диапазон, а боевая сборка должна быть
+    # воспроизводимой (тот же урок, что с aiogram/aiohttp 26.10).
+    "starlette==1.10.0",
     "uvicorn[standard]==0.32.1",
     "sqlalchemy[asyncio]==2.0.36",
     "asyncpg==0.30.0",

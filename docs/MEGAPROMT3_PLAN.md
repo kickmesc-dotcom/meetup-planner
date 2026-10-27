@@ -556,7 +556,8 @@
 | S-13 | Сравнение секретов не constant-time | P2 | **сделано 26.10** (пакет 3): `compare_digest` по байтам |
 | S-14 | Гонка `alembic upgrade head` у двух хостов | P2 | **сделано 26.10** (пакет 3): `app/db/migrate.py` + advisory-lock |
 | S-15…S-17 | гигиена: `server: uvicorn`, диагностика сети, подписи в логах | P3 | **сделано 26.10** (пакет 4): `--no-server-header`, `/api/meta/net` под секретом (404 без него), `app/log_redaction.py` |
-| S-18 | `fastapi`/`starlette` 0.115/0.41 с advisories Starlette | P1 | план: перевести `api/routes_meta.py` на перечисление маршрутов по схеме OpenAPI и только затем поднимать `starlette` 1.x |
+| S-18 | `fastapi`/`starlette` 0.115/0.41 с advisories Starlette | P1 | **сделано 27.10**: перечисление ручек переведено на схему OpenAPI (`routes_meta._routes_from_schema`) и общий обход для проверок прав (`app/routing.iter_route_objects`), затем подъём до `fastapi 0.162.0` / `starlette 1.10.0`. Цифры до/после совпали: 354 ручки, 351 из них `/api`, `features` — те же 3, полный `pytest` 1641 зелёный, чистый `pip install .` разрешается в те же версии |
+| S-21 | Один путь `PATCH /api/admin/employees/{id}` объявлен дважды: `routes_hr_admin` и `routes_hr_ops_admin` | P1 | **найдено 27.10** (всплыло от предупреждения FastAPI о дубле `operation_id`): второй обработчик недостижим — Starlette берёт первый по порядку. Фронт (`api/hrOps.ts`) ждёт форму `HrEmployeeCard` от ops-модуля, а отвечает старый `EmployeeAdminOut`; к тому же у них разные права (`AdminDep` против `AupDep`), поэтому «просто поменять порядок» = расширить доступ руководителям. Нужно решение по продукту — какой обработчик главный и кому можно править людей |
 | S-19 | `aiohttp` 3.10.11: 74 advisories, свежий 3.14.5 (0 advisories) не влезает в память | P1 | план: либо тариф Amvera от 1 ГБ, либо снять с приложения ~300 МБ старта — и тогда `aiogram` 3.29+ / `aiohttp` 3.14.5 |
 
 ### S-19. Потолок памяти хоста как ограничение зависимостей

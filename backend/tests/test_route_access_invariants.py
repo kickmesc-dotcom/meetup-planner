@@ -31,6 +31,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./.test_invariants.db
 import pytest  # noqa: E402
 
 from app.main import create_app  # noqa: E402
+from app.routing import iter_route_objects  # noqa: E402
 
 # Зависимости, которыми пользуется код для авторизации.
 AUTH_DEPENDENCIES = {
@@ -108,9 +109,15 @@ def _app():  # noqa: ANN202 - объект FastAPI
 
 
 def _routes() -> list[tuple[str, str, set[str], object]]:
-    """(метод, путь, зависимости авторизации, endpoint) для всех маршрутов api/tg."""
+    """(метод, путь, зависимости авторизации, endpoint) для всех маршрутов api/tg.
+
+    Обход — через `app.routing.iter_route_objects`, а не по `app.routes`: в
+    Starlette 1.x включённые роутеры больше не разворачиваются в плоский список,
+    и прямой обход давал бы пустой набор — тест-инвариант «зеленел» бы ни на чём
+    (аудит 26.10.2026, S-18).
+    """
     out: list[tuple[str, str, set[str], object]] = []
-    for route in _app().routes:
+    for route in iter_route_objects(_app()):
         path = getattr(route, "path", None)
         methods = getattr(route, "methods", None)
         if not path or not methods or not path.startswith(("/api", "/tg")):

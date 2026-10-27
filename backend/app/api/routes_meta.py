@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -75,19 +76,64 @@ _FEATURE_ROUTES: dict[str, tuple[str, str]] = {
 _ROUTE_HASH_SKIP = {"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"}
 
 
+# `{job_id:path}` — стиль Starlette. В схеме OpenAPI тот же параметр записан
+# как `{job_id}`, и без нормализации два источника давали бы два «разных» роута
+# и разный отпечаток (аудит 26.10.2026, S-18).
+_PATH_CONVERTER_RE = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*):[^}]+\}")
+
+
+def _normalise_path(path: str) -> str:
+    """`/api/admin/jobs/{job_id:path}` → `/api/admin/jobs/{job_id}`."""
+    return _PATH_CONVERTER_RE.sub(r"{\1}", path)
+
+
+def _routes_from_schema(app: FastAPI) -> set[tuple[str, str]]:
+    """Роуты из схемы OpenAPI — источник, не зависящий от раскладки `app.routes`.
+
+    Зачем (S-18). В Starlette 1.x включённые роутеры больше не разворачиваются
+    в плоский список: `app.router.routes` отдаёт 33 объекта вместо 359. На этом
+    списке живёт `fingerprint`, а по `features` фронт прячет разделы интерфейса —
+    то есть обновление библиотеки тихо выключило бы экраны, а тесты остались бы
+    зелёными. Схема OpenAPI собирается из тех же роутеров в обеих версиях, поэтому
+    она и становится главным источником, а `app.router.routes` — фолбэком.
+    """
+    try:
+        schema = app.openapi()
+    except Exception as exc:  # noqa: BLE001 — диагностика не имеет права падать
+        structlog.get_logger().warning("meta.openapi_failed", error=str(exc))
+        return set()
+    out: set[tuple[str, str]] = set()
+    for path, operations in (schema.get("paths") or {}).items():
+        if not path or path in _ROUTE_HASH_SKIP:
+            continue
+        for method in operations:
+            upper = str(method).upper()
+            # `parameters` — не метод: так OpenAPI описывает параметры пути.
+            if upper in {"HEAD", "OPTIONS", "PARAMETERS", "TRACE"}:
+                continue
+            out.add((upper, _normalise_path(path)))
+    return out
+
+
 def _iter_routes(app: FastAPI) -> list[tuple[str, str]]:
-    """(METHOD, path) для всех зарегистрированных ручек, без служебных."""
-    out: list[tuple[str, str]] = []
+    """(METHOD, path) для всех зарегистрированных ручек, без служебных.
+
+    Объединение двух источников, а не один: схема знает про все роутеры (и в
+    Starlette 0.41, и в 1.x), а `app.router.routes` — про те, что запрещены в
+    схему (`include_in_schema=False`). После нормализации путей списки
+    совпадают, поэтому объединение ничего не добавляет задним числом.
+    """
+    out: set[tuple[str, str]] = _routes_from_schema(app)
     for route in app.router.routes:
-        path = getattr(route, "path", "")
+        path = _normalise_path(getattr(route, "path", "") or "")
         methods = getattr(route, "methods", None) or set()
         if not path or path in _ROUTE_HASH_SKIP:
             continue
-        for method in sorted(methods):
+        for method in methods:
             if method in {"HEAD", "OPTIONS"}:
                 continue
-            out.append((method, path))
-    return out
+            out.add((method, path))
+    return sorted(out)
 
 
 def code_fingerprint(app: FastAPI) -> dict[str, Any]:
@@ -96,7 +142,7 @@ def code_fingerprint(app: FastAPI) -> dict[str, Any]:
     Возвращает число роутов, число `/api`-роутов и короткий хеш их списка.
     Достаточно сравнить `fingerprint` двух хостов: равны — код один и тот же.
     """
-    routes = sorted(_iter_routes(app))
+    routes = _iter_routes(app)
     joined = "\n".join(f"{method} {path}" for method, path in routes)
     digest = hashlib.sha256(joined.encode("utf-8")).hexdigest()[:12]
     return {
