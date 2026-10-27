@@ -267,7 +267,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
     <button
       type="button"
       onClick={onClick}
-      className="w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left transition-transform active:scale-[0.99]"
+      className="w-full rounded-card bg-tg-secondary-bg/60 p-3 text-left press"
     >
       <div className="flex items-start gap-2">
         <span className="text-base leading-5" aria-hidden>
@@ -678,7 +678,7 @@ function ActionButton({
       disabled={disabled}
       onClick={onClick}
       className={[
-        "min-h-10 rounded-tile px-3 text-xs font-medium transition-transform active:scale-[0.98] disabled:opacity-50",
+        "min-h-10 rounded-tile px-3 text-xs font-medium press disabled:opacity-50",
         variant === "primary"
           ? "bg-tg-button text-tg-button-text"
           : "bg-tg-secondary-bg text-tg-text",

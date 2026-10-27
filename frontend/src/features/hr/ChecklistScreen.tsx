@@ -261,7 +261,7 @@ function HallPicker({
           disabled={busy}
           onClick={() => onChange(hall.id)}
           className={[
-            "flex w-full items-center justify-between rounded-card px-4 py-3 text-left text-sm transition-transform active:scale-[0.99] disabled:opacity-60",
+            "flex w-full items-center justify-between rounded-card px-4 py-3 text-left text-sm press disabled:opacity-60",
             hall.id === selectedId
               ? "bg-tg-button text-tg-button-text"
               : "bg-tg-secondary-bg/60 text-tg-text",

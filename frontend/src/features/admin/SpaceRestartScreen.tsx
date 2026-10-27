@@ -120,7 +120,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
               );
               if (ok) restart.mutate();
             }}
-            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 press flex items-center justify-center gap-2"
           >
             {restart.isPending && <Spinner />}
             <Icon name="refresh" size={16} />{tx("Рестарт Space")}</button>
@@ -230,7 +230,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
               haptic("medium");
               save.mutate(draft);
             }}
-            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 press flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
             <Icon name="save" size={16} />{tx("Сохранить расписание")}</button>

@@ -41,7 +41,7 @@ export default function YearView({ anchor, ranges, users, isPending = false }: P
             key={m.getMonth()}
             type="button"
             onClick={() => onMonthTap(m)}
-            className="bg-tg-secondary-bg/40 rounded-card p-2 text-left active:scale-95 transition-transform"
+            className="bg-tg-secondary-bg/40 rounded-card p-2 text-left press"
           >
             <div className="text-xs font-semibold mb-1 capitalize">
               {monthFull(m.getMonth())}

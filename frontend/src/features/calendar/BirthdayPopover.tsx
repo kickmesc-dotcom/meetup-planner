@@ -139,7 +139,7 @@ export default function BirthdayPopover() {
             type="button"
             onClick={() => greetingMut.mutate()}
             disabled={greetingMut.isPending}
-            className="rounded-tile bg-tg-button text-tg-button-text py-2 px-3 text-sm font-medium active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+            className="rounded-tile bg-tg-button text-tg-button-text py-2 px-3 text-sm font-medium press disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {greetingMut.isPending && <Spinner size={14} />}
             <Icon name="sparkles" size={16} />
@@ -201,7 +201,7 @@ export default function BirthdayPopover() {
           <button
             type="button"
             onClick={onAssignMeeting}
-            className="mt-1 rounded-tile bg-tg-secondary-bg text-tg-text py-2 px-3 text-sm font-medium active:scale-[0.98]"
+            className="mt-1 rounded-tile bg-tg-secondary-bg text-tg-text py-2 px-3 text-sm font-medium press"
           >
             <Icon name="calendar" size={15} className="mr-1 inline-block align-[-2px]" />
             {tx("Назначить встречу")}

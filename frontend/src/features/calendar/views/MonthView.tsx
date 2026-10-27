@@ -155,7 +155,7 @@ function MonthBlock({
                   : undefined
               }
               className={[
-                "aspect-square rounded-tile flex flex-col items-center justify-start py-1 px-1 text-xs transition-transform active:scale-95 relative",
+                "aspect-square rounded-tile flex flex-col items-center justify-start py-1 px-1 text-xs press relative",
                 // DESIGN_SYSTEM §2: было `text-tg-hint/60` — модификатор не
                 // применялся, и дни соседних месяцев рисовались полным цветом
                 // текста (то есть как текущие). Теперь альфа работает, берём

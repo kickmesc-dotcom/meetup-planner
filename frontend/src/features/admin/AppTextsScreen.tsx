@@ -141,7 +141,7 @@ export default function AppTextsScreen({ onBack }: Props) {
                   <button
                     type="button"
                     onClick={() => reset(item)}
-                    className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
+                    className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link press"
                   >
                     <InlineIcon name="refresh" />
                     {tx("Как было")}
@@ -162,7 +162,7 @@ export default function AppTextsScreen({ onBack }: Props) {
               haptic("medium");
               save.mutate();
             }}
-            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 press inline-flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
             {save.isPending ? (

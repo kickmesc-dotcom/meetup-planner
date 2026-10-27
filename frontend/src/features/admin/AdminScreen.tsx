@@ -490,11 +490,13 @@ function Card({
   /** Опц. счётчик справа; >0 → красный. */
   badge?: number;
 }) {
+  // §10: на ПК карточка приподнимается под курсором (`.lift` живёт внутри
+  // `@media (hover: hover)`), на телефоне остаётся только отклик нажатия.
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-card bg-tg-secondary-bg/60 p-3 text-left transition-transform active:scale-[0.98]"
+      className="lift flex w-full items-center gap-3 rounded-card bg-tg-secondary-bg/60 p-3 text-left press"
     >
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-tile bg-tg-bg/60 text-tg-text">
         <Icon name={icon} size={22} />

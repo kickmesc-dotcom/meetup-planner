@@ -32,7 +32,7 @@ export default function AllYearsView({ anchor }: Props) {
               type="button"
               onClick={() => onYearTap(y)}
               className={[
-                "aspect-[3/2] rounded-card flex items-center justify-center text-2xl font-semibold transition-transform active:scale-95",
+                "aspect-[3/2] rounded-card flex items-center justify-center text-2xl font-semibold press",
                 current
                   ? "bg-tg-button text-tg-button-text"
                   : "bg-tg-secondary-bg/60 text-tg-text",

@@ -488,7 +488,7 @@ export default function HrFeedScreen() {
                   title={tx("Предыдущий день")}
                   disabled={index >= allGroups.length - 1}
                   onClick={() => jumpToDay(index + 1)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition active:scale-95 disabled:opacity-35 disabled:active:scale-100"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition press disabled:opacity-35 disabled:press"
                 >
                   <Icon name="back" size={16} />
                 </button>
@@ -499,7 +499,7 @@ export default function HrFeedScreen() {
                   title={tx("Следующий день")}
                   disabled={index === 0}
                   onClick={() => jumpToDay(index - 1)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition active:scale-95 disabled:opacity-35 disabled:active:scale-100"
+                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition press disabled:opacity-35 disabled:press"
                 >
                   <Icon name="chevron" size={16} />
                 </button>

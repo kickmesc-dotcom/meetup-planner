@@ -97,7 +97,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   <button
                     type="button"
                     onClick={onOpenTasks}
-                    className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link active:scale-95 transition-transform"
+                    className="min-h-9 rounded-tile bg-tg-bg/70 px-2 text-xs text-tg-link press"
                   >
                     {tx("Открыть →")}
                   </button>

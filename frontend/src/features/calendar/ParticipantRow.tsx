@@ -330,7 +330,7 @@ export default function ParticipantRow({
                         displayName: user.display_name,
                       });
                     }}
-                    className="absolute top-0.5 right-0.5 z-10 grid place-items-center rounded-tile bg-tg-bg/70 p-0.5 text-tg-link active:scale-95"
+                    className="absolute top-0.5 right-0.5 z-10 grid place-items-center rounded-tile bg-tg-bg/70 p-0.5 text-tg-link press"
                   >
                     <Icon name="cake" size={12} />
                   </button>

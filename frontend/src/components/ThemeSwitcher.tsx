@@ -41,7 +41,7 @@ export default function ThemeSwitcher({ className }: { className?: string }) {
       }}
       className={[
         "-my-2 grid h-11 w-11 shrink-0 place-items-center rounded-full",
-        "active:scale-95 transition-transform",
+        "press",
         className ?? "",
       ].join(" ")}
     >

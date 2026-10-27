@@ -193,7 +193,7 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
           e.stopPropagation();
           onClose();
         }}
-        className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white active:scale-95"
+        className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white press"
       >
         <Icon name="close" size={18} />
       </button>
@@ -206,7 +206,7 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
             e.stopPropagation();
             reset();
           }}
-          className="absolute left-3 top-3 z-10 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white active:scale-95"
+          className="absolute left-3 top-3 z-10 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white press"
         >
           {scale.toFixed(1)}× · {tr("сбросить")}
         </button>

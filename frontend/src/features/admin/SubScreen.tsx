@@ -21,7 +21,7 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
             haptic("light");
             onBack();
           }}
-          className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 px-2 text-sm text-tg-link active:scale-95 transition-transform"
+          className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 px-2 text-sm text-tg-link press"
           aria-label={tx("Назад")}
         >
           <Icon name="back" size={20} />

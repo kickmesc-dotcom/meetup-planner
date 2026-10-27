@@ -118,7 +118,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
               enterHotMode();
               jobs.refetch();
             }}
-            className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint active:scale-95 transition-transform"
+            className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint press"
             title={tx("Обновить и опрашивать чаще 3 минуты")}
           >
             <Icon name="refresh" size={13} className="mr-1 inline-block" />
@@ -144,7 +144,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
             }
           }}
           disabled={collapse.isPending}
-          className="mb-2 w-full rounded-tile bg-status-busy/15 px-3 py-2 text-xs font-semibold text-status-busy active:scale-[0.99] disabled:opacity-50"
+          className="mb-2 w-full rounded-tile bg-status-busy/15 px-3 py-2 text-xs font-semibold text-status-busy press disabled:opacity-50"
         >
           {collapse.isPending
             ? tx("Пересобираем…")
@@ -294,7 +294,7 @@ function JobRow({
               onReschedule(iso);
             }}
             disabled={pending}
-            className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40            active:scale-[0.98] transition-transform"
+            className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-40            press"
             aria-label={tx("Сохранить время")}
             title={tx("Сохранить время")}
           >

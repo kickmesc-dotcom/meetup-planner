@@ -547,7 +547,7 @@ function Cell({
             }${shift.ends_at ? `–${shift.ends_at}` : ""}`
           : tx("Смены нет")
       }
-      className={`relative flex min-h-11 flex-col items-center justify-center rounded-tile text-xs leading-none transition-transform active:scale-95 ${
+      className={`relative flex min-h-11 flex-col items-center justify-center rounded-tile text-xs leading-none press ${
         shift
           ? TONE[shift.status]
           : "border border-dashed border-tg-hint/25 text-tg-hint"

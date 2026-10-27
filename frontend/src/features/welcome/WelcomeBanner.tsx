@@ -39,7 +39,7 @@ export default function WelcomeBanner({ meName, onHide }: Props) {
           }}
           aria-label={tx("Скрыть приветствие")}
           title={tx("Не показывать в следующий раз")}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-tg-hint transition-transform hover:text-tg-text active:scale-95"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-tg-hint transition-transform hover:text-tg-text press"
         >
           <Icon name="close" size={16} />
         </button>

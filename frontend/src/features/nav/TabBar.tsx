@@ -89,8 +89,12 @@ export default function TabBar({
             // 12 px подписи «Команда»/«События» вылезали за кнопку и обрезались
             // по краям экрана. `text-2xs` + truncate держат семь подписей
             // целиком, а min-w-0 не даёт flex-1 раздуться от длинного слова.
+            // §10: вкладку не сжимаем — она занимает всю высоту полосы, и
+            // сжатие читалось бы как «прыжок» полосы. Вместо этого подсветка
+            // (как в iOS): палец нажал — вкладка тихо потемнела.
+            data-no-press
             className={[
-              "relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
+              "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
             aria-label={

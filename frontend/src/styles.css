@@ -241,3 +241,128 @@ textarea:focus-visible,
 select:focus-visible {
   outline: none;
 }
+
+/* ==========================================================================
+   §10 DESIGN_SYSTEM: отклик нажатия (план, раздел 10).
+
+   Отклик — базовая настройка `button`, а не класс, который надо не забыть
+   повесить: в приложении 335 кнопок, и именно забытые выглядели «мёртвыми»
+   (шапки, нижняя полоса, строки списков).
+
+   Почему так, а не иначе:
+
+   * `scale` (индивидуальное свойство), а не `transform`: сжатие не затирает
+     позиционирование. У плашек, попоуверов и центрированных кнопок в разметке
+     уже есть `-translate-*`, и `transform: scale()` его сбросил бы — кнопка
+     прыгнула бы на пол-экрана в момент нажатия.
+   * только `scale` и `opacity`: их рисует композитор, layout не пересчитывается.
+     Соседние элементы не «прыгают», тач-цель остаётся ≥44 px.
+   * `button:not([data-no-press])` вместо голого `button`: утилита
+     `transition-colors` в разметке имеет специфичность класса и иначе перебила бы
+     нашу `transition-property` — отклик стал бы мгновенным рывком вместо сжатия.
+     `:not([data-no-press])` даёт (0,1,1) и заодно служит выключателем для
+     элементов, которым отклик противопоказан (жесты, перетаскивание).
+   * `@media (hover: hover) and (pointer: fine)` для подсветки: на тач-экране
+     hover «залипает» после тапа, и кнопка выглядит нажатой, пока не тронешь
+     другую.
+   * `:disabled` / `[aria-disabled="true"]` отменяют отклик: человек не должен
+     видеть реакцию на действие, которого не будет. Прозрачность не трогаем —
+     у кнопок есть свои `disabled:opacity-*`.
+
+   120 мс — «мгновенно, но заметно»: медленнее читается как лаг.
+   ========================================================================== */
+
+button:not([data-no-press]),
+[role="button"],
+.press,
+.press-icon,
+.press-row,
+.lift {
+  transition-property: scale, opacity, background-color, translate, box-shadow;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Двойной тап по кнопке не должен зумить страницу: `manipulation` убирает
+   задержку распознавания двойного тапа (~300 мс на части WebView) — кнопка
+   отзывается в момент касания, а не после решения браузера. Заодно текст на
+   кнопке не выделяется, если человек жмёт несколько раз подряд. */
+button,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button:not([data-no-press]):active,
+[role="button"]:active,
+.press:active {
+  scale: 0.97;
+  opacity: 0.9;
+}
+
+/* Иконка-кнопка: сжатие заметнее, потому что площадь маленькая. */
+.press-icon:active {
+  scale: 0.9;
+  opacity: 0.85;
+}
+
+/* Строка списка: двигать её целиком незачем — человек уже попал пальцем в
+   широкую цель, ему нужна подсветка, а не «прыжок» строки. */
+.press-row:active {
+  opacity: 0.75;
+  background-color: color-mix(
+    in srgb,
+    var(--tg-theme-text-color, #000000) 7%,
+    transparent
+  );
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Курсор есть — можно позволить лёгкий подъём и подсветку. На тач этого
+     блока нет вовсе. */
+  .press:hover:not(:disabled):not([aria-disabled="true"]),
+  .press-icon:hover:not(:disabled):not([aria-disabled="true"]) {
+    opacity: 0.96;
+  }
+  .lift:hover:not(:disabled):not([aria-disabled="true"]) {
+    translate: 0 -1px;
+    box-shadow: 0 6px 16px -12px rgba(0, 0, 0, 0.45);
+  }
+}
+
+/* Отключённая кнопка не откликается. */
+button:disabled,
+button[aria-disabled="true"],
+[role="button"][aria-disabled="true"],
+.press:disabled,
+.press[aria-disabled="true"],
+.press-icon:disabled,
+.press-icon[aria-disabled="true"],
+.press-row[aria-disabled="true"] {
+  scale: 1;
+  cursor: not-allowed;
+}
+
+/* «Меньше движения» — не «без отклика»: движение убираем, затемнение оставляем. */
+@media (prefers-reduced-motion: reduce) {
+  button:not([data-no-press]),
+  [role="button"],
+  .press,
+  .press-icon,
+  .press-row,
+  .lift {
+    transition-property: opacity, background-color;
+  }
+  button:not([data-no-press]):active,
+  [role="button"]:active,
+  .press:active,
+  .press-icon:active {
+    scale: 1;
+    opacity: 0.82;
+  }
+  .lift:hover {
+    translate: 0 0;
+    box-shadow: none;
+  }
+}

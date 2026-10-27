@@ -217,7 +217,7 @@ function Tile({
     <button
       type="button"
       onClick={onOpen}
-      className="rounded-card bg-tg-secondary-bg/60 p-3 text-left transition-transform active:scale-[0.98]"
+      className="rounded-card bg-tg-secondary-bg/60 p-3 text-left press"
     >
       {content}
     </button>

@@ -117,7 +117,7 @@ export default function PollPresetsScreen({ onBack }: Props) {
               haptic("medium");
               save.mutate(draft);
             }}
-            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 active:scale-[0.98] transition-transform inline-flex items-center justify-center gap-2"
+            className="w-full min-h-11 rounded-tile bg-tg-button py-2 text-sm font-medium text-tg-button-text disabled:opacity-40 press inline-flex items-center justify-center gap-2"
           >
             {save.isPending && <Spinner />}
             {save.isPending ? (

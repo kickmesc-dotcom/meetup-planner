@@ -326,3 +326,33 @@ The UI language is Russian.
   / `ruMonthFull` / `ruWeekdayShort` helpers in `features/calendar/dateUtils.ts`.
 - Dates shown to humans use `toLocaleDateString("ru-RU")`.
 - Pluralization goes through explicit helpers (e.g. `pluralVotes`), never English rules.
+
+### 7.1 Press feedback (plan §10)
+
+Every button responds to a press — it is a **base rule**, not a class someone has to
+remember to add: 335 buttons exist, and the forgotten ones read as "dead" (headers, tab
+bar, list rows).
+
+| Where | Rule | Why |
+|---|---|---|
+| all `button`, `[role="button"]` | `scale: .97`, `opacity: .9`, 120 ms | compositor-only; layout never reflows, touch target (44 px) unchanged |
+| `.press-icon` | `scale: .9` | small target needs a bigger cue |
+| `.press-row` | tint + `opacity: .75`, no scale | a full-width row already got the finger; scaling it looks like a jump |
+| `.lift` | `translate: 0 -1px` + soft shadow on hover | desktop only (`@media (hover: hover) and (pointer: fine)`) |
+| `[data-no-press]` | opt out | gesture surfaces (tab bar, drag handles) where scaling reads as a layout jump |
+
+Implementation notes that are easy to undo by accident:
+
+* `scale` is the **individual property**, not `transform: scale()`. Half the overlays are
+  centred with `-translate-*`; a transform-based squeeze would reset that and throw the
+  element across the screen on touch.
+* The selector is `button:not([data-no-press])`, not a bare `button`: a `transition-colors`
+  utility (class specificity) would otherwise override our `transition-property` and the
+  press would snap instantly instead of easing.
+* `:disabled` / `aria-disabled="true"` cancel the reaction — a button that reacts but does
+  nothing reads as a bug. Disabled opacity stays the component's own business.
+* `prefers-reduced-motion` keeps the darkening and drops the movement.
+* Raw `active:scale-*` in markup is forbidden (`press.guard.test.ts`): it bypasses
+  reduced-motion, ignores `:disabled`, and drifted across 0.9/0.95/0.98/0.99.
+* No ripple, no JS animation, no new dependency: the whole feature is ~40 lines of CSS
+  already in the bundle, so it costs 0 kB of JS.

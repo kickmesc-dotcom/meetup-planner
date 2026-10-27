@@ -88,7 +88,7 @@ export default function HolidaysCard() {
                   removeMut.mutate(h.id);
                 }}
                 disabled={removeMut.isPending}
-                className="grid shrink-0 place-items-center rounded-tile bg-tg-bg/60 p-1.5 text-status-busy active:scale-95 disabled:opacity-60"
+                className="grid shrink-0 place-items-center rounded-tile bg-tg-bg/60 p-1.5 text-status-busy press disabled:opacity-60"
                 aria-label={tx("Удалить праздник")}
               >
                 <Icon name="close" size={14} />
@@ -132,7 +132,7 @@ export default function HolidaysCard() {
             addMut.mutate();
           }}
           disabled={!ready || addMut.isPending}
-          className="w-full rounded-tile bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text active:scale-[0.98] disabled:opacity-60"
+          className="w-full rounded-tile bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text press disabled:opacity-60"
         >
           {tx("+ Добавить праздник")}
         </button>

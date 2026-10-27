@@ -24,7 +24,7 @@ export default function NavBar() {
           haptic("light");
           shift(-1);
         }}
-        className="w-9 h-9 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text active:scale-95 transition-transform"
+        className="w-9 h-9 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text press"
         aria-label={tx("назад")}
       >
         ‹
@@ -50,7 +50,7 @@ export default function NavBar() {
           haptic("light");
           shift(1);
         }}
-        className="w-9 h-9 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text active:scale-95 transition-transform"
+        className="w-9 h-9 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text press"
         aria-label={tx("вперёд")}
       >
         ›

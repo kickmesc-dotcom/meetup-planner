@@ -173,7 +173,7 @@ function PlanCard({
       <button
         type="button"
         onClick={onToggleOpen}
-        className="flex w-full items-start gap-2 px-3 py-2.5 text-left active:scale-[0.99]"
+        className="flex w-full items-start gap-2 px-3 py-2.5 text-left press"
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
