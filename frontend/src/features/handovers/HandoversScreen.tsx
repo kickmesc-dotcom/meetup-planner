@@ -19,7 +19,7 @@ import BottomSheet from "@/features/actions/BottomSheet";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
-import { CardSkeleton } from "@/components/Skeleton";
+import { CardSkeleton, Skeleton, SkeletonText } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
@@ -279,7 +279,9 @@ function HandoverCard({
 
       {expanded && (
         <div className="mt-2 space-y-1.5">
-          {detailQ.isLoading && <div className="text-xs text-tg-hint">{tx("Загружаю…")}</div>}
+          {/* Деталь уже открытой карточки: каркас из двух пунктов вместо
+              надписи — высота та же, блок не прыгает после ответа. */}
+          {detailQ.isLoading && <SkeletonText lines={2} />}
           {card.items.map((item) => (
             <div
               key={`${item.kind}-${item.ref_id ?? item.id}-${item.id}`}
@@ -400,7 +402,10 @@ function CreateHandoverSheet({
     <BottomSheet title={tx("Сдать смену")} onClose={onClose}>
       <div className="text-xs text-tg-hint">{tx("Кому передаёшь")}</div>
       {colleaguesQ.isLoading && (
-        <div className="mt-1 text-xs text-tg-hint">{tx("Загружаю коллег…")}</div>
+        <div className="mt-1" aria-busy="true">
+          {/* Плашки коллег: тот же ряд, что будет после ответа. */}
+          <Skeleton className="h-8 w-2/3" />
+        </div>
       )}
       {!colleaguesQ.isLoading && colleagues.length === 0 && (
         <div className="mt-1 text-xs text-status-busy">{tx("Некому передать: в отделе нет других активных сотрудников.")}</div>

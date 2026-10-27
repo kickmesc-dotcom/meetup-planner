@@ -15,7 +15,7 @@ import DepartmentScreen from "@/features/hr/DepartmentScreen";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
-import { ListSkeleton } from "@/components/Skeleton";
+import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
 import { currentIntlLocale, tx, useTx, type Locale } from "@/i18n";
 import {
@@ -325,9 +325,13 @@ export default function HrFeedScreen() {
           )}
         </div>
         <div className="mt-1 flex items-start justify-between gap-2">
-          <p className="min-w-0 text-xs text-tg-hint">
-            {feed ? tx(SCOPE_HINT[feed.scope]) : tx("Загружаем правила видимости…")}
-          </p>
+          {/* Подпись о видимости — статика из данных ленты: до ответа на её
+              месте строка-скелетон той же высоты (правило 9.1). */}
+          {feed ? (
+            <p className="min-w-0 text-xs text-tg-hint">{tx(SCOPE_HINT[feed.scope])}</p>
+          ) : (
+            <Skeleton className="h-3 w-2/3" />
+          )}
           {freshCount > 0 && (
             <span
               data-testid="feed-fresh-count"

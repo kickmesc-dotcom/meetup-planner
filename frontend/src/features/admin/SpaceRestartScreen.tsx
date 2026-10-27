@@ -18,6 +18,7 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
+import { SkeletonText } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
 
 import { useTx } from "@/i18n";
@@ -85,7 +86,8 @@ export default function SpaceRestartScreen({ onBack }: Props) {
       subtitle={tx("Принудительный перезапуск backend-контейнера на HF")}
       onBack={onBack}
     >
-      {q.isPending && <div className="text-xs text-tg-hint">{tx("Загрузка…")}</div>}
+      {/* Каркас стадии вместо надписи: карточка уже нарисована (правило 9.1). */}
+      {q.isPending && <SkeletonText lines={2} />}
       {q.isError && (
         <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
           <InlineIcon name="alert" />

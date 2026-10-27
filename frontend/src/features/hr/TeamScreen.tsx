@@ -16,7 +16,7 @@ import DepartmentTag from "@/components/DepartmentTag";
 import Icon, { type IconName } from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
 import ErrorState from "@/components/ErrorState";
-import { CardSkeleton } from "@/components/Skeleton";
+import { CardSkeleton, SkeletonText } from "@/components/Skeleton";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
 import InvitationsScreen from "@/features/admin/InvitationsScreen";
@@ -477,9 +477,8 @@ function WorkHoursPanel() {
   });
 
   if (settings.isLoading || !settings.data) {
-    return (
-      <div className="mt-2 text-xs text-tg-hint">{tx("Загружаем…")}</div>
-    );
+    // Настройки отдела — две строки полей; держим их форму, а не надпись.
+    return <SkeletonText lines={2} className="mt-2" />;
   }
 
   const data = settings.data;

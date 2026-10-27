@@ -4,6 +4,7 @@ import { countOpenTasks, fetchChecklist, fetchTasks } from "@/api/hr";
 import { fetchIssues } from "@/api/issues";
 import Icon, { type IconName } from "@/components/Icon";
 import ProgressBar from "@/components/ProgressBar";
+import { SkeletonText } from "@/components/Skeleton";
 import { useUI, type Tab } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
@@ -69,7 +70,9 @@ export default function OverviewRail() {
         }
       >
         {checklistQ.isLoading ? (
-          <Muted>{tx("Загружаем…")}</Muted>
+          // Каркас вместо "Загружаем…": рельс уже нарисован, грузится только
+          // содержимое карточки, и его форма известна заранее.
+          <SkeletonText lines={2} />
         ) : shift && shift.total > 0 ? (
           <ProgressBar
             value={shift.done}
@@ -94,7 +97,7 @@ export default function OverviewRail() {
         }
       >
         {tasksQ.isLoading ? (
-          <Muted>{tx("Загружаем…")}</Muted>
+          <SkeletonText lines={2} />
         ) : tasksQ.isError ? (
           <Muted>{tx("Не удалось загрузить")}</Muted>
         ) : (
@@ -115,7 +118,7 @@ export default function OverviewRail() {
         action={<RailLink onClick={() => go("issues")}>{tx("Журнал")}</RailLink>}
       >
         {issuesQ.isLoading ? (
-          <Muted>{tx("Загружаем…")}</Muted>
+          <SkeletonText lines={2} />
         ) : problems ? (
           <div className="flex items-end gap-4">
             <Figure value={problems.total_open ?? 0} caption={tx("открыто")} />

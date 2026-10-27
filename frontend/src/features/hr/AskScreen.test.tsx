@@ -77,6 +77,31 @@ describe("AskScreen", () => {
     expect(screen.getByText(/сдайте выручку/)).toBeTruthy();
   });
 
+  it("во время поиска форма и подсказки остаются на экране", async () => {
+    // Правило 9.1: статика — в первом кадре. Пока ответа нет, человек должен
+    // видеть поле, кнопку и подсказки, а не пустоту и не надпись «Ищу…».
+    // Задержка, а не вечный промис: вечный не даёт vitest-воркеру завершиться
+    // и тест падает по таймауту процесса, а не по существу проверки.
+    searchMock.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve({ query: "", words: [], hits: [], empty: true }),
+            400,
+          ),
+        ),
+    );
+    renderScreen();
+    await runSearch("закрыть смену");
+    expect(screen.getByRole("textbox")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Найти" })).toBeTruthy();
+    // Шапка — статика: она не должна исчезать ни до, ни во время поиска.
+    expect(screen.getByText("Спросить")).toBeTruthy();
+    await waitFor(() =>
+      expect(document.querySelector("[aria-busy='true']")).toBeTruthy(),
+    );
+  });
+
   it("на пустой выдаче предлагает спросить руководителя", async () => {
     searchMock.mockResolvedValue({
       query: "несуществующее",

@@ -18,7 +18,7 @@ import { useSimulation } from "@/store/simulation";
 import { getApiBase, humanizeApiError, setApiBase } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
-import { CardSkeleton } from "@/components/Skeleton";
+import { CardSkeleton, Skeleton } from "@/components/Skeleton";
 import AchievementsCard from "@/features/hr/AchievementsCard";
 import Badge from "@/features/hr/Badge";
 import FeedbackScreen from "@/features/hr/FeedbackScreen";
@@ -424,7 +424,10 @@ export default function HrProfileScreen() {
 
             <div className="mt-2 flex flex-wrap gap-1.5">
               {depsQ.isLoading && (
-                <div className="text-xs text-tg-hint">{tx("Загружаем…")}</div>
+                <>
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                  <Skeleton className="h-8 w-20 rounded-full" />
+                </>
               )}
               {deps.map((d) => {
                 const active = pickedDept === d.id;

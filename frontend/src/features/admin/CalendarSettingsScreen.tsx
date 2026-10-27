@@ -20,6 +20,7 @@ import {
 } from "@/api/admin";
 import { humanizeApiError } from "@/api/client";
 import Icon, { InlineIcon } from "@/components/Icon";
+import { Skeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
@@ -91,11 +92,9 @@ export default function CalendarSettingsScreen({ onBack }: Props) {
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="text-sm text-tg-text">
             {tx("Включён")}
-            {q.isPending && (
-              <span className="ml-2 text-xs text-tg-hint">
-                {tx("загрузка…")}
-              </span>
-            )}
+            {/* Значение тумблера ещё едет — на его месте строка-скелетон той же
+                высоты, чтобы подпись и тумблер не сдвигались. */}
+            {q.isPending && <Skeleton className="ml-2 inline-block h-3 w-10 align-middle" />}
           </div>
           <Switch
             checked={enabled}

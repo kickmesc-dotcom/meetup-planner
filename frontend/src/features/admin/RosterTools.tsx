@@ -16,6 +16,7 @@ import {
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
+import { SkeletonText } from "@/components/Skeleton";
 
 import { currentIntlLocale, useTx } from "@/i18n";
 /**
@@ -358,7 +359,7 @@ export function RosterSnapshotsPanel() {
             )}
           </p>
 
-          {q.isLoading && <p className="text-xs text-tg-hint">{tx("Загружаем…")}</p>}
+          {q.isLoading && <SkeletonText lines={2} />}
           {q.isError && (
             <p className="text-xs text-status-busy">
               {humanizeApiError(q.error)}

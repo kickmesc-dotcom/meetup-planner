@@ -7,6 +7,7 @@ import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
 import { addDays, format, startOfDay } from "date-fns";
 import { InlineIcon } from "@/components/Icon";
+import { SkeletonText } from "@/components/Skeleton";
 
 import { useTx } from "@/i18n";
 interface Props {
@@ -206,7 +207,9 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-tg-hint/40" />
 
-        {!range && <div className="text-tg-hint">{tx("Загрузка…")}</div>}
+        {/* Шторка уже открыта — грузится только содержимое; каркас держит её
+            высоту, чтобы она не схлопывалась и не прыгала. */}
+        {!range && <SkeletonText lines={4} />}
 
         {range && (
           <>

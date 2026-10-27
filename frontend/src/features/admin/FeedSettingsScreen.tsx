@@ -14,6 +14,7 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import { haptic, showAlert } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { Switch } from "@/components/Checkbox";
+import { Skeleton } from "@/components/Skeleton";
 
 import { useTx } from "@/i18n";
 interface Props {
@@ -75,11 +76,7 @@ export default function FeedSettingsScreen({ onBack }: Props) {
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="text-sm text-tg-text">
             {tx("Включён")}
-            {q.isPending && (
-              <span className="ml-2 text-xs text-tg-hint">
-                {tx("загрузка…")}
-              </span>
-            )}
+            {q.isPending && <Skeleton className="ml-2 inline-block h-3 w-10 align-middle" />}
           </div>
           <Switch
             checked={compact}

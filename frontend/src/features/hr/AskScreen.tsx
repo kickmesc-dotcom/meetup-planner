@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { searchKnowledge, type KnowledgeHit } from "@/api/knowledge";
 import ErrorState from "@/components/ErrorState";
+import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -113,8 +114,13 @@ export default function AskScreen() {
           </section>
         )}
 
+        {/* Пока идёт поиск, форма и подсказки уже на экране — скелетон занимает
+            ровно место будущих карточек, поэтому результат не «прыгает». */}
         {query && search.isPending && (
-          <div className="mt-4 text-sm text-tg-hint">{tx("Ищу…")}</div>
+          <section className="mt-4 flex flex-col gap-2" aria-busy="true">
+            <CardSkeleton />
+            <CardSkeleton />
+          </section>
         )}
 
         {query && search.isError && (
