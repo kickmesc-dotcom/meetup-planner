@@ -69,6 +69,11 @@ function Root() {
   return <App />;
 }
 
+// Заставка из `index.html` отрисована ещё до бандла: убираем её сами, чтобы
+// React не рисовал приложение вокруг чужого узла (и чтобы на медленном канале
+// между каркасом и первым кадром не было сразу двух скелетонов).
+document.getElementById("boot-splash")?.remove();
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={qc}>
