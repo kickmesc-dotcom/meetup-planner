@@ -64,7 +64,8 @@ export type IconName =
   | "settings"
   | "swap"
   | "signal"
-  | "bolt";
+  | "bolt"
+  | "mic";
 
 interface Props extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
@@ -356,4 +357,13 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   signal: <path d="M5 18.5V15M9.5 18.5v-6M14 18.5V9M18.5 18.5V6.5" />,
   bolt: <path d="M13.2 3.5 5.8 13h5l-1 7.5L17.4 11h-5.1z" />,
+  // Микрофон для диктовки: капсула + стойка. Рисуется теми же штрихами, что и
+  // остальные иконки, чтобы не выпадать из набора.
+  mic: (
+    <>
+      <rect x="9" y="3.2" width="6" height="10.6" rx="3" />
+      <path d="M5.6 11.2a6.4 6.4 0 0 0 12.8 0" />
+      <path d="M12 17.6v3.2" />
+    </>
+  ),
 };

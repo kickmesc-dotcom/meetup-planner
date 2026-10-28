@@ -26,6 +26,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 import { useUI } from "@/store/ui";
+import QuickTaskSheet from "@/features/hr/QuickTaskSheet";
 
 /**
  * SemiTaskBot: «Мои задачи» — главный экран смены.
@@ -114,6 +115,9 @@ export default function MyTasksScreen() {
   const setTab = useUI((s) => s.setTab);
   const [showClosed, setShowClosed] = useState(false);
   const [issueFor, setIssueFor] = useState<number | null>(null);
+  // «Сказал — стало поручением» (план, 8.5). Открывается из шапки смены:
+  // руководитель видит проблему в зале, а не сидит в админке.
+  const [quickOpen, setQuickOpen] = useState(false);
   // Подписи пустого состояния меняет управляющий (админка → «Тексты»).
   const emptyTitle = useAppText("tasks.empty.title", "На сегодня всё");
   const emptyHint = useAppText(
@@ -306,6 +310,25 @@ export default function MyTasksScreen() {
             {tx("Проблемы")}
           </button>
         </div>
+        {/* Вход в быстрое поручение. Не пятая кнопка в строке иконок (там уже
+            тесно на 360px), а строка во всю ширину: она и объясняет, что
+            произойдёт, и приглашает сказать вслух. */}
+        {meQ.data?.is_aup && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic("light");
+              setQuickOpen(true);
+            }}
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-full bg-tg-secondary-bg px-3 text-left text-xs text-tg-hint"
+          >
+            <Icon name="plus" size={15} className="shrink-0 text-tg-text" />
+            <span className="min-w-0 flex-1 truncate">
+              {tx("Сказать, что нужно сделать — станет поручением")}
+            </span>
+            <Icon name="mic" size={14} className="shrink-0" />
+          </button>
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
@@ -421,6 +444,14 @@ export default function MyTasksScreen() {
         ))}
         </div>
       </div>
+      {quickOpen && (
+        <QuickTaskSheet
+          onClose={() => {
+            setQuickOpen(false);
+            invalidate();
+          }}
+        />
+      )}
     </div>
   );
 }

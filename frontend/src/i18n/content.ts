@@ -1619,4 +1619,42 @@ export const EN_CONTENT: Record<string, string> = {
   // Общий отказ, когда сервер назвал код, которого клиент не знает.
   "Не удалось сказать спасибо. Попробуй ещё раз.":
     "The thanks didn't send. Try again.",
+
+  // План, 8.5: «Сказал — стало поручением».
+  "Сказать, что нужно сделать — станет поручением":
+    "Say what needs doing — it becomes a task",
+  "Скажи, что нужно сделать": "Say what needs doing",
+  "Что нужно сделать": "What needs doing",
+  "Например: Аня, протри витрину до 18:00":
+    "For example: Anna, wipe the display by 18:00",
+  "Напиши или продиктуй одной фразой: что сделать, кому и к когда. Срок и исполнителя разберём сами.":
+    "Write or dictate one sentence: what to do, to whom, and by when. We'll work out the deadline and the assignee.",
+  "Голос распознаёт браузер — запись никуда не отправляется.":
+    "Your browser does the speech recognition — the audio is never uploaded.",
+  "Сказать голосом": "Say it out loud",
+  "Остановить запись": "Stop recording",
+  "Не расслышал — попробуй ещё раз или напиши словами.":
+    "I didn't catch that — try again or type it.",
+  "Поручение создано": "Task created",
+  "Исполнитель: {name}": "Assignee: {name}",
+  "Поручение отправлено отделу.": "The task went to the department.",
+  "Ещё одно": "One more",
+  "Кому?": "To whom?",
+  "Всему отделу": "The whole department",
+  "Кто именно:": "Who exactly:",
+  "В команде пока никого нет.": "There's nobody in the team yet.",
+  "Выбери исполнителя — без него поручение не создать.":
+    "Pick an assignee — a task can't be created without one.",
+  "У тебя не указано подразделение — выбери человека, кому поручить.":
+    "Your department isn't set — pick the person to assign it to.",
+  "Без срока": "No deadline",
+  "К концу смены": "By the end of the shift",
+  "Через час": "In an hour",
+  "Завтра": "Tomorrow",
+  "Точное время": "Exact time",
+  "Срочно": "Urgent",
+  "Фото": "Photo",
+  "Срок: конец смены": "Deadline: end of the shift",
+  "Срок взят из фразы": "Deadline taken from your words",
+  "сегодня": "today",
 };

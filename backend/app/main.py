@@ -30,6 +30,7 @@ from app.api import (
     routes_hr,
     routes_hr_admin,
     routes_hr_ops_admin,
+    routes_hr_quick,
     routes_hr_training_plan,
     routes_issues,
     routes_materials,
@@ -440,6 +441,10 @@ def create_app() -> FastAPI:
     app.include_router(routes_calendar.router, prefix="/api")
     # SemiTaskBot HR-ядро: ручки сотрудника и управляющий контур (АУП/админ).
     app.include_router(routes_hr.router, prefix="/api")
+    # «Сказал — стало поручением» (план, 8.5): разбор фразы в черновик и
+    # создание из него. Под правами АУП, но не в админском префиксе: вход
+    # сюда — из рабочего экрана, а не из кабинета.
+    app.include_router(routes_hr_quick.router, prefix="/api")
     # Фотоотчёты: загрузка снимка из мини-аппа и публичная выдача по подписи.
     # Отдельный роутер, потому что выдача работает без tma-заголовка (`<img>`).
     app.include_router(routes_media.router, prefix="/api")
