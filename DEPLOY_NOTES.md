@@ -4452,3 +4452,32 @@ CSS, JS не изменился.
   коды отказов) и обновлённые стражи (список видов ленты, тенант-таблица,
   таблицы, созданные после 0054) — полный `pytest` зелёный. Фронтенд: 8 новых
   тестов карточки и листа, полный `vitest` — 582 зелёных, `tsc` чист.
+
+## 28.10.2026: раунд 8 — «Сказал — стало поручением» (план, 8.5)
+
+Коммит `28371c4`, пуш в `origin/main` (`09307d4..28371c4`).
+
+- **Проверки.** Бэкенд: полный `pytest` — **1711 passed, 12 skipped** (19 новых
+  тестов разбора и ручек). Фронтенд: 6 новых тестов шторки, полный `vitest` —
+  **69 файлов / 590 тестов**, `tsc --noEmit` чисто, сборка ок
+  (`index-BHEtqLc8.js`, CSS `index-Cv01sZIJ.css`).
+- **API — HF Space** `fryesw/meetup-planner-backend`: пересобран, `RUNNING`,
+  `/healthz` 200, `/api/meta` — 362 пути, head кода и базы `0062_kudos`.
+- **API — Amvera** `meetup-planner`: пересобран; в живой схеме
+  (`/openapi.json`) есть `/api/hr/quick/people`, `/api/hr/quick/parse`,
+  `/api/hr/quick/task`. Вызовы без авторизации отвечают `401`/`400`, а не `404`,
+  — то есть крутится новый код, а не старая сборка.
+- **Мини-апп.** CF Pages `semitaskbot`: деплой `7044930c`
+  (`https://7044930c.semitaskbot.pages.dev`), загружен локальный бандл
+  `index-BHEtqLc8.js` + Functions.
+- ⚠ **Чтение живого бандла на `*.pages.dev` снова недоступно** из этой машины:
+  `curl` — сброс соединения (`HTTP 000`), как и в прошлом раунде. Наличие нового
+  кода подтверждено локальной сборкой (в `dist/assets/index-BHEtqLc8.js` есть
+  `Сказать, что нужно сделать`, `quick-parse`, `/api/hr/quick/task`) и списком
+  деплоев wrangler, а не чтением домена.
+- **Грабля с пушем (записать, чтобы не искать заново).** У `git` на этой машине
+  helper — `credential manager`, и сохранённый вход пропал: `git push` молча
+  висел, затем `fatal: could not read Username for 'https://github.com'`.
+  Рабочий путь без печати секрета — PAT из `PROMT/semiCREDS.txt` через
+  `tools/creds.py` и временный helper:
+  `git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_PAT"; }; f' push origin main`.
