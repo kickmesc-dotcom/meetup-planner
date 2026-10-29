@@ -4481,3 +4481,31 @@ CSS, JS не изменился.
   Рабочий путь без печати секрета — PAT из `PROMT/semiCREDS.txt` через
   `tools/creds.py` и временный helper:
   `git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_PAT"; }; f' push origin main`.
+
+## Перевод данных на месте — выкладка (29.10.2026)
+
+**Коммиты:** `28c711d` (сервис, ручка, кнопка, кэш), `124a9bd` (узбекский
+профиль), `ebd7f87` (адрес ручки + страж), пуш в `origin/main`.
+
+- **Модели.** `solavr/small100-ctranslate2-int8` (ru→en, MIT) и наша конверсия
+  `fryesw/m2m100-en-uz-ct2-int8` (en→uz, int8, 661 МБ; собрана
+  `tools/upload-mt-model.py` из `booba-uz/english-uzbek-translation_v3`).
+  В Space стоит переменная `TRANSLATE_UZ_MODEL_REPO` (и `TRANSLATE_MODEL_REPO`);
+  на Amvera `TRANSLATE_*` пусты намеренно — 0,5 ГБ RAM.
+- **HF Space.** Собран, `RUNNING`. В логах — `translate.model_loaded` для обеих
+  моделей и `translate.warmed_up` по `en` и `uz`: веса реально скачались и
+  прогрелись в фоне. Миграция `0063_translation_cache` применена к Neon,
+  `/api/meta` показывает 363 пути и head `0063_translation_cache`.
+- **Amvera.** Пересобран; проверено, что `/api/hr/translate` отвечает `401`
+  (авторизация), а не `404` — то есть новый код на хосте.
+- **CF Pages.** Деплой `7adf4bce` (`https://7adf4bce.semitaskbot.pages.dev`).
+- **Грабля, которую стоит помнить.** Первая выкладка положила ручку на
+  `/api/translate`: роутер HR монтируется с `prefix="/api"`, и путь внутри него
+  должен начинаться с `/hr`. Живой хост ответил `404`, кнопка просто не
+  появлялась. Теперь путь закреплён тестом
+  `test_route_is_mounted_where_the_client_calls_it` (по `app.openapi()`),
+  а не только глазами.
+- **Ограничение проверки.** Сквозной запрос с подписью Telegram (`initData`)
+  из этой машины не выполнить: подпись выдаёт Telegram. Проверено то, что
+  проверяемо снаружи — наличие пути, `401` без авторизации, загрузка моделей
+  по логам, прогрев; логика сервиса и кнопки покрыта тестами на sqlite/jsdom.
