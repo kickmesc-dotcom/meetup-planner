@@ -26,6 +26,8 @@ import {
 } from "@/api/hr";
 import { markFeedSeen, readFeedSeen } from "@/features/hr/feedSeen";
 import { useLocale } from "@/i18n";
+import * as translateApi from "@/api/translate";
+import { __clearTranslateCache } from "@/components/translateCore";
 
 vi.mock("@/api/hr", () => ({
   fetchHrFeed: vi.fn(),
@@ -368,5 +370,48 @@ describe("время и дни в ленте", () => {
     expect(headings[1]).toContain("21 октября");
     // Заголовок дня — абсолютная дата, а не «Сегодня»/«Вчера».
     expect(headings.join(" ")).not.toMatch(/Сегодня|Вчера/);
+  });
+});
+
+describe("перевод дня (план, 11.5)", () => {
+  it("одна кнопка на день переводит все события дня одним запросом", async () => {
+    __clearTranslateCache();
+    useLocale.setState({ locale: "uz", uzPackAvailable: true });
+    const spy = vi
+      .spyOn(translateApi, "translateTexts")
+      .mockImplementation(async (batch, target) => ({
+        target,
+        available: true,
+        reason: null,
+        items: batch.map((t) => ({ translated: `[${t}]`, provider: "small100" })),
+      }));
+
+    renderFeed([
+      item({ at: "2026-10-22T10:00:00Z", text: "закрыл поручение", ref_id: 1 }),
+      item({ at: "2026-10-22T11:00:00Z", text: "начал смену", ref_id: 2 }),
+    ]);
+
+    await screen.findByText("закрыл поручение");
+    // Один день — одна кнопка на весь блок, а не по кнопке в каждой строке.
+    const buttons = screen.getAllByTestId("translate-block");
+    expect(buttons).toHaveLength(1);
+
+    fireEvent.click(buttons[0]);
+    expect(await screen.findByText("[закрыл поручение]")).toBeTruthy();
+    expect(screen.getByText("[начал смену]")).toBeTruthy();
+    expect(spy).toHaveBeenCalledTimes(1);
+    // Точечно, а не `restoreAllMocks`: тот сбросил бы и моки соседних модулей
+    // (карточка благодарностей живёт в ленте тем же файлом).
+    spy.mockRestore();
+  });
+
+  it("на английском кнопки нет: текст события уже английский", async () => {
+    useLocale.setState({ locale: "en" });
+    renderFeed([
+      item({ at: "2026-10-22T10:00:00Z", display_name: "Peter", text: "closed a task" }),
+    ]);
+
+    await screen.findByText("closed a task");
+    expect(screen.queryByTestId("translate-block")).toBeNull();
   });
 });

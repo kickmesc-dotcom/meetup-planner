@@ -16,6 +16,11 @@ import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
+import {
+  TranslateBlockButton,
+  TranslateFailedNotice,
+  useBatchTranslate,
+} from "@/components/TranslatableBlock";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 import { useTx } from "@/i18n";
@@ -223,6 +228,17 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
     queryFn: () => fetchStandard(id),
   });
 
+  // Инструкция и тест — чужие данные: их пишет руководитель по-русски, кодом
+  // такое не переводится. Одна кнопка на весь стандарт: заголовок, тело и
+  // тест целиком, — а не стрелка у каждого варианта ответа. Хук стоит до
+  // раннего возврата, иначе порядок хуков менялся бы между состояниями.
+  const standardTexts = [
+    detailQ.data?.title ?? "",
+    detailQ.data?.body ?? "",
+    ...(detailQ.data?.questions ?? []).flatMap((q) => [q.text, ...q.options]),
+  ];
+  const translate = useBatchTranslate(standardTexts);
+
   // Обязательность — то, что попадает в отчёт смены; меняется одним тапом.
   const toggleRequired = useMutation({
     mutationFn: (next: boolean) => updateStandard(id, { is_required: next }),
@@ -271,7 +287,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-tg-text">
             {standard?.emoji ? `${standard.emoji} ` : ""}
-            {standard?.title ?? tx("Стандарт")}
+            {standard ? translate.t(standard.title) : tx("Стандарт")}
           </div>
           <div className="text-xs text-tg-hint">
             {standard
@@ -282,15 +298,32 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               : "…"}
           </div>
         </div>
+        {translate.canTranslate && (
+          <TranslateBlockButton
+            on={translate.on}
+            busy={translate.busy}
+            onClick={() => void translate.toggle()}
+          />
+        )}
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+        <TranslateFailedNotice show={translate.failed} />
         {detailQ.isLoading && <CardSkeleton />}
 
         {standard && (
           <article className="rounded-card bg-tg-secondary-bg/60 p-3">
-            <p className="whitespace-pre-wrap break-words text-sm text-tg-text/90">
-              {standard.body}
+            <p
+              className={[
+                "whitespace-pre-wrap break-words text-sm text-tg-text/90",
+                translate.t(standard.body) !== standard.body
+                  ? "rounded-tile bg-tg-secondary-bg/80 px-1 ring-1 ring-tg-hint/10"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {translate.t(standard.body)}
             </p>
           </article>
         )}
@@ -332,7 +365,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         {questions.map((q, index) => (
           <section key={q.id} className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="text-sm font-medium text-tg-text">
-              {index + 1}. {q.text}
+              {index + 1}. {translate.t(q.text)}
             </div>
             <div className="mt-2 space-y-1.5">
               {q.options.map((option, optionIndex) => {
@@ -360,7 +393,9 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
                     <span className="text-xs text-tg-hint">
                       {String.fromCharCode(1040 + optionIndex)})
                     </span>
-                    <span className="min-w-0 flex-1 break-words">{option}</span>
+                    <span className="min-w-0 flex-1 break-words">
+                      {translate.t(option)}
+                    </span>
                   </button>
                 );
               })}

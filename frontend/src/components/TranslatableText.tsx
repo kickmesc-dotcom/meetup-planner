@@ -2,7 +2,7 @@ import { createElement, useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { tx, useLocale } from "@/i18n";
 import { haptic } from "@/tg/webapp";
-import { translateTexts, type TranslateTarget } from "@/api/translate";
+import { needsTranslation, targetFor, translateOne } from "./translateCore";
 import { useTranslateAssist } from "@/store/translate";
 
 /**
@@ -26,21 +26,6 @@ import { useTranslateAssist } from "@/store/translate";
  * размонтируются, поэтому локального состояния мало, иначе возврат на экран
  * показывал бы перевод, о котором человек уже забыл.
  */
-const CYRILLIC = /[А-Яа-яЁё]/;
-
-/** Сервер принимает до 500 символов; режем здесь, чтобы не получить 400. */
-const MAX_CHARS = 500;
-
-/**
- * Кэш на время сессии: `язык + текст → перевод`.
- *
- * Нужен, потому что человек листает список и включает перевод у нескольких
- * блоков подряд, а иногда выключает и включает снова. Один и тот же текст
- * второй раз по сети не ходит — серверный кэш в базе всё равно сработал бы, но
- * это лишний круг до чужого сервера на мобильном интернете.
- */
-const SESSION_CACHE = new Map<string, string | null>();
-
 type Tag = "p" | "span" | "div" | "h2" | "h3";
 
 interface Props {
@@ -52,12 +37,6 @@ interface Props {
   as?: Tag;
   /** `inline` — внутри строки, без блочной обёртки. */
   layout?: "block" | "inline";
-}
-
-function targetFor(locale: string): TranslateTarget | null {
-  if (locale === "en") return "en";
-  if (locale === "uz") return "uz";
-  return null;
 }
 
 export default function TranslatableText({
@@ -91,13 +70,11 @@ export default function TranslatableText({
 
   const Tag = (layout === "inline" ? "span" : as) as Tag;
 
-  if (!target || !CYRILLIC.test(text)) {
+  if (!target || !needsTranslation(text)) {
     // Русский интерфейс или уже латинский текст: переводить нечего, и кнопки
     // быть не должно — иначе она выглядит как обещание, которого нет.
     return createElement(Tag, { className }, text);
   }
-
-  const source = text.slice(0, MAX_CHARS);
 
   const press = async () => {
     haptic("light");
@@ -109,21 +86,11 @@ export default function TranslatableText({
       setOn(true);
       return;
     }
-    const key = `${target}:${source}`;
-    const preset = SESSION_CACHE.get(key);
-    if (preset !== undefined) {
-      setTranslated(preset);
-      setFailed(preset === null);
-      setOn(preset !== null);
-      return;
-    }
 
     setBusy(true);
     setFailed(false);
     try {
-      const response = await translateTexts([source], target);
-      const value = response.items[0]?.translated ?? null;
-      SESSION_CACHE.set(key, value);
+      const value = await translateOne(text, target);
       if (!alive.current) return;
       setTranslated(value);
       setOn(value !== null);

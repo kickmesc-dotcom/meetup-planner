@@ -16,6 +16,11 @@ import DepartmentScreen from "@/features/hr/DepartmentScreen";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
+import {
+  TranslateBlockButton,
+  TranslateFailedNotice,
+  useBatchTranslate,
+} from "@/components/TranslatableBlock";
 import { ListSkeleton, Skeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
 import { currentIntlLocale, intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
@@ -470,71 +475,22 @@ export default function HrFeedScreen() {
         {!feedQ.isLoading && <KudosCard />}
 
         {groupByDay(items, locale).map((group, index, allGroups) => (
-          <section key={group.key} data-day={group.key}>
-            {/* Плашка дня закреплена сверху и сменяется, когда начинается
-                следующая дата. Раньше это была полупрозрачная строка с
-                линией: содержимое просвечивало сквозь неё, и день читался
-                как ещё одна запись ленты. Теперь это отдельная подложка на
-                непрозрачном фоне — по ней видно, где ты находишься. */}
-            <h2 className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-tg-bg px-4 py-1">
-              <span
-                data-testid="feed-day"
-                className="flex min-w-0 items-center gap-1.5 rounded-full bg-tg-secondary-bg px-3 py-1.5 text-xs font-semibold text-tg-text shadow-sm"
-              >
-                <Icon
-                  name="calendar"
-                  size={13}
-                  className="shrink-0 text-tg-hint"
-                />
-                <span className="truncate">{group.label}</span>
-              </span>
-              <span className="ml-auto flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  data-testid="feed-prev-day"
-                  aria-label={tx("Предыдущий день")}
-                  title={tx("Предыдущий день")}
-                  disabled={index >= allGroups.length - 1}
-                  onClick={() => jumpToDay(index + 1)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition press disabled:opacity-35 disabled:press"
-                >
-                  <Icon name="back" size={16} />
-                </button>
-                <button
-                  type="button"
-                  data-testid="feed-next-day"
-                  aria-label={tx("Следующий день")}
-                  title={tx("Следующий день")}
-                  disabled={index === 0}
-                  onClick={() => jumpToDay(index - 1)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition press disabled:opacity-35 disabled:press"
-                >
-                  <Icon name="chevron" size={16} />
-                </button>
-              </span>
-            </h2>
-            <div className="mt-1.5 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
-              {group.items.map((item, i) => (
-                <Fragment key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}>
-                  <FeedRow
-                    item={item}
-                    departmentName={
-                      filters?.departments.find(
-                        (d) => d.id === item.department_id,
-                      )?.name ??
-                      depsQ.data?.find((d) => d.id === item.department_id)?.name ??
-                      null
-                    }
-                    onOpen={setCardEmployeeId}
-                    onOpenDepartment={setCardDepartmentId}
-                  />
-                  {/* Разделитель стоит после последнего нового события, а не
-                      после первого: читаешь сверху вниз и видишь границу. */}
-                  {item === lastFresh && <FreshDivider count={freshCount} />}
-                </Fragment>
-              ))}
-            </div>
-          </section>
+          <FeedDay
+            key={group.key}
+            group={group}
+            index={index}
+            dayCount={allGroups.length}
+            departmentNameFor={(departmentId: number | null) =>
+              filters?.departments.find((d) => d.id === departmentId)?.name ??
+              depsQ.data?.find((d) => d.id === departmentId)?.name ??
+              null
+            }
+            lastFresh={lastFresh}
+            freshCount={freshCount}
+            onJumpDay={jumpToDay}
+            onOpenEmployee={setCardEmployeeId}
+            onOpenDepartment={setCardDepartmentId}
+          />
         ))}
       </div>
 
@@ -789,13 +745,133 @@ function FilterRow({
   );
 }
 
+/**
+ * Один день ленты: плашка дня, навигация по дням и кнопка перевода — одна на
+ * весь день (план, 11.5).
+ *
+ * Почему кнопка на день, а не на строку. В дне два десятка событий; иконка
+ * «перевести» в каждом — это стена одинаковых кнопок, которая мешает читать и
+ * не помогает: человеку нужен весь день на своём языке сразу. Один запрос
+ * переводит все видимые события дня пачкой (ручка принимает до 20 строк).
+ *
+ * Компонент отдельный, а не кусок разметки в `map`: режим перевода — это
+ * состояние (хук), а хуки внутри цикла вызывать нельзя.
+ */
+function FeedDay({
+  group,
+  index,
+  dayCount,
+  departmentNameFor,
+  lastFresh,
+  freshCount,
+  onJumpDay,
+  onOpenEmployee,
+  onOpenDepartment,
+}: {
+  group: { key: string; label: string; items: HrFeedItem[] };
+  index: number;
+  dayCount: number;
+  departmentNameFor: (departmentId: number | null) => string | null;
+  lastFresh: HrFeedItem | null;
+  freshCount: number;
+  onJumpDay: (index: number) => void;
+  onOpenEmployee: (employeeId: number) => void;
+  onOpenDepartment: (departmentId: number) => void;
+}) {
+  const { tx } = useTx();
+  const translate = useBatchTranslate(group.items.map((item) => item.text));
+
+  return (
+    <section data-day={group.key}>
+      {/* Плашка дня закреплена сверху и сменяется, когда начинается
+          следующая дата. Раньше это была полупрозрачная строка с
+          линией: содержимое просвечивало сквозь неё, и день читался
+          как ещё одна запись ленты. Теперь это отдельная подложка на
+          непрозрачном фоне — по ней видно, где ты находишься. */}
+      <h2 className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-tg-bg px-4 py-1">
+        <span
+          data-testid="feed-day"
+          className="flex min-w-0 items-center gap-1.5 rounded-full bg-tg-secondary-bg px-3 py-1.5 text-xs font-semibold text-tg-text shadow-sm"
+        >
+          <Icon
+            name="calendar"
+            size={13}
+            className="shrink-0 text-tg-hint"
+          />
+          <span className="truncate">{group.label}</span>
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-1">
+          {translate.canTranslate && (
+            <TranslateBlockButton
+              on={translate.on}
+              busy={translate.busy}
+              onClick={() => void translate.toggle()}
+            />
+          )}
+          <button
+            type="button"
+            data-testid="feed-prev-day"
+            aria-label={tx("Предыдущий день")}
+            title={tx("Предыдущий день")}
+            disabled={index >= dayCount - 1}
+            onClick={() => onJumpDay(index + 1)}
+            className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition press disabled:opacity-35 disabled:press"
+          >
+            <Icon name="back" size={16} />
+          </button>
+          <button
+            type="button"
+            data-testid="feed-next-day"
+            aria-label={tx("Следующий день")}
+            title={tx("Следующий день")}
+            disabled={index === 0}
+            onClick={() => onJumpDay(index - 1)}
+            className="grid h-9 w-9 place-items-center rounded-full bg-tg-secondary-bg text-tg-text transition press disabled:opacity-35 disabled:press"
+          >
+            <Icon name="chevron" size={16} />
+          </button>
+        </span>
+      </h2>
+      {/* Отказ стоит здесь, а не в закреплённой шапке: он не должен ни
+          растягивать плашку дня, ни теряться при прокрутке вместе с ней. */}
+      <TranslateFailedNotice show={translate.failed} />
+      <div className="mt-1.5 divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/40">
+        {group.items.map((item, i) => {
+          const shown = translate.t(item.text);
+          return (
+            <Fragment key={`${item.kind}-${item.ref_id ?? i}-${item.at}`}>
+              <FeedRow
+                item={item}
+                text={shown}
+                translated={shown !== item.text}
+                departmentName={departmentNameFor(item.department_id)}
+                onOpen={onOpenEmployee}
+                onOpenDepartment={onOpenDepartment}
+              />
+              {/* Разделитель стоит после последнего нового события, а не
+                  после первого: читаешь сверху вниз и видишь границу. */}
+              {item === lastFresh && <FreshDivider count={freshCount} />}
+            </Fragment>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function FeedRow({
   item,
+  text,
+  translated,
   departmentName,
   onOpen,
   onOpenDepartment,
 }: {
   item: HrFeedItem;
+  /** Текст события: оригинал либо перевод, если в дне включён режим. */
+  text: string;
+  /** Признак перевода — для подложки, чтобы машинный текст не читался как авторский. */
+  translated: boolean;
   departmentName: string | null;
   onOpen: (employeeId: number) => void;
   onOpenDepartment: (departmentId: number) => void;
@@ -848,7 +924,15 @@ function FeedRow({
                 tone={dept}
               />
             )}{" "}
-            {item.text}
+            <span
+              className={
+                translated
+                  ? "rounded-tile bg-tg-secondary-bg/80 px-0.5 ring-1 ring-tg-hint/10"
+                  : undefined
+              }
+            >
+              {text}
+            </span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tg-hint">
             <time
