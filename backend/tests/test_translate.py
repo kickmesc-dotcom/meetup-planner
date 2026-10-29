@@ -228,3 +228,18 @@ async def test_route_without_model_is_honest(session, monkeypatch) -> None:
     assert out.available is False
     assert out.reason == "model_unavailable"
     assert out.items[0].translated is None
+
+
+def test_route_is_mounted_where_the_client_calls_it() -> None:
+    """Путь в клиенте и путь на сервере — одно и то же.
+
+    Зачем отдельная проверка. Первая выкладка положила ручку на
+    `/api/translate` (роутер HR монтируется с `prefix="/api"`), а фронтенд звал
+    `/api/hr/translate` — живой хост ответил 404, и кнопка молча не работала.
+    Ни один из тестов сервиса этого поймать не мог: они вызывают функцию
+    напрямую, без маршрутизации.
+    """
+    from app.main import app
+
+    paths = app.openapi()["paths"]
+    assert "/api/hr/translate" in paths

@@ -2011,7 +2011,9 @@ class TranslateOut(BaseModel):
     items: list[TranslateItemOut]
 
 
-@router.post("/translate", response_model=TranslateOut)
+# Полный путь — `/api/hr/translate`: роутер монтируется с `prefix="/api"`, а все
+# HR-ручки внутри живут под `/hr`.
+@router.post("/hr/translate", response_model=TranslateOut)
 async def translate_data(
     body: TranslateIn,
     session: SessionDep,

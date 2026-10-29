@@ -29,6 +29,8 @@ export interface TranslateResponse {
 
 export const translateTexts = (texts: string[], target: TranslateTarget) =>
   api<TranslateResponse>("/api/hr/translate", {
+    // Путь целиком проверен на живом хосте: роутер HR монтируется с `/api`, и
+    // без `/hr` ручка лежала бы на `/api/translate` — кнопка получала бы 404.
     method: "POST",
     body: JSON.stringify({ target, texts }),
   });
