@@ -252,4 +252,154 @@ export const UZ_CONTENT: Record<string, string> = {
   "Сохранить и перезагрузить": "Saqlash va qayta yuklash",
   "Видно": "Koʻrinadi",
   "Скрыто": "Yashirin",
+
+  // ------------------------------- «Сказал — стало поручением» (план, 8.5) --
+  // Экран, который руководитель открывает в зале: строки короткие, разговорные.
+  "Сказать, что нужно сделать — станет поручением":
+    "Nima qilish kerakligini ayting — topshiriqqa aylanadi",
+  "Скажи, что нужно сделать": "Nima qilish kerakligini ayting",
+  "Например: Аня, протри витрину до 18:00":
+    "Masalan: Anya, vitrinani soat 18:00 gacha artib chiqing",
+  "Напиши или продиктуй одной фразой: что сделать, кому и к когда. Срок и исполнителя разберём сами.":
+    "Bir jumla bilan yozing yoki ayting: nima qilish, kimga va qachonga. Muddat va ijrochini oʻzimiz aniqlaymiz.",
+  "Что нужно сделать": "Nima qilish kerak",
+  "Сказать голосом": "Ovoz bilan aytish",
+  "Остановить запись": "Yozuvni toʻxtatish",
+  "Голос распознаёт браузер — запись никуда не отправляется.":
+    "Ovozni brauzer taniydi — yozuv hech qayerga yuborilmaydi.",
+  "Не расслышал — попробуй ещё раз или напиши словами.":
+    "Eshitmadim — yana urinib koʻring yoki yozib yuboring.",
+  "Кому?": "Kimga?",
+  "Всему отделу": "Butun boʻlimga",
+  "Кто именно:": "Aynan kim:",
+  "В команде пока никого нет.": "Jamoada hozircha hech kim yoʻq.",
+  "Выбери исполнителя — без него поручение не создать.":
+    "Ijrochini tanlang — usiz topshiriq yaratilmaydi.",
+  "У тебя не указано подразделение — выбери человека, кому поручить.":
+    "Sizda boʻlim koʻrsatilmagan — topshiriq beradigan odamni tanlang.",
+  "Создать поручение": "Topshiriq yaratish",
+  "Создаю…": "Yaratilmoqda…",
+  "Поручение создано": "Topshiriq yaratildi",
+  "Поручение отправлено отделу.": "Topshiriq boʻlimga yuborildi.",
+  "Исполнитель: {name}": "Ijrochi: {name}",
+  "Ещё одно": "Yana bitta",
+  "Готово": "Tayyor",
+
+  // Сроки и чипы разбора: те же слова, что человек говорит вслух.
+  "Без срока": "Muddatsiz",
+  "К концу смены": "Smena oxirigacha",
+  "Через час": "Bir soatdan keyin",
+  "Завтра": "Ertaga",
+  "Точное время": "Aniq vaqt",
+  "Срочно": "Shoshilinch",
+  "Фото": "Foto",
+  "Срок: конец смены": "Muddat: smena oxiri",
+  "Срок взят из фразы": "Muddat jumladan olindi",
+  "сегодня": "bugun",
+  "завтра": "ertaga",
+
+  // ------------------------------------------------------ «Команда» (11.4) --
+  // Руководительская сторона смены: сводка, люди, часы и опасная зона очистки.
+  "Команда": "Jamoa",
+  "все подразделения": "barcha boʻlimlar",
+  "моё подразделение": "mening boʻlimim",
+  "Сводка смены": "Smena xulosasi",
+  "Сводка дня": "Kun xulosasi",
+  "Смена начата": "Smena boshlandi",
+  "Закрыто": "Yopilgan",
+  "Просрочено": "Muddati oʻtgan",
+  "Требует внимания": "Eʼtibor talab qiladi",
+  "и ещё {count}": "va yana {count}",
+  "Позвать в команду": "Jamoaga taklif qilish",
+  "Ссылка-приглашение или код компании: человек входит сам и сразу попадает в свой отдел.":
+    "Taklif havolasi yoki kompaniya kodi: odam oʻzi kiradi va darhol oʻz boʻlimiga tushadi.",
+  "Пригласить сотрудника": "Xodimni taklif qilish",
+  "Подразделения": "Boʻlimlar",
+  "Подразделений пока нет.": "Hozircha boʻlimlar yoʻq.",
+  "Сотрудники": "Xodimlar",
+  "из {count}": "{count} tadan",
+  "Найти человека или должность": "Odam yoki lavozimni izlash",
+  "Поиск по сотрудникам": "Xodimlar boʻyicha qidiruv",
+  "Никого не нашли.": "Hech kim topilmadi.",
+  "Сотрудников пока нет.": "Hozircha xodimlar yoʻq.",
+  "Последние действия": "Soʻnggi amallar",
+  "Рабочие часы и уведомления": "Ish soatlari va bildirishnomalar",
+  "закрыто {count}": "yopilgan {count}",
+  "проблем {count}": "muammo {count}",
+  "Открыть карточку": "Kartochkani ochish",
+  "Открытие": "Ochilish",
+  "Закрытие": "Yopilish",
+  "Сохранить часы": "Soatlarni saqlash",
+  "Алерты только в рабочее время": "Ogohlantirishlar faqat ish vaqtida",
+  "Вторая ступень: пинг админам": "Ikkinchi bosqich: adminlarga signal",
+  "Если руководитель молчит": "Agar rahbar javob bermasa",
+  "Порог второй ступени, часы": "Ikkinchi bosqich chegarasi, soat",
+  "{hours} ч": "{hours} soat",
+  "Напоминать в каждой смене": "Har smenada eslatish",
+  "Мьют до {when}": "{when} gacha ovozsiz",
+  "Мьют выключен": "Ovozsiz rejim oʻchirilgan",
+  "Ночью уведомления не уходят в чат, но копятся в приложении — утренний разбор не потеряется.":
+    "Kechasi bildirishnomalar chatga ketmaydi, lekin ilovada toʻplanadi — ertalabki tahlil yoʻqolmaydi.",
+  "Сбрасывать нечего — всё уже закрыто.":
+    "Tozalash uchun hech narsa yoʻq — hammasi yopilgan.",
+  "Удалить {tasks} поручений и {issues} проблем?":
+    "{tasks} ta topshiriq va {issues} ta muammo oʻchirilsinmi?",
+  "Точно? Действие необратимо. Завершённые поручения и история останутся.":
+    "Ishonchingiz komilmi? Amalni qaytarib boʻlmaydi. Tugallangan topshiriqlar va tarix qoladi.",
+  "Удалено: поручений {tasks}, проблем {issues}.":
+    "Oʻchirildi: topshiriqlar {tasks}, muammolar {issues}.",
+  "Данные изменились, пока ты подтверждал. Открой сброс заново.":
+    "Tasdiqlayotganingizda maʼlumotlar oʻzgardi. Tozalashni qaytadan oching.",
+  "Опасная зона": "Xavfli hudud",
+  "Убирает незакрытые поручения и открытые проблемы. Завершённые задачи, KPI и история сдач остаются; тестовый пул сбрасывается отдельно.":
+    "Yopilmagan topshiriqlar va ochiq muammolarni olib tashlaydi. Tugallangan vazifalar, KPI va topshirish tarixi qoladi; sinov toʻplami alohida tozalanadi.",
+  "Считаем…": "Hisoblanmoqda…",
+  "Сбросить текущую работу": "Joriy ishni tozalash",
+
+  // -------------------------------------------- «Проблемы» смены (11.4) ---
+  "Журнал проблем не открылся": "Muammolar jurnali ochilmadi",
+  "Назад к задачам": "Vazifalarga qaytish",
+  "Журнал проблем": "Muammolar jurnali",
+  "Что на смене пошло не так — и кто это закрывает.":
+    "Smenada nima xato boʻldi — va buni kim hal qilmoqda.",
+  "+ Сообщить": "+ Xabar berish",
+  "У тебя открытых проблем нет": "Sizda ochiq muammo yoʻq",
+  "Журнал пуст": "Jurnal boʻsh",
+  "Сломалось оборудование, закончились расходники, гость недоволен — заведи карточку, чтобы смена не теряла проблему.":
+    "Jihoz buzildi, sarf materiallari tugadi, mehmon norozi — kartochka oching, smena muammoni yoʻqotmasin.",
+  "висит {age}": "{age} ochiq turibdi",
+  "· завёл {name}": "· ochgan: {name}",
+  "· на {name}": "· {name} ga",
+  "· из поручения": "· topshiriqdan",
+  "Новая проблема": "Yangi muammo",
+  "Что случилось": "Nima boʻldi",
+  "Например: не работает терминал на баре":
+    "Masalan: bardagi terminal ishlamayapti",
+  "Категория": "Turkum",
+  "Насколько срочно": "Qanchalik shoshilinch",
+  "Где (необязательно)": "Qayerda (majburiy emas)",
+  "Зал, кухня, бар, склад…": "Zal, oshxona, bar, ombor…",
+  "Подробности (необязательно)": "Tafsilotlar (majburiy emas)",
+  "Что уже пробовали, кому сказали, что нужно для решения":
+    "Nima sinab koʻrildi, kimga aytildi, hal qilish uchun nima kerak",
+  "Записываю…": "Yozilmoqda…",
+  "Завести карточку": "Kartochka ochish",
+  "Руководитель отдела увидит проблему в колокольчике и в журнале. В чат сообщение не уходит — это не срочный алерт.":
+    "Boʻlim rahbari muammoni qoʻngʻiroqcha va jurnalda koʻradi. Chatga xabar ketmaydi — bu shoshilinch ogohlantirish emas.",
+  "Проблема": "Muammo",
+  "Завёл {name} · смена {date} · висит {age}":
+    "Ochgan: {name} · smena {date} · {age} ochiq",
+  " · ответственный: {name}": " · masʼul: {name}",
+  "Решено": "Hal qilindi",
+  "Переоткрыть": "Qayta ochish",
+  "Назначить на себя": "Oʻzimga belgilash",
+  "История": "Tarix",
+  "система": "tizim",
+  "Добавить комментарий": "Izoh qoʻshish",
+  "Отправить": "Yuborish",
+
+  // Общие мелкие подписи, которые встречаются на обоих экранах.
+  "Назад": "Orqaga",
+  "Обновить": "Yangilash",
+  "Снять": "Bekor qilish",
 };
