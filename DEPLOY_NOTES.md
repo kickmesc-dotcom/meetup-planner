@@ -4545,3 +4545,13 @@ helper с PAT, но тогда PAT должен быть от аккаунта-�
   на блок/день, а не в каждой строке: в списке 20+ событий, и 20 кнопок —
   визуальный шум хуже непереведённого текста. Ручка уже принимает до 20 строк
   за раз — ровно под эту пачку.
+
+**Проверенный способ пуша (итог).** Правильный токен лежит в DPAPI-хранилище
+машины — `secrets/Get-Secret.ps1 GITHUB_PAT` (там же есть отдельный
+`GITHUB_PAT_YOUMAKE`). `GITHUB_PAT` из `PROMT/semiCREDS.txt` принадлежит
+другому аккаунту и даёт `403`. Рабочая команда:
+
+```bash
+export GITHUB_PAT="$(powershell -NoProfile -File ../secrets/Get-Secret.ps1 GITHUB_PAT | tr -d '\r\n')"
+GIT_TERMINAL_PROMPT=0 git -c credential.helper='!f() { echo username=x-access-token; echo "password=$GITHUB_PAT"; }; f' push origin HEAD:main
+```
