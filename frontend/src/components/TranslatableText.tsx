@@ -2,7 +2,8 @@ import { createElement, useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { tx, useLocale } from "@/i18n";
 import { haptic } from "@/tg/webapp";
-import { needsTranslation, targetFor, translateOne } from "./translateCore";
+import { needsTranslation, targetCode, targetFor, translateOne } from "./translateCore";
+import { TRANSLATED_MARK_INLINE } from "./TranslatableBlock";
 import { useTranslateAssist } from "@/store/translate";
 
 /**
@@ -54,6 +55,7 @@ export default function TranslatableText({
   const alive = useRef(true);
 
   const target = targetFor(locale);
+  const code = targetCode(locale);
 
   // Ушли с экрана — режим снят. Перевод в кэше остаётся: вернувшись, человек
   // получит его мгновенно, но уже по своему нажатию.
@@ -117,12 +119,14 @@ export default function TranslatableText({
         className: [
           className,
           on && translated
-            ? // Подложка: видно, что это перевод поверх оригинала, а не сам
-              // оригинал. Без неё человек читает машинный текст как авторский.
-              "-mx-1 rounded-tile bg-tg-secondary-bg/70 px-1 ring-1 ring-tg-hint/10"
+            ? // Подложка в цвет активного глобуса: видно, что это перевод поверх
+              // оригинала, а не сам оригинал. Серый был цветом карточек вокруг —
+              // то есть подложки не было видно вовсе.
+              TRANSLATED_MARK_INLINE
             : "",
-          // Место под кнопку, чтобы она не наезжала на первую строку.
-          "pr-9",
+          // Место под кнопку с кодом языка, чтобы она не наезжала на первую
+          // строку.
+          "pr-16",
         ]
           .filter(Boolean)
           .join(" "),
@@ -140,7 +144,7 @@ export default function TranslatableText({
         title: on ? tx(locale, "Показать оригинал") : tx(locale, "Перевести"),
         "data-testid": "translate-toggle",
         className: [
-          "absolute right-0 top-0 grid h-9 w-9 place-items-center rounded-full",
+          "absolute right-0 top-0 flex h-7 items-center gap-1 rounded-full px-2",
           "border border-tg-hint/15 transition-colors",
           busy ? "opacity-60" : "",
           on
@@ -150,7 +154,17 @@ export default function TranslatableText({
           .filter(Boolean)
           .join(" "),
       },
-      createElement(Icon, { name: "globe", size: 16 }),
+      createElement(Icon, { name: "globe", size: 13 }),
+      code
+        ? createElement(
+            "span",
+            {
+              "data-testid": "translate-target",
+              className: "text-2xs font-semibold tracking-wide",
+            },
+            code,
+          )
+        : null,
     ),
     failed
       ? createElement(

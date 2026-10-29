@@ -8,6 +8,12 @@ import {
 } from "@/api/kudos";
 import Icon from "@/components/Icon";
 import { Skeleton } from "@/components/Skeleton";
+import {
+  TRANSLATED_MARK_INLINE,
+  TranslateBlockButton,
+  TranslateFailedNotice,
+  useBatchTranslate,
+} from "@/components/TranslatableBlock";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
 
@@ -184,6 +190,12 @@ export function KudosSheet({
       person.display_name.toLowerCase().includes(needleLower) ||
       (person.position ?? "").toLowerCase().includes(needleLower),
   );
+
+  // Должности в списке — данные организации, а не код: «Бариста» пишет админ
+  // по-русски. Имена — собственные и не переводятся, а фразы благодарности
+  // живут в ленте и уезжают вместе с днём. Поэтому единственное, что здесь
+  // стоит переводить, — должность.
+  const translate = useBatchTranslate(people.map((person) => person.position ?? ""));
   // `kudosErrorText` всегда возвращает фразу: свою для известного кода и
   // общую — для остальных. Поэтому «пустого» отказа на экране не бывает.
   const errorText = send.isError ? kudosErrorText(send.error) : null;
@@ -213,14 +225,24 @@ export function KudosSheet({
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        <input
-          type="search"
-          value={needle}
-          onChange={(e) => setNeedle(e.target.value)}
-          placeholder={tx("Поиск по имени")}
-          aria-label={tx("Поиск по имени")}
-          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text outline-none"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={needle}
+            onChange={(e) => setNeedle(e.target.value)}
+            placeholder={tx("Поиск по имени")}
+            aria-label={tx("Поиск по имени")}
+            className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text outline-none"
+          />
+          {translate.canTranslate && (
+            <TranslateBlockButton
+              on={translate.on}
+              busy={translate.busy}
+              onClick={() => void translate.toggle()}
+            />
+          )}
+        </div>
+        <TranslateFailedNotice show={translate.failed} />
 
         {peopleQ.isLoading && (
           <div className="space-y-2">
@@ -258,8 +280,17 @@ export function KudosSheet({
                     {person.display_name}
                   </span>
                   {person.position && (
-                    <span className="shrink-0 truncate text-xs text-tg-hint">
-                      {person.position}
+                    <span
+                      className={[
+                        "shrink-0 truncate text-xs text-tg-hint",
+                        translate.t(person.position) !== person.position
+                          ? TRANSLATED_MARK_INLINE
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {translate.t(person.position)}
                     </span>
                   )}
                   {active && <Icon name="check" size={16} />}

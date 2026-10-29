@@ -24,6 +24,9 @@ import {
   giveKudos,
   type KudosWeek,
 } from "@/api/kudos";
+import * as translateApi from "@/api/translate";
+import { __clearTranslateCache } from "@/components/translateCore";
+import { useLocale } from "@/i18n";
 
 vi.mock("@/api/kudos", async (importOriginal) => {
   // `kudosErrorText` оставляем настоящим: проверяем перевод кодов в фразы,
@@ -87,7 +90,12 @@ beforeEach(() => {
   ]);
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  // Локаль переживает тест — иначе следующий кейс получил бы узбекский
+  // интерфейс и кнопку перевода там, где её быть не должно.
+  useLocale.setState({ locale: "ru" });
+});
 
 describe("KudosCard", () => {
   it("показывает каркас до ответа сервера", async () => {
@@ -211,6 +219,38 @@ describe("KudosCard", () => {
         "Сегодня ты уже благодарил(а) этого человека — завтра можно снова.",
       ),
     ).toBeTruthy();
+  });
+
+  it("переводит должности в листе одной кнопкой (план, 11.6)", async () => {
+    __clearTranslateCache();
+    useLocale.setState({ locale: "uz", uzPackAvailable: true });
+    const spy = vi
+      .spyOn(translateApi, "translateTexts")
+      .mockImplementation(async (batch, target) => ({
+        target,
+        available: true,
+        reason: null,
+        items: batch.map((text) => ({
+          translated: text === "Су-шеф" ? "Sous-shef" : text,
+          provider: "small100",
+        })),
+      }));
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <KudosSheet onClose={() => {}} />
+      </QueryClientProvider>,
+    );
+
+    // Кнопка говорит, на какой язык переведёт, ещё до нажатия.
+    expect((await screen.findByTestId("translate-target")).textContent).toBe("UZ");
+    fireEvent.click(screen.getByTestId("translate-block"));
+
+    expect(await screen.findByText("Sous-shef")).toBeTruthy();
+    // Имена — собственные, они не уезжают в переводчик.
+    expect(screen.getByText("Борис")).toBeTruthy();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
   });
 
   it("поиск в листе оставляет только совпавших", async () => {

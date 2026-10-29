@@ -42,6 +42,21 @@ export function targetFor(locale: string): TranslateTarget | null {
   return null;
 }
 
+/**
+ * Короткий код языка для кнопки: `EN`, `UZ`.
+ *
+ * Кнопка-глобус без кода — это «перевести куда-то». Человек с узбекским
+ * интерфейсом должен видеть, что получит узбекский, а не гадать. Код стоит
+ * рядом с глобусом всегда, а не только после нажатия: иначе обещание кнопки
+ * выясняется уже по факту.
+ */
+export function targetCode(locale: string): "EN" | "UZ" | null {
+  const target = targetFor(locale);
+  if (target === "en") return "EN";
+  if (target === "uz") return "UZ";
+  return null;
+}
+
 /** Есть ли в тексте что переводить. */
 export function needsTranslation(text: string): boolean {
   return CYRILLIC.test(text);

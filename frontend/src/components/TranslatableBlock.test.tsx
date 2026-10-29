@@ -70,6 +70,8 @@ describe("перевод блока", () => {
 
     render(<Block texts={["Убрать зал", "Проверить кассу"]} />);
     expect(screen.getByText("Убрать зал")).toBeTruthy();
+    // Код языка виден до нажатия: кнопка обязана ответить «на что переведёт».
+    expect(screen.getByTestId("translate-target").textContent).toBe("UZ");
 
     const button = screen.getByTestId("translate-block");
     fireEvent.click(button);

@@ -17,6 +17,7 @@ import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import {
+  TRANSLATED_MARK_INLINE,
   TranslateBlockButton,
   TranslateFailedNotice,
   useBatchTranslate,
@@ -925,11 +926,9 @@ function FeedRow({
               />
             )}{" "}
             <span
-              className={
-                translated
-                  ? "rounded-tile bg-tg-secondary-bg/80 px-0.5 ring-1 ring-tg-hint/10"
-                  : undefined
-              }
+              // Цвет акцента, как у активного глобуса в плашке дня: иначе
+              // подложка сливалась с карточкой, и перевод читался как оригинал.
+              className={translated ? TRANSLATED_MARK_INLINE : undefined}
             >
               {text}
             </span>

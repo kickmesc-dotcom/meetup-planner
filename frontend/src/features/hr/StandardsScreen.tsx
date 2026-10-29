@@ -17,6 +17,8 @@ import ErrorState from "@/components/ErrorState";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import {
+  TRANSLATED_MARK,
+  TRANSLATED_MARK_INLINE,
   TranslateBlockButton,
   TranslateFailedNotice,
   useBatchTranslate,
@@ -317,7 +319,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
               className={[
                 "whitespace-pre-wrap break-words text-sm text-tg-text/90",
                 translate.t(standard.body) !== standard.body
-                  ? "rounded-tile bg-tg-secondary-bg/80 px-1 ring-1 ring-tg-hint/10"
+                  ? TRANSLATED_MARK
                   : "",
               ]
                 .filter(Boolean)
@@ -365,7 +367,16 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
         {questions.map((q, index) => (
           <section key={q.id} className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="text-sm font-medium text-tg-text">
-              {index + 1}. {translate.t(q.text)}
+              {index + 1}.{" "}
+              <span
+                className={
+                  translate.t(q.text) !== q.text
+                    ? TRANSLATED_MARK_INLINE
+                    : undefined
+                }
+              >
+                {translate.t(q.text)}
+              </span>
             </div>
             <div className="mt-2 space-y-1.5">
               {q.options.map((option, optionIndex) => {
@@ -393,7 +404,16 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
                     <span className="text-xs text-tg-hint">
                       {String.fromCharCode(1040 + optionIndex)})
                     </span>
-                    <span className="min-w-0 flex-1 break-words">
+                    <span
+                      className={[
+                        "min-w-0 flex-1 break-words",
+                        translate.t(option) !== option
+                          ? TRANSLATED_MARK_INLINE
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
                       {translate.t(option)}
                     </span>
                   </button>

@@ -2,8 +2,24 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { tx, useLocale, useTx } from "@/i18n";
 import { haptic } from "@/tg/webapp";
-import { needsTranslation, targetFor, translateBatch } from "./translateCore";
+import { needsTranslation, targetCode, targetFor, translateBatch } from "./translateCore";
 import { useTranslateAssist } from "@/store/translate";
+
+/**
+ * Подложка перевода (план, 11.6).
+ *
+ * Раньше это был серый `bg-tg-secondary-bg`, то есть ровно тот же цвет, что у
+ * карточек вокруг: подложки фактически не было, и человек читал машинный
+ * перевод как авторский текст. Теперь цвет тот же, что у активного глобуса
+ * (`tg-link/10` + кольцо того же акцента) — между кнопкой и тем, что она
+ * изменила, видно связь, не вчитываясь.
+ */
+export const TRANSLATED_MARK =
+  "rounded-tile bg-tg-link/10 px-1 ring-1 ring-tg-link/30";
+
+/** То же для текста внутри строки: подложка рвётся по переносам, а не рамкой. */
+export const TRANSLATED_MARK_INLINE =
+  "box-decoration-clone rounded-tile bg-tg-link/10 px-0.5 ring-1 ring-tg-link/25";
 
 /**
  * Перевод целого блока данных одной кнопкой (план, 11.5).
@@ -107,6 +123,9 @@ export function useBatchTranslate(texts: string[]): BatchTranslate {
 /**
  * Кнопка блока: та же форма и тот же отклик, что у одиночного текста — иначе
  * два способа перевести одно и то же выглядели бы как два разных продукта.
+ *
+ * Код языка (`EN`/`UZ`) стоит рядом с глобусом всегда, а не после нажатия:
+ * кнопка обязана отвечать на вопрос «на что переведёт» до того, как её нажали.
  */
 export function TranslateBlockButton({
   on,
@@ -117,8 +136,9 @@ export function TranslateBlockButton({
   busy: boolean;
   onClick: () => void;
 }) {
-  const { tx } = useTx();
+  const { tx, locale } = useTx();
   const label = on ? tx("Показать оригинал") : tx("Перевести");
+  const code = targetCode(locale);
   return (
     <button
       type="button"
@@ -129,7 +149,7 @@ export function TranslateBlockButton({
       title={label}
       data-testid="translate-block"
       className={[
-        "grid h-9 w-9 shrink-0 place-items-center rounded-full",
+        "flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5",
         "border border-tg-hint/15 transition-colors press",
         busy ? "opacity-60" : "",
         on ? "bg-tg-link/15 text-tg-link" : "bg-tg-secondary-bg text-tg-hint",
@@ -137,7 +157,15 @@ export function TranslateBlockButton({
         .filter(Boolean)
         .join(" ")}
     >
-      <Icon name="globe" size={16} />
+      <Icon name="globe" size={15} />
+      {code && (
+        <span
+          data-testid="translate-target"
+          className="text-2xs font-semibold tracking-wide"
+        >
+          {code}
+        </span>
+      )}
     </button>
   );
 }

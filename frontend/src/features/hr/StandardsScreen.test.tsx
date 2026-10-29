@@ -122,7 +122,10 @@ describe("StandardDetail и перевод", () => {
 
     // Повторное нажатие возвращает оригинал: по нему человек отчитывается.
     fireEvent.click(screen.getByTestId("translate-block"));
-    expect(screen.getByText(/1\. Сколько секунд мыть руки\?/)).toBeTruthy();
+    // Вопрос теперь отдельный узел (у него своя подложка перевода), поэтому
+    // номер проверяем по строке целиком: он обязан остаться рядом с текстом.
+    const questionRow = screen.getByText("Сколько секунд мыть руки?").parentElement!;
+    expect(questionRow.textContent).toContain("1.");
     spy.mockRestore();
   });
 
