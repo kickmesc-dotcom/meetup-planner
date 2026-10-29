@@ -179,4 +179,77 @@ export const UZ_CONTENT: Record<string, string> = {
   "Перевести": "Tarjima qilish",
   "Показать оригинал": "Asl matnni koʻrsatish",
   "Перевод недоступен": "Tarjima bu yerda mavjud emas",
+
+  // ------------------------------------------------- «Профиль» (план, 11.4) --
+  // Скриншот 29.10: переключатель показывал UZ, а тело карточки было русским.
+  // Переведено ровно то, что на этом экране видно.
+  "Профиль готов. Смена начнётся с чек-листа.":
+    "Profil tayyor. Smena chek-listdan boshlanadi.",
+  "Сохранили — остался один шаг.": "Saqlandi — bitta qadam qoldi.",
+  "Изменить мои данные": "Maʼlumotlarimni oʻzgartirish",
+  "Изменить": "Oʻzgartirish",
+  "Доступ": "Ruxsat",
+  "Подразделение": "Boʻlim",
+  "Опыт": "Tajriba",
+  "новичок": "yangi",
+  "с опытом": "tajribali",
+  "выбери ниже": "quyidan tanlang",
+  "не указан": "koʻrsatilmagan",
+  "Профиль открыт": "Profil ochiq",
+  "Профиль закрыт": "Profil yopiq",
+  "Коллеги видят твою активность и цифры. Руководитель видит их всегда.":
+    "Hamkasblar faolligingiz va raqamlaringizni koʻradi. Rahbar ularni doim koʻradi.",
+  "Коллеги видят только имя и отдел. Руководитель и админ — всё.":
+    "Hamkasblar faqat ism va boʻlimni koʻradi. Rahbar va admin — hammasini.",
+  "Так решили": "Shunday belgilangan",
+  "Открыт": "Ochiq",
+  "Закрыт": "Yopiq",
+  "Последний заход": "Oxirgi kirish",
+  "Коллеги видят, когда ты последний раз открывал приложение.":
+    "Hamkasblar ilovani oxirgi marta qachon ochganingizni koʻradi.",
+  "Включено руководителем — выключить нельзя.":
+    "Rahbar yoqqan — oʻchirib boʻlmaydi.",
+  "Последнее медиа": "Oxirgi media",
+  "Коллеги видят твоё последнее фото из отчёта.":
+    "Hamkasblar hisobotdagi oxirgi suratingizni koʻradi.",
+  "Настройка организации": "Tashkilot sozlamalari",
+  "Разделы, подразделения и кто что видит":
+    "Boʻlimlar, tuzilmalar va kim nima koʻradi",
+  "Закончим знакомство": "Tanishuvni yakunlaymiz",
+  "Мои данные": "Mening maʼlumotlarim",
+  "Подразделение определяет чек-листы, поручения и ссылки, которые тебе приходят.":
+    "Boʻlim sizga keladigan chek-listlar, topshiriqlar va havolalarni belgilaydi.",
+  "Продолжить": "Davom etish",
+  "Сохранить": "Saqlash",
+  "Опыт и обучение": "Tajriba va oʻqish",
+  "Курс": "Kurs",
+  "Три уровня от знакомства до самостоятельной работы — по одному действию на урок.":
+    "Tanishuvdan mustaqil ishgacha uch daraja — har darsda bitta amal.",
+  "Учимся вместе · вкл": "Birga oʻrganamiz · yoniq",
+  "Учимся вместе · выкл": "Birga oʻrganamiz · oʻchiq",
+  "Открыть курс": "Kursni ochish",
+  "Продолжить курс": "Kursni davom ettirish",
+  "Все разделы": "Barcha boʻlimlar",
+  "Для администратора": "Administrator uchun",
+  "Примерить роль": "Rolni sinab koʻrish",
+  "Роль меняет только твой обзор: задачи, ленту и кабинет. Доступ в админку остаётся — вернуть себя можно этой же кнопкой.":
+    "Rol faqat koʻrinishingizni oʻzgartiradi: vazifalar, lenta va kabinet. Adminga kirish qoladi — shu tugma bilan qaytish mumkin.",
+  "Режим проверки": "Tekshiruv rejimi",
+  "Открой приложение глазами сотрудника. Тестовые задачи и смены удалятся при выходе — настоящие данные не изменятся.":
+    "Ilovani xodim koʻzi bilan oching. Sinov vazifalari va smenalari chiqishda oʻchiriladi — haqiqiy maʼlumotlar oʻzgarmaydi.",
+  "Кого проверяем": "Kimni tekshiramiz",
+  "Выбери сотрудника": "Xodimni tanlang",
+  "Открываем…": "Ochilmoqda…",
+  "Открыть как сотрудник": "Xodim sifatida ochish",
+  "Тестовый пул": "Sinov toʻplami",
+  "Сотрудники `[BOT]` для проверки сценариев. Настоящие данные не затрагиваются.":
+    "`[BOT]` xodimlari ssenariylarni tekshirish uchun. Haqiqiy maʼlumotlarga tegmaydi.",
+  "Открыть тестовый пул": "Sinov toʻplamini ochish",
+  "Вернуться в чат с ботом": "Bot chatiga qaytish",
+  "Сервер": "Server",
+  "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.":
+    "Asosiy manzil ishlamasa, zaxirasini koʻrsating — ilova qayta oʻrnatishsiz ishlashda davom etadi. Boʻsh — yigʻilgan manzil ishlatiladi.",
+  "Сохранить и перезагрузить": "Saqlash va qayta yuklash",
+  "Видно": "Koʻrinadi",
+  "Скрыто": "Yashirin",
 };
