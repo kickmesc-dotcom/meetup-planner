@@ -405,6 +405,40 @@ describe("перевод дня (план, 11.5)", () => {
     spy.mockRestore();
   });
 
+  it("благодарность в ленте переводится тем же блоком, что и день", async () => {
+    __clearTranslateCache();
+    useLocale.setState({ locale: "uz", uzPackAvailable: true });
+    const spy = vi
+      .spyOn(translateApi, "translateTexts")
+      .mockImplementation(async (batch, target) => ({
+        target,
+        available: true,
+        reason: null,
+        items: batch.map((t) => ({ translated: `[${t}]`, provider: "small100" })),
+      }));
+
+    // Благодарность приходит в ленте как обычное событие: имя коллеги и фраза
+    // в одном тексте. Отдельного механизма ей не нужно — иначе одна и та же
+    // фраза переводилась бы двумя путями и по-разному.
+    const kudos =
+      "поблагодарил(а) Tasya: «Спасибо за смену, выручила с залом»";
+    renderFeed([
+      item({ at: "2026-10-22T10:00:00Z", kind: "kudos", text: kudos, ref_id: 7 }),
+    ]);
+
+    const original = await screen.findByText(kudos);
+    // До нажатия — авторский текст: подложки быть не должно.
+    expect(original.className).not.toContain("bg-tg-link/10");
+
+    fireEvent.click(screen.getByTestId("translate-block"));
+    // Перевод получает ту же подложку, что и остальные события дня: иначе
+    // машинный текст в благодарности читался бы как написанный человеком.
+    const translated = await screen.findByText(`[${kudos}]`);
+    expect(translated.className).toContain("bg-tg-link/10");
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
   it("на английском кнопки нет: текст события уже английский", async () => {
     useLocale.setState({ locale: "en" });
     renderFeed([
