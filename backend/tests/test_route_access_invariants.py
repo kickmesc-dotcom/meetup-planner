@@ -322,3 +322,30 @@ def test_employee_patch_accepts_the_name_the_ui_sends():
     body = routes_hr_ops_admin.EmployeePatchIn(display_name="Tasya", role="employee")
     assert body.display_name == "Tasya"
     assert body.role == "employee"
+
+
+def test_every_endpoint_annotation_resolves():
+    """Имена в аннотациях ручек обязаны существовать в модуле.
+
+    Зачем (найдено 30.10 при подъёме pydantic, S-19). `routes_admin` объявлял
+    поле `immunity_mode: Literal["announce", "silent"]`, не импортировав
+    `Literal`. Со старым pydantic это проходило: модель строилась лениво и
+    ошибка не всплывала. На 2.13 импорт приложения падал на сборке OpenAPI, а
+    вместе с ним `/api/meta` терял список ручек — и проверки прав на этом списке
+    переставали что-либо охранять.
+
+    Тест не зависит от версии библиотеки: он спрашивает у Python, разрешаются
+    ли аннотации, — то есть сработает и на следующем подъёме.
+    """
+    import typing
+
+    app = create_app()
+    broken: dict[str, str] = {}
+    for route in iter_route_objects(app):
+        try:
+            typing.get_type_hints(route.endpoint)
+        except NameError as exc:  # имя в аннотации не определено
+            methods = ",".join(sorted(route.methods or ()))
+            broken[f"{methods} {route.path}"] = str(exc)
+
+    assert broken == {}

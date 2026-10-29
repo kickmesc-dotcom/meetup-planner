@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Literal
 import structlog
 # Добавлен импорт Response
 from fastapi import APIRouter, HTTPException, status, Response
