@@ -7,6 +7,7 @@ import {
   updateUiPrefs,
   type UiPrefs,
 } from "./api/availability";
+import { useBootstrap } from "./api/bootstrap";
 
 import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
 // SemiTaskBot: рабочие экраны сотрудника.
@@ -57,13 +58,32 @@ import { useTx } from "@/i18n";
 export default function App() {
   const { tx } = useTx();
   const qc = useQueryClient();
-  const me = useQuery({ queryKey: ["me"], queryFn: fetchMe });
-  const users = useQuery({ queryKey: ["users"], queryFn: fetchUsers });
+  // Старт одним запросом: сервер отдаёт профиль, участников, HR-профиль,
+  // поручения, настройку организации и личные настройки разом, а хук кладёт
+  // их в кеш под обычными ключами — экраны про это не знают.
+  const boot = useBootstrap();
+  // Не вышло — включаем прежние шесть запросов поштучно (человек без
+  // членства в организации, старый сервер без ручки). Деградация до
+  // вчерашнего поведения, а не пустой экран.
+  const bootFailed = boot.isError;
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: fetchMe,
+    enabled: bootFailed,
+    staleTime: 60_000,
+  });
+  const users = useQuery({
+    queryKey: ["users"],
+    queryFn: fetchUsers,
+    enabled: bootFailed,
+    staleTime: 60_000,
+  });
   // HR-профиль нужен не только экрану профиля: от его роли зависит, есть ли
   // вкладка «Команда» (руководитель) и кабинет (прописанный админ).
   const hrMe = useQuery({
     queryKey: ["hr-employee"],
     queryFn: fetchEmployee,
+    enabled: bootFailed,
     retry: false,
     staleTime: 60_000,
   });
@@ -74,7 +94,7 @@ export default function App() {
   const tasksQ = useQuery({
     queryKey: ["hr-tasks", false],
     queryFn: () => fetchTasks(false),
-    enabled: hrMe.data?.onboarding_state === "done",
+    enabled: bootFailed && hrMe.data?.onboarding_state === "done",
     staleTime: 60_000,
     retry: false,
   });
@@ -84,10 +104,16 @@ export default function App() {
   const orgSetup = useQuery({
     queryKey: ["org-setup"],
     queryFn: fetchOrgSetup,
+    enabled: bootFailed,
     retry: false,
     staleTime: 5 * 60_000,
   });
-  const uiPrefs = useQuery({ queryKey: ["ui-prefs"], queryFn: fetchUiPrefs });
+  const uiPrefs = useQuery({
+    queryKey: ["ui-prefs"],
+    queryFn: fetchUiPrefs,
+    enabled: bootFailed,
+    staleTime: 60_000,
+  });
   const hideGreeting = useMutation({
     mutationFn: () => updateUiPrefs({ hide_greeting: true }),
     onMutate: async () => {

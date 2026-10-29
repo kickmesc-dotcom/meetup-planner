@@ -66,10 +66,13 @@ def _to_out(
     )
 
 
-@router.get("/me", response_model=UserOut)
-async def me(session: SessionDep, user: CurrentUser) -> UserOut:
-    # GHG11(10): мини-апп при запуске зовёт `/me` — здесь и отмечаем «последний
-    # заход». Best-effort и троттлинг внутри (см. services/game/presence).
+async def me_out(session: SessionDep, user: CurrentUser) -> UserOut:
+    """Мой профиль. Отдельной функцией — её же собирает `/api/bootstrap`.
+
+    GHG11(10): мини-апп при запуске зовёт `/me` — здесь и отмечаем «последний
+    заход». Best-effort и троттлинг внутри (см. services/game/presence). Сам
+    сбор ответа от этого не зависит: отметка не должна ронять старт экрана.
+    """
     from app._legacy.services.game import presence
 
     await presence.touch_last_app_seen(session, user.id)
@@ -80,8 +83,13 @@ async def me(session: SessionDep, user: CurrentUser) -> UserOut:
     return _to_out(user, admin_ids=admin_ids, custom_name=custom_name)
 
 
-@router.get("/users", response_model=list[UserOut])
-async def list_users(session: SessionDep, _: CurrentUser) -> list[UserOut]:
+@router.get("/me", response_model=UserOut)
+async def me(session: SessionDep, user: CurrentUser) -> UserOut:
+    return await me_out(session, user)
+
+
+async def users_out(session: SessionDep) -> list[UserOut]:
+    """Все участники текущей организации — списком, без N+1."""
     admin_ids = get_settings().admin_tg_id_set
     result = await session.scalars(select(User).order_by(User.id))
     # Одно доп. чтение на весь список (не N+1): кастомные имена из игровых профилей.
@@ -99,6 +107,11 @@ async def list_users(session: SessionDep, _: CurrentUser) -> list[UserOut]:
         _to_out(u, admin_ids=admin_ids, custom_name=custom_names.get(u.id))
         for u in result.all()
     ]
+
+
+@router.get("/users", response_model=list[UserOut])
+async def list_users(session: SessionDep, _: CurrentUser) -> list[UserOut]:
+    return await users_out(session)
 
 
 # --- GHG8 (18.06 #2): прокси аватарок ---
@@ -189,14 +202,19 @@ class UiPrefsPatch(BaseModel):
     show_last_seen: bool | None = None
 
 
-@router.get("/me/ui-prefs", response_model=UiPrefsOut)
-async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
+async def ui_prefs_out(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
+    """Личные настройки интерфейса. Четыре чтения одного префикса — одним местом."""
     return UiPrefsOut(
         hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
         welcome_format=await get_ui_welcome_format(session, user.telegram_id),
         muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
         show_last_seen=await get_ui_show_last_seen(session, user.telegram_id),
     )
+
+
+@router.get("/me/ui-prefs", response_model=UiPrefsOut)
+async def get_ui_prefs(session: SessionDep, user: CurrentUser) -> UiPrefsOut:
+    return await ui_prefs_out(session, user)
 
 
 async def _notifications_out(session: SessionDep, user_id: int) -> NotificationsOut:
@@ -273,9 +291,4 @@ async def put_ui_prefs(
         )
     if body.show_last_seen is not None:
         await set_ui_show_last_seen(session, user.telegram_id, body.show_last_seen)
-    return UiPrefsOut(
-        hide_greeting=await get_ui_hide_greeting(session, user.telegram_id),
-        welcome_format=await get_ui_welcome_format(session, user.telegram_id),
-        muted_feed=sorted(await get_ui_muted_feed(session, user.telegram_id)),
-        show_last_seen=await get_ui_show_last_seen(session, user.telegram_id),
-    )
+    return await ui_prefs_out(session, user)

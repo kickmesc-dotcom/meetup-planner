@@ -25,6 +25,7 @@ from app.api import (
     routes_auth,
     routes_availability,
     routes_birthdays,
+    routes_bootstrap,
     routes_calendar,
     routes_handovers,
     routes_hr,
@@ -450,6 +451,8 @@ def create_app() -> FastAPI:
     # Push вне Telegram: подписка браузера и тестовое уведомление (2.4).
     app.include_router(routes_push.router, prefix="/api")
     app.include_router(routes_users.router, prefix="/api")
+    # Старт приложения одним запросом вместо шести (быстрый десктоп).
+    app.include_router(routes_bootstrap.router, prefix="/api")
     # Вход в веб-версию по ссылке (вне Telegram, где нет initData).
     app.include_router(routes_app_access.router, prefix="/api")
     app.include_router(routes_availability.router, prefix="/api")
