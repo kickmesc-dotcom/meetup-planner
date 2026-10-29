@@ -1657,4 +1657,10 @@ export const EN_CONTENT: Record<string, string> = {
   "Срок: конец смены": "Deadline: end of the shift",
   "Срок взят из фразы": "Deadline taken from your words",
   "сегодня": "today",
+
+  // Перевод данных на месте (план, 11): кнопка в углу блока с чужими
+  // данными — поручением или пунктом чек-листа.
+  "Перевести": "Translate",
+  "Показать оригинал": "Show the original",
+  "Перевод недоступен": "Translation isn't available here",
 };

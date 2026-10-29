@@ -1783,3 +1783,44 @@ class AppAccessLink(OrgScoped, Base):
     )
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TranslationCache(Base):
+    """Перевод строки данных на язык интерфейса (план, 11).
+
+    Зачем таблица, а не «перевести на месте». Модель живёт только там, где есть
+    память (HF Space, 16 ГБ). У Amvera 0,5 ГБ, и там её нет физически — зато
+    ровно та же база. Поэтому посчитанный один раз перевод становится общим:
+    первый хост считает, второй отдаёт.
+
+    Почему в ключе хэш, а не текст. `source_hash` = sha256(текст + язык). В
+    таблице нет ни исходной строки, ни её фрагментов: кэш не должен становиться
+    второй копией заданий и переписки. Хэша достаточно, чтобы найти готовое, и
+    недостаточно, чтобы прочитать чужое.
+
+    Таблица НЕ тенантная сознательно: одинаковый текст («Помыть пол в зале»)
+    переводится одинаково в любой организации, и хранить его дважды нет смысла.
+    Утечки это не даёт — в строке лежит только перевод того текста, который
+    запросивший и так видит.
+    """
+
+    __tablename__ = "translation_cache"
+    __table_args__ = (
+        UniqueConstraint("source_hash", "target", name="uq_translation_hash_target"),
+    )
+
+    # `with_variant(Integer, "sqlite")` — как у остальных таблиц проекта:
+    # SQLite не делает BIGINT первичным ключом с автоинкрементом, и без этого
+    # вставка падала бы на `NOT NULL constraint failed: translation_cache.id`.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    source_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    target: Mapped[str] = mapped_column(String(8), nullable=False)
+    translated: Mapped[str] = mapped_column(Text, nullable=False)
+    # Чем переведено: имя провайдера («small100»). Нужно, чтобы при смене
+    # модели было видно происхождение строки, не пересчитывая всё заново.
+    provider: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

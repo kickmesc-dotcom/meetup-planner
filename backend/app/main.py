@@ -319,9 +319,27 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         scheduler_task = None
         structlog.get_logger().warning("scheduler.start_failed", error=str(exc))
 
+    # 4. Перевод данных (план, 11): веса грузим в фоне, а не в момент нажатия
+    # кнопки. 780 МБ качаются с Hub и читаются с диска минуты — первый
+    # человек не должен ждать этого с открытым экраном. Где моделей нет
+    # (Amvera, 0,5 ГБ), задача сразу завершается: `get_provider()` вернёт None.
+    try:
+        from app.services.translate import warm_up as _translate_warm_up
+
+        translate_task: asyncio.Task | None = asyncio.create_task(_translate_warm_up())
+    except Exception as exc:  # noqa: BLE001
+        translate_task = None
+        structlog.get_logger().warning("translate.start_failed", error=str(exc))
+
     yield
 
     # Завершение: гасим фоновые задачи, если они ещё бегут.
+    if translate_task is not None:
+        translate_task.cancel()
+        try:
+            await translate_task
+        except (asyncio.CancelledError, Exception):  # noqa: BLE001
+            pass
     for _task in (tg_task,):
         _task.cancel()
         try:

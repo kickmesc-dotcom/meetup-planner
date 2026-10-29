@@ -21,7 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-RUN pip install --upgrade pip && pip install hatchling && pip install .
+# `.[mt]` — движок офлайн-перевода (CTranslate2 + токенизаторы, план, 11).
+# Самых весов моделей в образе НЕТ: они качаются или монтируются на хосте, где
+# хватает памяти. На Amvera (0,5 ГБ) переменные `TRANSLATE_*` пусты, модели не
+# поднимаются, и пакеты только лежат на диске.
+RUN pip install --upgrade pip && pip install hatchling && pip install ".[mt]"
 
 COPY app ./app
 COPY alembic ./alembic

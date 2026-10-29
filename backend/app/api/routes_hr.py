@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, EmployeeDep, SessionDep
+from app.services import translate as translate_service
 from app.db.hr_models import (
     EXPERIENCES,
     ONBOARDING_DONE,
@@ -1979,3 +1980,82 @@ async def kudos_people(
         )
         for eid, name, did, position, badge in rows.all()
     ]
+
+
+class TranslateIn(BaseModel):
+    """Строки данных, которые человек хочет прочитать на своём языке.
+
+    Ограничения здесь, а не только в сервисе: ручка не должна превращаться в
+    «переведи мне весь экран». 20 строк — это блок задания целиком (заголовок,
+    описание, подписи) с запасом; 500 символов — длинный пункт чек-листа.
+    """
+
+    target: Literal["en", "uz"]
+    texts: list[str] = Field(default_factory=list)
+
+
+class TranslateItemOut(BaseModel):
+    # `None` — перевода нет: либо строка уже не по-русски (`provider="same"`),
+    # либо на этом хосте нет модели (`available=false`). Пустая строка вместо
+    # `None` выглядела бы как «перевод получился пустым».
+    translated: str | None = None
+    provider: str | None = None
+
+
+class TranslateOut(BaseModel):
+    target: str
+    # Есть ли на этом хосте модель. Amvera на 0,5 ГБ отвечает `false` — и это
+    # не ошибка: кэш от другого контура при этом всё равно работает.
+    available: bool
+    reason: str | None = None
+    items: list[TranslateItemOut]
+
+
+@router.post("/translate", response_model=TranslateOut)
+async def translate_data(
+    body: TranslateIn,
+    session: SessionDep,
+    employee: EmployeeDep,
+) -> TranslateOut:
+    """Перевести данные на язык интерфейса — по нажатию, а не всегда.
+
+    Почему это ручка, а не поле в каждой задаче. Перевод нужен не всем и не
+    всегда: одному человеку в бригаде, на один блок, на минуту. Считать его
+    заранее для всех заданий — значит платить моделью за то, что никто не
+    откроет.
+
+    Почему нажатие, а не автоперевод. Машинный перевод корявый, и подменять им
+    текст задания, по которому сотрудник отчитывается, нельзя: он должен уметь
+    вернуться к оригиналу одним тапом (это делает фронтенд).
+    """
+    if not body.texts:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="empty_texts")
+    if len(body.texts) > translate_service.MAX_TEXTS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="too_many_texts")
+    if any(len(text) > translate_service.MAX_TEXT_CHARS for text in body.texts):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="text_too_long")
+
+    provider = translate_service.get_provider()
+    # `supports`, а не просто «провайдер есть»: у узбекского нужна вторая
+    # модель (en→uz), и на хосте, где её нет, кнопка не должна обещать
+    # английский перевод узбекской строки.
+    if provider is not None and not provider.supports(body.target):
+        provider = None
+    items, reason = await translate_service.translate_texts(
+        session, body.texts, body.target, provider=provider
+    )
+    # Коммит нужен только когда что-то посчитали; `translate_texts` пишет через
+    # `ON CONFLICT DO NOTHING`, поэтому повторный запрос ничего не дублирует.
+    await session.commit()
+    return TranslateOut(
+        target=body.target,
+        available=provider is not None,
+        # `model_unavailable` — это «на этом хосте нет модели для этого языка»,
+        # и клиент по нему говорит человеку правду, а не крутит бесконечный
+        # спиннер.
+        reason=reason,
+        items=[
+            TranslateItemOut(translated=item.translated, provider=item.provider)
+            for item in items
+        ],
+    )

@@ -205,6 +205,46 @@ def existing_variables() -> set[str]:
     return set(body)
 
 
+def put_variable(key: str, value: str) -> bool:
+    """Публичная настройка Space (не секрет).
+
+    Зачем отдельно от секретов: `TRANSLATE_*` — не тайна, а адрес модели на Hub
+    и выключатель. HF не разрешает держать одно имя и в переменных, и в
+    секретах (24.10.2026 это уронило Space в `CONFIG_ERROR`), поэтому имена
+    переменных проверяются так же, как у секретов, но в своём списке.
+    """
+    status, body = api_request(
+        f"spaces/{SPACE_REPO}/variables", method="POST", payload={"key": key, "value": value}
+    )
+    ok = status in (200, 201)
+    print(f"  {'✓' if ok else '✗'} {key}={value}" + ("" if ok else f" — HTTP {status} {body.get('error', '')}"))
+    return ok
+
+
+def cmd_vars(args) -> int:
+    """`vars KEY=VALUE …` — выставить переменные Space (идемпотентно).
+
+    Нужно для перевода данных (план, 11): модели живут на Hub, и Space должен
+    знать их имена. На Amvera эти переменные НЕ ставятся: там 0,5 ГБ RAM, модели
+    не поднимаются, и второй контур живёт кэшем из общей базы.
+    """
+    pairs = [item.split("=", 1) for item in args.pairs]
+    bad = [k for k, *_ in [(p + [""])[:2] for p in pairs] if not k]
+    if bad:
+        print("нужно KEY=VALUE")
+        return 2
+    secrets = existing_variables()  # список имён переменных Space
+    ok = True
+    for pair in pairs:
+        key = pair[0]
+        value = pair[1] if len(pair) > 1 else ""
+        if key in secrets:
+            print(f"  = {key} — уже есть, не трогаю")
+            continue
+        ok = put_variable(key, value) and ok
+    return 0 if ok else 1
+
+
 def cmd_env(_args) -> int:
     env = read_env_file()
     # Публичный адрес API — это сам Space: от него зависят CORS и редиректы,
@@ -426,6 +466,9 @@ def main() -> int:
         p = sub.add_parser(name)
         p.add_argument("--timeout", type=int, default=1800, help="сколько ждать сборку, сек")
         p.set_defaults(func=func)
+    vars_parser = sub.add_parser("vars", help="выставить переменные Space (KEY=VALUE)")
+    vars_parser.add_argument("pairs", nargs="+", metavar="KEY=VALUE")
+    vars_parser.set_defaults(func=cmd_vars)
     args = parser.parse_args()
     return args.func(args)
 

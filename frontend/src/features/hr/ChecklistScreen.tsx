@@ -15,6 +15,7 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
 import ProgressBar from "@/components/ProgressBar";
+import TranslatableText from "@/components/TranslatableText";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { intlLocaleFor, useTx, type Locale } from "@/i18n";
@@ -374,15 +375,16 @@ function ItemRow({
                   : "text-tg-text",
             ].join(" ")}
           >
-            {item.title}
+            <TranslatableText layout="inline" text={item.title} />
             {!item.is_mandatory && (
               <span className="ml-1 text-xs text-tg-hint">{tx("(опц.)")}</span>
             )}
           </div>
           {item.description && (
-            <div className="mt-0.5 text-xs text-tg-hint">
-              {item.description}
-            </div>
+            <TranslatableText
+              className="mt-0.5 text-xs text-tg-hint"
+              text={item.description}
+            />
           )}
           {item.schedule_label && (
             <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">

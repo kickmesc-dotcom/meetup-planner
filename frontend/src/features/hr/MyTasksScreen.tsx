@@ -27,6 +27,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 import { useUI } from "@/store/ui";
 import QuickTaskSheet from "@/features/hr/QuickTaskSheet";
+import TranslatableText from "@/components/TranslatableText";
 
 /**
  * SemiTaskBot: «Мои задачи» — главный экран смены.
@@ -487,9 +488,11 @@ function TaskCard({
       ].join(" ")}
     >
       <div className="flex items-start justify-between gap-2">
-        <h2 className="text-sm font-semibold text-tg-text break-words">
-          {task.title}
-        </h2>
+        <TranslatableText
+          as="h2"
+          className="text-sm font-semibold text-tg-text break-words"
+          text={task.title}
+        />
         <span
           className={[
             "shrink-0 rounded-full px-2 py-0.5 text-xs",
@@ -553,9 +556,10 @@ function TaskCard({
       )}
 
       {task.description && (
-        <p className="mt-2 text-xs text-tg-text/90 whitespace-pre-wrap break-words">
-          {task.description}
-        </p>
+        <TranslatableText
+          className="mt-2 text-xs text-tg-text/90 whitespace-pre-wrap break-words"
+          text={task.description}
+        />
       )}
       {task.expected_result && (
         <p className="mt-1 text-xs text-tg-hint">

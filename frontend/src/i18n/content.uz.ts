@@ -174,4 +174,9 @@ export const UZ_CONTENT: Record<string, string> = {
 
   "Не удалось сказать спасибо. Попробуй ещё раз.":
     "Rahmat aytib boʻlmadi. Yana urinib koʻring.",
+
+  // Кнопка перевода данных (план, 11).
+  "Перевести": "Tarjima qilish",
+  "Показать оригинал": "Asl matnni koʻrsatish",
+  "Перевод недоступен": "Tarjima bu yerda mavjud emas",
 };
