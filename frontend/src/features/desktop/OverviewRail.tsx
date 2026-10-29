@@ -137,10 +137,11 @@ export default function OverviewRail() {
         {tx("Быстрый переход")}
       </h2>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <Quick tab="shifts" icon="calendar" label={tx("Табель")} onClick={go} />
+        <Quick tab="shifts" icon="calendar" label={tx("График")} onClick={go} />
         <Quick tab="materials" icon="book" label={tx("Материалы")} onClick={go} />
         <Quick tab="team" icon="team" label={tx("Команда")} onClick={go} />
-        <Quick tab="calendar" icon="clock" label={tx("Календарь")} onClick={go} />
+        {/* Вместо старого «Календаря» — встречи: расписание смен уже выше. */}
+        <Quick tab="meetings" icon="clock" label={tx("Встречи")} onClick={go} />
       </div>
     </aside>
   );

@@ -37,12 +37,15 @@ const WORK: NavItem[] = [
   { id: "feed", label: "События", icon: "feed" },
   { id: "tasks", label: "Мои задачи", icon: "tasks" },
   { id: "checklist", label: "Чек-лист смены", icon: "clipboard" },
-  { id: "shifts", label: "Табель", icon: "calendar" },
+  // «График» — это расписание смен. Раньше здесь стояло «Табель» (сводка
+  // часов), а рядом в «Сервисе» жил «Календарь» — сетка свободного времени
+  // старого планировщика с людьми, которых в смене уже нет. Одна неделя
+  // работы вместо двух экранов.
+  { id: "shifts", label: "График", icon: "calendar" },
   { id: "materials", label: "Материалы", icon: "book" },
 ];
 
 const SERVICE: NavItem[] = [
-  { id: "calendar", label: "Календарь", icon: "calendar" },
   { id: "meetings", label: "Встречи и опросы", icon: "clock" },
   { id: "standards", label: "Стандарты", icon: "checklist" },
   { id: "links", label: "Ссылки", icon: "globe" },

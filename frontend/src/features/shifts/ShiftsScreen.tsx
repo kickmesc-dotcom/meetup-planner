@@ -238,7 +238,7 @@ export default function ShiftsScreen() {
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
-              <Icon name="calendar" size={16} />{tx("Табель смен")}</div>
+              <Icon name="calendar" size={16} />{tx("График смен")}</div>
             <div className="text-xs text-tg-hint">
               {rangeLabel(days)} · {canEdit ? tx("можно править") : tx("твой отдел")}
             </div>

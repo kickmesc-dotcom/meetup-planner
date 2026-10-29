@@ -7,7 +7,7 @@ import {
   updateUiPrefs,
   type UiPrefs,
 } from "./api/availability";
-import CalendarView from "./features/calendar/CalendarView";
+
 import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
 // SemiTaskBot: рабочие экраны сотрудника.
 import MyTasksScreen from "./features/hr/MyTasksScreen";
@@ -377,19 +377,21 @@ export default function App() {
 
   let content: React.ReactNode = null;
   if (tab === "calendar") {
+    // Вкладка «Календарь» — наследство планировщика встреч: сетка свободного
+    // времени по участникам. В рабочем приложении она показывала имена людей,
+    // которых в смене уже нет, а вместо графика — пустые полосы. Теперь это
+    // расписание смен (план, 13.1): та же неделя, но с реальной работой.
+    // Отдельного пункта в меню у старой сетки больше нет.
     content = (
       <>
-        {/* GHG8 P4: приветствие над календарём. Сводки званий больше нет —
-            остались имя и закрытие (P4.1.c), сама пометка — та же ui-prefs
-            мутация, что и раньше. */}
         {!greetingHidden && (
           <WelcomeBanner
             meName={meData.display_name}
             onHide={() => hideGreeting.mutate()}
           />
         )}
-        <main className="flex-1 overflow-hidden">
-          <CalendarView users={users.data} meId={meData.id} />
+        <main className="flex-1 overflow-hidden flex flex-col">
+          <ShiftsScreen />
         </main>
       </>
     );

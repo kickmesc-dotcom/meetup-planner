@@ -478,6 +478,8 @@ export const UZ_CONTENT: Record<string, string> = {
   "Тест": "Test",
   "Вопрос {number}": "Savol {number}",
   "Удалить вопрос": "Savolni oʻchirish",
+  "График": "Jadval",
+  "График смен": "Smenalar jadvali",
   "Верный вариант": "Toʻgʻri variant",
   "Вариант": "Variant",
   "+ Вопрос": "+ Savol",

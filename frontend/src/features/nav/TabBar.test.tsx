@@ -20,7 +20,7 @@ describe("TabBar", () => {
     const { container } = render(<TabBar isAdmin={false} />);
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(5);
-    for (const label of ["Задачи", "Смена", "Табель", "События", "Профиль"]) {
+    for (const label of ["Задачи", "Смена", "График", "События", "Профиль"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
     // Раньше здесь были эмодзи (✅ 🕒 🗓 …) — теперь один SVG на вкладку.

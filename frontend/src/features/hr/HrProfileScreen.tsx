@@ -233,7 +233,8 @@ export default function HrProfileScreen() {
     { icon: "checklist", label: "Стандарты", onSelect: () => setTab("standards") },
     { icon: "alert", label: "Журнал проблем", onSelect: () => setTab("issues") },
     { icon: "send", label: "Передача смены", onSelect: () => setTab("handovers") },
-    { icon: "calendar", label: "График", onSelect: () => setTab("calendar") },
+    // «График» — расписание смен; старая сетка участников убрана (план, 13.1).
+    { icon: "calendar", label: "График", onSelect: () => setTab("shifts") },
     { icon: "clock", label: "Встречи", onSelect: () => setTab("meetings") },
     { icon: "edit", label: "Обратная связь", onSelect: () => setShowFeedback(true) },
   ];
