@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, SessionDep
 from app.config import get_settings
 from app.db.models import GameProfile, User
+from app.db.org_models import OrganizationMember, current_org_id
 from app.schemas.user import UserOut
 from app.services.admin_config import (
     get_ui_hide_greeting,
@@ -89,9 +90,33 @@ async def me(session: SessionDep, user: CurrentUser) -> UserOut:
 
 
 async def users_out(session: SessionDep) -> list[UserOut]:
-    """Все участники текущей организации — списком, без N+1."""
+    """Все участники ТЕКУЩЕЙ организации — списком, без N+1.
+
+    Почему по членству, а не по таблице `users`. `users` — глобальная: там
+    каждая личность, когда-либо заходившая в любой бот проекта. Пока контур
+    был один, разницы не было. После переезда на SemiTaskBot в списке остались
+    пять аккаунтов прошлой группы (Митян, Сомов, Никита, Русланище и ещё
+    один): сотрудников в организации три, а `/users` отдавал восемь. Они
+    всплывали в списках участников встреч — то есть приложение показывало
+    людей, которых здесь нет.
+
+    Тенантский фильтр (`db/tenancy.py`) тут не помогает: он вешается на модели
+    `OrgScoped`, а `users` намеренно глобальная (одна личность — много
+    организаций). Поэтому границу проводит `organization_members` — там же,
+    где живёт само право доступа.
+
+    Кого это НЕ отрезает: любого, кто реально пользуется приложением. Строка
+    членства создаётся при входе через бот организации (`deps.current_user`)
+    и при первом открытии HR-профиля (`hr_access.ensure_employee`), а
+    приглашённый получает её при принятии ссылки (`invitations`).
+    """
     admin_ids = get_settings().admin_tg_id_set
-    result = await session.scalars(select(User).order_by(User.id))
+    member_ids = select(OrganizationMember.user_id).where(
+        OrganizationMember.org_id == current_org_id.get()
+    )
+    result = await session.scalars(
+        select(User).where(User.id.in_(member_ids)).order_by(User.id)
+    )
     # Одно доп. чтение на весь список (не N+1): кастомные имена из игровых профилей.
     custom_names = {
         int(uid): name

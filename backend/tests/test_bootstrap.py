@@ -157,3 +157,31 @@ async def test_bootstrap_still_marks_the_employee_as_seen(session) -> None:
 
     await session.refresh(employee)
     assert employee.last_seen_at is not None
+
+
+async def test_users_list_is_scoped_to_the_organization(session) -> None:
+    """Аккаунт без членства в организации в списке участников не появляется.
+
+    Найдено на боевом экране 29.10: сотрудников в организации три, а `/users`
+    отдавал восемь — в списках висели пять аккаунтов прошлой группы (Митян,
+    Сомов, Никита, Русланище и ещё один). Причина не в вёрстке: выборка шла по
+    глобальной таблице `users`, а не по членству.
+
+    Тест смотрит именно на список, а не на права: право входить у старого
+    аккаунта никто не отбирает (пароль/Telegram у него свои), его просто не
+    должно быть среди «наших людей».
+    """
+    user, employee = await _person(session)
+    # Личность из прошлого контура: заходила в старый бот, в этой организации
+    # не состоит.
+    session.add(User(id=2, telegram_id=111, display_name="Митян"))
+    await session.commit()
+
+    listed = await routes_users.users_out(session)
+
+    assert [u.id for u in listed] == [user.id]
+
+    # И то же самое через быстрый старт: у него свой список, и он обязан
+    # совпадать — иначе экран «до» и «после» перезагрузки показывал бы разное.
+    boot = await routes_bootstrap.bootstrap(session, user, employee)
+    assert [u.id for u in boot.users or []] == [user.id]
