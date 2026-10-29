@@ -296,20 +296,6 @@ class EmployeeAdminOut(BaseModel):
     is_demo: bool = False
 
 
-class EmployeePatch(BaseModel):
-    role: str | None = None
-    department_id: int | None = None
-    position: str | None = None
-    # Плашка должность/звание: `badge` — текст, `badge_emoji` — значок.
-    # `clear_badge` снимает плашку целиком (пустая строка в `badge` иначе
-    # неотличима от «не трогать»).
-    badge: str | None = Field(None, max_length=64)
-    badge_emoji: str | None = Field(None, max_length=8)
-    clear_badge: bool = False
-    clear_department: bool = False
-    is_active: bool | None = None
-
-
 class TaskAssignmentOut(BaseModel):
     employee_id: int
     display_name: str
@@ -1035,51 +1021,11 @@ async def admin_employees(
     return out
 
 
-@router.patch("/employees/{employee_id}", response_model=EmployeeAdminOut)
-async def patch_employee(
-    employee_id: int, body: EmployeePatch, session: SessionDep, _: AdminDep
-) -> EmployeeAdminOut:
-    employee = await session.get(Employee, employee_id)
-    if employee is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="employee_not_found")
-    user = await session.get(User, employee.user_id)
-    if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="user_not_found")
-
-    if body.role is not None:
-        if body.role not in ROLES:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_role")
-        # `set_role` ставит `role_locked`: иначе env-админу роль вернут
-        # автоматически на следующем запросе (`ensure_employee`).
-        hr_access.set_role(employee, body.role)
-    if body.clear_department:
-        employee.department_id = None
-    elif body.department_id is not None:
-        if await hr_departments.get_department(session, body.department_id) is None:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST, detail="department_not_found"
-            )
-        employee.department_id = body.department_id
-    if body.position is not None:
-        employee.position = body.position or None
-    if body.clear_badge:
-        employee.badge = None
-        employee.badge_emoji = None
-    else:
-        if body.badge is not None:
-            employee.badge = body.badge or None
-        if body.badge_emoji is not None:
-            employee.badge_emoji = body.badge_emoji or None
-    if body.is_active is not None:
-        employee.is_active = body.is_active
-    await session.commit()
-    await session.refresh(employee)
-    department = (
-        await session.get(Department, employee.department_id)
-        if employee.department_id
-        else None
-    )
-    return _employee_admin_out(employee, user, department)
+# Права на правку сотрудника живут ОДНИМ обработчиком — в
+# `routes_hr_ops_admin.patch_employee`. Здесь такого маршрута нет намеренно:
+# два `PATCH` на один путь означали, что работает только первый по порядку
+# подключения, а второй молча недостижим (аудит 27.10, S-21; закрыто 30.10).
+# Подробности — в docstring оставшегося обработчика.
 
 
 @router.get(

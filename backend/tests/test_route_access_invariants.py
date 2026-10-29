@@ -243,3 +243,82 @@ def test_subscription_and_send_use_the_same_rule():
 
     source = inspect.getsource(web_push.send)
     assert "endpoint_is_allowed" in source
+
+
+def _patch_routes(app, path: str) -> list:
+    """Все объявления `PATCH <path>` — в порядке подключения роутеров."""
+    return [
+        route
+        for route in iter_route_objects(app)
+        if route.path == path and "PATCH" in (route.methods or ())
+    ]
+
+
+def test_no_route_is_declared_twice():
+    """Один путь + один метод = один обработчик.
+
+    Зачем это отдельный инвариант (аудит 27.10, S-21; закрыто 30.10). Starlette
+    берёт первый обработчик по порядку подключения, а второй остаётся жить в
+    коде и в схеме OpenAPI: он виден в документации, по нему пишут тесты, но
+    запросы к нему не приходят. Так `PATCH /api/admin/employees/{id}` работал в
+    админском варианте, а фронт ждал ответ и поля от ops-варианта —
+    переименование сотрудника молча не применялось.
+
+    Проверяем весь список маршрутов, а не конкретный путь: следующая такая пара
+    появится не там, где её ждут.
+    """
+    import collections
+
+    app = create_app()
+    seen: dict[tuple[str, str], list[str]] = collections.defaultdict(list)
+    for route in iter_route_objects(app):
+        for method in route.methods or ():
+            seen[(method, route.path)].append(
+                f"{route.endpoint.__module__}.{route.endpoint.__name__}"
+            )
+
+    duplicates = {key: names for key, names in seen.items() if len(names) > 1}
+    assert duplicates == {}
+
+
+def test_employee_patch_is_the_ops_handler_and_admin_only():
+    """Правка сотрудника — один обработчик, карточка в ответе, права админа.
+
+    Три свойства вместе, потому что порознь каждое уже было выполнено, пока
+    баг жил: обработчик существовал, ответ был, права были — только у другого
+    обработчика. Проверяем ровно тот набор, который видит фронт.
+    """
+    app = create_app()
+    routes = _patch_routes(app, "/api/admin/employees/{employee_id}")
+
+    assert len(routes) == 1, "на путь должен остаться ровно один обработчик"
+    route = routes[0]
+    assert route.endpoint.__module__ == "app.api.routes_hr_ops_admin"
+    assert route.response_model is not None
+    assert route.response_model.__name__ == "EmployeeCardOut"
+
+    # Права не расширились при слиянии: путь и раньше фактически был админским.
+    names = set()
+
+    def collect(dependant) -> None:
+        for dep in getattr(dependant, "dependencies", ()) or ():
+            call = getattr(dep, "call", None)
+            if call is not None:
+                names.add(getattr(call, "__name__", ""))
+            collect(dep)
+
+    collect(route.dependant)
+    assert "require_admin" in names
+
+
+def test_employee_patch_accepts_the_name_the_ui_sends():
+    """Поле `display_name` — то самое, которое старый обработчик молча терял.
+
+    Pydantic по умолчанию игнорирует лишние поля, поэтому несовпадение схемы с
+    телом от фронта не даёт ни 422, ни 500 — только «сохранил, а имя прежнее».
+    """
+    from app.api import routes_hr_ops_admin
+
+    body = routes_hr_ops_admin.EmployeePatchIn(display_name="Tasya", role="employee")
+    assert body.display_name == "Tasya"
+    assert body.role == "employee"
