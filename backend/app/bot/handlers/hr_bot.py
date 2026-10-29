@@ -1481,3 +1481,56 @@ async def on_text(message: Message) -> None:
         "как разберёшься, отметь выполнение.",
         parse_mode="HTML",
     )
+
+
+# ==========================================================================
+# 8. Устаревшие кнопки
+# ==========================================================================
+
+# Отдельный роутер, а не `router`: диспетчер подключает его ПОСЛЕДНИМ.
+# Иначе ловушка «любое нажатие» съела бы кнопки других сценариев (`hra:` —
+# алерты руководителя) — они включены в диспетчер позже hr-роутера.
+stale_router = Router(name="stale-buttons")
+
+
+@stale_router.callback_query()
+async def on_stale_callback(callback: CallbackQuery) -> None:
+    """Любая кнопка, для которой в текущем коде нет обработчика.
+
+    Так выглядит **старое сообщение**. Telegram не переписывает уже
+    отправленные сообщения: меню, отправленное прошлой сборкой, хранит
+    `callback_data`, которых в сегодняшнем коде уже нет (переименовали префикс,
+    провели пункт — кнопка осталась). Человек нажимает, Telegram честно
+    присылает апдейт, вебхук отвечает `200`, aiogram пишет
+    `Update ... is not handled` — и в чате тишина, будто бот умер.
+
+    Что делаем: не гадаем, какой смысл был у старой кнопки (его больше нет),
+    а показываем актуальное меню и говорим об этом одной строкой. Это ровно
+    то, что человек сделал бы сам через `/start`, только без догадки, что
+    команду нужно помнить.
+    """
+    if callback.from_user is None:
+        return
+    log.info(
+        "hr.bot_stale_callback",
+        telegram_id=callback.from_user.id,
+        data=(callback.data or "")[:64],
+    )
+    sm = get_sessionmaker()
+    async with sm() as session:
+        ctx = await _load(session, callback.from_user.id)
+        if ctx is None:
+            # Нет сотрудника — меню ему всё равно нечего показать, а тишина
+            # выглядела бы как поломка. Называем единственный рабочий вход.
+            await callback.answer("Меню устарело — отправь /start", show_alert=True)
+            return
+        user, employee = ctx
+        department = await _department_name(session, employee.department_id)
+        fresh = await session.get(User, employee.user_id)
+    await callback.answer()
+    await _answer(
+        callback,
+        "Это сообщение из прошлой версии меню — вот актуальное.\n\n"
+        + menu_text(fresh.display_name if fresh else user.display_name, department, employee),
+        main_menu_kb(employee),
+    )

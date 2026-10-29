@@ -537,4 +537,8 @@ def get_dispatcher() -> Dispatcher:
         _dispatcher.include_router(poll_answer.router)
         _dispatcher.include_router(next_meeting.router)
         _dispatcher.include_router(help_handler.router)
+        # Кнопки из СТАРЫХ сообщений (прежние сборки меню): ловушка обязана
+        # стоять последней, иначе заберёт чужие callback_data. Без неё нажатие
+        # на устаревшее меню не давало ничего — см. `hr_bot.on_stale_callback`.
+        _dispatcher.include_router(hr_bot.stale_router)
     return _dispatcher
