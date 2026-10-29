@@ -28,9 +28,14 @@ export default function OverviewRail() {
     queryFn: () => fetchChecklist(),
     staleTime: 30_000,
   });
+  // `staleTime` здесь не про свежесть, а про старт: рельс монтируется сразу
+  // после `/api/bootstrap`, который кладёт поручения в этот же ключ. Без него
+  // запрос считается протухшим с первого взгляда — и старт снова платит
+  // лишний круг, ради которого всё делалось.
   const tasksQ = useQuery({
     queryKey: ["hr-tasks", false],
     queryFn: () => fetchTasks(false),
+    staleTime: 60_000,
   });
   const issuesQ = useQuery({
     queryKey: ["hr-issues", "panel"],
