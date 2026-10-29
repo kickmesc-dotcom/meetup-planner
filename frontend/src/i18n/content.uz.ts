@@ -402,4 +402,84 @@ export const UZ_CONTENT: Record<string, string> = {
   "Назад": "Orqaga",
   "Обновить": "Yangilash",
   "Снять": "Bekor qilish",
+
+  // -------------------------------------------------------- «Лента» (11.4) --
+  // Экран, куда приложение открывается по умолчанию: события смены и фильтры.
+  "Лента недоступна": "Lenta mavjud emas",
+  "События смены": "Smena voqealari",
+  "{count} новых": "{count} yangi",
+  "Поиск по имени или должности": "Ism yoki lavozim boʻyicha qidiruv",
+  "Поиск сотрудника": "Xodimni izlash",
+  "Фильтр": "Filtr",
+  "Сбросить фильтры": "Filtrlarni tozalash",
+  "Видны только твои действия. Расширенные фильтры доступны руководителю подразделения и управляющему.":
+    "Faqat sizning amallaringiz koʻrinadi. Kengaytirilgan filtrlar boʻlim rahbari va boshqaruvchiga ochiq.",
+  "Пока тихо": "Hozircha jim",
+  "Здесь появятся отметки и поручения.":
+    "Bu yerda belgilar va topshiriqlar paydo boʻladi.",
+  "Предыдущий день": "Oldingi kun",
+  "Следующий день": "Keyingi kun",
+  "Новые события: {count}": "Yangi voqealar: {count}",
+  "Новые · {count}": "Yangi · {count}",
+  "Убрать фильтр {label}": "Filtrni olib tashlash: {label}",
+  "Фильтры ленты": "Lenta filtrlari",
+  "Закрыть фильтры": "Filtrlarni yopish",
+  "Фильтры": "Filtrlar",
+  "Закрыть": "Yopish",
+  "Все подразделения": "Barcha boʻlimlar",
+  "Сотрудник": "Xodim",
+  "Поиск сотрудника в фильтре": "Filtrda xodim izlash",
+  "Все сотрудники": "Barcha xodimlar",
+  "Сбросить": "Tozalash",
+  "Тестовый сотрудник": "Sinov xodimi",
+  "тест": "sinov",
+  "Открыть подразделение {name}": "Boʻlimni ochish: {name}",
+
+  // ---------------------------------------------------- «Стандарты» (11.4) ---
+  // Инструкции с короткими тестами: читают новые сотрудники и сдают сменой.
+  "Стандарты": "Standartlar",
+  "Инструкции и короткие тесты по ним":
+    "Yoʻriqnomalar va ular boʻyicha qisqa testlar",
+  "+ Стандарт": "+ Standart",
+  "Стандартов пока нет": "Hozircha standartlar yoʻq",
+  "Руководитель добавит инструкции — здесь появятся они и тесты к ним.":
+    "Rahbar yoʻriqnomalar qoʻshadi — bu yerda ular va testlar paydo boʻladi.",
+  "Сдано стандартов": "Topshirilgan standartlar",
+  "сдано": "topshirilgan",
+  "не сдано": "topshirilmagan",
+  "Назад к списку": "Roʻyxatga qaytish",
+  "Стандарт": "Standart",
+  "{category} · порог {percent}%": "{category} · chegara {percent}%",
+  "Обязательный: не сдавшие попадают в отчёт смены":
+    "Majburiy: topshirmaganlar smena hisobotiga tushadi",
+  "Сделать обязательным для отчёта смены":
+    "Smena hisoboti uchun majburiy qilish",
+  "Теста к этому стандарту нет — достаточно прочитать инструкцию.":
+    "Bu standartga test yoʻq — yoʻriqnomani oʻqish kifoya.",
+  "Ответ неверный — вернись к инструкции выше.":
+    "Javob xato — yuqoridagi yoʻriqnomaga qayting.",
+  "Сдано": "Topshirildi",
+  "Пока не сдано": "Hozircha topshirilmagan",
+  " Перечитай инструкцию и попробуй снова.":
+    " Yoʻriqnomani qayta oʻqing va yana urinib koʻring.",
+  "Попробовать снова": "Yana urinib koʻrish",
+  "Проверить ответы": "Javoblarni tekshirish",
+  "Новый стандарт": "Yangi standart",
+  "Пиши как для нового сотрудника: что сделать, в каком порядке и почему.":
+    "Yangi xodim uchun yozing: nima qilish, qanday tartibda va nima uchun.",
+  "Название": "Nomi",
+  "Гигиена рук перед сменой": "Smenadan oldin qoʻl gigienasi",
+  "Значок": "Belgi",
+  "Короткое описание (для списка)": "Qisqa taʼrif (roʻyxat uchun)",
+  "Инструкция": "Yoʻriqnoma",
+  "1. Помой руки…": "1. Qoʻllarni yuving…",
+  "Обязательный: не сдавшие попадут в пробелы отчёта смены.":
+    "Majburiy: topshirmaganlar smena hisoboti kamchiliklariga tushadi.",
+  "Тест": "Test",
+  "Вопрос {number}": "Savol {number}",
+  "Удалить вопрос": "Savolni oʻchirish",
+  "Верный вариант": "Toʻgʻri variant",
+  "Вариант": "Variant",
+  "+ Вопрос": "+ Savol",
+  "Сохранить стандарт": "Standartni saqlash",
 };
