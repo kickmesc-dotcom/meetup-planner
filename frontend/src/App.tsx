@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMe,
@@ -27,7 +27,12 @@ import HandoversScreen from "./features/handovers/HandoversScreen";
 import StandardsScreen from "./features/hr/StandardsScreen";
 import AskScreen from "./features/hr/AskScreen";
 import ReviewScreen from "./features/hr/ReviewScreen";
-import ReportsScreen from "./features/hr/ReportsScreen";
+// Отчёт смены и админка — код управления: сотрудник его не открывает никогда.
+// Держать их в общем бандле — значит заставлять его скачивать и разбирать
+// чужую половину приложения перед первым экраном (замеры: 961 кБ одним файлом).
+// `lazy` не «ускоряет всё» — он убирает из первой загрузки то, что не нужно
+// именно сейчас; переход в раздел покажет скелетон той же формы.
+const ReportsScreen = lazy(() => import("./features/hr/ReportsScreen"));
 import LinksScreen from "./features/hr/LinksScreen";
 import MaterialsScreen from "./features/hr/MaterialsScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
@@ -35,7 +40,7 @@ import OnboardingScreen from "./features/hr/OnboardingScreen";
 import OrgSetupScreen from "./features/hr/OrgSetupScreen";
 import { sectionEnabled } from "./features/hr/sections";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
-import AdminScreen from "./features/admin/AdminScreen";
+const AdminScreen = lazy(() => import("./features/admin/AdminScreen"));
 import AuthScreen from "./features/auth/AuthScreen";
 import StartScreen from "./features/auth/StartScreen";
 import InviteScreen from "./features/auth/InviteScreen";
@@ -45,6 +50,7 @@ import DesktopShell from "./features/desktop/DesktopShell";
 import OverviewRail from "./features/desktop/OverviewRail";
 import { useIsDesktop } from "./lib/useIsDesktop";
 import ErrorState from "./components/ErrorState";
+import { Skeleton } from "./components/Skeleton";
 import Icon from "./components/Icon";
 import TabTransition from "./components/TabTransition";
 import ThemeSwitcher from "./components/ThemeSwitcher";
@@ -581,6 +587,23 @@ export default function App() {
     );
   }
 
+  // Отдельный чанк подгружается по переходу — поэтому вокруг экранов стоит
+  // Suspense. На месте будущего экрана — каркас той же формы (DESIGN_SYSTEM §9),
+  // а не надпись «Загрузка…».
+  const screen = (
+    <Suspense
+      fallback={
+        <main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </main>
+      }
+    >
+      {content}
+    </Suspense>
+  );
+
   // ПК/браузер: постоянный сайдбар и широкая область. Раньше здесь была та же
   // колонка 560px, что и на телефоне, — на мониторе половина экрана пустовала.
   if (isDesktop) {
@@ -599,7 +622,7 @@ export default function App() {
           }
         >
           <SimulationBanner />
-          <TabTransition key={tab}>{content}</TabTransition>
+          <TabTransition key={tab}>{screen}</TabTransition>
         </DesktopShell>
       </div>
     );
@@ -613,7 +636,7 @@ export default function App() {
     <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
       <SimulationBanner />
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
-      <TabTransition key={tab}>{content}</TabTransition>
+      <TabTransition key={tab}>{screen}</TabTransition>
       <TabBar
         isAdmin={isAdmin}
         canManage={canManage}
