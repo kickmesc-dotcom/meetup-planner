@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, format, startOfDay } from "date-fns";
+import { addDays, startOfDay } from "date-fns";
 import {
   autoPick,
   createAutoPickPoll,
@@ -12,9 +12,30 @@ import { useUI } from "@/store/ui";
 import { haptic, showAlert } from "@/tg/webapp";
 import { humanizeApiError } from "@/api/client";
 import Icon, { InlineIcon } from "@/components/Icon";
+import { currentIntlLocale, useTx } from "@/i18n";
 import BottomSheet from "./BottomSheet";
 
+/** Начало слота: день недели, число, месяц и время — в порядке выбранной локали. */
+function fmtSlotStart(iso: string): string {
+  return new Date(iso).toLocaleString(currentIntlLocale(), {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Конец слота: только время — дата уже сказана в начале. */
+function fmtSlotEnd(iso: string): string {
+  return new Date(iso).toLocaleString(currentIntlLocale(), {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function AutoPickSheet() {
+  const { tx } = useTx();
   const close = () => useUI.getState().setShowAutoPickSheet(false);
   const [windowDays, setWindowDays] = useState(14);
   const [slots, setSlots] = useState<AutoPickSlot[] | null>(null);
@@ -61,49 +82,51 @@ export default function AutoPickSheet() {
         duration_minutes: 120,
         step_minutes: 60,
         top_n: 3,
-        question: "Когда соберёмся?",
+        // Вопрос уходит в чат, поэтому берём язык того, кто его создаёт.
+        question: tx("Когда соберёмся?"),
         closes_in_hours: 24,
       });
     },
     onSuccess: () => {
-      haptic("success");        setPollMsg("Опрос опубликован в чате — голосуйте.");
+      haptic("success");
+      setPollMsg(tx("Опрос опубликован в чате — голосуйте."));
       qc.invalidateQueries({ queryKey: ["polls"] });
     },
     onError: (e) => {
       haptic("error");
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("not_enough_slots")) {
-        setPollMsg("Слотов меньше двух — расширь окно или подними пилюли.");
+        setPollMsg(tx("Слотов меньше двух — расширь окно или подними пилюли."));
       } else {
-        setPollMsg(`Ошибка: ${humanizeApiError(e)}`);
+        setPollMsg(tx("Ошибка: {error}", { error: humanizeApiError(e) }));
       }
     },
   });
 
   return (
-    <BottomSheet title="Авто-подбор времени" onClose={close}>
+    <BottomSheet title={tx("Авто-подбор времени")} onClose={close}>
       <div className="grid grid-cols-1 gap-2">
         <label className="text-sm">
-          <div className="mb-1 text-xs text-tg-hint">Окно</div>
+          <div className="mb-1 text-xs text-tg-hint">{tx("Окно")}</div>
           <select
             value={windowDays}
             onChange={(e) => setWindowDays(Number(e.target.value))}
             className="w-full rounded-tile bg-tg-secondary-bg px-2 py-2"
           >
-            <option value={7}>Неделя</option>
-            <option value={14}>2 недели</option>
-            <option value={30}>Месяц</option>
+            <option value={7}>{tx("Неделя")}</option>
+            <option value={14}>{tx("2 недели")}</option>
+            <option value={30}>{tx("Месяц")}</option>
           </select>
         </label>
         {presetsQ.data && presetsQ.data.length > 0 && (
           <div className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-xs text-tg-hint">
             <InlineIcon name="clock" />
-            Слоты времени:{" "}
+            {tx("Слоты времени:")}{" "}
             <span className="text-tg-text">
               {presetsQ.data.map((p) => `${p.start}–${p.end}`).join(", ")}
             </span>
             <div className="mt-0.5 text-2xs">
-              Меняются в админке → «Пресеты времени».
+              {tx("Меняются в админке → «Пресеты времени».")}
             </div>
           </div>
         )}
@@ -118,12 +141,12 @@ export default function AutoPickSheet() {
         disabled={mut.isPending}
         className="mt-3 w-full rounded-card bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50"
       >
-        {mut.isPending ? "Считаем…" : "Найти слоты"}
+        {mut.isPending ? tx("Считаем…") : tx("Найти слоты")}
       </button>
 
       {slots && slots.length === 0 && (
         <div className="mt-3 text-center text-tg-hint">
-          Нет подходящих слотов. Скажи всем разметить календарь.
+          {tx("Нет подходящих слотов. Скажи всем разметить календарь.")}
         </div>
       )}
 
@@ -133,8 +156,7 @@ export default function AutoPickSheet() {
             <li key={i} className="rounded-card bg-tg-secondary-bg p-3">
               <div className="flex items-baseline justify-between">
                 <div className="font-medium">
-                  {format(new Date(s.starts_at), "EEE d MMM, HH:mm")} →{" "}
-                  {format(new Date(s.ends_at), "HH:mm")}
+                  {fmtSlotStart(s.starts_at)} → {fmtSlotEnd(s.ends_at)}
                 </div>
                 <div className="text-xs text-tg-hint">
                   <Icon
@@ -173,11 +195,11 @@ export default function AutoPickSheet() {
           className="mt-3 w-full rounded-card bg-status-maybe/20 py-3 font-medium text-tg-text disabled:opacity-50"
         >
           {pollMut.isPending ? (
-            "Публикуем…"
+            tx("Публикуем…")
           ) : (
             <>
               <Icon name="send" size={16} className="mr-1 inline-block align-[-2px]" />
-              Опубликовать опрос топ-3
+              {tx("Опубликовать опрос топ-3")}
             </>
           )}
         </button>
@@ -191,7 +213,7 @@ export default function AutoPickSheet() {
         onClick={close}
         className="mt-4 w-full rounded-card bg-tg-secondary-bg py-3 font-medium"
       >
-        Закрыть
+        {tx("Закрыть")}
       </button>
     </BottomSheet>
   );

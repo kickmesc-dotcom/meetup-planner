@@ -39,8 +39,6 @@ const sources = import.meta.glob("../**/*.{ts,tsx}", {
  */
 const PENDING = new Set<string>([
   "api/access.ts",
-  "features/actions/AutoPickSheet.tsx",
-  "features/actions/PollSheet.tsx",
   "features/admin/ChecklistSettingsScreen.tsx",
   "features/admin/ProxyScreen.tsx",
 ]);
@@ -123,7 +121,7 @@ describe("перевод: покрытие", () => {
     // журнал, «требует внимания», тексты приложения, вид календаря, дни
     // рождения, пресеты опросов, вид ленты, панель действий. Перевод экрана —
     // минус строка отсюда и минус единица в пределе, а не «перевод» на словах.
-    expect(PENDING.size).toBeLessThanOrEqual(5);
+    expect(PENDING.size).toBeLessThanOrEqual(3);
   });
 
   it("английский словарь без пустых значений", () => {

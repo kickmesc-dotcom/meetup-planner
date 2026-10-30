@@ -10,6 +10,7 @@ import { humanizeApiError } from "@/api/client";
 import { Checkbox } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
 import Icon from "@/components/Icon";
+import { currentIntlLocale, useTx } from "@/i18n";
 import BottomSheet from "./BottomSheet";
 
 interface Props {
@@ -22,8 +23,6 @@ interface OptionDraft {
   /** HH:MM, актуально только если includeTime=true */
   time: string;
 }
-
-const DOW_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"] as const;
 
 /**
  * GHG6 PL1: дефолтные 3 варианта — пятница/суббота/воскресенье текущей недели.
@@ -53,19 +52,23 @@ function defaultWeekendOptions(today: Date = new Date()): string[] {
   return [fri, sat, sun].map((d) => format(d, "yyyy-MM-dd"));
 }
 
-function fmtDateRu(d: string): string {
+/**
+ * Подпись выбранной даты. Порядок дня и месяца — по локали, а не склейкой:
+ * в английском он другой, и «Пт · 24.10» там читалось бы как опечатка.
+ */
+function fmtDate(d: string, locale: string): string {
   if (!d) return "";
-  try {
-    const dt = new Date(d + "T00:00:00");
-    const dow = DOW_RU[dt.getDay()];
-    const dm = format(dt, "dd.MM");
-    return `${dow} · ${dm}`;
-  } catch {
-    return d;
-  }
+  const dt = new Date(`${d}T00:00:00`);
+  if (Number.isNaN(dt.getTime())) return d;
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  }).format(dt);
 }
 
 export default function PollSheet(_props: Props) {
+  const { tx } = useTx();
   const close = () => {
     useUI.getState().setShowPollSheet(false);
     // Очищаем пресеты после закрытия, чтобы следующий ручной вызов
@@ -76,7 +79,7 @@ export default function PollSheet(_props: Props) {
   // GHG8 P2.4.c: ДР-поповер кладёт сюда «Собираемся на ДР {имя}?».
   const presetQuestion = useUI((s) => s.pollSheetPresetQuestion);
   const [question, setQuestion] = useState(
-    presetQuestion ?? "Когда собираемся?",
+    presetQuestion ?? tx("Когда собираемся?"),
   );
 
   // Public presets подтягиваем — нужен дефолт-час, если включат «Указать время».
@@ -171,9 +174,9 @@ export default function PollSheet(_props: Props) {
     (!includeTime || options.every((o) => /^\d{2}:\d{2}$/.test(o.time)));
 
   return (
-    <BottomSheet title="Опрос в чат" onClose={close}>
+    <BottomSheet title={tx("Опрос в чат")} onClose={close}>
       <label className="text-sm">
-        <div className="mb-1 text-xs text-tg-hint">Вопрос</div>
+        <div className="mb-1 text-xs text-tg-hint">{tx("Вопрос")}</div>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -186,19 +189,19 @@ export default function PollSheet(_props: Props) {
         <Checkbox
           checked={includeTime}
           onChange={setIncludeTime}
-          label="Указать время"
+          label={tx("Указать время")}
           size="md"
         />
         {!includeTime && (
           <div className="mt-1 pl-1 text-xs text-tg-hint">
-            Без времени — в опросе будет только день недели и число.
+            {tx("Без времени — в опросе будет только день недели и число.")}
           </div>
         )}
       </div>
 
       <div className="mt-3 space-y-2">
         <div className="text-xs text-tg-hint">
-          Варианты дат (2–6) · по умолчанию пт/сб/вс текущей недели
+          {tx("Варианты дат (2–6) · по умолчанию пт/сб/вс текущей недели")}
         </div>
         {options.map((o, i) => (
           <div
@@ -213,15 +216,15 @@ export default function PollSheet(_props: Props) {
                 className="flex-1 rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
               />
               <span className="min-w-[78px] text-right text-xs text-tg-hint tabular-nums">
-                {fmtDateRu(o.date)}
+                {fmtDate(o.date, currentIntlLocale())}
               </span>
               {options.length > 2 && (
                 <button
                   type="button"
                   onClick={() => removeOption(i)}
                   className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-status-busy/15 text-status-busy"
-                  title="Убрать"
-                  aria-label="Убрать вариант"
+                  title={tx("Убрать")}
+                  aria-label={tx("Убрать вариант")}
                 >
                   <Icon name="close" size={14} />
                 </button>
@@ -243,7 +246,7 @@ export default function PollSheet(_props: Props) {
             onClick={addOption}
             className="w-full rounded-tile bg-tg-secondary-bg/60 py-2 text-sm"
           >
-            + ещё вариант
+            {tx("+ ещё вариант")}
           </button>
         )}
       </div>
@@ -267,26 +270,25 @@ export default function PollSheet(_props: Props) {
             size={14}
             className="mr-1 inline-block align-[-2px]"
           />
-          Закрепить опрос в чате
+          {tx("Закрепить опрос в чате")}
           <div className="text-xs text-tg-hint">
-            Сразу после публикации бот пин-нёт сообщение (без шумного
-            уведомления).
+            {tx("Сразу после публикации бот пин-нёт сообщение (без шумного уведомления).")}
           </div>
         </span>
       </label>
 
       <label className="mt-3 block text-sm">
-        <div className="mb-1 text-xs text-tg-hint">Закрыть через</div>
+        <div className="mb-1 text-xs text-tg-hint">{tx("Закрыть через")}</div>
         <select
           value={closesIn}
           onChange={(e) => setClosesIn(Number(e.target.value))}
           className="w-full rounded-tile bg-tg-secondary-bg px-2 py-2"
         >
-          <option value={6}>6 часов</option>
-          <option value={12}>12 часов</option>
-          <option value={24}>24 часа</option>
-          <option value={48}>2 дня</option>
-          <option value={72}>3 дня</option>
+          <option value={6}>{tx("6 часов")}</option>
+          <option value={12}>{tx("12 часов")}</option>
+          <option value={24}>{tx("24 часа")}</option>
+          <option value={48}>{tx("2 дня")}</option>
+          <option value={72}>{tx("3 дня")}</option>
         </select>
       </label>
 
@@ -306,7 +308,7 @@ export default function PollSheet(_props: Props) {
         className="mt-4 w-full rounded-card bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
       >
         {mut.isPending && <Spinner />}
-        {mut.isPending ? "Отправляем…" : "Отправить в чат"}
+        {mut.isPending ? tx("Отправляем…") : tx("Отправить в чат")}
       </button>
 
       <button
@@ -314,7 +316,7 @@ export default function PollSheet(_props: Props) {
         onClick={close}
         className="mt-2 w-full rounded-card bg-tg-secondary-bg py-3 font-medium"
       >
-        Отмена
+        {tx("Отмена")}
       </button>
 
       {/* Chip-presets времени убраны — они теперь применяются только когда

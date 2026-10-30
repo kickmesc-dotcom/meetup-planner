@@ -1661,6 +1661,42 @@ export const EN_CONTENT: Record<string, string> = {
   "Срок взят из фразы": "Deadline taken from your words",
   "сегодня": "today",
 
+  // ------------------- встречи: авто-подбор времени и опрос в чат ------
+  "Авто-подбор времени": "Auto-pick a time",
+  "Окно": "Window",
+  "2 недели": "2 weeks",
+  "Слоты времени:": "Time slots:",
+  "Меняются в админке → «Пресеты времени».": "Changed in the admin panel → “Time presets”.",
+  "Найти слоты": "Find slots",
+  "Нет подходящих слотов. Скажи всем разметить календарь.":
+    "No suitable slots. Ask everyone to mark their calendar.",
+  "Публикуем…": "Publishing…",
+  "Опубликовать опрос топ-3": "Publish a poll with the top 3",
+  "Когда соберёмся?": "When shall we meet?",
+  "Опрос опубликован в чате — голосуйте.": "Poll published in the chat — go vote.",
+  "Слотов меньше двух — расширь окно или подними пилюли.":
+    "Fewer than two slots — widen the window or loosen the time pills.",
+  "Ошибка: {error}": "Error: {error}",
+  "Опрос в чат": "Poll to the chat",
+  "Когда собираемся?": "When are we meeting?",
+  "Вопрос": "Question",
+  "Указать время": "Include a time",
+  "Без времени — в опросе будет только день недели и число.":
+    "Without a time the poll shows only the weekday and the date.",
+  "Варианты дат (2–6) · по умолчанию пт/сб/вс текущей недели":
+    "Date options (2–6) · defaults to Fri/Sat/Sun of this week",
+  "Убрать вариант": "Remove the option",
+  "+ ещё вариант": "+ one more option",
+  "Закрепить опрос в чате": "Pin the poll in the chat",
+  "Сразу после публикации бот пин-нёт сообщение (без шумного уведомления).":
+    "Right after publishing the bot pins the message (no noisy notification).",
+  "Закрыть через": "Close after",
+  "6 часов": "6 hours",
+  "12 часов": "12 hours",
+  "24 часа": "24 hours",
+  "2 дня": "2 days",
+  "Отправить в чат": "Send to the chat",
+
   // Перевод данных на месте (план, 11): кнопка в углу блока с чужими
   // данными — поручением или пунктом чек-листа.
   "Перевести": "Translate",
