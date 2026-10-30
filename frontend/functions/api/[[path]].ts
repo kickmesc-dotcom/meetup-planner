@@ -42,7 +42,17 @@ interface PagesContext<E> {
 
 type PagesHandler<E> = (context: PagesContext<E>) => Promise<Response>;
 
-const FALLBACK_ORIGIN = "https://fryesw-meetup-planner-backend.hf.space";
+/**
+ * Куда уходят запросы по умолчанию.
+ *
+ * Было: HF Space (США). Стало: Amvera (Варшава) — тот же код (отпечаток
+ * `8b5d036f0536` совпадает) и та же база. Причина — замеры, а не вкус:
+ * установка соединения до США стоила ~0,48 с на каждом новом соединении,
+ * до Варшавы — ~0,01 с (см. `docs/RELOCATION.md`, вариант A).
+ *
+ * Откат без правки кода: переменная `API_ORIGIN` в настройках Pages.
+ */
+const FALLBACK_ORIGIN = "https://meetup-planner-youmakemefry.waw0.amvera.tech";
 
 /**
  * Заголовки, которые нельзя пересылать как есть.
