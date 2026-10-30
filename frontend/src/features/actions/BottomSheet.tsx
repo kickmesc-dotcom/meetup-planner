@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { SAFE_AREA_BOTTOM } from "@/tg/safeArea";
 
 interface Props {
   title: string;
@@ -24,7 +25,11 @@ export default function BottomSheet({ title, onClose, children }: Props) {
         data-testid="sheet"
         role="dialog"
         aria-label={title}
+        // Низ шторки — с запасом на home-индикатор: иначе на iPhone в режиме
+        // «на домашнем экране» последняя кнопка оказывается под полосой
+        // системы, и нажать её нельзя (M1, docs/MOBILE_PARALLEL.md).
         className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
+        style={{ paddingBottom: `calc(2rem + ${SAFE_AREA_BOTTOM})` }}
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}

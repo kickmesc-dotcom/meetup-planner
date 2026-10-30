@@ -17,6 +17,15 @@ import { describe, expect, it } from "vitest";
 import manifestRaw from "../public/manifest.webmanifest?raw";
 import swRaw from "../public/sw.js?raw";
 import indexHtml from "../index.html?raw";
+import tabBarSource from "./features/nav/TabBar.tsx?raw";
+import sheetSource from "./features/actions/BottomSheet.tsx?raw";
+import lightboxSource from "./components/MediaLightbox.tsx?raw";
+import appSource from "./App.tsx?raw";
+import {
+  SAFE_AREA_BOTTOM,
+  SAFE_AREA_ROOT,
+  SAFE_AREA_TOP_OFFSET,
+} from "./tg/safeArea";
 
 const manifest = JSON.parse(manifestRaw) as {
   name: string;
@@ -63,6 +72,56 @@ describe("index.html", () => {
     expect(indexHtml).toContain('rel="apple-touch-icon"');
     expect(indexHtml).toContain("apple-mobile-web-app-capable");
     expect(indexHtml).toContain('name="theme-color"');
+  });
+});
+
+/**
+ * M1 плана [`MOBILE_PARALLEL.md`](../docs/MOBILE_PARALLEL.md): установленное
+ * приложение (PWA, а позже нативная обёртка) не должно прятать интерфейс под
+ * системные вырезы и не должно ждать чужой домен ради первого кадра.
+ *
+ * Это ровно те правила, которые легко потерять незаметно: `env()` выглядит
+ * как случайный шум в классе, а `defer` в теге — как мелочь, и оба удаляются
+ * при «чистке» вёрстки без единого падения тестов.
+ *
+ * Проверяем значения и применение, а не CSS-файл: vitest подменяет импорт
+ * стилей пустой строкой, поэтому отступы вынесены в `tg/safeArea.ts`, где
+ * страж их действительно видит.
+ */
+describe("мобильная оболочка (M1)", () => {
+  it("константы безопасных зон заданы для всех четырёх сторон", () => {
+    expect(SAFE_AREA_ROOT.paddingTop).toContain("env(safe-area-inset-top");
+    expect(SAFE_AREA_ROOT.paddingLeft).toContain("env(safe-area-inset-left");
+    expect(SAFE_AREA_ROOT.paddingRight).toContain("env(safe-area-inset-right");
+    expect(SAFE_AREA_BOTTOM).toContain("env(safe-area-inset-bottom");
+    // Фолбэк обязателен: без него старый браузер выкинул бы padding целиком.
+    for (const value of [
+      SAFE_AREA_ROOT.paddingTop,
+      SAFE_AREA_BOTTOM,
+      SAFE_AREA_TOP_OFFSET,
+    ]) {
+      expect(value).toContain("0px");
+    }
+  });
+
+  it("зоны применены на корне, в шторке и в просмотре фото", () => {
+    // Корень приложения: мобильный и широкий контейнеры.
+    expect(appSource).toContain("SAFE_AREA_ROOT");
+    expect(appSource).toContain("style={SAFE_AREA_ROOT}");
+    // Низ — у поверхностей, которые доходят до края экрана.
+    expect(tabBarSource).toContain("env(safe-area-inset-bottom");
+    expect(sheetSource).toContain("SAFE_AREA_BOTTOM");
+    // Верх полноэкранного просмотра фото — иначе кнопка под чёлкой.
+    expect(lightboxSource).toContain("SAFE_AREA_TOP_OFFSET");
+  });
+
+  it("SDK Telegram не блокирует первый кадр", () => {
+    // Вне Telegram этот скрипт не нужен, а в России его доступность не
+    // гарантирована: блокирующий тег означал бы белый экран вместо входа.
+    expect(indexHtml).toMatch(
+      /<script\s+defer\s+src="https:\/\/telegram\.org\/js\/telegram-web-app\.js"/,
+    );
+    expect(/<script\s+src="https:\/\/telegram\.org/.test(indexHtml)).toBe(false);
   });
 });
 

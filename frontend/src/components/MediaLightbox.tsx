@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
+import { SAFE_AREA_TOP_OFFSET } from "@/tg/safeArea";
 import { useTx } from "@/i18n";
 const MIN_SCALE = 1;
 const MAX_SCALE = 5;
@@ -193,7 +194,10 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
           e.stopPropagation();
           onClose();
         }}
-        className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white press"
+        // Верх — с запасом на чёлку: в установленном приложении кнопка иначе
+        // уезжает под системную плашку и по ней не попасть (M1).
+        className="absolute right-3 z-10 grid h-10 w-10 place-items-center rounded-full bg-white/15 text-white press"
+        style={{ top: SAFE_AREA_TOP_OFFSET }}
       >
         <Icon name="close" size={18} />
       </button>
@@ -206,7 +210,8 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
             e.stopPropagation();
             reset();
           }}
-          className="absolute left-3 top-3 z-10 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white press"
+          className="absolute left-3 z-10 rounded-full bg-white/15 px-3 py-1.5 text-xs font-medium text-white press"
+          style={{ top: SAFE_AREA_TOP_OFFSET }}
         >
           {scale.toFixed(1)}× · {tr("сбросить")}
         </button>

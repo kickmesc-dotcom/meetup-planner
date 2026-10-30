@@ -46,6 +46,7 @@ import StartScreen from "./features/auth/StartScreen";
 import InviteScreen from "./features/auth/InviteScreen";
 import { clearInviteTokenFromUrl, inviteTokenFromUrl } from "./features/auth/inviteUrl";
 import TabBar from "./features/nav/TabBar";
+import { SAFE_AREA_ROOT } from "./tg/safeArea";
 import DesktopShell from "./features/desktop/DesktopShell";
 import OverviewRail from "./features/desktop/OverviewRail";
 import { useIsDesktop } from "./lib/useIsDesktop";
@@ -357,7 +358,10 @@ export default function App() {
   // целиком), потом личное знакомство сотрудника.
   if (orgSetup.data?.can_edit && !orgSetup.data.done && hrMe.data) {
     return (
-      <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+      <div
+      className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10"
+      style={SAFE_AREA_ROOT}
+    >
         <SimulationBanner />
         <OrgSetupScreen
           setup={orgSetup.data}
@@ -380,7 +384,10 @@ export default function App() {
   const onboarding = !!hrMe.data && hrMe.data.onboarding_state !== "done";
   if (onboarding) {
     return (
-      <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+      <div
+      className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10"
+      style={SAFE_AREA_ROOT}
+    >
         <SimulationBanner />
         <OnboardingScreen employee={hrMe.data!} />
       </div>
@@ -608,7 +615,10 @@ export default function App() {
   // колонка 560px, что и на телефоне, — на мониторе половина экрана пустовала.
   if (isDesktop) {
     return (
-      <div className="relative flex h-full w-full bg-tg-bg">
+      <div
+        className="relative flex h-full w-full bg-tg-bg"
+        style={SAFE_AREA_ROOT}
+      >
         <DesktopShell
           canManage={canManage}
           isAdmin={isAdmin}
@@ -633,7 +643,10 @@ export default function App() {
     // приложение читается как мини-апп, а не растягивается на всю ширину.
     // GHG11(8) плеер подборки недели (музыкальная механика) убран вместе с
     // остальным шуточным контуром — он уехал в `src/_legacy`, каркас остался.
-    <div className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10">
+    <div
+      className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10"
+      style={SAFE_AREA_ROOT}
+    >
       <SimulationBanner />
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
       <TabTransition key={tab}>{screen}</TabTransition>
