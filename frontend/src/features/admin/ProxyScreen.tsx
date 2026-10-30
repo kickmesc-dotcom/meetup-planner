@@ -34,6 +34,7 @@ import { Toggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
+import { useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
 
 interface Props {
@@ -55,6 +56,7 @@ const MODE_HINTS: Record<ProxyMode, string> = {
 };
 
 export default function ProxyScreen({ onBack }: Props) {
+  const { tx } = useTx();
   const qc = useQueryClient();
 
   const modeQ = useQuery({ queryKey: ["admin", "proxy-mode"], queryFn: fetchProxyMode });
@@ -278,8 +280,8 @@ export default function ProxyScreen({ onBack }: Props) {
 
   return (
     <SubScreen
-      title="Прокси"
-      subtitle="Пул прокси, индикаторы и парсер из @ProxyMTProto"
+      title={tx("Прокси")}
+      subtitle={tx("Пул прокси, индикаторы и парсер из @ProxyMTProto")}
       onBack={onBack}
     >
       {/* === Индикаторы === */}
@@ -300,7 +302,7 @@ export default function ProxyScreen({ onBack }: Props) {
 
       {/* === Режим === */}
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-        <div className="text-base font-semibold">Режим</div>
+        <div className="text-base font-semibold">{tx("Режим")}</div>
         {modeQ.isPending || !modeQ.data ? (
           <ListSkeleton rows={1} />
         ) : (
@@ -321,12 +323,12 @@ export default function ProxyScreen({ onBack }: Props) {
                       : "bg-tg-bg/50 text-tg-text border border-transparent",
                   ].join(" ")}
                 >
-                  {MODE_LABELS[m]}
+                  {tx(MODE_LABELS[m])}
                 </button>
               ))}
             </div>
             <div className="text-xs text-tg-hint pt-1">
-              {MODE_HINTS[modeQ.data.mode]}
+              {tx(MODE_HINTS[modeQ.data.mode])}
             </div>
           </>
         )}
@@ -338,14 +340,14 @@ export default function ProxyScreen({ onBack }: Props) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 text-base font-semibold">
               <Icon name="bell" size={16} className="shrink-0 text-tg-hint" />
-              Уведомлять админа
+              {tx("Уведомлять админа")}
             </div>
             <div className="text-xs text-tg-hint">
-              В личку при падении всех прокси. Не чаще 1 раза в час.
+              {tx("В личку при падении всех прокси. Не чаще 1 раза в час.")}
               {alertsQ.data?.last_alert_at && (
                 <>
                   {" "}
-                  Последний алёрт:{" "}
+                  {tx("Последний алёрт:")}{" "}
                   <span className="text-tg-text">
                     {new Date(alertsQ.data.last_alert_at).toLocaleString()}
                   </span>
@@ -363,10 +365,11 @@ export default function ProxyScreen({ onBack }: Props) {
 
       {/* === Добавление через парсер === */}
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-        <div className="text-base font-semibold">Добавить прокси</div>
+        <div className="text-base font-semibold">{tx("Добавить прокси")}</div>
         <div className="text-xs text-tg-hint">
-          Вставь сюда блок из <b>@ProxyMTProto</b> (можно несколько подряд) или
-          раскрой «Ввести вручную».
+          {tx(
+            "Вставь сюда блок из @ProxyMTProto (можно несколько подряд) или раскрой «Ввести вручную».",
+          )}
         </div>
         <ParserBox
           onParse={async (text) => {
@@ -383,9 +386,7 @@ export default function ProxyScreen({ onBack }: Props) {
           }
         />
         <details className="rounded-tile bg-tg-bg/30 p-2">
-          <summary className="text-xs text-tg-link cursor-pointer select-none">
-            Ввести вручную (IP / port / type / secret)
-          </summary>
+          <summary className="text-xs text-tg-link cursor-pointer select-none">{tx("Ввести вручную (IP / port / type / secret)")}</summary>
           <div className="pt-2">
             <AddProxyForm
               isPending={add.isPending}
@@ -408,11 +409,11 @@ export default function ProxyScreen({ onBack }: Props) {
             bootstrap.mutate();
           }}
           className="w-full min-h-10 rounded-tile bg-tg-button/80 px-3 py-2 text-sm text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
-          title="Скачать публичный список прокси, пингануть и добавить живые"
+          title={tx("Скачать публичный список прокси, пингануть и добавить живые")}
         >
           {bootstrap.isPending && <Spinner />}
           <Icon name="globe" size={16} />
-          Найти живые прокси
+          {tx("Найти живые прокси")}
         </button>
       </section>
 
@@ -436,7 +437,7 @@ export default function ProxyScreen({ onBack }: Props) {
           >
             <ChevronToggle open={poolOpen} className="text-tg-hint" />
             <span>
-              Пул прокси {listQ.data ? `(${listQ.data.length}/50)` : ""}
+              {tx("Пул прокси")}{" "}{listQ.data ? `(${listQ.data.length}/50)` : ""}
             </span>
           </button>
           {poolOpen && (
@@ -449,7 +450,7 @@ export default function ProxyScreen({ onBack }: Props) {
                   pingAllM.mutate();
                 }}
                 className="min-h-11 rounded-tile bg-tg-button/80 px-2 text-xs text-tg-button-text disabled:opacity-50 inline-flex items-center gap-1"
-                title="Пинг всех (медленно)"
+                title={tx("Пинг всех (медленно)")}
               >
                 {pingAllM.isPending && <Spinner />}
                 Ping all
@@ -464,7 +465,7 @@ export default function ProxyScreen({ onBack }: Props) {
                   }
                 }}
                 className="min-h-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
-                title="Удалить мёртвые"
+                title={tx("Удалить мёртвые")}
               >
                 <Icon name="trash" size={14} />
                 dead
@@ -476,7 +477,7 @@ export default function ProxyScreen({ onBack }: Props) {
                   "min-h-11 rounded-tile px-2 text-xs",
                   sortBySpeed ? "bg-tg-link/20 text-tg-link" : "bg-tg-bg/50 text-tg-text",
                 ].join(" ")}
-                title="Сортировать по скорости (свежее last_ok сверху)"
+                title={tx("Сортировать по скорости (свежее last_ok сверху)")}
               >
                 <Icon name="swap" size={14} />
                 speed
@@ -489,9 +490,7 @@ export default function ProxyScreen({ onBack }: Props) {
             {listQ.isPending || !listQ.data ? (
               <ListSkeleton rows={3} />
             ) : sortedList.length === 0 ? (
-              <div className="text-xs text-tg-hint text-center py-3">
-                Пусто. Бот ходит direct.
-              </div>
+              <div className="text-xs text-tg-hint text-center py-3">{tx("Пусто. Бот ходит direct.")}</div>
             ) : (
               <div className="space-y-2">
                 {sortedList.map((p) => (
@@ -528,11 +527,12 @@ export default function ProxyScreen({ onBack }: Props) {
 // --- Indicator components ---
 
 function StatusBadge({ statusQ }: { statusQ: ReturnType<typeof useQuery<any, any, any, any>> }) {
+  const { tx } = useTx();
   if (statusQ.isPending || !statusQ.data) {
     return (
       <div className="flex items-center gap-2 text-sm">
         <span className="inline-block h-3 w-3 rounded-full bg-tg-hint animate-pulse motion-reduce:animate-none" />
-        <span className="text-tg-hint">Проверяем статус бота…</span>
+        <span className="text-tg-hint">{tx("Проверяем статус бота…")}</span>
       </div>
     );
   }
@@ -544,12 +544,12 @@ function StatusBadge({ statusQ }: { statusQ: ReturnType<typeof useQuery<any, any
           ok ? "bg-status-free" : "bg-status-busy"
         }`}
       />
-      <span className="font-medium">{ok ? "Бот активен" : "Бот недоступен"}</span>
+      <span className="font-medium">{ok ? tx("Бот активен") : tx("Бот недоступен")}</span>
       <span className="text-xs text-tg-hint ml-auto">
-        режим: <b className="text-tg-text">{statusQ.data.mode}</b>
+        {tx("режим:")} <b className="text-tg-text">{statusQ.data.mode}</b>
         {statusQ.data.pool_size > 0 && (
           <>
-            {" "}· пул: <b className="text-tg-text">{statusQ.data.alive_count}/{statusQ.data.pool_size}</b>
+            {" "}{tx("· пул:")} <b className="text-tg-text">{statusQ.data.alive_count}/{statusQ.data.pool_size}</b>
           </>
         )}
       </span>
@@ -572,6 +572,7 @@ function SelftestCard({
   isRunning: boolean;
   onRun: () => void;
 }) {
+  const { tx } = useTx();
   const color = !last
     ? "bg-tg-hint"
     : !last.ok
@@ -583,7 +584,7 @@ function SelftestCard({
     <div className="rounded-tile bg-tg-bg/40 p-2 space-y-1">
       <div className="flex items-center gap-2">
         <span className={`inline-block h-2.5 w-2.5 rounded-full ${color}`} />
-        <span className="text-sm font-medium">Отправка сообщений</span>
+        <span className="text-sm font-medium">{tx("Отправка сообщений")}</span>
         <button
           type="button"
           disabled={isRunning}
@@ -595,22 +596,25 @@ function SelftestCard({
         >
           {isRunning && <Spinner />}
           <Icon name="check" size={14} />
-          Проверить
+          {tx("Проверить")}
         </button>
       </div>
       <div className="text-xs text-tg-hint">
         {!last ? (
-          "Проверка ещё не запускалась."
+          tx("Проверка ещё не запускалась.")
         ) : last.ok ? (
           <>
-            <InlineIcon name="check" />через <b className="text-tg-text">{last.mode_used}</b>
+            <InlineIcon name="check" />
+            {tx("через")} <b className="text-tg-text">{last.mode_used}</b>
             {last.proxy_id !== null && <> (proxy #{last.proxy_id})</>}
-            {last.latency_ms !== null && <>, ~{last.latency_ms} мс</>}
+            {last.latency_ms !== null && (
+              <>{tx(", ~{ms} мс", { ms: last.latency_ms })}</>
+            )}
           </>
         ) : (
           <span className="text-status-busy">
             <InlineIcon name="close" />
-            {last.error || "ошибка"}
+            {last.error || tx("ошибка")}
           </span>
         )}
       </div>
@@ -625,17 +629,18 @@ function LastErrorCard({
   error: { at: string; message: string; mode_used: string; proxy_id: number | null };
   onClear: () => void;
 }) {
+  const { tx } = useTx();
   if (!error.message) return null;
   return (
     <div className="rounded-tile bg-status-busy/15 border border-status-busy/40 p-2 space-y-1">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-status-busy">Последняя ошибка</span>
+        <span className="text-sm font-medium text-status-busy">{tx("Последняя ошибка")}</span>
         <button
           type="button"
           onClick={onClear}
           className="ml-auto min-h-7 min-w-7 rounded-tile bg-tg-bg/40 px-1 text-xs text-tg-hint"
-          title="Очистить"
-          aria-label="Очистить ошибку"
+          title={tx("Очистить")}
+          aria-label={tx("Очистить ошибку")}
         >
           <Icon name="close" size={14} />
         </button>
@@ -680,6 +685,7 @@ function ProxyRow({
   pingPending: boolean;
   deletePending: boolean;
 }) {
+  const { tx } = useTx();
   const dead = p.dead_until && new Date(p.dead_until) > new Date();
   const statusDot = !p.enabled
     ? "bg-tg-hint"
@@ -732,8 +738,8 @@ function ProxyRow({
             onDelete();
           }}
           className="min-h-11 min-w-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50"
-          title="Удалить"
-          aria-label="Удалить прокси"
+          title={tx("Удалить")}
+          aria-label={tx("Удалить прокси")}
         >
           <Icon name="trash" size={16} />
         </button>
@@ -764,6 +770,7 @@ function EditRowForm({
     clear_secret?: boolean;
   }) => Promise<void>;
 }) {
+  const { tx } = useTx();
   const [server, setServer] = useState(p.server);
   const [port, setPort] = useState(String(p.port));
   const [type, setType] = useState<ProxyType>(p.type);
@@ -838,14 +845,14 @@ function EditRowForm({
         >
           {saving && <Spinner />}
           <Icon name="save" size={16} />
-          Сохранить
+          {tx("Сохранить")}
         </button>
         <button
           type="button"
           onClick={onCancel}
           className="min-h-10 rounded-tile bg-tg-bg/50 px-3 text-sm text-tg-text"
         >
-          Отмена
+          {tx("Отмена")}
         </button>
       </div>
     </div>
@@ -861,6 +868,7 @@ function ParserBox({
   onParse: (text: string) => Promise<ProxyDraft[]>;
   onAdd: (draft: ProxyDraft) => Promise<unknown>;
 }) {
+  const { tx } = useTx();
   const [text, setText] = useState("");
   const [parsing, setParsing] = useState(false);
   const [drafts, setDrafts] = useState<ProxyDraft[] | null>(null);
@@ -900,7 +908,11 @@ function ParserBox({
     }
     setAdding(false);
     haptic(ok > 0 ? "success" : "error");
-    void showAlert(`Добавлено: ${ok}${fail ? `, пропущено: ${fail}` : ""}`);
+    void showAlert(
+      fail
+        ? tx("Добавлено: {ok}, пропущено: {fail}", { ok, fail })
+        : tx("Добавлено: {ok}", { ok }),
+    );
     setText("");
     setDrafts(null);
     setSelected(new Set());
@@ -924,7 +936,7 @@ function ParserBox({
         >
           {parsing && <Spinner />}
           <Icon name="copy" size={16} />
-          Распарсить
+          {tx("Распарсить")}
         </button>
         {drafts && (
           <button
@@ -936,14 +948,16 @@ function ParserBox({
             }}
             className="min-h-10 rounded-tile bg-tg-bg/50 px-3 text-sm text-tg-text"
           >
-            Сброс
+            {tx("Сброс")}
           </button>
         )}
       </div>
       {drafts && drafts.length > 0 && (
         <div className="space-y-1.5">
           <div className="text-xs text-tg-hint">
-            Найдено: {drafts.length}. Снимите галочки, чтобы пропустить.
+            {tx("Найдено: {count}. Снимите галочки, чтобы пропустить.", {
+              count: drafts.length,
+            })}
           </div>
           {drafts.map((d, i) => (
             // GHG7 P1.1: добавлен .chk-tg для контрастной рамки/заливки
@@ -981,7 +995,7 @@ function ParserBox({
           >
             {adding && <Spinner />}
             <Icon name="plus" size={16} />
-          Добавить выбранные ({selected.size})
+          {tx("Добавить выбранные ({count})", { count: selected.size })}
           </button>
         </div>
       )}
@@ -1003,6 +1017,7 @@ function AddProxyForm({
     secret?: string | null;
   }) => void;
 }) {
+  const { tx } = useTx();
   const [server, setServer] = useState("");
   const [port, setPort] = useState("443");
   const [type, setType] = useState<ProxyType>("mtproto");
@@ -1042,7 +1057,7 @@ function AddProxyForm({
         </select>
         <input
           type="text"
-          placeholder="secret / pass (опц.)"
+          placeholder={tx("secret / pass (опц.)")}
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
           className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
@@ -1071,7 +1086,7 @@ function AddProxyForm({
         ) : (
           <>
             <Icon name="plus" size={16} />
-            Добавить
+            {tx("Добавить")}
           </>
         )}
       </button>
@@ -1088,6 +1103,7 @@ function AddResultBanner({
   result: ProxyAddResult;
   onDismiss: () => void;
 }) {
+  const { tx } = useTx();
   const { proxy, created, ping_result } = result;
   // MTProto не пингуется по HTTP — это «нельзя проверить», не «мёртв».
   const isMtprotoNotChecked =
@@ -1100,15 +1116,33 @@ function AddResultBanner({
       ? "bg-status-busy/15 text-status-busy border-status-busy/40"
       : "bg-tg-link/15 text-tg-link border-tg-link/40";
 
+  // Адрес одинаков во всех исходах, а глагол и хвост — разные. Собираем их
+  // по отдельности: склеивать половину фразы до перевода нельзя, в английском
+  // порядок другой.
+  const endpoint = `${proxy.server}:${proxy.port}`;
+  const verb = created ? tx("добавлен") : tx("обновлён");
   let msg: string;
   if (!ping_result) {
-    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"} (не пинговали — enabled=false)`;
+    msg = tx("{endpoint} {verb} (не пинговали — enabled=false)", { endpoint, verb });
   } else if (ok) {
-    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"}, ping ${ping_result.latency_ms}мс`;
+    msg = tx("{endpoint} {verb}, ping {ms} мс", {
+      endpoint,
+      verb,
+      // Успешный пинг без замер больше не бывает, но тип разрешает null —
+      // подстановка не принимает null, поэтому 0 вместо него.
+      ms: ping_result.latency_ms ?? 0,
+    });
   } else if (isMtprotoNotChecked) {
-    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"}. MTProto не проверяется по HTTP — оценишь по селфтесту/использованию.`;
+    msg = tx("{endpoint} {verb}. MTProto не проверяется по HTTP — оценишь по селфтесту.", {
+      endpoint,
+      verb,
+    });
   } else {
-    msg = `${proxy.server}:${proxy.port} ${created ? "добавлен" : "обновлён"}, но не отвечает: ${ping_result.error ?? "unknown"}`;
+    msg = tx("{endpoint} {verb}, но не отвечает: {error}", {
+      endpoint,
+      verb,
+      error: ping_result.error ?? "unknown",
+    });
   }
   return (
     <div
@@ -1124,8 +1158,8 @@ function AddResultBanner({
         type="button"
         onClick={onDismiss}
         className="text-current opacity-70 hover:opacity-100"
-        title="Скрыть"
-        aria-label="Скрыть"
+        title={tx("Скрыть")}
+        aria-label={tx("Скрыть")}
       >
         <Icon name="close" size={14} />
       </button>
@@ -1150,6 +1184,7 @@ function AddErrorsSection({
   onClear: () => void;
   isClearing: boolean;
 }) {
+  const { tx } = useTx();
   const [open, setOpen] = useState(false);
   // Показываем самые свежие сверху.
   const reversed = [...errors].reverse();
@@ -1164,20 +1199,20 @@ function AddErrorsSection({
           <ChevronToggle open={open} />
           <span className="inline-flex items-center gap-1.5">
             <Icon name="alert" size={16} />
-            Ошибки добавления ({errors.length})
+            {tx("Ошибки добавления ({count})", { count: errors.length })}
           </span>
         </button>
         <button
           type="button"
           disabled={isClearing}
           onClick={() => {
-            if (confirm("Очистить ленту ошибок добавления?")) onClear();
+            if (confirm(tx("Очистить ленту ошибок добавления?"))) onClear();
           }}
           className="min-h-11 rounded-tile bg-status-busy/20 px-2 text-xs text-status-busy disabled:opacity-50 inline-flex items-center gap-1"
         >
           {isClearing && <Spinner />}
           <Icon name="close" size={14} />
-          Очистить
+          {tx("Очистить")}
         </button>
       </div>
       {open && (
@@ -1195,7 +1230,7 @@ function AddErrorsSection({
               >
                 <div className="flex items-center justify-between gap-2 tabular-nums">
                   <span className="font-semibold text-status-busy">
-                    {REASON_LABEL[e.reason] ?? e.reason}
+                    {tx(REASON_LABEL[e.reason] ?? e.reason)}
                   </span>
                   <span className="text-tg-hint">
                     {new Date(e.at).toLocaleString()}

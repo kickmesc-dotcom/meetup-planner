@@ -1661,6 +1661,76 @@ export const EN_CONTENT: Record<string, string> = {
   "Срок взят из фразы": "Deadline taken from your words",
   "сегодня": "today",
 
+  // ------------------------------------- админка: пул прокси и селфтест --
+  "Пул прокси, индикаторы и парсер из @ProxyMTProto":
+    "Proxy pool, health indicators and a parser from @ProxyMTProto",
+  "Режим": "Mode",
+  "Только через прокси": "Proxy only",
+  "Direct (без прокси)": "Direct (no proxy)",
+  "Auto-fallback (direct → прокси при проблеме)":
+    "Auto-fallback (direct → proxy on failure)",
+  "Каждый запрос — через прокси. Если все прокси умерли, бот падает и админ получает алёрт.":
+    "Every request goes through a proxy. If every proxy dies, the bot stops and the admin gets an alert.",
+  "Прокси не используется. Хорошо когда сеть из РФ открыта.":
+    "No proxy is used. Good when the network is reachable directly.",
+  "Сначала direct. При сетевой ошибке — следующий живой прокси из пула. Самотест раз в 10 мин.":
+    "Direct first. On a network error — the next live proxy from the pool. Self-test every 10 minutes.",
+  "Уведомлять админа": "Notify the admin",
+  "В личку при падении всех прокси. Не чаще 1 раза в час.":
+    "A direct message when every proxy is down. At most once an hour.",
+  "Последний алёрт:": "Last alert:",
+  "Добавить прокси": "Add a proxy",
+  "Вставь сюда блок из @ProxyMTProto (можно несколько подряд) или раскрой «Ввести вручную».":
+    "Paste a block from @ProxyMTProto here (several in a row is fine) or open “Enter manually”.",
+  "Ввести вручную (IP / port / type / secret)":
+    "Enter manually (IP / port / type / secret)",
+  "Найти живые прокси": "Find live proxies",
+  "Скачать публичный список прокси, пингануть и добавить живые":
+    "Download the public proxy list, ping it and add the live ones",
+  "Пул прокси": "Proxy pool",
+  "Проверяем статус бота…": "Checking the bot status…",
+  "Бот активен": "Bot is active",
+  "Бот недоступен": "Bot is unreachable",
+  "режим:": "mode:",
+  "· пул:": "· pool:",
+  "Пинг всех (медленно)": "Ping all (slow)",
+  "Удалить мёртвые": "Remove the dead ones",
+  "Сортировать по скорости (свежее last_ok сверху)":
+    "Sort by speed (freshest last_ok first)",
+  "Пусто. Бот ходит direct.": "Empty. The bot goes direct.",
+  "Отправка сообщений": "Message delivery",
+  "через": "via",
+  ", ~{ms} мс": ", ~{ms} ms",
+  "Проверка ещё не запускалась.": "The check hasn't run yet.",
+  "ошибка": "error",
+  "Последняя ошибка": "Last error",
+  "Очистить ошибку": "Clear the error",
+  "Очистить": "Clear",
+  "Удалить прокси": "Delete the proxy",
+  "secret / pass (опц.)": "secret / pass (optional)",
+  "Распарсить": "Parse",
+  "Сброс": "Reset",
+  "Добавить выбранные ({count})": "Add selected ({count})",
+  "Найдено: {count}. Снимите галочки, чтобы пропустить.":
+    "Found: {count}. Uncheck the ones to skip.",
+  "Добавлено: {ok}": "Added: {ok}",
+  "Добавлено: {ok}, пропущено: {fail}": "Added: {ok}, skipped: {fail}",
+  "Пул переполнен": "The pool is full",
+  "Ошибка БД": "Database error",
+  "Не прошёл валидацию": "Failed validation",
+  "добавлен": "added",
+  "обновлён": "updated",
+  "{endpoint} {verb} (не пинговали — enabled=false)":
+    "{endpoint} {verb} (not pinged — enabled=false)",
+  "{endpoint} {verb}, ping {ms} мс": "{endpoint} {verb}, ping {ms} ms",
+  "{endpoint} {verb}. MTProto не проверяется по HTTP — оценишь по селфтесту.":
+    "{endpoint} {verb}. MTProto can't be checked over HTTP — the self-test will tell.",
+  "{endpoint} {verb}, но не отвечает: {error}":
+    "{endpoint} {verb}, but it does not respond: {error}",
+  "Скрыть": "Hide",
+  "Ошибки добавления ({count})": "Add errors ({count})",
+  "Очистить ленту ошибок добавления?": "Clear the add-errors log?",
+
   // ------------------- встречи: авто-подбор времени и опрос в чат ------
   "Авто-подбор времени": "Auto-pick a time",
   "Окно": "Window",
