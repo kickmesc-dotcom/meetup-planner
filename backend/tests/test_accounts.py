@@ -226,6 +226,43 @@ async def test_expired_session_does_not_resolve(session) -> None:
     assert await accounts.resolve_session(session, token) is None
 
 
+async def test_active_session_is_extended(session) -> None:
+    """M2 `MOBILE_PARALLEL.md`: активный вход не должен истекать по календарю.
+
+    Без продления человек, который открывает приложение каждый день, на
+    31-й день видел бы «введите пароль» — в установленном приложении это
+    читается как поломка, а не как мера безопасности.
+    """
+    user = await accounts.register(session, email=EMAIL, password=PASSWORD)
+    # Сессия, у которой осталось мало времени: половина срока уже прожита.
+    row, token = await accounts.create_session(
+        session, user, ttl=timedelta(days=1)
+    )
+    before = row.expires_at
+
+    assert await accounts.resolve_session(session, token) is not None
+    await session.refresh(row)
+
+    assert row.expires_at > before
+    # SQLite отдаёт время без часового пояса — приводим сами, тест не про это.
+    deadline = row.expires_at
+    if deadline.tzinfo is None:
+        deadline = deadline.replace(tzinfo=UTC)
+    assert deadline - datetime.now(UTC) > timedelta(days=29)
+
+
+async def test_fresh_session_is_not_extended(session) -> None:
+    """Продление — не запись в базу на каждый запрос: свежий вход не трогаем."""
+    user = await accounts.register(session, email=EMAIL, password=PASSWORD)
+    row, token = await accounts.create_session(session, user)
+    before = row.expires_at
+
+    assert await accounts.resolve_session(session, token) is not None
+    await session.refresh(row)
+
+    assert row.expires_at == before
+
+
 async def test_session_records_the_membership_org(session) -> None:
     first, second = await _orgs(session)
     user = await accounts.register(session, email=EMAIL, password=PASSWORD)

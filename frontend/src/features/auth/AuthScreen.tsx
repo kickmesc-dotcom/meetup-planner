@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -14,6 +14,11 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useErrorMessage, useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
+import {
+  isStandalone,
+  markStandaloneHintSeen,
+  shouldShowStandaloneHint,
+} from "@/tg/standalone";
 import { haptic } from "@/tg/webapp";
 
 /**
@@ -56,8 +61,18 @@ export default function AuthScreen({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  // M2: в установленном приложении человек не понимает, почему перед ним
+  // форма, а не бот. Подсказка — один раз и закрываемая, не блокирует вход.
+  const [standalone] = useState(() => isStandalone());
+  const [appHint, setAppHint] = useState(() => shouldShowStandaloneHint());
   const { t } = useT();
   const errorText = useErrorMessage();
+
+  useEffect(() => {
+    // Помечаем при показе: иначе человек, который сразу вошёл, видел бы
+    // подсказку при каждом запуске до первого «Понятно».
+    if (shouldShowStandaloneHint()) markStandaloneHintSeen();
+  }, []);
 
   const accept = (session: AuthSession) => {
     // Ссылка доступа из бота больше не нужна: сессия главнее и её можно отозвать.
@@ -133,6 +148,24 @@ export default function AuthScreen({
             <ThemeSwitcher />
           </div>
         </div>
+
+        {appHint && (
+          <div className="mb-3 flex items-start gap-2 rounded-card bg-tg-link/10 p-3">
+            <p className="min-w-0 flex-1 text-xs text-tg-text">
+              {t("auth.appNote")}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                haptic("light");
+                setAppHint(false);
+              }}
+              className="min-h-9 shrink-0 rounded-tile px-2 text-xs font-medium text-tg-link"
+            >
+              {t("auth.appNote.dismiss")}
+            </button>
+          </div>
+        )}
 
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
           <h1 className="text-lg font-semibold text-tg-text">{t(TITLES[mode])}</h1>
@@ -241,9 +274,13 @@ export default function AuthScreen({
           )}
         </div>
 
-        <p className="mt-3 px-1 text-xs text-tg-hint">
-          {t("auth.telegramNote")}
-        </p>
+        {/* В установленном приложении про Telegram молчим: там его нет, и
+            фраза читалась бы как ошибка выбора. */}
+        {!standalone && (
+          <p className="mt-3 px-1 text-xs text-tg-hint">
+            {t("auth.telegramNote")}
+          </p>
+        )}
       </div>
     </div>
   );

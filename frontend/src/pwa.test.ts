@@ -35,6 +35,7 @@ const manifest = JSON.parse(manifestRaw) as {
   display: string;
   theme_color: string;
   background_color: string;
+  launch_handler?: { client_mode?: string };
   icons: { src: string; sizes: string; purpose?: string }[];
 };
 
@@ -50,6 +51,19 @@ describe("manifest", () => {
   it("цвета совпадают с темой приложения", () => {
     expect(manifest.theme_color).toBe("#1c6fb8");
     expect(manifest.background_color).toBe("#ffffff");
+  });
+
+  it("ссылки из письма открываются в том же окне приложения", () => {
+    // M2: адрес внутри `scope` Android открывает внутри установленного
+    // приложения, а не в новой вкладке браузера. Ссылки входа и приглашений
+    // поэтому обязаны оставаться в корне — вынести их на поддомен значит
+    // выкинуть человека из приложения в браузер.
+    for (const path of ["/invite", "/reset", "/verify"]) {
+      expect(path.startsWith(manifest.scope)).toBe(true);
+    }
+    // Без этого поля запуск по ссылке мог открыть вторую копию приложения:
+    // два окна с разными сессиями выглядят как разные аккаунты.
+    expect(manifest.launch_handler?.client_mode).toBe("navigate-existing");
   });
 
   it("есть иконки 192, 512 и maskable", () => {

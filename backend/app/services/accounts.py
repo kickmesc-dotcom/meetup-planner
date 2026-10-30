@@ -231,10 +231,23 @@ async def resolve_session(
     if user is None:
         return None
 
+    # Продление срока (M2 `docs/MOBILE_PARALLEL.md`). Без него сессия умирает
+    # ровно через `auth_session_days` от входа, сколько бы человек ни
+    # пользовался приложением: тот, кто открывает его каждое утро, получает
+    # «введите пароль» на 31-й день — в установленном приложении это выглядит
+    # как поломка. Продлеваем, когда израсходована половина срока: раз в
+    # пятнадцать дней, а не записью в базу на каждый запрос.
+    lifetime = timedelta(days=get_settings().auth_session_days)
+    extended = _aware(row.expires_at) - now < lifetime / 2
+    if extended:
+        row.expires_at = now + lifetime
+
     # Отмечаем активность не чаще раза в LAST_SEEN_STEP: иначе каждый запрос
     # мини-аппа писал бы в базу.
-    if now - _aware(row.last_seen_at) > LAST_SEEN_STEP:
+    touched = now - _aware(row.last_seen_at) > LAST_SEEN_STEP
+    if touched:
         row.last_seen_at = now
+    if extended or touched:
         await session.commit()
     return user, row.org_id
 
