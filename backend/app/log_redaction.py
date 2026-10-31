@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from typing import Any
 
 import structlog
@@ -97,6 +98,29 @@ def redact_event(_logger: Any, _method: str, event_dict: dict[str, Any]) -> dict
     for key in list(event_dict):
         event_dict[key] = scrub_value(event_dict[key])
     return event_dict
+
+
+def configure_logging() -> None:
+    """Единая настройка `structlog` для всех процессов контейнера.
+
+    Зачем отдельная функция, а не `structlog.configure(processors=…)` на месте.
+    Поток логов у нас **stderr**, а не stdout. Причина найдена 31.10.2026, когда
+    выяснилось, что в панели Amvera за четыре часа нет ни одной записи structlog,
+    хотя `apscheduler` и `uvicorn` пишут нормально: те идут через стандартный
+    `logging`, чей дефолтный обработчик смотрит в stderr, а `PrintLogger`
+    structlog по умолчанию смотрит в stdout — и его панель не собирает. Из-за
+    этого `scheduler.job_fired`, `scheduler.job_failed` и прочая диагностика
+    существовали только на бумаге: их не было видно там, где их ищут.
+
+    `flush=True` внутри `PrintLogger.msg` означает, что дело не в буферизации —
+    меняем именно приёмник. Второй заход по stdout (например, в CI) не нужен:
+    stderr неотличимо виден в обоих случаях, потому что это тот же поток вывода
+    контейнера.
+    """
+    structlog.configure(
+        processors=log_processors(),
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+    )
 
 
 def log_processors() -> list[Any]:

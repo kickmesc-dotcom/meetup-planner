@@ -28,7 +28,15 @@ os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./.test_pack4.db")
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.log_redaction import REDACTED, log_processors, redact_event, scrub  # noqa: E402
+import structlog  # noqa: E402
+
+from app.log_redaction import (  # noqa: E402
+    REDACTED,
+    configure_logging,
+    log_processors,
+    redact_event,
+    scrub,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -184,10 +192,33 @@ def test_application_uses_the_redacting_chain():
     )
 
 
+def test_structlog_writes_to_stderr_not_stdout():
+    """structlog обязан идти в stderr.
+
+    Регрессия 31.10.2026: события structlog (`scheduler.job_fired` и остальные)
+    месяцами не попадали в логи хостинга — панель Amvera собирает stderr, а
+    `PrintLogger` по умолчанию пишет в stdout. Диагностика существовала, но её
+    нельзя было увидеть, поэтому здесь закреплён сам приёмник, а не только
+    состав процессоров.
+    """
+    import sys
+
+    configure_logging()
+    factory = structlog.get_config()["logger_factory"]
+    assert factory._file is sys.stderr, (
+        "structlog должен писать в stderr: stdout панель хостинга не собирает"
+    )
+
+
 def test_migrations_process_uses_the_same_chain():
-    """`app.db.migrate` стартует отдельным процессом — цепочка у него та же."""
+    """`app.db.migrate` стартует отдельным процессом — цепочка у него та же.
+
+    Проверяем именно `configure_logging()`, а не список процессоров: с
+    31.10.2026 общая настройка включает ещё и приёмник (stderr), и миграции
+    обязаны получать его тем же вызовом, что и приложение.
+    """
     source = (ROOT / "app" / "db" / "migrate.py").read_text(encoding="utf-8")
-    assert "log_processors" in source
+    assert "configure_logging" in source
     # Важно и то, ЧЕМ импортируется: из `app.main` это тянуло бы всё приложение
     # в процесс миграций и поднимало его память (см. S-19).
     assert "from app.main import" not in source

@@ -155,9 +155,9 @@ def main(argv: list[str] | None = None) -> int:
     # Та же цепочка процессоров, что у приложения: текст ошибки подключения несёт
     # в себе DSN с паролем, и он не должен уехать в лог хостинга текстом
     # (аудит 26.10.2026, S-17).
-    from app.log_redaction import log_processors
+    from app.log_redaction import configure_logging
 
-    structlog.configure(processors=log_processors())
+    configure_logging()
     host = url.split("@")[-1].split("/")[0]
     log.info("db.migrate_start", host=host)
     if "asyncpg" not in url:
