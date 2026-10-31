@@ -26,6 +26,7 @@ from app.services.admin_config import (
     get_scheduled_settings,
 )
 from app.services.birthdays import run_birthdays_job
+from app.services import quiet_hours
 from app.services.reminders import run_due_reminders
 
 log = structlog.get_logger()
@@ -754,8 +755,18 @@ async def reload_dynamic_jobs(bot: Bot) -> None:
 
     # --- Reminders ---
     if sched_cfg["reminders"]["enabled"]:
+        async def _reminders_tick(*, bot: Bot) -> None:
+            # Ночью — не чаще раза в час: квота Neon считается часами compute,
+            # а не «часами работы сервиса» (см. app/services/quiet_hours.py).
+            if not quiet_hours.should_run(
+                JOB_REMINDERS_TICK, tz=settings.scheduler_tz
+            ):
+                log.info("scheduler.job_throttled_quiet", job_id=JOB_REMINDERS_TICK)
+                return
+            await run_due_reminders(bot=bot)
+
         sched.add_job(
-            _logged_job(JOB_REMINDERS_TICK, run_due_reminders),
+            _logged_job(JOB_REMINDERS_TICK, _reminders_tick),
             IntervalTrigger(minutes=tick_minutes),
             kwargs={"bot": bot},
             id=JOB_REMINDERS_TICK,
@@ -1002,6 +1013,17 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         log.info("scheduler.start_skipped_not_leader")
         return sched
 
+    # Окно тихих часов — в лог при старте: без этого невозможно отличить
+    # «прореживание работает» от «job вообще не зарегистрирован».
+    q_start, q_end, q_tick = quiet_hours.quiet_window()
+    log.info(
+        "scheduler.quiet_hours",
+        start=q_start,
+        end=q_end,
+        tick_minutes=q_tick,
+        enabled=q_start != q_end,
+    )
+
     # GHG6 AD6: avatars/birthdays регистрирует `reload_dynamic_jobs` —
     # респектят master-toggles из admin_config.
     # `reload_dynamic_jobs` — респектят master-toggles из admin_config.
@@ -1048,6 +1070,10 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     async def _hr_tasks_tick(*, bot: Bot) -> None:
         from app.services.hr_reminders import run_hr_tick
 
+        # Тот же тихий час, что и у напоминаний: ночью сроки не «горят».
+        if not quiet_hours.should_run(JOB_HR_TASKS, tz=settings.scheduler_tz):
+            log.info("scheduler.job_throttled_quiet", job_id=JOB_HR_TASKS)
+            return
         await run_hr_tick(bot=bot)
 
     sched.add_job(
