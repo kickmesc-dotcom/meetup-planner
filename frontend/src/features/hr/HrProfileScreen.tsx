@@ -238,16 +238,25 @@ export default function HrProfileScreen() {
     { icon: "clock", label: "Встречи", onSelect: () => setTab("meetings") },
     { icon: "edit", label: "Обратная связь", onSelect: () => setShowFeedback(true) },
   ];
+  // 31.10.2026: управленческие разделы больше не подмешиваются в список
+  // сотрудника. Раньше «Приёмка» и «Отчёт смены» вставлялись в середину
+  // `sections` через `splice(4/5)`, и руководитель видел их между «Стандартами»
+  // и «Ссылками» — то есть одна и та же зона выглядела по-разному у разных
+  // людей, а граница «моя работа / работа руководителя» не читалась вообще.
+  // Теперь это отдельный блок ниже (см. «Руководителю»).
+  const managerSections: RowItem[] = [];
   if (me.is_aup || me.is_staff) {
-    sections.splice(4, 0, {
-      icon: "check",
-      label: "Приёмка",
-      onSelect: () => setTab("review"),
-    });
-    sections.splice(5, 0, {
-      icon: "layout",
-      label: "Отчёт смены",
-      onSelect: () => setTab("reports"),
+    managerSections.push(
+      { icon: "team", label: "Команда", onSelect: () => setTab("team") },
+      { icon: "check", label: "Приёмка", onSelect: () => setTab("review") },
+      { icon: "layout", label: "Отчёт смены", onSelect: () => setTab("reports") },
+    );
+  }
+  if (me.is_admin) {
+    managerSections.push({
+      icon: "admin",
+      label: "Управление предприятием",
+      onSelect: () => setTab("admin"),
     });
   }
 
@@ -604,6 +613,24 @@ export default function HrProfileScreen() {
         )}
       </section>
 
+      {/* Блок руководителя. Продуктовая граница, а не косметика: у сотрудника
+          этого блока нет вообще, у руководителя он отделён от его собственных
+          разделов и свёрнут — управление нужно набегами, а не каждый день. */}
+      {managerSections.length > 0 && (
+        <section className="rounded-card bg-tg-bg/40 ring-1 ring-tg-hint/15">
+          <div className="flex items-center gap-2 px-3 pt-2.5">
+            <span className="text-2xs font-semibold uppercase tracking-wide text-tg-hint">
+              {tx("Руководителю")}
+            </span>
+          </div>
+          <div className="p-2">
+            {managerSections.map((item) => (
+              <Row key={item.label} {...item} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Веб-версия: широкая ссылка для компьютера. Живёт рядом с разделами —
           это личный доступ, а не админская настройка. */}
       <WebVersionCard />
@@ -641,25 +668,6 @@ export default function HrProfileScreen() {
 
           {showAdmin && (
             <div id="profile-admin" className="space-y-4 border-t border-tg-hint/10 p-3">
-              {/* Кабинет предприятия — единственный вход в него после
-                  31.10.2026: в нижней полосе вкладки «Админ» больше нет, а
-                  иначе на телефоне это была седьмая подпись, которую видел
-                  и сотрудник. Видна только тем, кому сервер разрешил (`me.is_admin`). */}
-              {me.is_admin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    haptic("light");
-                    setTab("admin");
-                  }}
-                  className="flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-bg/60 px-3 text-left text-sm font-medium text-tg-text"
-                >
-                  <Icon name="admin" size={17} className="text-tg-link" />
-                  <span className="min-w-0 flex-1">{tx("Управление предприятием")}</span>
-                  <Icon name="chevron" size={15} className="text-tg-hint" />
-                </button>
-              )}
-
               <div>
                 <h3 className="text-xs font-medium text-tg-text">{tx("Примерить роль")}</h3>
                 <p className="mt-1 text-xs text-tg-hint">{tx(

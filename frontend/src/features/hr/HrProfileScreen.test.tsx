@@ -196,4 +196,25 @@ describe("HrProfileScreen (P1.7)", () => {
     expect(screen.queryByText("Для администратора")).toBeNull();
     expect(screen.queryByText("Управление предприятием")).toBeNull();
   });
+  it("держит блок руководителя отдельно от разделов сотрудника", async () => {
+    // 31.10.2026: «Приёмка» и «Отчёт смены» раньше вставлялись в середину
+    // списка сотрудника (`splice(4/5)`), поэтому граница между «моя работа»
+    // и «работа руководителя» не читалась. Теперь это отдельный блок.
+    employeeMock.mockResolvedValue(
+      me({ role: "aup", is_aup: true, is_staff: false, is_admin: false }),
+    );
+    renderScreen();
+    await screen.findByText("Пётр");
+
+    expect(screen.getByText("Руководителю")).toBeTruthy();
+
+    // До раскрытия «Все разделы» управленческих пунктов в списке нет:
+    // они живут только в своём блоке.
+    fireEvent.click(screen.getByRole("button", { name: /Все разделы/ }));
+    const sections = document.getElementById("profile-sections");
+    expect(sections?.textContent ?? "").not.toContain("Приёмка");
+    expect(sections?.textContent ?? "").not.toContain("Отчёт смены");
+    // Кабинет — только у админа, у руководителя его нет.
+    expect(screen.queryByText("Управление предприятием")).toBeNull();
+  });
 });

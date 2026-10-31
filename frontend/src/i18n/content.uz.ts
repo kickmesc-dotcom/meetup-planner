@@ -429,6 +429,7 @@ export const UZ_CONTENT: Record<string, string> = {
   "Благодарности": "Tashakkurnomalar",
   "Закрыть благодарности": "Tashakkurnomalarni yopish",
   "Управление предприятием": "Korxonani boshqarish",
+  "Руководителю": "Rahbarga",
   "Закрыть": "Yopish",
   "Все подразделения": "Barcha boʻlimlar",
   "Сотрудник": "Xodim",

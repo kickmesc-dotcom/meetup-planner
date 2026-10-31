@@ -90,6 +90,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Благодарности": "Kudos",
   "Закрыть благодарности": "Close kudos",
   "Управление предприятием": "Company management",
+  "Руководителю": "For managers",
   "Закрыть": "Close",
   "Подразделение": "Department",
   "Все подразделения": "All departments",
