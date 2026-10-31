@@ -39,14 +39,19 @@ export interface KudosPerson {
   badge: string | null;
 }
 
-export const fetchKudosWeek = () => api<KudosWeek>("/api/hr/kudos/week");
+// Пути — `/api/kudos/*`, а не `/api/hr/kudos/*`. На сервере роутер `routes_hr`
+// подключён с префиксом `/api`, а внутри него ручка объявлена как `/kudos/week`.
+// Пока здесь стоял `/api/hr/...`, все три запроса возвращали 404, и на телефоне
+// это выглядело как «Благодарности сейчас не загрузились» — ровно то сообщение,
+// которое пришло со скриншотом с пилота (31.10.2026).
+export const fetchKudosWeek = () => api<KudosWeek>("/api/kudos/week");
 
 /** Кому можно сказать спасибо. Список считает сервер по тем же правилам. */
 export const fetchKudosPeople = () =>
-  api<KudosPerson[]>("/api/hr/kudos/people");
+  api<KudosPerson[]>("/api/kudos/people");
 
 export const giveKudos = (toEmployeeId: number, message?: string) =>
-  api<KudosWeek>("/api/hr/kudos", {
+  api<KudosWeek>("/api/kudos", {
     method: "POST",
     body: JSON.stringify({
       to_employee_id: toEmployeeId,
