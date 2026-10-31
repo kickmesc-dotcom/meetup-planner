@@ -595,7 +595,39 @@ async def meta(request: Request) -> dict[str, Any]:
             ),
         },
         "features": available_features(fastapi_app),
+        # Планировщик — публично видимая часть состояния: напоминания, эскалации
+        # и сводка в боте живут именно в нём. 31.10.2026 его молчание
+        # обнаружилось только через логи хостинга, а их приходится гадать по
+        # буферу. Здесь это один дешёвый ответ (без процентов и секретов):
+        # запущен ли, кто лидер и какое окно тихих часов применилось.
+        "scheduler": _scheduler_state(),
     }
+
+
+def _scheduler_state() -> dict[str, Any]:
+    """Состояние планировщика без доступа к БД и без секретов.
+
+    `running` — идут ли job'ы сейчас; `leader` — держит ли этот инстанс лиз
+    (при нескольких контейнерах работает только лидер); `quiet_hours` —
+    окно прореживания, чтобы было видно, что оно вообще применилось.
+    """
+    try:
+        from app.bot.scheduler import get_scheduler, is_leader
+        from app.services import quiet_hours
+
+        start, end, tick = quiet_hours.quiet_window()
+        return {
+            "running": bool(get_scheduler().running),
+            "leader": is_leader(),
+            "quiet_hours": {
+                "start": start,
+                "end": end,
+                "tick_minutes": tick,
+                "enabled": start != end,
+            },
+        }
+    except Exception as exc:  # noqa: BLE001 — диагностика не должна ронять /meta
+        return {"error": type(exc).__name__}
 
 
 def _cors_diagnostics() -> dict[str, Any]:
