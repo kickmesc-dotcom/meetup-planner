@@ -186,8 +186,13 @@ def test_application_uses_the_redacting_chain():
         getattr(item, "__name__", type(item).__name__) for item in processors
     ]
     assert "redact_event" in names
-    json_at = names.index("JSONRenderer")
-    assert names.index("redact_event") < json_at, (
+    # Рендерер — последний в цепочке, каким бы он ни был: полоскание обязано
+    # идти до него (иначе оно полоскает не то). Именно так, а не по имени
+    # `JSONRenderer`: 31.10.2026 рендерер сменился на консольный, потому что
+    # панель хостинга не показывает JSON-строки вообще.
+    renderer_at = names.index("ConsoleRenderer")
+    assert renderer_at == len(names) - 1, "рендерер должен быть последним"
+    assert names.index("redact_event") < renderer_at, (
         "полоскание должно идти до рендерера, иначе оно полоскает не то"
     )
 
