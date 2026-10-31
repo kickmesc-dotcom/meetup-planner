@@ -294,11 +294,23 @@ section in `LeaderboardScreen`. Nowhere else.
 
 ### 8.1.a Icons
 
-UI chrome uses `Icon` (SVG), never an emoji: navigation, headers, admin cards,
-empty states and controls. Emoji stay only in content — statuses (⏰ 📷), feed
-texts and game phrasing — where they carry meaning, not layout. Icons are
-decorative (`aria-hidden`); the accessible name comes from the button's
-`aria-label` or visible text.
+UI chrome uses `Icon`, never an emoji: navigation, headers, admin cards, empty
+states and controls. Emoji stay only in content — statuses (⏰ 📷), feed texts and
+game phrasing — where they carry meaning, not layout. Icons are decorative
+(`aria-hidden`); the accessible name comes from the button's `aria-label` or
+visible text.
+
+**Source: Iconoir** (`iconoir-react`, MIT, https://iconoir.com). One library for
+the whole product — no mixing, no hand-drawn SVGs in screens (a single custom
+icon next to Iconoir looks almost right and quietly shifts the row). The licence
+notice lives in `frontend/THIRD_PARTY_NOTICES.md`, and `iconSet.test.tsx` fails if
+the notice disappears or a `<svg>` appears outside `Icon.tsx`.
+
+Fixed parameters, not per-screen choices: grid 24×24, outline style, line width
+**1.8** (Iconoir's 1.5 is overridden once, on the `<svg>`), `currentColor` so a
+single icon works in light and dark themes, `size` 20 by default and 13 for the
+inline variant. Apple SF Symbols are not used in the web app — their licence does
+not cover it.
 
 ### 8.2 Scoreboard fill
 
