@@ -269,16 +269,20 @@ class Settings(BaseSettings):
 
     @property
     def staff_tg_id_set(self) -> set[int]:
-        """Кому доступна админка Mini App.
+        """Кому доступна админка Mini App: только владельцы продукта.
 
-        Mini App открыт всем, кто пришёл из Telegram, но управление — только
-        «шестёрке»: участникам `WHITELIST_TG_IDS` (они же прописаны в чате) и
-        владельцам из `ADMIN_TG_IDS`/`BUILTIN_ADMIN_TG_IDS`. Раньше whitelist
-        был пропуском в приложение целиком — теперь он пропуск в админку.
+        Источник — `ADMIN_TG_IDS` плюс встроенная пара `BUILTIN_ADMIN_TG_IDS`.
+        `WHITELIST_TG_IDS` сюда больше НЕ входит: раньше «пропуск в проект» и
+        «права редактора» были одной переменной, и каждый, кого вписали в
+        чат, автоматически становился админом приложения (31.10.2026).
+
+        Права клиентов из env не берутся вообще. Клиентская команда получает
+        их из базы: `org_members.role` → `owner` = admin, `manager` = aup,
+        `staff` = employee (см. `services/hr_access._ORG_ROLE_TO_HR`). Иначе
+        пришлось бы править переменные окружения на каждого нового клиента —
+        а для входа без Telegram это просто невозможно.
         """
-        out: set[int] = set(self.admin_tg_id_set)
-        out.update(tg_id for tg_id, _ in self.whitelist_pairs)
-        return out
+        return set(self.admin_tg_id_set)
 
     @property
     def chukhan_weight_map(self) -> dict[int, float]:

@@ -263,6 +263,19 @@ async def _register_telegram_metadata_with_retry() -> None:
     for attempt in range(1, 7):  # ~5+10+20+40+80+160s ≈ 5min total
         webhook_ok = False
         metadata_ok = False
+
+        # 0. Жив ли групповой чат. Чат — необязательная часть: бот работает в
+        # приложении, а группа только для анонсов. Если её больше нет
+        # (`chat not found`), выключаем env-чат до перезапуска — иначе
+        # планировщик и анонсы каждый раз бьются в мёртвый id. Проверка
+        # идемпотентна и делается один раз за процесс.
+        try:
+            from app.services import group_chat
+
+            await group_chat.validate_env_chat()
+        except Exception as exc:  # noqa: BLE001 — не повод не ставить вебхук
+            log.warning("group_chat.check_failed", error=str(exc)[:160])
+
         try:
             await _set_webhook()
             webhook_ok = True

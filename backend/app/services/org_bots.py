@@ -50,6 +50,13 @@ class OrgBotConfig:
 _registry: dict[int, OrgBotConfig] = {}
 _loaded = False
 
+# Env-чат могли выключить на старте: `GROUP_CHAT_ID` указывает на чат, которого
+# больше нет (бот выведен, id устарел). Тогда чат организации по умолчанию
+# считается «не настроенным», и все места с `if not settings.group_chat_id`
+# тихо пропускают групповую часть. См. `app/services/group_chat.py`.
+_env_chat_disabled = False
+_env_chat_reason: str | None = None
+
 
 def _env_defaults() -> tuple[str | None, int | None]:
     """Бот и чат из env — обслуживают организацию по умолчанию."""
@@ -79,7 +86,7 @@ async def reload(session: AsyncSession) -> int:
     for org in rows:
         token = org.bot_token or (env_token if org.id == DEFAULT_ORG_ID else None)
         chat = org.group_chat_id
-        if chat is None and org.id == DEFAULT_ORG_ID:
+        if chat is None and org.id == DEFAULT_ORG_ID and not _env_chat_disabled:
             chat = env_chat
         secret = org.webhook_secret
         if secret is None and org.id == DEFAULT_ORG_ID:
@@ -115,9 +122,48 @@ def loaded() -> bool:
 
 def reset() -> None:
     """Забыть реестр (тесты и выход из приложения)."""
-    global _loaded
+    global _loaded, _env_chat_disabled, _env_chat_reason
     _registry.clear()
     _loaded = False
+    _env_chat_disabled = False
+    _env_chat_reason = None
+
+
+def disable_env_chat(reason: str) -> None:
+    """Считать env-чат ненастроенным.
+
+    Вызывается один раз на старте, когда Telegram ответил, что чата нет.
+    Отдельный флаг, а не правка окружения: менять переменные контейнера из
+    кода нельзя, а перезапуск с тем же мёртвым id дал бы ту же ошибку.
+    """
+    global _env_chat_disabled, _env_chat_reason
+    if _env_chat_disabled:
+        return
+    _env_chat_disabled = True
+    _env_chat_reason = (reason or "unavailable")[:200]
+    _, env_chat = _env_defaults()
+    cfg = _registry.get(DEFAULT_ORG_ID)
+    # Чистим реестр, только если там лежит именно env-чат. Чат из
+    # `organizations.group_chat_id` трогать нельзя: у клиента со своим чатом
+    # он жив, даже если переменная по умолчанию устарела.
+    if cfg is None or env_chat is None or cfg.chat_id != env_chat:
+        return
+    _registry[DEFAULT_ORG_ID] = OrgBotConfig(
+        org_id=cfg.org_id,
+        slug=cfg.slug,
+        token=cfg.token,
+        chat_id=None,
+        webhook_secret=cfg.webhook_secret,
+        own_bot=cfg.own_bot,
+    )
+
+
+def env_chat_disabled() -> bool:
+    return _env_chat_disabled
+
+
+def env_chat_reason() -> str | None:
+    return _env_chat_reason
 
 
 def config(org_id: int) -> OrgBotConfig | None:
@@ -149,6 +195,9 @@ def chat_id_for(org_id: int) -> int | None:
     cfg = _registry.get(org_id)
     if cfg is not None and cfg.chat_id is not None:
         return cfg.chat_id
+    if _env_chat_disabled:
+        # Чат из env признан недоступным на старте — не отдаём его снова.
+        return None
     _, env_chat = _env_defaults()
     return env_chat
 
