@@ -195,21 +195,25 @@ class _IPv4AiohttpSession(AiohttpSession):
         try:
             result = await self._make_request_with_pool(*args, **kwargs)
         except Exception as exc:
-            # `extra=`, а не именованные поля: здесь `log` — обычный логгер из
-            # `logging`. Если передать `method=…` напрямую, stdlib бросит
-            # `TypeError: Logger._log() got an unexpected keyword argument`,
-            # и настоящая ошибка сети подменится ошибкой логирования — именно
-            # так родился лог «webhook.set_failed: Logger._log() ...».
+            # Текст ошибки — В САМОМ сообщении, а не только в `extra`.
+            #
+            # Так пришлось сделать 31.10.2026: хостинг Amvera сохраняет у
+            # stdlib-логов лишь `record.getMessage()`, а поля из `extra`
+            # отбрасывает. В журнале оставалось голое
+            # `telegram.request_failed` без метода и причины — по нему нельзя
+            # было понять, что именно сломалось (403 прокси, таймаут, отказ
+            # Bot API), и разбор превращался в гадание. Формат `%s` вместо
+            # именованных полей выбран ещё и потому, что stdlib-logger падает
+            # с `TypeError` на непривычных kwargs — эта ловушка здесь уже
+            # срабатывала («webhook.set_failed: Logger._log() ...»).
             log.warning(
-                "telegram.request_failed",
-                extra={
-                    "method": method,
-                    "error": exc.__class__.__name__,
-                    "detail": str(exc)[:160],
-                    "host": _api_host(self.api),
-                    "family": _family_label(),
-                    "ms": int((time.monotonic() - started) * 1000),
-                },
+                "telegram.request_failed method=%s error=%s detail=%s host=%s family=%s ms=%s",
+                method,
+                exc.__class__.__name__,
+                str(exc)[:160],
+                _api_host(self.api),
+                _family_label(),
+                int((time.monotonic() - started) * 1000),
             )
             if _is_default_api(self.api):
                 # Уже ходили напрямую — второй такой же попытки не нужно.

@@ -114,6 +114,15 @@ async def _register_bot_metadata() -> bool:
         BotCommand(command=c.cmd, description=c.desc_ru)
         for c in bot_commands_for_scope("group")
     ]
+    # Каждый вызов — в своём `try`. 31.10.2026 выяснилось, чем кончается общий
+    # блок: чат группы из `GROUP_CHAT_ID` больше не существует (бот выведен или
+    # id устарел), `set_my_commands(scope=Chat)` отвечает
+    # `Bad Request: chat not found`, и вместе с ним отменялись **все**
+    # следующие шаги — включая кнопку меню. В журнале это выглядело как голый
+    # `telegram.request_failed` на старте, а в боте — как «старое» меню и
+    # молчание. Теперь отсутствие группы портит только себя: остальные scope и
+    # кнопка ставятся дальше.
+    binary_ok = True
     try:
         # Устанавливаем команды с коротким таймаутом
         await bot.set_my_commands(
@@ -121,11 +130,25 @@ async def _register_bot_metadata() -> bool:
             scope=BotCommandScopeAllPrivateChats(),
             request_timeout=10,
         )
+    except Exception as exc:  # noqa: BLE001
+        binary_ok = False
+        structlog.get_logger().warning(
+            "bot.set_commands_failed", scope="private", error=str(exc)
+        )
+
+    try:
         await bot.set_my_commands(
             group_cmds,
             scope=BotCommandScopeAllGroupChats(),
             request_timeout=10,
         )
+    except Exception as exc:  # noqa: BLE001
+        binary_ok = False
+        structlog.get_logger().warning(
+            "bot.set_commands_failed", scope="all_groups", error=str(exc)
+        )
+
+    try:
         # GHG7 P1.3: чтобы в нашем основном чате Telegram не дописывал
         # `@gunghogunsbot` к каждой команде в autocomplete, ставим
         # команды дополнительно прицельно на `group_chat_id` через
@@ -141,8 +164,16 @@ async def _register_bot_metadata() -> bool:
                 request_timeout=10,
             )
     except Exception as exc:  # noqa: BLE001
-        commands_ok = False
-        structlog.get_logger().warning("bot.set_commands_failed", error=str(exc))
+        # Отсутствие группы — не повод считать неудачей весь пакет: команды в
+        # личке и в остальных группах уже стоят (см. комментарий выше).
+        structlog.get_logger().warning(
+            "bot.set_commands_failed",
+            scope="group_chat",
+            chat_id=settings.group_chat_id,
+            error=str(exc),
+        )
+
+    commands_ok = binary_ok
 
     try:
         await bot.set_chat_menu_button(

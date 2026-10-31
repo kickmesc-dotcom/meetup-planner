@@ -69,3 +69,50 @@ async def test_stops_after_first_success(monkeypatch):
     await app_main._register_telegram_metadata_with_retry()
 
     assert calls == {"webhook": 1, "metadata": 1}
+
+
+@pytest.mark.asyncio
+async def test_missing_group_does_not_block_menu_button(monkeypatch):
+    """Отказ для одного scope не отменяет остальные шаги (баг 31.10.2026).
+
+    На проде `set_my_commands(scope=Chat(GROUP_CHAT_ID))` отвечал
+    `Bad Request: chat not found`: группу удалили или бот из неё вышел. Вызов
+    стоял в общем `try`, поэтому вместе с ним отменялась и кнопка меню, а бот
+    оставался со старым меню. Проверяем, что теперь кнопка ставится.
+    """
+
+    from types import SimpleNamespace
+
+    class StubBot:
+        def __init__(self) -> None:
+            self.scopes: list[str] = []
+            self.menu_set = False
+
+        async def set_my_commands(self, commands, scope=None, request_timeout=None):
+            from aiogram.types import BotCommandScopeChat
+
+            if isinstance(scope, BotCommandScopeChat):
+                raise RuntimeError("Bad Request: chat not found")
+            self.scopes.append(type(scope).__name__)
+
+        async def set_chat_menu_button(self, menu_button=None, request_timeout=None):
+            self.menu_set = True
+
+    bot = StubBot()
+    monkeypatch.setattr(app_main, "get_bot", lambda: bot)
+    monkeypatch.setattr(
+        app_main,
+        "get_settings",
+        lambda: SimpleNamespace(
+            group_chat_id=-100123,
+            mini_app_url="https://example.com",
+            tg_webhook_secret="test-secret",
+        ),
+    )
+
+    commands_ok = await app_main._register_bot_metadata()
+
+    # Команды в личке и в остальных группах встали, кнопка — тоже.
+    assert commands_ok is True
+    assert bot.scopes == ["BotCommandScopeAllPrivateChats", "BotCommandScopeAllGroupChats"]
+    assert bot.menu_set is True
