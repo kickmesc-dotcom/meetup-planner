@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import HrProfileScreen from "./HrProfileScreen";
+import { useUI } from "@/store/ui";
 import {
   fetchAdminEmployees,
   fetchDepartments,
@@ -169,5 +170,30 @@ describe("HrProfileScreen (P1.7)", () => {
 
     expect(screen.getByText("Примерить роль")).toBeTruthy();
     expect(screen.getByText("Режим проверки")).toBeTruthy();
+  });
+
+  it("кабинет предприятия открывается из профиля, а не из нижней полосы", async () => {
+    // 31.10.2026: вкладка «Админ» убрана из полосы, потому что это блок
+    // руководителя, а не сотрудника. Единственный вход — эта строка; без
+    // неё кабинет стал бы недоступен вообще.
+    employeeMock.mockResolvedValue(
+      me({ role: "admin", is_admin: true, is_staff: true, is_aup: true }),
+    );
+    renderScreen();
+    await screen.findByText("Пётр");
+
+    fireEvent.click(screen.getByRole("button", { name: /Для администратора/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Управление предприятием/ }));
+
+    expect(useUI.getState().tab).toBe("admin");
+  });
+
+  it("сотруднику строки управления не показываются", async () => {
+    employeeMock.mockResolvedValue(me({ role: "employee" }));
+    renderScreen();
+    await screen.findByText("Пётр");
+
+    expect(screen.queryByText("Для администратора")).toBeNull();
+    expect(screen.queryByText("Управление предприятием")).toBeNull();
   });
 });

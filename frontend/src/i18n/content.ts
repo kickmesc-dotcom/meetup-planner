@@ -86,6 +86,10 @@ export const EN_CONTENT: Record<string, string> = {
   "Фильтры ленты": "Feed filters",
   "Закрыть фильтры": "Close filters",
   "Фильтры": "Filters",
+  "Тип события": "Event type",
+  "Благодарности": "Kudos",
+  "Закрыть благодарности": "Close kudos",
+  "Управление предприятием": "Company management",
   "Закрыть": "Close",
   "Подразделение": "Department",
   "Все подразделения": "All departments",
@@ -1485,7 +1489,7 @@ export const EN_CONTENT: Record<string, string> = {
     "{count} items · photo report required for {photos}",
   "только «{position}»": "only “{position}”",
   // --- Первый запуск: сотрудник или руководитель ---
-  SemiWorkBot: "SemiWorkBot",
+  "SemiWorkBot": "SemiWorkBot",
   "Кто вы в компании?": "Who are you at the company?",
   "Сотрудник присоединяется к готовой команде по коду от руководителя. Руководитель создаёт организацию и приглашает людей сам.":
     "An employee joins an existing team with a code from their manager. A manager creates the organization and invites people.",

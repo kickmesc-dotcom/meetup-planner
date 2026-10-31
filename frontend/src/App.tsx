@@ -651,7 +651,6 @@ export default function App() {
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
       <TabTransition key={tab}>{screen}</TabTransition>
       <TabBar
-        isAdmin={isAdmin}
         canManage={canManage}
         sections={sections ?? undefined}
         openTasks={openTasks}

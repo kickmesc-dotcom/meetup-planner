@@ -41,15 +41,11 @@ const MANAGER_ITEMS: Item[] = [
   { id: "profile", labelKey: "nav.profile", icon: "profile" },
 ];
 
-const ADMIN_ITEM: Item = { id: "admin", labelKey: "nav.admin", icon: "admin" };
-
 export default function TabBar({
-  isAdmin,
   canManage = false,
   sections,
   openTasks = 0,
 }: {
-  isAdmin: boolean;
   /** Руководитель или прописанный админ — видит сводку по команде. */
   canManage?: boolean;
   /** Разделы из настройки организации (undefined — ничего не прячем). */
@@ -63,10 +59,17 @@ export default function TabBar({
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
   const { t } = useT();
-  const items = [
-    ...(canManage ? MANAGER_ITEMS : BASE_ITEMS),
-    ...(isAdmin ? [ADMIN_ITEM] : []),
-  ].filter((item) => !sections || sectionEnabled(item.id, sections));
+  // «Управление» (админка) из нижней полосы убрано 31.10.2026. Причина не в
+  // дизайне, а в разделении ролей: полоса — это рабочий день сотрудника, а
+  // кабинет предприятия — отдельный блок руководителя. Семь подписей на
+  // 360–390 px уже обрезались, а сотрудник видел вкладку, которая ему не
+  // принадлежит: достаточно было попасть в ADMIN_TG_IDS, чтобы она появилась.
+  // Вход в кабинет теперь один и осознанный — из профиля, раздел
+  // «Руководителю» (см. `HrProfileScreen`), и только у того, кому сервер это
+  // разрешил.
+  const items = (canManage ? MANAGER_ITEMS : BASE_ITEMS).filter(
+    (item) => !sections || sectionEnabled(item.id, sections),
+  );
 
   return (
     <nav

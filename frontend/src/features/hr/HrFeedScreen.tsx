@@ -182,6 +182,10 @@ export default function HrFeedScreen() {
   // Фильтры живут в листе: два селекта в одной строке не влезали на узкий
   // экран, и их системные стрелки обрезались по краям.
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // Благодарности — отдельным листом по маленькой кнопке. В ленте они
+  // занимали первый экран и перетягивали внимание с самих событий смены;
+  // при этом функция нужная, поэтому не удалена, а спрятана в один тап.
+  const [kudosOpen, setKudosOpen] = useState(false);
   // Чью карточку открыли (null — оверлей закрыт).
   const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
   // Какое подразделение открыли дашбордом (тап по плашке в ленте).
@@ -232,6 +236,11 @@ export default function HrFeedScreen() {
     // Локаль — часть ключа: фразу записи собирает сервер, поэтому при смене
     // языка ленту надо перезапросить, а не переводить уже полученный текст.
     queryKey: ["hr-feed", employeeId, departmentId, kinds.join(","), locale],
+    // 31.10.2026: без этого шапка схлопывалась посреди работы. Смена
+    // типа события меняет ключ → `feed` на миг `undefined` → `can_filter`
+    // неизвестен → исчезают и поиск, и кнопка «Фильтр», и только что
+    // открытый лист. Держим предыдущий ответ, пока едет новый.
+    placeholderData: (previous) => previous,
     queryFn: () =>
       fetchHrFeed({
         employeeId,
@@ -341,6 +350,23 @@ export default function HrFeedScreen() {
           ) : (
             <Skeleton className="h-3 w-2/3" />
           )}
+          {/* Благодарности: иконка без подписи в шапке — их ищут редко, а
+              ленту они больше не перекрывают. Живёт вне блока фильтров:
+              сотруднику без права фильтровать они тоже нужны. Подпись в
+              aria-label, чтобы кнопка не была «безымянной иконкой». */}
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={tx("Благодарности")}
+            title={tx("Благодарности")}
+            onClick={() => {
+              haptic("light");
+              setKudosOpen(true);
+            }}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-tg-secondary-bg text-tg-hint transition press"
+          >
+            <Icon name="sparkles" size={15} />
+          </button>
           {freshCount > 0 && (
             <span
               data-testid="feed-fresh-count"
@@ -375,7 +401,12 @@ export default function HrFeedScreen() {
                 {tx("Фильтр")}
                 {hasFilters && (
                   <span className="grid h-4 min-w-4 place-items-center rounded-full bg-tg-link/15 px-1 text-2xs text-tg-text">
-                    {(employeeId !== null ? 1 : 0) + (departmentId !== null ? 1 : 0)}
+                    {/* Типы событий тоже считаются: раньше они были видны в
+                        шапке сами, теперь живут в листе — счётчик остаётся
+                        единственным напоминанием, что фильтр не пустой. */}
+                    {(employeeId !== null ? 1 : 0) +
+                      (departmentId !== null ? 1 : 0) +
+                      (kinds.length > 0 ? 1 : 0)}
                   </span>
                 )}
               </button>
@@ -412,35 +443,9 @@ export default function HrFeedScreen() {
               </button>
             )}
 
-            <div className="flex flex-wrap gap-1.5">
-              {filters.kinds.map((k) => {
-                const active = kinds.includes(k);
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => {
-                      haptic("selection");
-                      setKinds(active ? kinds.filter((x) => x !== k) : [...kinds, k]);
-                    }}
-                    className={[
-                      "min-h-7 rounded-full px-2.5 text-xs transition-colors",
-                      // P3.16: фильтр по типам — выбор, а не действие; заливка
-                      // главной кнопки остаётся за кнопками-действиями.
-                      active
-                        ? "bg-tg-link/15 font-medium text-tg-text"
-                        : "bg-tg-secondary-bg text-tg-hint",
-                    ].join(" ")}
-                  >
-                    <span className="inline-flex items-center gap-1">
-                      <Icon name={KIND_ICON[k]} size={13} />
-                      {tx(KIND_LABEL[k])}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            {/* Типы событий уехали в лист фильтра (31.10.2026). В шапке они
+                занимали три строки чипов и отбирали место у самой ленты, а
+                между кнопкой «Фильтр» и фильтрами не было видно связи. */}
           </div>
         )}
 
@@ -470,10 +475,6 @@ export default function HrFeedScreen() {
           </div>
         )}
 
-        {/* Благодарности — над лентой: за неделю их немного, и они мотивируют
-            сильнее, чем ещё одна строка в потоке событий. Карточка идёт после
-            пустого состояния, чтобы не сдвигать его вниз при пустой ленте. */}
-        {!feedQ.isLoading && <KudosCard />}
 
         {groupByDay(items, locale).map((group, index, allGroups) => (
           <FeedDay
@@ -501,6 +502,9 @@ export default function HrFeedScreen() {
           employees={visibleEmployees}
           departmentId={departmentId}
           employeeId={employeeId}
+          kinds={kinds}
+          availableKinds={filters.kinds}
+          onKinds={setKinds}
           search={search}
           onSearch={setSearch}
           onDepartment={(id) => {
@@ -521,6 +525,10 @@ export default function HrFeedScreen() {
             setFiltersOpen(false);
           }}
         />
+      )}
+
+      {kudosOpen && (
+        <KudosSheet onClose={() => setKudosOpen(false)} />
       )}
 
       {cardEmployeeId !== null && (
@@ -581,6 +589,49 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
 }
 
 /**
+ * Лист благодарностей — то, что раньше стояло карточкой над лентой.
+ *
+ * Зачем прятать: карточка занимала первый экран ленты и перетягивала
+ * внимание с событий смены, а смотреть её нужно редко (раз в неделю).
+ * Содержимое при этом осталось прежним — тот же `KudosCard` с теми же
+ * правилами от сервера.
+ */
+function KudosSheet({ onClose }: { onClose: () => void }) {
+  const { tx } = useTx();
+  return (
+    <div
+      className="fixed inset-0 z-40 flex flex-col justify-end"
+      role="dialog"
+      aria-modal="true"
+      aria-label={tx("Благодарности")}
+    >
+      <button
+        type="button"
+        aria-label={tx("Закрыть благодарности")}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40"
+      />
+      <div className="relative max-h-[85%] overflow-y-auto rounded-t-card bg-tg-bg p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-tg-text">{tx("Благодарности")}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
+            aria-label={tx("Закрыть")}
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+        <div className="mt-3">
+          <KudosCard />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Лист фильтров: подразделение и сотрудник списками.
  *
  * Почему не `<select>`: нативный селект рисует стрелку сам, её нельзя ни
@@ -593,6 +644,9 @@ function FiltersSheet({
   employees,
   departmentId,
   employeeId,
+  kinds,
+  availableKinds,
+  onKinds,
   search,
   onSearch,
   onDepartment,
@@ -604,6 +658,11 @@ function FiltersSheet({
   employees: { id: number; display_name: string; department_id: number | null; position: string | null; badge: string | null }[];
   departmentId: number | null;
   employeeId: number | null;
+  /** Выбранные типы событий (мультивыбор). */
+  kinds: FeedKind[];
+  /** Какие типы разрешает сервер — список может быть пустым у сотрудника. */
+  availableKinds: FeedKind[];
+  onKinds: (next: FeedKind[]) => void;
   search: string;
   onSearch: (value: string) => void;
   onDepartment: (id: number | null) => void;
@@ -684,6 +743,44 @@ function FiltersSheet({
             />
           ))}
         </div>
+
+        {/* Типы событий: перенесены из шапки ленты (31.10.2026). Там это была
+            стена чипов в три строки, которая съедала первый экран; здесь они
+            рядом с остальными фильтрами — один лист, один «Готово». */}
+        {availableKinds.length > 0 && (
+          <>
+            <h3 className="mt-4 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+              {tx("Тип события")}
+            </h3>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {availableKinds.map((k) => {
+                const active = kinds.includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => {
+                      haptic("selection");
+                      onKinds(active ? kinds.filter((x) => x !== k) : [...kinds, k]);
+                    }}
+                    className={[
+                      "min-h-8 rounded-full px-2.5 text-xs transition-colors",
+                      active
+                        ? "bg-tg-link/15 font-medium text-tg-text"
+                        : "bg-tg-secondary-bg text-tg-hint",
+                    ].join(" ")}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <Icon name={KIND_ICON[k]} size={13} />
+                      {tx(KIND_LABEL[k])}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         <div className="mt-4 flex gap-2">
           <button

@@ -17,7 +17,7 @@ afterEach(() => {
 
 describe("TabBar", () => {
   it("рисует пять вкладок с SVG-иконками и подписями", () => {
-    const { container } = render(<TabBar isAdmin={false} />);
+    const { container } = render(<TabBar />);
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(5);
     for (const label of ["Задачи", "Смена", "График", "События", "Профиль"]) {
@@ -28,17 +28,26 @@ describe("TabBar", () => {
     expect(container.textContent).not.toMatch(/[✅🕒🗓📋👤]/u);
   });
 
-  it("руководителю добавляет «Команду», админу — «Админ»", () => {
-    render(<TabBar isAdmin canManage />);
+  it("руководителю добавляет «Команду», но кабинета в полосе нет ни у кого", () => {
+    // 31.10.2026: «Управление» убрано из полосы. Полоса — рабочий день
+    // сотрудника, кабинет предприятия живёт в профиле, в разделе
+    // «Руководителю». Сотрудник вкладку управления не видит вообще.
+    render(<TabBar canManage />);
     expect(screen.getByText("Команда")).toBeTruthy();
-    expect(screen.getByText("Админ")).toBeTruthy();
-    expect(screen.getAllByRole("button")).toHaveLength(7);
+    expect(screen.queryByText("Админ")).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(6);
   });
 
-  it("семь подписей не вылезают за кнопку", () => {
+  it("сотрудник видит ровно пять своих разделов", () => {
+    render(<TabBar />);
+    expect(screen.getAllByRole("button")).toHaveLength(5);
+    expect(screen.queryByText("Команда")).toBeNull();
+  });
+
+  it("шесть подписей не вылезают за кнопку", () => {
     // P3.17: на 360–390 px «Команда»/«События» при 12 px обрезались по краям
     // экрана. Подпись обязана ужиматься внутри своей кнопки, а не вылезать.
-    render(<TabBar isAdmin canManage />);
+    render(<TabBar canManage />);
     const label = screen.getByText("Команда");
     expect(label.className).toContain("truncate");
     expect(label.className).toContain("text-center");
@@ -49,7 +58,7 @@ describe("TabBar", () => {
 
   it("показывает число открытых поручений, но не больше 9+", () => {
     // Приём из соцсетей: цифра на разделе видна до перехода.
-    render(<TabBar isAdmin={false} openTasks={3} />);
+    render(<TabBar openTasks={3} />);
     expect(screen.getByTestId("tab-tasks-badge").textContent).toBe("3");
     // Цифра не ломает доступное имя: объяснение — в aria-label кнопки.
     expect(
@@ -57,17 +66,17 @@ describe("TabBar", () => {
     ).toBeTruthy();
 
     cleanup();
-    render(<TabBar isAdmin={false} openTasks={12} />);
+    render(<TabBar openTasks={12} />);
     expect(screen.getByTestId("tab-tasks-badge").textContent).toBe("9+");
   });
 
   it("не рисует бейдж без открытых задач", () => {
-    render(<TabBar isAdmin={false} openTasks={0} />);
+    render(<TabBar openTasks={0} />);
     expect(screen.queryByTestId("tab-tasks-badge")).toBeNull();
   });
 
   it("тап переключает вкладку", () => {
-    render(<TabBar isAdmin={false} />);
+    render(<TabBar />);
     fireEvent.click(screen.getByText("Смена"));
     expect(useUI.getState().tab).toBe("checklist");
   });
@@ -75,7 +84,7 @@ describe("TabBar", () => {
   it("«События» стоят первыми — туда приложение и открывается", () => {
     // Раунд 5: первый экран — события смены, а не личные задачи.
     expect(useUI.getInitialState().tab).toBe("feed");
-    render(<TabBar isAdmin={false} />);
+    render(<TabBar />);
     const buttons = screen.getAllByRole("button");
     expect(buttons[0].textContent).toContain("События");
   });

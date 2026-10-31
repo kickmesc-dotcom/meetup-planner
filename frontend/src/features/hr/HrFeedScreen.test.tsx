@@ -449,3 +449,69 @@ describe("перевод дня (план, 11.5)", () => {
     expect(screen.queryByTestId("translate-block")).toBeNull();
   });
 });
+
+/**
+ * 31.10.2026: шапка ленты разгружена.
+ *
+ * Было: три строки чипов с типами событий прямо под поиском. Они отъедали
+ * первый экран (главное — сама лента), а связь с кнопкой «Фильтр» не читалась:
+ * рядом стояли и кнопка, и её содержимое. Стало: типы живут в листе фильтра, в
+ * шапке остаётся счётчик активных фильтров.
+ *
+ * Там же благодарности: карточка «за неделю» больше не занимает верх ленты, но
+ * остаётся в один тап по маленькой иконке.
+ */
+describe("HrFeedScreen: разгрузка шапки (31.10.2026)", () => {
+  function renderFilterable() {
+    feedMock.mockResolvedValue({ scope: "all", can_filter: true, items: [] });
+    filtersMock.mockResolvedValue({
+      scope: "all",
+      can_filter: true,
+      departments: [{ id: 1, name: "Зал", emoji: null }],
+      employees: [],
+      kinds: ["task_status", "kudos"],
+    } as unknown as Awaited<ReturnType<typeof fetchFeedFilters>>);
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <QueryClientProvider client={qc}>
+        <HrFeedScreen />
+      </QueryClientProvider>,
+    );
+  }
+
+  it("типы событий открываются в листе фильтра, а не висят в шапке", async () => {
+    renderFilterable();
+
+    await screen.findByRole("button", { name: /Фильтр/ });
+    // До открытия листа чипов в шапке нет — это и есть освобождённое место.
+    expect(screen.queryByText("Статус поручения")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Фильтр/ }));
+    expect(screen.getByText("Тип события")).toBeTruthy();
+    expect(screen.getByText("Статус поручения")).toBeTruthy();
+    expect(screen.getByText("Поблагодарил(а) коллегу")).toBeTruthy();
+  });
+
+  it("выбранный тип виден по счётчику фильтра", async () => {
+    renderFilterable();
+    await screen.findByRole("button", { name: /Фильтр/ });
+
+    fireEvent.click(screen.getByRole("button", { name: /Фильтр/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Статус поручения/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Готово" }));
+
+    // Счётчик на кнопке — единственное напоминание: сами чипы теперь в листе.
+    expect(screen.getByRole("button", { name: /Фильтр/ }).textContent).toContain("1");
+  });
+
+  it("благодарности спрятаны за маленькой кнопкой", async () => {
+    renderFeed([]);
+
+    const trigger = await screen.findByRole("button", { name: "Благодарности" });
+    expect(screen.queryByRole("dialog", { name: "Благодарности" })).toBeNull();
+
+    fireEvent.click(trigger);
+
+    expect(screen.getByRole("dialog", { name: "Благодарности" })).toBeTruthy();
+  });
+});

@@ -641,6 +641,25 @@ export default function HrProfileScreen() {
 
           {showAdmin && (
             <div id="profile-admin" className="space-y-4 border-t border-tg-hint/10 p-3">
+              {/* Кабинет предприятия — единственный вход в него после
+                  31.10.2026: в нижней полосе вкладки «Админ» больше нет, а
+                  иначе на телефоне это была седьмая подпись, которую видел
+                  и сотрудник. Видна только тем, кому сервер разрешил (`me.is_admin`). */}
+              {me.is_admin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic("light");
+                    setTab("admin");
+                  }}
+                  className="flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-bg/60 px-3 text-left text-sm font-medium text-tg-text"
+                >
+                  <Icon name="admin" size={17} className="text-tg-link" />
+                  <span className="min-w-0 flex-1">{tx("Управление предприятием")}</span>
+                  <Icon name="chevron" size={15} className="text-tg-hint" />
+                </button>
+              )}
+
               <div>
                 <h3 className="text-xs font-medium text-tg-text">{tx("Примерить роль")}</h3>
                 <p className="mt-1 text-xs text-tg-hint">{tx(
