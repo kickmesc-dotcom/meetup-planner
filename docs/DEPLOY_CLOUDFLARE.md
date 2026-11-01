@@ -1,7 +1,15 @@
-# Деплой: Cloudflare + Neon (Amvera больше не используется)
+# Деплой: Cloudflare (фронт) + API + Postgres
+
+> **Документ частично устарел (01.11.2026).** Ниже описана схема
+> «Cloudflare + Hugging Face Space + Neon», которая была верна в конце октября.
+> На боевом контуре сейчас: фронт — Cloudflare Pages, API — **Amvera**
+> (`meetup-planner`, Warsaw-0), HF Space **остановлен**, база пока Neon и
+> переносится в managed PostgreSQL Amvera. Актуальная картина и расчёт —
+> [`INFRA_CHOICE.md`](INFRA_CHOICE.md); разделы про Cloudflare ниже верны и
+> используются.
 
 Действующая схема — как у оригинального meetup-planner: Cloudflare на краю,
-бесплатный docker-хост для FastAPI, база в Neon.
+docker-хост для FastAPI, база в Postgres.
 
 ```
 Telegram Mini App
@@ -10,7 +18,7 @@ Telegram Mini App
 Cloudflare Pages ── статика React/Vite ── https://semitaskbot.pages.dev
       │ HTTPS, VITE_API_BASE
       ▼
-Hugging Face Space (docker, cpu-basic, бесплатно) ── FastAPI + APScheduler
+Amvera (docker, Warsaw-0) ── FastAPI + APScheduler
       │ asyncpg + SSL
       ├──► Neon Postgres
       └──► R2 (медиа)
@@ -22,8 +30,10 @@ Hugging Face Space (docker, cpu-basic, бесплатно) ── FastAPI + APSc
 как в оригинале; Cloudflare отвечает за фронт, медиа и (при необходимости)
 прокси до `api.telegram.org`.
 
-Amvera из проекта убрана: конфиги `backend/amvera.y*ml` и диагностика удалены,
-`docs/PROD_DEPLOY.md` заменён этим файлом.
+Порядок с 31.10.2026 обратный: HF Space остановлен как третья копия того же кода
+на той же базе, а боевой хост — Amvera. Конфиги `backend/amvera.y*ml` живут в
+репозитории проекта Amvera, отдельной диагностики не требуется: `/api/meta`
+отдаёт код, head миграций и состояние планировщика.
 
 ## 1. Доступ к Cloudflare
 
