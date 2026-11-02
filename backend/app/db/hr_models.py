@@ -1824,3 +1824,79 @@ class TranslationCache(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+# Категория по умолчанию для позиции меню: одна колонка «Меню» вместо
+# обязательного деления на салаты/горячее. Заведение, которому группы нужны,
+# вводит их само — список категорий не зашит в код.
+DEFAULT_MENU_CATEGORY = "Меню"
+
+
+class MenuItem(OrgScoped, Base):
+    """Позиция меню смены, которую руководитель правит прямо в приложении.
+
+    Зачем своя таблица, а не лист Google. Меню — единственный документ смены,
+    который меняется каждый день и часто в последний момент (закончилась рыба,
+    поменялась цена). До сих пор его правили в таблице, а приложение показывало
+    снимок: чтобы убрать позицию, нужно было открыть Google, найти лист, потом
+    ещё дождаться обновления копии. Руководитель делал это ночью с телефона.
+
+    Что здесь СПЕЦИАЛЬНО не хранится:
+
+    * состав и технология — это стандарты (`standards`), у них своя проверка
+      знаний; дублировать рецепт в меню значило бы держать две правды;
+    * остатки на складе — их нет ни в одном контуре, а «полу-учёт» хуже, чем
+      честная пометка «нет в наличии»;
+    * фото блюда — сжатие и хранение снимков уже живут в медиа (`hr_media`),
+      и тянуть их сюда ради строки в меню незачем.
+
+    `price_rub` — целые рубли. Копейки в меню не встречаются, а хранение
+    копеек заставляет каждое место интерфейса помнить про деление на 100; для
+    «цены в меню» это лишняя точка ошибки. Пустая цена = «по запросу».
+
+    `is_available` — не удаление, а «сегодня этого нет»: строка остаётся, официант
+    видит её серой, а сотруднику она не показывается вовсе. Удаление отдельно и
+    осознанно.
+    """
+
+    __tablename__ = "menu_items"
+    __table_args__ = (
+        # Меню читают целиком: сначала группа, потом порядок внутри группы.
+        Index("ix_menu_items_order", "category", "sort_order", "id"),
+        CheckConstraint(
+            "price_rub IS NULL OR price_rub >= 0", name="ck_menu_items_price"
+        ),
+    )
+
+    # `with_variant(Integer, "sqlite")` — как у остальных таблиц проекта: SQLite
+    # не делает BIGINT первичным ключом с автоинкрементом.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default=DEFAULT_MENU_CATEGORY,
+        server_default=DEFAULT_MENU_CATEGORY,
+    )
+    description: Mapped[str | None] = mapped_column(String(300))
+    price_rub: Mapped[int | None] = mapped_column(Integer)
+    is_available: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Кто последним тронул строку. Нужен ровно для одного вопроса в спорной
+    # ситуации: «кто убрал позицию из меню перед сменой».
+    updated_by_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+

@@ -12,6 +12,8 @@ import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
+import { fetchMenu } from "@/api/menu";
+import MenuList from "@/features/menu/MenuList";
 
 import { currentLocale, tx as txIn, useTx } from "@/i18n";
 /**
@@ -22,6 +24,11 @@ import { currentLocale, tx as txIn, useTx } from "@/i18n";
  * остановка работы. Рядом честная подпись «обновлено …» и предупреждение,
  * если последнее обновление не удалось (показываем последнюю рабочую версию).
  */
+// Меню в приложении живёт отдельной вкладкой рядом с таблицами: сервер отдаёт
+// его объектами, а не строками CSV, поэтому id — отрицательный маркер, которого
+// не может быть у источника таблицы.
+const MENU_TAB = -1;
+
 export default function MaterialsScreen({
   onBack,
 }: {
@@ -45,6 +52,12 @@ export default function MaterialsScreen({
   });
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const [activeId, setActiveId] = useState<number | null>(null);
+  // Меню теперь правится в приложении и приходит объектами, а не снимком
+  // таблицы. Показываем его первой вкладкой, если в нём что-то есть.
+  const menuQ = useQuery({ queryKey: ["menu"], queryFn: fetchMenu, staleTime: 60_000 });
+  const menu = menuQ.data;
+  const menuItems = menu?.items ?? [];
+  const showMenu = menuItems.length > 0;
 
   const refresh = useMutation({
     mutationFn: (id: number) => refreshMaterial(id),
@@ -67,6 +80,9 @@ export default function MaterialsScreen({
   }
 
   const materials = materialsQ.data ?? [];
+  const menuActive =
+    showMenu &&
+    (activeId === MENU_TAB || (activeId === null && materials.length === 0));
   const active =
     materials.find((m) => m.id === activeId) ?? materials[0] ?? null;
   const canRefresh = !!meQ.data?.is_aup || !!meQ.data?.is_admin;
@@ -103,7 +119,7 @@ export default function MaterialsScreen({
           </>
         )}
 
-        {!materialsQ.isLoading && materials.length === 0 && (
+        {!materialsQ.isLoading && materials.length === 0 && !showMenu && (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Icon name="book" size={34} className="text-tg-hint" />
             <div className="mt-2 text-sm font-medium text-tg-text">{tx("Материалов пока нет")}</div>
@@ -111,9 +127,27 @@ export default function MaterialsScreen({
           </div>
         )}
 
-        {materials.length > 0 && (
+        {(materials.length > 0 || showMenu) && (
           <>
             <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {showMenu && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic("selection");
+                    setActiveId(MENU_TAB);
+                  }}
+                  aria-pressed={menuActive}
+                  className={[
+                    "min-h-9 shrink-0 rounded-full px-3 text-xs",
+                    menuActive
+                      ? "bg-tg-button text-tg-button-text"
+                      : "bg-tg-secondary-bg text-tg-hint",
+                  ].join(" ")}
+                >
+                  {tx("Меню смены")}
+                </button>
+              )}
               {materials.map((m) => (
                 <button
                   key={m.id}
@@ -122,10 +156,10 @@ export default function MaterialsScreen({
                     haptic("selection");
                     setActiveId(m.id);
                   }}
-                  aria-pressed={active?.id === m.id}
+                  aria-pressed={!menuActive && active?.id === m.id}
                   className={[
                     "min-h-9 shrink-0 rounded-full px-3 text-xs",
-                    active?.id === m.id
+                    !menuActive && active?.id === m.id
                       ? "bg-tg-button text-tg-button-text"
                       : "bg-tg-secondary-bg text-tg-hint",
                   ].join(" ")}
@@ -136,7 +170,16 @@ export default function MaterialsScreen({
               ))}
             </div>
 
-            {active && (
+            {menuActive && (
+              <>
+                <p className="text-xs text-tg-hint">
+                  {tx("Меню правит руководитель: в кабинете, раздел «Меню смены».")}
+                </p>
+                <MenuList items={menuItems} categories={menu?.categories ?? []} />
+              </>
+            )}
+
+            {!menuActive && active && (
               <>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-tg-hint">
                   <span>

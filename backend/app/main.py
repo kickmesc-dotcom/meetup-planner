@@ -37,6 +37,7 @@ from app.api import (
     routes_materials,
     routes_media,
     routes_meetings,
+    routes_menu,
     routes_meta,
     routes_orgs,
     routes_polls,
@@ -517,6 +518,9 @@ def create_app() -> FastAPI:
     app.include_router(routes_media.router, prefix="/api")
     # Материалы смены: снимок Google Sheets из БД (устойчиво к блокировкам).
     app.include_router(routes_materials.router, prefix="/api")
+    # Меню смены: сотрудник читает, руководитель правит в приложении
+    # (раньше это был лист Google, который обновлялся по расписанию).
+    app.include_router(routes_menu.router, prefix="/api")
     # Тексты интерфейса: правятся из админки, читаются без токена (это подписи).
     app.include_router(routes_texts.router, prefix="/api")
     # Журнал операционных проблем — отдельная сущность со своими правами.

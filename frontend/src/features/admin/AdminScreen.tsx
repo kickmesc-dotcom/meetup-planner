@@ -27,6 +27,7 @@ import TeamScreen from "@/features/hr/TeamScreen";
 import ReviewScreen from "@/features/hr/ReviewScreen";
 import ReportsScreen from "@/features/hr/ReportsScreen";
 import MaterialsScreen from "@/features/hr/MaterialsScreen";
+import MenuScreen from "./MenuScreen";
 import StandardsScreen from "@/features/hr/StandardsScreen";
 import SettingsScreen from "@/features/admin/SettingsScreen";
 import Icon, { type IconName } from "@/components/Icon";
@@ -58,6 +59,7 @@ type Section =
   | "team"
   | "review"
   | "reports"
+  | "menu"
   | "materials"
   | "standards"
   | "settings"
@@ -86,6 +88,7 @@ const VALID_SECTIONS: Section[] = [
   "team",
   "review",
   "reports",
+  "menu",
   "materials",
   "standards",
   "settings",
@@ -186,6 +189,13 @@ const SECTIONS: SectionDef[] = [
     icon: "layout",
     title: "Отчёт смены",
     subtitle: "Срез дня по стандартам и выгрузка CSV",
+  },
+  {
+    id: "menu",
+    group: GROUP_DOCS,
+    icon: "book",
+    title: "Меню смены",
+    subtitle: "Позиции и цены: убрать на сегодня, вернуть, добавить",
   },
   {
     id: "materials",
@@ -388,6 +398,7 @@ const MANAGER_SECTIONS: Section[] = [
   "team",
   "review",
   "reports",
+  "menu",
   "materials",
   "standards",
 ];
@@ -454,6 +465,7 @@ export default function AdminScreen({
   if (section === "team") return <TeamScreen canManage={false} onBack={back} />;
   if (section === "review") return <ReviewScreen onBack={back} />;
   if (section === "reports") return <ReportsScreen onBack={back} />;
+  if (section === "menu") return <MenuScreen onBack={back} />;
   if (section === "materials") return <MaterialsScreen onBack={back} />;
   if (section === "standards") return <StandardsScreen onBack={back} />;
   if (section === "settings") {

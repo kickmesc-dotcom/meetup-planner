@@ -100,6 +100,7 @@ TENANT_TABLES: set[str] = {
     "meeting_feedback",
     "meeting_reminders",
     "meetings",
+    "menu_items",
     "music_game_rounds",
     "music_selections",
     "music_track_likes",
@@ -392,7 +393,8 @@ def test_migration_0054_covers_every_tenant_table() -> None:
         "org_invitations",
         "push_subscriptions",
         "hr_kudos",  # 0062
-    }  # 0057, 0058, 0062
+        "menu_items",  # 0064
+    }  # 0057, 0058, 0062, 0064
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 
