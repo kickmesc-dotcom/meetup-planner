@@ -376,8 +376,22 @@ async def admin_departments(
 
 @router.post("/departments", response_model=DepartmentAdminOut)
 async def create_department(
-    body: DepartmentIn, session: SessionDep, _: AdminDep
+    body: DepartmentIn, session: SessionDep, employee: AdminDep
 ) -> DepartmentAdminOut:
+    # Тариф (шаг 4.1): новый отдел — рост, а не настройка. Пакет
+    # отрасли и мастер создают свои отделы отдельно и лимитом не
+    # блокируются: иначе первый же набор пресетов не прошёл бы.
+    from app.services import billing
+
+    try:
+        await billing.ensure_branches(session, employee.org_id)
+    except billing.PlanError as exc:
+        raise HTTPException(
+            status.HTTP_402_PAYMENT_REQUIRED
+            if str(exc) == "trial_expired"
+            else status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     try:
         dept = await hr_departments.create_department(
             session, name=body.name, emoji=body.emoji, slug=body.slug

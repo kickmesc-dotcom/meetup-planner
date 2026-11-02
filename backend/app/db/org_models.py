@@ -134,6 +134,30 @@ class Organization(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
+    # Тариф организации (шаг 4.1). `trial` ставится явно при создании
+    # (`orgs.create_with_owner`), а серверный дефолт `business` нужен
+    # старым строкам: ограничивать действующего клиента датой в
+    # календаре — поломка, а не введение тарифов.
+    plan: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="trial", server_default="business"
+    )
+    # Конец пробного периода. Пусто у платных тарифов и у старых
+    # организаций: срок есть только у `trial`.
+    trial_ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    # Тариф организации (шаг 4.1). `trial` ставится явно при создании
+    # (`orgs.create_with_owner`), а серверный дефолт `business` нужен
+    # старым строкам: ограничивать действующего клиента датой в
+    # календаре — поломка, а не введение тарифов.
+    plan: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="trial", server_default="business"
+    )
+    # Конец пробного периода. Пусто у платных тарифов и у старых
+    # организаций: срок есть только у `trial`.
+    trial_ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     # Свой бот клиента (B2B_PLATFORM_PLAN, шаг 1.6). Пусто — организация
     # работает на боте из env (текущий контур). Токен здесь только потому, что
     # у каждой организации свой BotFather-бот; отдавать его наружу нельзя.

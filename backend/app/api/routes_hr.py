@@ -1189,9 +1189,29 @@ async def save_org_setup(
             item["name"].strip().lower(): item["emoji"]
             for item in org_setup.presets_for(updated.industry)
         }
-        for name in updated.departments:
-            if name.strip().lower() in existing:
-                continue
+        new_names = [
+            name
+            for name in updated.departments
+            if name.strip().lower() not in existing
+        ]
+        if new_names:
+            # Тариф (шаг 4.1): подразделения — тоже граница. Проверяем
+            # пакетом, потому что отказ на третьем отделе из пяти
+            # оставил бы мастера наполовину применённым.
+            from app.services import billing
+
+            try:
+                await billing.ensure_branches(
+                    session, employee.org_id, add=len(new_names)
+                )
+            except billing.PlanError as exc:
+                raise HTTPException(
+                    status.HTTP_402_PAYMENT_REQUIRED
+                    if str(exc) == "trial_expired"
+                    else status.HTTP_409_CONFLICT,
+                    detail=str(exc),
+                ) from exc
+        for name in new_names:
             await hr_departments.create_department(
                 session, name=name, emoji=presets.get(name.strip().lower())
             )

@@ -61,6 +61,11 @@ _STATUS: dict[str, int] = {
     "member_not_found": status.HTTP_404_NOT_FOUND,
     "self_role_change": status.HTTP_400_BAD_REQUEST,
     "last_owner": status.HTTP_409_CONFLICT,
+    # Тариф (шаг 4.1): лимит мест и подразделений — конфликт с
+    # границей, а истёкший триал — «нужна оплата», не «ошибка ввода».
+    "seats_limit": status.HTTP_409_CONFLICT,
+    "branches_limit": status.HTTP_409_CONFLICT,
+    "trial_expired": status.HTTP_402_PAYMENT_REQUIRED,
 }
 
 
@@ -106,6 +111,21 @@ class OrgOut(BaseModel):
     slug: str
     name: str
     role: str
+
+
+class PlanOut(BaseModel):
+    """Тариф своей организации: лимиты, занятые места и срок триала."""
+
+    code: str
+    title: str
+    seats_used: int
+    seats_limit: int
+    branches_used: int
+    branches_limit: int
+    invites_active: int
+    trial_ends_at: str | None = None
+    trial_days_left: int | None = None
+    trial_expired: bool
 
 
 class OrgMemberOut(BaseModel):
@@ -290,6 +310,33 @@ def _member_out(
         role=member.role,
         hr_role=hr_role,
         is_self=member.user_id == me,
+    )
+
+
+@router.get("/org/plan", response_model=PlanOut)
+async def organization_plan(
+    session: SessionDep, org: OrgDep, _admin: AdminDep
+) -> PlanOut:
+    """Тариф своей организации.
+
+    Только руководителю: цифры про людей и границы тарифа — не то, что
+    нужно смене. Чужой тариф не запросить: организация берётся из
+    сотрудника запроса, а не из параметров.
+    """
+    from app.services import billing
+
+    state = await billing.state(session, org)
+    return PlanOut(
+        code=state.code,
+        title=state.title,
+        seats_used=state.seats_used,
+        seats_limit=state.seats_limit,
+        branches_used=state.branches_used,
+        branches_limit=state.branches_limit,
+        invites_active=state.invites_active,
+        trial_ends_at=_iso(state.trial_ends_at),
+        trial_days_left=state.trial_days_left,
+        trial_expired=state.trial_expired,
     )
 
 

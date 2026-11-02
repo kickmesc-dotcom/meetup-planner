@@ -134,3 +134,25 @@ export const updateOrgMemberRole = (userId: number, role: OrgRole) =>
     method: "PATCH",
     body: JSON.stringify({ role }),
   });
+
+/**
+ * Тариф организации: лимиты, занятые места и срок триала.
+ *
+ * Места считает сервер (люди + непринятые приглашения, без демо): если бы это
+ * делал браузер, экран и отказ разошлись бы на первой же правке правил.
+ */
+export interface OrgPlan {
+  code: string;
+  title: string;
+  seats_used: number;
+  seats_limit: number;
+  branches_used: number;
+  branches_limit: number;
+  invites_active: number;
+  trial_ends_at: string | null;
+  trial_days_left: number | null;
+  trial_expired: boolean;
+}
+
+/** Тариф своей организации. Только руководителю. */
+export const fetchOrgPlan = () => api<OrgPlan>("/api/org/plan");

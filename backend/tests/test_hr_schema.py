@@ -58,6 +58,8 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0055_org_bot.py",
     "0056_accounts.py",
     "0060_hr_presence_privacy.py",
+    # Тарифы (4.1): организации получили `plan` и `trial_ends_at`.
+    "0065_org_plans.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).

@@ -32,6 +32,7 @@ import MaterialsScreen from "@/features/hr/MaterialsScreen";
 import MenuScreen from "./MenuScreen";
 import StandardsScreen from "@/features/hr/StandardsScreen";
 import SettingsScreen from "@/features/admin/SettingsScreen";
+import PlanScreen from "./PlanScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -79,6 +80,7 @@ type Section =
   | "intervals"
   | "proxy"
   | "jobs"
+  | "plan"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -109,6 +111,7 @@ const VALID_SECTIONS: Section[] = [
   "intervals",
   "proxy",
   "jobs",
+  "plan",
   "space-restart",
 ];
 
@@ -332,6 +335,13 @@ const SECTIONS: SectionDef[] = [
     subtitle: "APScheduler-job'ы: изменить, пропустить",
   },
   {
+    id: "plan",
+    group: GROUP_SETTINGS,
+    icon: "award",
+    title: "Тариф и лимиты",
+    subtitle: "Места, подразделения и срок пробного периода",
+  },
+  {
     id: "proxy",
     group: GROUP_SYSTEM,
     icon: "globe",
@@ -517,6 +527,7 @@ export default function AdminScreen({
   if (section === "proxy") return <ProxyScreen onBack={back} />;
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
+  if (section === "plan") return <PlanScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");

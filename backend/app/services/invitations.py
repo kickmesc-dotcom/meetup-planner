@@ -102,6 +102,15 @@ async def create(
     if len(await active(session, org_id)) >= MAX_ACTIVE:
         raise InvitationsError("invite_limit")
 
+    # Ссылка уже обещает место: без этой проверки двадцать приглашений
+    # обходили бы лимит тарифа, а узнавали бы об этом при входе людей.
+    from app.services import billing
+
+    try:
+        await billing.ensure_seats(session, org_id)
+    except billing.PlanError as exc:
+        raise InvitationsError(str(exc)) from exc
+
     token = secrets.token_urlsafe(32)
     row = OrgInvitation(
         org_id=org_id,

@@ -90,7 +90,17 @@ async def create_org(
     if await by_slug(session, clean_slug) is not None:
         raise OrgsError("slug_taken")
 
-    org = Organization(slug=clean_slug, name=clean_name, industry=industry)
+    # Новая организация начинает с пробного периода: тариф — часть
+    # создания, а не отдельное действие, которое можно забыть.
+    from app.services import billing
+
+    org = Organization(
+        slug=clean_slug,
+        name=clean_name,
+        industry=industry,
+        plan=billing.DEFAULT_PLAN,
+        trial_ends_at=billing.trial_deadline(),
+    )
     session.add(org)
     await session.commit()
     await session.refresh(org)
@@ -408,6 +418,7 @@ async def ensure_default(session: AsyncSession) -> Organization:
         slug=DEFAULT_ORG_SLUG,
         name="Моя организация",
         industry="restaurant",
+        plan="business",
     )
     session.add(org)
     await session.commit()
