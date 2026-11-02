@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AdminScreen from "./AdminScreen";
+import { useUI } from "@/store/ui";
 import { fetchAdminTasks } from "@/api/hr";
 import { fetchIssues } from "@/api/issues";
 
@@ -43,6 +44,9 @@ function renderScreen(platform = true, canManage = false) {
 
 beforeEach(() => {
   localStorage.clear();
+  // Раздел кабинета теперь лежит в сторе (его переключает и нижняя полоса
+  // зоны управления), поэтому тесты не должны начинать с чужого раздела.
+  useUI.setState({ adminSection: "root" });
   tasksMock.mockReset();
   issuesMock.mockReset();
   tasksMock.mockResolvedValue([]);
@@ -112,6 +116,26 @@ describe("AdminScreen (P1.9)", () => {
     expect(screen.queryByText("Стандарты")).toBeNull();
     // Сотрудник читает их в своём профиле — из кабинета они ему не нужны.
     expect(screen.getByText("Чек-листы")).toBeTruthy();
+  });
+
+  it("открывает настройки и уводит из них в разделы вида", () => {
+    // Язык и тема переехали сюда из шапки зоны управления: в шапке они стояли
+    // рядом с вкладками зон и читались как их продолжение.
+    useUI.setState({ adminSection: "settings" });
+    renderScreen();
+
+    expect(screen.getByTestId("language-switcher")).toBeTruthy();
+    expect(screen.getByTestId("theme-switcher")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Вид ленты"));
+    expect(useUI.getState().adminSection).toBe("feed-settings");
+  });
+
+  it("прячет системные тексты от владельца организации", () => {
+    useUI.setState({ adminSection: "settings" });
+    renderScreen(false, true);
+
+    expect(screen.queryByText("Тексты приложения")).toBeNull();
   });
 
   it("запоминает открытый раздел в localStorage", () => {

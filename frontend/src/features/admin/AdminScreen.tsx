@@ -28,6 +28,7 @@ import ReviewScreen from "@/features/hr/ReviewScreen";
 import ReportsScreen from "@/features/hr/ReportsScreen";
 import MaterialsScreen from "@/features/hr/MaterialsScreen";
 import StandardsScreen from "@/features/hr/StandardsScreen";
+import SettingsScreen from "@/features/admin/SettingsScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -59,6 +60,7 @@ type Section =
   | "reports"
   | "materials"
   | "standards"
+  | "settings"
   | "checklists"
   | "training-plan"
   | "feed-settings"
@@ -86,6 +88,7 @@ const VALID_SECTIONS: Section[] = [
   "reports",
   "materials",
   "standards",
+  "settings",
   "checklists",
   "training-plan",
   "feed-settings",
@@ -114,6 +117,10 @@ const GROUP_RESULT = "Опыт и результат";
 const GROUP_CALENDAR = "Календарь";
 const GROUP_TEXTS = "Тексты";
 const GROUP_SYSTEM = "Система";
+// Настройки приложения: язык, тема и виды экранов. Раньше язык и тема висели
+// в шапке зоны управления рядом с вкладками — как ещё две вкладки (жалоба
+// владельца 02.11.2026).
+const GROUP_SETTINGS = "Настройки";
 
 interface SectionDef {
   id: Section;
@@ -269,6 +276,13 @@ const SECTIONS: SectionDef[] = [
     subtitle: "Приветствие, подсказки и пустые состояния",
   },
   {
+    id: "settings",
+    group: GROUP_SETTINGS,
+    icon: "settings",
+    title: "Настройки",
+    subtitle: "Язык, тема и вид экранов",
+  },
+  {
     id: "intervals",
     group: GROUP_SYSTEM,
     icon: "repeat",
@@ -305,6 +319,7 @@ const GROUPS: { title: string; icon: IconName }[] = [
   { title: GROUP_RESULT, icon: "award" },
   { title: GROUP_CALENDAR, icon: "calendar" },
   { title: GROUP_TEXTS, icon: "edit" },
+  { title: GROUP_SETTINGS, icon: "settings" },
   { title: GROUP_SYSTEM, icon: "admin" },
 ];
 
@@ -389,7 +404,11 @@ export default function AdminScreen({
     if (MANAGER_SECTIONS.includes(s.id)) return canManage || platform;
     return true;
   });
-  const [section, setSection] = useState<Section>("root");
+  // Раздел — в сторе, а не локально: его переключает и нижняя полоса зоны
+  // управления, и deep link из профиля. Два источника состояния на один экран
+  // разошлись бы (полоса подсветила бы одно, кабинет показал другое).
+  const section = useUI((s) => s.adminSection) as Section;
+  const setSection = useUI((s) => s.setAdminSection);
   const [query, setQuery] = useState("");
   const [usage, setUsage] = useState<Record<string, number>>(readUsage);
 
@@ -402,7 +421,7 @@ export default function AdminScreen({
       setSection(pendingAdminSection as Section);
     }
     setPendingAdminSection(null);
-  }, [pendingAdminSection, setPendingAdminSection]);
+  }, [pendingAdminSection, setPendingAdminSection, setSection]);
 
   // Бейдж «требует внимания» — просроченные поручения + срочные проблемы.
   const tasks = useQuery({
@@ -437,6 +456,15 @@ export default function AdminScreen({
   if (section === "reports") return <ReportsScreen onBack={back} />;
   if (section === "materials") return <MaterialsScreen onBack={back} />;
   if (section === "standards") return <StandardsScreen onBack={back} />;
+  if (section === "settings") {
+    return (
+      <SettingsScreen
+        platform={platform}
+        onBack={back}
+        onOpen={(next) => setSection(next)}
+      />
+    );
+  }
   if (section === "checklists") return <ChecklistSettingsScreen onBack={back} />;
   if (section === "training-plan") return <TrainingPlanScreen onBack={back} />;
   if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;

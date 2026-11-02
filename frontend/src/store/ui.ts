@@ -235,6 +235,15 @@ interface UIState {
    */
   pendingAdminSection: string | null;
   setPendingAdminSection: (s: string | null) => void;
+
+  /**
+   * Какой раздел кабинета открыт. Лежит в сторе, а не в `AdminScreen`, потому
+   * что переключать его теперь может не только сам кабинет: нижняя полоса
+   * зоны управления (02.11.2026) ведёт сразу в важные разделы, и ей нужно
+   * и подсвечивать текущий, и слышать клик. `"root"` — сам список разделов.
+   */
+  adminSection: string;
+  setAdminSection: (s: string) => void;
 }
 
 function shiftDateByZoom(d: Date, z: ZoomLevel, dir: 1 | -1): Date {
@@ -355,4 +364,7 @@ export const useUI = create<UIState>((set, get) => ({
 
   pendingAdminSection: null,
   setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),
+
+  adminSection: "root",
+  setAdminSection: (adminSection) => set({ adminSection }),
 }));

@@ -1781,4 +1781,14 @@ export const EN_CONTENT: Record<string, string> = {
   // Две зоны экрана (02.11.2026): вкладки «Сотрудник | Управление» вверху.
   "Зона приложения": "App area",
   "Кабинет руководителя": "Manager's office",
+
+  // Нижняя полоса зоны управления и экран настроек (02.11.2026).
+  "Разделы управления": "Management sections",
+  "Язык, вид приложения и доступы": "Language, appearance and access",
+  "Язык и вид": "Language and appearance",
+  "Язык": "Language",
+  "Интерфейс без перезагрузки": "Switches without a reload",
+  "Тема": "Theme",
+  "Светлая или тёмная — по клику": "Light or dark in one tap",
+  "Ещё настройки": "More settings",
 };
