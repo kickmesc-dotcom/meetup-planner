@@ -26,6 +26,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
 import { useTx } from "@/i18n";
+import { useTerms } from "@/api/texts";
 /**
  * Админка → «Чек-листы».
  *
@@ -63,6 +64,7 @@ function parseWeekdays(value: string | null | undefined): number[] {
 }
 
 export default function ChecklistSettingsScreen({ onBack }: Props) {
+  const term = useTerms();
   const { tx } = useTx();
   const qc = useQueryClient();
   const deps = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
@@ -101,7 +103,8 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
   const hallName =
     effectiveHall === "common"
       ? tx("Общий (все залы)")
-      : (halls.find((h) => h.id === effectiveHall)?.name ?? tx("Зал"));
+      : (halls.find((h) => h.id === effectiveHall)?.name ??
+        term("hall.one", tx("Зал")));
 
   const invalidate = () => {
     haptic("success");
@@ -161,7 +164,9 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
 
       {kind === "shift" ? (
         <section className="space-y-2">
-          <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">{tx("Зал")}</div>
+          <div className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
+            {term("hall.one", tx("Зал"))}
+          </div>
           <Chips
             options={[
               { value: "common" as const, label: tx("Общий") },
@@ -578,6 +583,7 @@ function ItemEditor({
 // ---------------------------------------------------------------------------
 
 function HallsCard() {
+  const term = useTerms();
   const { tx } = useTx();
   const qc = useQueryClient();
   const hallsQ = useQuery({
@@ -625,7 +631,9 @@ function HallsCard() {
         className="flex w-full items-center justify-between text-left"
       >
         <div>
-          <div className="text-sm font-semibold text-tg-text">{tx("Залы ресторана")}</div>
+          <div className="text-sm font-semibold text-tg-text">
+            {term("hall.many", tx("Залы ресторана"))}
+          </div>
           <div className="text-xs text-tg-hint">
             {tx("{count} залов · от них зависит выбор у официанта", {
               count: hallsQ.data?.length ?? 0,

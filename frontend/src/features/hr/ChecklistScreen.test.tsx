@@ -14,6 +14,9 @@ import * as hrApi from "@/api/hr";
 
 vi.mock("@/api/texts", () => ({
   useAppText: (_code: string, fallback: string) => fallback,
+  // Термин отрасли здесь не проверяется: без правки руководителя подпись
+  // остаётся обычной, и это ровно то, что видит большинство организаций.
+  useTerms: () => (_code: string, fallback: string) => fallback,
 }));
 
 const item = {

@@ -115,3 +115,32 @@ async def test_unknown_values_in_config_are_ignored(session) -> None:
     )
     await session.commit()
     assert await app_texts.overrides(session) == {app_texts.CATALOG[0].code: "Своё"}
+
+# --------------------------------------------------------------------------
+# Термины отрасли (B2B_PLATFORM_PLAN, шаг 3.1)
+# --------------------------------------------------------------------------
+
+
+def test_every_term_has_a_pair_and_a_default() -> None:
+    """Термин без «одно/много» или с пустым дефолтом ломает подпись на экране."""
+    terms = [item for item in app_texts.CATALOG if item.code.startswith("term.")]
+    assert terms, "термины пропали из каталога"
+    codes = {item.code for item in terms}
+    for item in terms:
+        assert item.group == app_texts.TERM_GROUP, item.code
+        assert item.default.strip(), item.code
+        # Каждый термин идёт парой: подпись одного объекта и подпись раздела.
+        form = item.code.rsplit(".", 1)
+        assert form[-1] in {"one", "many"}, item.code
+        other = "many" if form[-1] == "one" else "one"
+        assert f"{form[0]}.{other}" in codes, item.code
+
+
+async def test_term_is_renamed_through_the_same_edit_path(session) -> None:
+    """«Залы» → «Кабинеты» — это та же правка текста, а не отдельный механизм."""
+    await app_texts.save(session, {"term.hall.many": "Кабинеты"})
+    effective = await app_texts.effective(session)
+    assert effective["term.hall.many"] == "Кабинеты"
+    # Соседняя форма не поехала за парой: единственное число правится отдельно.
+    assert effective["term.hall.one"] == "Зал"
+

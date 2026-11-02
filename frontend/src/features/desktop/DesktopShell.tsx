@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Icon, { type IconName } from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useTerms } from "@/api/texts";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useUI, type Tab } from "@/store/ui";
 import { sectionEnabled } from "@/features/hr/sections";
@@ -73,6 +74,7 @@ export default function DesktopShell({
   children: ReactNode;
 }) {
   const { tx } = useTx();
+  const term = useTerms();
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
 
@@ -83,7 +85,7 @@ export default function DesktopShell({
   // управления (вкладки вверху), а называть группу из проблем и передач
   // смены «Командой» было нечестно.
   const groups: NavGroup[] = [
-    { title: tx("Смена"), items: keep(WORK) },
+    { title: term("shift.one", tx("Смена")), items: keep(WORK) },
     { title: tx("Сервис"), items: keep([...SERVICE, PROFILE]) },
   ];
 

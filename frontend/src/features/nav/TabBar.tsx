@@ -5,6 +5,7 @@ import type { MessageKey } from "@/i18n/messages";
 import { useUI, type Tab } from "@/store/ui";
 import { sectionEnabled } from "@/features/hr/sections";
 import { haptic } from "@/tg/webapp";
+import { useTerms } from "@/api/texts";
 
 interface Item {
   id: Tab;
@@ -12,6 +13,12 @@ interface Item {
   labelKey: MessageKey;
   /** VISUAL_AUDIT P1.4: единый SVG-набор вместо эмодзи. */
   icon: IconName;
+  /**
+   * Термин отрасли (B2B_PLATFORM_PLAN, 3.1): у салона не «Смена», а «Приём»,
+   * у розницы не «Задачи», а «Заявки». Подставляется поверх перевода, поэтому
+   * язык и отрасль не спорят друг с другом: без правки остаётся обычная подпись.
+   */
+  termCode?: string;
 }
 
 // SemiTaskBot (раунд 5): «События» стоят первыми — туда приложение и
@@ -26,8 +33,8 @@ interface Item {
 // команда, приёмка и отчёт живут в зоне управления (вкладки вверху экрана).
 const ITEMS: Item[] = [
   { id: "feed", labelKey: "nav.feed", icon: "feed" },
-  { id: "tasks", labelKey: "nav.tasks", icon: "tasks" },
-  { id: "checklist", labelKey: "nav.shift", icon: "shift" },
+  { id: "tasks", labelKey: "nav.tasks", icon: "tasks", termCode: "task.many" },
+  { id: "checklist", labelKey: "nav.shift", icon: "shift", termCode: "shift.one" },
   { id: "shifts", labelKey: "nav.table", icon: "calendar" },
   { id: "profile", labelKey: "nav.profile", icon: "profile" },
 ];
@@ -47,6 +54,7 @@ export default function TabBar({
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
   const { t } = useT();
+  const term = useTerms();
   // «Управление» (админка) из нижней полосы убрано 31.10.2026. Причина не в
   // дизайне, а в разделении ролей: полоса — это рабочий день сотрудника, а
   // кабинет предприятия — отдельный блок руководителя. Семь подписей на
@@ -66,7 +74,7 @@ export default function TabBar({
     >
       {items.map((it) => {
         const active = tab === it.id;
-        const label = t(it.labelKey);
+        const label = it.termCode ? term(it.termCode, t(it.labelKey)) : t(it.labelKey);
         return (
           <button
             key={it.id}

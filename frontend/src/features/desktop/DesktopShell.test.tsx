@@ -8,14 +8,19 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DesktopShell from "./DesktopShell";
 import { useUI } from "@/store/ui";
 
-function renderShell() {
+function renderShell(sections?: string[]) {
+  // Сайдбар берёт термины отрасли из текстов приложения — как и всё приложение.
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <DesktopShell meName="Сергей" meHint="Официант">
-      <div>Экран</div>
-    </DesktopShell>,
+    <QueryClientProvider client={qc}>
+      <DesktopShell meName="Сергей" meHint="Официант" sections={sections}>
+        <div>Экран</div>
+      </DesktopShell>
+    </QueryClientProvider>,
   );
 }
 

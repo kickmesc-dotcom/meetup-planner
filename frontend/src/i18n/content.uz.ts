@@ -32,8 +32,8 @@ export const UZ_CONTENT: Record<string, string> = {
   "В каком зале работаешь?": "Qaysi zalda ishlaysiz?",
   "У каждого зала свой чек-лист открытия. Выбор запомнится на сегодня — сменить можно в любой момент.":
     "Har bir zalning ochilish chek-listi bor. Tanlov bugun uchun eslab qolinadi — istalgan paytda almashtirish mumkin.",
-  "Залы не заведены. Попроси руководителя добавить их в разделе «Чек-листы».":
-    "Zallar kiritilmagan. Rahbardan ularni «Chek-listlar» boʻlimida qoʻshishni soʻrang.",
+  "{halls} не заведены. Попроси руководителя добавить их в разделе «Чек-листы».":
+    "«{halls}» kiritilmagan. Rahbardan ularni «Chek-listlar» boʻlimida qoʻshishni soʻrang.",
   "выбран": "tanlangan",
   "выбрать": "tanlash",
   "закрытия смены": "smenani yopish",

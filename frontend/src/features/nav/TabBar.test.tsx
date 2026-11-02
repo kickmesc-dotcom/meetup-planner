@@ -5,10 +5,34 @@
  * Проверяем, что вкладки рисуются SVG-иконками (а не эмодзи), подписи остаются
  * доступным именем кнопки, а роли добавляют/убирают нужные пункты.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import TabBar from "./TabBar";
 import { useUI } from "@/store/ui";
+const { apiMock } = vi.hoisted(() => ({ apiMock: vi.fn() }));
+
+// Подменяем не `useTerms`, а сам HTTP-слой: иначе проверяли бы заглушку, а не
+// настоящую подстановку термина в подпись вкладки.
+vi.mock("@/api/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/client")>();
+  return { ...actual, api: apiMock };
+});
+
+/** Полоса берёт термины отрасли из тех же текстов, что и остальной интерфейс. */
+function renderTabBar(props: { openTasks?: number } = {}) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <TabBar {...props} />
+    </QueryClientProvider>,
+  );
+}
+
+beforeEach(() => {
+  apiMock.mockResolvedValue({});
+});
+
 
 afterEach(() => {
   cleanup();
@@ -16,8 +40,24 @@ afterEach(() => {
 });
 
 describe("TabBar", () => {
+  it("берёт подпись вкладки из термина отрасли", async () => {
+    // Шаг 3.1 плана: у розницы «Задачи» — это «Заявки», у салона «Смена» —
+    // «Приём». Меняется одна строка в кабинете, код остаётся прежним.
+    apiMock.mockResolvedValue({
+      "term.task.many": "Заявки",
+      "term.shift.one": "Приём",
+    });
+    renderTabBar();
+
+    expect(await screen.findByText("Заявки")).toBeTruthy();
+    expect(screen.getByText("Приём")).toBeTruthy();
+    // Не тронутые термином подписи остаются как были.
+    expect(screen.getByText("График")).toBeTruthy();
+    expect(screen.queryByText("Задачи")).toBeNull();
+  });
+
   it("рисует пять вкладок с SVG-иконками и подписями", () => {
-    const { container } = render(<TabBar />);
+    const { container } = renderTabBar();
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(5);
     for (const label of ["Задачи", "Смена", "График", "События", "Профиль"]) {
@@ -33,7 +73,7 @@ describe("TabBar", () => {
     // Раньше у руководителя на месте «Профиля» стояла «Команда», и одна зона
     // выглядела по-разному у разных людей. Команда, приёмка и отчёт живут
     // в зоне управления — вкладками вверху экрана.
-    render(<TabBar />);
+    renderTabBar();
     expect(screen.getAllByRole("button")).toHaveLength(5);
     expect(screen.queryByText("Команда")).toBeNull();
     expect(screen.queryByText("Админ")).toBeNull();
@@ -42,7 +82,7 @@ describe("TabBar", () => {
   it("подписи не вылезают за кнопку", () => {
     // P3.17: на 360–390 px подписи при 12 px обрезались по краям экрана.
     // Подпись обязана ужиматься внутри своей кнопки, а не вылезать.
-    render(<TabBar />);
+    renderTabBar();
     const label = screen.getByText("События");
     expect(label.className).toContain("truncate");
     expect(label.className).toContain("text-center");
@@ -53,7 +93,7 @@ describe("TabBar", () => {
 
   it("показывает число открытых поручений, но не больше 9+", () => {
     // Приём из соцсетей: цифра на разделе видна до перехода.
-    render(<TabBar openTasks={3} />);
+    renderTabBar({ openTasks: 3 });
     expect(screen.getByTestId("tab-tasks-badge").textContent).toBe("3");
     // Цифра не ломает доступное имя: объяснение — в aria-label кнопки.
     expect(
@@ -61,17 +101,17 @@ describe("TabBar", () => {
     ).toBeTruthy();
 
     cleanup();
-    render(<TabBar openTasks={12} />);
+    renderTabBar({ openTasks: 12 });
     expect(screen.getByTestId("tab-tasks-badge").textContent).toBe("9+");
   });
 
   it("не рисует бейдж без открытых задач", () => {
-    render(<TabBar openTasks={0} />);
+    renderTabBar({ openTasks: 0 });
     expect(screen.queryByTestId("tab-tasks-badge")).toBeNull();
   });
 
   it("тап переключает вкладку", () => {
-    render(<TabBar />);
+    renderTabBar();
     fireEvent.click(screen.getByText("Смена"));
     expect(useUI.getState().tab).toBe("checklist");
   });
@@ -79,7 +119,7 @@ describe("TabBar", () => {
   it("«События» стоят первыми — туда приложение и открывается", () => {
     // Раунд 5: первый экран — события смены, а не личные задачи.
     expect(useUI.getInitialState().tab).toBe("feed");
-    render(<TabBar />);
+    renderTabBar();
     const buttons = screen.getAllByRole("button");
     expect(buttons[0].textContent).toContain("События");
   });

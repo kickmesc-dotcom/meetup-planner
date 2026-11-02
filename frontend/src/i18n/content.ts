@@ -193,7 +193,9 @@ export const EN_CONTENT: Record<string, string> = {
   "В каком зале работаешь?": "Which hall are you working in?",
   "У каждого зала свой чек-лист открытия. Выбор запомнится на сегодня — сменить можно в любой момент.":
     "Each hall has its own opening checklist. Your choice is kept for today — you can change it at any time.",
-  "Залы не заведены. Попроси руководителя добавить их в разделе «Чек-листы».":
+  // Запасное слово для термина отрасли, когда руководитель его не менял.
+  "Залы": "Halls",
+  "{halls} не заведены. Попроси руководителя добавить их в разделе «Чек-листы».":
     "No halls yet. Ask your manager to add them under “Checklists”.",
   "выбран": "selected",
   "выбрать": "select",

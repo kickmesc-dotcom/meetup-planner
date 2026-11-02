@@ -19,6 +19,7 @@ import TranslatableText from "@/components/TranslatableText";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { intlLocaleFor, useTx, type Locale } from "@/i18n";
+import { useTerms } from "@/api/texts";
 
 /**
  * SemiTaskBot: «Чек-лист смены».
@@ -235,6 +236,7 @@ function HallPicker({
   onChange: (hallId: number) => void;
 }) {
   const { tx } = useTx();
+  const term = useTerms();
   return (
     <div className="space-y-2">
       <div className="rounded-card bg-tg-secondary-bg/60 p-3">
@@ -251,7 +253,8 @@ function HallPicker({
       {!loading && halls.length === 0 && (
         <div className="rounded-card bg-tg-secondary-bg/40 p-3 text-xs text-tg-hint">
           {tx(
-            "Залы не заведены. Попроси руководителя добавить их в разделе «Чек-листы».",
+            "{halls} не заведены. Попроси руководителя добавить их в разделе «Чек-листы».",
+            { halls: term("hall.many", tx("Залы")) },
           )}
         </div>
       )}
