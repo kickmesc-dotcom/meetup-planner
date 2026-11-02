@@ -60,6 +60,7 @@ from app.services import (
     hr_tasks,
     hr_training,
     hr_training_plan,
+    org_packs,
     org_setup,
     orgs,
     weekdays,
@@ -1165,14 +1166,26 @@ async def save_org_setup(
         # рабочий экран сотрудника говорит «попроси руководителя назначить
         # шаблон». Руководителя рядом нет, что просить — непонятно, и рабочий
         # день начинается не с работы, а с переписки. Поэтому вместе с
-        # подразделениями мастер заводит стартовую пару: «Открытие смены» и
-        # «Закрытие смены». Функция ничего не трогает там, где шаблон уже есть.
-        created = await hr_checklists.ensure_starter_templates_for_all(session)
-        if created:
+        # отраслью мастер применяет стартовый пакет (`org_packs`): слова,
+        # пару чек-листов «открытие / закрытие» и веса опыта на чистую
+        # установку. Пакет идемпотентен и не трогает уже заведённое.
+        #
+        # Смена отрасли — отдельный случай: человек явно сказал «мы не
+        # ресторан», и оставить ему ресторанные слова было бы выполнением
+        # ровно наоборот. Но только при смене отрасли, а не при повторном
+        # проходе того же мастера.
+        applied = await org_packs.apply(
+            session,
+            industry=updated.industry,
+            force_terms=current.industry != updated.industry,
+        )
+        if applied.terms_set or applied.templates_created or applied.kpi_updated:
             log.info(
-                "org_setup.starter_templates",
-                count=len(created),
-                department_ids=sorted({t.department_id for t in created}),
+                "org_setup.pack",
+                industry=applied.industry,
+                terms=applied.terms_set,
+                templates=applied.templates_created,
+                kpi=applied.kpi_updated,
             )
 
     await org_setup.save(session, updated)
@@ -1180,6 +1193,142 @@ async def save_org_setup(
         updated,
         can_edit=True,
         can_manage_packs=await _may_manage_packs(session, employee, user),
+    )
+
+
+# --------------------------------------------------------------------------
+# Пакет отрасли (фаза 3, шаг 3.2)
+# --------------------------------------------------------------------------
+
+
+class PackOut(BaseModel):
+    """Стартовый набор отрасли в человеческом виде.
+
+    Отдаём и содержимое, а не только название: руководитель должен видеть, что
+    именно получит, до нажатия. «Применить пакет салона» без списка пунктов —
+    это кнопка-лотерея.
+    """
+
+    industry: str
+    title: str
+    why: str
+    terms: dict[str, str] = {}
+    positions: list[str] = []
+    checklist_items: int = 0
+    opening_items: list[str] = []
+    closing_items: list[str] = []
+    kpi: dict[str, int] = {}
+
+
+class PackApplyIn(BaseModel):
+    """Запрос применения. Отрасль по умолчанию — своя."""
+
+    industry: str | None = None
+    # Перезаписать уже переименованное. Отдельный флаг, а не поведение по
+    # умолчанию: молча вернуть «Зал» поверх «Кабинета» нельзя.
+    force_terms: bool = False
+
+
+class PackApplyOut(BaseModel):
+    """Что пакет реально изменил — числами, а не «ok»."""
+
+    industry: str
+    title: str
+    terms_set: int = 0
+    templates_created: int = 0
+    kpi_updated: bool = False
+    force: bool = False
+
+
+class PackStateOut(BaseModel):
+    """Пакет организации плюс право на применение."""
+
+    pack: PackOut
+    can_apply: bool = False
+    # Отрасль, выбранная в мастере; `pack.industry` может отличаться, если
+    # установлена неизвестная отрасль и работает универсальный набор.
+    industry: str = "restaurant"
+    catalog: list[PackOut] = []
+
+
+def _pack_out(pack: org_packs.IndustryPack) -> PackOut:
+    return PackOut(**org_packs.summary(pack))
+
+
+async def _industry_of(session: AsyncSession, employee: Employee) -> str:
+    """Отрасль организации: сначала ответ мастера, затем поле организации.
+
+    Мастер — источник правды, потому что отрасль можно поменять там повторно,
+    а `Organization.industry` пишется один раз при создании и дальше не
+    обновляется.
+    """
+    setup = await org_setup.load(session)
+    if setup.industry:
+        return setup.industry
+    row = await orgs.get(session, employee.org_id)
+    return (row.industry if row is not None else "") or "restaurant"
+
+
+@router.get("/pack", response_model=PackStateOut)
+async def get_pack(
+    session: SessionDep, user: CurrentUser, employee: EmployeeDep
+) -> PackStateOut:
+    """Пакет своей отрасли и каталог — читать можно всем.
+
+    Читать: на экране кабинета видно, из каких слов состоит приложение, и это
+    объясняет, почему вкладка называется «Приёмы». Применять — руководителю.
+    """
+    industry = await _industry_of(session, employee)
+    return PackStateOut(
+        pack=_pack_out(org_packs.get(industry)),
+        can_apply=_may_edit_setup(employee, user),
+        industry=industry,
+        catalog=[_pack_out(item) for item in org_packs.all_packs()],
+    )
+
+
+@router.post("/pack/apply", response_model=PackApplyOut)
+async def apply_pack(
+    body: PackApplyIn,
+    session: SessionDep,
+    user: CurrentUser,
+    employee: EmployeeDep,
+) -> PackApplyOut:
+    """Применить пакет к своей организации.
+
+    Идемпотентно: повторное нажатие не плодит чек-листы и не перезаписывает
+    правки. `force_terms` — единственный способ вернуть слова пакета поверх
+    своих, и он приходит явно с экрана.
+    """
+    if not _may_edit_setup(employee, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="managers_only")
+
+    industry = (body.industry or "").strip().lower()
+    if not industry:
+        industry = await _industry_of(session, employee)
+    if not org_packs.known(industry):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="bad_industry")
+
+    applied = await org_packs.apply(
+        session, industry=industry, force_terms=body.force_terms
+    )
+    pack = org_packs.get(industry)
+    log.info(
+        "org.pack.apply",
+        industry=applied.industry,
+        terms=applied.terms_set,
+        templates=applied.templates_created,
+        kpi=applied.kpi_updated,
+        force=applied.force,
+        employee_id=employee.id,
+    )
+    return PackApplyOut(
+        industry=pack.industry,
+        title=pack.title,
+        terms_set=applied.terms_set,
+        templates_created=applied.templates_created,
+        kpi_updated=applied.kpi_updated,
+        force=applied.force,
     )
 
 

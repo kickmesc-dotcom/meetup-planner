@@ -22,6 +22,7 @@ import ProxyScreen from "./ProxyScreen";
 import SpaceRestartScreen from "./SpaceRestartScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
 import LanguagesScreen from "./LanguagesScreen";
+import PackScreen from "./PackScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
 import TeamScreen from "@/features/hr/TeamScreen";
 import ReviewScreen from "@/features/hr/ReviewScreen";
@@ -72,6 +73,7 @@ type Section =
   | "poll-presets"
   | "texts"
   | "languages"
+  | "pack"
   | "intervals"
   | "proxy"
   | "jobs"
@@ -100,6 +102,7 @@ const VALID_SECTIONS: Section[] = [
   "birthdays",
   "poll-presets",
   "texts",
+  "pack",
   "intervals",
   "proxy",
   "jobs",
@@ -249,6 +252,16 @@ const SECTIONS: SectionDef[] = [
     icon: "globe",
     title: "Языки",
     subtitle: "Узбекский пакет для команды: включён по умолчанию",
+  },
+  {
+    // Пакет отрасли — рядом с «Языками»: это тоже «что видит команда», а не
+    // настройка экрана. Термины, чек-листы, веса опыта и должности — один
+    // ответ на вопрос «мы не ресторан, почему у нас залы».
+    id: "pack",
+    group: GROUP_PEOPLE,
+    icon: "layout",
+    title: "Пакет отрасли",
+    subtitle: "Термины, KPI и должности под ваш бизнес",
   },
   {
     id: "kpi",
@@ -467,6 +480,7 @@ export default function AdminScreen({
   if (section === "reports") return <ReportsScreen onBack={back} />;
   if (section === "menu") return <MenuScreen onBack={back} />;
   if (section === "materials") return <MaterialsScreen onBack={back} />;
+  if (section === "pack") return <PackScreen onBack={back} />;
   if (section === "standards") return <StandardsScreen onBack={back} />;
   if (section === "settings") {
     return (

@@ -631,10 +631,20 @@ STARTER_OPENING_TITLE = "Открытие смены"
 STARTER_CLOSING_TITLE = "Закрытие смены"
 
 
-async def ensure_starter_templates(
-    session: AsyncSession, *, department_id: int
+async def ensure_templates(
+    session: AsyncSession,
+    *,
+    department_id: int,
+    opening: tuple[tuple[str, bool], ...] = STARTER_OPENING_ITEMS,
+    closing: tuple[tuple[str, bool], ...] = STARTER_CLOSING_ITEMS,
+    opening_title: str = STARTER_OPENING_TITLE,
+    closing_title: str = STARTER_CLOSING_TITLE,
 ) -> list[ChecklistTemplate]:
-    """Завести стартовую пару шаблонов подразделению, если их ещё нет.
+    """Завести пару шаблонов подразделению, если их ещё нет.
+
+    Пункты приходят снаружи, потому что «включить свет и проверить витрину» —
+    ресторанный старт. Салону и автосервису нужен свой набор (`org_packs`),
+    но правило создания одно: пара «открытие / закрытие» на подразделение.
 
     Идемпотентно и неразрушающе: если у подразделения уже есть свой шаблон
     нужного вида (хоть один, даже пустой) — не трогаем ничего. Это важно, потому
@@ -645,8 +655,8 @@ async def ensure_starter_templates(
     """
     created: list[ChecklistTemplate] = []
     for kind, title, items in (
-        (TEMPLATE_SHIFT, STARTER_OPENING_TITLE, STARTER_OPENING_ITEMS),
-        (TEMPLATE_CLOSE, STARTER_CLOSING_TITLE, STARTER_CLOSING_ITEMS),
+        (TEMPLATE_SHIFT, opening_title, opening),
+        (TEMPLATE_CLOSE, closing_title, closing),
     ):
         exists = await session.scalar(
             select(ChecklistTemplate.id)
@@ -683,22 +693,8 @@ async def ensure_starter_templates(
     return created
 
 
-async def ensure_starter_templates_for_all(
-    session: AsyncSession,
+async def ensure_starter_templates(
+    session: AsyncSession, *, department_id: int
 ) -> list[ChecklistTemplate]:
-    """Стартовая пара — всем подразделениям организации, у кого её нет.
-
-    Именно «всем», а не «одному»: у кофейни и салона подразделений несколько
-    (зал, кухня, администраторы), и смену открывает каждое своё. Пока шаблона
-    нет ни у одного, любой сотрудник видит пустой экран.
-    """
-    from app.services import hr_departments
-
-    created: list[ChecklistTemplate] = []
-    for department in await hr_departments.list_departments(
-        session, active_only=False
-    ):
-        created.extend(
-            await ensure_starter_templates(session, department_id=department.id)
-        )
-    return created
+    """Стартовая пара «как у всех» — для вызовов, которым отрасль не важна."""
+    return await ensure_templates(session, department_id=department_id)
