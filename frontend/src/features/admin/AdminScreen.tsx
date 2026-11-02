@@ -23,6 +23,7 @@ import SpaceRestartScreen from "./SpaceRestartScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
 import LanguagesScreen from "./LanguagesScreen";
 import PackScreen from "./PackScreen";
+import DemoScreen from "./DemoScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
 import TeamScreen from "@/features/hr/TeamScreen";
 import ReviewScreen from "@/features/hr/ReviewScreen";
@@ -74,6 +75,7 @@ type Section =
   | "texts"
   | "languages"
   | "pack"
+  | "demo"
   | "intervals"
   | "proxy"
   | "jobs"
@@ -103,6 +105,7 @@ const VALID_SECTIONS: Section[] = [
   "poll-presets",
   "texts",
   "pack",
+  "demo",
   "intervals",
   "proxy",
   "jobs",
@@ -262,6 +265,15 @@ const SECTIONS: SectionDef[] = [
     icon: "layout",
     title: "Пакет отрасли",
     subtitle: "Термины, KPI и должности под ваш бизнес",
+  },
+  {
+    // Демо — рядом с пакетом: это один и тот же разговор «мы не ресторан»,
+    // только на витрине. Показ клиенту идёт до его данных, а не после.
+    id: "demo",
+    group: GROUP_PEOPLE,
+    icon: "sparkles",
+    title: "Демо-данные",
+    subtitle: "Показать приложение на тестовых людях за пять минут",
   },
   {
     id: "kpi",
@@ -481,6 +493,7 @@ export default function AdminScreen({
   if (section === "menu") return <MenuScreen onBack={back} />;
   if (section === "materials") return <MaterialsScreen onBack={back} />;
   if (section === "pack") return <PackScreen onBack={back} />;
+  if (section === "demo") return <DemoScreen onBack={back} />;
   if (section === "standards") return <StandardsScreen onBack={back} />;
   if (section === "settings") {
     return (

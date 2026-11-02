@@ -592,6 +592,9 @@ export interface HrDemoEmployee {
 export interface HrDemoState {
   visible: boolean;
   prefix: string;
+  /** Отрасль, под которую набран пул: демо салона показывает мастеров. */
+  industry: string;
+  industry_title: string;
   employees: HrDemoEmployee[];
   activity: {
     checklist_runs: number;

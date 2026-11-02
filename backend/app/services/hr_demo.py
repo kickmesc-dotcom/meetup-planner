@@ -57,7 +57,7 @@ from app.db.hr_models import (
 )
 from app.db.models import User
 from app.db.seed import color_for_user
-from app.services import hr_checklists, hr_settings
+from app.services import hr_checklists, hr_settings, org_packs, org_setup
 
 log = structlog.get_logger()
 
@@ -67,21 +67,30 @@ DEMO_PREFIX = "[BOT]"
 DEMO_TG_BASE = 900_000_000
 
 # (имя, slug подразделения, должность, текст плашки, эмодзи плашки)
-_DEMO_PEOPLE: tuple[tuple[str, str, str, str, str], ...] = (
-    ("Алина", "cook", "повар", "Стажёр", "🌱"),
-    ("Игорь", "cook", "су-шеф", "Су-шеф", "🍳"),
-    ("Марина", "waiter", "официант", "Официант", "🍽"),
-    ("Пётр", "barman", "бармен", "Бармен", "🍸"),
-    ("Ольга", "manager", "менеджер смены", "Менеджер", "📋"),
-    ("Тимур", "waiter", "официант", "Новичок", "🌱"),
-)
+# Имена общие для всех отраслей: меняются роли, а не люди. Иначе смена отрасли
+# заводила бы второй набор «других» тестовых сотрудников, а старые оставались
+# бы в ленте с чужими должностями.
+_DEMO_NAMES: tuple[str, ...] = ("Алина", "Игорь", "Марина", "Пётр", "Ольга", "Тимур")
 
 # (название поручения, нужен ли фотоотчёт)
-_DEMO_TASKS: tuple[tuple[str, bool], ...] = (
-    ("Проверить сроки годности на раздаче", True),
-    ("Убрать кухонный инвентарь после закрытия", False),
-    ("Обновить ценники в зале", False),
-)
+
+
+def demo_people(
+    industry: str | None = None,
+) -> list[tuple[str, str, str, str, str]]:
+    """Состав пула для отрасли: (имя, подразделение, должность, плашка, эмодзи).
+
+    Роли берём из пакета отрасли (`org_packs`), имена — из общего списка.
+    Подразделение — имя из пресетов отрасли, а не slug: в боевой организации
+    slug получается `slugify(имя)`, и связь по слагу нашла бы только сид.
+    """
+    roles = org_packs.demo_roster(industry)
+    return [
+        (name, department, position, badge, emoji)
+        for name, (department, position, badge, emoji) in zip(
+            _DEMO_NAMES, roles, strict=False
+        )
+    ]
 
 # Чередование статусов по индексу сотрудника: у пула должны быть и «новые», и
 # «в работе», и «выполненные» поручения — иначе лента и отчёты выглядят мертво.
@@ -134,7 +143,7 @@ def is_demo_telegram_id(telegram_id: int) -> bool:
 
 
 def demo_pool_size() -> int:
-    return len(_DEMO_PEOPLE)
+    return len(demo_people())
 
 
 # --------------------------------------------------------------------------
@@ -206,6 +215,10 @@ class DemoOverview:
 
     visible: bool
     prefix: str
+    # Чей состав показывается: без этого руководитель салона не понимает,
+    # почему в демо повара, и лезет «чинить» отрасль в мастере.
+    industry: str
+    industry_title: str
     employees: list[DemoEmployeeRow]
     activity: DemoActivity
 
@@ -216,9 +229,12 @@ async def overview(session: AsyncSession) -> DemoOverview:
     departments = {
         int(d.id): d.name for d in await session.scalars(select(Department))
     }
+    setup = await org_setup.load(session)
     return DemoOverview(
         visible=await hr_settings.get_demo_visible(session),
         prefix=DEMO_PREFIX,
+        industry=setup.industry,
+        industry_title=org_packs.get(setup.industry).title,
         employees=[
             DemoEmployeeRow(
                 employee_id=int(employee.id),
@@ -257,13 +273,25 @@ async def overview(session: AsyncSession) -> DemoOverview:
 # --------------------------------------------------------------------------
 
 
-async def seed_pool(session: AsyncSession) -> int:
-    """Создать/дополнить тестовый пул. Идемпотентно: повтор не дублирует людей."""
-    departments = {
-        d.slug: d for d in await session.scalars(select(Department))
+async def seed_pool(session: AsyncSession, *, industry: str | None = None) -> int:
+    """Создать/дополнить тестовый пул. Идемпотентно: повтор не дублирует людей.
+
+    Отрасль по умолчанию берётся из настройки организации: демо салона должно
+    показывать парикмахеров, а не поваров. Повторный проход с другой отраслью
+    не плодит людей — он переписывает должности и подразделения у тех же строк.
+    """
+    resolved = industry if industry is not None else (await org_setup.load(session)).industry
+    by_name = {
+        d.name.strip().casefold(): d
+        for d in await session.scalars(select(Department))
     }
+    # Одно подразделение — не повод оставить демо без привязки: чек-листы
+    # считаются по подразделению, и невозвязанные люди выглядят как баг.
+    sole = next(iter(by_name.values())) if len(by_name) == 1 else None
     created = 0
-    for index, (name, slug, position, badge, emoji) in enumerate(_DEMO_PEOPLE):
+    for index, (name, department_name, position, badge, emoji) in enumerate(
+        demo_people(resolved)
+    ):
         telegram_id = demo_telegram_id(index)
         user = await session.scalar(select(User).where(User.telegram_id == telegram_id))
         if user is None:
@@ -275,7 +303,7 @@ async def seed_pool(session: AsyncSession) -> int:
             session.add(user)
             await session.flush()
 
-        department = departments.get(slug)
+        department = by_name.get(department_name.strip().casefold()) or sole
         department_id = department.id if department is not None else None
         employee = await session.scalar(select(Employee).where(Employee.user_id == user.id))
         if employee is None:
@@ -297,12 +325,17 @@ async def seed_pool(session: AsyncSession) -> int:
         # Повторный заведение — не «пересоздать», а подтянуть метки: так правка
         # списка пула в коде применяется к уже существующим тестовым людям.
         employee.is_demo = True
+        # Должность тоже: сменилась отрасль — сменились роли, и «повар» в
+        # списке салона читается как «система перепутала организацию».
+        employee.position = position
         employee.badge = badge
         employee.badge_emoji = emoji
         if department_id is not None:
             employee.department_id = department_id
     await session.flush()
-    log.info("hr.demo.seeded", created=created, total=demo_pool_size())
+    log.info(
+        "hr.demo.seeded", created=created, total=demo_pool_size(), industry=resolved
+    )
     return created
 
 
@@ -311,7 +344,9 @@ async def seed_pool(session: AsyncSession) -> int:
 # --------------------------------------------------------------------------
 
 
-async def simulate(session: AsyncSession, *, days: int = 3) -> dict[str, int]:
+async def simulate(
+    session: AsyncSession, *, days: int = 3, industry: str | None = None
+) -> dict[str, int]:
     """Сгенерировать правдоподобную активность пула за последние `days` смен.
 
     Генератор детерминированный (сид — id сотрудника и дата), поэтому повторный
@@ -320,6 +355,11 @@ async def simulate(session: AsyncSession, *, days: int = 3) -> dict[str, int]:
     rows = await demo_rows(session)
     if not rows:
         return dict(_EMPTY_COUNTS)
+
+    # Поручения тоже отраслевые: «проверить сроки годности на раздаче» в
+    # автосервисе — это сразу видно, и витрина перестаёт работать.
+    resolved = industry if industry is not None else (await org_setup.load(session)).industry
+    tasks = org_packs.demo_tasks(resolved)
 
     counters = dict(_EMPTY_COUNTS)
     owner_id = await session.scalar(
@@ -343,7 +383,7 @@ async def simulate(session: AsyncSession, *, days: int = 3) -> dict[str, int]:
             await _simulate_checklist(session, employee, shift_date, rng, counters)
             if offset == 0:
                 await _simulate_task(
-                    session, employee, index, owner_id, now, rng, counters
+                    session, employee, index, owner_id, now, rng, counters, tasks
                 )
                 await _simulate_feedback(
                     session, employee, shift_date, index, questions, counters
@@ -413,8 +453,9 @@ async def _simulate_task(
     now: datetime,
     rng: random.Random,
     counters: dict[str, int],
+    tasks: tuple[tuple[str, bool], ...],
 ) -> None:
-    title, needs_photo = _DEMO_TASKS[index % len(_DEMO_TASKS)]
+    title, needs_photo = tasks[index % len(tasks)]
     target_status = _DEMO_STATUSES[index % len(_DEMO_STATUSES)]
     task = Task(
         title=title,
@@ -485,7 +526,7 @@ async def _simulate_task(
             counters["task_photos"] += 1
 
     # Один из пула «не успевает» — чтобы у руководителя было что эскалировать.
-    if index == len(_DEMO_PEOPLE) - 1:
+    if index == demo_pool_size() - 1:
         session.add(
             TaskIssue(
                 task_id=task.id,

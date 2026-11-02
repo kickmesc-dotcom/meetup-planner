@@ -40,6 +40,12 @@ from app.services.hr_checklists import STARTER_CLOSING_ITEMS, STARTER_OPENING_IT
 # это порядок работы в смене, и он не должен зависеть от сортировки ключей.
 PackItem = tuple[str, bool]
 
+# Демо-роль: (подразделение, должность, плашка, эмодзи плашки). Подразделение —
+# имя из пресетов отрасли, а не slug: в боевой организации slug получается
+# `slugify(имя)`, и привязка по слагу из сида нашла бы разве что сидовые данные.
+DemoRole = tuple[str, str, str, str]
+DemoTask = tuple[str, bool]
+
 
 @dataclass(frozen=True)
 class IndustryPack:
@@ -57,6 +63,10 @@ class IndustryPack:
     # Веса опыта. Пустой словарь — «оставить как есть»: у универсального
     # пакета нет причин спорить с текущими правилами.
     kpi: dict[str, int] = field(default_factory=dict)
+    # Состав витрины «покажем за 5 минут»: без него демо салона показывает
+    # поваров и официантов, и клиент проверяет чужой продукт.
+    demo_roles: tuple[DemoRole, ...] = ()
+    demo_tasks: tuple[DemoTask, ...] = ()
 
     @property
     def checklist_items(self) -> int:
@@ -96,6 +106,19 @@ PACKS: dict[str, IndustryPack] = {
             ("Закрыть кассу и сдать выручку", False),
             ("Внести, что закончилось на кухне и в баре", False),
         ),
+        demo_roles=(
+            ("Кухня", "повар", "Стажёр", "🌱"),
+            ("Кухня", "су-шеф", "Су-шеф", "🍳"),
+            ("Официанты", "официант", "Официант", "🍽"),
+            ("Бар", "бармен", "Бармен", "🍸"),
+            ("Менеджеры", "менеджер смены", "Менеджер", "📋"),
+            ("Официанты", "официант", "Новичок", "🌱"),
+        ),
+        demo_tasks=(
+            ("Проверить сроки годности на раздаче", True),
+            ("Убрать кухонный инвентарь после закрытия", False),
+            ("Обновить ценники в зале", False),
+        ),
     ),
     "salon": IndustryPack(
         industry="salon",
@@ -126,6 +149,19 @@ PACKS: dict[str, IndustryPack] = {
         # Приёмов в салоне много и они короткие: вес «смены» ниже, вес
         # поручения — выше, иначе опыт капал бы за сам факт рабочего дня.
         kpi={"xp_shift_done": 6, "xp_task": 12, "xp_on_time": 5, "min_xp_winner": 20},
+        demo_roles=(
+            ("Парикмахеры", "парикмахер", "Мастер", "✂️"),
+            ("Парикмахеры", "парикмахер-стажёр", "Стажёр", "🌱"),
+            ("Мастера ногтей", "мастер ногтей", "Нейл-мастер", "💅"),
+            ("Косметологи", "косметолог", "Косметолог", "🧖"),
+            ("Администраторы", "администратор", "Администратор", "🧾"),
+            ("Администраторы", "менеджер смены", "Менеджер", "📋"),
+        ),
+        demo_tasks=(
+            ("Подтвердить запись клиентов на завтра", False),
+            ("Сфотографировать рабочее место до приёма", True),
+            ("Проверить, что расходники на завтра есть", False),
+        ),
     ),
     "autoservice": IndustryPack(
         industry="autoservice",
@@ -156,6 +192,19 @@ PACKS: dict[str, IndustryPack] = {
         # Наряд — основная единица работы и стоит дороже, чем в других
         # отраслях: за него отвечают деньгами клиента, а не галочкой.
         kpi={"xp_task": 20, "xp_on_time": 8, "xp_shift_done": 10, "min_xp_winner": 20},
+        demo_roles=(
+            ("Механики", "механик", "Механик", "🔧"),
+            ("Механики", "автослесарь", "Стажёр", "🌱"),
+            ("Кузовной цех", "мастер кузовного цеха", "Кузовной", "🚗"),
+            ("Приёмка", "приёмщик", "Приёмщик", "🧾"),
+            ("Склад", "кладовщик", "Склад", "📦"),
+            ("Механики", "бригадир", "Бригадир", "📋"),
+        ),
+        demo_tasks=(
+            ("Сфотографировать машину при приёмке", True),
+            ("Заказать запчасти по наряду", False),
+            ("Проверить, что инструмент вернули на место", False),
+        ),
     ),
     "retail": IndustryPack(
         industry="retail",
@@ -184,6 +233,19 @@ PACKS: dict[str, IndustryPack] = {
             ("Выключить свет и оборудование", False),
         ),
         kpi={"xp_shift_done": 8, "xp_task": 12, "xp_on_time": 5, "min_xp_winner": 20},
+        demo_roles=(
+            ("Торговый зал", "продавец", "Продавец", "🛍"),
+            ("Торговый зал", "продавец-стажёр", "Стажёр", "🌱"),
+            ("Касса", "кассир", "Кассир", "💳"),
+            ("Склад", "кладовщик", "Склад", "📦"),
+            ("Управляющие", "управляющий", "Управляющий", "📋"),
+            ("Торговый зал", "мерчендайзер", "Выкладка", "🧺"),
+        ),
+        demo_tasks=(
+            ("Выложить новую поставку", True),
+            ("Переклеить ценники на акцию", False),
+            ("Проверить сроки годности на полке", False),
+        ),
     ),
 }
 
@@ -207,6 +269,23 @@ def known(industry: str | None) -> bool:
     """
     key = (industry or "").strip().lower()
     return key in PACKS or key in _ALIASES
+
+
+def demo_roster(industry: str | None) -> tuple[DemoRole, ...]:
+    """Кого показывать в демо для этой отрасли.
+
+    Универсальный пакет демо-состава не задаёт (он и есть ресторанный фолбэк),
+    поэтому пустой список здесь означает «взять ресторанный» — иначе витрина
+    у установки без отрасли осталась бы без людей.
+    """
+    pack = get(industry)
+    return pack.demo_roles or PACKS["restaurant"].demo_roles
+
+
+def demo_tasks(industry: str | None) -> tuple[DemoTask, ...]:
+    """Поручения демо для этой отрасли. Пусто — ресторанные, как и с ролями."""
+    pack = get(industry)
+    return pack.demo_tasks or PACKS["restaurant"].demo_tasks
 
 
 def all_packs() -> list[IndustryPack]:
@@ -328,4 +407,16 @@ def summary(pack: IndustryPack) -> dict[str, object]:
         "opening_items": [title for title, _ in pack.opening],
         "closing_items": [title for title, _ in pack.closing],
         "kpi": dict(pack.kpi),
+        "demo_roles": [
+            {
+                "department": department,
+                "position": position,
+                "badge": badge,
+                "emoji": emoji,
+            }
+            for department, position, badge, emoji in pack.demo_roles
+        ],
+        "demo_tasks": [
+            {"title": title, "photo": photo} for title, photo in pack.demo_tasks
+        ],
     }

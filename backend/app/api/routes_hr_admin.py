@@ -1367,6 +1367,10 @@ class DemoActivityOut(BaseModel):
 class DemoStateOut(BaseModel):
     visible: bool
     prefix: str
+    # Отрасль, под которую набран пул: экран витрины пишет «демо салона»,
+    # и руководитель видит, что демо соответствует его бизнесу.
+    industry: str
+    industry_title: str
     employees: list[DemoEmployeeOut]
     activity: DemoActivityOut
 
@@ -1394,6 +1398,8 @@ def _demo_state(data: hr_demo.DemoOverview) -> DemoStateOut:
     return DemoStateOut(
         visible=data.visible,
         prefix=data.prefix,
+        industry=data.industry,
+        industry_title=data.industry_title,
         employees=[
             DemoEmployeeOut(
                 employee_id=row.employee_id,
