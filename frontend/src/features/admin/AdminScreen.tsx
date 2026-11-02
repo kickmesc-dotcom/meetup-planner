@@ -26,6 +26,8 @@ import AdminTasksScreen from "./AdminTasksScreen";
 import TeamScreen from "@/features/hr/TeamScreen";
 import ReviewScreen from "@/features/hr/ReviewScreen";
 import ReportsScreen from "@/features/hr/ReportsScreen";
+import MaterialsScreen from "@/features/hr/MaterialsScreen";
+import StandardsScreen from "@/features/hr/StandardsScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -55,6 +57,8 @@ type Section =
   | "team"
   | "review"
   | "reports"
+  | "materials"
+  | "standards"
   | "checklists"
   | "training-plan"
   | "feed-settings"
@@ -80,6 +84,8 @@ const VALID_SECTIONS: Section[] = [
   "team",
   "review",
   "reports",
+  "materials",
+  "standards",
   "checklists",
   "training-plan",
   "feed-settings",
@@ -100,6 +106,10 @@ const GROUP_PEOPLE = "Смена и люди";
 // есть кабинет. Своя группа, потому что это не «смена и люди» в смысле
 // настроек, а надзор за тем, что уже происходит.
 const GROUP_TEAM = "Команда и контроль";
+// Документы смены (меню, график, методички, инструкции с тестами) сотрудник
+// читает у себя, а правит руководитель — значит править должен здесь, в
+// кабинете, а не в экране сотрудника по совместительству.
+const GROUP_DOCS = "Документы и знания";
 const GROUP_RESULT = "Опыт и результат";
 const GROUP_CALENDAR = "Календарь";
 const GROUP_TEXTS = "Тексты";
@@ -169,6 +179,20 @@ const SECTIONS: SectionDef[] = [
     icon: "layout",
     title: "Отчёт смены",
     subtitle: "Срез дня по стандартам и выгрузка CSV",
+  },
+  {
+    id: "materials",
+    group: GROUP_DOCS,
+    icon: "book",
+    title: "Материалы смены",
+    subtitle: "Меню, график и методички: обновить копию с сервера",
+  },
+  {
+    id: "standards",
+    group: GROUP_DOCS,
+    icon: "checklist",
+    title: "Стандарты",
+    subtitle: "Инструкции и тесты по ним: добавить и поправить",
   },
   {
     id: "checklists",
@@ -277,6 +301,7 @@ const SECTIONS: SectionDef[] = [
 const GROUPS: { title: string; icon: IconName }[] = [
   { title: GROUP_PEOPLE, icon: "team" },
   { title: GROUP_TEAM, icon: "check" },
+  { title: GROUP_DOCS, icon: "book" },
   { title: GROUP_RESULT, icon: "award" },
   { title: GROUP_CALENDAR, icon: "calendar" },
   { title: GROUP_TEXTS, icon: "edit" },
@@ -344,7 +369,13 @@ interface Props {
 }
 
 /** Разделы надзора за людьми: нужны руководителю, а не владельцу платформы. */
-const MANAGER_SECTIONS: Section[] = ["team", "review", "reports"];
+const MANAGER_SECTIONS: Section[] = [
+  "team",
+  "review",
+  "reports",
+  "materials",
+  "standards",
+];
 
 export default function AdminScreen({
   users,
@@ -404,6 +435,8 @@ export default function AdminScreen({
   if (section === "team") return <TeamScreen canManage={false} onBack={back} />;
   if (section === "review") return <ReviewScreen onBack={back} />;
   if (section === "reports") return <ReportsScreen onBack={back} />;
+  if (section === "materials") return <MaterialsScreen onBack={back} />;
+  if (section === "standards") return <StandardsScreen onBack={back} />;
   if (section === "checklists") return <ChecklistSettingsScreen onBack={back} />;
   if (section === "training-plan") return <TrainingPlanScreen onBack={back} />;
   if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;

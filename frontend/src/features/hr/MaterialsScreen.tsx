@@ -22,7 +22,16 @@ import { currentLocale, tx as txIn, useTx } from "@/i18n";
  * остановка работы. Рядом честная подпись «обновлено …» и предупреждение,
  * если последнее обновление не удалось (показываем последнюю рабочую версию).
  */
-export default function MaterialsScreen() {
+export default function MaterialsScreen({
+  onBack,
+}: {
+  /**
+   * Куда вернуться. Без него экран живёт вкладкой (как раньше). Из кабинета
+   * управления передаётся возврат в его разделы: кнопка «назад» не должна
+   * уводить руководителя в зону сотрудника.
+   */
+  onBack?: () => void;
+} = {}) {
   const { tx } = useTx();
   const qc = useQueryClient();
   const hint = useAppText(
@@ -64,9 +73,26 @@ export default function MaterialsScreen() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <h1 className="text-lg font-semibold text-tg-text">{tx("Материалы смены")}</h1>
-        <p className="mt-1 text-xs text-tg-hint">{hint}</p>
+      <header className="flex items-start gap-2 border-b border-tg-secondary-bg px-4 py-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={() => {
+              haptic("light");
+              onBack();
+            }}
+            className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
+            aria-label={tx("Назад")}
+          >
+            ‹
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold text-tg-text">
+            {tx("Материалы смены")}
+          </h1>
+          <p className="mt-1 text-xs text-tg-hint">{hint}</p>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

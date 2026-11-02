@@ -30,13 +30,13 @@ const USAGE_KEY = "admin.usage.v1";
  * умолчанию кабинет открывается владельцу организации, и системных карточек
  * там нет: см. отдельный тест ниже.
  */
-function renderScreen(platform = true) {
+function renderScreen(platform = true, canManage = false) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={qc}>
-      <AdminScreen users={[]} platform={platform} />
+      <AdminScreen users={[]} platform={platform} canManage={canManage} />
     </QueryClientProvider>,
   );
 }
@@ -95,6 +95,23 @@ describe("AdminScreen (P1.9)", () => {
     expect(screen.queryByText("Прокси")).toBeNull();
     expect(screen.queryByText("Рестарт Space")).toBeNull();
     expect(screen.queryByText("Тексты приложения")).toBeNull();
+  });
+
+  it("держит документы смены в кабинете у того, кто ими управляет", () => {
+    // 02.11.2026: меню, график и методички сотрудник читает у себя, а правит
+    // руководитель — поэтому правка живёт в зоне управления, а не в экране
+    // сотрудника «по совместительству».
+    renderScreen(false, true);
+    expect(screen.getByText("Материалы смены")).toBeTruthy();
+    expect(screen.getByText("Стандарты")).toBeTruthy();
+  });
+
+  it("не показывает документы тому, кому управлять нечем", () => {
+    renderScreen(false, false);
+    expect(screen.queryByText("Материалы смены")).toBeNull();
+    expect(screen.queryByText("Стандарты")).toBeNull();
+    // Сотрудник читает их в своём профиле — из кабинета они ему не нужны.
+    expect(screen.getByText("Чек-листы")).toBeTruthy();
   });
 
   it("запоминает открытый раздел в localStorage", () => {

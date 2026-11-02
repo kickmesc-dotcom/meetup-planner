@@ -34,7 +34,15 @@ import { useTx } from "@/i18n";
  * сервер сверяет ответы и возвращает разбор, поэтому «подсмотреть» ключ в
  * запросе нельзя.
  */
-export default function StandardsScreen() {
+export default function StandardsScreen({
+  onBack,
+}: {
+  /**
+   * Куда вернуться. Без него — к задачам (старый вход из профиля). Из кабинета
+   * управления возврат ведёт в его разделы, а не в зону сотрудника.
+   */
+  onBack?: () => void;
+} = {}) {
   const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -60,7 +68,8 @@ export default function StandardsScreen() {
           type="button"
           onClick={() => {
             haptic("light");
-            setTab("tasks");
+            if (onBack) onBack();
+            else setTab("tasks");
           }}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label={tx("Назад к задачам")}
