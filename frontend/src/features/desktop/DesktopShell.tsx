@@ -43,6 +43,10 @@ const WORK: NavItem[] = [
   // работы вместо двух экранов.
   { id: "shifts", label: "График", icon: "calendar" },
   { id: "materials", label: "Материалы", icon: "book" },
+  // Проблемы и передачи смены — часть рабочего дня, а не надзор. Пока они
+  // стояли отдельной группой «Команда», группа называлась не по делу.
+  { id: "issues", label: "Проблемы", icon: "alert" },
+  { id: "handovers", label: "Передачи смены", icon: "repeat" },
 ];
 
 const SERVICE: NavItem[] = [
@@ -54,20 +58,14 @@ const SERVICE: NavItem[] = [
 const PROFILE: NavItem = { id: "profile", label: "Профиль", icon: "profile" };
 
 export default function DesktopShell({
-  canManage,
-  isAdmin,
   meName,
   meHint,
   openTasks = 0,
   sections,
   children,
 }: {
-  /** Руководитель или прописанный админ: видны «Команда», приёмка и отчёты. */
-  canManage: boolean;
   /** Разделы из настройки организации (undefined — ничего не прячем). */
   sections?: string[];
-  /** Полный админ — виден раздел «Управление». */
-  isAdmin: boolean;
   meName: string;
   meHint: string;
   /** Открытые поручения — счётчик рядом с «Мои задачи», как в соцсетях. */
@@ -78,38 +76,15 @@ export default function DesktopShell({
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
 
-  const team: NavItem[] = [
-    ...(canManage
-      ? ([
-          { id: "team", label: "Команда", icon: "team" },
-          { id: "review", label: "Приёмка работ", icon: "checklist" },
-          { id: "reports", label: "Отчёт смены", icon: "layout" },
-        ] satisfies NavItem[])
-      : []),
-    { id: "issues", label: "Проблемы", icon: "alert" },
-    { id: "handovers", label: "Передачи смены", icon: "repeat" },
-  ];
-
   const keep = (items: NavItem[]) =>
     sections ? items.filter((item) => sectionEnabled(item.id, sections)) : items;
+  // 02.11.2026: каркас широкого экрана — тот же, что у сотрудника. Группы
+  // «Команда» и «Управление» ушли: команда, приёмка и отчёт теперь в зоне
+  // управления (вкладки вверху), а называть группу из проблем и передач
+  // смены «Командой» было нечестно.
   const groups: NavGroup[] = [
     { title: tx("Смена"), items: keep(WORK) },
-    { title: tx("Команда"), items: keep(team) },
     { title: tx("Сервис"), items: keep([...SERVICE, PROFILE]) },
-    ...(isAdmin
-      ? [
-          {
-            title: tx("Управление"),
-            items: [
-              {
-                id: "admin" as Tab,
-                label: tx("Админка"),
-                icon: "admin" as IconName,
-              },
-            ],
-          },
-        ]
-      : []),
   ];
 
   return (

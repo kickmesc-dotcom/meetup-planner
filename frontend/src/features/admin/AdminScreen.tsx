@@ -23,6 +23,9 @@ import SpaceRestartScreen from "./SpaceRestartScreen";
 import TrainingPlanScreen from "./TrainingPlanScreen";
 import LanguagesScreen from "./LanguagesScreen";
 import AdminTasksScreen from "./AdminTasksScreen";
+import TeamScreen from "@/features/hr/TeamScreen";
+import ReviewScreen from "@/features/hr/ReviewScreen";
+import ReportsScreen from "@/features/hr/ReportsScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -49,6 +52,9 @@ type Section =
   | "notifications"
   | "employees"
   | "invitations"
+  | "team"
+  | "review"
+  | "reports"
   | "checklists"
   | "training-plan"
   | "feed-settings"
@@ -71,6 +77,9 @@ const VALID_SECTIONS: Section[] = [
   "notifications",
   "employees",
   "invitations",
+  "team",
+  "review",
+  "reports",
   "checklists",
   "training-plan",
   "feed-settings",
@@ -86,6 +95,11 @@ const VALID_SECTIONS: Section[] = [
 ];
 
 const GROUP_PEOPLE = "Смена и люди";
+// Команда, приёмка и отчёт смены жили в нижней полосе руководителя. С 02.11.2026
+// полоса сотрудника одинакова у всех, а эти три экрана — работа с людьми, то
+// есть кабинет. Своя группа, потому что это не «смена и люди» в смысле
+// настроек, а надзор за тем, что уже происходит.
+const GROUP_TEAM = "Команда и контроль";
 const GROUP_RESULT = "Опыт и результат";
 const GROUP_CALENDAR = "Календарь";
 const GROUP_TEXTS = "Тексты";
@@ -134,6 +148,27 @@ const SECTIONS: SectionDef[] = [
     icon: "send",
     title: "Приглашения",
     subtitle: "Ссылка с ролью и сроком — вход без Telegram",
+  },
+  {
+    id: "team",
+    group: GROUP_TEAM,
+    icon: "team",
+    title: "Команда",
+    subtitle: "Кто на смене, активность и карточки сотрудников",
+  },
+  {
+    id: "review",
+    group: GROUP_TEAM,
+    icon: "checklist",
+    title: "Приёмка работ",
+    subtitle: "Сданные работы: принять или вернуть с причиной",
+  },
+  {
+    id: "reports",
+    group: GROUP_TEAM,
+    icon: "layout",
+    title: "Отчёт смены",
+    subtitle: "Срез дня по стандартам и выгрузка CSV",
   },
   {
     id: "checklists",
@@ -241,6 +276,7 @@ const SECTIONS: SectionDef[] = [
 
 const GROUPS: { title: string; icon: IconName }[] = [
   { title: GROUP_PEOPLE, icon: "team" },
+  { title: GROUP_TEAM, icon: "check" },
   { title: GROUP_RESULT, icon: "award" },
   { title: GROUP_CALENDAR, icon: "calendar" },
   { title: GROUP_TEXTS, icon: "edit" },
@@ -303,14 +339,25 @@ interface Props {
   users: User[];
   /** Прописанный админ платформы: видит системные разделы. */
   platform?: boolean;
+  /** Руководитель: видит команду, приёмку и отчёт смены. */
+  canManage?: boolean;
 }
 
-export default function AdminScreen({ users, platform = false }: Props) {
+/** Разделы надзора за людьми: нужны руководителю, а не владельцу платформы. */
+const MANAGER_SECTIONS: Section[] = ["team", "review", "reports"];
+
+export default function AdminScreen({
+  users,
+  platform = false,
+  canManage = false,
+}: Props) {
   void users;
   const { tx } = useTx();
-  const sections = platform
-    ? SECTIONS
-    : SECTIONS.filter((s) => !PLATFORM_SECTIONS.includes(s.id));
+  const sections = SECTIONS.filter((s) => {
+    if (PLATFORM_SECTIONS.includes(s.id)) return platform;
+    if (MANAGER_SECTIONS.includes(s.id)) return canManage || platform;
+    return true;
+  });
   const [section, setSection] = useState<Section>("root");
   const [query, setQuery] = useState("");
   const [usage, setUsage] = useState<Record<string, number>>(readUsage);
@@ -354,6 +401,9 @@ export default function AdminScreen({ users, platform = false }: Props) {
   if (section === "notifications") return <NotificationsScreen onBack={back} />;
   if (section === "employees") return <EmployeesScreen onBack={back} />;
   if (section === "invitations") return <InvitationsScreen onBack={back} />;
+  if (section === "team") return <TeamScreen canManage={false} onBack={back} />;
+  if (section === "review") return <ReviewScreen onBack={back} />;
+  if (section === "reports") return <ReportsScreen onBack={back} />;
   if (section === "checklists") return <ChecklistSettingsScreen onBack={back} />;
   if (section === "training-plan") return <TrainingPlanScreen onBack={back} />;
   if (section === "feed-settings") return <FeedSettingsScreen onBack={back} />;

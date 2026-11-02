@@ -11,14 +11,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import DesktopShell from "./DesktopShell";
 import { useUI } from "@/store/ui";
 
-function renderShell(props?: { canManage?: boolean; isAdmin?: boolean }) {
+function renderShell() {
   return render(
-    <DesktopShell
-      canManage={props?.canManage ?? false}
-      isAdmin={props?.isAdmin ?? false}
-      meName="Сергей"
-      meHint="Официант"
-    >
+    <DesktopShell meName="Сергей" meHint="Официант">
       <div>Экран</div>
     </DesktopShell>,
   );
@@ -53,27 +48,14 @@ describe("DesktopShell", () => {
     expect(screen.getByText("Экран")).toBeTruthy();
   });
 
-  it("руководителю показывает команду, приёмку и отчет", () => {
-    renderShell({ canManage: true });
-    expect(screen.getByRole("button", { name: "Команда" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Приёмка работ" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Отчёт смены" })).toBeTruthy();
-    // Без админской роли раздела «Управление» нет.
-    expect(screen.queryByRole("button", { name: "Админка" })).toBeNull();
-  });
-
-  it("сотруднику не показывает чужие разделы", () => {
+  it("не держит управленческих разделов — они живут в зоне управления", () => {
+    // 02.11.2026: каркас сотрудника один для всех. Команда, приёмка и отчёт
+    // переехали во вторую зону (вкладки вверху), а не в сайдбар сотрудника.
     renderShell();
     expect(screen.queryByRole("button", { name: "Команда" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Приёмка работ" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Отчёт смены" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Админка" })).toBeNull();
-  });
-
-  it("админу добавляет раздел «Управление»", () => {
-    renderShell({ canManage: true, isAdmin: true });
-    expect(screen.getByText("Управление")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Админка" }));
-    expect(useUI.getState().tab).toBe("admin");
   });
 
   it("подсвечивает текущий раздел и переключает вкладку по клику", () => {

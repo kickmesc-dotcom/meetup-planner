@@ -24,7 +24,17 @@ import { intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
  * в групповом поручении работы разные, и «принять всё» — не всегда верно.
  * Возврат требует комментария: «переделай» без причины сотруднику бесполезно.
  */
-export default function ReviewScreen() {
+export default function ReviewScreen({
+  onBack,
+}: {
+  /**
+   * Куда вернуться. Без него — к задачам, как раньше: экран открывался вкладкой
+   * из полосы. Из кабинета управления (`AdminZone` → `AdminScreen`) передаётся
+   * возврат в список разделов, иначе кнопка «назад» уводила бы в зону
+   * сотрудника и человек терял место, откуда пришёл.
+   */
+  onBack?: () => void;
+} = {}) {
   const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
   const tasksQ = useQuery({
@@ -50,7 +60,8 @@ export default function ReviewScreen() {
           type="button"
           onClick={() => {
             haptic("light");
-            setTab("tasks");
+            if (onBack) onBack();
+            else setTab("tasks");
           }}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label={tx("Назад к задачам")}

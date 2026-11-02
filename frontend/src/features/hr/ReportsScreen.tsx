@@ -46,7 +46,15 @@ function fmtDate(iso: string, locale: Locale): string {
   });
 }
 
-export default function ReportsScreen() {
+export default function ReportsScreen({
+  onBack,
+}: {
+  /**
+   * Куда вернуться. Без него — в профиль, где раздел и открывался. Из кабинета
+   * управления возврат ведёт в список разделов, а не в чужую зону.
+   */
+  onBack?: () => void;
+} = {}) {
   const { tx, locale } = useTx();
   const setTab = useUI((s) => s.setTab);
   const [on, setOn] = useState<string>(todayIso());
@@ -92,7 +100,8 @@ export default function ReportsScreen() {
           type="button"
           onClick={() => {
             haptic("light");
-            setTab("profile");
+            if (onBack) onBack();
+            else setTab("profile");
           }}
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label={tx("Назад в профиль")}

@@ -28,27 +28,22 @@ describe("TabBar", () => {
     expect(container.textContent).not.toMatch(/[✅🕒🗓📋👤]/u);
   });
 
-  it("руководителю добавляет «Команду», но кабинета в полосе нет ни у кого", () => {
-    // 31.10.2026: «Управление» убрано из полосы. Полоса — рабочий день
-    // сотрудника, кабинет предприятия живёт в профиле, в разделе
-    // «Руководителю». Сотрудник вкладку управления не видит вообще.
-    render(<TabBar canManage />);
-    expect(screen.getByText("Команда")).toBeTruthy();
-    expect(screen.queryByText("Админ")).toBeNull();
-    expect(screen.getAllByRole("button")).toHaveLength(6);
-  });
-
-  it("сотрудник видит ровно пять своих разделов", () => {
+  it("полоса одна для всех: руководитель видит те же пять разделов", () => {
+    // 02.11.2026: полоса — это рабочий день сотрудника, без вариантов по роли.
+    // Раньше у руководителя на месте «Профиля» стояла «Команда», и одна зона
+    // выглядела по-разному у разных людей. Команда, приёмка и отчёт живут
+    // в зоне управления — вкладками вверху экрана.
     render(<TabBar />);
     expect(screen.getAllByRole("button")).toHaveLength(5);
     expect(screen.queryByText("Команда")).toBeNull();
+    expect(screen.queryByText("Админ")).toBeNull();
   });
 
-  it("шесть подписей не вылезают за кнопку", () => {
-    // P3.17: на 360–390 px «Команда»/«События» при 12 px обрезались по краям
-    // экрана. Подпись обязана ужиматься внутри своей кнопки, а не вылезать.
-    render(<TabBar canManage />);
-    const label = screen.getByText("Команда");
+  it("подписи не вылезают за кнопку", () => {
+    // P3.17: на 360–390 px подписи при 12 px обрезались по краям экрана.
+    // Подпись обязана ужиматься внутри своей кнопки, а не вылезать.
+    render(<TabBar />);
+    const label = screen.getByText("События");
     expect(label.className).toContain("truncate");
     expect(label.className).toContain("text-center");
     const button = label.closest("button");

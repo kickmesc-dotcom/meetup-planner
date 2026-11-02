@@ -19,35 +19,23 @@ interface Item {
 // профиль. «Ссылки» у сотрудника уехали в профиль: шесть подписей — предел
 // полосы.
 //
-// Нижняя полоса осталась в пять-шесть кнопок: восемь подписей на 360px
-// нечитаемы. «График» и «Встречи» НЕ удалены — они открываются из профиля
-// (раздел «Все разделы»), поэтому функциональность никуда не пропала.
-const BASE_ITEMS: Item[] = [
+// 02.11.2026: набор один для всех. Раньше у руководителя вместо «Профиля»
+// стояла «Команда», и полоса менялась в зависимости от роли — то есть одна и та
+// же зона выглядела по-разному у разных людей. Теперь это полоса сотрудника в
+// буквальном смысле: руководитель видит здесь ровно то же, что и его люди, а
+// команда, приёмка и отчёт живут в зоне управления (вкладки вверху экрана).
+const ITEMS: Item[] = [
   { id: "feed", labelKey: "nav.feed", icon: "feed" },
   { id: "tasks", labelKey: "nav.tasks", icon: "tasks" },
   { id: "checklist", labelKey: "nav.shift", icon: "shift" },
   { id: "shifts", labelKey: "nav.table", icon: "calendar" },
-  { id: "profile", labelKey: "nav.profile", icon: "profile" },
-];
-
-// Руководителю важнее команда, чем справочник ссылок: «Ссылки» у него
-// остаются в профиле, а на их месте — сводка смены по отделу.
-const MANAGER_ITEMS: Item[] = [
-  { id: "feed", labelKey: "nav.feed", icon: "feed" },
-  { id: "tasks", labelKey: "nav.tasks", icon: "tasks" },
-  { id: "checklist", labelKey: "nav.shift", icon: "shift" },
-  { id: "shifts", labelKey: "nav.table", icon: "calendar" },
-  { id: "team", labelKey: "nav.team", icon: "team" },
   { id: "profile", labelKey: "nav.profile", icon: "profile" },
 ];
 
 export default function TabBar({
-  canManage = false,
   sections,
   openTasks = 0,
 }: {
-  /** Руководитель или прописанный админ — видит сводку по команде. */
-  canManage?: boolean;
   /** Разделы из настройки организации (undefined — ничего не прячем). */
   sections?: string[];
   /**
@@ -67,7 +55,7 @@ export default function TabBar({
   // Вход в кабинет теперь один и осознанный — из профиля, раздел
   // «Руководителю» (см. `HrProfileScreen`), и только у того, кому сервер это
   // разрешил.
-  const items = (canManage ? MANAGER_ITEMS : BASE_ITEMS).filter(
+  const items = ITEMS.filter(
     (item) => !sections || sectionEnabled(item.id, sections),
   );
 

@@ -172,20 +172,23 @@ describe("HrProfileScreen (P1.7)", () => {
     expect(screen.getByText("Режим проверки")).toBeTruthy();
   });
 
-  it("кабинет предприятия открывается из профиля, а не из нижней полосы", async () => {
+  it("кабинет предприятия открывается из профиля и включает зону управления", async () => {
     // 31.10.2026: вкладка «Админ» убрана из полосы, потому что это блок
-    // руководителя, а не сотрудника. Единственный вход — эта строка; без
-    // неё кабинет стал бы недоступен вообще.
+    // руководителя, а не сотрудника. 02.11.2026: кабинет — уже не вкладка
+    // вообще, а вторая зона, поэтому строка профиля переключает режим, а не
+    // `tab`. Вкладка сотрудника при этом остаётся той, где человек был.
     employeeMock.mockResolvedValue(
       me({ role: "admin", is_admin: true, is_staff: true, is_aup: true }),
     );
+    useUI.setState({ mode: "staff", tab: "feed" });
     renderScreen();
     await screen.findByText("Пётр");
 
     fireEvent.click(screen.getByRole("button", { name: /Для администратора/ }));
     fireEvent.click(screen.getByRole("button", { name: /Управление предприятием/ }));
 
-    expect(useUI.getState().tab).toBe("admin");
+    expect(useUI.getState().mode).toBe("manage");
+    expect(useUI.getState().tab).toBe("feed");
   });
 
   it("сотруднику строки управления не показываются", async () => {

@@ -1777,4 +1777,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Перевести": "Translate",
   "Показать оригинал": "Show the original",
   "Перевод недоступен": "Translation isn't available here",
+
+  // Две зоны экрана (02.11.2026): вкладки «Сотрудник | Управление» вверху.
+  "Зона приложения": "App area",
+  "Кабинет руководителя": "Manager's office",
 };

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMe,
@@ -14,7 +14,6 @@ import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
 import MyTasksScreen from "./features/hr/MyTasksScreen";
 import ChecklistScreen from "./features/hr/ChecklistScreen";
 import ShiftsScreen from "./features/shifts/ShiftsScreen";
-import TeamScreen from "./features/hr/TeamScreen";
 import {
   countOpenTasks,
   fetchEmployee,
@@ -26,13 +25,9 @@ import IssuesScreen from "./features/issues/IssuesScreen";
 import HandoversScreen from "./features/handovers/HandoversScreen";
 import StandardsScreen from "./features/hr/StandardsScreen";
 import AskScreen from "./features/hr/AskScreen";
-import ReviewScreen from "./features/hr/ReviewScreen";
-// Отчёт смены и админка — код управления: сотрудник его не открывает никогда.
-// Держать их в общем бандле — значит заставлять его скачивать и разбирать
-// чужую половину приложения перед первым экраном (замеры: 961 кБ одним файлом).
-// `lazy` не «ускоряет всё» — он убирает из первой загрузки то, что не нужно
-// именно сейчас; переход в раздел покажет скелетон той же формы.
-const ReportsScreen = lazy(() => import("./features/hr/ReportsScreen"));
+// Весь код управления (кабинет, приёмка, отчёт смены) живёт в зоне управления
+// и грузится отдельными чанками оттуда: сотрудник его не открывает никогда, и
+// незачем тянуть чужие полторы тысячи строк в первую загрузку его экрана.
 import LinksScreen from "./features/hr/LinksScreen";
 import MaterialsScreen from "./features/hr/MaterialsScreen";
 import HrProfileScreen from "./features/hr/HrProfileScreen";
@@ -40,7 +35,10 @@ import OnboardingScreen from "./features/hr/OnboardingScreen";
 import OrgSetupScreen from "./features/hr/OrgSetupScreen";
 import { sectionEnabled } from "./features/hr/sections";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
-const AdminScreen = lazy(() => import("./features/admin/AdminScreen"));
+// Кабинет управления — отдельный каркас (`ManageZone`), а не вкладка внутри
+// приложения сотрудника. Он сам лениво тянет AdminScreen, поэтому здесь его нет.
+import ManageZone from "./features/admin/ManageZone";
+import ModeSwitch from "./features/nav/ModeSwitch";
 import AuthScreen from "./features/auth/AuthScreen";
 import StartScreen from "./features/auth/StartScreen";
 import InviteScreen from "./features/auth/InviteScreen";
@@ -143,7 +141,26 @@ export default function App() {
   const tab = useUI((s) => s.tab);
   const { t } = useT();
   const setTab = useUI((s) => s.setTab);
+  const mode = useUI((s) => s.mode);
+  const setMode = useUI((s) => s.setMode);
+  const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);
   const simulationId = useSimulation((s) => s.sessionId);
+  // Кому вообще можно управлять: руководитель отдела (`aup`), владелец
+  // организации или прописанный разработчик. Считается по сырым данным, до
+  // первых `return` — страховка от «застрявшего» режима нужна выше них.
+  const canManageZone =
+    !!(
+      me.data?.is_admin ||
+      hrMe.data?.is_admin ||
+      hrMe.data?.is_aup ||
+      hrMe.data?.is_staff
+    ) && !simulationId;
+  // Режим проверки и смена роли отбирают кабинет. Без этого человек остался бы
+  // внутри зоны, которая ему больше не принадлежит, и видел бы там ошибки
+  // доступа вместо своего экрана.
+  useEffect(() => {
+    if (mode === "manage" && !canManageZone) setMode("staff");
+  }, [mode, canManageZone, setMode]);
   // Широкий экран — отдельный каркас (сайдбар + рабочая область). Нижняя
   // полоса остаётся мобильной навигацией и на ПК не рисуется вовсе.
   const isDesktop = useIsDesktop();
@@ -349,7 +366,6 @@ export default function App() {
   // по почте и его Telegram-ID нет в списке платформы. Раньше кабинет
   // открывался только прописанным админам: B2B-клиент не видел ни чек-листов,
   // ни отделов, ни приглашений — а именно там они и живут.
-  const isAdmin = !!(meData.is_admin || hrMe.data?.is_admin) && !simulationId;
   const canManage = !!(hrMe.data?.is_aup || hrMe.data?.is_staff);
   // Открытые поручения — одно число на оба каркаса (нижняя полоса и сайдбар).
   const { open: openTasks } = countOpenTasks(tasksQ.data ?? []);
@@ -394,15 +410,24 @@ export default function App() {
     );
   }
 
-  // Если переключились на admin без прав — мягко возвращаем к задачам.
-  if (tab === "admin" && !isAdmin) {
-    setTab("tasks");
-  }
-  if (tab === "team" && !canManage) {
-    setTab("tasks");
-  }
-  if (tab === "review" && !canManage) {
-    setTab("tasks");
+  // Управленческие экраны — не вкладки зоны сотрудника, а разделы кабинета
+  // (02.11.2026): команда, приёмка и отчёт плюс старые входы «Админка» из
+  // профиля, полосы и deep link'ов. Человека с правом отправляем в зону
+  // управления сразу в нужный раздел, без права — к его работе, а не в
+  // кабинет, который ему не принадлежит.
+  if (
+    tab === "admin" ||
+    tab === "team" ||
+    tab === "review" ||
+    tab === "reports"
+  ) {
+    if (canManageZone) {
+      if (tab !== "admin") setPendingAdminSection(tab);
+      setTab("feed");
+      setMode("manage");
+    } else {
+      setTab("tasks");
+    }
   }
   // Раздел выключен в настройке организации — возвращаем на события. Данные
   // грузятся один раз, поэтому до ответа ничего не прячем (иначе вкладки
@@ -410,6 +435,19 @@ export default function App() {
   const sections = orgSetup.data?.sections ?? null;
   if (sections !== null && !sectionEnabled(tab, sections)) {
     setTab("feed");
+  }
+
+  // Зона управления — отдельный экран целиком: своя шапка с переключателем,
+  // без нижней полосы сотрудника. Права проверены выше: без них режим уже
+  // вернулся бы в `staff`.
+  if (mode === "manage" && canManageZone) {
+    return (
+      <ManageZone
+        users={users.data}
+        platform={!!meData.is_admin}
+        canManage={canManage}
+      />
+    );
   }
 
   const greetingHidden = uiPrefs.data?.hide_greeting === true;
@@ -489,12 +527,6 @@ export default function App() {
         <OverviewRail />
       </main>
     );
-  } else if (tab === "team") {
-    content = (
-      <main className="flex-1 overflow-hidden flex flex-col">
-        <TeamScreen canManage={!!hrMe.data?.is_staff} />
-      </main>
-    );
   } else if (tab === "issues") {
     // Журнал проблем: свой заголовок и возврат к задачам внутри экрана.
     content = (
@@ -522,22 +554,6 @@ export default function App() {
         <AskScreen />
       </main>
     );
-  } else if (tab === "review") {
-    // Приёмка — только для АУП: сотруднику сервер всё равно вернёт пустой
-    // список, а вкладку незачем даже показывать.
-    content = canManage ? (
-      <main className="flex-1 overflow-hidden flex flex-col">
-        <ReviewScreen />
-      </main>
-    ) : null;
-  } else if (tab === "reports") {
-    // Отчёт смены — только руководителю: сотруднику сервер всё равно вернёт
-    // 403, а вкладку незачем показывать.
-    content = canManage ? (
-      <main className="flex-1 overflow-hidden flex flex-col">
-        <ReportsScreen />
-      </main>
-    ) : null;
   } else if (tab === "materials") {
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
@@ -572,26 +588,6 @@ export default function App() {
         </main>
       </>
     );
-  } else if (tab === "admin") {
-    content = (
-      <>
-        <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-base font-medium">
-              <Icon name="admin" size={17} />
-              {tx("Админка")}
-            </div>
-            <div className="text-xs text-tg-hint">
-              {tx("Люди, смены и правила — только для управляющих.")}
-            </div>
-          </div>
-          <ThemeSwitcher />
-        </header>
-        <main className="flex-1 overflow-hidden flex flex-col">
-          <AdminScreen users={users.data} platform={meData.is_admin} />
-        </main>
-      </>
-    );
   }
 
   // Отдельный чанк подгружается по переходу — поэтому вокруг экранов стоит
@@ -620,8 +616,6 @@ export default function App() {
         style={SAFE_AREA_ROOT}
       >
         <DesktopShell
-          canManage={canManage}
-          isAdmin={isAdmin}
           sections={sections ?? undefined}
           openTasks={openTasks}
           meName={hrMe.data?.display_name.replace("[BOT]", "").trim() || meData.display_name}
@@ -632,6 +626,11 @@ export default function App() {
           }
         >
           <SimulationBanner />
+          {canManageZone && (
+            <div className="flex justify-center border-b border-tg-secondary-bg px-3 py-2">
+              <ModeSwitch className="w-full max-w-[320px]" />
+            </div>
+          )}
           <TabTransition key={tab}>{screen}</TabTransition>
         </DesktopShell>
       </div>
@@ -648,13 +647,16 @@ export default function App() {
       style={SAFE_AREA_ROOT}
     >
       <SimulationBanner />
+      {/* Верхние вкладки — только у того, кому есть что переключать. У
+          сотрудника их нет вовсе: его зона одна. */}
+      {canManageZone && (
+        <div className="border-b border-tg-secondary-bg px-3 py-2">
+          <ModeSwitch />
+        </div>
+      )}
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
       <TabTransition key={tab}>{screen}</TabTransition>
-      <TabBar
-        canManage={canManage}
-        sections={sections ?? undefined}
-        openTasks={openTasks}
-      />
+      <TabBar sections={sections ?? undefined} openTasks={openTasks} />
     </div>
   );
 }

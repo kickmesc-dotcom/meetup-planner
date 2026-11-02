@@ -74,6 +74,8 @@ export default function HrProfileScreen() {
   const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
+  const setMode = useUI((s) => s.setMode);
+  const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);
   const photoHint = useAppText(
     "profile.photo.hint",
     "Фотоотчёт можно приложить прямо в пункте чек-листа (камера или галерея), а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.",
@@ -244,19 +246,32 @@ export default function HrProfileScreen() {
   // и «Ссылками» — то есть одна и та же зона выглядела по-разному у разных
   // людей, а граница «моя работа / работа руководителя» не читалась вообще.
   // Теперь это отдельный блок ниже (см. «Руководителю»).
+  // 02.11.2026: эти строки больше не вкладки, а адреса внутри зоны управления.
+  // Раньше они меняли нижнюю полосу, а кабинет открывался последней строкой;
+  // теперь одна зона — одна дверь, и внутри неё уже свои разделы. Ссылка
+  // передаётся через `pendingAdminSection`, чтобы человек попадал сразу в
+  // «Команду», а не в корень кабинета.
+  const openManage = (section?: string) => {
+    if (section) setPendingAdminSection(section);
+    setMode("manage");
+  };
   const managerSections: RowItem[] = [];
   if (me.is_aup || me.is_staff) {
     managerSections.push(
-      { icon: "team", label: "Команда", onSelect: () => setTab("team") },
-      { icon: "check", label: "Приёмка", onSelect: () => setTab("review") },
-      { icon: "layout", label: "Отчёт смены", onSelect: () => setTab("reports") },
+      { icon: "team", label: "Команда", onSelect: () => openManage("team") },
+      { icon: "check", label: "Приёмка", onSelect: () => openManage("review") },
+      {
+        icon: "layout",
+        label: "Отчёт смены",
+        onSelect: () => openManage("reports"),
+      },
     );
   }
   if (me.is_admin) {
     managerSections.push({
       icon: "admin",
       label: "Управление предприятием",
-      onSelect: () => setTab("admin"),
+      onSelect: () => openManage(),
     });
   }
 
