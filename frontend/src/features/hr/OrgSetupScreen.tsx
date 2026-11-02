@@ -2,11 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchDepartments,
+  fetchOrgSetupProgress,
   saveOrgSetup,
   type OrgSetup,
   type OrgSetupPatch,
   type OrgProfileVisibility,
 } from "@/api/hr";
+import { createInvitation, type OrgInvitation } from "@/api/orgs";
+import {
+  applyShiftTemplate,
+  fetchShiftWeek,
+  saveShiftTemplate,
+} from "@/api/shifts";
+import { copyText } from "@/lib/clipboard";
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -99,10 +107,23 @@ export default function OrgSetupScreen({
   const steps = [
     tx("Предприятие"),
     tx("Подразделения"),
+    tx("Люди"),
+    tx("График"),
     tx("Разделы"),
     tx("Кто что видит"),
     tx("Готово"),
   ];
+  const lastStep = steps.length - 1;
+
+  // Сводка нужна только на последнем шаге: до него это лишний запрос на
+  // каждый ответ мастера.
+  const progressQ = useQuery({
+    queryKey: ["org-setup-progress"],
+    queryFn: fetchOrgSetupProgress,
+    enabled: step === lastStep,
+    staleTime: 30_000,
+    retry: false,
+  });
 
   const toggleSection = (id: string) => {
     haptic("selection");
@@ -114,15 +135,20 @@ export default function OrgSetupScreen({
     }));
   };
 
-  const patchForStep = (target: number): OrgSetupPatch => {
+  /**
+   * Что сохранить при уходе с шага. `null` — у шага нет ответов мастера:
+   * «Люди» и «График» живут своими ручками (приглашение, шаблон смены),
+   * и пустой POST только ради галочки был бы лишним запросом.
+   */
+  const patchForStep = (target: number): OrgSetupPatch | null => {
     switch (target) {
       case 0:
         return { industry: draft.industry, headcount: draft.headcount };
       case 1:
         return { departments: pickedDepartments, create_departments: true };
-      case 2:
+      case 4:
         return { sections: draft.sections };
-      case 3:
+      case 5:
         return {
           profile_visibility: draft.profile_visibility,
           cross_department_watch: draft.cross_department_watch,
@@ -130,31 +156,35 @@ export default function OrgSetupScreen({
           allow_hide_media: draft.allow_hide_media,
         };
       default:
-        return {};
+        return null;
     }
   };
 
   const go = async (target: number) => {
     haptic("light");
     setError(null);
-    if (target <= 4) {
+    const patch = patchForStep(step);
+    if (target <= lastStep && patch) {
       try {
         // Сохраняем ответы ТОГО шага, с которого уходим. Раньше здесь стоял
         // `patchForStep(target)`, то есть патч следующего шага: отрасль и
         // подразделения молча не доезжали до сервера — человек видел их в
         // итоговой сводке, а следующий экран показывал пустой список отделов.
-        await save.mutateAsync(patchForStep(step));
+        await save.mutateAsync(patch);
       } catch {
         return; // ошибка уже в состоянии мутации и на экране
       }
     }
-    setStep(Math.max(0, Math.min(4, target)));
+    setStep(Math.max(0, Math.min(lastStep, target)));
   };
 
   const finish = async () => {
     haptic("success");
     try {
-      const data = await save.mutateAsync({ ...patchForStep(step), done: true });
+      const data = await save.mutateAsync({
+        ...(patchForStep(step) ?? {}),
+        done: true,
+      });
       qc.setQueryData(["org-setup"], data);
       onClose();
     } catch {
@@ -328,6 +358,25 @@ export default function OrgSetupScreen({
         )}
 
         {step === 2 && (
+          <PeopleStep
+            positions={draft.positions}
+            departments={(depsQ.data ?? []).map((dep) => ({
+              id: dep.id,
+              name: dep.name,
+            }))}
+          />
+        )}
+
+        {step === 3 && (
+          <ScheduleStep
+            departments={(depsQ.data ?? []).map((dep) => ({
+              id: dep.id,
+              name: dep.name,
+            }))}
+          />
+        )}
+
+        {step === 4 && (
           <section className="space-y-2">
             <div>
               <h2 className="text-sm font-semibold text-tg-text">
@@ -349,7 +398,7 @@ export default function OrgSetupScreen({
           </section>
         )}
 
-        {step === 3 && (
+        {step === 5 && (
           <section className="space-y-3">
             <div>
               <h2 className="text-sm font-semibold text-tg-text">
@@ -452,7 +501,7 @@ export default function OrgSetupScreen({
           </section>
         )}
 
-        {step === 4 && (
+        {step === 6 && (
           <section className="space-y-3">
             <div className="rounded-card bg-status-free/10 p-3 text-center">
               <Icon
@@ -466,6 +515,61 @@ export default function OrgSetupScreen({
               <p className="mt-1 text-xs text-tg-hint">
                 {tx("Настройку можно поменять позже — в профиле, «Настройка организации».")}
               </p>
+            </div>
+            <div className="rounded-tile bg-tg-secondary-bg/60 p-3">
+              <div className="text-2xs font-medium uppercase tracking-wide text-tg-hint">
+                {tx("Что уже готово")}
+              </div>
+              {progressQ.isPending ? (
+                <div className="mt-2">
+                  <SkeletonChips count={2} />
+                </div>
+              ) : progressQ.data ? (
+                <div className="mt-1 space-y-1 text-xs text-tg-text">
+                  <div>
+                    {tx("Подразделения")}: {progressQ.data.departments}
+                  </div>
+                  <div>
+                    {tx("Сотрудники")}: {progressQ.data.people}
+                  </div>
+                  <div>
+                    {tx("Приглашения")}: {progressQ.data.invites_pending}
+                  </div>
+                  <div>
+                    {tx("Шаблоны смен")}: {progressQ.data.shift_templates}
+                  </div>
+                  {progressQ.data.checklists.length ? (
+                    <ul className="mt-1 space-y-0.5">
+                      {progressQ.data.checklists.slice(0, 6).map((item) => (
+                        <li
+                          key={`${item.department ?? ""}-${item.title}`}
+                          className="text-2xs text-tg-hint"
+                        >
+                          {tx("Стартовые чек-листы")}: {item.title} ·{" "}
+                          {item.department ?? "—"} · {item.items}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-2xs text-tg-hint">
+                      {tx(
+                        "Чек-листов пока нет — пакет отрасли заведёт их на последнем шаге.",
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1 text-2xs text-tg-hint">
+                  {tx("Пока пусто — для новой организации это нормально.")}
+                </div>
+              )}
+              {progressQ.data?.checklists.length ? (
+                <div className="mt-2 text-2xs text-tg-hint">
+                  {tx(
+                    "Первый чек-лист уже ждёт сотрудников в разделе «Чек-лист».",
+                  )}
+                </div>
+              ) : null}
             </div>
             <SummaryRow
               label={tx("Предприятие")}
@@ -525,10 +629,10 @@ export default function OrgSetupScreen({
         <button
           type="button"
           disabled={save.isPending}
-          onClick={() => void (step === 4 ? finish() : go(step + 1))}
+          onClick={() => void (step === lastStep ? finish() : go(step + 1))}
           className="min-h-11 flex-[2] rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
-          {step === 4 ? tx("Начать работу") : tx("Далее")}
+          {step === lastStep ? tx("Начать работу") : tx("Далее")}
         </button>
       </footer>
     </div>
@@ -685,5 +789,377 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <div className="text-2xs text-tg-hint">{label}</div>
       <div className="mt-0.5 text-xs text-tg-text">{value}</div>
     </div>
+  );
+}
+
+// --------------------------------------------------------------------------
+// Шаг «Люди»: приглашение первых сотрудников
+// --------------------------------------------------------------------------
+
+/**
+ * Приглашение прямо в мастере.
+ *
+ * Зачем не «потом в админке». После настройки владелец остаётся один:
+ * приложение настроено, а работать в нём некому, и следующая неделя уходит на
+ * переписку «пришлите мне ссылку». Ссылка создаётся здесь же, почта
+ * необязательна — в смене её чаще передают в мессенджере.
+ */
+function PeopleStep({
+  positions,
+  departments,
+}: {
+  positions: string[];
+  departments: { id: number; name: string }[];
+}) {
+  const { tx } = useTx();
+  const [email, setEmail] = useState("");
+  const [position, setPosition] = useState<string | null>(null);
+  const [departmentId, setDepartmentId] = useState<number | null>(
+    departments[0]?.id ?? null,
+  );
+  const [created, setCreated] = useState<OrgInvitation[]>([]);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const invite = useMutation({
+    mutationFn: () =>
+      createInvitation({
+        email: email.trim() || null,
+        role: "staff",
+        days: 7,
+        position,
+        department_id: departmentId,
+      }),
+    onSuccess: (data) => {
+      setCreated((cur) => [...cur, data]);
+      setEmail("");
+      setCopied(false);
+      setError(null);
+      haptic("success");
+    },
+    onError: (err) => setError(humanizeApiError(err)),
+  });
+
+  const last = created[created.length - 1];
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-tg-text">
+          {tx("Кого позвать первым?")}
+        </h2>
+        <p className="mt-1 text-xs text-tg-hint">
+          {tx(
+            "Сотрудник откроет ссылку и попадёт в вашу организацию. Почту можно не указывать — тогда передайте ссылку лично.",
+          )}
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-1.5">
+        <input
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          maxLength={120}
+          placeholder={tx("Почта (необязательно)")}
+          aria-label={tx("Почта (необязательно)")}
+          className="min-h-10 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
+        />
+        <button
+          type="button"
+          disabled={invite.isPending}
+          onClick={() => invite.mutate()}
+          className="min-h-10 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
+        >
+          {tx("Создать приглашение")}
+        </button>
+      </div>
+
+      {positions.length > 0 && (
+        <div>
+          <div className="text-2xs font-medium uppercase tracking-wide text-tg-hint">
+            {tx("Должность")}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {positions.map((item) => {
+              const active = position === item;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    haptic("selection");
+                    setPosition(active ? null : item);
+                  }}
+                  className={[
+                    "inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-xs transition-colors",
+                    active
+                      ? "bg-tg-link/15 font-medium text-tg-text"
+                      : "bg-tg-secondary-bg text-tg-hint",
+                  ].join(" ")}
+                >
+                  {item}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {departments.length > 0 && (
+        <label className="block">
+          <span className="text-2xs font-medium uppercase tracking-wide text-tg-hint">
+            {tx("Подразделение")}
+          </span>
+          <select
+            value={departmentId ?? ""}
+            onChange={(event) =>
+              setDepartmentId(
+                event.target.value ? Number(event.target.value) : null,
+              )
+            }
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          >
+            <option value="">{tx("Пока без подразделения")}</option>
+            {departments.map((dep) => (
+              <option key={dep.id} value={dep.id}>
+                {dep.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {last?.link && (
+        <div
+          className="rounded-tile bg-tg-secondary-bg/60 p-2"
+          data-testid="org-setup-invite-link"
+        >
+          <div className="text-2xs text-tg-hint">{tx("Ссылка-приглашение")}</div>
+          <div className="mt-0.5 break-all text-xs text-tg-text">{last.link}</div>
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="mt-1 min-h-9 rounded-tile bg-tg-bg/70 px-3 text-xs text-tg-link"
+          >
+            {copied ? tx("Скопировано") : tx("Копировать")}
+          </button>
+        </div>
+      )}
+
+      {created.length > 0 && (
+        <div className="text-2xs text-tg-hint">
+          {tx("Приглашений создано: {n}", { n: created.length })}
+        </div>
+      )}
+      <p className="rounded-tile bg-tg-secondary-bg/60 p-2 text-2xs text-tg-hint">
+        {tx("Готовые приглашения всегда в разделе «Приглашения».")}
+      </p>
+    </section>
+  );
+
+  async function copyLink() {
+    if (!last?.link) return;
+    setCopied(await copyText(last.link));
+  }
+}
+
+// --------------------------------------------------------------------------
+// Шаг «График»: рабочая неделя одной настройкой
+// --------------------------------------------------------------------------
+
+const WEEK_PATTERNS = [
+  { id: "5_2", code: "5/2", label: "Пять дней", workdays: [0, 1, 2, 3, 4] },
+  { id: "6_1", code: "6/1", label: "Шесть дней", workdays: [0, 1, 2, 3, 4, 5] },
+  {
+    id: "7_0",
+    code: "7/0",
+    label: "Каждый день",
+    workdays: [0, 1, 2, 3, 4, 5, 6],
+  },
+];
+
+function todayIso(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Рабочая неделя без таблицы на сорок клеток.
+ *
+ * В мастер человек пришёл за «как у нас работает смена», а не за табель:
+ * выбрать рисунок недели и часы дешевле, чем ставить каждому сотруднику
+ * клетки — которых на этом шаге ещё и нет. Шаблон сохраняется на отдел, а
+ * смены ставятся сразу, если люди уже пришли по ссылке; иначе шаблон ждёт их
+ * в табеле и применяется одной кнопкой.
+ */
+function ScheduleStep({
+  departments,
+}: {
+  departments: { id: number; name: string }[];
+}) {
+  const { tx } = useTx();
+  const [patternId, setPatternId] = useState(WEEK_PATTERNS[0].id);
+  const [startsAt, setStartsAt] = useState("09:00");
+  const [endsAt, setEndsAt] = useState("18:00");
+  const [departmentId, setDepartmentId] = useState<number | null>(
+    departments[0]?.id ?? null,
+  );
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const pattern =
+    WEEK_PATTERNS.find((item) => item.id === patternId) ?? WEEK_PATTERNS[0];
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const template = await saveShiftTemplate({
+        // Имя без перевода: оно живёт в базе организации, а не на экране, и
+        // при смене языка не должно превращаться в другой шаблон.
+        name: `Смена ${pattern.code}`,
+        department_id: departmentId,
+        days: [0, 1, 2, 3, 4, 5, 6].map((weekday) =>
+          pattern.workdays.includes(weekday)
+            ? {
+                weekday,
+                status: "planned" as const,
+                starts_at: startsAt,
+                ends_at: endsAt,
+              }
+            : {
+                weekday,
+                status: "dayoff" as const,
+                starts_at: null,
+                ends_at: null,
+              },
+        ),
+      });
+      const week = await fetchShiftWeek(todayIso(), {
+        days: 7,
+        departmentId,
+      });
+      if (!week.people.length) return 0;
+      const result = await applyShiftTemplate(template.id, {
+        employee_ids: week.people.map((person) => person.employee_id),
+        week_start: week.start,
+        overwrite: false,
+      });
+      return result.saved;
+    },
+    onSuccess: (saved) => {
+      setError(null);
+      haptic("success");
+      setNote(
+        saved
+          ? tx("Шаблон сохранён. Смены поставлены: {n}.", { n: saved })
+          : tx("Шаблон сохранён. Поставим смены, когда появятся люди."),
+      );
+    },
+    onError: (err) => setError(humanizeApiError(err)),
+  });
+
+  return (
+    <section className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-tg-text">
+          {tx("Рабочая неделя")}
+        </h2>
+        <p className="mt-1 text-xs text-tg-hint">
+          {tx("Смены и часы можно поправить в табеле в любой момент.")}
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+          {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2">
+        {WEEK_PATTERNS.map((item) => (
+          <Choice
+            key={item.id}
+            label={tx(item.label)}
+            active={item.id === patternId}
+            onClick={() => {
+              haptic("selection");
+              setPatternId(item.id);
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="block">
+          <span className="text-2xs text-tg-hint">{tx("Начало")}</span>
+          <input
+            type="time"
+            value={startsAt}
+            onChange={(event) => setStartsAt(event.target.value)}
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          />
+        </label>
+        <label className="block">
+          <span className="text-2xs text-tg-hint">{tx("Конец")}</span>
+          <input
+            type="time"
+            value={endsAt}
+            onChange={(event) => setEndsAt(event.target.value)}
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          />
+        </label>
+      </div>
+
+      {departments.length > 0 && (
+        <label className="block">
+          <span className="text-2xs font-medium uppercase tracking-wide text-tg-hint">
+            {tx("Подразделение")}
+          </span>
+          <select
+            value={departmentId ?? ""}
+            onChange={(event) =>
+              setDepartmentId(
+                event.target.value ? Number(event.target.value) : null,
+              )
+            }
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          >
+            <option value="">{tx("Все подразделения")}</option>
+            {departments.map((dep) => (
+              <option key={dep.id} value={dep.id}>
+                {dep.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <button
+        type="button"
+        disabled={save.isPending}
+        onClick={() => save.mutate()}
+        className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
+      >
+        {tx("Сохранить шаблон недели")}
+      </button>
+
+      {note && (
+        <div
+          className="rounded-tile bg-status-free/10 p-2 text-xs text-tg-text"
+          data-testid="org-setup-schedule-done"
+        >
+          {note}
+        </div>
+      )}
+    </section>
   );
 }

@@ -61,6 +61,7 @@ from app.services import (
     hr_training,
     hr_training_plan,
     org_packs,
+    org_progress,
     org_setup,
     orgs,
     weekdays,
@@ -242,6 +243,10 @@ class OrgSetupOut(BaseModel):
     uz_pack: bool = True
     # Подсказки для шага «подразделения» — под выбранную отрасль.
     presets: list[dict[str, str]] = []
+    # Должности, которые в этой отрасли пишут чаще всего: подсказка на
+    # шаге «люди», чтобы приглашение уходило с должностью, а первый
+    # профиль не начинался с пустого поля.
+    positions: list[str] = []
     # Может ли смотрящий менять настройку (мастер открыт только им).
     can_edit: bool = False
     # Языковой пакет — решение владельца (будущая платная опция тарифа),
@@ -249,7 +254,26 @@ class OrgSetupOut(BaseModel):
     can_manage_packs: bool = False
 
 
-class OrgSetupIn(BaseModel):
+class SetupChecklistOut(BaseModel):
+    """Стартовый чек-лист в сводке мастера."""
+
+    title: str
+    kind: str
+    department: str | None = None
+    items: int
+
+
+class SetupProgressOut(BaseModel):
+    """Что мастер реально сделал: числа, а не флаг «готово».\r\n"""
+
+    departments: int
+    people: int
+    invites_pending: int
+    shift_templates: int
+    checklists: list[SetupChecklistOut] = []
+
+
+class OrgSetupIn(BaseModel):
     """Частичный ответ мастера: присылается по шагам, а не целиком."""
 
     industry: str | None = None
@@ -1032,6 +1056,7 @@ def _org_setup_out(
         allow_hide_media=setup.allow_hide_media,
         uz_pack=setup.uz_pack,
         presets=org_setup.presets_for(setup.industry),
+        positions=list(org_packs.get(setup.industry).positions),
         can_edit=can_edit,
         can_manage_packs=can_manage_packs,
     )
@@ -1080,6 +1105,36 @@ async def get_org_setup(
         setup,
         can_edit=_may_edit_setup(employee, user),
         can_manage_packs=await _may_manage_packs(session, employee, user),
+    )
+
+
+@router.get("/org-setup/progress", response_model=SetupProgressOut)
+async def get_org_setup_progress(
+    session: SessionDep, user: CurrentUser, employee: EmployeeDep
+) -> SetupProgressOut:
+    """Сводка последнего шага мастера: что действительно завелось.
+
+    Только для тех, кто мастер проходит: это внутренняя кухня настройки, а не
+    данные о людях для всего зала. Число сотрудников и приглашений — уже
+    достаточно личная информация, чтобы отдавать её каждому входящему.
+    """
+    if not _may_edit_setup(employee, user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="managers_only")
+    progress = await org_progress.summary(session, org_id=employee.org_id)
+    return SetupProgressOut(
+        departments=progress.departments,
+        people=progress.people,
+        invites_pending=progress.invites_pending,
+        shift_templates=progress.shift_templates,
+        checklists=[
+            SetupChecklistOut(
+                title=item.title,
+                kind=item.kind,
+                department=item.department,
+                items=item.items,
+            )
+            for item in progress.checklists
+        ],
     )
 
 

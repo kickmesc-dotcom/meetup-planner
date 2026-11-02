@@ -409,6 +409,8 @@ export interface OrgSetup {
   /** Языковой пакет (узбекский): включён по умолчанию, решает владелец. */
   uz_pack: boolean;
   presets: { name: string; emoji: string }[];
+  /** Должности отрасли: подсказки на шаге «люди». */
+  positions: string[];
   can_edit: boolean;
   can_manage_packs: boolean;
 }
@@ -434,6 +436,25 @@ export const saveOrgSetup = (body: OrgSetupPatch) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+/** Что мастер реально сделал: числа последнего шага, а не флаг «готово». */
+export interface OrgSetupChecklistBrief {
+  title: string;
+  kind: string;
+  department: string | null;
+  items: number;
+}
+
+export interface OrgSetupProgress {
+  departments: number;
+  people: number;
+  invites_pending: number;
+  shift_templates: number;
+  checklists: OrgSetupChecklistBrief[];
+}
+
+export const fetchOrgSetupProgress = () =>
+  api<OrgSetupProgress>("/api/org-setup/progress");
 
 // --- Обучение пользованию приложением (этап онбординга) ---
 

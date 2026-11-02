@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 /**
- * Мастер настройки организации: на выходе с шага сохраняются ОТВЕТЫ ЭТОГО
- * ШАГА. Регрессия была дорогой и молчаливой: экран слал патч следующего шага,
- * поэтому отрасль и подразделения не доезжали до сервера. Итоговая сводка
- * показывала «Кухня, Официанты», а следующий экран — пустой список отделов, и
- * первый запуск заканчивался тупиком «Где ты работаешь?» без вариантов.
+ * Мастер настройки организации.
+ *
+ * Две вещи, на которых он ломался дорого и молчаливо:
+ *
+ * * экран слал патч следующего шага, поэтому отрасль и подразделения не
+ *   доезжали до сервера — итог показывал «Кухня, Официанты», а следующий
+ *   экран пустой список отделов;
+ * * мастер закрывался «готово», не заводя ни людей, ни графика: руководитель
+ *   уверен, что настроил, сотрудник открывает приложение и видит нечего.
+ *
+ * Поэтому здесь проверяются не пиксели, а следы: что ушло на сервер с каждого
+ * шага и что мастер показывает на шаге «Люди», «График» и в сводке.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -13,11 +20,29 @@ import type { OrgSetup } from "@/api/hr";
 
 const saveOrgSetup = vi.fn();
 const fetchDepartments = vi.fn();
+const fetchOrgSetupProgress = vi.fn();
+const createInvitation = vi.fn();
+const saveShiftTemplate = vi.fn();
+const fetchShiftWeek = vi.fn();
+const applyShiftTemplate = vi.fn();
 
 vi.mock("@/api/hr", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/hr")>();
-  return { ...actual, saveOrgSetup, fetchDepartments };
+  return {
+    ...actual,
+    saveOrgSetup,
+    fetchDepartments,
+    fetchOrgSetupProgress,
+  };
 });
+
+vi.mock("@/api/orgs", () => ({ createInvitation }));
+
+vi.mock("@/api/shifts", () => ({
+  saveShiftTemplate,
+  fetchShiftWeek,
+  applyShiftTemplate,
+}));
 
 const SETUP: OrgSetup = {
   done: false,
@@ -35,6 +60,7 @@ const SETUP: OrgSetup = {
     { name: "Кухня", emoji: "🍳" },
     { name: "Бариста", emoji: "☕" },
   ],
+  positions: ["Бариста", "Повар"],
   can_edit: true,
 };
 
@@ -55,6 +81,20 @@ let OrgSetupScreenLazy: typeof import("./OrgSetupScreen").default;
 beforeEach(async () => {
   saveOrgSetup.mockReset();
   fetchDepartments.mockReset().mockResolvedValue([]);
+  fetchOrgSetupProgress.mockReset();
+  createInvitation.mockReset();
+  saveShiftTemplate.mockReset();
+  fetchShiftWeek.mockReset().mockResolvedValue({
+    start: "2026-11-02",
+    end: "2026-11-08",
+    today: "2026-11-02",
+    can_edit: true,
+    statuses: [],
+    departments: [],
+    people: [],
+    shifts: [],
+  });
+  applyShiftTemplate.mockReset().mockResolvedValue({ saved: 0, skipped: 0 });
   saveOrgSetup.mockImplementation(async (patch: Record<string, unknown>) => ({
     ...SETUP,
     ...patch,
@@ -67,6 +107,13 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
+
+/** Пройти мастер до нужного шага кнопкой «Далее». */
+async function passSteps(count: number) {
+  for (let index = 0; index < count; index += 1) {
+    fireEvent.click(await screen.findByRole("button", { name: "Далее" }));
+  }
+}
 
 describe("OrgSetupScreen", () => {
   it("с шага «Предприятие» уходят ответы про предприятие, а не про отделы", async () => {
@@ -92,10 +139,6 @@ describe("OrgSetupScreen", () => {
       }),
     );
 
-    // Организация без подсказок сервера: ни готовых отделов, ни пресетов —
-    // единственный случай, когда шаг остался бы пустым без каркаса. Сохранение
-    // первого шага тоже возвращает ответ без пресетов (иначе `setDraft`
-    // вернул бы подсказки из фикстуры и шаг перестал бы быть пустым).
     saveOrgSetup.mockImplementation(async (patch: Record<string, unknown>) => ({
       ...SETUP,
       presets: [],
@@ -104,7 +147,6 @@ describe("OrgSetupScreen", () => {
     renderScreen({ ...SETUP, presets: [] });
     fireEvent.click(await screen.findByRole("button", { name: "Далее" }));
 
-    // Статика шага уже на экране, пока данных нет.
     expect(await screen.findByText("Из кого состоит команда?")).toBeTruthy();
     expect(await screen.findByTestId("org-setup-departments-skeleton")).toBeTruthy();
 
@@ -115,7 +157,7 @@ describe("OrgSetupScreen", () => {
 
   it("с шага «Подразделения» отделы уходят вместе с флагом создания", async () => {
     renderScreen();
-    fireEvent.click(await screen.findByRole("button", { name: "Далее" }));
+    await passSteps(1);
     fireEvent.click(await screen.findByRole("button", { name: /Бариста/ }));
     fireEvent.click(screen.getByRole("button", { name: "Далее" }));
 
@@ -124,5 +166,82 @@ describe("OrgSetupScreen", () => {
       departments: ["Бариста"],
       create_departments: true,
     });
+  });
+
+  it("на шаге «Люди» ссылка создаётся и показывается, почту можно не вводить", async () => {
+    createInvitation.mockResolvedValue({
+      id: 11,
+      email: null,
+      role: "staff",
+      created_at: null,
+      expires_at: "2026-11-09T00:00:00Z",
+      link: "https://semitaskbot.pages.dev/invite?token=abc",
+    });
+    renderScreen();
+    await passSteps(2);
+
+    expect(await screen.findByText("Кого позвать первым?")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Создать приглашение" }));
+
+    await waitFor(() => expect(createInvitation).toHaveBeenCalledTimes(1));
+    // Роль всегда «сотрудник»: владельца себе мастер не приглашает.
+    expect(createInvitation.mock.calls[0][0]).toMatchObject({
+      email: null,
+      role: "staff",
+      position: null,
+    });
+    expect(
+      (await screen.findByTestId("org-setup-invite-link")).textContent,
+    ).toContain("/invite?token=abc");
+  });
+
+  it("на шаге «График» сохраняется шаблон недели с рабочими днями", async () => {
+    saveShiftTemplate.mockResolvedValue({
+      id: 5,
+      name: "Смена 5/2",
+      department_id: null,
+      department_name: null,
+      days: [],
+    });
+    renderScreen();
+    await passSteps(3);
+
+    expect(await screen.findByText("Рабочая неделя")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить шаблон недели" }));
+
+    await waitFor(() => expect(saveShiftTemplate).toHaveBeenCalledTimes(1));
+    const body = saveShiftTemplate.mock.calls[0][0];
+    expect(body.name).toBe("Смена 5/2");
+    const working = body.days.filter(
+      (day: { status: string }) => day.status === "planned",
+    );
+    expect(working).toHaveLength(5);
+    expect(await screen.findByTestId("org-setup-schedule-done")).toBeTruthy();
+    // Людей ещё нет — смены не ставим, но и не обещаем, что поставили.
+    expect(fetchShiftWeek).toHaveBeenCalledTimes(1);
+    expect(applyShiftTemplate).not.toHaveBeenCalled();
+  });
+
+  it("на последнем шаге сводка показывает, что реально завелось", async () => {
+    fetchOrgSetupProgress.mockResolvedValue({
+      departments: 2,
+      people: 3,
+      invites_pending: 1,
+      shift_templates: 1,
+      checklists: [
+        { title: "Открытие смены", kind: "shift", department: "Кухня", items: 5 },
+      ],
+    });
+    renderScreen();
+    await passSteps(6);
+
+    expect(await screen.findByText("Что уже готово")).toBeTruthy();
+    await waitFor(() => expect(fetchOrgSetupProgress).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Сотрудники: 3/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Первый чек-лист уже ждёт сотрудников в разделе «Чек-лист».",
+      ),
+    ).toBeTruthy();
   });
 });

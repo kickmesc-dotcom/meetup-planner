@@ -35,6 +35,7 @@ const SETUP: OrgSetup = {
   allow_hide_media: true,
   uz_pack: true,
   presets: [],
+  positions: [],
   can_edit: true,
   can_manage_packs: true,
 };
