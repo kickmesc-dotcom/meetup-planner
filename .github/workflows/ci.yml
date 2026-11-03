@@ -1,0 +1,94 @@
+# CI: тесты, типы и сборка на каждый пуш (B2B_PLATFORM_PLAN, шаг 5.1).
+#
+# Зачем. До этого «всё зелёное» означало «на моей машине зелёное»: пуш в main
+# мог привезти красные тесты, а узнавали об этом на следующем деплое или от
+# клиента. Здесь те же команды, что мы запускаем руками, выполняются на чистой
+# машине GitHub — без локальной .venv, без забытых пакетов и с теми же флагами.
+#
+# Почему линтер не входит. В проекте нет `eslint.config.*`, и `npm run lint`
+# падает на конфиге, а не на коде: красный CI из-за отсутствующего конфига
+# быстро приучает игнорировать красный. Как только конфиг появится — добавить
+# шаг сюда.
+#
+# Почему ограничены форки vitest. Без `maxForks` прогон на 2 vCPU раннере
+# падает по таймаутам jsdom (это же воспроизводится локально на слабых
+# машинах), и CI врал бы «тесты сломаны» вместо «машина не тянет».
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Новый пуш в ту же ветку отменяет предыдущий прогон: важно последнее
+# состояние, а не история очереди.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # Тесты сами выставляют эти значения через `setdefault`, но явно — надёжнее:
+    # если один тест забудет, прогон не упадёт на импорте `Settings`.
+    env:
+      BOT_TOKEN: test-token
+      TG_WEBHOOK_SECRET: test-secret
+      MINI_APP_URL: https://example.com
+      DATABASE_URL: postgresql+asyncpg://u:p@localhost:5432/db
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      # `-e .[dev]` — ровно то, что ставит разработчик: версии закреплены в
+      # `pyproject.toml`, поэтому CI и рабочая машина получают одно и то же.
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      # Полный набор, без `-x`: один красный тест не должен скрывать остальные.
+      # `-p no:cacheprovider` — раннер всё равно одноразовый.
+      - name: Run tests
+        run: python -m pytest -q -p no:cacheprovider
+
+  frontend:
+    name: Frontend (types, tests, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci`, а не `npm install`: lock-файл — источник правды, и CI не
+      # должен молча поднимать версии пакетов.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npx vitest run --poolOptions.forks.maxForks=2 --poolOptions.forks.minForks=1
+
+      # Сборка последней: она ловит ошибки, которые не видят типы (импорт
+      # чанка, размер бандла, отсутствующий ассет).
+      - name: Build
+        run: npm run build
