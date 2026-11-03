@@ -57,10 +57,27 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
-      # Полный набор, без `-x`: один красный тест не должен скрывать остальные.
-      # `-p no:cacheprovider` — раннер всё равно одноразовый.
+      # `pipefail` обязателен: без него `tee` вернёт 0, шаг станет зелёным, и
+      # красный CI перестанет значить хоть что-нибудь. `-p no:cacheprovider` —
+      # раннер всё равно одноразовый.
       - name: Run tests
-        run: python -m pytest -q -p no:cacheprovider
+        run: |
+          set -o pipefail
+          python -m pytest -q -p no:cacheprovider 2>&1 | tee pytest.log
+
+      # Логи приватного репозитория без токена не читаются, а без хвоста
+      # падения красный CI — это «что-то сломалось». Аннотация прикрепляется к
+      # коммиту и видна всем, у кого есть доступ к репозиторию.
+      - name: Report failures
+        if: failure()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          lines = Path("pytest.log").read_text(errors="replace").splitlines()[-80:]
+          text = "%0A".join(line.replace("%", "%25") for line in lines)
+          print(f"::error title=Pytest failed::{text}")
+          PY
 
   frontend:
     name: Frontend (types, tests, build)
