@@ -180,6 +180,7 @@ JOB_GAME_MUSIC_GAME = "game_music_game_weekly"  # GHG10 Э16
 JOB_WATCHDOG = "scheduler_watchdog"  # GHG11(3): схлопывание зависших задач
 JOB_HR_DIGEST = "hr_morning_digest"  # план 8.2: сводка руководителю в 08:30
 JOB_HR_TASKS = "hr_tasks_tick"  # SemiTaskBot: напоминания о сроке + эскалация просрочки
+JOB_MONITORING_ALERTS = "monitoring_alerts"  # план 5.2: ошибки/latency в Telegram
 
 def _env_int(name: str, default: int) -> int:
     import os
@@ -1107,6 +1108,37 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
         max_instances=1,
         coalesce=True,
         misfire_grace_time=3600,
+    )
+
+    # --- Мониторинг (B2B_PLATFORM_PLAN, 5.2) ---
+    # Раз в пять минут смотрим окно метрик. Кулдаун живёт в `take_alert`:
+    # «плохо уже час» не превращается в сообщение каждые пять минут, иначе
+    # алерт отключают — и настоящее падение проходит незамеченным.
+    async def _monitoring_alerts_job(*, bot: Bot) -> None:
+        from app.services import monitoring as mon
+
+        # Если метрик нет вовсе (ни одного запроса), алерта тоже нет: тишина в
+        # API — это не падение API, у нас нет фонового трафика.
+        reason = mon.take_alert()
+        if reason is None:
+            return
+        text = mon.metrics.alert_text(reason)
+        for admin_id in settings.staff_tg_id_set:
+            try:
+                await bot.send_message(chat_id=admin_id, text=text)
+            except Exception as exc:  # noqa: BLE001 - бот не должен валить job
+                log.warning("monitoring.alert_failed", admin=admin_id, error=str(exc))
+        log.warning("monitoring.alert_sent", reason=reason)
+
+    sched.add_job(
+        _logged_job(JOB_MONITORING_ALERTS, _monitoring_alerts_job),
+        IntervalTrigger(minutes=5),
+        kwargs={"bot": bot},
+        id=JOB_MONITORING_ALERTS,
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=300,
     )
 
     sched.start()

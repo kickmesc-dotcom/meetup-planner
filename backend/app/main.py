@@ -70,6 +70,7 @@ from app.db.base import get_sessionmaker
 from app.db.hr_seed import seed_hr
 from app.log_redaction import configure_logging
 from app.api.deps import session_auth
+from app.api.middleware_monitoring import MonitoringMiddleware
 from app.db.org_models import DEFAULT_ORG_ID, reset_org, set_org
 from app.db.seed import seed_users
 
@@ -491,6 +492,10 @@ def create_app() -> FastAPI:
         regex_rejected=settings.cors_origin_regex_rejected,
         credentials=settings.cors_credentials_allowed,
     )
+    # Метрики (B2B_PLATFORM_PLAN, 5.2). Добавляется последним, то есть
+    # оказывается самым внешним: только так видны и те ответы, которые отбил
+    # лимит частоты, и обработчики, упавшие с исключением.
+    app.add_middleware(MonitoringMiddleware)
     app.include_router(bot_webhook.router)
     # Вход по почте: регистрация, вход, сессии, сброс (B2B_PLATFORM_PLAN, 2.1).
     app.include_router(routes_auth.router, prefix="/api")

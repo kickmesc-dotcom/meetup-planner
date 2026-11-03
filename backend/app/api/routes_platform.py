@@ -35,7 +35,7 @@ from app.config import get_settings
 from app.db.models import User
 from app.db.org_models import OrgInvoice, Organization
 from app.db.tenancy import all_orgs
-from app.services import billing
+from app.services import billing, monitoring
 
 log = structlog.get_logger()
 router = APIRouter(tags=["platform"])
@@ -458,3 +458,63 @@ async def platform_cancel_invoice(
             by=admin.id,
         )
         return await _invoice_out(session, invoice)
+
+
+class MonitoringTopPathOut(BaseModel):
+    path: str
+    count: int
+
+
+class MonitoringTopErrorOut(BaseModel):
+    path: str
+    status: int
+    count: int
+
+
+class MonitoringLastErrorOut(BaseModel):
+    at: str
+    method: str
+    path: str
+    status: int
+    duration_ms: float
+
+
+class PlatformMonitoringOut(BaseModel):
+    """Сводка по последним минутам: объём, ошибки, скорость, причина алерта."""
+
+    window_seconds: int
+    requests: int
+    errors: int
+    error_rate: float
+    p50_ms: float
+    p95_ms: float
+    slowest_ms: float
+    top_paths: list[MonitoringTopPathOut]
+    top_errors: list[MonitoringTopErrorOut]
+    last_error: MonitoringLastErrorOut | None
+    alert: str | None
+
+
+@router.get("/platform/monitoring", response_model=PlatformMonitoringOut)
+async def platform_monitoring(_admin: PlatformDep) -> PlatformMonitoringOut:
+    """Что происходит с API прямо сейчас.
+
+    Только для платформенного админа: цифры про все организации сразу — не то,
+    что должен видеть клиент, и уж точно не публичная ручка. Счётчики живут в
+    памяти процесса, поэтому после перезапуска окно начинается заново — это
+    ожидаемо и описано в `docs/MONITORING.md`.
+    """
+    data = monitoring.snapshot()
+    return PlatformMonitoringOut(
+        window_seconds=data.window_seconds,
+        requests=data.requests,
+        errors=data.errors,
+        error_rate=round(data.error_rate, 4),
+        p50_ms=round(data.p50_ms, 1),
+        p95_ms=round(data.p95_ms, 1),
+        slowest_ms=round(data.slowest_ms, 1),
+        top_paths=data.top_paths,
+        top_errors=data.top_errors,
+        last_error=data.last_error,
+        alert=data.alert,
+    )
