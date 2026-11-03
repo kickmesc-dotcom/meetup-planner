@@ -24,6 +24,26 @@ from app.config import (  # noqa: E402
     origin_of_url,
 )
 
+import pytest  # noqa: E402
+
+from app.config import get_settings  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fixed_cors_env(monkeypatch):
+    """Тесты говорят о правиле, а не о `.env` машины.
+
+    Локально у разработчика `CORS_ORIGINS` заполнен, и пять тестов ниже
+    проходили «сами собой». В CI файла `.env` нет, список пуст — Starlette
+    отвечает `*`, и проверки падали, хотя код был тот же. Настройки кешируются
+    (`lru_cache`), поэтому кеш чистим до и после.
+    """
+    monkeypatch.setenv("CORS_ORIGINS", "https://semitaskbot.pages.dev")
+    monkeypatch.delenv("CORS_ORIGIN_REGEX", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
 
 def _settings(**overrides) -> Settings:
     base = {
