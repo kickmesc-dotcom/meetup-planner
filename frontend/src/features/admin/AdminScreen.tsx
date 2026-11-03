@@ -34,6 +34,7 @@ import StandardsScreen from "@/features/hr/StandardsScreen";
 import SettingsScreen from "@/features/admin/SettingsScreen";
 import PlanScreen from "./PlanScreen";
 import BillingScreen from "./BillingScreen";
+import PlatformScreen from "./PlatformScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -83,6 +84,7 @@ type Section =
   | "jobs"
   | "plan"
   | "billing"
+  | "platform"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -115,6 +117,7 @@ const VALID_SECTIONS: Section[] = [
   "jobs",
   "plan",
   "billing",
+  "platform",
   "space-restart",
 ];
 
@@ -354,6 +357,13 @@ const SECTIONS: SectionDef[] = [
     subtitle: "Тарифы, счёт на оплату и история платежей",
   },
   {
+    id: "platform",
+    group: GROUP_SYSTEM,
+    icon: "admin",
+    title: "Платформа",
+    subtitle: "Клиенты, тарифы, блокировки и подтверждение оплат",
+  },
+  {
     id: "proxy",
     group: GROUP_SYSTEM,
     icon: "globe",
@@ -387,6 +397,9 @@ const GROUPS: { title: string; icon: IconName }[] = [
  * ему не нужны и только пугают.
  */
 const PLATFORM_SECTIONS: Section[] = [
+  // Админка платформы: клиенты всех организаций. Владельцу салона она не
+  // нужна и опасна — он увидел бы чужие компании.
+  "platform",
   "texts",
   "intervals",
   "jobs",
@@ -541,6 +554,7 @@ export default function AdminScreen({
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
   if (section === "plan") return <PlanScreen onBack={back} />;
   if (section === "billing") return <BillingScreen onBack={back} />;
+  if (section === "platform") return <PlatformScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");

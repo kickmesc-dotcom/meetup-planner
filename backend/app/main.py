@@ -40,6 +40,7 @@ from app.api import (
     routes_menu,
     routes_meta,
     routes_orgs,
+    routes_platform,
     routes_polls,
     routes_push,
     routes_reports,
@@ -495,6 +496,8 @@ def create_app() -> FastAPI:
     app.include_router(routes_auth.router, prefix="/api")
     # Приглашения в организацию: ссылка с ролью и сроком (B2B_PLATFORM_PLAN, 2.2).
     app.include_router(routes_orgs.router, prefix="/api")
+    # Админка платформы: организации, тарифы, блокировки, оплаты (4.3).
+    app.include_router(routes_platform.router, prefix="/api")
     # Push вне Telegram: подписка браузера и тестовое уведомление (2.4).
     app.include_router(routes_push.router, prefix="/api")
     app.include_router(routes_users.router, prefix="/api")
