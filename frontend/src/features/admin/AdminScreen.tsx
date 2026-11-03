@@ -34,6 +34,7 @@ import StandardsScreen from "@/features/hr/StandardsScreen";
 import SettingsScreen from "@/features/admin/SettingsScreen";
 import PlanScreen from "./PlanScreen";
 import BillingScreen from "./BillingScreen";
+import BrandScreen from "./BrandScreen";
 import PlatformScreen from "./PlatformScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
@@ -85,6 +86,7 @@ type Section =
   | "plan"
   | "billing"
   | "platform"
+  | "brand"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -118,6 +120,7 @@ const VALID_SECTIONS: Section[] = [
   "plan",
   "billing",
   "platform",
+  "brand",
   "space-restart",
 ];
 
@@ -350,6 +353,15 @@ const SECTIONS: SectionDef[] = [
   {
     // Рядом с «Тарифом»: лимит и его цена — один разговор, и человек ищет
     // оплату там же, где увидел, что места кончились.
+    // Бренд рядом с оплатой: это один разговор «как выглядит наш продукт»,
+    // и настраивает его владелец, а не тот, кто правит подписи.
+    id: "brand",
+    group: GROUP_SETTINGS,
+    icon: "edit",
+    title: "Бренд",
+    subtitle: "Своё имя, цвет и логотип вместо SemiTaskBot",
+  },
+  {
     id: "billing",
     group: GROUP_SETTINGS,
     icon: "award",
@@ -555,6 +567,7 @@ export default function AdminScreen({
   if (section === "plan") return <PlanScreen onBack={back} />;
   if (section === "billing") return <BillingScreen onBack={back} />;
   if (section === "platform") return <PlatformScreen onBack={back} />;
+  if (section === "brand") return <BrandScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");

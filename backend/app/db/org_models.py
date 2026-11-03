@@ -154,6 +154,14 @@ class Organization(Base):
     plan_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    # Бренд клиента (шаг 4.4). Пусто — видно имя организации; заполнено —
+    # имя, цвет ссылок и логотип клиента вместо платформенных. Цвет хранится
+    # текстом `#rrggbb`: это CSS-значение, его сравнивают и логируют как текст.
+    brand_name: Mapped[str | None] = mapped_column(String(64))
+    brand_color: Mapped[str | None] = mapped_column(String(9))
+    # Логотип — ссылка на CDN клиента: загрузка файла потребовала бы хранилища
+    # и чистки сирот, а поле при появлении загрузки останется тем же.
+    brand_logo_url: Mapped[str | None] = mapped_column(Text)
     # Свой бот клиента (B2B_PLATFORM_PLAN, шаг 1.6). Пусто — организация
     # работает на боте из env (текущий контур). Токен здесь только потому, что
     # у каждой организации свой BotFather-бот; отдавать его наружу нельзя.

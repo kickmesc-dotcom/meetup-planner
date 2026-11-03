@@ -30,7 +30,7 @@ from app.db.org_models import (
     Organization,
     OrganizationMember,
 )
-from app.services import billing, hr_access, invitations, mail, orgs
+from app.services import billing, brand, hr_access, invitations, mail, orgs
 
 log = structlog.get_logger()
 router = APIRouter(tags=["orgs"])
@@ -76,6 +76,10 @@ _STATUS: dict[str, int] = {
     "invoice_expired": status.HTTP_410_GONE,
     "invoice_not_payable": status.HTTP_409_CONFLICT,
     "invoice_not_cancelable": status.HTTP_409_CONFLICT,
+    # Бренд (шаг 4.4): цвет и логотип приходят из формы, поэтому это
+    # ошибка ввода, а не конфликт состояния.
+    "bad_color": status.HTTP_400_BAD_REQUEST,
+    "bad_logo": status.HTTP_400_BAD_REQUEST,
 }
 
 
@@ -182,6 +186,24 @@ class BillingOut(BaseModel):
 class InvoiceIn(BaseModel):
     plan: str = Field(min_length=1, max_length=16)
     period: str = Field(default="month", max_length=8)
+
+
+class BrandOut(BaseModel):
+    """Бренд организации: что видит клиент вместо имени платформы."""
+
+    name: str
+    color: str
+    logo_url: str | None
+    bot_username: str | None
+    is_custom: bool
+
+
+class BrandPatch(BaseModel):
+    """Правка бренда. Отсутствующее поле не меняется, пустое — сбрасывается."""
+
+    name: str | None = Field(default=None, max_length=64)
+    color: str | None = Field(default=None, max_length=9)
+    logo_url: str | None = Field(default=None, max_length=500)
 
 
 class OrgMemberOut(BaseModel):
@@ -514,6 +536,69 @@ async def cancel_org_invoice(
         _fail(exc)
     log.info("billing.invoice_canceled", org_id=org.id, invoice_id=invoice.id)
     return _invoice_out(invoice)
+
+
+@router.get("/brand", response_model=BrandOut)
+async def current_brand(org: OrgDep) -> BrandOut:
+    """Бренд своей организации. Доступен любому вошедшему.
+
+    Не только руководителю: имя и цвет видит каждый сотрудник, и если бы
+    ручка была админской, у смены остался бы бренд платформы, а у владельца —
+    свой. Организация берётся из сотрудника запроса, поэтому чужой бренд не
+    запросить.
+    """
+    row = brand.from_org(org)
+    return BrandOut(
+        name=row.name,
+        color=row.color,
+        logo_url=row.logo_url,
+        bot_username=row.bot_username,
+        is_custom=row.is_custom,
+    )
+
+
+@router.patch("/org/brand", response_model=BrandOut)
+async def update_brand(
+    body: BrandPatch, session: SessionDep, org: OrgDep, _admin: AdminDep
+) -> BrandOut:
+    """Задать своё имя, цвет и логотип.
+
+    Только руководителю: бренд видит вся команда, и менять его из-под смены
+    нельзя. `name` обязателен, если передан: пустое имя — это не «бренд без
+    имени», а забытое поле. Сбросить бренд целиком — `DELETE`.
+    """
+    try:
+        row = await brand.update(
+            session,
+            org,
+            name=body.name,
+            color=body.color,
+            logo_url=body.logo_url,
+        )
+    except brand.BrandError as exc:
+        _fail(exc)
+    log.info("orgs.brand_updated", org_id=org.id, custom=row.is_custom)
+    return BrandOut(
+        name=row.name,
+        color=row.color,
+        logo_url=row.logo_url,
+        bot_username=row.bot_username,
+        is_custom=row.is_custom,
+    )
+
+
+@router.delete("/org/brand", response_model=BrandOut)
+async def reset_brand(session: SessionDep, org: OrgDep, _admin: AdminDep) -> BrandOut:
+    """Сбросить бренд к имени организации. Цвет и логотип тоже уходят."""
+    row = await brand.clear(session, org)
+    log.info("orgs.brand_reset", org_id=org.id)
+    return BrandOut(
+        name=row.name,
+        color=row.color,
+        logo_url=row.logo_url,
+        bot_username=row.bot_username,
+        is_custom=row.is_custom,
+    )
 
 
 @router.get("/org/members", response_model=list[OrgMemberOut])
