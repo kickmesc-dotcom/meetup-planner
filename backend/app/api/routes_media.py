@@ -59,7 +59,14 @@ async def upload_media(
         blob = await hr_media.store_upload(session, file)
     except hr_media.MediaError as exc:
         await session.rollback()
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        # Кончилось место тарифа — `413`, а не `400`: это не битый файл,
+        # а граница квоты, и клиент должен показать «место кончилось».
+        code = (
+            status.HTTP_413_CONTENT_TOO_LARGE
+            if str(exc) == "storage_full"
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(code, detail=str(exc)) from exc
     await session.commit()
     return media_out(blob)
 

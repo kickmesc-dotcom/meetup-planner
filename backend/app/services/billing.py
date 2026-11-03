@@ -78,6 +78,12 @@ class Plan:
     title: str
     seats: int
     branches: int
+    # Потолок частоты запросов организации в минуту и объём медиа (шаг
+    # 5.3). Это граница тарифа, а не наказание: клиенту, которому мало,
+    # видно, что именно кончилось, и он покупает тариф выше, а не
+    # считает, что «приложение тормозит».
+    api_rpm: int = 300
+    storage_mb: int = 200
     # Цена в целых рублях за период. Ноль у пробного: он не продаётся.
     price_month: int = 0
     price_year: int = 0
@@ -92,12 +98,35 @@ class Plan:
 # стоит десять месяцев: скидка за предоплату, а не «12 по цене 12».
 PLANS: dict[str, Plan] = {
     "trial": Plan("trial", "Пробный", seats=10, branches=5, trial=True),
-    "start": Plan("start", "Начало", seats=15, branches=5, price_month=2900, price_year=29_000),
+    "start": Plan(
+        "start",
+        "Начало",
+        seats=15,
+        branches=5,
+        api_rpm=600,
+        storage_mb=1000,
+        price_month=2900,
+        price_year=29_000,
+    ),
     "business": Plan(
-        "business", "Бизнес", seats=50, branches=15, price_month=7900, price_year=79_000
+        "business",
+        "Бизнес",
+        seats=50,
+        branches=15,
+        api_rpm=1200,
+        storage_mb=5000,
+        price_month=7900,
+        price_year=79_000,
     ),
     "network": Plan(
-        "network", "Сеть", seats=200, branches=60, price_month=19_900, price_year=199_000
+        "network",
+        "Сеть",
+        seats=200,
+        branches=60,
+        api_rpm=2400,
+        storage_mb=20_000,
+        price_month=19_900,
+        price_year=199_000,
     ),
 }
 
@@ -481,6 +510,12 @@ async def mark_paid(
     # Оплаченный тариф — не триал: дата окончания триала больше не значит
     # ничего и не должна закрывать рост.
     org.trial_ends_at = None
+    # Потолок частоты и объём хранилища зависят от тарифа (шаг 5.3):
+    # без сброса кэша клиент после оплаты минуту жил бы со старым
+    # лимитом и получал `429`, за который уже заплатил.
+    from app.services import org_limits
+
+    org_limits.forget_plan(org.id)
     await session.commit()
     await session.refresh(invoice)
     await session.refresh(org)

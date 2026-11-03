@@ -15,7 +15,7 @@ from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
 from app.db.models import User
 from app.db.org_models import Organization, set_org
-from app.services import display_names, org_bots, orgs
+from app.services import display_names, org_bots, org_limits, orgs
 
 
 async def db_session() -> AsyncIterator[AsyncSession]:
@@ -117,6 +117,9 @@ async def current_user(
             org = await orgs.default_org_for(session, user)
             if org is not None:
                 set_org(org.id)
+                # Частоту считаем по организации, а не по адресу: за
+                # одним офисом сидит вся смена (шаг 5.3).
+                await org_limits.enforce_rate(session, org.id)
             return user
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="missing_authorization")
 
@@ -138,6 +141,7 @@ async def current_user(
             org_id = fallback.id if fallback is not None else None
         if org_id is not None:
             set_org(org_id)
+            await org_limits.enforce_rate(session, org_id)
         return user
 
     init_data = _strip_tma_prefix(authorization)
@@ -167,6 +171,7 @@ async def current_user(
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=detail)
     if matched_org is not None:
         set_org(matched_org)
+        await org_limits.enforce_rate(session, matched_org)
 
     user = await session.scalar(select(User).where(User.telegram_id == payload.user_id))
     if user is None:
@@ -272,6 +277,10 @@ async def current_employee(
         # Тенантский фильтр: все дальнейшие ORM-запросы в этом запросе видят
         # только его организацию (см. `app/db/tenancy.py`).
         set_org(employee.org_id)
+        # Лимит частоты организации (шаг 5.3). Стоит в зависимости, а не
+        # в middleware: организация известна только после
+        # аутентификации, и второй раз разбирать подпись незачем.
+        await org_limits.enforce_rate(session, employee.org_id)
         yield employee
     except hr_access.HrAccessError as exc:
         # Уволенный сотрудник: доступ закрыт, пока его не вернут из корзины.

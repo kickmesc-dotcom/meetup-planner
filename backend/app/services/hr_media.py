@@ -37,6 +37,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db.hr_models import MediaBlob, TaskPhoto
+from app.db.org_models import current_org_id
+from app.services import org_limits
 
 log = structlog.get_logger()
 
@@ -254,6 +256,12 @@ async def store_bytes(
         if telegram_file_id and not blob.telegram_file_id:
             blob.telegram_file_id = telegram_file_id
         return blob
+    # Квота организации (шаг 5.3): база и диск контейнера общие, и поток
+    # снимков одного клиента не должен приближать отказ остальным.
+    try:
+        await org_limits.ensure_storage(session, current_org_id.get(), len(data))
+    except org_limits.QuotaExceeded as exc:
+        raise MediaError("storage_full") from exc
     width, height = image_size(data, detected)
     blob = MediaBlob(
         sha256=digest,

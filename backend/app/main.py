@@ -72,6 +72,7 @@ from app.log_redaction import configure_logging
 from app.api.deps import session_auth
 from app.api.middleware_monitoring import MonitoringMiddleware
 from app.db.org_models import DEFAULT_ORG_ID, reset_org, set_org
+from app.services import org_limits
 from app.db.seed import seed_users
 
 
@@ -442,6 +443,10 @@ def create_app() -> FastAPI:
         """
         token = set_org(DEFAULT_ORG_ID)
         auth_token = session_auth.set(False)
+        # Лимит частоты считается один раз за запрос (шаг 5.3):
+        # пользователь и сотрудник резолвятся в одном запросе, и без
+        # сброса флага запрос списывался бы дважды.
+        org_limits.begin_request()
         try:
             return await call_next(request)
         finally:
