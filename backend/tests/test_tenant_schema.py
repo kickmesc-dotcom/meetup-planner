@@ -70,6 +70,9 @@ TENANT_TABLES: set[str] = {
     # Приглашение принадлежит организации, из которой выписано (шаг 2.2):
     # именно его `org_id` решает, куда попадёт приглашённый.
     "org_invitations",
+    # Счёт выписан организации (шаг 4.2): чужой счёт не должен быть виден
+    # даже зная его id.
+    "org_invoices",
     "event_log",
     "feedback_answers",
     "feedback_questions",
@@ -394,7 +397,8 @@ def test_migration_0054_covers_every_tenant_table() -> None:
         "push_subscriptions",
         "hr_kudos",  # 0062
         "menu_items",  # 0064
-    }  # 0057, 0058, 0062, 0064
+        "org_invoices",  # 0066
+    }  # 0057, 0058, 0062, 0064, 0066
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 

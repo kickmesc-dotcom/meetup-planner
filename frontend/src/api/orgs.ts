@@ -152,7 +152,66 @@ export interface OrgPlan {
   trial_ends_at: string | null;
   trial_days_left: number | null;
   trial_expired: boolean;
+  /** Срок оплаченной подписки (шаг 4.2). Пусто — бессрочно или триал. */
+  plan_ends_at?: string | null;
+  plan_days_left?: number | null;
+  subscription_expired?: boolean;
 }
 
 /** Тариф своей организации. Только руководителю. */
 export const fetchOrgPlan = () => api<OrgPlan>("/api/org/plan");
+
+/** Тариф в витрине: что включено и сколько стоит. Цена приходит с сервера. */
+export interface PlanPrice {
+  code: string;
+  title: string;
+  seats: number;
+  branches: number;
+  price_month: number;
+  price_year: number;
+}
+
+/** Счёт на оплату. `status` считает сервер, включая `expired`. */
+export interface OrgInvoice {
+  id: number;
+  number: string;
+  plan: string;
+  plan_title: string;
+  period: "month" | "year" | string;
+  amount: number;
+  currency: string;
+  status: "pending" | "awaiting" | "paid" | "canceled" | "expired" | string;
+  created_at: string | null;
+  expires_at: string;
+  paid_at: string | null;
+  period_start: string | null;
+  period_end: string | null;
+}
+
+export interface OrgBilling {
+  plan: OrgPlan;
+  prices: PlanPrice[];
+  invoices: OrgInvoice[];
+  invoice_ttl_days: number;
+}
+
+/** Витрина тарифов и история счетов своей организации. Только руководителю. */
+export const fetchOrgBilling = () => api<OrgBilling>("/api/org/billing");
+
+/**
+ * Выставить счёт. Сумма считается на сервере из каталога: браузер не выбирает,
+ * сколько платить. Повторный клик вернёт тот же открытый счёт.
+ */
+export const createInvoice = (body: { plan: string; period: string }) =>
+  api<OrgInvoice>("/api/org/invoices", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
+/** «Я оплатил»: счёт ждёт подтверждения. Подписку это НЕ продлевает. */
+export const requestInvoicePaid = (id: number) =>
+  api<OrgInvoice>(`/api/org/invoices/${id}/paid`, { method: "POST" });
+
+/** Отменить неоплаченный счёт. */
+export const cancelInvoice = (id: number) =>
+  api<OrgInvoice>(`/api/org/invoices/${id}/cancel`, { method: "POST" });

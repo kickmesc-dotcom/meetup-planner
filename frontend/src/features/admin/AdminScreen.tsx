@@ -33,6 +33,7 @@ import MenuScreen from "./MenuScreen";
 import StandardsScreen from "@/features/hr/StandardsScreen";
 import SettingsScreen from "@/features/admin/SettingsScreen";
 import PlanScreen from "./PlanScreen";
+import BillingScreen from "./BillingScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -81,6 +82,7 @@ type Section =
   | "proxy"
   | "jobs"
   | "plan"
+  | "billing"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -112,6 +114,7 @@ const VALID_SECTIONS: Section[] = [
   "proxy",
   "jobs",
   "plan",
+  "billing",
   "space-restart",
 ];
 
@@ -342,6 +345,15 @@ const SECTIONS: SectionDef[] = [
     subtitle: "Места, подразделения и срок пробного периода",
   },
   {
+    // Рядом с «Тарифом»: лимит и его цена — один разговор, и человек ищет
+    // оплату там же, где увидел, что места кончились.
+    id: "billing",
+    group: GROUP_SETTINGS,
+    icon: "award",
+    title: "Оплата и счета",
+    subtitle: "Тарифы, счёт на оплату и история платежей",
+  },
+  {
     id: "proxy",
     group: GROUP_SYSTEM,
     icon: "globe",
@@ -528,6 +540,7 @@ export default function AdminScreen({
   if (section === "jobs") return <JobsQueueScreen onBack={back} />;
   if (section === "space-restart") return <SpaceRestartScreen onBack={back} />;
   if (section === "plan") return <PlanScreen onBack={back} />;
+  if (section === "billing") return <BillingScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");

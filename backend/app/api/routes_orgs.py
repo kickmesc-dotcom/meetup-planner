@@ -30,7 +30,7 @@ from app.db.org_models import (
     Organization,
     OrganizationMember,
 )
-from app.services import hr_access, invitations, mail, orgs
+from app.services import billing, hr_access, invitations, mail, orgs
 
 log = structlog.get_logger()
 router = APIRouter(tags=["orgs"])
@@ -66,6 +66,16 @@ _STATUS: dict[str, int] = {
     "seats_limit": status.HTTP_409_CONFLICT,
     "branches_limit": status.HTTP_409_CONFLICT,
     "trial_expired": status.HTTP_402_PAYMENT_REQUIRED,
+    # Оплата (шаг 4.2): неверный тариф/период — ошибка ввода, а
+    # просроченный и уже оплаченный счёт — конфликт состояния, не 404.
+    "subscription_expired": status.HTTP_402_PAYMENT_REQUIRED,
+    "bad_plan": status.HTTP_400_BAD_REQUEST,
+    "bad_period": status.HTTP_400_BAD_REQUEST,
+    "plan_not_payable": status.HTTP_409_CONFLICT,
+    "invoice_not_found": status.HTTP_404_NOT_FOUND,
+    "invoice_expired": status.HTTP_410_GONE,
+    "invoice_not_payable": status.HTTP_409_CONFLICT,
+    "invoice_not_cancelable": status.HTTP_409_CONFLICT,
 }
 
 
@@ -126,6 +136,52 @@ class PlanOut(BaseModel):
     trial_ends_at: str | None = None
     trial_days_left: int | None = None
     trial_expired: bool
+    # Срок оплаченной подписки (шаг 4.2). Пусто у триала и у
+    # организаций, оплаченных бессрочно.
+    plan_ends_at: str | None = None
+    plan_days_left: int | None = None
+    subscription_expired: bool = False
+
+
+class PlanPriceOut(BaseModel):
+    """Тариф в витрине: что включено и сколько стоит."""
+
+    code: str
+    title: str
+    seats: int
+    branches: int
+    price_month: int
+    price_year: int
+
+
+class InvoiceOut(BaseModel):
+    """Счёт на оплату. `status` считает сервер, включая `expired`."""
+
+    id: int
+    number: str
+    plan: str
+    plan_title: str
+    period: str
+    amount: int
+    currency: str
+    status: str
+    created_at: str | None
+    expires_at: str
+    paid_at: str | None
+    period_start: str | None
+    period_end: str | None
+
+
+class BillingOut(BaseModel):
+    plan: PlanOut
+    prices: list[PlanPriceOut]
+    invoices: list[InvoiceOut]
+    invoice_ttl_days: int
+
+
+class InvoiceIn(BaseModel):
+    plan: str = Field(min_length=1, max_length=16)
+    period: str = Field(default="month", max_length=8)
 
 
 class OrgMemberOut(BaseModel):
@@ -323,8 +379,28 @@ async def organization_plan(
     нужно смене. Чужой тариф не запросить: организация берётся из
     сотрудника запроса, а не из параметров.
     """
-    from app.services import billing
+    return await _plan_out(session, org)
 
+
+def _invoice_out(invoice) -> InvoiceOut:  # noqa: ANN001
+    return InvoiceOut(
+        id=invoice.id,
+        number=invoice.number,
+        plan=invoice.plan,
+        plan_title=billing.plan_for(invoice.plan).title,
+        period=invoice.period,
+        amount=invoice.amount,
+        currency=invoice.currency,
+        status=billing.invoice_status(invoice),
+        created_at=_iso(invoice.created_at),
+        expires_at=_iso(invoice.expires_at) or "",
+        paid_at=_iso(invoice.paid_at),
+        period_start=_iso(invoice.period_start),
+        period_end=_iso(invoice.period_end),
+    )
+
+
+async def _plan_out(session: SessionDep, org: OrgDep) -> PlanOut:
     state = await billing.state(session, org)
     return PlanOut(
         code=state.code,
@@ -337,7 +413,107 @@ async def organization_plan(
         trial_ends_at=_iso(state.trial_ends_at),
         trial_days_left=state.trial_days_left,
         trial_expired=state.trial_expired,
+        plan_ends_at=_iso(state.plan_ends_at),
+        plan_days_left=state.plan_days_left,
+        subscription_expired=state.subscription_expired,
     )
+
+
+@router.get("/org/billing", response_model=BillingOut)
+async def organization_billing(
+    session: SessionDep, org: OrgDep, _admin: AdminDep
+) -> BillingOut:
+    """Витрина тарифов и история счетов своей организации.
+
+    Только руководителю: суммы и счета — не то, что нужно смене. Чужую
+    бухгалтерию запросить нельзя: организация берётся из сотрудника запроса.
+    """
+    rows = await billing.list_invoices(session, org.id)
+    return BillingOut(
+        plan=await _plan_out(session, org),
+        prices=[
+            PlanPriceOut(
+                code=plan.code,
+                title=plan.title,
+                seats=plan.seats,
+                branches=plan.branches,
+                price_month=plan.price_month,
+                price_year=plan.price_year,
+            )
+            for plan in billing.payable_plans()
+        ],
+        invoices=[_invoice_out(row) for row in rows],
+        invoice_ttl_days=billing.INVOICE_TTL_DAYS,
+    )
+
+
+@router.post(
+    "/org/invoices",
+    response_model=InvoiceOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_org_invoice(
+    body: InvoiceIn,
+    session: SessionDep,
+    user: CurrentUser,
+    org: OrgDep,
+    _admin: AdminDep,
+) -> InvoiceOut:
+    """Выставить счёт на тариф и период.
+
+    Счёт не меняет тариф: подписка продлевается только подтверждённой
+    оплатой (`billing.mark_paid`). Иначе «выставить счёт» было бы кнопкой
+    бесплатного безлимита.
+    """
+    try:
+        invoice = await billing.create_invoice(
+            session,
+            org,
+            plan_code=body.plan,
+            period=body.period,
+            created_by_id=user.id,
+        )
+    except billing.InvoiceError as exc:
+        _fail(exc)
+    log.info(
+        "billing.invoice_created",
+        org_id=org.id,
+        invoice_id=invoice.id,
+        plan=invoice.plan,
+        period=invoice.period,
+        amount=invoice.amount,
+    )
+    return _invoice_out(invoice)
+
+
+@router.post("/org/invoices/{invoice_id}/paid", response_model=InvoiceOut)
+async def request_invoice_payment(
+    invoice_id: int, session: SessionDep, org: OrgDep, _admin: AdminDep
+) -> InvoiceOut:
+    """«Я оплатил»: счёт ждёт подтверждения.
+
+    Не продлевает подписку. Подтверждение приходит от платформы — иначе
+    владелец продлевал бы тариф одним кликом без денег.
+    """
+    try:
+        invoice = await billing.request_payment(session, org.id, invoice_id)
+    except billing.InvoiceError as exc:
+        _fail(exc)
+    log.info("billing.invoice_payment_requested", org_id=org.id, invoice_id=invoice.id)
+    return _invoice_out(invoice)
+
+
+@router.post("/org/invoices/{invoice_id}/cancel", response_model=InvoiceOut)
+async def cancel_org_invoice(
+    invoice_id: int, session: SessionDep, org: OrgDep, _admin: AdminDep
+) -> InvoiceOut:
+    """Отменить неоплаченный счёт. Оплаченный не отменяется — это деньги."""
+    try:
+        invoice = await billing.cancel_invoice(session, org.id, invoice_id)
+    except billing.InvoiceError as exc:
+        _fail(exc)
+    log.info("billing.invoice_canceled", org_id=org.id, invoice_id=invoice.id)
+    return _invoice_out(invoice)
 
 
 @router.get("/org/members", response_model=list[OrgMemberOut])

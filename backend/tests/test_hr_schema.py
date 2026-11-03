@@ -60,6 +60,10 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0060_hr_presence_privacy.py",
     # Тарифы (4.1): организации получили `plan` и `trial_ends_at`.
     "0065_org_plans.py",
+    # Счета (4.2): появились `organizations.plan_ends_at` и
+    # `org_invoices`. Это не HR-ядро, но сверяется тем же списком —
+    # иначе новая миграция тихо проскочила бы мимо проверки колонок.
+    "0066_org_billing.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
@@ -99,6 +103,8 @@ HR_TABLES = {
     "organizations",
     "organization_members",
     # 0056_accounts: вход по почте и сессии (не тенантные таблицы).
+    # 0066_org_billing: счета организации (B2B_PLATFORM_PLAN, 4.2).
+    "org_invoices",
     "auth_sessions",
     "password_resets",
 }

@@ -146,16 +146,12 @@ class Organization(Base):
     trial_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
-    # Тариф организации (шаг 4.1). `trial` ставится явно при создании
-    # (`orgs.create_with_owner`), а серверный дефолт `business` нужен
-    # старым строкам: ограничивать действующего клиента датой в
-    # календаре — поломка, а не введение тарифов.
-    plan: Mapped[str] = mapped_column(
-        String(16), nullable=False, default="trial", server_default="business"
-    )
-    # Конец пробного периода. Пусто у платных тарифов и у старых
-    # организаций: срок есть только у `trial`.
-    trial_ends_at: Mapped[datetime | None] = mapped_column(
+    # До какого срока подписка оплачена (шаг 4.2). Пусто у триала и у
+    # существующих организаций: «Бизнес» без срока — это бессрочно, а не
+    # «истекло вчера». Срок ставит только `billing.mark_paid`: ручка
+    # организации лишь просит подтвердить оплату, иначе кнопка «я оплатил»
+    # стала бы бесплатным безлимитом.
+    plan_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
     # Свой бот клиента (B2B_PLATFORM_PLAN, шаг 1.6). Пусто — организация
@@ -268,3 +264,60 @@ class OrgInvitation(OrgScoped, Base):
     department_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
     )
+
+class OrgInvoice(OrgScoped, Base):
+    """Счёт на оплату тарифа (B2B_PLATFORM_PLAN, шаг 4.2).
+
+    Почему счёт, а не платёж. Платёжного провайдера подключает владелец, и до
+    этого продукт не должен показывать кнопку «Оплатить», которая ничего не
+    делает. Счёт — документ, который существует независимо от провайдера:
+    номер, тариф, период, сумма и срок. Провайдер, когда появится, будет
+    закрывать те же счета, и история платежей не переедет.
+
+    Почему `expired` не хранится. Просроченный счёт — это `pending` с
+    прошедшим `expires_at`. Отдельный статус потребовал бы фоновой задачи,
+    которая переводит строки, и дал бы расхождение между задачей и фактом.
+
+    `period_start`/`period_end` — что именно оплатили. Они заполняются при
+    подтверждении, а не при выставлении: до денег это ещё обещание.
+    """
+
+    __tablename__ = "org_invoices"
+    __table_args__ = (
+        UniqueConstraint("number", name="uq_org_invoice_number"),
+        Index("ix_org_invoices_org", "org_id", "created_at"),
+        # Идемпотентность кнопки «выставить счёт»: повторный клик ищет открытый
+        # счёт на тот же тариф и период по этому индексу.
+        Index("ix_org_invoices_open", "org_id", "plan", "period", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    number: Mapped[str] = mapped_column(String(32), nullable=False)
+    plan: Mapped[str] = mapped_column(String(16), nullable=False)
+    # `month` или `year`: период подписки, а не длительность в днях.
+    period: Mapped[str] = mapped_column(String(8), nullable=False)
+    # Целые рубли. Копейки в B2B-подписке не нужны, а float в деньгах —
+    # источник расхождений на копейку, который потом ищут бухгалтерией.
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="RUB", server_default="RUB"
+    )
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="pending", server_default="pending"
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Примечание платформы: «оплатили по счёту №…», реквизиты, номер платёжки.
+    comment: Mapped[str | None] = mapped_column(Text)
