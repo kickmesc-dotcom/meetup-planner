@@ -47,3 +47,6 @@ frontend/.devinit-tmp.txt
 .test_cors.db-wal
 .test_cors.db-shm
 .corsprobe.db
+
+# Дампы боевой базы (шаг 5.4): данные клиентов, в git им не место.
+backups/

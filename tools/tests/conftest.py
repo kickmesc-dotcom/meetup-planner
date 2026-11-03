@@ -19,6 +19,7 @@ import pytest
 TOOLS_DIR = Path(__file__).resolve().parents[1]
 SWITCH_DB_PATH = TOOLS_DIR / "switch-db.py"
 BACKFILL_PATH = TOOLS_DIR / "backfill-media-reactions.py"
+BACKUP_DB_PATH = TOOLS_DIR / "backup-db.py"
 
 
 def _load_module(name: str, path: Path):
@@ -39,3 +40,8 @@ def switch_db():
 @pytest.fixture(scope="session")
 def backfill():
     return _load_module("backfill_media_reactions", BACKFILL_PATH)
+
+
+@pytest.fixture(scope="session")
+def backup_db():
+    return _load_module("backup_db", BACKUP_DB_PATH)

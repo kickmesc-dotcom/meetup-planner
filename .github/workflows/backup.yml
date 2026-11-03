@@ -1,0 +1,140 @@
+name: Backup
+
+# Зачем этот workflow.
+#
+# Шаг 5.4 плана (`docs/B2B_PLATFORM_PLAN.md`) требует не «настроить бэкапы», а
+# доказать, что восстановление работает. 03.11.2026 выяснилось, что бэкапов
+# боевой базы не было месяц: единственный дамп снят 29.09 на миграции 0022, а
+# боевая база ушла на 0067. Причина — ручной запуск: пока о бэкапе нужно
+# помнить, его не будет.
+#
+# Два расписания, потому что вопросы разные:
+#   * ежедневно — снять дамп и проверить его целостность (RPO ≤ 24 ч);
+#   * раз в неделю — восстановить дамп в ЧИСТЫЙ Postgres и сверить построчно
+#     (доказательство, что дамп — точка отката, а не набор файлов).
+#
+# Нужен секрет репозитория `DATABASE_URL` (боевой DSN). Его добавляет владелец:
+# Settings → Secrets and variables → Actions → New repository secret.
+
+on:
+  schedule:
+    # 03:00 UTC — до утренних смен и после ночной активности.
+    - cron: "0 3 * * *"
+    # Проверка восстановления: воскресенье, 04:30 UTC.
+    - cron: "30 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      rehearsal:
+        description: "Проверить восстановление в чистом Postgres"
+        type: boolean
+        default: true
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    # Ежедневный дамп и еженедельная сверка идут разными job'ами: падение
+    # восстановления не должно скрывать, что сам дамп снялся.
+    if: github.event_name != 'workflow_dispatch' || inputs.rehearsal == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить asyncpg
+        run: pip install asyncpg
+
+      - name: Снять дамп боевой базы
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Секрет DATABASE_URL не задан — дамп не снят."
+            exit 1
+          fi
+          python tools/backup-db.py dump --out backups
+
+      - name: Проверить целостность и непустоту
+        run: |
+          LATEST=$(ls -d backups/*/ | tail -1)
+          python tools/backup-db.py verify "$LATEST"
+
+      - name: Ротация (14 свежих)
+        run: python tools/backup-db.py prune --out backups --keep 14
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/
+          retention-days: 14
+          if-no-files-found: error
+
+  rehearsal:
+    # Доказательство шага 5.4: дамп восстанавливается в чистую базу и совпадает
+    # с ней построчно. Секреты здесь не нужны — только чтение боевой базы.
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '30 4 * * 0'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: rehearsal
+          POSTGRES_DB: rehearsal
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # Целевая база — контейнер рядом, а не прод: восстановление не должно
+      # уметь испортить то, что восстанавливаем.
+      SCRATCH_URL: postgresql+asyncpg://postgres:rehearsal@localhost:5432/rehearsal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить зависимости
+        run: |
+          pip install asyncpg
+          pip install -e ./backend
+
+      - name: Снять дамп боевой базы
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Секрет DATABASE_URL не задан — восстановление не проверить."
+            exit 1
+          fi
+          python tools/backup-db.py dump --out backups
+
+      - name: Миграции на пустой базе
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ env.SCRATCH_URL }}
+          BOT_TOKEN: "0:rehearsal"
+          TG_WEBHOOK_SECRET: rehearsal
+          MINI_APP_URL: https://rehearsal.invalid
+        run: python -m alembic upgrade head
+
+      - name: Залить дамп в чистую базу
+        env:
+          DATABASE_URL: ${{ env.SCRATCH_URL }}
+        run: |
+          LATEST=$(ls -d backups/*/ | tail -1)
+          python tools/backup-db.py restore "$LATEST" --yes
+
+      - name: Сверить восстановленное с дампом
+        run: |
+          LATEST=$(ls -d backups/*/ | tail -1)
+          python tools/db-rehearsal.py check "$LATEST" --dsn "$SCRATCH_URL"
