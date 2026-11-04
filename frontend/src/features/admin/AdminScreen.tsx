@@ -35,6 +35,7 @@ import SettingsScreen from "@/features/admin/SettingsScreen";
 import PlanScreen from "./PlanScreen";
 import BillingScreen from "./BillingScreen";
 import BrandScreen from "./BrandScreen";
+import PrivacyScreen from "./PrivacyScreen";
 import PlatformScreen from "./PlatformScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
@@ -56,6 +57,7 @@ import { useUI } from "@/store/ui";
  */
 type Section =
   | "root"
+  | "privacy"
   | "attention"
   | "admin-tasks"
   | "journal"
@@ -121,6 +123,7 @@ const VALID_SECTIONS: Section[] = [
   "billing",
   "platform",
   "brand",
+  "privacy",
   "space-restart",
 ];
 
@@ -362,6 +365,15 @@ const SECTIONS: SectionDef[] = [
     subtitle: "Своё имя, цвет и логотип вместо SemiTaskBot",
   },
   {
+    // Рядом с брендом и оплатой: это тоже «наши настройки с сервисом»,
+    // а не работа смены (шаг 5.5).
+    id: "privacy",
+    group: GROUP_SETTINGS,
+    icon: "check",
+    title: "Данные и приватность",
+    subtitle: "Копия данных, удаление организации, журнал доступа",
+  },
+  {
     id: "billing",
     group: GROUP_SETTINGS,
     icon: "award",
@@ -568,6 +580,7 @@ export default function AdminScreen({
   if (section === "billing") return <BillingScreen onBack={back} />;
   if (section === "platform") return <PlatformScreen onBack={back} />;
   if (section === "brand") return <BrandScreen onBack={back} />;
+  if (section === "privacy") return <PrivacyScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");

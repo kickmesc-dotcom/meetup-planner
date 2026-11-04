@@ -14,10 +14,12 @@
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Annotated, NoReturn
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -30,7 +32,16 @@ from app.db.org_models import (
     Organization,
     OrganizationMember,
 )
-from app.services import billing, brand, hr_access, invitations, mail, orgs
+from app.services import (
+    audit,
+    billing,
+    brand,
+    hr_access,
+    invitations,
+    mail,
+    orgs,
+    privacy,
+)
 
 log = structlog.get_logger()
 router = APIRouter(tags=["orgs"])
@@ -80,6 +91,13 @@ _STATUS: dict[str, int] = {
     # ошибка ввода, а не конфликт состояния.
     "bad_color": status.HTTP_400_BAD_REQUEST,
     "bad_logo": status.HTTP_400_BAD_REQUEST,
+    # Приватность (шаг 5.5): удаление требует точного кода организации —
+    # опечатка не должна стирать клиента; повторный запрос и отмена
+    # без запроса — конфликт состояния, а не ошибка ввода.
+    "bad_confirm": status.HTTP_400_BAD_REQUEST,
+    "already_deleting": status.HTTP_409_CONFLICT,
+    "not_deleting": status.HTTP_409_CONFLICT,
+    "owner_required": status.HTTP_403_FORBIDDEN,
 }
 
 
@@ -705,6 +723,16 @@ async def set_member_role(
         hr_access.set_role(employee, hr_access.hr_role_for_org(body.role))
     await session.commit()
     await session.refresh(target)
+    await audit.record(
+        session,
+        org_id=org.id,
+        user=user,
+        action="member.role_changed",
+        target_type="user",
+        target_id=member_user_id,
+        details={"role": body.role},
+    )
+    await session.commit()
     target_user = await session.get(User, member_user_id)
     log.info(
         "orgs.member_role",
@@ -777,6 +805,16 @@ async def create_invitation(
             log.warning(
                 "orgs.invite_mail_failed", error=str(exc), org_id=org.id
             )
+    await audit.record(
+        session,
+        org_id=org.id,
+        user=user,
+        action="invitation.created",
+        target_type="invitation",
+        target_id=row.id,
+        details={"role": row.role, "email": row.email},
+    )
+    await session.commit()
     return await _out(session, row, link=link, mail_sent=mail_sent)
 
 
@@ -784,7 +822,11 @@ async def create_invitation(
     "/org/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT
 )
 async def revoke_invitation(
-    invitation_id: int, session: SessionDep, org: OrgDep, _admin: AdminDep
+    invitation_id: int,
+    session: SessionDep,
+    user: CurrentUser,
+    org: OrgDep,
+    _admin: AdminDep,
 ) -> Response:
     try:
         await invitations.revoke(
@@ -792,6 +834,15 @@ async def revoke_invitation(
         )
     except invitations.InvitationsError as exc:
         _fail(exc)
+    await audit.record(
+        session,
+        org_id=org.id,
+        user=user,
+        action="invitation.revoked",
+        target_type="invitation",
+        target_id=invitation_id,
+    )
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -821,3 +872,168 @@ async def accept_invitation(
     except invitations.InvitationsError as exc:
         _fail(exc)
     return AcceptOut(ok=True, org_id=org.id, org_name=org.name, role=role)
+
+
+# ---------------------------------------------------------------------------
+# Приватность (B2B_PLATFORM_PLAN, шаг 5.5)
+#
+# Клиент вправе забрать свои данные и уйти. Оба действия — только владельцу:
+# выгрузка отдаёт людей с почтами, а удаление необратимо. Роль берём из
+# членства в запросе (`org` из сотрудника), поэтому чужую организацию
+# выгрузить нельзя даже зная её код.
+# ---------------------------------------------------------------------------
+
+
+class RetentionOut(BaseModel):
+    """Сроки хранения. Те же числа, что в `docs/PRIVACY.md`."""
+
+    audit_days: int
+    deletion_grace_days: int
+    fired_trash_days: int
+    backup_artifact_days: int
+
+
+class DeletionOut(BaseModel):
+    deleted: bool
+    deleted_at: str | None
+    purge_after: str | None
+    days_left: int | None
+
+
+class PrivacyOut(BaseModel):
+    # Код нужен экрану для подтверждения удаления: человек вводит его
+    # руками, а не нажимает «да» в диалоге.
+    slug: str
+    retention: RetentionOut
+    deletion: DeletionOut
+
+
+class DeleteOrgIn(BaseModel):
+    """Подтверждение кодом организации: «удалить» без кода слишком дёшево."""
+
+    confirm: str = Field(min_length=1, max_length=120)
+
+
+class AuditEventOut(BaseModel):
+    id: int
+    action: str
+    actor_name: str | None
+    target_type: str | None
+    target_id: str | None
+    details: str | None
+    created_at: str | None
+
+
+async def _require_owner(
+    session: SessionDep, org: OrgDep, user: CurrentUser
+) -> None:
+    row = await orgs.member(session, org_id=org.id, user_id=user.id)
+    if row is None or row.role != "owner":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="owner_required")
+
+
+@router.get("/org/privacy", response_model=PrivacyOut)
+async def organization_privacy(org: OrgDep, _admin: AdminDep) -> PrivacyOut:
+    """Сроки хранения и состояние удаления — для экрана кабинета."""
+    return PrivacyOut(
+        slug=org.slug,
+        retention=RetentionOut(**privacy.retention()),
+        deletion=DeletionOut(**privacy.state(org)),
+    )
+
+
+@router.get("/org/export")
+async def export_organization(
+    session: SessionDep, user: CurrentUser, org: OrgDep, _admin: AdminDep
+) -> JSONResponse:
+    """Выгрузка структуры и людей организации в JSON-файл.
+
+    `Cache-Control: no-store` здесь не формальность: в файле почты и имена,
+    и промежуточный прокси не должен их кэшировать.
+    """
+    await _require_owner(session, org, user)
+    data = await privacy.export_org(session, org)
+    await audit.record(
+        session,
+        org_id=org.id,
+        user=user,
+        action="data.exported",
+        target_type="organization",
+        target_id=org.id,
+        details={
+            "members": len(data["members"]),
+            "employees": len(data["employees"]),
+        },
+    )
+    await session.commit()
+    filename = f"org-{org.slug}-{datetime.now(timezone.utc):%Y%m%d}.json"
+    return JSONResponse(
+        data,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.delete("/org", response_model=DeletionOut)
+async def delete_organization(
+    body: DeleteOrgIn,
+    session: SessionDep,
+    user: CurrentUser,
+    org: OrgDep,
+    _admin: AdminDep,
+) -> DeletionOut:
+    """Запросить удаление организации. Данные исчезнут через 30 дней."""
+    await _require_owner(session, org, user)
+    try:
+        await privacy.request_deletion(
+            session, org, confirm=body.confirm, user=user
+        )
+    except privacy.PrivacyError as exc:
+        _fail(exc)
+    log.info("orgs.delete_requested", org_id=org.id, by=user.id)
+    return DeletionOut(**privacy.state(org))
+
+
+@router.post("/org/restore", response_model=DeletionOut)
+async def restore_organization(
+    session: SessionDep,
+    user: CurrentUser,
+    org: OrgDep,
+    _admin: AdminDep,
+) -> DeletionOut:
+    """Отменить запланированное удаление, пока срок не вышел."""
+    await _require_owner(session, org, user)
+    try:
+        await privacy.cancel_deletion(session, org, user=user)
+    except privacy.PrivacyError as exc:
+        _fail(exc)
+    log.info("orgs.delete_canceled", org_id=org.id, by=user.id)
+    return DeletionOut(**privacy.state(org))
+
+
+@router.get("/org/audit", response_model=list[AuditEventOut])
+async def organization_audit(
+    session: SessionDep,
+    org: OrgDep,
+    _admin: AdminDep,
+    limit: int = 50,
+) -> list[AuditEventOut]:
+    """Кто и когда выгружал данные и менял доступы.
+
+    Только руководителю: журнал показывает имена и действия коллег.
+    """
+    rows = await audit.events(session, org.id, limit=limit)
+    return [
+        AuditEventOut(
+            id=row.id,
+            action=row.action,
+            actor_name=row.actor_name,
+            target_type=row.target_type,
+            target_id=row.target_id,
+            details=row.details,
+            created_at=_iso(row.created_at),
+        )
+        for row in rows
+    ]

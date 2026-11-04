@@ -52,6 +52,7 @@ TENANT_TABLES: set[str] = {
     "achievement_counters",
     "app_access_links",
     "app_notifications",
+    "audit_events",
     "availability_ranges",
     "birthday_notifications",
     "birthdays",
@@ -324,20 +325,20 @@ async def test_current_org_rejects_inactive_and_missing(session) -> None:
     await session.commit()
     await session.refresh(employee)
 
-    resolved = await deps.current_org(session, employee)
+    resolved = await deps.current_org(session, employee, user)
     assert resolved.id == org.id
 
     org.is_active = False
     await session.commit()
     with pytest.raises(HTTPException) as inactive:
-        await deps.current_org(session, employee)
+        await deps.current_org(session, employee, user)
     assert inactive.value.status_code == 403
     assert inactive.value.detail == "org_inactive"
 
     employee.org_id = 999
     await session.commit()
     with pytest.raises(HTTPException) as missing:
-        await deps.current_org(session, employee)
+        await deps.current_org(session, employee, user)
     assert missing.value.detail == "org_missing"
 
 
@@ -398,7 +399,8 @@ def test_migration_0054_covers_every_tenant_table() -> None:
         "hr_kudos",  # 0062
         "menu_items",  # 0064
         "org_invoices",  # 0066
-    }  # 0057, 0058, 0062, 0064, 0066
+        "audit_events",  # 0068
+    }  # 0057, 0058, 0062, 0064, 0066, 0068
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 

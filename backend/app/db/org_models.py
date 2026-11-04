@@ -172,6 +172,16 @@ class Organization(Base):
     webhook_secret: Mapped[str | None] = mapped_column(Text)
     # Чат, куда бот пишет отчёты и напоминания. Пусто — значение из env.
     group_chat_id: Mapped[int | None] = mapped_column(BigInteger)
+    # Приватность (B2B_PLATFORM_PLAN, шаг 5.5): удаление по запросу.
+    # `deleted_at` — когда попросили, `purge_after` — когда данные
+    # исчезнут. Между ними владелец может отменить: удаление
+    # необратимо, и мгновенная кнопка была бы ловушкой.
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    purge_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -329,3 +339,39 @@ class OrgInvoice(OrgScoped, Base):
     period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Примечание платформы: «оплатили по счёту №…», реквизиты, номер платёжки.
     comment: Mapped[str | None] = mapped_column(Text)
+
+
+class AuditEvent(OrgScoped, Base):
+    """Событие доступа к данным организации (B2B_PLATFORM_PLAN, шаг 5.5).
+
+    Почему отдельная таблица, а не `structlog`. Лог живёт до ротации
+    контейнера и недоступен клиенту; журнал — данные организации: читается
+    из кабинета, обрезается по сроку и удаляется вместе с организацией.
+
+    Почему `actor_name` — снимок. Сотрудника можно удалить, а событие «кто
+    выгрузил данные» должно остаться читаемым. При `ON DELETE SET NULL`
+    ссылка обнуляется, имя сохраняется здесь.
+
+    `details` — JSON текстом: журнал не фильтруют по деталям, а sqlite в
+    тестах не знает JSONB.
+    """
+
+    __tablename__ = "audit_events"
+    __table_args__ = (
+        Index("ix_audit_events_org_time", "org_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    actor_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    actor_name: Mapped[str | None] = mapped_column(String(120))
+    action: Mapped[str] = mapped_column(String(48), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(32))
+    target_id: Mapped[str | None] = mapped_column(String(64))
+    details: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

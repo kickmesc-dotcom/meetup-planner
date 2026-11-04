@@ -861,9 +861,13 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
         async with sm() as session:
             # Корзина уволенных: через 30 дней данные сносим сами, чтобы
             # обещание «автоудалится» не зависело от чьей-то памяти.
-            from app.services import hr_admin_ops
+            from app.services import audit, hr_admin_ops, privacy
 
             purged = await hr_admin_ops.purge_due(session, now=now)
+            # Организации с истёкшим сроком удаления и журнал старше
+            # срока хранения — та же ежедневная уборка (шаг 5.5).
+            await privacy.purge_due_orgs(session, now=now)
+            await audit.prune(session, now=now)
             if await hr_settings.get_reminders_enabled(session):
                 reminders = len(
                     await send_deadline_reminders(session, bot=bot, now=now)

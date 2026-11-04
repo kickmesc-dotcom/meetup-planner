@@ -45,6 +45,7 @@ TABLES = (
     "users",
     "employees",
     "organization_members",
+    "audit_events",
     "auth_sessions",
 )
 

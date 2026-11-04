@@ -48,6 +48,7 @@ TABLES = (
     "departments",
     "employees",
     "organization_members",
+    "audit_events",
     "auth_sessions",
     "org_invitations",
 )

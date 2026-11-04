@@ -320,7 +320,9 @@ AupDep = Annotated[Employee, Depends(require_aup)]
 AdminDep = Annotated[Employee, Depends(require_admin)]
 
 
-async def current_org(session: SessionDep, employee: EmployeeDep) -> Organization:
+async def current_org(
+    session: SessionDep, employee: EmployeeDep, user: CurrentUser
+) -> Organization:
     """Организация текущего сотрудника (B2B_PLATFORM_PLAN, шаг 1.2).
 
     Источник — `employees.org_id`, а не заголовок запроса: клиент не должен
@@ -333,6 +335,15 @@ async def current_org(session: SessionDep, employee: EmployeeDep) -> Organizatio
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="org_missing")
     if not org.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="org_inactive")
+    if org.deleted_at is not None:
+        # Удаление запрошено (шаг 5.5): команда уже не работает, а
+        # владелец видит состояние и может отменить — иначе ошибку
+        # нельзя было бы исправить, а действие необратимо.
+        member = await orgs.member(session, org_id=org.id, user_id=user.id)
+        if member is None or member.role != "owner":
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, detail="org_deleting"
+            )
     return org
 
 

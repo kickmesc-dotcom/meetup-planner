@@ -49,6 +49,12 @@ const SHORTCUTS: Shortcut[] = [
     subtitle: "Узбекский пакет: включён по умолчанию",
   },
   {
+    id: "privacy",
+    icon: "check",
+    title: "Данные и приватность",
+    subtitle: "Копия данных, удаление организации, журнал доступа",
+  },
+  {
     id: "texts",
     icon: "edit",
     title: "Тексты приложения",

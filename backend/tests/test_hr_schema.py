@@ -67,10 +67,12 @@ HR_MIGRATIONS: tuple[str, ...] = (
     # Бренд (4.4): у организации появились `brand_name`, `brand_color`
     # и `brand_logo_url`.
     "0067_org_brand.py",
+    "0068_org_privacy.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
 HR_TABLES = {
+    "audit_events",
     "departments",
     "employees",
     "employee_training_days",
