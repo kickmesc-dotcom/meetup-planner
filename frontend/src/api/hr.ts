@@ -267,10 +267,10 @@ export interface NotifyPrefs {
   kinds: string[];
 }
 
-export const fetchNotifyPrefs = () => api<NotifyPrefs>("/api/hr/notify-prefs");
+export const fetchNotifyPrefs = () => api<NotifyPrefs>("/api/notify-prefs");
 
 export const setNotifyPref = (kind: string, enabled: boolean) =>
-  api<NotifyPrefs>("/api/hr/notify-prefs", {
+  api<NotifyPrefs>("/api/notify-prefs", {
     method: "PATCH",
     body: JSON.stringify({ kind, enabled }),
   });
