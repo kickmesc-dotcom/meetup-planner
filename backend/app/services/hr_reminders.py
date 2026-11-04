@@ -402,12 +402,16 @@ async def deliver_external(
         )
         if subs:
             task_id = (payload or {}).get("task_id")
+            # M3: тап по уведомлению ведёт в «Задачи», а не в корень ленты.
+            # Человек получает напоминание о сроке — ему нужен список задач, а
+            # не экран событий, где надо ещё вспомнить, куда идти.
+            target = f"/?task={int(task_id)}" if task_id else "/"
             await web_push.send(
                 session,
                 subscriptions=subs,
                 title=PUSH_TITLES.get(kind, "SemiTaskBot"),
                 body=_push_body(text),
-                url="/",
+                url=target,
                 tag=f"{kind}:{task_id}" if task_id else kind,
             )
     except Exception as exc:  # noqa: BLE001 — push не роняет тик

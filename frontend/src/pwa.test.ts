@@ -164,6 +164,10 @@ describe("service worker", () => {
     expect(swRaw).toContain("showNotification");
     expect(swRaw).toContain('addEventListener("notificationclick"');
     expect(swRaw).toContain("openWindow");
+    // M3: тап по уведомлению переключает раздел в уже открытом окне, а не
+    // открывает вторую копию приложения.
+    expect(swRaw).toContain("postMessage({ type: \"semitask:navigate\"");
+    expect(swRaw).toContain("client.navigate");
   });
 
   it("читает оболочку из того кеша, куда её положила установка", () => {

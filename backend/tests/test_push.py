@@ -175,7 +175,13 @@ async def test_send_deletes_gone_subscription(session, monkeypatch) -> None:
     monkeypatch.setattr(web_push, "_send_one", fake_send)
     subs = (await session.scalars(select(PushSubscription))).all()
     sent = await web_push.send(
-        session, subscriptions=list(subs), title="T", body="B"
+        session,
+        subscriptions=list(subs),
+        title="T",
+        body="B",
+        # Тест про удаление мёртвых подписок, а не про тихие часы (M3):
+        # иначе в ночном окне отправки не было бы и тест падал бы по времени.
+        respect_quiet=False,
     )
     await session.commit()
 

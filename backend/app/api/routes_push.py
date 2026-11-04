@@ -159,6 +159,9 @@ async def test_push(session: SessionDep, employee: EmployeeDep) -> PushStatusOut
         body="Уведомления включены. Напоминания о сроках придут сюда.",
         url="/",
         tag="push-test",
+        # Человек нажал «Проверить» сам — значит ждёт ответа сейчас, даже если
+        # по расписанию это ночное окно. Молчание здесь читается как поломка.
+        respect_quiet=False,
     )
     await session.commit()
     return PushStatusOut(sent=sent)

@@ -128,8 +128,16 @@ self.addEventListener("push", (event) => {
 });
 
 /**
- * Клик по уведомлению. Если приложение уже открыто — фокусируем его вкладку,
- * а не плодим новую: водитель не должен собирать десять копий приложения.
+ * Клик по уведомлению (M3).
+ *
+ * Почему не только «открыть точный URL». Раньше искалось окно с ровно тем же
+ * адресом, иначе открывалось новое. У приложения один экран (`/`), а ссылка из
+ * push ведёт на `/?task=42`: точного совпадения не было бы никогда, и человек
+ * с уже открытым приложением получал вторую копию — с отдельной историей.
+ *
+ * Теперь: любое окно нашего origin получает `postMessage` и переключает
+ * раздел внутри себя; `navigate` — второй заход для сред, где сообщение не
+ * доходит. Нет ни одного окна — открываем адрес как раньше.
  */
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
@@ -141,8 +149,26 @@ self.addEventListener("notificationclick", (event) => {
         type: "window",
         includeUncontrolled: true,
       });
-      for (const client of windows) {
-        if (client.url === target && "focus" in client) return client.focus();
+      const ours = windows.filter((client) => {
+        try {
+          return new URL(client.url).origin === self.location.origin;
+        } catch {
+          return false;
+        }
+      });
+      const client =
+        ours.find((item) => item.url === target) || (ours.length ? ours[0] : null);
+      if (client) {
+        if ("focus" in client) await client.focus();
+        if ("navigate" in client && client.url !== target) {
+          try {
+            await client.navigate(target);
+          } catch {
+            // Навигация недоступна — раздел переключит сообщение ниже.
+          }
+        }
+        client.postMessage({ type: "semitask:navigate", url: target });
+        return undefined;
       }
       return self.clients.openWindow(target);
     })(),

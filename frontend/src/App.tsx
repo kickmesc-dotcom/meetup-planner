@@ -59,6 +59,11 @@ import SimulationBanner from "./components/SimulationBanner";
 import { useSimulation } from "./store/simulation";
 import { useUI } from "./store/ui";
 import { getInitData, getStartParam, haptic } from "./tg/webapp";
+import {
+  clearDeepLink,
+  deepLinkFromLocation,
+  parseDeepLink,
+} from "./tg/deepLink";
 import { useTx } from "@/i18n";
 export default function App() {
   const { tx } = useTx();
@@ -174,6 +179,31 @@ export default function App() {
   useEffect(() => {
     const start = getStartParam();
     if (start === "achievements" || start === "feed") setTab("feed");
+  }, [setTab]);
+
+  // M3: диплинк из уведомления. Сервер присылает `/?task=42`, service worker
+  // по тапу либо открывает окно, либо пишет в уже открытое. Второй случай
+  // важен: человек с открытым приложением не должен получать вторую копию —
+  // он должен увидеть нужный раздел в том же окне.
+  useEffect(() => {
+    const apply = (raw: string) => {
+      const link = parseDeepLink(raw);
+      if (link) setTab(link.tab);
+    };
+    const initial = deepLinkFromLocation();
+    if (initial) {
+      setTab(initial.tab);
+      clearDeepLink();
+    }
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; url?: string } | undefined;
+      if (data?.type === "semitask:navigate" && typeof data.url === "string") {
+        apply(data.url);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, [setTab]);
 
   // Языковой пакет (план, 8.3): включён ли узбекский в этой организации.

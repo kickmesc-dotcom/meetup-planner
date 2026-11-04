@@ -32,7 +32,7 @@ import hashlib
 import ipaddress
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
 import structlog
@@ -42,12 +42,46 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db.hr_models import Employee
 from app.db.push_models import PushSubscription
+from app.services import quiet_hours
 
 log = structlog.get_logger()
 
 # Так push-сервисы отвечают на удалённую подписку (приложение удалено,
 # разрешение отозвано, браузер переустановлен).
 GONE_STATUSES = frozenset({404, 410})
+
+# Частота. Одинаковый `tag` одному человеку не чаще раза в полчаса: tag уже
+# заменяет предыдущее уведомление на экране, но каждая отправка — это
+# пробуждение устройства. Пять напоминаний об одной задаче человек читает как
+# спам и выключает канал целиком.
+MIN_REPEAT = timedelta(minutes=30)
+
+# Память процесса, а не база: это защита от серии, а не учёт. После рестарта
+# максимум один лишний push — дешевле, чем запись в базу на каждую отправку.
+_RECENT: dict[tuple[int, str], datetime] = {}
+
+
+def _allow(user_id: int, tag: str | None, moment: datetime) -> bool:
+    """Не слали ли этому человеку то же самое только что."""
+    if not tag:
+        return True
+    key = (int(user_id), tag)
+    last = _RECENT.get(key)
+    if last is not None and moment - last < MIN_REPEAT:
+        return False
+    _RECENT[key] = moment
+    # Чистка: словарь не должен расти вместе с числом задач за месяцы.
+    if len(_RECENT) > 2000:
+        cutoff = moment - MIN_REPEAT
+        for old_key, sent_at in list(_RECENT.items()):
+            if sent_at < cutoff:
+                del _RECENT[old_key]
+    return True
+
+
+def reset_state() -> None:
+    """Сбросить память частоты (тесты и диагностика)."""
+    _RECENT.clear()
 
 
 def enabled() -> bool:
@@ -195,19 +229,32 @@ async def send(
     body: str,
     url: str = "/",
     tag: str | None = None,
+    respect_quiet: bool = True,
+    now: datetime | None = None,
 ) -> int:
     """Разослать уведомление. Возвращает число доставленных.
 
     Мёртвые подписки удаляются. `last_seen_at` обновляется пачкой, без коммита:
     вызывающий и так коммитит свою транзакцию (уведомления в приложении уже
     добавлены в неё).
+
+    `respect_quiet` (M3): в ночном окне push не уходит — уведомление в
+    приложении остаётся, человек увидит его утром. Исключение — проверочный
+    push, который человек запросил сам (`respect_quiet=False`).
     """
     if not subscriptions or not enabled():
+        return 0
+    moment = now or datetime.now(UTC)
+    if respect_quiet and quiet_hours.in_quiet_hours(moment):
+        log.info("push.quiet_skipped", count=len(subscriptions))
         return 0
     # Проверка на отправке, а не только на подписке: строки могли быть заведены
     # до проверки адреса, а схема «сервер сам ходит по строке из базы» требует
     # одного и того же правила в обоих местах (аудит 26.10.2026, S-8).
     subscriptions = [sub for sub in subscriptions if endpoint_is_allowed(sub.endpoint)]
+    subscriptions = [
+        sub for sub in subscriptions if _allow(int(sub.user_id), tag, moment)
+    ]
     if not subscriptions:
         return 0
     payload = PushPayload(title=title, body=body, url=url, tag=tag).as_json()
