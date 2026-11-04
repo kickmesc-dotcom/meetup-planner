@@ -38,6 +38,7 @@ from app.api import (
     routes_media,
     routes_meetings,
     routes_menu,
+    routes_import,
     routes_meta,
     routes_integrations,
     routes_orgs,
@@ -540,6 +541,9 @@ def create_app() -> FastAPI:
     # Меню смены: сотрудник читает, руководитель правит в приложении
     # (раньше это был лист Google, который обновлялся по расписанию).
     app.include_router(routes_menu.router, prefix="/api")
+    # Импорт людей и графика из CSV (план, шаг 6.3): первый день клиента
+    # без ручного заведения двадцати человек.
+    app.include_router(routes_import.router, prefix="/api")
     # Тексты интерфейса: правятся из админки, читаются без токена (это подписи).
     app.include_router(routes_texts.router, prefix="/api")
     # Журнал операционных проблем — отдельная сущность со своими правами.

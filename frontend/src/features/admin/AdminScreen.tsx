@@ -36,6 +36,7 @@ import PlanScreen from "./PlanScreen";
 import BillingScreen from "./BillingScreen";
 import BrandScreen from "./BrandScreen";
 import IntegrationsScreen from "./IntegrationsScreen";
+import ImportScreen from "./ImportScreen";
 import PrivacyScreen from "./PrivacyScreen";
 import PlatformScreen from "./PlatformScreen";
 import Icon, { type IconName } from "@/components/Icon";
@@ -60,6 +61,7 @@ type Section =
   | "root"
   | "privacy"
   | "integrations"
+  | "import"
   | "attention"
   | "admin-tasks"
   | "journal"
@@ -101,6 +103,7 @@ const VALID_SECTIONS: Section[] = [
   "notifications",
   "employees",
   "invitations",
+  "import",
   "team",
   "review",
   "reports",
@@ -191,6 +194,15 @@ const SECTIONS: SectionDef[] = [
     icon: "send",
     title: "Приглашения",
     subtitle: "Ссылка с ролью и сроком — вход без Telegram",
+  },
+  {
+    // 04.11.2026, шаг 6.3: первый день клиента — это двадцать человек и неделя
+    // графика. Ручное заведение съедало наше время при каждом внедрении.
+    id: "import",
+    group: GROUP_PEOPLE,
+    icon: "inbox",
+    title: "Импорт из таблицы",
+    subtitle: "Люди и график из CSV: разбор, предпросмотр, запись",
   },
   {
     id: "team",
@@ -593,6 +605,7 @@ export default function AdminScreen({
   if (section === "brand") return <BrandScreen onBack={back} />;
   if (section === "privacy") return <PrivacyScreen onBack={back} />;
   if (section === "integrations") return <IntegrationsScreen onBack={back} />;
+  if (section === "import") return <ImportScreen onBack={back} />;
 
   const select = (s: Section) => {
     haptic("selection");

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * Пути личных подписок — `/api/notify-prefs`, а не `/api/hr/notify-prefs`.
  *
