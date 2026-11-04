@@ -255,6 +255,26 @@ export interface HrDigest {
 // Роутер HR-ядра монтируется в `/api` без префикса `hr` — как `/api/departments`.
 export const fetchDigest = () => api<HrDigest>("/api/digest");
 
+/**
+ * Личные подписки на автоматические уведомления.
+ *
+ * Сервер по умолчанию отвечает «всё выключено»: сводка в Telegram приходит
+ * только тем, кто её включил. Экран не должен показывать «включено» из-за
+ * отсутствия ответа — поэтому состояние берётся отсюда, а не из `undefined`.
+ */
+export interface NotifyPrefs {
+  prefs: { kind: string; enabled: boolean }[];
+  kinds: string[];
+}
+
+export const fetchNotifyPrefs = () => api<NotifyPrefs>("/api/hr/notify-prefs");
+
+export const setNotifyPref = (kind: string, enabled: boolean) =>
+  api<NotifyPrefs>("/api/hr/notify-prefs", {
+    method: "PATCH",
+    body: JSON.stringify({ kind, enabled }),
+  });
+
 /** Открыть или закрыть свой профиль для коллег. */
 export const setProfileVisibility = (isPublic: boolean) =>
   api<HrEmployee>("/api/me/profile-visibility", {

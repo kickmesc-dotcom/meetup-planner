@@ -177,7 +177,10 @@ async def get_tick_minutes(session: AsyncSession) -> int:
 
 
 async def get_digest_enabled(session: AsyncSession) -> bool:
-    return await _get_bool(session, KEY_DIGEST_ENABLED, True)
+    # По умолчанию выключено: рассылка без согласия — это спам, и
+    # включается она либо владельцем организации, либо личной подпиской
+    # человека (`services.notify_prefs`).
+    return await _get_bool(session, KEY_DIGEST_ENABLED, False)
 
 
 async def set_digest_enabled(session: AsyncSession, value: bool) -> bool:

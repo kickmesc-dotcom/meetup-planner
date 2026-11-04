@@ -441,6 +441,44 @@ export default function App() {
   // без нижней полосы сотрудника. Права проверены выше: без них режим уже
   // вернулся бы в `staff`.
   if (mode === "manage" && canManageZone) {
+    // 04.11.2026: на широком экране кабинет переезжает в тот же каркас, что и
+    // зона сотрудника. Раньше он рисовал свой заголовок и нижнюю полосу, и при
+    // переключении зон навигация прыгала из левого столбца в нижнюю строку.
+    if (isDesktop) {
+      return (
+        <div
+          className="relative flex h-full w-full bg-tg-bg"
+          style={SAFE_AREA_ROOT}
+        >
+          <DesktopShell
+            zone="manage"
+            sections={sections ?? undefined}
+            meName={
+              hrMe.data?.display_name.replace("[BOT]", "").trim() ||
+              meData.display_name
+            }
+            meHint={
+              hrMe.data?.position ??
+              hrMe.data?.department_name ??
+              tx("Руководитель")
+            }
+            canManage={canManage}
+            platform={!!meData.is_admin}
+          >
+            <SimulationBanner />
+            <div className="flex justify-center border-b border-tg-secondary-bg px-3 py-2">
+              <ModeSwitch className="w-full max-w-[320px]" />
+            </div>
+            <ManageZone
+              desktop
+              users={users.data}
+              platform={!!meData.is_admin}
+              canManage={canManage}
+            />
+          </DesktopShell>
+        </div>
+      );
+    }
     return (
       <ManageZone
         users={users.data}

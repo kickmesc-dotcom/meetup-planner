@@ -12,16 +12,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DigestScreen from "./DigestScreen";
-import { fetchDigest } from "@/api/hr";
+import { fetchDigest, fetchNotifyPrefs } from "@/api/hr";
 import { useUI } from "@/store/ui";
 
-vi.mock("@/api/hr", () => ({ fetchDigest: vi.fn() }));
+vi.mock("@/api/hr", () => ({
+  fetchDigest: vi.fn(),
+  fetchNotifyPrefs: vi.fn(),
+  setNotifyPref: vi.fn(),
+}));
 vi.mock("@/tg/webapp", () => ({
   haptic: vi.fn(),
   showAlert: vi.fn(),
 }));
 
 const digestMock = vi.mocked(fetchDigest);
+const prefsMock = vi.mocked(fetchNotifyPrefs);
 
 function renderScreen() {
   const qc = new QueryClient({
@@ -48,6 +53,11 @@ const CALM = {
 
 beforeEach(() => {
   digestMock.mockReset();
+  prefsMock.mockReset();
+  prefsMock.mockResolvedValue({
+    prefs: [{ kind: "digest", enabled: false }],
+    kinds: ["digest"],
+  });
 });
 afterEach(cleanup);
 

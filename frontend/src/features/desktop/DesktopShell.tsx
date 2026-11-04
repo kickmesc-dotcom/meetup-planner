@@ -12,15 +12,19 @@ import { useTx } from "@/i18n";
  *
  * Мобильная версия остаётся как была: колонка 560px и нижняя полоса. На ПК
  * (растянутое окно Telegram Desktop или прямая ссылка в браузере) открывается
- * эта оболочка — постоянный сайдбар со всеми разделами и широкая рабочая
- * область. Причина простая: в нижнюю полосу влезает пять-шесть подписей, а на
- * 1440px это выглядит как телефон, растянутый на монитор, и половина экрана
- * пустует.
+ * эта оболочка — постоянный сайдбар и широкая рабочая область.
  *
- * Группы разделов повторяют логику работы, а не порядок вкладок: «Смена» — что
- * делать сейчас, «Команда» — что с людьми (там же приёмка и отчёты), «Сервис» —
- * календарь, встречи и справочники. Пункт показывается только если у человека
- * есть на него право — ровно как в нижней полосе.
+ * 04.11.2026: каркас стал **одним для обеих зон**. Раньше зона сотрудника
+ * рисовала сайдбар, а зона управления — свой заголовок и нижнюю полосу, и на
+ * десктопе навигация прыгала из левого столбца в нижнюю строку при
+ * переключении «Сотрудник | Управление». Жалоба владельца была именно об этом:
+ * разные блоки, разная логика расположения, даже кнопки переключателя зон
+ * переезжают. Теперь правило жёсткое: слева — сайдбар, сверху — переключатель
+ * зон, снизу — ничего; нижняя полоса существует только на узком экране.
+ *
+ * `zone="manage"` меняет не каркас, а только содержимое сайдбара: в управлении
+ * это «Кабинет · Внимание · Поручения · Приёмка · Настройки». Один и тот же
+ * человек, переключая зону, остаётся в том же месте экрана.
  */
 
 interface NavItem {
@@ -32,6 +36,13 @@ interface NavItem {
 interface NavGroup {
   title: string;
   items: NavItem[];
+}
+
+interface AdminItem {
+  id: string;
+  label: string;
+  icon: IconName;
+  manager?: boolean;
 }
 
 const WORK: NavItem[] = [
@@ -58,11 +69,23 @@ const SERVICE: NavItem[] = [
 
 const PROFILE: NavItem = { id: "profile", label: "Профиль", icon: "profile" };
 
+const ADMIN_ITEMS: AdminItem[] = [
+  { id: "root", label: "Кабинет", icon: "layout" },
+  { id: "attention", label: "Внимание", icon: "alert" },
+  { id: "admin-tasks", label: "Поручения", icon: "clipboard" },
+  { id: "review", label: "Приёмка", icon: "check", manager: true },
+];
+
+const ADMIN_SETTINGS: AdminItem = { id: "settings", label: "Настройки", icon: "settings" };
+
 export default function DesktopShell({
   meName,
   meHint,
   openTasks = 0,
   sections,
+  zone = "staff",
+  canManage = false,
+  platform = false,
   children,
 }: {
   /** Разделы из настройки организации (undefined — ничего не прячем). */
@@ -71,23 +94,32 @@ export default function DesktopShell({
   meHint: string;
   /** Открытые поручения — счётчик рядом с «Мои задачи», как в соцсетях. */
   openTasks?: number;
+  /** `manage` — зона управления: тот же каркас, другой сайдбар. */
+  zone?: "staff" | "manage";
+  canManage?: boolean;
+  platform?: boolean;
   children: ReactNode;
 }) {
   const { tx } = useTx();
   const term = useTerms();
   const tab = useUI((s) => s.tab);
   const setTab = useUI((s) => s.setTab);
+  const adminSection = useUI((s) => s.adminSection);
+  const setAdminSection = useUI((s) => s.setAdminSection);
 
   const keep = (items: NavItem[]) =>
     sections ? items.filter((item) => sectionEnabled(item.id, sections)) : items;
-  // 02.11.2026: каркас широкого экрана — тот же, что у сотрудника. Группы
-  // «Команда» и «Управление» ушли: команда, приёмка и отчёт теперь в зоне
-  // управления (вкладки вверху), а называть группу из проблем и передач
-  // смены «Командой» было нечестно.
-  const groups: NavGroup[] = [
+  // Группы сотрудника: 02.11.2026 команда, приёмка и отчёт переехали в зону
+  // управления, поэтому «Команды» здесь больше нет.
+  const staffGroups: NavGroup[] = [
     { title: term("shift.one", tx("Смена")), items: keep(WORK) },
     { title: tx("Сервис"), items: keep([...SERVICE, PROFILE]) },
   ];
+
+  const adminItems = ADMIN_ITEMS.filter(
+    (item) => !item.manager || canManage || platform,
+  );
+  const manage = zone === "manage";
 
   return (
     <div className="flex h-full min-h-0 w-full" data-testid="desktop-shell">
@@ -97,64 +129,129 @@ export default function DesktopShell({
       >
         <div className="flex items-center gap-2 px-4 pb-3 pt-4">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-tile bg-tg-link/15 text-tg-link">
-            <Icon name="shift" size={18} />
+            <Icon name={manage ? "layout" : "shift"} size={18} />
           </span>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold text-tg-text">
-              SemiTask
+              {manage ? tx("Управление") : "SemiTask"}
             </div>
             <div className="truncate text-2xs text-tg-hint">
-              {tx("Смена и команда")}
+              {manage ? tx("Кабинет руководителя") : tx("Смена и команда")}
             </div>
           </div>
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-          {groups.map((group) => (
-            <section key={group.title} className="mt-2">
-              <h2 className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
-                {group.title}
-              </h2>
-              <ul className="space-y-0.5">
-                {group.items.map((item) => {
-                  const active = tab === item.id;
-                  return (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        aria-current={active ? "page" : undefined}
-                        onClick={() => {
-                          if (active) return;
-                          haptic("light");
-                          setTab(item.id);
-                        }}
-                        className={[
-                          "flex min-h-10 w-full items-center gap-2.5 rounded-tile px-3 text-left text-sm transition-colors",
-                          active
-                            ? "bg-tg-link/15 font-medium text-tg-link"
-                            : "text-tg-text hover:bg-tg-secondary-bg/70",
-                        ].join(" ")}
-                      >
-                        <Icon name={item.icon} size={18} />
-                        <span className="min-w-0 flex-1 truncate">
-                          {tx(item.label)}
-                        </span>
-                        {item.id === "tasks" && openTasks > 0 && (
-                          <span
-                            aria-hidden
-                            data-testid="desktop-tasks-badge"
-                            className="shrink-0 rounded-full bg-tg-link/15 px-1.5 text-2xs font-semibold text-tg-text"
-                          >
-                            {openTasks > 9 ? "9+" : openTasks}
+          {manage ? (
+            <>
+              <section className="mt-2">
+                <h2 className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
+                  {tx("Работа")}
+                </h2>
+                <ul className="space-y-0.5">
+                  {adminItems.map((item) => {
+                    const active = adminSection === item.id;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => {
+                            if (active) return;
+                            haptic("light");
+                            setAdminSection(item.id);
+                          }}
+                          className={[
+                            "flex min-h-10 w-full items-center gap-2.5 rounded-tile px-3 text-left text-sm transition-colors",
+                            active
+                              ? "bg-tg-link/15 font-medium text-tg-link"
+                              : "text-tg-text hover:bg-tg-secondary-bg/70",
+                          ].join(" ")}
+                        >
+                          <Icon name={item.icon} size={18} />
+                          <span className="min-w-0 flex-1 truncate">
+                            {tx(item.label)}
                           </span>
-                        )}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+              <section className="mt-2">
+                <h2 className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
+                  {tx("Сервис")}
+                </h2>
+                <button
+                  type="button"
+                  aria-current={
+                    adminSection === ADMIN_SETTINGS.id ? "page" : undefined
+                  }
+                  onClick={() => {
+                    haptic("light");
+                    setAdminSection(ADMIN_SETTINGS.id);
+                  }}
+                  className={[
+                    "flex min-h-10 w-full items-center gap-2.5 rounded-tile px-3 text-left text-sm transition-colors",
+                    adminSection === ADMIN_SETTINGS.id
+                      ? "bg-tg-link/15 font-medium text-tg-link"
+                      : "text-tg-text hover:bg-tg-secondary-bg/70",
+                  ].join(" ")}
+                >
+                  <Icon name={ADMIN_SETTINGS.icon} size={18} />
+                  <span className="min-w-0 flex-1 truncate">
+                    {tx(ADMIN_SETTINGS.label)}
+                  </span>
+                </button>
+              </section>
+            </>
+          ) : (
+            staffGroups.map((group) => (
+              <section key={group.title} className="mt-2">
+                <h2 className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
+                  {group.title}
+                </h2>
+                <ul className="space-y-0.5">
+                  {group.items.map((item) => {
+                    const active = tab === item.id;
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => {
+                            if (active) return;
+                            haptic("light");
+                            setTab(item.id);
+                          }}
+                          className={[
+                            "flex min-h-10 w-full items-center gap-2.5 rounded-tile px-3 text-left text-sm transition-colors",
+                            active
+                              ? "bg-tg-link/15 font-medium text-tg-link"
+                              : "text-tg-text hover:bg-tg-secondary-bg/70",
+                          ].join(" ")}
+                        >
+                          <Icon name={item.icon} size={18} />
+                          <span className="min-w-0 flex-1 truncate">
+                            {tx(item.label)}
+                          </span>
+                          {item.id === "tasks" && openTasks > 0 && (
+                            <span
+                              aria-hidden
+                              data-testid="desktop-tasks-badge"
+                              className="shrink-0 rounded-full bg-tg-link/15 px-1.5 text-2xs font-semibold text-tg-text"
+                            >
+                              {openTasks > 9 ? "9+" : openTasks}
+                            </span>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
+          )}
         </nav>
 
         <div className="border-t border-tg-hint/10 px-3 py-3">

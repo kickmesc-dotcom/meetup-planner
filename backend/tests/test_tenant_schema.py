@@ -54,6 +54,7 @@ TENANT_TABLES: set[str] = {
     "app_notifications",
     "api_keys",
     "audit_events",
+    "notify_prefs",
     "webhook_deliveries",
     "webhook_endpoints",
     "availability_ranges",
@@ -406,7 +407,8 @@ def test_migration_0054_covers_every_tenant_table() -> None:
         "api_keys",  # 0069
         "webhook_endpoints",  # 0069
         "webhook_deliveries",  # 0069
-    }  # 0057, 0058, 0062, 0064, 0066, 0068, 0069
+        "notify_prefs",  # 0070
+    }  # 0057, 0058, 0062, 0064, 0066, 0068, 0069, 0070
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 
 

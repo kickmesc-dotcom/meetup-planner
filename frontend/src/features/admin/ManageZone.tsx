@@ -16,25 +16,68 @@ const AdminScreen = lazy(() => import("./AdminScreen"));
  *
  * Зачем отдельный каркас. Полоса сотрудника отвечает на вопрос «что мне делать
  * сейчас»: смена, чек-лист, задачи, табель, профиль. Кабинет отвечает на совсем
- * другой: что происходит с людьми и предприятием. Пока обе вещи жили в одной
- * полосе, у руководителя она отличалась от сотрудниковой, и граница зон не
- * читалась — ровно та жалоба, с которой начался этот пак.
+ * другой: что происходит с людьми и предприятием.
  *
- * Здесь нет нижней полосы сотрудника вообще: в этой зоне её разделы не нужны,
- * а вернуться к своей смене — одна вкладка вверху.
+ * 04.11.2026, жалоба владельца: на десктопе зона сотрудника рисовала сайдбар
+ * слева, а кабинет — заголовок сверху и полосу снизу, и при переключении зон
+ * навигация прыгала по экрану. Причина была не в стилях, а в двух разных
+ * каркасах. Теперь на широком экране каркас один (`DesktopShell`): сайдбар
+ * слева, переключатель зон сверху. Этот компонент при `desktop` не рисует ни
+ * своей шапки, ни нижней полосы — иначе внутри общего каркаса появился бы
+ * второй набор тех же элементов.
  */
 export default function ManageZone({
   users,
   platform = false,
   canManage = false,
+  desktop = false,
 }: {
   users: User[];
   /** Прописанный админ платформы: видит системные разделы (прокси, тексты…). */
   platform?: boolean;
   /** Руководитель: видит команду, приёмку и отчёт смены. */
   canManage?: boolean;
+  /** Широкий экран: навигация живёт в сайдбаре `DesktopShell`. */
+  desktop?: boolean;
 }) {
   const { tx } = useTx();
+
+  const content = (
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1360px] flex-col">
+        <Suspense
+          fallback={
+            <div className="flex flex-1 flex-col gap-3 p-4">
+              <Skeleton className="h-11" />
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+              <Skeleton className="h-20" />
+            </div>
+          }
+        >
+          <AdminScreen
+            users={users}
+            platform={platform}
+            canManage={canManage}
+          />
+        </Suspense>
+      </div>
+    </main>
+  );
+
+  if (desktop) {
+    return (
+      <div
+        className="flex min-h-0 flex-1 flex-col bg-tg-bg"
+        data-testid="manage-zone"
+        data-layout="desktop"
+      >
+        <SimulationBanner />
+        {content}
+      </div>
+    );
+  }
+
   return (
     <div
       className="relative flex h-full w-full flex-col bg-tg-bg"
@@ -42,12 +85,8 @@ export default function ManageZone({
       data-testid="manage-zone"
     >
       <SimulationBanner />
-      {/* В шапке осталось ровно одно решение: в какой я зоне.
-          До 02.11.2026 здесь стояли подряд декоративный значок с гаечным
-          ключом (выглядел кнопкой и не делал ничего), вкладки зон, язык и
-          тема — четыре разных типа элементов в одну строку. Язык и тема —
-          настройки и уехали в «Настройки» (правая кнопка нижней полосы),
-          значок убран совсем: подпись вкладки говорит то же самое словами. */}
+      {/* В шапке осталось ровно одно решение: в какой я зоне. Язык и тема —
+          настройки и живут в «Настройках». */}
       <header className="flex items-center gap-2 border-b border-tg-secondary-bg px-3 py-2 sm:px-4">
         <div className="hidden min-w-0 flex-1 md:block">
           <div className="truncate text-sm font-semibold text-tg-text">
@@ -64,28 +103,10 @@ export default function ManageZone({
             отступ: flex-1 у заголовка уже держит его по центру. */}
         <div className="hidden flex-1 md:block" />
       </header>
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1360px] flex-col">
-          <Suspense
-            fallback={
-              <div className="flex flex-1 flex-col gap-3 p-4">
-                <Skeleton className="h-11" />
-                <Skeleton className="h-20" />
-                <Skeleton className="h-20" />
-                <Skeleton className="h-20" />
-              </div>
-            }
-          >
-            <AdminScreen
-              users={users}
-              platform={platform}
-              canManage={canManage}
-            />
-          </Suspense>
-        </div>
-      </main>
-      {/* Полоса разделов управления — внизу, как у сотрудника: главный экран
-          зоны не должен требовать возврата в общий список на каждый шаг. */}
+      {content}
+      {/* Полоса разделов управления — только на узком экране: на ПК навигация
+          уже в сайдбаре, и вторая полоса внизу — это ровно то, на что жаловался
+          владелец. */}
       <ManageTabBar canManage={canManage} platform={platform} />
     </div>
   );

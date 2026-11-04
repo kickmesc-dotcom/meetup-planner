@@ -14,6 +14,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.client.telegram import TelegramAPIServer
 
+from app.bot import notify_buttons
 from app.bot.handlers import (
     app_link,
     changelog,
@@ -534,6 +535,8 @@ def get_dispatcher() -> Dispatcher:
         # Кнопки под алертами руководителя («решено», «напомнить завтра», мьют).
         # Свой префикс `hra:` — с кнопками сценария сотрудника (`hr:`) не спорит.
         _dispatcher.include_router(hr_alerts.router)
+        # Кнопки «Отключить»/«Настройки» под автоматическими сводками.
+        _dispatcher.include_router(notify_buttons.router)
         _dispatcher.include_router(whoami.router)
         # `/app` — вход в широкую веб-версию с компьютера (ссылка доступа).
         _dispatcher.include_router(app_link.router)

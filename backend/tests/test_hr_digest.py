@@ -41,7 +41,7 @@ from app.db.hr_models import (  # noqa: E402
     HrShift,
     Task,
 )
-from app.services import hr_digest, hr_settings  # noqa: E402
+from app.services import hr_digest, hr_settings, notify_prefs  # noqa: E402
 
 TABLES = [
     # organizations/users нужны не для проверок, а для FK у `employees`.
@@ -56,6 +56,9 @@ TABLES = [
     "checklist_runs",
     "hr_issues",
     "admin_config",
+    # 04.11.2026: персональные подписки на уведомления (0070). Без таблицы
+    # сводка не могла проверить подписку и падала на `no such table`.
+    "notify_prefs",
 ]
 
 DAY = date(2026, 10, 27)
@@ -96,6 +99,24 @@ async def _employee(
         session.add(User(id=employee_id, telegram_id=telegram_id, display_name="Тест"))
         await session.flush()
     return employee
+
+
+async def _subscribe(session, manager) -> None:
+    """Включить сводку так, как это делает человек: глобально и лично.
+
+    04.11.2026 обе подписки по умолчанию выключены — автоматическое сообщение в
+    личку приходит только по явному выбору. Тест, который этого не делает,
+    проверяет уже не отправку, а её отсутствие.
+    """
+    await hr_settings.set_digest_enabled(session, True)
+    await notify_prefs.set_enabled(
+        session,
+        org_id=int(manager.org_id),
+        user_id=int(manager.user_id),
+        kind="digest",
+        enabled=True,
+    )
+    await session.commit()
 
 
 # --- Текст сообщения -------------------------------------------------------
@@ -217,9 +238,11 @@ async def test_build_ignores_simulation_pool(session):
 class FakeBot:
     def __init__(self) -> None:
         self.sent: list[tuple[int, str]] = []
+        self.markups: list[object] = []
 
-    async def send_message(self, *, chat_id: int, text: str) -> None:
+    async def send_message(self, *, chat_id: int, text: str, reply_markup=None) -> None:  # noqa: ANN001
         self.sent.append((chat_id, text))
+        self.markups.append(reply_markup)
 
 
 async def test_morning_digest_goes_out_once_per_day(session):
@@ -227,7 +250,7 @@ async def test_morning_digest_goes_out_once_per_day(session):
         session, employee_id=1, role=ROLE_AUP, telegram_id=555
     )
     assert manager.id == 1
-    await session.commit()
+    await _subscribe(session, manager)
     bot = FakeBot()
 
     first = await hr_digest.send_morning(session, bot=bot, app_url="https://app.example")
@@ -237,12 +260,18 @@ async def test_morning_digest_goes_out_once_per_day(session):
     assert second == 0
     assert len(bot.sent) == 1
     assert bot.sent[0][0] == 555
+    # К каждому автоматическому сообщению крепятся кнопки: «выключить» сразу и
+    # «настройки» (план 04.11.2026).
+    markup = bot.markups[0]
+    assert markup is not None
+    assert "np:digest:off" in str(markup)
+    assert "web_app" in str(markup)
     assert await hr_settings.get_digest_sent_on(session) == hr_digest.hr_settings.local_now().date()
 
 
 async def test_force_allows_manual_resend(session):
-    await _employee(session, employee_id=1, role=ROLE_AUP, telegram_id=555)
-    await session.commit()
+    manager = await _employee(session, employee_id=1, role=ROLE_AUP, telegram_id=555)
+    await _subscribe(session, manager)
     bot = FakeBot()
 
     await hr_digest.send_morning(session, bot=bot)
@@ -250,6 +279,26 @@ async def test_force_allows_manual_resend(session):
     await hr_digest.send_morning(session, bot=bot, force=True)
 
     assert len(bot.sent) == 2
+
+
+async def test_no_opt_in_no_private_message(session):
+    """Главное правило жалобы 04.11.2026: без личного «да» — ни одного сообщения.
+
+    Глобальный тумблер организации включён, но человек своей подписки не
+    ставил. Раньше сводка уходила всем руководителям — это и был спам.
+    """
+    manager = await _employee(session, employee_id=1, role=ROLE_AUP, telegram_id=555)
+    await session.commit()
+    await hr_settings.set_digest_enabled(session, True)
+    bot = FakeBot()
+
+    sent = await hr_digest.send_morning(session, bot=bot)
+
+    assert sent == 0
+    assert bot.sent == []
+    assert await notify_prefs.get(
+        session, org_id=int(manager.org_id), user_id=int(manager.user_id), kind="digest"
+    ) is False
 
 
 async def test_disabled_digest_sends_nothing(session):

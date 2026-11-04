@@ -2045,6 +2045,65 @@ async def my_digest(
     )
 
 
+
+
+class NotifyPrefOut(BaseModel):
+    kind: str
+    enabled: bool
+
+
+class NotifyPrefsOut(BaseModel):
+    """Личные подписки: что включено и какие виды вообще бывают."""
+
+    prefs: list[NotifyPrefOut]
+    kinds: list[str]
+
+
+class NotifyPrefIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=24)
+    enabled: bool
+
+
+@router.get("/notify-prefs", response_model=NotifyPrefsOut)
+async def my_notify_prefs(
+    session: SessionDep, employee: EmployeeDep
+) -> NotifyPrefsOut:
+    """Мои подписки. По умолчанию всё выключено — это не ошибка."""
+    from app.services import notify_prefs
+
+    values = await notify_prefs.snapshot(
+        session, org_id=int(employee.org_id), user_id=int(employee.user_id)
+    )
+    return NotifyPrefsOut(
+        prefs=[
+            NotifyPrefOut(kind=kind, enabled=values[kind])
+            for kind in notify_prefs.KINDS
+        ],
+        kinds=list(notify_prefs.KINDS),
+    )
+
+
+@router.patch("/notify-prefs", response_model=NotifyPrefsOut)
+async def set_my_notify_pref(
+    payload: NotifyPrefIn, session: SessionDep, employee: EmployeeDep
+) -> NotifyPrefsOut:
+    """Включить/выключить своё уведомление. Право — у самого человека."""
+    from app.services import notify_prefs
+
+    try:
+        await notify_prefs.set_enabled(
+            session,
+            org_id=int(employee.org_id),
+            user_id=int(employee.user_id),
+            kind=payload.kind,
+            enabled=payload.enabled,
+        )
+    except notify_prefs.NotifyPrefError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.commit()
+    return await my_notify_prefs(session, employee)
+
+
 # --- «Спасибо коллеге» (план, 8.4) -----------------------------------------
 
 

@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { fetchDigest } from "@/api/hr";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { fetchDigest, fetchNotifyPrefs, setNotifyPref } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import { SkeletonText } from "@/components/Skeleton";
@@ -22,6 +22,18 @@ import { useTx } from "@/i18n";
 export default function DigestScreen({ onBack }: { onBack: () => void }) {
   const { tx } = useTx();
   const digestQ = useQuery({ queryKey: ["hr-digest"], queryFn: fetchDigest });
+  const prefsQ = useQuery({
+    queryKey: ["notify-prefs"],
+    queryFn: fetchNotifyPrefs,
+    staleTime: 30_000,
+  });
+  const qc = useQueryClient();
+  const toggle = useMutation({
+    mutationFn: (enabled: boolean) => setNotifyPref("digest", enabled),
+    onSuccess: (data) => qc.setQueryData(["notify-prefs"], data),
+  });
+  const digestOn =
+    prefsQ.data?.prefs.find((item) => item.kind === "digest")?.enabled ?? false;
   const setTab = useUI((s) => s.setTab);
 
   const go = (tab: "tasks" | "issues" | "checklist") => {
@@ -51,7 +63,7 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
             {tx("Сводка дня")}
           </div>
           <div className="text-xs text-tg-hint">
-            {tx("То же, что приходит в 08:30 — без поиска по чату")}
+            {tx("Что требует внимания сегодня — и можно ли получать это в Telegram")}
           </div>
         </div>
       </header>
@@ -153,6 +165,41 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
                 </button>
               </section>
             )}
+
+            <section className="rounded-card bg-tg-secondary-bg/60 p-3">
+              <h2 className="text-sm font-semibold text-tg-text">
+                {tx("Присылать сводку в Telegram")}
+              </h2>
+              <p className="mt-1 text-xs text-tg-hint">
+                {tx(
+                  "По умолчанию выключено: уведомления приходят только тем, кто их включил. Включённую сводку можно выключить кнопкой под сообщением.",
+                )}
+              </p>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={digestOn}
+                disabled={prefsQ.isLoading || toggle.isPending || !prefsQ.data}
+                onClick={() => toggle.mutate(!digestOn)}
+                className={[
+                  "mt-2 min-h-11 w-full rounded-tile text-sm font-semibold disabled:opacity-50",
+                  digestOn
+                    ? "bg-status-free/15 text-status-free"
+                    : "bg-tg-link/15 text-tg-link",
+                ].join(" ")}
+              >
+                {toggle.isPending
+                  ? tx("Сохраняем…")
+                  : digestOn
+                    ? tx("Выключить")
+                    : tx("Включить")}
+              </button>
+              {toggle.isError && (
+                <p className="mt-1 text-2xs text-red-600" role="alert">
+                  {tx("Не удалось изменить подписку — попробуйте ещё раз.")}
+                </p>
+              )}
+            </section>
 
             <p className="px-1 text-2xs text-tg-hint">
               {tx(

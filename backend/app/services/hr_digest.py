@@ -43,7 +43,7 @@ from app.db.hr_models import (
     Task,
 )
 from app.db.models import User
-from app.services import hr_issues, hr_settings
+from app.services import hr_issues, hr_settings, notify_prefs
 
 log = structlog.get_logger(__name__)
 
@@ -250,6 +250,15 @@ async def send_morning(
     tg_ids = await _manager_tg_ids(session, managers)
     sent = 0
     for manager in managers:
+        # Личная подписка: без явного «да» сводка в личку не уходит. Это
+        # и есть ответ на жалобу «зачем мне это каждый день».
+        if not await notify_prefs.get(
+            session,
+            org_id=int(manager.org_id),
+            user_id=int(manager.user_id),
+            kind="digest",
+        ):
+            continue
         # Сводка персональная: у руководителя подразделения журнал проблем
         # фильтруется по его отделу, и числа обязаны совпадать с тем, что он
         # увидит на экране.
@@ -258,7 +267,15 @@ async def send_morning(
         tg_id = tg_ids.get(int(manager.user_id))
         if tg_id and bot is not None:
             try:
-                await bot.send_message(chat_id=tg_id, text=text)
+                from app.bot import notify_buttons
+
+                await bot.send_message(
+                    chat_id=tg_id,
+                    text=text,
+                    reply_markup=notify_buttons.keyboard(
+                        "digest", enabled=True, app_url=app_url
+                    ),
+                )
                 sent += 1
             except Exception as exc:  # noqa: BLE001 — один менеджер не блокирует остальных
                 log.warning("hr.digest_dm_failed", employee_id=manager.id, error=str(exc))

@@ -19,6 +19,11 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ---- личные уведомления (04.11.2026) ----
+  "Что требует внимания сегодня — и можно ли получать это в Telegram": "What needs attention today — and whether to get it in Telegram",
+  "Присылать сводку в Telegram": "Get the daily digest in Telegram",
+  "По умолчанию выключено: уведомления приходят только тем, кто их включил. Включённую сводку можно выключить кнопкой под сообщением.": "Off by default: notifications go only to those who turned them on. An enabled digest can be turned off with the button under the message.",
+  "Не удалось изменить подписку — попробуйте ещё раз.": "Could not change the subscription — try again.",
   // ---- интеграции (шаг 6.1) ----
   "Интеграции": "Integrations",
   "Ключи API и вебхуки для внешних систем": "API keys and webhooks for external systems",
@@ -748,6 +753,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Передачи смены": "Shift handovers",
   "Смена": "Shift",
   "Сервис": "Services",
+  "Работа": "Work",
+  "Руководитель": "Manager",
   "Управление": "Management",
   "Смена и команда": "Shift and team",
   "Разделы приложения": "App sections",

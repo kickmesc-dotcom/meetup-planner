@@ -475,3 +475,38 @@ class WebhookDelivery(OrgScoped, Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class NotifyPref(OrgScoped, Base):
+    """Личная подписка на автоматическое уведомление (04.11.2026).
+
+    Автоматическое сообщение приходит человеку только при явном `enabled`.
+    Строка создаётся при первом включении; её отсутствие значит «выключено»,
+    поэтому миграция не обязана заводить строки на всех.
+
+    Уникальный ключ `(org_id, user_id, kind)` — потому что один человек может
+    работать в двух организациях сети, и подписка в одной не включает сводку в
+    другой.
+    """
+
+    __tablename__ = "notify_prefs"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id", "user_id", "kind", name="uq_notify_pref_org_user_kind"
+        ),
+        Index("ix_notify_prefs_user", "org_id", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(24), nullable=False)
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
