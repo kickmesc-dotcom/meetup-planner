@@ -271,6 +271,27 @@ async def send_dm(  # noqa: ANN001
         return False
 
 
+def _prefs_keyboard(base, pref_kind: str):  # noqa: ANN001
+    """Клавиатура алерта + личные кнопки «Отключить»/«Настройки» под ней.
+
+    Два ряда — не дублирование: «Ситуация решена» относится к задаче, а
+    «Отключить» — к праву человека не получать такие сообщения вообще. Первую
+    кнопку без второй человек ищет в настройках приложения, куда ночью не
+    пойдёт. У разных видов сохраняем один и тот же порядок и одну и ту же
+    подпись.
+    """
+    from aiogram.types import InlineKeyboardMarkup
+
+    from app.bot import notify_buttons
+
+    prefs = notify_buttons.keyboard(pref_kind, enabled=True)
+    if base is None:
+        return prefs
+    return InlineKeyboardMarkup(
+        inline_keyboard=[*base.inline_keyboard, *prefs.inline_keyboard]
+    )
+
+
 async def _deliver(
     session: AsyncSession,
     *,
@@ -280,6 +301,7 @@ async def _deliver(
     text: str,
     payload: dict | None = None,
     keyboard=None,  # noqa: ANN001
+    pref_kind: str | None = None,
 ) -> None:
     """Личное уведомление в приложении + best-effort личка в Telegram.
 
@@ -287,6 +309,11 @@ async def _deliver(
     (`hr_settings.notifications_allowed`). Уведомление в приложении создаётся
     всегда: оно не звонит в 03:41 и не теряется, если человек откроет Mini App
     утром.
+
+    `pref_kind` — вид уведомления из `notify_prefs` (04.11.2026). Если он задан,
+    личка в Telegram уходит **только подписанным**, а под сообщением появляются
+    «Отключить» и «Настройки». Приложение и push не фильтруются: это раздел,
+    куда человек заходит сам, а не сообщение, которое звонит в кармане.
     """
     recipients = unique_employees(employees)
     if not recipients:
@@ -304,8 +331,26 @@ async def _deliver(
     if not allowed:
         log.info("hr.dm_suppressed", reason=reason, kind=kind, recipients=len(recipients))
         return
-    tg_map = await _telegram_ids(session, recipients)
-    for employee in recipients:
+    targets = recipients
+    if pref_kind is not None:
+        from app.services import notify_prefs
+
+        subscribed = await notify_prefs.subscribers(
+            session, org_id=int(recipients[0].org_id), kind=pref_kind
+        )
+        targets = [item for item in recipients if int(item.user_id) in subscribed]
+        if not targets:
+            log.info(
+                "hr.dm_no_subscribers",
+                kind=kind,
+                pref=pref_kind,
+                recipients=len(recipients),
+            )
+            return
+        keyboard = _prefs_keyboard(keyboard, pref_kind)
+
+    tg_map = await _telegram_ids(session, targets)
+    for employee in targets:
         tg_id = tg_map.get(employee.user_id)
         if tg_id:
             await send_dm(bot, tg_id, text, keyboard)
@@ -430,6 +475,11 @@ async def alert_managers(
         text=text,
         payload={"task_id": task_id},
         keyboard=hr_alerts.alert_keyboard(int(task_id)),
+        pref_kind=(
+            "escalation"
+            if kind in {hr_notify.KIND_TASK_OVERDUE, hr_notify.KIND_TASK_ESCALATED}
+            else None
+        ),
     )
 
 
@@ -509,6 +559,8 @@ async def send_deadline_reminders(
             text=f"⏳ Напоминание: {hr_notify.task_short(task)} — срок "
             f"{hr_notify.fmt_due(task.due_at)}",
             payload={"task_id": task.id},
+            # Вид «deadline»: личка только подписанным, под сообщением — кнопки.
+            pref_kind="deadline",
         )
         session.add(
             TaskEvent(
@@ -789,6 +841,7 @@ async def escalate_to_admins(
             ),
             payload={"task_id": task.id},
             keyboard=hr_alerts.alert_keyboard(int(task.id)),
+            pref_kind="escalation",
         )
         session.add(
             TaskEvent(
@@ -843,6 +896,7 @@ async def escalate_overdue(
             payload={"task_id": task.id},
             # Кнопки прямо в алерте: ответить можно, не заходя в приложение.
             keyboard=hr_alerts.alert_keyboard(int(task.id)),
+            pref_kind="escalation",
         )
     await session.commit()
     return changed

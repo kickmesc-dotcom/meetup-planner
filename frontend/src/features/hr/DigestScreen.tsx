@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchDigest, fetchNotifyPrefs, setNotifyPref } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
@@ -19,6 +20,29 @@ import { useTx } from "@/i18n";
  * Правило загрузки общее (план, раздел 9): заголовок и объяснение — в первом
  * кадре, числа занимают заранее нарисованные плитки.
  */
+/**
+ * Виды личных уведомлений (04.11.2026): все три живут одной настройкой.
+ *
+ * Почему списком, а не «галочка на сводку». Правило владельца — любое
+ * автоматическое сообщение в личку только по явному выбору — значит человеку
+ * нужно видеть **весь** набор, который ему могут прислать, а не один вид.
+ * Иначе он выключит сводку и через неделю получит «напоминание о сроке»,
+ * которого не выбирал.
+ */
+const NOTIFY_KINDS: { kind: string; label: string; hint: string }[] = [
+  {
+    kind: "digest",
+    label: "Сводка дня",
+    hint: "Утром: просрочки, чек-листы, проблемы",
+  },
+  { kind: "deadline", label: "Напоминания о сроке", hint: "Перед сроком поручения" },
+  {
+    kind: "escalation",
+    label: "Эскалации",
+    hint: "Просрочка и вторая ступень — руководителю",
+  },
+];
+
 export default function DigestScreen({ onBack }: { onBack: () => void }) {
   const { tx } = useTx();
   const digestQ = useQuery({ queryKey: ["hr-digest"], queryFn: fetchDigest });
@@ -28,12 +52,16 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
     staleTime: 30_000,
   });
   const qc = useQueryClient();
+  const [busyKind, setBusyKind] = useState<string | null>(null);
   const toggle = useMutation({
-    mutationFn: (enabled: boolean) => setNotifyPref("digest", enabled),
-    onSuccess: (data) => qc.setQueryData(["notify-prefs"], data),
+    mutationFn: ({ kind, enabled }: { kind: string; enabled: boolean }) =>
+      setNotifyPref(kind, enabled),
+    onSuccess: (data) => {
+      qc.setQueryData(["notify-prefs"], data);
+      setBusyKind(null);
+    },
+    onError: () => setBusyKind(null),
   });
-  const digestOn =
-    prefsQ.data?.prefs.find((item) => item.kind === "digest")?.enabled ?? false;
   const setTab = useUI((s) => s.setTab);
 
   const go = (tab: "tasks" | "issues" | "checklist") => {
@@ -168,32 +196,61 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <h2 className="text-sm font-semibold text-tg-text">
-                {tx("Присылать сводку в Telegram")}
+                {tx("Уведомления в Telegram")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">
                 {tx(
-                  "По умолчанию выключено: уведомления приходят только тем, кто их включил. Включённую сводку можно выключить кнопкой под сообщением.",
+                  "Каждое приходит только по вашему выбору. Под любым сообщением есть кнопка «Отключить» — можно не заходить в приложение.",
                 )}
               </p>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={digestOn}
-                disabled={prefsQ.isLoading || toggle.isPending || !prefsQ.data}
-                onClick={() => toggle.mutate(!digestOn)}
-                className={[
-                  "mt-2 min-h-11 w-full rounded-tile text-sm font-semibold disabled:opacity-50",
-                  digestOn
-                    ? "bg-status-free/15 text-status-free"
-                    : "bg-tg-link/15 text-tg-link",
-                ].join(" ")}
-              >
-                {toggle.isPending
-                  ? tx("Сохраняем…")
-                  : digestOn
-                    ? tx("Выключить")
-                    : tx("Включить")}
-              </button>
+              <ul className="mt-2 space-y-1.5">
+                {NOTIFY_KINDS.map(({ kind, label, hint }) => {
+                  const on =
+                    prefsQ.data?.prefs.find((item) => item.kind === kind)
+                      ?.enabled ?? false;
+                  const pending = toggle.isPending && busyKind === kind;
+                  return (
+                    <li key={kind}>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={on}
+                        aria-label={tx(label)}
+                        disabled={prefsQ.isLoading || pending || !prefsQ.data}
+                        onClick={() => {
+                          haptic("light");
+                          setBusyKind(kind);
+                          toggle.mutate({ kind, enabled: !on });
+                        }}
+                        className="flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-bg/40 px-3 py-2 text-left press disabled:opacity-50"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm text-tg-text">
+                            {tx(label)}
+                          </span>
+                          <span className="block text-2xs text-tg-hint">
+                            {tx(hint)}
+                          </span>
+                        </span>
+                        <span
+                          className={[
+                            "shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold",
+                            on
+                              ? "bg-status-free/15 text-status-free"
+                              : "bg-tg-secondary-bg text-tg-hint",
+                          ].join(" ")}
+                        >
+                          {pending
+                            ? tx("Сохраняем…")
+                            : on
+                              ? tx("Выключить")
+                              : tx("Включить")}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
               {toggle.isError && (
                 <p className="mt-1 text-2xs text-red-600" role="alert">
                   {tx("Не удалось изменить подписку — попробуйте ещё раз.")}

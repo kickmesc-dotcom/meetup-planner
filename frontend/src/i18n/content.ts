@@ -19,6 +19,14 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ---- уведомления: срок и эскалации (04.11.2026) ----
+  "Уведомления в Telegram": "Telegram notifications",
+  "Каждое приходит только по вашему выбору. Под любым сообщением есть кнопка «Отключить» — можно не заходить в приложение.": "Each one arrives only because you chose it. Every message carries a Disable button — no need to open the app.",
+  "Утром: просрочки, чек-листы, проблемы": "Morning: overdue tasks, checklists, problems",
+  "Перед сроком поручения": "Before a task is due",
+  "Просрочка и вторая ступень — руководителю": "Overdue and second stage — for managers",
+  "Напоминания о сроке": "Deadline reminders",
+  "Эскалации": "Escalations",
   // ---- импорт из таблицы (шаг 6.3) ----
   "Импорт из таблицы": "Import from a spreadsheet",
   "Люди и график из CSV — без ручного заведения": "People and schedule from CSV — no manual entry",

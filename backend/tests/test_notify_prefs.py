@@ -40,7 +40,13 @@ from app.db.base import Base  # noqa: E402
 from app.db.hr_models import Employee  # noqa: E402
 from app.db.models import User  # noqa: E402
 from app.db.org_models import Organization  # noqa: E402
-from app.services import hr_digest, hr_reminders, notify_prefs  # noqa: E402
+from app.services import (  # noqa: E402
+    hr_alerts,
+    hr_digest,
+    hr_notify,
+    hr_reminders,
+    notify_prefs,
+)
 
 TABLES = (
     "organizations",
@@ -94,7 +100,7 @@ async def test_all_kinds_are_off_by_default(session) -> None:
         )
     assert await notify_prefs.snapshot(
         session, org_id=org.id, user_id=user.id
-    ) == {"digest": False}
+    ) == {kind: False for kind in notify_prefs.KINDS}
 
 
 async def test_enable_is_idempotent_and_reversible(session) -> None:
@@ -215,3 +221,114 @@ async def test_digest_skips_unsubscribed_and_sends_to_subscribed(session, monkey
     assert bot.calls[0]["chat_id"] == 777
     markup = bot.calls[0]["reply_markup"]
     assert markup.inline_keyboard[0][0].callback_data == "np:digest:off"
+
+
+async def test_private_dm_needs_opt_in_and_carries_buttons(session, monkeypatch) -> None:
+    """Напоминание о сроке: без подписки — ни одного сообщения в Telegram.
+
+    В приложении уведомление остаётся: это раздел, куда человек заходит сам.
+    Отключается именно то, что звонит в кармане.
+    """
+    org = await _org(session)
+    user, employee = await _manager(session, org, user_id=7, tg=7007)
+    in_app: list[str] = []
+
+    async def fake_notify(_session, *, employees, kind, text, payload=None):
+        in_app.append(kind)
+        return len(employees)
+
+    async def fake_external(*_args, **_kwargs):
+        return None
+
+    async def allowed(_session):
+        return True, "ok"
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.calls: list[dict] = []
+
+        async def send_message(self, **kwargs):
+            self.calls.append(kwargs)
+
+    monkeypatch.setattr(hr_notify, "notify", fake_notify)
+    monkeypatch.setattr(hr_reminders, "deliver_external", fake_external)
+    monkeypatch.setattr(hr_reminders.hr_settings, "notifications_allowed", allowed)
+
+    bot = FakeBot()
+    await hr_reminders._deliver(
+        session,
+        bot=bot,
+        employees=[employee],
+        kind=hr_notify.KIND_TASK_DEADLINE,
+        text="Напоминание о сроке",
+        pref_kind="deadline",
+    )
+    assert bot.calls == []
+    assert in_app == [hr_notify.KIND_TASK_DEADLINE]
+
+    await notify_prefs.set_enabled(
+        session, org_id=org.id, user_id=user.id, kind="deadline", enabled=True
+    )
+    await session.commit()
+
+    await hr_reminders._deliver(
+        session,
+        bot=bot,
+        employees=[employee],
+        kind=hr_notify.KIND_TASK_DEADLINE,
+        text="Напоминание о сроке",
+        pref_kind="deadline",
+    )
+    assert len(bot.calls) == 1
+    assert bot.calls[0]["chat_id"] == 7007
+    markup = bot.calls[0]["reply_markup"]
+    assert markup.inline_keyboard[0][0].callback_data == "np:deadline:off"
+    assert markup.inline_keyboard[0][1].web_app is not None
+
+
+async def test_escalation_keeps_alert_rows_and_adds_prefs(session, monkeypatch) -> None:
+    """У эскалации два действия: «решено/напомнить» по задаче и «отключить» вид."""
+    org = await _org(session)
+    user, employee = await _manager(session, org, user_id=8, tg=8008)
+    await notify_prefs.set_enabled(
+        session, org_id=org.id, user_id=user.id, kind="escalation", enabled=True
+    )
+    await session.commit()
+
+    async def fake_notify(*_args, **_kwargs):
+        return 1
+
+    async def fake_external(*_args, **_kwargs):
+        return None
+
+    async def allowed(_session):
+        return True, "ok"
+
+    class FakeBot:
+        def __init__(self) -> None:
+            self.calls: list[dict] = []
+
+        async def send_message(self, **kwargs):
+            self.calls.append(kwargs)
+
+    monkeypatch.setattr(hr_notify, "notify", fake_notify)
+    monkeypatch.setattr(hr_reminders, "deliver_external", fake_external)
+    monkeypatch.setattr(hr_reminders.hr_settings, "notifications_allowed", allowed)
+
+    bot = FakeBot()
+    base = hr_alerts.alert_keyboard(42)
+    await hr_reminders._deliver(
+        session,
+        bot=bot,
+        employees=[employee],
+        kind=hr_notify.KIND_TASK_OVERDUE,
+        text="Просрочено",
+        keyboard=base,
+        pref_kind="escalation",
+    )
+
+    markup = bot.calls[0]["reply_markup"]
+    assert len(markup.inline_keyboard) == len(base.inline_keyboard) + 1
+    codes = [row[0].callback_data for row in markup.inline_keyboard]
+    assert "np:escalation:off" in codes
+    assert codes[0].startswith("hra:")

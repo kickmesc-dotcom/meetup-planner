@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import DigestScreen from "./DigestScreen";
-import { fetchDigest, fetchNotifyPrefs } from "@/api/hr";
+import { fetchDigest, fetchNotifyPrefs, setNotifyPref } from "@/api/hr";
 import { useUI } from "@/store/ui";
 
 vi.mock("@/api/hr", () => ({
@@ -27,6 +27,7 @@ vi.mock("@/tg/webapp", () => ({
 
 const digestMock = vi.mocked(fetchDigest);
 const prefsMock = vi.mocked(fetchNotifyPrefs);
+const setPrefMock = vi.mocked(setNotifyPref);
 
 function renderScreen() {
   const qc = new QueryClient({
@@ -55,8 +56,21 @@ beforeEach(() => {
   digestMock.mockReset();
   prefsMock.mockReset();
   prefsMock.mockResolvedValue({
-    prefs: [{ kind: "digest", enabled: false }],
-    kinds: ["digest"],
+    prefs: [
+      { kind: "digest", enabled: false },
+      { kind: "deadline", enabled: false },
+      { kind: "escalation", enabled: false },
+    ],
+    kinds: ["digest", "deadline", "escalation"],
+  });
+  setPrefMock.mockReset();
+  setPrefMock.mockResolvedValue({
+    prefs: [
+      { kind: "digest", enabled: false },
+      { kind: "deadline", enabled: true },
+      { kind: "escalation", enabled: false },
+    ],
+    kinds: ["digest", "deadline", "escalation"],
   });
 });
 afterEach(cleanup);
@@ -112,5 +126,29 @@ describe("DigestScreen", () => {
     fireEvent.click(button);
 
     await waitFor(() => expect(useUI.getState().tab).toBe("tasks"));
+  });
+
+  it("показывает все виды уведомлений, а не только сводку", async () => {
+    digestMock.mockResolvedValue(CALM);
+    renderScreen();
+
+    expect(
+      await screen.findByRole("switch", { name: "Напоминания о сроке" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("switch", { name: "Эскалации" })).toBeTruthy();
+    expect(screen.getByRole("switch", { name: "Сводка дня" })).toBeTruthy();
+  });
+
+  it("включает напоминание о сроке тем же тумблером", async () => {
+    digestMock.mockResolvedValue(CALM);
+    renderScreen();
+
+    fireEvent.click(
+      await screen.findByRole("switch", { name: "Напоминания о сроке" }),
+    );
+
+    await waitFor(() =>
+      expect(setPrefMock).toHaveBeenCalledWith("deadline", true),
+    );
   });
 });
