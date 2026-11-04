@@ -1,10 +1,10 @@
 import { ReactNode, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchAdminTasks } from "@/api/hr";
-import { fetchIssues } from "@/api/issues";
+import { fetchDashboard } from "@/api/hr";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
 import AttentionScreen from "./AttentionScreen";
+import AttentionStrip from "./AttentionStrip";
 import AppTextsScreen from "./AppTextsScreen";
 import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
@@ -541,21 +541,18 @@ export default function AdminScreen({
     setPendingAdminSection(null);
   }, [pendingAdminSection, setPendingAdminSection, setSection]);
 
-  // Бейдж «требует внимания» — просроченные поручения + срочные проблемы.
-  const tasks = useQuery({
-    queryKey: ["admin", "tasks", "attention"],
-    queryFn: () => fetchAdminTasks(),
-    staleTime: 60_000,
-  });
-  const issues = useQuery({
-    queryKey: ["issues", "attention"],
-    queryFn: () => fetchIssues({ statuses: ["open", "in_progress"], limit: 50 }),
+  // Сводка первым экраном: один запрос вместо двух. Раньше корень кабинета
+  // тянул поручения и проблемы только ради бейджа, а «сколько чего горит»
+  // руководитель собирал глазами по трём разделам. Теперь те же числа, но
+  // одним ответом и сразу на виду; область видимости `/api/admin/dashboard`
+  // считает сам по роли (руководитель — своё подразделение, админ — всё).
+  const dashboard = useQuery({
+    queryKey: ["admin", "dashboard"],
+    queryFn: fetchDashboard,
     staleTime: 60_000,
   });
   const attentionCount =
-    (tasks.data ?? []).filter(
-      (t) => t.is_overdue && t.status !== "done" && t.status !== "failed",
-    ).length + (issues.data?.summary.attention ?? 0);
+    (dashboard.data?.tasks_overdue ?? 0) + (dashboard.data?.open_issues ?? 0);
 
   const back = () => setSection("root");
 
@@ -658,6 +655,16 @@ export default function AdminScreen({
           className="min-h-11 w-full rounded-tile bg-tg-secondary-bg pl-10 pr-3 text-sm text-tg-text placeholder:text-tg-hint"
         />
       </div>
+
+      {/* Сводка стоит выше списка разделов и прячется только при поиске:
+          человек, который ищет конкретный раздел, уже знает, что ему нужно. */}
+      {!needle && (
+        <AttentionStrip
+          data={dashboard.data}
+          loading={dashboard.isPending}
+          onOpen={select}
+        />
+      )}
 
       {needle ? (
         <>

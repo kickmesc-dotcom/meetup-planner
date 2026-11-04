@@ -9,20 +9,33 @@
  *    «Частое» при следующем заходе.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AdminScreen from "./AdminScreen";
 import { useUI } from "@/store/ui";
-import { fetchAdminTasks } from "@/api/hr";
-import { fetchIssues } from "@/api/issues";
+import { fetchDashboard, type HrDashboard } from "@/api/hr";
 
-vi.mock("@/api/hr", () => ({ fetchAdminTasks: vi.fn() }));
-vi.mock("@/api/issues", () => ({ fetchIssues: vi.fn() }));
+vi.mock("@/api/hr", () => ({ fetchDashboard: vi.fn() }));
 // Подраздел не предмет теста: важно, что переход произошёл.
 vi.mock("./AppTextsScreen", () => ({ default: () => <div>тексты-экран</div> }));
 
-const tasksMock = vi.mocked(fetchAdminTasks);
-const issuesMock = vi.mocked(fetchIssues);
+const dashboardMock = vi.mocked(fetchDashboard);
+
+/** Пустая сводка: числа, которые нужны тесту, он подставляет сам. */
+const EMPTY_DASHBOARD: HrDashboard = {
+  work_date: "2026-11-04",
+  scope: "all",
+  departments: [],
+  employees: [],
+  attention: [],
+  activity: [],
+  total_employees: 0,
+  shifts_started: 0,
+  shifts_done: 0,
+  tasks_open: 0,
+  tasks_overdue: 0,
+  open_issues: 0,
+};
 
 const USAGE_KEY = "admin.usage.v1";
 
@@ -47,16 +60,33 @@ beforeEach(() => {
   // Раздел кабинета теперь лежит в сторе (его переключает и нижняя полоса
   // зоны управления), поэтому тесты не должны начинать с чужого раздела.
   useUI.setState({ adminSection: "root" });
-  tasksMock.mockReset();
-  issuesMock.mockReset();
-  tasksMock.mockResolvedValue([]);
-  issuesMock.mockResolvedValue({
-    summary: { attention: 0 },
-  } as unknown as Awaited<ReturnType<typeof fetchIssues>>);
+  dashboardMock.mockReset();
+  dashboardMock.mockResolvedValue(EMPTY_DASHBOARD);
 });
 afterEach(cleanup);
 
 describe("AdminScreen (P1.9)", () => {
+  it("показывает сводку внимания первым экраном", async () => {
+    // Пункт плана «качество жизни»: числа не должны прятаться в разделе —
+    // иначе руководитель снова собирает их глазами по трём экранам.
+    dashboardMock.mockResolvedValue({
+      ...EMPTY_DASHBOARD,
+      total_employees: 4,
+      shifts_started: 2,
+      tasks_overdue: 2,
+      open_issues: 1,
+    });
+    renderScreen();
+
+    const strip = await screen.findByTestId("attention-strip");
+    // Сначала на месте стоит каркас загрузки с тем же testid — ждём ответ.
+    await waitFor(() =>
+      expect(strip.textContent).toContain("Смена: 2 из 4 начали"),
+    );
+    expect(strip.textContent).toContain("Просрочено");
+    expect(strip.textContent).toContain("Проблемы");
+  });
+
   it("ищет по названию раздела и убирает остальные", () => {
     renderScreen();
 

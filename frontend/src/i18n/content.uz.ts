@@ -21,6 +21,10 @@
  * что в русском. Проверка — `src/i18n/uz.guard.test.ts`.
  */
 export const UZ_CONTENT: Record<string, string> = {
+  // ---- сводка внимания на первом экране кабинета (05.11.2026) ----
+  "Не начали смену": "Smenani boshlamaganlar",
+  "Не закрыли чек-лист": "Chek-listni yopmaganlar",
+  "Смена: {started} из {total} начали": "Smena: {total} dan {started} tasi boshlandi",
   // --------------------------------------------------- «Чек-лист» --------
   // Экран смены: зал, пункты, фотоотчёт, закрытие.
   "Чек-лист смены": "Smena chek-listi",

@@ -19,6 +19,10 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ---- сводка внимания на первом экране кабинета (05.11.2026) ----
+  "Не начали смену": "Shift not started",
+  "Не закрыли чек-лист": "Checklist not finished",
+  "Смена: {started} из {total} начали": "Shift: {started} of {total} started",
   // ---- входящий обмен по ключу (шаг 6.2) ----
   "Ключ открывает данные снаружи: чтение, а с правом записи — импорт людей и графика по CSV.": "The key opens data to the outside world: read, and with a write scope — CSV import of people and schedule.",
   "Люди (запись)": "People (write)",
