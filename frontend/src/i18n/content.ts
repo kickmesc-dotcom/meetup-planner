@@ -19,6 +19,16 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ---- входящий обмен по ключу (шаг 6.2) ----
+  "Ключ открывает данные снаружи: чтение, а с правом записи — импорт людей и графика по CSV.": "The key opens data to the outside world: read, and with a write scope — CSV import of people and schedule.",
+  "Люди (запись)": "People (write)",
+  "График (запись)": "Schedule (write)",
+  "Импорты по API": "API imports",
+  "Ошибок: {count}": "Errors: {count}",
+  "Без ошибок": "No errors",
+  "Создано: {count}": "Created: {count}",
+  "Обновлено: {count}": "Updated: {count}",
+  "Импортов по ключу пока не было.": "No imports through the key yet.",
   // ---- уведомления: срок и эскалации (04.11.2026) ----
   "Уведомления в Telegram": "Telegram notifications",
   "Каждое приходит только по вашему выбору. Под любым сообщением есть кнопка «Отключить» — можно не заходить в приложение.": "Each one arrives only because you chose it. Every message carries a Disable button — no need to open the app.",
@@ -64,7 +74,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Интеграции": "Integrations",
   "Ключи API и вебхуки для внешних систем": "API keys and webhooks for external systems",
   "Ключи API": "API keys",
-  "Ключ открывает людям и графику доступ снаружи — только чтение. Показывается один раз.": "A key opens people and schedule to an outside system — read only. Shown once.",
+  "__unused_key_readonly__": "A key opens people and schedule to an outside system — read only. Shown once.",
   "Ключ создан — скопируйте сейчас, второй раз он не покажется.": "Key created — copy it now, it will not be shown again.",
   "Например: CRM": "For example: CRM",
   "Создать ключ": "Create key",

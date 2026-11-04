@@ -39,6 +39,19 @@ export interface WebhookCreated {
   secret: string;
 }
 
+export interface ImportRunRow {
+  id: number;
+  key_id: number;
+  kind: string;
+  filename: string | null;
+  status: string;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  created_at: string;
+}
+
 export interface DeliveryRow {
   id: number;
   endpoint_id: number;
@@ -62,6 +75,10 @@ export const SCOPE_LABELS: Record<string, string> = {
   "schedule.read": "График",
   "menu.read": "Меню",
   "contacts.read": "Контакты (почта)",
+  // Запись — отдельные права (шаг 6.2): ключ, который читает, не должен
+  // молча создавать людей. Владелец видит это в списке ключа.
+  "people.write": "Люди (запись)",
+  "schedule.write": "График (запись)",
 };
 
 export const fetchApiKeys = () => api<ApiKeyRow[]>("/api/org/api-keys");
@@ -97,3 +114,6 @@ export const deleteWebhook = (id: number) =>
 
 export const fetchDeliveries = (limit = 20) =>
   api<DeliveryRow[]>(`/api/org/webhooks/deliveries?limit=${limit}`);
+
+export const fetchImportRuns = (limit = 10) =>
+  api<ImportRunRow[]>(`/api/org/import-runs?limit=${limit}`);

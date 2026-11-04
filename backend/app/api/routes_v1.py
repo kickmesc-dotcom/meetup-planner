@@ -23,16 +23,24 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from fastapi import APIRouter, HTTPException, Query, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import ApiKeyDep, SessionDep
+from app.api.routes_import import (
+    PROBLEM_TEXT,
+    ImportIn,
+    ImportPreviewOut,
+    ImportResultOut,
+)
 from app.db.hr_models import Department, Employee, HrShift, MenuItem
 from app.db.models import User
 from app.db.org_models import Organization
-from app.services import api_keys
+from app.services import api_ingest, api_keys, people_import
 
 router = APIRouter(prefix="/v1", tags=["public-api"])
 
@@ -229,6 +237,123 @@ async def menu(session: SessionDep, key: ApiKeyDep) -> list[MenuItemOut]:
             name=row.name,
             price_rub=row.price_rub,
             is_available=row.is_available,
+        )
+        for row in rows
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Входящий обмен (шаг 6.2)
+#
+# Зачем запись в публичном API, если шаг 6.1 был намеренно read-only. Там
+# запись означала «второй путь создания данных без проверок кабинета». Здесь
+# путь один и тот же: `people_import` — тот же разбор, что у экрана импорта,
+# а права проверяются по виду данных и **до** записи. 1С и Excel не ждут
+# подписания контракта с вендором: они умеют отдать CSV.
+# ---------------------------------------------------------------------------
+
+
+class ImportRunOut(BaseModel):
+    """Строка журнала входящих импортов: числа и имя файла, без тела ответа."""
+
+    id: int
+    key_id: int
+    kind: str
+    filename: str | None
+    status: str
+    created: int
+    updated: int
+    skipped: int
+    errors: int
+    idempotency_key: str | None
+    created_at: datetime
+
+
+def _import_problem(exc: people_import.ImportProblem) -> HTTPException:
+    code = str(exc)
+    return HTTPException(
+        status.HTTP_400_BAD_REQUEST,
+        detail=code if code in PROBLEM_TEXT else "import_failed",
+    )
+
+
+def _ingest_problem(exc: api_ingest.ApiIngestError) -> HTTPException:
+    code = str(exc)
+    if code.startswith("scope_required:"):
+        return HTTPException(status.HTTP_403_FORBIDDEN, detail=code)
+    if code == "idempotency_key_reused":
+        # Тот же ключ идемпотентности с другим файлом — ошибка интегратора.
+        # Вернуть сохранённый ответ значило бы соврать «данные применены».
+        return HTTPException(status.HTTP_409_CONFLICT, detail=code)
+    return HTTPException(status.HTTP_400_BAD_REQUEST, detail=code)
+
+
+@router.post("/import/preview", response_model=ImportPreviewOut)
+async def api_import_preview(
+    payload: ImportIn, session: SessionDep, key: ApiKeyDep
+) -> ImportPreviewOut:
+    """Разбор без записи. Право на вид данных проверяется до ответа."""
+    try:
+        data = await api_ingest.preview(
+            session,
+            key=key,
+            text=payload.text,
+            kind=payload.kind,
+            overwrite=payload.overwrite,
+        )
+    except people_import.ImportProblem as exc:
+        raise _import_problem(exc) from exc
+    except api_ingest.ApiIngestError as exc:
+        raise _ingest_problem(exc) from exc
+    return ImportPreviewOut(**data)
+
+
+@router.post("/import/apply", response_model=ImportResultOut)
+async def api_import_apply(
+    payload: ImportIn,
+    session: SessionDep,
+    key: ApiKeyDep,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> ImportResultOut:
+    """Применить разбор. Повтор с тем же `Idempotency-Key` — тот же ответ."""
+    try:
+        data, _replay = await api_ingest.apply(
+            session,
+            key=key,
+            text=payload.text,
+            kind=payload.kind,
+            overwrite=payload.overwrite,
+            filename=payload.filename,
+            idempotency_key=idempotency_key,
+        )
+    except people_import.ImportProblem as exc:
+        raise _import_problem(exc) from exc
+    except api_ingest.ApiIngestError as exc:
+        raise _ingest_problem(exc) from exc
+    return ImportResultOut(**data)
+
+
+@router.get("/import/runs", response_model=list[ImportRunOut])
+async def api_import_runs(
+    session: SessionDep,
+    key: ApiKeyDep,
+    limit: int = Query(default=20, ge=1, le=api_ingest.MAX_RUNS),
+) -> list[ImportRunOut]:
+    """Журнал прогонов: «ошибки видны» — это числа и файл, а не только код 200."""
+    rows = await api_ingest.runs(session, key.org_id, limit=limit)
+    return [
+        ImportRunOut(
+            id=row.id,
+            key_id=row.key_id,
+            kind=row.kind,
+            filename=row.filename,
+            status=row.status,
+            created=row.created,
+            updated=row.updated,
+            skipped=row.skipped,
+            errors=row.errors,
+            idempotency_key=row.idempotency_key,
+            created_at=row.created_at,
         )
         for row in rows
     ]

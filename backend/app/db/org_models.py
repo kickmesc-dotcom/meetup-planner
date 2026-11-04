@@ -510,3 +510,47 @@ class NotifyPref(OrgScoped, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class ApiImportRun(OrgScoped, Base):
+    """Журнал входящих импортов по ключу API (B2B_PLATFORM_PLAN, шаг 6.2).
+
+    Зачем отдельная таблица, если есть `audit_events`. Аудит отвечает «кто и
+    когда», но не хранит ответ. Интегратору при повторе нужно получить **тот
+    же** ответ, а владельцу — увидеть числа (создано/обновлено/ошибок), не
+    разбирая JSON аудита.
+
+    `idempotency_key` пустой у обычных вызовов, поэтому уникальность по тройке
+    ограничивает только явные ключи: NULL не участвует в уникальности.
+    `request_hash` отличает повтор от ошибки «тот же ключ, другой файл».
+    """
+
+    __tablename__ = "api_import_runs"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id", "key_id", "idempotency_key", name="uq_api_import_run_idem"
+        ),
+        Index("ix_api_import_runs_org_time", "org_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    key_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("api_keys.id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(String(120))
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    filename: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="applied", server_default="applied"
+    )
+    created: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    errors: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    response: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

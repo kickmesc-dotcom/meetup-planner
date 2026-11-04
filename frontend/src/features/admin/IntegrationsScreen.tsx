@@ -23,6 +23,7 @@ import {
   EVENT_LABELS,
   fetchApiKeys,
   fetchDeliveries,
+  fetchImportRuns,
   fetchWebhooks,
   revokeApiKey,
   SCOPE_LABELS,
@@ -34,7 +35,14 @@ import { Skeleton } from "@/components/Skeleton";
 import { useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
 
-const ALL_SCOPES = ["people.read", "schedule.read", "menu.read", "contacts.read"];
+const ALL_SCOPES = [
+  "people.read",
+  "schedule.read",
+  "menu.read",
+  "contacts.read",
+  "people.write",
+  "schedule.write",
+];
 const DEFAULT_SCOPES = ["people.read", "schedule.read", "menu.read"];
 const ALL_EVENTS = ["employee.created", "employee.updated", "employee.deactivated"];
 
@@ -125,6 +133,12 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
     staleTime: 20_000,
     retry: false,
   });
+  const importRuns = useQuery({
+    queryKey: ["integrations", "import-runs"],
+    queryFn: () => fetchImportRuns(10),
+    staleTime: 20_000,
+    retry: false,
+  });
 
   const createKey = useMutation({
     mutationFn: () => createApiKey(keyName.trim(), keyScopes),
@@ -171,7 +185,8 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
   });
 
   const error =
-    keys.error ?? hooks.error ?? deliveries.error ?? createKey.error ??
+    keys.error ?? hooks.error ?? deliveries.error ?? importRuns.error ??
+    createKey.error ??
     revoke.error ?? addHook.error ?? patchHook.error ?? removeHook.error;
 
   return (
@@ -191,7 +206,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
         <div className="text-sm font-semibold text-tg-text">{tx("Ключи API")}</div>
         <p className="mt-1 text-xs text-tg-hint">
           {tx(
-            "Ключ открывает людям и графику доступ снаружи — только чтение. Показывается один раз.",
+            "Ключ открывает данные снаружи: чтение, а с правом записи — импорт людей и графика по CSV.",
           )}
         </p>
 
@@ -464,6 +479,56 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
           </p>
         )}
       </section>
+      {/* ------------------------ журнал импортов по API --------------------- */}
+      <section>
+        <div className="mb-2 px-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
+          {tx("Импорты по API")}
+        </div>
+        {importRuns.data && importRuns.data.length > 0 ? (
+          <ul className="overflow-hidden rounded-card border border-tg-secondary-bg">
+            {importRuns.data.map((row, index) => (
+              <li
+                key={row.id}
+                className={[
+                  "px-3 py-2 text-sm",
+                  index > 0 ? "border-t border-tg-secondary-bg" : "",
+                ].join(" ")}
+              >
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="min-w-0 truncate text-tg-text">
+                    {row.kind === "people" ? tx("Люди") : tx("График")}
+                    {row.filename ? ` · ${row.filename}` : ""}
+                  </span>
+                  <span
+                    className={[
+                      "shrink-0 text-2xs",
+                      row.errors > 0 ? "text-red-600" : "text-tg-link",
+                    ].join(" ")}
+                  >
+                    {row.errors > 0
+                      ? tx("Ошибок: {count}", { count: String(row.errors) })
+                      : tx("Без ошибок")}
+                  </span>
+                </div>
+                <div className="text-2xs text-tg-hint">
+                  {shortDate(row.created_at)} ·{" "}
+                  {tx("Создано: {count}", { count: String(row.created) })}
+                  {row.updated > 0
+                    ? ` · ${tx("Обновлено: {count}", {
+                        count: String(row.updated),
+                      })}`
+                    : ""}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-tile bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
+            {tx("Импортов по ключу пока не было.")}
+          </p>
+        )}
+      </section>
+
     </SubScreen>
   );
 }

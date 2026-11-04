@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, OrgDep, SessionDep
 from app.db.models import User
-from app.services import api_keys, audit, orgs, webhooks
+from app.services import api_ingest, api_keys, audit, orgs, webhooks
 
 router = APIRouter(tags=["integrations"])
 
@@ -321,6 +321,52 @@ async def webhook_deliveries(
             error=row.error,
             created_at=row.created_at,
             delivered_at=row.delivered_at,
+        )
+        for row in rows
+    ]
+
+
+class ImportRunOut(BaseModel):
+    """Прогон входящего импорта для кабинета: числа и файл, без тела ответа."""
+
+    id: int
+    key_id: int
+    kind: str
+    filename: str | None
+    status: str
+    created: int
+    updated: int
+    skipped: int
+    errors: int
+    created_at: datetime
+
+
+@router.get("/org/import-runs", response_model=list[ImportRunOut])
+async def org_import_runs(
+    session: SessionDep,
+    org: OrgDep,
+    user: CurrentUser,
+    limit: int = Query(default=10, ge=1, le=api_ingest.MAX_RUNS),
+) -> list[ImportRunOut]:
+    """«Ошибки видны в журнале» — со стороны владельца, а не интегратора.
+
+    Читает только владелец: это данные о том, кто и когда менял людей и
+    график снаружи. Управляющий видит результат в пуле, а не канал доступа.
+    """
+    await _owner(session, org, user)
+    rows = await api_ingest.runs(session, org.id, limit=limit)
+    return [
+        ImportRunOut(
+            id=row.id,
+            key_id=row.key_id,
+            kind=row.kind,
+            filename=row.filename,
+            status=row.status,
+            created=row.created,
+            updated=row.updated,
+            skipped=row.skipped,
+            errors=row.errors,
+            created_at=row.created_at,
         )
         for row in rows
     ]

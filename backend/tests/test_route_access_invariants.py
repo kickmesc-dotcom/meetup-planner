@@ -70,6 +70,11 @@ PUBLIC_ROUTES: dict[str, str] = {
     "GET /api/v1/employees": "публичный API: ключ в X-Api-Key, только чтение",
     "GET /api/v1/shifts": "публичный API: ключ в X-Api-Key, только чтение",
     "GET /api/v1/menu": "публичный API: ключ в X-Api-Key, только чтение",
+    # Входящий обмен (шаг 6.2): ключ в X-Api-Key, право people.write /
+    # schedule.write. Без ключа 401, без права — 403 до записи.
+    "POST /api/v1/import/preview": "публичный API: ключ в X-Api-Key, разбор без записи",
+    "POST /api/v1/import/apply": "публичный API: ключ в X-Api-Key и право записи",
+    "GET /api/v1/import/runs": "публичный API: ключ в X-Api-Key, журнал своей организации",
 }
 
 # Проверки прав внутри тела. Список намеренно широкий: важно, чтобы проверка

@@ -43,6 +43,11 @@ SCOPES: tuple[str, ...] = (
     "schedule.read",
     "menu.read",
     "contacts.read",
+    # Запись (шаг 6.2). Отдельные права, а не «раз читает — пусть и пишет»:
+    # импорт создаёт людей и смены, то есть меняет данные организации. Владелец
+    # выдаёт это осознанно и видит право в списке ключа.
+    "people.write",
+    "schedule.write",
 )
 
 DEFAULT_SCOPES: tuple[str, ...] = ("people.read", "schedule.read", "menu.read")

@@ -17,6 +17,7 @@ import {
   createWebhook,
   fetchApiKeys,
   fetchDeliveries,
+  fetchImportRuns,
   fetchWebhooks,
   revokeApiKey,
 } from "@/api/integrations";
@@ -33,6 +34,7 @@ vi.mock("@/api/integrations", async (importOriginal) => {
     updateWebhook: vi.fn(),
     deleteWebhook: vi.fn(),
     fetchDeliveries: vi.fn(),
+    fetchImportRuns: vi.fn(),
   };
 });
 
@@ -42,6 +44,7 @@ const revokeMock = vi.mocked(revokeApiKey);
 const hooksMock = vi.mocked(fetchWebhooks);
 const createHookMock = vi.mocked(createWebhook);
 const deliveriesMock = vi.mocked(fetchDeliveries);
+const importRunsMock = vi.mocked(fetchImportRuns);
 
 const KEY = {
   id: 1,
@@ -78,6 +81,20 @@ beforeEach(() => {
       error: null,
       created_at: "2026-11-04T10:05:00+00:00",
       delivered_at: "2026-11-04T10:05:01+00:00",
+    },
+  ]);
+  importRunsMock.mockResolvedValue([
+    {
+      id: 4,
+      key_id: 1,
+      kind: "people",
+      filename: "people.csv",
+      status: "applied",
+      created: 12,
+      updated: 0,
+      skipped: 1,
+      errors: 2,
+      created_at: "2026-11-04T10:00:00+00:00",
     },
   ]);
   createKeyMock.mockResolvedValue({
@@ -143,5 +160,13 @@ describe("IntegrationsScreen", () => {
     renderScreen();
     expect(await screen.findByText("Отправлено")).toBeTruthy();
     expect(screen.getByText(/HTTP 200/)).toBeTruthy();
+  });
+
+  it("показывает журнал импортов по ключу и число ошибок", async () => {
+    renderScreen();
+
+    expect(await screen.findByText("Импорты по API")).toBeTruthy();
+    expect(await screen.findByText(/people\.csv/)).toBeTruthy();
+    expect(screen.getByText("Ошибок: 2")).toBeTruthy();
   });
 });
