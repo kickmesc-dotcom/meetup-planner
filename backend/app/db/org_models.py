@@ -375,3 +375,103 @@ class AuditEvent(OrgScoped, Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+class ApiKey(OrgScoped, Base):
+    """Ключ публичного API организации (B2B_PLATFORM_PLAN, шаг 6.1).
+
+    Зачем не пароль владельца. Интегратору нужны люди и график, но не кабинет:
+    пароль дал бы ему всё, включая удаление организации. Ключ выписывается на
+    подрядчика, имеет свой набор прав и отзывается отдельно.
+
+    Почему в базе хеш и префикс. Ключ показывается один раз при создании;
+    утечка дампа не даёт доступа к API, а человек узнаёт ключ в списке по
+    началу «stk_live_7fa2…». Тот же приём, что у приглашений и сессий.
+    """
+
+    __tablename__ = "api_keys"
+    __table_args__ = (
+        Index("ix_api_keys_token_hash", "token_hash", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    prefix: Mapped[str] = mapped_column(String(24), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    scopes: Mapped[str] = mapped_column(String(240), nullable=False, default="")
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WebhookEndpoint(OrgScoped, Base):
+    """Приёмник событий организации (шаг 6.1).
+
+    `failures` считает подряд идущие неудачи: по нему в кабинете видно, что
+    интегратор сломался. Сам приёмник не выключается — иначе клиент чинил бы
+    сервер и не понимал, почему события перестали приходить.
+    """
+
+    __tablename__ = "webhook_endpoints"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    secret: Mapped[str] = mapped_column(String(64), nullable=False)
+    events: Mapped[str] = mapped_column(String(300), nullable=False, default="")
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status_code: Mapped[int | None] = mapped_column(Integer)
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class WebhookDelivery(OrgScoped, Base):
+    """Очередь доставки и её журнал (шаг 6.1).
+
+    Почему `payload` снимком, а не ссылкой на данные. Повтор обязан отправить
+    то же тело, что и первая попытка: иначе интегратор получит событие
+    «сотрудник создан» с уже изменённой должностью.
+    """
+
+    __tablename__ = "webhook_deliveries"
+    __table_args__ = (
+        Index("ix_webhook_deliveries_org_time", "org_id", "created_at"),
+        Index("ix_webhook_deliveries_due", "status", "next_attempt_at"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    endpoint_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("webhook_endpoints.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event: Mapped[str] = mapped_column(String(48), nullable=False)
+    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    response_code: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

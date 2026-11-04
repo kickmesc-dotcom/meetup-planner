@@ -680,6 +680,19 @@ async def add_person(
     if role is not None:
         # Ручной выбор роли сильнее env-списка админов (`ensure_employee`).
         hr_access.set_role(employee, role)
+    from app.services import webhooks as webhooks_svc
+
+    await webhooks_svc.emit(
+        session,
+        org_id=int(employee.org_id),
+        event="employee.created",
+        data={
+            "employee_id": int(employee.id),
+            "name": user.display_name,
+            "position": employee.position,
+            "department_id": employee.department_id,
+        },
+    )
     await session.commit()
     log.info("hr.admin.person_added", employee_id=int(employee.id), telegram_id=number)
     return await _card_of(session, viewer, int(employee.id))
@@ -766,6 +779,14 @@ async def update_profile(
         employee.badge = badge.strip()[:MAX_NAME] or None
     if badge_emoji is not None:
         employee.badge_emoji = badge_emoji.strip()[:8] or None
+    from app.services import webhooks as webhooks_svc
+
+    await webhooks_svc.emit(
+        session,
+        org_id=int(employee.org_id),
+        event="employee.updated",
+        data={"employee_id": int(employee.id), "name": user.display_name},
+    )
     await session.commit()
     cards = {card.employee_id: card for card in await directory(session, viewer)}
     card = cards.get(employee_id)
@@ -872,6 +893,14 @@ async def fire(
     employee.purge_after = (
         _now() + timedelta(days=max(1, restore_days)) if mode == FIRED_TRASH else None
     )
+    from app.services import webhooks as webhooks_svc
+
+    await webhooks_svc.emit(
+        session,
+        org_id=int(employee.org_id),
+        event="employee.deactivated",
+        data={"employee_id": int(employee.id), "mode": mode},
+    )
     await session.commit()
     if mode == FIRED_PURGE:
         # Снимок ДО удаления: строка ещё на месте, состав полный. Это и есть
@@ -898,6 +927,14 @@ async def restore(session: AsyncSession, viewer: Employee, employee_id: int) -> 
     employee.purge_after = None
     employee.fired_mode = None
     employee.is_active = True
+    from app.services import webhooks as webhooks_svc
+
+    await webhooks_svc.emit(
+        session,
+        org_id=int(employee.org_id),
+        event="employee.updated",
+        data={"employee_id": int(employee.id), "restored": True},
+    )
     await session.commit()
     return await _card_of(session, viewer, employee_id)
 

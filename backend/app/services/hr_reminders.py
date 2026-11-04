@@ -868,6 +868,12 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
             # срока хранения — та же ежедневная уборка (шаг 5.5).
             await privacy.purge_due_orgs(session, now=now)
             await audit.prune(session, now=now)
+            # Вебхуки (шаг 6.1): отправка созревших доставок и обрезка
+            # журнала. В том же tick'е, чтобы не заводить второй job.
+            from app.services import webhooks
+
+            await webhooks.flush(session, now=now)
+            await webhooks.prune(session, now=now)
             if await hr_settings.get_reminders_enabled(session):
                 reminders = len(
                     await send_deadline_reminders(session, bot=bot, now=now)

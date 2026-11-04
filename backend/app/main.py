@@ -39,6 +39,7 @@ from app.api import (
     routes_meetings,
     routes_menu,
     routes_meta,
+    routes_integrations,
     routes_orgs,
     routes_platform,
     routes_polls,
@@ -51,6 +52,7 @@ from app.api import (
     routes_standards,
     routes_texts,
     routes_users,
+    routes_v1,
 )
 from app.bot import webhook as bot_webhook
 from app.bot.dispatcher import get_bot
@@ -506,6 +508,10 @@ def create_app() -> FastAPI:
     app.include_router(routes_auth.router, prefix="/api")
     # Приглашения в организацию: ссылка с ролью и сроком (B2B_PLATFORM_PLAN, 2.2).
     app.include_router(routes_orgs.router, prefix="/api")
+    # Интеграции: ключи API и вебхуки организации (B2B_PLATFORM_PLAN, 6.1).
+    app.include_router(routes_integrations.router, prefix="/api")
+    # Публичный read-only API для внешних систем — контракт `/api/v1`.
+    app.include_router(routes_v1.router, prefix="/api")
     # Админка платформы: организации, тарифы, блокировки, оплаты (4.3).
     app.include_router(routes_platform.router, prefix="/api")
     # Push вне Telegram: подписка браузера и тестовое уведомление (2.4).

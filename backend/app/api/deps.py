@@ -14,7 +14,7 @@ from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
 from app.db.models import User
-from app.db.org_models import Organization, set_org
+from app.db.org_models import ApiKey, Organization, set_org
 from app.services import display_names, org_bots, org_limits, orgs
 
 
@@ -348,3 +348,31 @@ async def current_org(
 
 
 OrgDep = Annotated[Organization, Depends(current_org)]
+
+
+async def api_key_auth(
+    session: SessionDep,
+    x_api_key: Annotated[str | None, Header()] = None,
+) -> ApiKey:
+    """Организация по ключу публичного API (B2B_PLATFORM_PLAN, шаг 6.1).
+
+    Ключ приходит без пользователя: у интегратора нет ни Telegram, ни сессии.
+    Организацию и права даёт сама строка ключа, поэтому подставить чужой
+    `org_id` в заголовке нельзя — его здесь просто нет.
+
+    Лимит частоты считается по организации, а не по адресу: за прокси
+    интегратора может стоять несколько сервисов, и все они — один клиент.
+    """
+    from app.services import api_keys, org_limits
+
+    key = await api_keys.resolve(session, x_api_key or "")
+    if key is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail="api_key_invalid"
+        )
+    set_org(key.org_id)
+    await org_limits.enforce_rate(session, key.org_id, path="/api/v1")
+    return key
+
+
+ApiKeyDep = Annotated[ApiKey, Depends(api_key_auth)]

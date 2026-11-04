@@ -19,6 +19,38 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ---- интеграции (шаг 6.1) ----
+  "Интеграции": "Integrations",
+  "Ключи API и вебхуки для внешних систем": "API keys and webhooks for external systems",
+  "Ключи API": "API keys",
+  "Ключ открывает людям и графику доступ снаружи — только чтение. Показывается один раз.": "A key opens people and schedule to an outside system — read only. Shown once.",
+  "Ключ создан — скопируйте сейчас, второй раз он не покажется.": "Key created — copy it now, it will not be shown again.",
+  "Например: CRM": "For example: CRM",
+  "Создать ключ": "Create key",
+  "Отозван": "Revoked",
+  "Живой": "Active",
+  "Использован": "Last used",
+  "Да, отозвать": "Yes, revoke",
+  "Ключей пока нет.": "No keys yet.",
+  "Вебхуки": "Webhooks",
+  "События уходят на ваш адрес сразу, а не по опросу. Подпись — в заголовке X-SemiTask-Signature.": "Events go to your endpoint immediately, not by polling. The signature is in the X-SemiTask-Signature header.",
+  "Секрет создан — им проверяется подпись. Второй раз не покажется.": "Secret created — use it to verify the signature. It will not be shown again.",
+  "Адрес приёмника": "Endpoint URL",
+  "Добавить вебхук": "Add webhook",
+  "Ошибок подряд: {count}": "Consecutive failures: {count}",
+  "Включить": "Enable",
+  "Вебхуков пока нет.": "No webhooks yet.",
+  "Последние доставки": "Recent deliveries",
+  "Отправлено": "Sent",
+  "Ошибка": "Failed",
+  "В очереди": "Queued",
+  "Попыток: {count}": "Attempts: {count}",
+  "Доставок пока нет.": "No deliveries yet.",
+  "Меню": "Menu",
+  "Контакты (почта)": "Contacts (email)",
+  "Новый сотрудник": "New employee",
+  "Сотрудник изменён": "Employee updated",
+  "Сотрудник уволен": "Employee deactivated",
   // ------------------------------------------------- «Спросить» ----------
   // Один поиск по знаниям: стандарты + пункты чек-листов.
   "Спросить": "Ask",
