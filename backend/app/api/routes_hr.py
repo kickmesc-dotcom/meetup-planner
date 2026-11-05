@@ -361,6 +361,9 @@ class CompleteIn(BaseModel):
     photo_file_id: str | None = None
     media_id: int | None = None
     note: str | None = None
+    # Дата смены. Приходит из офлайн-очереди: отметку поставили в подвале без
+    # сети, а отправили позже — она должна уйти в свою смену, а не в текущую.
+    shift_date: date | None = None
 
 
 class TaskOut(BaseModel):
@@ -1467,7 +1470,13 @@ async def checklist_complete(
     if template is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="template_not_found")
 
-    shift_date = hr_checklists.local_today()
+    today = hr_checklists.local_today()
+    try:
+        shift_date = hr_checklists.resolve_shift_date(body.shift_date, today)
+    except hr_checklists.ChecklistError as exc:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     run = await hr_checklists.get_or_create_run(session, employee, template, shift_date)
     try:
         await hr_checklists.complete_item(

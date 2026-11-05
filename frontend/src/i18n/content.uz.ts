@@ -21,6 +21,10 @@
  * что в русском. Проверка — `src/i18n/uz.guard.test.ts`.
  */
 export const UZ_CONTENT: Record<string, string> = {
+  // ---- офлайн-очередь чек-листа (05.11.2026) ----
+  "Не отправлено: {count}. Отправим, когда появится связь.": "{count} ta yuborilmadi. Aloqa paydo bo'lganda yuboramiz.",
+  "Показан сохранённый чек-лист: связи нет. Отметки сохранятся на телефоне.": "Saqlangan chek-list ko'rsatilmoqda: aloqa yo'q. Belgilar telefonda saqlanadi.",
+  "Сервер отклонил часть отметок — открой чек-лист и проверь.": "Server ba'zi belgilarni rad etdi — chek-listni ochib tekshiring.",
   // ---- сводка внимания на первом экране кабинета (05.11.2026) ----
   "Не начали смену": "Smenani boshlamaganlar",
   "Не закрыли чек-лист": "Chek-listni yopmaganlar",

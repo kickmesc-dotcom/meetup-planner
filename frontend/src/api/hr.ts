@@ -113,6 +113,11 @@ export interface HrChecklist {
   hall_name?: string | null;
   /** Сначала нужно выбрать зал — списка пунктов пока нет. */
   needs_hall?: boolean;
+  /**
+   * Показан снимок из памяти: связи нет. Сервер это поле не присылает, его
+   * ставит экран, когда берёт последний ответ из `localStorage`.
+   */
+  offline?: boolean;
 }
 
 export type TaskStatus =
@@ -551,6 +556,11 @@ export const completeChecklistItem = (body: {
   /** ID снимка, загруженного в приложении (`POST /api/media`). */
   media_id?: number | null;
   note?: string | null;
+  /**
+   * Дата смены. Приходит из офлайн-очереди: отметку поставили без сети, а
+   * отправили позже — она должна уйти в свою смену, а не в сегодняшнюю.
+   */
+  shift_date?: string | null;
 }) =>
   api<HrChecklist>("/api/checklist/complete", {
     method: "POST",

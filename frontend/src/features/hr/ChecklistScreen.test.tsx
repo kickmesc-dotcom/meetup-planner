@@ -44,6 +44,9 @@ function renderScreen() {
 }
 
 beforeEach(() => {
+  // Очередь отметок живёт в localStorage: чужой прогон не должен «досылать»
+  // свои отметки в следующий тест.
+  localStorage.clear();
   vi.spyOn(hrApi, "fetchHalls").mockResolvedValue([
     { id: 1, name: "Первый зал", slug: "first", sort_order: 10 },
     { id: 2, name: "Второй зал", slug: "second", sort_order: 20 },
@@ -56,6 +59,40 @@ afterEach(() => {
 });
 
 describe("ChecklistScreen", () => {
+  it("без связи отметка уходит в очередь и не теряется", async () => {
+    vi.spyOn(hrApi, "fetchChecklist").mockResolvedValue({
+      run_id: 1,
+      template_id: 5,
+      template_title: "Открытие — Первый зал",
+      kind: "shift",
+      shift_date: "2026-11-05",
+      status: "in_progress",
+      done: 0,
+      total: 1,
+      progress_text: "Выполнено 0 из 1",
+      items: [item],
+      needs_hall: false,
+      hall_id: 1,
+      hall_name: "Первый зал",
+    });
+    vi.spyOn(hrApi, "completeChecklistItem").mockRejectedValue(
+      new TypeError("Failed to fetch"),
+    );
+
+    renderScreen();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Отметить пункт" }),
+    );
+
+    const queue = await screen.findByTestId("checklist-offline-queue");
+    expect(queue.textContent).toContain("Не отправлено: 1");
+    // Пункт уже отмечен: человек не должен нажимать его второй раз.
+    expect(
+      (screen.getByRole("button", { name: "Отметить пункт" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
   it("без выбора зала показывает выбор, а не пункты", async () => {
     vi.spyOn(hrApi, "fetchChecklist").mockResolvedValue({
       run_id: null,

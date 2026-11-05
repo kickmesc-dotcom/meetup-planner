@@ -19,6 +19,10 @@
  * одинаковые в обоих языках (см. `tx`).
  */
 export const EN_CONTENT: Record<string, string> = {
+  // ---- офлайн-очередь чек-листа (05.11.2026) ----
+  "Не отправлено: {count}. Отправим, когда появится связь.": "{count} not sent yet. We will send it when the connection is back.",
+  "Показан сохранённый чек-лист: связи нет. Отметки сохранятся на телефоне.": "Showing the saved checklist: no connection. Ticks are kept on the phone.",
+  "Сервер отклонил часть отметок — открой чек-лист и проверь.": "The server rejected some ticks — open the checklist and check.",
   // ---- сводка внимания на первом экране кабинета (05.11.2026) ----
   "Не начали смену": "Shift not started",
   "Не закрыли чек-лист": "Checklist not finished",

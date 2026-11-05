@@ -68,6 +68,26 @@ def local_today(tz: str | None = None) -> date:
 # --------------------------------------------------------------------------
 
 
+
+# Отметка, сделанная без сети, отправляется позже. Разрешаем закрыть ею
+# недавнюю смену, но не переписать позавчерашний отчёт: очередь — страховка от
+# обрыва, а не способ задним числом поправить закрытый день.
+OFFLINE_MAX_DAYS = 7
+
+
+def resolve_shift_date(requested: date | None, today: date) -> date:
+    """Дата смены для отметки: сегодня или недавнее прошлое.
+
+    Пусто — текущая смена. Будущее и всё старше недели отклоняются: клиент не
+    должен уметь записать отметку в чужой день, даже если очередь испорчена.
+    """
+    if requested is None:
+        return today
+    if requested > today or (today - requested).days > OFFLINE_MAX_DAYS:
+        raise ChecklistError("bad_shift_date")
+    return requested
+
+
 def applicable_items(
     items: list[ChecklistItem], position: str | None
 ) -> list[ChecklistItem]:

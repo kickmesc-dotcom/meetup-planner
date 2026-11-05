@@ -169,7 +169,7 @@ function Tile({
           tone === "alert"
             ? "text-status-busy"
             : tone === "warn"
-              ? "text-status-warn"
+              ? "text-tg-hint"
               : "text-tg-hint"
         }
       />

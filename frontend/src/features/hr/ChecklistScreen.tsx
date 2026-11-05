@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   chooseHall,
@@ -6,9 +6,18 @@ import {
   fetchChecklist,
   fetchHalls,
   type ChecklistKind,
+  type HrChecklist,
   type HrChecklistItem,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import {
+  enqueueCompletion,
+  flushCompletions,
+  isRetryable,
+  loadChecklistSnapshot,
+  pendingCount,
+  saveChecklistSnapshot,
+} from "@/offline/checklistQueue";
 import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
 import Icon, { InlineIcon } from "@/components/Icon";
@@ -47,10 +56,27 @@ export default function ChecklistScreen() {
   const [kind, setKind] = useState<ChecklistKind>("shift");
   const [noteFor, setNoteFor] = useState<number | null>(null);
   const [changingHall, setChangingHall] = useState(false);
+  // Сколько отметок ждёт связи. Очередь живёт в localStorage и переживает
+  // перезапуск приложения, поэтому считаем её при открытии экрана.
+  const [queued, setQueued] = useState(() => pendingCount());
 
   const q = useQuery({
     queryKey: ["hr-checklist", kind],
-    queryFn: () => fetchChecklist(kind),
+    queryFn: async () => {
+      try {
+        const fresh = await fetchChecklist(kind);
+        // Снимок — не кеш ради скорости, а страховка: без сети экран должен
+        // показать хотя бы то, что человек видел в прошлый раз, иначе он не
+        // помнит пункты и не может отметить сделанное.
+        saveChecklistSnapshot(kind, fresh);
+        return fresh;
+      } catch (error) {
+        if (!isRetryable(error)) throw error;
+        const cached = loadChecklistSnapshot(kind);
+        if (!cached) throw error;
+        return { ...cached, offline: true };
+      }
+    },
   });
 
   const data = q.data;
@@ -88,8 +114,65 @@ export default function ChecklistScreen() {
       void qc.invalidateQueries({ queryKey: ["hr-feed"] });
       setNoteFor(null);
     },
-    onError: (e) => void showAlert(humanizeApiError(e)),
+    onError: (e, variables) => {
+      if (!isRetryable(e)) {
+        void showAlert(humanizeApiError(e));
+        return;
+      }
+      // Связи нет — отметка не теряется. В очередь едет дата смены: утренняя
+      // отправка вечерней отметки не должна попасть в сегодняшний прогон.
+      enqueueCompletion({
+        item_id: variables.item_id,
+        kind,
+        shift_date: data?.shift_date ?? new Date().toISOString().slice(0, 10),
+        note: variables.note ?? null,
+        media_id: variables.media_id ?? null,
+        photo_file_id: variables.photo_file_id ?? null,
+      });
+      setQueued(pendingCount());
+      // Отмечаем сразу в кэше: человек должен видеть галочку, иначе он будет
+      // тыкать пункт повторно и решит, что приложение зависло.
+      qc.setQueryData(["hr-checklist", kind], (prev: HrChecklist | undefined) =>
+        markDone(prev, variables.item_id),
+      );
+      setNoteFor(null);
+      haptic("success");
+    },
   });
+
+  const syncQueued = async () => {
+    if (!pendingCount()) return;
+    const result = await flushCompletions((entry) =>
+      completeChecklistItem({
+        item_id: entry.item_id,
+        shift_date: entry.shift_date,
+        note: entry.note,
+        media_id: entry.media_id,
+        photo_file_id: entry.photo_file_id,
+      }),
+    );
+    setQueued(result.left);
+    if (result.sent > 0) {
+      // Прогресс и лента посчитаны сервером: после отправки берём его числа,
+      // а не свои оптимистичные.
+      void qc.invalidateQueries({ queryKey: ["hr-checklist"] });
+      void qc.invalidateQueries({ queryKey: ["hr-feed"] });
+    }
+    if (result.dropped > 0) {
+      void showAlert(
+        tx("Сервер отклонил часть отметок — открой чек-лист и проверь."),
+      );
+    }
+  };
+
+  // Отправляем при открытии и при возврате связи. Именно событие `online`, а
+  // не таймер: опрос в фоне будил бы радио каждые N секунд без пользы.
+  useEffect(() => {
+    void syncQueued();
+    const onOnline = () => void syncQueued();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
 
   if (q.isError)
     return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
@@ -150,6 +233,24 @@ export default function ChecklistScreen() {
           </div>
         )}
       </header>
+
+      {queued > 0 && (
+        <div
+          data-testid="checklist-offline-queue"
+          className="mx-4 mt-2 rounded-tile bg-status-busy/10 px-3 py-2 text-xs text-status-busy"
+        >
+          {tx("Не отправлено: {count}. Отправим, когда появится связь.", {
+            count: queued,
+          })}
+        </div>
+      )}
+      {data?.offline && (
+        <div className="mx-4 mt-2 rounded-tile bg-tg-secondary-bg px-3 py-2 text-xs text-tg-hint">
+          {tx(
+            "Показан сохранённый чек-лист: связи нет. Отметки сохранятся на телефоне.",
+          )}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
         {q.isLoading && (
@@ -472,4 +573,33 @@ function ItemRow({
       )}
     </div>
   );
+}
+
+/**
+ * Пометить пункт выполненным в кэше, не дожидаясь сервера.
+ *
+ * При обрыве связи ответа нет, а галочка нужна сразу. Прогресс считаем по тем
+ * же полям, что и сервер (`done`, `progress_text`), иначе полоса осталась бы
+ * на старом месте до синхронизации — и это выглядело бы как потеря отметки.
+ */
+function markDone(
+  view: HrChecklist | undefined,
+  itemId: number,
+): HrChecklist | undefined {
+  if (!view) return view;
+  let changed = false;
+  const items = view.items.map((item) => {
+    if (item.id !== itemId || item.done) return item;
+    changed = true;
+    return { ...item, done: true, done_at: new Date().toISOString() };
+  });
+  if (!changed) return view;
+  const done = Math.min(view.total, view.done + 1);
+  return {
+    ...view,
+    items,
+    done,
+    progress_text: `Выполнено ${done} из ${view.total}`,
+    status: view.total > 0 && done >= view.total ? "done" : view.status,
+  };
 }
