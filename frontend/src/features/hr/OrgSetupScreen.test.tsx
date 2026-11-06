@@ -17,14 +17,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { OrgSetup } from "@/api/hr";
+// Статический импорт, а не `await import()` в beforeEach: в полном
+// параллельном прогоне динамический импорт не укладывался в 10 с таймаута
+// хука, и тест падал «Hook timed out» без единой проверки.
+import OrgSetupScreen from "./OrgSetupScreen";
 
-const saveOrgSetup = vi.fn();
-const fetchDepartments = vi.fn();
-const fetchOrgSetupProgress = vi.fn();
-const createInvitation = vi.fn();
-const saveShiftTemplate = vi.fn();
-const fetchShiftWeek = vi.fn();
-const applyShiftTemplate = vi.fn();
+// `vi.hoisted`: фабрики `vi.mock` поднимаются выше импортов, поэтому моки, на
+// которые они ссылаются, должны существовать уже на этом этапе — иначе
+// статический импорт экрана падает на `cannot access before initialization`.
+const {
+  saveOrgSetup,
+  fetchDepartments,
+  fetchOrgSetupProgress,
+  createInvitation,
+  saveShiftTemplate,
+  fetchShiftWeek,
+  applyShiftTemplate,
+} = vi.hoisted(() => ({
+  saveOrgSetup: vi.fn(),
+  fetchDepartments: vi.fn(),
+  fetchOrgSetupProgress: vi.fn(),
+  createInvitation: vi.fn(),
+  saveShiftTemplate: vi.fn(),
+  fetchShiftWeek: vi.fn(),
+  applyShiftTemplate: vi.fn(),
+}));
 
 vi.mock("@/api/hr", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/api/hr")>();
@@ -68,7 +85,7 @@ function renderScreen(setup: OrgSetup = SETUP) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  const Screen = OrgSetupScreenLazy;
+  const Screen = OrgSetupScreen;
   return render(
     <QueryClientProvider client={qc}>
       <Screen setup={setup} onClose={() => undefined} />
@@ -76,9 +93,7 @@ function renderScreen(setup: OrgSetup = SETUP) {
   );
 }
 
-let OrgSetupScreenLazy: typeof import("./OrgSetupScreen").default;
-
-beforeEach(async () => {
+beforeEach(() => {
   saveOrgSetup.mockReset();
   fetchDepartments.mockReset().mockResolvedValue([]);
   fetchOrgSetupProgress.mockReset();
@@ -99,8 +114,6 @@ beforeEach(async () => {
     ...SETUP,
     ...patch,
   }));
-  const mod = await import("./OrgSetupScreen");
-  OrgSetupScreenLazy = mod.default;
 });
 
 afterEach(() => {

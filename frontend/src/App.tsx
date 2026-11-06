@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMe,
@@ -9,30 +9,30 @@ import {
 } from "./api/availability";
 import { useBootstrap } from "./api/bootstrap";
 
-import MeetingsPollsScreen from "./features/meetings/MeetingsPollsScreen";
+const MeetingsPollsScreen = lazy(() => import("./features/meetings/MeetingsPollsScreen"));
 // SemiTaskBot: рабочие экраны сотрудника.
-import MyTasksScreen from "./features/hr/MyTasksScreen";
-import ChecklistScreen from "./features/hr/ChecklistScreen";
-import ShiftsScreen from "./features/shifts/ShiftsScreen";
+const MyTasksScreen = lazy(() => import("./features/hr/MyTasksScreen"));
+const ChecklistScreen = lazy(() => import("./features/hr/ChecklistScreen"));
+const ShiftsScreen = lazy(() => import("./features/shifts/ShiftsScreen"));
 import {
   countOpenTasks,
   fetchEmployee,
   fetchOrgSetup,
   fetchTasks,
 } from "./api/hr";
-import HrFeedScreen from "./features/hr/HrFeedScreen";
-import IssuesScreen from "./features/issues/IssuesScreen";
-import HandoversScreen from "./features/handovers/HandoversScreen";
-import StandardsScreen from "./features/hr/StandardsScreen";
-import AskScreen from "./features/hr/AskScreen";
+const HrFeedScreen = lazy(() => import("./features/hr/HrFeedScreen"));
+const IssuesScreen = lazy(() => import("./features/issues/IssuesScreen"));
+const HandoversScreen = lazy(() => import("./features/handovers/HandoversScreen"));
+const StandardsScreen = lazy(() => import("./features/hr/StandardsScreen"));
+const AskScreen = lazy(() => import("./features/hr/AskScreen"));
 // Весь код управления (кабинет, приёмка, отчёт смены) живёт в зоне управления
 // и грузится отдельными чанками оттуда: сотрудник его не открывает никогда, и
 // незачем тянуть чужие полторы тысячи строк в первую загрузку его экрана.
-import LinksScreen from "./features/hr/LinksScreen";
-import MaterialsScreen from "./features/hr/MaterialsScreen";
-import HrProfileScreen from "./features/hr/HrProfileScreen";
-import OnboardingScreen from "./features/hr/OnboardingScreen";
-import OrgSetupScreen from "./features/hr/OrgSetupScreen";
+const LinksScreen = lazy(() => import("./features/hr/LinksScreen"));
+const MaterialsScreen = lazy(() => import("./features/hr/MaterialsScreen"));
+const HrProfileScreen = lazy(() => import("./features/hr/HrProfileScreen"));
+const OnboardingScreen = lazy(() => import("./features/hr/OnboardingScreen"));
+const OrgSetupScreen = lazy(() => import("./features/hr/OrgSetupScreen"));
 import { sectionEnabled } from "./features/hr/sections";
 import WelcomeBanner from "./features/welcome/WelcomeBanner";
 // Кабинет управления — отдельный каркас (`ManageZone`), а не вкладка внутри
@@ -409,8 +409,14 @@ export default function App() {
       style={SAFE_AREA_ROOT}
     >
         <SimulationBanner />
-        <OrgSetupScreen
-          setup={orgSetup.data}
+        {/* Экран грузится отдельным чанком: большинство людей его не видят. */}
+        <Suspense fallback={<main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </main>}>
+          <OrgSetupScreen
+            setup={orgSetup.data}
           onClose={() => {
             void orgSetup.refetch();
             // Мастер закрыл знакомство руководителя на сервере — без
@@ -419,9 +425,10 @@ export default function App() {
             void qc.invalidateQueries({ queryKey: ["hr-employee"] });
             // Следующий шаг руководителя — люди, а не пустая лента: «Команда»
             // держит приглашение и код компании.
-            setTab("team");
-          }}
-        />
+              setTab("team");
+            }}
+          />
+        </Suspense>
       </div>
     );
   }
@@ -435,7 +442,13 @@ export default function App() {
       style={SAFE_AREA_ROOT}
     >
         <SimulationBanner />
-        <OnboardingScreen employee={hrMe.data!} />
+        <Suspense fallback={<main className="flex flex-1 flex-col gap-3 overflow-hidden p-4">
+          <Skeleton className="h-10" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </main>}>
+          <OnboardingScreen employee={hrMe.data!} />
+        </Suspense>
       </div>
     );
   }
