@@ -71,6 +71,20 @@ async def upload_media(
     return media_out(blob)
 
 
+def media_headers() -> dict[str, str]:
+    """Заголовки байтовой выдачи фото.
+
+    `Content-Encoding: identity` — не украшение: глобальное сжатие ответов
+    (`main.add_compression`) иначе прогоняет JPEG/PNG через gzip. Фото уже
+    сжаты, выигрыша нет, а на контейнере 0.5 ГБ процессор занят зря именно
+    там, где его и так мало — при просмотре галереи отчётов.
+    """
+    return {
+        "Cache-Control": "private, max-age=86400",
+        "Content-Encoding": "identity",
+    }
+
+
 @router.get("/media/tg/{photo_id}")
 async def get_telegram_photo(photo_id: int, s: str | None = None) -> Response:
     """Фото из чата: лениво скачиваем из Telegram и кешируем в блоб.
@@ -91,11 +105,7 @@ async def get_telegram_photo(photo_id: int, s: str | None = None) -> Response:
         if blob is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="media_unavailable")
         data, mime = blob.data, blob.mime
-    return Response(
-        content=data,
-        media_type=mime,
-        headers={"Cache-Control": "private, max-age=86400"},
-    )
+    return Response(content=data, media_type=mime, headers=media_headers())
 
 
 @router.get("/media/checklist/{completion_id}")
@@ -111,11 +121,7 @@ async def get_checklist_photo(completion_id: int, s: str | None = None) -> Respo
         if blob is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="media_unavailable")
         data, mime = blob.data, blob.mime
-    return Response(
-        content=data,
-        media_type=mime,
-        headers={"Cache-Control": "private, max-age=86400"},
-    )
+    return Response(content=data, media_type=mime, headers=media_headers())
 
 
 @router.get("/media/{blob_id}")
@@ -131,5 +137,5 @@ async def get_media(blob_id: int, s: str | None = None) -> Response:
         return Response(
             content=blob.data,
             media_type=blob.mime,
-            headers={"Cache-Control": "private, max-age=86400"},
+            headers=media_headers(),
         )

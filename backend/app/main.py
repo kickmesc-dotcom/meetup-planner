@@ -17,6 +17,7 @@ from aiogram.types import (
 )
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import (
@@ -432,6 +433,28 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001 — невалидный токен не должен ломать выход
         structlog.get_logger().warning("bot.close_failed", error=str(exc))
 
+# С какого размера сжимать ответ. 512 байт — не «красивое число», а граница,
+# ниже которой заголовки и словарь gzip съедают выигрыш: `/api/texts` (732
+# байта подписей) уже выигрывает, `/healthz` (15 байт) — нет.
+GZIP_MINIMUM_SIZE = 512
+
+
+def add_compression(app: FastAPI) -> None:
+    """Сжать ответы API.
+
+    Зачем: Amvera отдавала JSON без `content-encoding`, и лента на 100 записей
+    ехала несжатой — на 3G это десятки-сотни КБ на каждый запрос, а не только
+    на первую загрузку. Замер до/после — в `docs/PERF_AUDIT.md`.
+
+    Ставится самым внутренним middleware (добавляется первым): CORS и метрики
+    остаются снаружи и видят готовый ответ. Фото через gzip не идут — их
+    выдача помечена `Content-Encoding: identity` в `routes_media`.
+    """
+    app.add_middleware(
+        GZipMiddleware, minimum_size=GZIP_MINIMUM_SIZE, compresslevel=6
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(title="SemiTaskBot", version="0.1.0", lifespan=lifespan)
@@ -462,13 +485,15 @@ def create_app() -> FastAPI:
     # следующее middleware НАРУЖУ, поэтому пишем их от внутреннего к внешнему.
     # Цепочка получается такая:
     #
-    #   security headers → CORS → лимит частоты → лимит размера → маршруты
+    #   сжатие → security headers → CORS → лимит частоты → лимит размера →
+    #   маршруты
     #
     # Почему так: CORS должен быть снаружи лимитов, иначе браузер не прочтёт
     # `429` (ответ без CORS-заголовков выглядит для страницы сетевой ошибкой, и
     # человек вместо «слишком много попыток» увидит «что-то пошло не так»).
     # Лимит размера тела — внутри лимита частоты: отказанному запросу незачем
     # читать тело вообще.
+    add_compression(app)
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(RateLimitMiddleware)
