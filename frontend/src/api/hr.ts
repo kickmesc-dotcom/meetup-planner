@@ -288,6 +288,18 @@ export const setProfileVisibility = (isPublic: boolean) =>
   });
 
 /**
+ * Имя в приложении: рабочее, а не телеграмное.
+ *
+ * Коллеги видят именно его в ленте, списке команды и отчёте смены, поэтому
+ * «мама» из мессенджера сюда не попадает.
+ */
+export const setMyName = (displayName: string) =>
+  api<HrEmployee>("/api/me/name", {
+    method: "PATCH",
+    body: JSON.stringify({ display_name: displayName }),
+  });
+
+/**
  * Личные галочки карточки: показывать ли последний заход и последнее медиа.
  *
  * Сервер может не принять `false` — если руководство запретило скрывать, он

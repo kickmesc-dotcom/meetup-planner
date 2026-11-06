@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchDigest, fetchNotifyPrefs, setNotifyPref } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
+import { NOTIFY_KINDS } from "@/features/hr/notifyKinds";
 import { SkeletonText } from "@/components/Skeleton";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
@@ -20,29 +21,6 @@ import { useTx } from "@/i18n";
  * Правило загрузки общее (план, раздел 9): заголовок и объяснение — в первом
  * кадре, числа занимают заранее нарисованные плитки.
  */
-/**
- * Виды личных уведомлений (04.11.2026): все три живут одной настройкой.
- *
- * Почему списком, а не «галочка на сводку». Правило владельца — любое
- * автоматическое сообщение в личку только по явному выбору — значит человеку
- * нужно видеть **весь** набор, который ему могут прислать, а не один вид.
- * Иначе он выключит сводку и через неделю получит «напоминание о сроке»,
- * которого не выбирал.
- */
-const NOTIFY_KINDS: { kind: string; label: string; hint: string }[] = [
-  {
-    kind: "digest",
-    label: "Сводка дня",
-    hint: "Утром: просрочки, чек-листы, проблемы",
-  },
-  { kind: "deadline", label: "Напоминания о сроке", hint: "Перед сроком поручения" },
-  {
-    kind: "escalation",
-    label: "Эскалации",
-    hint: "Просрочка и вторая ступень — руководителю",
-  },
-];
-
 export default function DigestScreen({ onBack }: { onBack: () => void }) {
   const { tx } = useTx();
   const digestQ = useQuery({ queryKey: ["hr-digest"], queryFn: fetchDigest });

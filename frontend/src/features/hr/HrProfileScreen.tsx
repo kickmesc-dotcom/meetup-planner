@@ -25,6 +25,7 @@ import FeedbackScreen from "@/features/hr/FeedbackScreen";
 import HrDemoPanel from "@/features/hr/HrDemoPanel";
 import OrgSetupScreen from "@/features/hr/OrgSetupScreen";
 import EmailVerifyCard from "@/features/hr/EmailVerifyCard";
+import MySettingsScreen from "@/features/hr/MySettingsScreen";
 import KpiCard from "@/features/hr/KpiCard";
 import PushCard from "@/features/hr/PushCard";
 import TrainingScreen from "@/features/hr/TrainingScreen";
@@ -96,6 +97,8 @@ export default function HrProfileScreen() {
   // Опрос живёт оверлеем поверх вкладок: он нужен раз в смену и не стоит
   // отдельной кнопки в нижней полосе.
   const [showFeedback, setShowFeedback] = useState(false);
+  // Настройки профиля: имя, публичность, уведомления, язык и оплата.
+  const [showSettings, setShowSettings] = useState(false);
   // Тестовый пул `[BOT]` — админский экран: показываем только администратору.
   const [showDemo, setShowDemo] = useState(false);
   // Обучение — этап онбординга и всегда доступный справочник.
@@ -437,6 +440,27 @@ export default function HrProfileScreen() {
             <Icon name="chevron" size={14} className="shrink-0 text-tg-hint" />
           </button>
         )}
+
+        {/* Одна дверь к личным настройкам: имя, публичность, уведомления,
+            язык и (у руководителя) оплата. Раньше это было разбросано по
+            шапке, «Сводке дня» и кабинету. */}
+        <button
+          type="button"
+          onClick={() => {
+            haptic("light");
+            setShowSettings(true);
+          }}
+          className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-bg/50 px-2 text-left text-xs text-tg-text active:bg-tg-bg/60"
+        >
+          <Icon name="settings" size={16} className="text-tg-hint" />
+          <span className="min-w-0 flex-1">
+            {tx("Настройки")}
+            <span className="block text-2xs text-tg-hint">
+              {tx("Имя, публичность, уведомления, язык и оплата")}
+            </span>
+          </span>
+          <Icon name="chevron" size={14} className="shrink-0 text-tg-hint" />
+        </button>
 
         {editing && (
           <div className="mt-3 border-t border-tg-hint/10 pt-3">
@@ -821,6 +845,10 @@ export default function HrProfileScreen() {
 
       {showFeedback && (
         <FeedbackScreen onClose={() => setShowFeedback(false)} />
+      )}
+
+      {showSettings && (
+        <MySettingsScreen onClose={() => setShowSettings(false)} />
       )}
 
       {showTraining && (

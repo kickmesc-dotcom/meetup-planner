@@ -197,6 +197,13 @@ class ProfilePrivacyIn(BaseModel):
     show_last_media: bool | None = None
 
 
+class MyNameIn(BaseModel):
+    """Имя в приложении: как человека видят коллеги."""
+
+    display_name: str = Field(min_length=1, max_length=64)
+    show_last_media: bool | None = None
+
+
 class DepartmentPersonOut(BaseModel):
     employee_id: int
     display_name: str
@@ -273,7 +280,7 @@ class SetupProgressOut(BaseModel):
     checklists: list[SetupChecklistOut] = []
 
 
-class OrgSetupIn(BaseModel):
+class OrgSetupIn(BaseModel):
     """Частичный ответ мастера: присылается по шагам, а не целиком."""
 
     industry: str | None = None
@@ -775,6 +782,56 @@ async def set_privacy(
         show_last_seen=body.show_last_seen,
         show_last_media=body.show_last_media,
     )
+    return await _employee_out(session, employee, user)
+
+
+@router.patch("/me/name", response_model=EmployeeOut)
+async def set_my_name(
+    body: MyNameIn,
+    session: SessionDep,
+    user: CurrentUser,
+    employee: EmployeeDep,
+) -> EmployeeOut:
+    """Имя в приложении — рабочее, а не из мессенджера.
+
+    Почему не берём имя из Telegram. У многих там «мама», «Аня 🍓» или ник:
+    в списке команды, в ленте и в отчёте смены это читается как чужой человек.
+    Имя здесь видят коллеги, поэтому оно должно быть рабочим и меняться без
+    переименования аккаунта в Telegram.
+
+    Пробелы схлопываются: « Анна  Петрова » и «Анна Петрова» — одно имя, и
+    хранить второе только потому, что человек скопировал его с пробелами,
+    значит показывать их в каждой строке списка.
+    """
+    name = " ".join(body.display_name.split())
+    if not name:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="empty_name")
+    # В режиме проверки `employee` — теневой профиль: переименовать его
+    # значило бы переименовать настоящего человека из чужой сессии.
+    if int(employee.user_id) != int(user.id):
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="not_my_profile")
+    # Тестовый пул `[BOT]` отличается от живых людей именно меткой в имени:
+    # свободная правка стёрла бы её, и демо-профили стали бы неотличимы.
+    if employee.is_demo:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="demo_profile")
+    owner = await session.get(User, employee.user_id)
+    if owner is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="user_not_found")
+    if owner.display_name != name:
+        before = owner.display_name
+        owner.display_name = name
+        from app.services import audit
+
+        await audit.record(
+            session,
+            org_id=int(employee.org_id),
+            action="profile.name",
+            user=user,
+            target_type="employee",
+            target_id=employee.id,
+            details={"before": before, "after": name},
+        )
+        await session.commit()
     return await _employee_out(session, employee, user)
 
 

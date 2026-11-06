@@ -242,6 +242,9 @@ def test_hr_routes_are_registered():
     expected_employee = {
         ("GET", "/api/me/employee"),
         ("POST", "/api/me/onboarding"),
+        # 06.11.2026: имя в приложении меняется отдельной ручкой —
+        # оно рабочее, а не телеграмное, и его видят коллеги.
+        ("PATCH", "/api/me/name"),
         ("GET", "/api/departments"),
         ("GET", "/api/checklist"),
         ("POST", "/api/checklist/complete"),
