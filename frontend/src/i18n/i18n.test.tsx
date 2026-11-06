@@ -19,6 +19,7 @@ import {
   LOCALE_STORAGE_KEY,
   currentIntlLocale,
   initLocale,
+  loadContent,
   translate,
   tx,
   useErrorMessage,
@@ -30,7 +31,11 @@ import { en, ru } from "./messages";
 
 const reload = vi.fn();
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Словари экранов теперь отдельные чанки: без ожидания `tx` вернул бы
+  // русские оригиналы, и проверки перевода молчали бы не о том.
+  await loadContent("en");
+  await loadContent("uz");
   localStorage.clear();
   // Пакет сбрасываем вместе с локалью: иначе тест, выключивший узбекский,
   // влиял бы на следующий — и проверка «третий язык есть» падала бы через раз.

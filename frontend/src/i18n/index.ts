@@ -18,8 +18,6 @@
  */
 import { create } from "zustand";
 import { ApiError, humanizeApiError } from "@/api/client";
-import { EN_CONTENT } from "./content";
-import { UZ_CONTENT } from "./content.uz";
 import { en, ru, uz, type MessageKey } from "./messages";
 
 export type { MessageKey };
@@ -73,6 +71,14 @@ export function applyLocale(locale: Locale): void {
 
 interface LocaleState {
   locale: Locale;
+  /**
+   * Счётчик догруженных словарей экранов (`loadContent`).
+   *
+   * Нужен только как повод перерисовать: локаль ставится сразу, а пакет
+   * английского или узбекского приезжает отдельным чанком позже. Без этого
+   * поля экран остался бы на русских оригиналах до следующего действия.
+   */
+  contentVersion: number;
   setLocale: (locale: Locale) => void;
   /**
    * Включён ли узбекский пакет в организации. По умолчанию `true` — ровно
@@ -87,10 +93,15 @@ interface LocaleState {
 export const useLocale = create<LocaleState>((set, get) => ({
   locale: DEFAULT_LOCALE,
   uzPackAvailable: true,
+  contentVersion: 0,
   setLocale: (locale) => {
     applyLocale(locale);
     storeLocale(locale);
     set({ locale });
+    // Словари экранов — отдельные чанки: см. `loadContent`. Локаль уже
+    // переключена (шапка и подписи меняются сразу), а переводы придут и
+    // перерисуют экран, когда загрузятся.
+    void loadContent(locale);
   },
   setUzPackAvailable: (available) => {
     if (get().uzPackAvailable === available) return;
@@ -117,7 +128,50 @@ export function initLocale(): Locale {
   const locale = readStoredLocale() ?? DEFAULT_LOCALE;
   applyLocale(locale);
   useLocale.setState({ locale });
+  // Сохранённый английский (или узбекский) — это ещё не словарь экранов:
+  // он приедет чанком и перерисует первый экран, когда загрузится.
+  void loadContent(locale);
   return locale;
+}
+
+/** Словари экранов по языкам; заполняются по требованию (`loadContent`). */
+const CONTENT: Partial<Record<Locale, Record<string, string>>> = {};
+const CONTENT_LOADS = new Map<Locale, Promise<void>>();
+
+/**
+ * Догрузить словарь экранов для языка.
+ *
+ * Зачем по требованию. `content.ts` — это 1854 английские строки, ~160 КБ
+ * исходника. Раньше он лежал в главном чанке и грузился каждому, включая тех,
+ * кто весь день работает по-русски и никогда не нажимал EN. Русскому словарь
+ * не нужен вовсе: `tx` возвращает оригинал, то есть сам русский текст.
+ *
+ * Возвращает промис: его ждут тесты и предзагрузка; в приложении он не
+ * блокирует переключение — локаль ставится сразу, а экран перерисуется, когда
+ * пакет придёт (`contentVersion` в сторе).
+ */
+export function loadContent(locale: Locale): Promise<void> {
+  if (locale === "ru") return Promise.resolve();
+  const pending = CONTENT_LOADS.get(locale);
+  if (pending) return pending;
+  const loading = (
+    locale === "en"
+      ? import("./content").then((module) => module.EN_CONTENT)
+      : import("./content.uz").then((module) => module.UZ_CONTENT)
+  )
+    .then((pack) => {
+      CONTENT[locale] = pack;
+      useLocale.setState((state) => ({
+        contentVersion: state.contentVersion + 1,
+      }));
+    })
+    .catch(() => {
+      // Сеть пропала — экран читается на русских оригиналах, а не падает.
+      // Запись убираем: следующая попытка выбора языка попробует снова.
+      CONTENT_LOADS.delete(locale);
+    });
+  CONTENT_LOADS.set(locale, loading);
+  return loading;
 }
 
 /**
@@ -157,11 +211,6 @@ export function useT() {
  * Подстановки (`{name}`) работают в обоих языках: русский текст тоже может
  * содержать плейсхолдер, и он подставляется так же, как в переводе.
  */
-const CONTENT: Record<Exclude<Locale, "ru">, Record<string, string>> = {
-  en: EN_CONTENT,
-  uz: UZ_CONTENT,
-};
-
 export function tx(
   locale: Locale,
   text: string,
@@ -171,7 +220,8 @@ export function tx(
   // она остаётся русской. Для узбекского это важнее, чем для английского:
   // русский в команде понимает каждый, а непереведённая английская строка
   // посреди узбекского экрана ничего не объяснит.
-  const template = locale === "ru" ? text : (CONTENT[locale][text] ?? text);
+  // Словарь мог ещё не приехать — тогда экран читается на русском оригинале.
+  const template = locale === "ru" ? text : (CONTENT[locale]?.[text] ?? text);
   if (!vars) return template;
   return template.replace(/\{(\w+)\}/g, (whole, name: string) =>
     name in vars ? String(vars[name]) : whole,
@@ -213,6 +263,9 @@ export function currentIntlLocale(): string {
 /** Хук экрана: `tx` для текстов и текущая локаль для дат и чисел. */
 export function useTx() {
   const locale = useLocale((s) => s.locale);
+  // Подписка на догрузку словаря: язык мог быть выбран раньше, чем приехал его
+  // пакет, и без этого экран не перерисовался бы сам.
+  useLocale((s) => s.contentVersion);
   return {
     locale,
     tx: (text: string, vars?: Record<string, string | number>) =>

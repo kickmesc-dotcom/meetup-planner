@@ -25,7 +25,7 @@ import {
   type HrFeedItem,
 } from "@/api/hr";
 import { markFeedSeen, readFeedSeen } from "@/features/hr/feedSeen";
-import { useLocale } from "@/i18n";
+import { loadContent, useLocale } from "@/i18n";
 import * as translateApi from "@/api/translate";
 import { __clearTranslateCache } from "@/components/translateCore";
 
@@ -305,6 +305,9 @@ describe("HrFeedScreen (P1.8)", () => {
   });
 
   it("на английском вся шапка и день — по-английски", async () => {
+    // Словарь экранов едет отдельным чанком (шаг 4 плана): сначала ждём его,
+    // иначе экран честно покажет русские оригиналы.
+    await loadContent("en");
     useLocale.setState({ locale: "en" });
     renderFeed([
       item({ at: "2026-10-22T10:00:00Z", display_name: "Peter", text: "closed a task" }),
