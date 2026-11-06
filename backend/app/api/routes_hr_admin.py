@@ -28,6 +28,8 @@ from app.db.hr_models import (
     ROLES,
     TASK_DONE,
     TASK_MODES,
+    TASK_SCOPE_DEPARTMENT,
+    TASK_SCOPE_EMPLOYEE,
     TEMPLATE_KINDS,
     ChecklistItem,
     ChecklistTemplate,
@@ -36,6 +38,7 @@ from app.db.hr_models import (
     FeedbackQuestion,
     Hall,
     Task,
+    TaskAssignment,
     UsefulLink,
 )
 from app.db.models import User
@@ -809,20 +812,25 @@ async def _employee_names(session, ids: set[int]) -> dict[int, str]:  # noqa: AN
     return {int(employee_id): str(name) for employee_id, name in rows.all()}
 
 
-async def _task_photo_outs(session, task_id: int) -> list[TaskAdminPhotoOut]:  # noqa: ANN001
-    """Фото поручения: блоб из приложения или подписанная ссылка на кеш TG."""
+async def _task_photo_outs_by_task(
+    session, task_ids: list[int]
+) -> dict[int, list[TaskAdminPhotoOut]]:  # noqa: ANN001
+    """Фото пачки поручений: два запроса на список, а не два на задачу.
+
+    Ключ — id поручения; у задач без фото в словаре просто нет записи.
+    """
     from app.db.hr_models import MediaBlob, TaskPhoto
     from app.services import hr_media
 
+    if not task_ids:
+        return {}
     rows = (
         await session.scalars(
             select(TaskPhoto)
-            .where(TaskPhoto.task_id == task_id)
+            .where(TaskPhoto.task_id.in_(task_ids))
             .order_by(TaskPhoto.created_at, TaskPhoto.id)
         )
     ).all()
-    if not rows:
-        return []
     media_ids = [p.media_id for p in rows if p.media_id is not None]
     blobs: dict[int, MediaBlob] = {}
     if media_ids:
@@ -830,63 +838,153 @@ async def _task_photo_outs(session, task_id: int) -> list[TaskAdminPhotoOut]:  #
             await session.scalars(select(MediaBlob).where(MediaBlob.id.in_(media_ids)))
         ).all():
             blobs[int(blob.id)] = blob
-    out: list[TaskAdminPhotoOut] = []
+    grouped: dict[int, list[TaskAdminPhotoOut]] = {}
     for photo in rows:
         blob = blobs.get(int(photo.media_id)) if photo.media_id is not None else None
         if blob is not None:
-            out.append(
-                TaskAdminPhotoOut(
-                    id=int(photo.id),
-                    url=hr_media.url_for(int(blob.id)),
-                    width=blob.width,
-                    height=blob.height,
-                )
+            item = TaskAdminPhotoOut(
+                id=int(photo.id),
+                url=hr_media.url_for(int(blob.id)),
+                width=blob.width,
+                height=blob.height,
             )
         else:
-            out.append(
-                TaskAdminPhotoOut(id=int(photo.id), url=hr_media.photo_url(int(photo.id)))
+            item = TaskAdminPhotoOut(
+                id=int(photo.id), url=hr_media.photo_url(int(photo.id))
             )
+        grouped.setdefault(int(photo.task_id), []).append(item)
+    return grouped
+
+
+async def _task_photo_outs(session, task_id: int) -> list[TaskAdminPhotoOut]:  # noqa: ANN001
+    """Фото одного поручения: блоб из приложения или ссылка на кеш TG."""
+    return (await _task_photo_outs_by_task(session, [task_id])).get(task_id, [])
+
+
+async def _task_admin_outs(session, tasks: list[Task]) -> list[TaskAdminOut]:  # noqa: ANN001
+    """Список поручений АУП — пакетно.
+
+    Раньше каждая задача стоила пяти запросов (`assignees`, назначения, имена,
+    фото и блобы), поэтому 20 поручений — это ~100 обращений к базе, и раздел
+    открывался тем медленнее, чем дольше работали. Теперь число запросов не
+    зависит от длины списка.
+    """
+    if not tasks:
+        return []
+    task_ids = [int(task.id) for task in tasks]
+    by_task: dict[int, list[TaskAssignment]] = {}
+    for row in (
+        await session.scalars(
+            select(TaskAssignment)
+            .where(TaskAssignment.task_id.in_(task_ids))
+            .order_by(TaskAssignment.id)
+        )
+    ).all():
+        by_task.setdefault(int(row.task_id), []).append(row)
+
+    assigned_ids = {int(row.employee_id) for rows in by_task.values() for row in rows}
+    # Legacy: у исторических задач строк исполнителей нет, адресат считается по
+    # `scope` — отдел или явный человек. Оба набора грузим одним запросом.
+    legacy_people = {
+        int(task.assignee_employee_id)
+        for task in tasks
+        if not by_task.get(int(task.id))
+        and task.scope == TASK_SCOPE_EMPLOYEE
+        and task.assignee_employee_id is not None
+    }
+    legacy_departments = {
+        int(task.department_id)
+        for task in tasks
+        if not by_task.get(int(task.id))
+        and task.scope == TASK_SCOPE_DEPARTMENT
+        and task.department_id is not None
+    }
+    department_people: dict[int, list[int]] = {}
+    if legacy_departments:
+        for employee_id, department_id in (
+            await session.execute(
+                select(Employee.id, Employee.department_id)
+                .where(
+                    Employee.department_id.in_(legacy_departments),
+                    Employee.is_active.is_(True),
+                )
+                .order_by(Employee.id)
+            )
+        ).all():
+            department_people.setdefault(int(department_id), []).append(int(employee_id))
+
+    # Существование исполнителей проверяем пачкой: старая версия молча
+    # выбрасывала id, которых нет в `employees`, и это поведение сохраняем.
+    known: set[int] = set()
+    known_ids = assigned_ids | legacy_people
+    if known_ids:
+        known = {
+            int(value)
+            for value in (
+                await session.scalars(select(Employee.id).where(Employee.id.in_(known_ids)))
+            ).all()
+        }
+    names = await _employee_names(session, assigned_ids)
+    photos = await _task_photo_outs_by_task(session, task_ids)
+
+    out: list[TaskAdminOut] = []
+    for task in tasks:
+        rows = by_task.get(int(task.id), [])
+        if rows:
+            assignee_ids = [
+                int(row.employee_id) for row in rows if int(row.employee_id) in known
+            ]
+        elif task.scope == TASK_SCOPE_EMPLOYEE and task.assignee_employee_id is not None:
+            assignee_ids = (
+                [int(task.assignee_employee_id)]
+                if int(task.assignee_employee_id) in known
+                else []
+            )
+        elif task.scope == TASK_SCOPE_DEPARTMENT and task.department_id is not None:
+            assignee_ids = department_people.get(int(task.department_id), [])
+        else:
+            assignee_ids = []
+        out.append(
+            TaskAdminOut(
+                id=task.id,
+                title=task.title,
+                scope=task.scope,
+                department_id=task.department_id,
+                assignee_employee_id=task.assignee_employee_id,
+                due_at=task.due_at,
+                priority=task.priority,
+                requires_photo=bool(task.requires_photo),
+                status=task.status,
+                created_by_employee_id=task.created_by_employee_id,
+                created_at=task.created_at,
+                done_at=task.done_at,
+                is_overdue=hr_tasks.is_overdue(task),
+                assignee_ids=assignee_ids,
+                mode=task.mode,
+                shift_date=task.shift_date,
+                requires_review=bool(task.requires_review),
+                progress_done=sum(1 for row in rows if row.status == TASK_DONE),
+                progress_total=len(rows),
+                weekdays=task.weekdays,
+                schedule_label=weekdays.label(task.weekdays),
+                photos=photos.get(int(task.id), []),
+                assignments=[
+                    TaskAssignmentOut(
+                        employee_id=row.employee_id,
+                        display_name=names.get(row.employee_id, "—"),
+                        status=row.status,
+                        part=row.part,
+                        done_at=row.done_at,
+                    )
+                    for row in rows
+                ],
+            )
+        )
     return out
 
 
 async def _task_admin_out(session, task: Task) -> TaskAdminOut:  # noqa: ANN001
-    assignees = await hr_tasks.assignees(session, task)
-    rows = await hr_tasks.assignments_of(session, task.id)
-    names = await _employee_names(session, {row.employee_id for row in rows})
-    return TaskAdminOut(
-        id=task.id,
-        title=task.title,
-        scope=task.scope,
-        department_id=task.department_id,
-        assignee_employee_id=task.assignee_employee_id,
-        due_at=task.due_at,
-        priority=task.priority,
-        requires_photo=bool(task.requires_photo),
-        status=task.status,
-        created_by_employee_id=task.created_by_employee_id,
-        created_at=task.created_at,
-        done_at=task.done_at,
-        is_overdue=hr_tasks.is_overdue(task),
-        assignee_ids=[e.id for e in assignees],
-        mode=task.mode,
-        shift_date=task.shift_date,
-        requires_review=bool(task.requires_review),
-        progress_done=sum(1 for row in rows if row.status == TASK_DONE),
-        progress_total=len(rows),
-        weekdays=task.weekdays,
-        schedule_label=weekdays.label(task.weekdays),
-        photos=await _task_photo_outs(session, int(task.id)),
-        assignments=[
-            TaskAssignmentOut(
-                employee_id=row.employee_id,
-                display_name=names.get(row.employee_id, "—"),
-                status=row.status,
-                part=row.part,
-                done_at=row.done_at,
-            )
-            for row in rows
-        ],
-    )
+    return (await _task_admin_outs(session, [task]))[0]
 
 
 @router.get("/tasks", response_model=list[TaskAdminOut])
@@ -905,7 +1003,7 @@ async def admin_tasks(
     )
     if shift_date is not None:
         rows = [task for task in rows if task.shift_date == shift_date]
-    return [await _task_admin_out(session, t) for t in rows]
+    return await _task_admin_outs(session, rows)
 
 
 @router.post("/tasks", response_model=TaskAdminOut)
