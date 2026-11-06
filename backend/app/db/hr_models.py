@@ -710,6 +710,8 @@ class ChecklistRun(OrgScoped, Base):
         ),
         CheckConstraint(_in_list("status", RUN_STATUSES), name="ck_checklist_run_status"),
         Index("ix_checklist_runs_employee_date", "employee_id", "shift_date"),
+        # Лента: последние закрытые смены организации (миграция 0072).
+        Index("ix_checklist_runs_org_completed", "org_id", "completed_at"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -765,6 +767,8 @@ class ChecklistCompletion(OrgScoped, Base):
     __tablename__ = "checklist_completions"
     __table_args__ = (
         UniqueConstraint("run_id", "item_id", name="uq_checklist_completion_item"),
+        # Лента: последние отметки пунктов по организации (миграция 0072).
+        Index("ix_checklist_completions_org_done", "org_id", "done_at"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -920,7 +924,11 @@ class TaskEvent(OrgScoped, Base):
     """История изменений поручения (аудит: кто, когда, из какого статуса в какой)."""
 
     __tablename__ = "task_events"
-    __table_args__ = (Index("ix_task_events_task", "task_id", "at"),)
+    __table_args__ = (
+        Index("ix_task_events_task", "task_id", "at"),
+        # Лента: последние события по организации (миграция 0072).
+        Index("ix_task_events_org_at", "org_id", "at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     task_id: Mapped[int] = mapped_column(
@@ -978,7 +986,11 @@ class TaskIssue(OrgScoped, Base):
     """
 
     __tablename__ = "task_issues"
-    __table_args__ = (Index("ix_task_issues_task", "task_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_task_issues_task", "task_id", "created_at"),
+        # Лента: последние проблемы по организации (миграция 0072).
+        Index("ix_task_issues_org_created", "org_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     task_id: Mapped[int] = mapped_column(
@@ -1003,7 +1015,11 @@ class TaskPhoto(OrgScoped, Base):
     """
 
     __tablename__ = "task_photos"
-    __table_args__ = (Index("ix_task_photos_task", "task_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_task_photos_task", "task_id", "created_at"),
+        # Лента: последние фотоотчёты по организации (миграция 0072).
+        Index("ix_task_photos_org_created", "org_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     task_id: Mapped[int] = mapped_column(
@@ -1587,6 +1603,8 @@ class Kudos(OrgScoped, Base):
         ),
         Index("ix_hr_kudos_to_day", "to_employee_id", "day"),
         Index("ix_hr_kudos_from_day", "from_employee_id", "day"),
+        # Лента: последние благодарности по организации (миграция 0072).
+        Index("ix_hr_kudos_org_created", "org_id", "created_at"),
     )
 
     # `with_variant(Integer, "sqlite")` — как у остальных таблиц, которые
