@@ -258,3 +258,31 @@ export const createBranch = (name: string) =>
     method: "POST",
     body: JSON.stringify({ name }),
   });
+
+/** Сотрудник текущей организации — кандидат на перевод в филиал. */
+export interface BranchEmployee {
+  id: number;
+  name: string;
+  position: string | null;
+}
+
+export const fetchBranchEmployees = () =>
+  api<BranchEmployee[]>("/api/org/branches/employees");
+
+export interface TransferResult {
+  employee_id: number;
+  from_org_id: number;
+  to_org_id: number;
+  shifts_moved: number;
+}
+
+/** Перевести человека в другой филиал сети. Прошлые смены остаются на месте. */
+export const transferEmployee = (body: {
+  employee_id: number;
+  target_org_id: number;
+  move_shifts: boolean;
+}) =>
+  api<TransferResult>("/api/org/branches/transfer", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });

@@ -15,7 +15,10 @@ os.environ.setdefault("TG_WEBHOOK_SECRET", "test-secret")
 os.environ.setdefault("MINI_APP_URL", "https://example.com")
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/db")
 
+from datetime import date, timedelta  # noqa: E402
+
 import pytest  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 from sqlalchemy import BigInteger  # noqa: E402
 from sqlalchemy.dialects.postgresql import JSONB  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
@@ -33,16 +36,24 @@ def _bigint_as_integer(type_, compiler, **kw):  # noqa: ARG001
 
 
 from app.db.base import Base  # noqa: E402
-from app.db.hr_models import Employee  # noqa: E402
+from app.db.hr_models import Employee, HrShift  # noqa: E402
 from app.db.models import User  # noqa: E402
 from app.db.org_models import Organization  # noqa: E402
+from app.db.tenancy import all_orgs  # noqa: E402
 from app.services import branches, hr_access, orgs  # noqa: E402
 
 
 @pytest.fixture()
 async def session():
     engine = create_async_engine("sqlite+aiosqlite://")
-    names = ("users", "organizations", "departments", "employees", "organization_members")
+    names = (
+        "users",
+        "organizations",
+        "departments",
+        "employees",
+        "organization_members",
+        "hr_shifts",
+    )
     tables = [Base.metadata.tables[name] for name in names if name in Base.metadata.tables]
     async with engine.begin() as conn:
         await conn.run_sync(lambda c: Base.metadata.create_all(c, tables=tables))
@@ -172,3 +183,123 @@ async def test_employee_lookup_is_scoped_by_org(session) -> None:
     assert first is not None and first.org_id == first_org.id
     assert second is not None and second.org_id == second_org.id
     assert first.role == "employee" and second.role == "admin"
+
+
+async def test_transfer_creates_profile_and_moves_future_shifts(session) -> None:
+    owner = await _user(session, 1)
+    root = await _org(session, "salon", 1)
+    await orgs.add_member(session, org_id=root.id, user_id=owner.id, role="owner")
+    branch = await branches.create_branch(
+        session, root=root, user=owner, name="Салон Юг"
+    )
+    worker = await _user(session, 5)
+    old = Employee(
+        user_id=worker.id, org_id=root.id, role="employee", position="Бармен"
+    )
+    session.add(old)
+    await session.commit()
+    await session.refresh(old)
+    today = date.today()
+    session.add_all(
+        [
+            HrShift(employee_id=old.id, org_id=root.id, day=today - timedelta(days=1)),
+            HrShift(employee_id=old.id, org_id=root.id, day=today + timedelta(days=2)),
+        ]
+    )
+    await session.commit()
+
+    result = await branches.transfer_employee(
+        session,
+        root=root,
+        source_org=root,
+        target_org=branch,
+        employee_id=old.id,
+        actor=owner,
+    )
+
+    assert result.shifts_moved == 1
+    with all_orgs():
+        moved = await session.get(Employee, result.employee_id)
+        future = await session.scalar(
+            select(HrShift).where(HrShift.day == today + timedelta(days=2))
+        )
+        past = await session.scalar(
+            select(HrShift).where(HrShift.day == today - timedelta(days=1))
+        )
+    assert moved is not None and moved.org_id == branch.id
+    assert moved.position == "Бармен"
+    assert future is not None and future.employee_id == moved.id
+    assert future.org_id == branch.id
+    assert past is not None and past.employee_id == old.id
+    assert past.org_id == root.id
+    await session.refresh(old)
+    assert old.is_active is False
+
+
+async def test_transfer_refuses_person_already_in_branch(session) -> None:
+    owner = await _user(session, 1)
+    root = await _org(session, "salon", 1)
+    await orgs.add_member(session, org_id=root.id, user_id=owner.id, role="owner")
+    branch = await branches.create_branch(
+        session, root=root, user=owner, name="Салон Юг"
+    )
+    worker = await _user(session, 6)
+    session.add_all(
+        [
+            Employee(user_id=worker.id, org_id=root.id, role="employee"),
+            Employee(user_id=worker.id, org_id=branch.id, role="employee"),
+        ]
+    )
+    await session.commit()
+    old = await session.scalar(
+        select(Employee).where(
+            Employee.user_id == worker.id, Employee.org_id == root.id
+        )
+    )
+
+    with pytest.raises(branches.BranchesError) as caught:
+        await branches.transfer_employee(
+            session,
+            root=root,
+            source_org=root,
+            target_org=branch,
+            employee_id=old.id,
+            actor=owner,
+        )
+    assert str(caught.value) == "already_in_branch"
+
+
+async def test_transfer_refuses_foreign_org_and_self(session) -> None:
+    owner = await _user(session, 1)
+    root = await _org(session, "salon", 1)
+    await orgs.add_member(session, org_id=root.id, user_id=owner.id, role="owner")
+    branch = await branches.create_branch(
+        session, root=root, user=owner, name="Салон Юг"
+    )
+    foreign = await _org(session, "other", 9)
+    own = Employee(user_id=owner.id, org_id=root.id, role="admin")
+    session.add(own)
+    await session.commit()
+    await session.refresh(own)
+
+    with pytest.raises(branches.BranchesError) as caught:
+        await branches.transfer_employee(
+            session,
+            root=root,
+            source_org=root,
+            target_org=foreign,
+            employee_id=own.id,
+            actor=owner,
+        )
+    assert str(caught.value) == "org_not_in_network"
+
+    with pytest.raises(branches.BranchesError) as caught:
+        await branches.transfer_employee(
+            session,
+            root=root,
+            source_org=root,
+            target_org=branch,
+            employee_id=own.id,
+            actor=owner,
+        )
+    assert str(caught.value) == "transfer_self"

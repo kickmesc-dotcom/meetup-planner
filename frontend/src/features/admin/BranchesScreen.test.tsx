@@ -9,12 +9,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import BranchesScreen from "./BranchesScreen";
-import { createBranch, fetchBranches, type Branch } from "@/api/orgs";
+import {
+  createBranch,
+  fetchBranchEmployees,
+  fetchBranches,
+  transferEmployee,
+  type Branch,
+} from "@/api/orgs";
 import { setActiveOrg } from "@/api/client";
 
 vi.mock("@/api/orgs", () => ({
   fetchBranches: vi.fn(),
   createBranch: vi.fn(),
+  fetchBranchEmployees: vi.fn(),
+  transferEmployee: vi.fn(),
 }));
 vi.mock("@/api/client", () => ({
   setActiveOrg: vi.fn(),
@@ -40,6 +48,8 @@ vi.mock("./SubScreen", () => ({
 
 const fetchMock = vi.mocked(fetchBranches);
 const createMock = vi.mocked(createBranch);
+const employeesMock = vi.mocked(fetchBranchEmployees);
+const transferMock = vi.mocked(transferEmployee);
 const pickMock = vi.mocked(setActiveOrg);
 const reload = vi.fn();
 
@@ -67,6 +77,8 @@ function renderScreen() {
 beforeEach(() => {
   fetchMock.mockReset();
   createMock.mockReset();
+  employeesMock.mockReset();
+  transferMock.mockReset();
   pickMock.mockReset();
   reload.mockReset();
   Object.defineProperty(window, "location", {
@@ -78,6 +90,15 @@ beforeEach(() => {
     branch({ id: 2, is_root: false, name: "Салон Юг" }),
   ]);
   createMock.mockResolvedValue(branch({ id: 3, name: "Салон Север" }));
+  employeesMock.mockResolvedValue([
+    { id: 10, name: "Анна", position: "Бармен" },
+  ]);
+  transferMock.mockResolvedValue({
+    employee_id: 11,
+    from_org_id: 1,
+    to_org_id: 2,
+    shifts_moved: 3,
+  });
 });
 afterEach(cleanup);
 
@@ -86,7 +107,8 @@ describe("BranchesScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Салон на Ленина")).toBeTruthy();
-    expect(screen.getByText("Салон Юг")).toBeTruthy();
+    // Филиал есть и в списке, и в выборе цели переноса.
+    expect(screen.getAllByText("Салон Юг").length).toBeGreaterThan(0);
     expect(screen.getByText("Головная организация · Текущая")).toBeTruthy();
     expect(screen.getByText("Вы здесь")).toBeTruthy();
   });
@@ -110,5 +132,22 @@ describe("BranchesScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Создать" }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledWith("Салон Север"));
+  });
+
+  it("переводит сотрудника в выбранный филиал", async () => {
+    renderScreen();
+
+    fireEvent.change(await screen.findByLabelText("Кто переезжает"), {
+      target: { value: "10" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Перевести" }));
+
+    await waitFor(() =>
+      expect(transferMock).toHaveBeenCalledWith({
+        employee_id: 10,
+        target_org_id: 2,
+        move_shifts: true,
+      }),
+    );
   });
 });

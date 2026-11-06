@@ -21,10 +21,13 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from dataclasses import dataclass
+from datetime import date
+
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.hr_models import Employee
+from app.db.hr_models import Employee, HrShift
 from app.db.models import User
 from app.db.org_models import INDUSTRIES, Organization
 from app.db.tenancy import all_orgs
@@ -37,6 +40,16 @@ MAX_BRANCHES = 20
 
 class BranchesError(Exception):
     """Отказ по филиалам. Строка — код, перевод живёт на фронте."""
+
+
+@dataclass(frozen=True)
+class TransferResult:
+    """Итог перевода: откуда, куда и сколько смен переехало с человеком."""
+
+    employee_id: int
+    from_org_id: int
+    to_org_id: int
+    shifts_moved: int
 
 
 async def root_of(session: AsyncSession, org: Organization) -> Organization:
@@ -145,3 +158,112 @@ async def create_branch(
     # действительно переключится (`ensure_employee`).
     await orgs.add_member(session, org_id=branch.id, user_id=user.id, role="owner")
     return branch
+
+
+async def employees_for_transfer(
+    session: AsyncSession, *, org: Organization
+) -> list[tuple[Employee, str]]:
+    """Кто может переехать: активные люди этой организации, без демо и теней."""
+    rows = await session.execute(
+        select(Employee, User.display_name)
+        .join(User, User.id == Employee.user_id)
+        .where(
+            Employee.org_id == org.id,
+            Employee.is_active.is_(True),
+            Employee.fired_at.is_(None),
+            Employee.is_demo.is_(False),
+            Employee.is_simulation.is_(False),
+        )
+        .order_by(User.display_name)
+    )
+    return [(employee, name) for employee, name in rows.all()]
+
+
+async def transfer_employee(
+    session: AsyncSession,
+    *,
+    root: Organization,
+    source_org: Organization,
+    target_org: Organization,
+    employee_id: int,
+    actor: User,
+    move_shifts: bool = True,
+) -> TransferResult:
+    """Перевести человека в другой филиал сети.
+
+    Почему создаётся новый профиль, а не двигается `employees.org_id`. Прошлые
+    смены — часть отчётов прежнего филиала: выручка и дисциплина считаются там,
+    где человек работал. Перенос строки утащил бы всю его историю в чужой
+    отчёт. Поэтому старый профиль остаётся (неактивным) со своей историей, а в
+    новом филиале появляется его профиль с теми же должностью и ставкой.
+
+    Будущие смены переезжают вместе с человеком: иначе он вышел бы на смену,
+    которой нет в графике нового филиала. Смены до сегодня остаются на месте.
+
+    Себя переводить нельзя: владелец сети и так заходит в любой филиал, а
+    случайный перевод лишил бы его профиля в головной.
+    """
+    if target_org.id == source_org.id:
+        raise BranchesError("same_org")
+    if target_org.id != root.id and target_org.parent_org_id != root.id:
+        raise BranchesError("org_not_in_network")
+    if not target_org.is_active or target_org.deleted_at is not None:
+        raise BranchesError("org_inactive")
+
+    employee = await session.get(Employee, int(employee_id))
+    if employee is None or employee.org_id != source_org.id:
+        raise BranchesError("employee_not_found")
+    if employee.user_id == actor.id:
+        raise BranchesError("transfer_self")
+    if employee.is_demo or employee.is_simulation:
+        raise BranchesError("transfer_demo")
+
+    with all_orgs():
+        existing = await session.scalar(
+            select(Employee.id).where(
+                Employee.org_id == target_org.id,
+                Employee.user_id == employee.user_id,
+            )
+        )
+    if existing is not None:
+        raise BranchesError("already_in_branch")
+
+    shadow = Employee(
+        user_id=employee.user_id,
+        org_id=target_org.id,
+        role=employee.role,
+        position=employee.position,
+        badge=employee.badge,
+        badge_emoji=employee.badge_emoji,
+        experience=employee.experience,
+        rate_type=employee.rate_type,
+        training_days=employee.training_days,
+        hire_date=employee.hire_date,
+        # Отдел принадлежит филиалу: чужой `department_id` показал бы человека
+        # в подразделении, которого в новой организации нет.
+        department_id=None,
+    )
+    session.add(shadow)
+    await session.flush()
+
+    moved = 0
+    if move_shifts:
+        result = await session.execute(
+            update(HrShift)
+            .where(
+                HrShift.employee_id == employee.id,
+                HrShift.day >= date.today(),
+            )
+            .values(employee_id=shadow.id, org_id=target_org.id)
+        )
+        moved = result.rowcount or 0
+
+    employee.is_active = False
+    await session.commit()
+    await session.refresh(shadow)
+    return TransferResult(
+        employee_id=shadow.id,
+        from_org_id=source_org.id,
+        to_org_id=target_org.id,
+        shifts_moved=moved,
+    )

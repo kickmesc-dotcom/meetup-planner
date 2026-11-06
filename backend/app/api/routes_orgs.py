@@ -104,6 +104,13 @@ _STATUS: dict[str, int] = {
     "org_switch_denied": status.HTTP_403_FORBIDDEN,
     "branch_of_branch": status.HTTP_409_CONFLICT,
     "branch_limit": status.HTTP_409_CONFLICT,
+    # Перенос (06.11.2026): не тот человек, не тот филиал, повторный перевод.
+    "employee_not_found": status.HTTP_404_NOT_FOUND,
+    "transfer_self": status.HTTP_409_CONFLICT,
+    "transfer_demo": status.HTTP_409_CONFLICT,
+    "already_in_branch": status.HTTP_409_CONFLICT,
+    "same_org": status.HTTP_409_CONFLICT,
+    "org_not_in_network": status.HTTP_403_FORBIDDEN,
     "domain_not_set": status.HTTP_409_CONFLICT,
     "verify_failed": status.HTTP_409_CONFLICT,
     "verify_mismatch": status.HTTP_409_CONFLICT,
@@ -679,6 +686,91 @@ async def create_branch(
         role="owner",
         is_root=False,
         is_current=False,
+    )
+
+
+class BranchEmployeeOut(BaseModel):
+    id: int
+    name: str
+    position: str | None
+
+
+class TransferIn(BaseModel):
+    employee_id: int
+    target_org_id: int
+    move_shifts: bool = True
+
+
+class TransferOut(BaseModel):
+    employee_id: int
+    from_org_id: int
+    to_org_id: int
+    shifts_moved: int
+
+
+@router.get("/org/branches/employees", response_model=list[BranchEmployeeOut])
+async def list_branch_employees(
+    session: SessionDep, org: OrgDep, user: CurrentUser, _admin: AdminDep
+) -> list[BranchEmployeeOut]:
+    """Сотрудники текущей организации — кандидаты на перевод."""
+    await _branch_root(session, org, user)
+    rows = await branches.employees_for_transfer(session, org=org)
+    return [
+        BranchEmployeeOut(id=row.id, name=name, position=row.position)
+        for row, name in rows
+    ]
+
+
+@router.post("/org/branches/transfer", response_model=TransferOut)
+async def transfer_branch_employee(
+    body: TransferIn,
+    session: SessionDep,
+    org: OrgDep,
+    user: CurrentUser,
+    _admin: AdminDep,
+) -> TransferOut:
+    """Перевести человека в другой филиал: новый профиль, старый — в архив."""
+    root = await _branch_root(session, org, user)
+    target = await session.get(Organization, body.target_org_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_not_found")
+    try:
+        result = await branches.transfer_employee(
+            session,
+            root=root,
+            source_org=org,
+            target_org=target,
+            employee_id=body.employee_id,
+            actor=user,
+            move_shifts=body.move_shifts,
+        )
+    except branches.BranchesError as exc:
+        _fail(exc)
+    await audit.record(
+        session,
+        org_id=root.id,
+        action="org.employee_transferred",
+        user=user,
+        target_type="employee",
+        target_id=result.employee_id,
+        details={
+            "from_org_id": result.from_org_id,
+            "to_org_id": result.to_org_id,
+            "shifts_moved": result.shifts_moved,
+        },
+    )
+    await session.commit()
+    log.info(
+        "orgs.employee_transferred",
+        from_org=result.from_org_id,
+        to_org=result.to_org_id,
+        shifts_moved=result.shifts_moved,
+    )
+    return TransferOut(
+        employee_id=result.employee_id,
+        from_org_id=result.from_org_id,
+        to_org_id=result.to_org_id,
+        shifts_moved=result.shifts_moved,
     )
 
 
