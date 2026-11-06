@@ -13,6 +13,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
 import { useState } from "react";
+import { useBackClose } from "@/lib/useBackClose";
 
 /**
  * Дашборд подразделения — что происходит в отделе прямо сейчас.
@@ -33,6 +34,10 @@ export default function DepartmentScreen({
   onClose: () => void;
 }) {
   const { tx } = useTx();
+  // Системная «назад» закрывает дашборд отдела, а не приложение целиком. Если
+  // сверху открыта карточка коллеги, её шаг истории лежит выше — «назад»
+  // сначала закроет карточку, потом отдел.
+  useBackClose(onClose);
   const [cardEmployeeId, setCardEmployeeId] = useState<number | null>(null);
   const q = useQuery({
     queryKey: ["hr-department", departmentId],

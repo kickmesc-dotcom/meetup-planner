@@ -10,6 +10,7 @@ import { KudosSheet } from "@/features/hr/KudosCard";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
+import { useBackClose } from "@/lib/useBackClose";
 /**
  * Карточка коллеги: тап по имени в ленте, табеле или «Команде».
  *
@@ -29,6 +30,8 @@ export default function EmployeeCardSheet({
   onClose: () => void;
 }) {
   const { tx } = useTx();
+  // Системная «назад» закрывает карточку, а не приложение целиком.
+  useBackClose(onClose);
   // Кому сказать спасибо — открывается прямо из карточки: человек смотрит на
   // коллегу, когда хочет его поблагодарить, а не ищет ради этого ленту.
   const [thanks, setThanks] = useState<number | null>(null);
