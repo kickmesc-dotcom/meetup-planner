@@ -57,11 +57,28 @@ PUSH_TITLES: dict[str, str] = {
     hr_notify.KIND_TASK_DEADLINE: "Срок поручения",
     hr_notify.KIND_TASK_OVERDUE: "Поручение просрочено",
     hr_notify.KIND_TASK_ESCALATED: "Просрочка без реакции",
+    hr_notify.KIND_SHIFT_START: "Смена не начата",
 }
 
 # Какие события дублируем письмом, если push не включён. Не всё подряд: письмо
 # на каждый чих — это спам, который быстро уводит домен в чёрный список.
-EMAIL_KINDS = frozenset(PUSH_TITLES)
+# Какие события дублируем письмом: только те, где письмо — запасной канал для
+# человека без подписки. Смена сюда не входит: письмо «откройте чек-лист»
+# приходит уже после того, как смена началась, и только раздражает.
+EMAIL_KINDS = frozenset(
+    {
+        hr_notify.KIND_TASK_DEADLINE,
+        hr_notify.KIND_TASK_OVERDUE,
+        hr_notify.KIND_TASK_ESCALATED,
+    }
+)
+
+# Куда ведёт тап по push. Задачи — к своей карточке (`?task=N`), смена — в
+# чек-лист. Без этого адреса все не-задачные push открывали корень приложения:
+# человек читал «смена не начата» и попадал в ленту событий.
+PUSH_URLS: dict[str, str] = {
+    hr_notify.KIND_SHIFT_START: "/?open=checklist",
+}
 
 
 # --------------------------------------------------------------------------
@@ -405,7 +422,11 @@ async def deliver_external(
             # M3: тап по уведомлению ведёт в «Задачи», а не в корень ленты.
             # Человек получает напоминание о сроке — ему нужен список задач, а
             # не экран событий, где надо ещё вспомнить, куда идти.
-            target = f"/?task={int(task_id)}" if task_id else "/"
+            target = (
+                f"/?task={int(task_id)}"
+                if task_id
+                else PUSH_URLS.get(kind, "/")
+            )
             await web_push.send(
                 session,
                 subscriptions=subs,
@@ -906,6 +927,136 @@ async def escalate_overdue(
     return changed
 
 
+async def send_shift_start_reminders(
+    session: AsyncSession,
+    *,
+    bot=None,  # noqa: ANN001
+    now: datetime | None = None,
+) -> list[int]:
+    """Напомнить тем, у кого смена началась, а чек-лист не открыт.
+
+    Зачем. График смен есть, руководитель видит в сводке «не начали смену», но
+    сам сотрудник об этом не узнавал никак: напоминания умели только про сроки
+    поручений. В итоге чек-лист открывался к вечеру или не открывался вовсе.
+
+    Правила, без которых напоминание становится помехой:
+
+    * только по графику (`HrShift` на сегодня со статусом `planned`) — «у всех
+      подряд» раздражает тех, у кого сегодня выходной;
+    * только когда смена действительно началась и ещё идёт;
+    * не тем, кто уже открыл чек-лист (прогон за сегодня есть);
+    * не тестовому и не теневому пулу: они никогда не закроют смену;
+    * один раз в день на человека — тик ходит каждые 15 минут.
+    """
+    from zoneinfo import ZoneInfo
+
+    from app.db.hr_models import SHIFT_PLANNED, ChecklistRun, HrShift
+    from app.db.models import AppNotification
+
+    moment = now or datetime.now(UTC)
+    tz = ZoneInfo(get_settings().scheduler_tz)
+    local = moment.astimezone(tz)
+    day = local.date()
+
+    shifts = list(
+        (
+            await session.scalars(
+                select(HrShift).where(
+                    HrShift.day == day,
+                    HrShift.status == SHIFT_PLANNED,
+                    HrShift.starts_at.is_not(None),
+                )
+            )
+        ).all()
+    )
+    if not shifts:
+        return []
+
+    def _running(shift) -> bool:  # noqa: ANN001 — строка модели
+        if shift.starts_at is None or local.time() < shift.starts_at:
+            return False
+        # Смена может пересекать полночь: без `ends_at` считаем её идущей до
+        # конца дня, иначе вечерняя смена не получила бы напоминания вовсе.
+        return shift.ends_at is None or local.time() <= shift.ends_at
+
+    running = [shift for shift in shifts if _running(shift)]
+    if not running:
+        return []
+
+    opened = {
+        int(v)
+        for v in (
+            await session.scalars(
+                select(ChecklistRun.employee_id).where(ChecklistRun.shift_date == day)
+            )
+        ).all()
+    }
+    demo = await hr_demo.demo_employee_ids(session)
+    pending = [
+        shift
+        for shift in running
+        if int(shift.employee_id) not in opened
+        and int(shift.employee_id) not in demo
+    ]
+    if not pending:
+        return []
+
+    employees = [
+        employee
+        for employee in (
+            await session.scalars(
+                select(Employee).where(
+                    Employee.id.in_([shift.employee_id for shift in pending])
+                )
+            )
+        ).all()
+        if not employee.is_simulation
+    ]
+    if not employees:
+        return []
+
+    # Один раз в день. Смотрим на уже записанные уведомления этого вида: без
+    # такой проверки тик раз в 15 минут прислал бы четыре напоминания в час.
+    recent = (
+        await session.execute(
+            select(AppNotification.user_id, AppNotification.created_at).where(
+                AppNotification.kind == hr_notify.KIND_SHIFT_START,
+                AppNotification.user_id.in_(
+                    [int(employee.user_id) for employee in employees]
+                ),
+            )
+        )
+    ).all()
+    already: set[int] = set()
+    for user_id, created_at in recent:
+        if created_at is None:
+            continue
+        moment_local = (
+            created_at.astimezone(tz)
+            if created_at.tzinfo is not None
+            else created_at.replace(tzinfo=UTC).astimezone(tz)
+        )
+        if moment_local.date() == day:
+            already.add(int(user_id))
+
+    sent: list[int] = []
+    for employee in employees:
+        if int(employee.user_id) in already:
+            continue
+        await _deliver(
+            session,
+            bot=bot,
+            employees=[employee],
+            kind=hr_notify.KIND_SHIFT_START,
+            text=hr_notify.shift_start_text(),
+            payload={},
+        )
+        sent.append(int(employee.id))
+    if sent:
+        await session.commit()
+    return sent
+
+
 async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa: ANN001
     """Тело job'а планировщика: напоминания + эскалация. Идемпотентно."""
     from app.db.base import get_sessionmaker
@@ -915,6 +1066,7 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
     escalated = 0
     escalated_second = 0
     purged = 0
+    shift_start = 0
     try:
         async with sm() as session:
             # Корзина уволенных: через 30 дней данные сносим сами, чтобы
@@ -936,6 +1088,9 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
                 reminders = len(
                     await send_deadline_reminders(session, bot=bot, now=now)
                 )
+                shift_start = len(
+                    await send_shift_start_reminders(session, bot=bot, now=now)
+                )
             if await hr_settings.get_escalation_enabled(session):
                 escalated = len(await escalate_overdue(session, bot=bot, now=now))
                 # Вторая ступень идёт после первой: только что просроченные
@@ -945,17 +1100,19 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
                 )
     except Exception as exc:  # noqa: BLE001 — job не имеет права падать
         log.warning("hr.tick_failed", error=str(exc))
-    if reminders or escalated or escalated_second or purged:
+    if reminders or escalated or escalated_second or shift_start or purged:
         log.info(
             "hr.tick_done",
             reminders=reminders,
             escalated=escalated,
             escalated_second=escalated_second,
+            shift_start=shift_start,
             purged=purged,
         )
     return {
         "reminders": reminders,
         "escalated": escalated,
         "escalated_second": escalated_second,
+        "shift_start": shift_start,
         "purged": purged,
     }
