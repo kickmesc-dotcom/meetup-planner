@@ -46,7 +46,11 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
               setLocale(option);
             }}
             className={[
-              "min-h-8 min-w-9 rounded-full px-2 text-2xs font-semibold uppercase transition-colors",
+              // Высота 44 — минимум тач-цели. Ширина остаётся по тексту: это
+            // сегмент-контрол из соседних вариантов, и растягивать каждый до 44
+            // значило бы выдавить заголовок шапки; промах по вертикали здесь и
+            // есть основной.
+            "min-h-11 min-w-9 rounded-full px-2 text-2xs font-semibold uppercase transition-colors",
               active ? "bg-tg-bg text-tg-text" : "text-tg-hint",
             ].join(" ")}
           >

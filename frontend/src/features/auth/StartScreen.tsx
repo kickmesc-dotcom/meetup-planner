@@ -201,7 +201,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
                 spellCheck={false}
                 placeholder={tx("ID или название")}
                 aria-label={tx("Код или название компании")}
-                className="mt-1 w-full rounded-tile border border-tg-hint/20 bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text placeholder:text-tg-hint/70 focus:outline-none focus:ring-2 focus:ring-tg-link/40"
+                className="mt-1 w-full rounded-tile border border-tg-hint/20 bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text placeholder:text-tg-hint/70 focus:border-tg-link"
               />
             </label>
 
@@ -253,7 +253,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
                 maxLength={120}
                 placeholder={tx("Например, «Кофейня на углу»")}
                 aria-label={tx("Название компании")}
-                className="mt-1 w-full rounded-tile border border-tg-hint/20 bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text placeholder:text-tg-hint/70 focus:outline-none focus:ring-2 focus:ring-tg-link/40"
+                className="mt-1 w-full rounded-tile border border-tg-hint/20 bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text placeholder:text-tg-hint/70 focus:border-tg-link"
               />
             </label>
 

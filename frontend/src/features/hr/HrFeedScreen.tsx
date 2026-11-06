@@ -617,7 +617,7 @@ function KudosSheet({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
+            className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
             aria-label={tx("Закрыть")}
           >
             <Icon name="close" size={16} />
@@ -685,7 +685,7 @@ function FiltersSheet({
           <button
             type="button"
             onClick={onClose}
-            className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
+            className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg/60 text-tg-text"
             aria-label={tx("Закрыть")}
           >
             <Icon name="close" size={16} />
