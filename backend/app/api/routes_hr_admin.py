@@ -985,6 +985,69 @@ async def set_task_status(
     return await _task_admin_out(session, task)
 
 
+class TaskBulkCloseIn(BaseModel):
+    """Пачка поручений на закрытие: руководитель отмечает несколько сразу."""
+
+    task_ids: list[int] = Field(min_length=1, max_length=100)
+    comment: str | None = None
+
+
+class TaskBulkFailure(BaseModel):
+    task_id: int
+    reason: str
+
+
+class TaskBulkCloseOut(BaseModel):
+    """Числа вместо «готово»: сколько просили, сколько вышло, что не вышло."""
+
+    requested: int
+    closed: int
+    failed: list[TaskBulkFailure] = []
+
+
+@router.post("/tasks/close-bulk", response_model=TaskBulkCloseOut)
+async def bulk_close_tasks(
+    body: TaskBulkCloseIn, session: SessionDep, employee: AupDep
+) -> TaskBulkCloseOut:
+    """Закрыть несколько поручений одним действием и вернуть числа.
+
+    Зачем числа. Одиночное закрытие можно подтвердить словом «готово», а пачку
+    — нет: из четырнадцати поручений два могли не закрыться (уже закрыто, нет
+    перехода, чужое в сеансе проверки), и человек должен увидеть это сразу, а
+    не искать глазами по списку.
+
+    Каждое поручение идёт через тот же `change_status`, что и одиночное
+    закрытие: права, события и пересчёт агрегата не расходятся между ручками.
+    Отказ по одному не отменяет остальные — он попадает в `failed`.
+    """
+    wanted = list(dict.fromkeys(body.task_ids))
+    closed = 0
+    failed: list[TaskBulkFailure] = []
+    for task_id in wanted:
+        task = await hr_tasks.get_task(session, task_id)
+        if task is None:
+            failed.append(TaskBulkFailure(task_id=task_id, reason="task_not_found"))
+            continue
+        if hr_simulation.current() is not None and not (
+            task.assignee_employee_id == employee.id
+            or task.created_by_employee_id == employee.id
+        ):
+            failed.append(
+                TaskBulkFailure(task_id=task_id, reason="simulation_self_only")
+            )
+            continue
+        try:
+            await hr_tasks.change_status(
+                session, task, TASK_DONE, by=employee, comment=body.comment
+            )
+        except hr_tasks.TaskError as exc:
+            failed.append(TaskBulkFailure(task_id=task_id, reason=str(exc)))
+            continue
+        closed += 1
+    await session.commit()
+    return TaskBulkCloseOut(requested=len(wanted), closed=closed, failed=failed)
+
+
 def _employee_admin_out(
     employee: Employee, user: User, department: Department | None = None
 ) -> EmployeeAdminOut:

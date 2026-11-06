@@ -1263,6 +1263,17 @@ export const EN_CONTENT: Record<string, string> = {
   "Поручение создано — сотрудник увидит его в приложении.":
     "Task created — the employee will see it in the app.",
   "Последние поручения": "Latest tasks",
+  "Выбрано: {count}": "Selected: {count}",
+  "Отметь несколько, чтобы закрыть пачкой":
+    "Select a few tasks to close them in one go",
+  "Зачесть выбранные": "Mark selected as done",
+  "Отмечаю…": "Marking…",
+  "Отмечено {closed} из {requested}": "Marked {closed} of {requested}",
+  "не удалось: {count}": "failed: {count}",
+  "Зачесть {count} поручений выполненными?":
+    "Mark {count} tasks as done?",
+  "Выбрать «{title}»": "Select “{title}”",
+  "Снять выбор «{title}»": "Deselect “{title}”",
   " · фото {count}": " · {count} photo(s)",
   "Зачесть выполненным": "Mark as done",
   "Закрыть «{title}»?": "Close “{title}”?",

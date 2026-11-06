@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  closeAdminTasksBulk,
   createAdminTask,
   fetchAdminEmployees,
   fetchAdminTasks,
@@ -10,7 +11,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
-import { InlineIcon } from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
 import { useTx } from "@/i18n";
@@ -119,6 +120,40 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });
+
+  // Массовое закрытие. Слово «готово» на пачке скрыло бы, что часть поручений
+  // не закрылась (уже закрыто, нет перехода), поэтому итог — числами.
+  const [picked, setPicked] = useState<number[]>([]);
+  const openTasks = (tasksQ.data ?? []).filter((task) => task.status !== "done");
+  const pickedOpen = picked.filter((id) => openTasks.some((t) => t.id === id));
+
+  const bulkClose = useMutation({
+    mutationFn: (ids: number[]) => closeAdminTasksBulk({ task_ids: ids }),
+    onSuccess: (result) => {
+      haptic("success");
+      setPicked([]);
+      void qc.invalidateQueries({ queryKey: ["hr-admin-tasks"] });
+      const tail = result.failed.length
+        ? ` · ${tx("не удалось: {count}", { count: result.failed.length })}`
+        : "";
+      void showAlert(
+        tx("Отмечено {closed} из {requested}", {
+          closed: result.closed,
+          requested: result.requested,
+        }) + tail,
+      );
+    },
+    onError: (e) => void showAlert(humanizeApiError(e)),
+  });
+
+  const togglePicked = (taskId: number) => {
+    haptic("selection");
+    setPicked((current) =>
+      current.includes(taskId)
+        ? current.filter((id) => id !== taskId)
+        : [...current, taskId],
+    );
+  };
 
   /** Быстрый срок: «через N минут от сейчас», секунды сохраняются. */
   const quickDue = (minutes: number) => {
@@ -377,6 +412,33 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
 
       <section className="space-y-2">
         <div className="text-sm font-semibold text-tg-text">{tx("Последние поручения")}</div>
+        {openTasks.length > 1 && (
+          <div className="flex items-center gap-2 rounded-tile bg-tg-bg/50 px-2 py-1.5">
+            <span className="min-w-0 flex-1 text-xs text-tg-hint">
+              {pickedOpen.length
+                ? tx("Выбрано: {count}", { count: pickedOpen.length })
+                : tx("Отметь несколько, чтобы закрыть пачкой")}
+            </span>
+            {pickedOpen.length > 0 && (
+              <button
+                type="button"
+                disabled={bulkClose.isPending}
+                onClick={async () => {
+                  const count = pickedOpen.length;
+                  const ok = await showConfirm(
+                    tx("Зачесть {count} поручений выполненными?", { count }),
+                  );
+                  if (ok) bulkClose.mutate(pickedOpen);
+                }}
+                className="min-h-9 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text disabled:opacity-50"
+              >
+                {bulkClose.isPending
+                  ? tx("Отмечаю…")
+                  : tx("Зачесть выбранные")}
+              </button>
+            )}
+          </div>
+        )}
         {(tasksQ.data ?? []).slice(0, 20).map((task) => (
           <article key={task.id} className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-start justify-between gap-2">
@@ -411,9 +473,35 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   )}
                 </div>
               </div>
-              <span className="shrink-0 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-hint">
-                {task.status}
-              </span>
+              <div className="flex shrink-0 items-center gap-1">
+                {task.status !== "done" && (
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={picked.includes(task.id)}
+                    aria-label={
+                      picked.includes(task.id)
+                        ? tx("Снять выбор «{title}»", { title: task.title })
+                        : tx("Выбрать «{title}»", { title: task.title })
+                    }
+                    onClick={() => togglePicked(task.id)}
+                    className={[
+                      "grid min-h-9 min-w-9 place-items-center rounded-tile text-xs",
+                      picked.includes(task.id)
+                        ? "bg-tg-button text-tg-button-text"
+                        : "bg-tg-bg/60 text-tg-hint",
+                    ].join(" ")}
+                  >
+                    <Icon
+                      name={picked.includes(task.id) ? "check" : "plus"}
+                      size={14}
+                    />
+                  </button>
+                )}
+                <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-hint">
+                  {task.status}
+                </span>
+              </div>
             </div>
             {task.status !== "done" && (
               <button

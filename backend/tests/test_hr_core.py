@@ -263,6 +263,7 @@ def test_hr_routes_are_registered():
         ("GET", "/api/admin/links"),
         ("POST", "/api/admin/tasks"),
         ("PATCH", "/api/admin/tasks/{task_id}/status"),
+        ("POST", "/api/admin/tasks/close-bulk"),
         ("GET", "/api/admin/employees"),
         ("GET", "/api/admin/reports/overview"),
     }

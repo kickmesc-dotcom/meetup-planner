@@ -948,6 +948,23 @@ export const setAdminTaskStatus = (
     body: JSON.stringify({ status, comment }),
   });
 
+/** Итог массового закрытия: сколько просили, сколько вышло, что не вышло. */
+export interface TaskBulkCloseResult {
+  requested: number;
+  closed: number;
+  failed: { task_id: number; reason: string }[];
+}
+
+/** Закрыть пачку поручений одним действием — ответ несёт числа, а не «ok». */
+export const closeAdminTasksBulk = (body: {
+  task_ids: number[];
+  comment?: string;
+}) =>
+  api<TaskBulkCloseResult>("/api/admin/tasks/close-bulk", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 // --------------------------------------------------------------------------
 // KPI смены (опыт за работу, нейтральные звания, сотрудник недели)
 // --------------------------------------------------------------------------
