@@ -14,7 +14,7 @@ from app.config import Settings, get_settings
 from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
 from app.db.models import User
-from app.db.org_models import ApiKey, Organization, set_org
+from app.db.org_models import ApiKey, Organization, reset_org, set_org
 from app.services import display_names, org_bots, org_limits, orgs
 
 
@@ -229,12 +229,18 @@ async def current_employee(
     session: SessionDep,
     user: CurrentUser,
     x_simulation_session: Annotated[str | None, Header()] = None,
+    x_org_id: Annotated[int | None, Header()] = None,
 ) -> AsyncIterator[Employee]:
     """HR-профиль текущего пользователя.
 
     Без заголовка — настоящий профиль (создаётся лениво). С заголовком
     `X-Simulation-Session` — теневой профиль сеанса проверки: все чтения и
     записи идут от его имени, а настоящий сотрудник остаётся нетронутым.
+
+    `X-Org-Id` выбирает филиал сети. Это просьба, а не право:
+    `branches.can_switch` разрешает организацию, только если у человека там
+    есть профиль или он владелец головной. Прислать чужой номер бесполезно —
+    ответ будет 403, и данные чужой организации не откроются.
     """
     from app.services import hr_access, hr_simulation
 
@@ -272,6 +278,21 @@ async def current_employee(
     if session_auth.get() and not await orgs.orgs_of(session, user.id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="org_required")
 
+    # Филиал сети (06.11.2026). Тенантский фильтр включаем ДО `ensure_employee`:
+    # он ищет профиль по организации из контекста, и именно от этого зависит,
+    # чьи смены увидит владелец.
+    switch_token = None
+    if x_org_id is not None:
+        from app.services import branches
+
+        if not await branches.can_switch(
+            session, user_id=user.id, org_id=x_org_id
+        ):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN, detail="org_switch_denied"
+            )
+        switch_token = set_org(x_org_id)
+
     try:
         employee = await hr_access.ensure_employee(session, user)
         # Тенантский фильтр: все дальнейшие ORM-запросы в этом запросе видят
@@ -288,6 +309,9 @@ async def current_employee(
         if str(exc) == "employee_fired":
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
         raise
+    finally:
+        if switch_token is not None:
+            reset_org(switch_token)
 
 
 EmployeeDep = Annotated[Employee, Depends(current_employee)]

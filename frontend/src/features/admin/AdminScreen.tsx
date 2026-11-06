@@ -36,6 +36,7 @@ import PlanScreen from "./PlanScreen";
 import BillingScreen from "./BillingScreen";
 import BrandScreen from "./BrandScreen";
 import DomainScreen from "./DomainScreen";
+import BranchesScreen from "./BranchesScreen";
 import IntegrationsScreen from "./IntegrationsScreen";
 import ImportScreen from "./ImportScreen";
 import PrivacyScreen from "./PrivacyScreen";
@@ -95,6 +96,7 @@ type Section =
   | "platform"
   | "brand"
   | "domain"
+  | "branches"
   | "space-restart";
 
 /** GHG11(4): допустимые подразделы для deep-link из анонса фичи. */
@@ -131,6 +133,7 @@ const VALID_SECTIONS: Section[] = [
   "platform",
   "brand",
   "domain",
+  "branches",
   "privacy",
   "space-restart",
 ];
@@ -604,6 +607,7 @@ export default function AdminScreen({
   if (section === "platform") return <PlatformScreen onBack={back} />;
   if (section === "brand") return <BrandScreen onBack={back} />;
   if (section === "domain") return <DomainScreen onBack={back} />;
+  if (section === "branches") return <BranchesScreen onBack={back} />;
   if (section === "privacy") return <PrivacyScreen onBack={back} />;
   if (section === "integrations") return <IntegrationsScreen onBack={back} />;
   if (section === "import") return <ImportScreen onBack={back} />;

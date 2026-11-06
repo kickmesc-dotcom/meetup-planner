@@ -163,6 +163,14 @@ class Organization(Base):
     # и чистки сирот, а поле при появлении загрузки останется тем же.
     brand_logo_url: Mapped[str | None] = mapped_column(Text)
     # Свой домен клиента (06.11.2026). Пока не подтверждён, он хранится, но
+    # Головная организация сети (06.11.2026). NULL — самостоятельная
+    # организация; у филиала здесь id головной. Глубина ровно один: филиал
+    # филиала запрещён сервисом, иначе проверка прав усложнилась бы без пользы.
+    parent_org_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        index=True,
+    )
     # не включается: иначе чужой человек занял бы домен, который ему не
     # принадлежит. Токен — наклейка для проверки файлом на домене.
     custom_domain: Mapped[str | None] = mapped_column(String(253))

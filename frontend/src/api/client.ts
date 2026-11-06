@@ -25,6 +25,33 @@ const API_BASE_KEY = "buff.api_base";
  * прокси.
  */
 const ACCESS_TOKEN_KEY = "semitask.access_token";
+/**
+ * Выбранный филиал сети (06.11.2026).
+ *
+ * Это просьба, а не право: сервер проверяет, что у человека есть профиль в
+ * этой организации или он владелец головной сети (`branches.can_switch`).
+ * Без заголовка работаем в организации из профиля — как раньше.
+ */
+const ACTIVE_ORG_KEY = "semitask.active_org";
+
+export function getActiveOrg(): number | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_ORG_KEY);
+    const value = raw ? Number(raw) : NaN;
+    return Number.isInteger(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveOrg(orgId: number | null): void {
+  try {
+    if (orgId === null) localStorage.removeItem(ACTIVE_ORG_KEY);
+    else localStorage.setItem(ACTIVE_ORG_KEY, String(orgId));
+  } catch {
+    // приватный режим — выбор живёт до перезагрузки
+  }
+}
 
 /**
  * Токен сессии почтового входа (B2B_PLATFORM_PLAN, шаг 2.1).
@@ -418,6 +445,10 @@ export async function api<T>(
   // обычный запрос настоящего пользователя.
   const simulationId = useSimulation.getState().sessionId;
   if (simulationId) headers.set("X-Simulation-Session", String(simulationId));
+  // Филиал сети: сервер ответит 403, если права на эту организацию нет.
+  // Заголовок не отправляем, пока филиал не выбран явно.
+  const activeOrg = getActiveOrg();
+  if (activeOrg !== null) headers.set("X-Org-Id", String(activeOrg));
   // FormData сам ставит boundary: если перезаписать заголовок JSON'ом,
   // multipart-загрузка фото ломается на разборе тела.
   if (

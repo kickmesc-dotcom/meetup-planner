@@ -240,3 +240,21 @@ export const verifyOrgDomain = () =>
 
 export const clearOrgDomain = () =>
   api<OrgDomain>("/api/org/domain", { method: "DELETE" });
+
+/** Организация сети: головная или филиал. */
+export interface Branch {
+  id: number;
+  slug: string;
+  name: string;
+  role: string;
+  is_root: boolean;
+  is_current: boolean;
+}
+
+export const fetchBranches = () => api<Branch[]>("/api/org/branches");
+
+export const createBranch = (name: string) =>
+  api<Branch>("/api/org/branches", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });

@@ -36,6 +36,7 @@ from app.services import (
     audit,
     billing,
     brand,
+    branches,
     domains,
     hr_access,
     invitations,
@@ -97,6 +98,12 @@ _STATUS: dict[str, int] = {
     "bad_domain": status.HTTP_400_BAD_REQUEST,
     "domain_reserved": status.HTTP_400_BAD_REQUEST,
     "domain_taken": status.HTTP_409_CONFLICT,
+    # Филиалы сети (06.11.2026): чужой филиал не открыть, глубже одного
+    # уровня не построить, потолок — не ошибка ввода, а состояние тарифа.
+    "branch_owner_required": status.HTTP_403_FORBIDDEN,
+    "org_switch_denied": status.HTTP_403_FORBIDDEN,
+    "branch_of_branch": status.HTTP_409_CONFLICT,
+    "branch_limit": status.HTTP_409_CONFLICT,
     "domain_not_set": status.HTTP_409_CONFLICT,
     "verify_failed": status.HTTP_409_CONFLICT,
     "verify_mismatch": status.HTTP_409_CONFLICT,
@@ -576,6 +583,103 @@ class DomainOut(BaseModel):
 
 class DomainIn(BaseModel):
     domain: str = Field(min_length=3, max_length=253)
+
+
+class BranchOut(BaseModel):
+    """Организация сети: головная или филиал."""
+
+    id: int
+    slug: str
+    name: str
+    role: str
+    is_root: bool
+    is_current: bool
+
+
+class BranchIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+async def _branch_root(
+    session: SessionDep, org: Organization, user: User
+) -> Organization:
+    """Головная организация сети, если человек — её владелец.
+
+    Проверка по членству, а не по роли сотрудника: владелец сети остаётся
+    владельцем, даже когда он сейчас работает в филиале.
+    """
+    root = await branches.root_of(session, org)
+    member = await orgs.member(session, org_id=root.id, user_id=user.id)
+    if member is None or member.role != "owner":
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, detail="branch_owner_required"
+        )
+    return root
+
+
+@router.get("/org/branches", response_model=list[BranchOut])
+async def list_branches(
+    session: SessionDep, org: OrgDep, user: CurrentUser, _admin: AdminDep
+) -> list[BranchOut]:
+    """Сеть: головная организация и её филиалы.
+
+    Список видит только владелец сети: для остальных филиалы — отдельные
+    клиенты, и их названия наружу не отдаются.
+    """
+    root = await _branch_root(session, org, user)
+    rows = await branches.network(session, root=root, user_id=user.id)
+    return [
+        BranchOut(
+            id=row.id,
+            slug=row.slug,
+            name=row.name,
+            role=role,
+            is_root=row.id == root.id,
+            is_current=row.id == org.id,
+        )
+        for row, role in rows
+    ]
+
+
+@router.post(
+    "/org/branches",
+    response_model=BranchOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_branch(
+    body: BranchIn,
+    session: SessionDep,
+    org: OrgDep,
+    user: CurrentUser,
+    _admin: AdminDep,
+) -> BranchOut:
+    """Завести филиал сети; владелец получает в нём членство `owner`."""
+    root = await _branch_root(session, org, user)
+    try:
+        row = await branches.create_branch(
+            session, root=root, user=user, name=body.name
+        )
+    except branches.BranchesError as exc:
+        _fail(exc)
+    await audit.record(
+        session,
+        org_id=root.id,
+        action="org.branch_created",
+        user=user,
+        target_type="organization",
+        target_id=row.id,
+        details={"name": row.name, "branch_org_id": row.id},
+    )
+    await session.commit()
+    log.info("orgs.branch_created", root_id=root.id, branch_id=row.id)
+    return BranchOut(
+        id=row.id,
+        slug=row.slug,
+        name=row.name,
+        role="owner",
+        is_root=False,
+        is_current=False,
+    )
 
 
 def _domain_out(row: domains.DomainState) -> DomainOut:

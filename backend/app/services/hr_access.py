@@ -82,9 +82,38 @@ def default_role_for(telegram_id: int) -> str:
     return ROLE_EMPLOYEE
 
 
-async def get_employee(session: AsyncSession, user_id: int) -> Employee | None:
-    """HR-профиль по внутреннему `users.id` (None, если ещё не заводили)."""
-    return await session.scalar(select(Employee).where(Employee.user_id == user_id))
+async def get_employee(
+    session: AsyncSession, user_id: int, *, org_id: int | None = None
+) -> Employee | None:
+    """HR-профиль по личности и организации (None, если ещё не заводили).
+
+    Профилей может быть несколько: человек работает в двух филиалах сети — это
+    две строки `employees` (уникальность `(org_id, user_id)`). Без фильтра по
+    организации запрос вернул бы первую попавшуюся, и владелец филиала увидел
+    бы смены соседнего. По умолчанию берём организацию из контекста запроса:
+    её ставит `deps.current_employee` — из профиля или из проверенного
+    заголовка `X-Org-Id`.
+    """
+    if org_id is None:
+        # Организация из контекста: тенантский фильтр уже ограничивает выборку
+        # ею, и явное условие — вторая страховка от чужой строки.
+        return await session.scalar(
+            select(Employee).where(
+                Employee.user_id == user_id,
+                Employee.org_id == current_org_id.get(),
+            )
+        )
+    # Явная организация — это выбор филиала. Тенантский фильтр снят нарочно:
+    # он отсёк бы строку, к которой мы и обращаемся, и `can_switch` уже
+    # проверил право на неё до вызова.
+    from app.db.tenancy import all_orgs
+
+    with all_orgs():
+        return await session.scalar(
+            select(Employee).where(
+                Employee.user_id == user_id, Employee.org_id == org_id
+            )
+        )
 
 
 async def ensure_employee(session: AsyncSession, user: User) -> Employee:
