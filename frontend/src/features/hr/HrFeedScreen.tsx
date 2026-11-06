@@ -30,6 +30,7 @@ import {
   markFeedSeen,
   readFeedSeen,
 } from "@/features/hr/feedSeen";
+import { readFeedFilters, saveFeedFilters } from "@/features/hr/feedFilters";
 
 /**
  * SemiTaskBot: «События смены» — лента с ролевой видимостью.
@@ -217,6 +218,26 @@ export default function HrFeedScreen() {
     // «новыми» и не пропадают из-под курсора.
     return () => markFeedSeen(employeeId);
   }, [myEmployeeId]);
+
+  // Срез фильтров запоминается на сотрудника: руководитель смотрит один и тот
+  // же отдел и те же типы событий каждый день, и выставлять их заново — это
+  // четыре тапа каждое утро. Восстанавливаем один раз, когда известен человек:
+  // до этого ключа нет, а писать пустой срез поверх сохранённого нельзя.
+  const [filtersRestored, setFiltersRestored] = useState(false);
+
+  useEffect(() => {
+    if (myEmployeeId === null || filtersRestored) return;
+    const saved = readFeedFilters(myEmployeeId);
+    if (saved.employeeId !== null) setEmployeeId(saved.employeeId);
+    if (saved.departmentId !== null) setDepartmentId(saved.departmentId);
+    if (saved.kinds.length > 0) setKinds(saved.kinds);
+    setFiltersRestored(true);
+  }, [myEmployeeId, filtersRestored]);
+
+  useEffect(() => {
+    if (myEmployeeId === null || !filtersRestored) return;
+    saveFeedFilters(myEmployeeId, { employeeId, departmentId, kinds });
+  }, [myEmployeeId, filtersRestored, employeeId, departmentId, kinds]);
 
   const filtersQ = useQuery({
     queryKey: ["hr-feed-filters"],
