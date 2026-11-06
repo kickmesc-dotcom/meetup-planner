@@ -308,6 +308,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Снять отчёт": "Take report photo",
   "закрыто в {time}": "closed at {time}",
   "Заметка": "Note",
+  "Раскрыть пункт с фотоотчётом": "Open the photo item",
+  "Свернуть": "Collapse",
   "Например: инвентарь в порядке, не хватило 2 упаковок":
     "For example: stock is fine, but 2 packs were missing",
   "Сохранить заметку": "Save note",

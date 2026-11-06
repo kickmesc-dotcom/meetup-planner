@@ -62,6 +62,8 @@ export const UZ_CONTENT: Record<string, string> = {
   "закрыто в {time}": "{time} da yopildi",
   "Отмена": "Bekor qilish",
   "Заметка": "Izoh",
+  "Раскрыть пункт с фотоотчётом": "Foto bandini ochish",
+  "Свернуть": "Yig'ish",
   "Например: инвентарь в порядке, не хватило 2 упаковок":
     "Masalan: inventar joyida, 2 dona qadoq yetmadi",
   "Сохранить заметку": "Izohni saqlash",

@@ -431,6 +431,12 @@ function ItemRow({
   // отмечается и не входит в прогресс — сервер тоже откажет.
   const inactive = item.active === false && !item.done;
   const photoBlocks = item.requires_photo && !item.done && !inactive;
+  // Пункты с фотоотчётом занимают пол-экрана: описание, подсказка и кнопка
+  // камеры видны сразу у всех, даже у тех, до кого человек ещё не дошёл. На
+  // 360px в список помещалось полтора пункта. Свернутыми они дают увидеть
+  // список целиком; раскрываются одним тапом — когда до пункта дошли.
+  const [expanded, setExpanded] = useState(false);
+  const folded = photoBlocks && !expanded;
 
   return (
     <div
@@ -484,13 +490,13 @@ function ItemRow({
               <span className="ml-1 text-xs text-tg-hint">{tx("(опц.)")}</span>
             )}
           </div>
-          {item.description && (
+          {!folded && item.description && (
             <TranslatableText
               className="mt-0.5 text-xs text-tg-hint"
               text={item.description}
             />
           )}
-          {item.schedule_label && (
+          {!folded && item.schedule_label && (
             <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
               <Icon name="calendar" size={11} />
               {inactive
@@ -498,7 +504,7 @@ function ItemRow({
                 : item.schedule_label}
             </div>
           )}
-          {item.requires_photo && (
+          {!folded && item.requires_photo && (
             <div className="mt-1 text-xs text-tg-hint">
               <InlineIcon name="camera" />
               {item.done
@@ -506,7 +512,7 @@ function ItemRow({
                 : tx("нужен фотоотчёт: снимок с камеры или из галереи")}
             </div>
           )}
-          {!item.done && photoBlocks && (
+          {!folded && !item.done && photoBlocks && (
             <div className="mt-2">
               <PhotoAttach
                 compact
@@ -538,7 +544,21 @@ function ItemRow({
           )}
         </div>
 
-        {!item.done && !inactive && (
+        {folded && (
+          <button
+            type="button"
+            aria-expanded={false}
+            aria-label={tx("Раскрыть пункт с фотоотчётом")}
+            onClick={() => {
+              haptic("selection");
+              setExpanded(true);
+            }}
+            className="min-h-9 shrink-0 rounded-tile bg-tg-bg/60 px-2.5 text-xs text-tg-text press"
+          >
+            {tx("Открыть")}
+          </button>
+        )}
+        {!folded && !item.done && !inactive && (
           <button
             type="button"
             onClick={onToggleNote}
@@ -549,6 +569,20 @@ function ItemRow({
         )}
       </div>
 
+      {photoBlocks && expanded && (
+        // Обратный путь: человек может передумать и вернуть компактный вид,
+        // не проматывая раскрытую карточку целиком.
+        <button
+          type="button"
+          onClick={() => {
+            haptic("selection");
+            setExpanded(false);
+          }}
+          className="mt-2 min-h-9 rounded-full bg-tg-bg/60 px-3 text-xs text-tg-hint"
+        >
+          {tx("Свернуть")}
+        </button>
+      )}
       {noteOpen && (
         <div className="mt-2 rounded-tile bg-tg-bg/60 p-2">
           <textarea
