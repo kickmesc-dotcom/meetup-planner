@@ -130,12 +130,12 @@ describe("мобильная оболочка (M1)", () => {
   });
 
   it("SDK Telegram не блокирует первый кадр", () => {
-    // Вне Telegram этот скрипт не нужен, а в России его доступность не
-    // гарантирована: блокирующий тег означал бы белый экран вместо входа.
-    expect(indexHtml).toMatch(
-      /<script\s+defer\s+src="https:\/\/telegram\.org\/js\/telegram-web-app\.js"/,
-    );
-    expect(/<script\s+src="https:\/\/telegram\.org/.test(indexHtml)).toBe(false);
+    // Чужого домена в критическом пути нет вовсе: `@twa-dev/sdk` везёт
+    // официальную копию telegram-web-app.js и создаёт `window.Telegram.WebApp`
+    // при импорте, поэтому отдельный тег был дублем на 88 КБ (шаг 6).
+    // Проверяем тег, а не подстроку: домен упомянут в комментарии намеренно.
+    expect(/<script[^>]+src="https?:\/\/telegram\.org/.test(indexHtml)).toBe(false);
+    expect(/<script[^>]+telegram-web-app\.js/.test(indexHtml)).toBe(false);
   });
 });
 
