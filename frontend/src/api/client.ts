@@ -170,10 +170,43 @@ export function isEndpointMissing(e: unknown): boolean {
 }
 
 /**
+ * Похоже ли это на отсутствие связи, а не на отказ сервера.
+ *
+ * Разница не косметическая: «нет сети» лечится ожиданием или переходом в
+ * другое место, а отказ 4xx — правкой того, что человек отправил. Показывать
+ * одно вместо другого значит отправлять его чинить не то.
+ */
+export function isNetworkError(e: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  if (!(e instanceof Error)) return false;
+  // Таймаут fetch отменяет запрос через `AbortError` — сервер не ответил,
+  // но сеть при этом есть, поэтому текст другой.
+  if (e.name === "AbortError") return true;
+  // Движки называют это по-разному: Chrome — «Failed to fetch», Safari —
+  // «Load failed», Firefox — «NetworkError when attempting to fetch resource».
+  return /failed to fetch|load failed|networkerror|network request failed/i.test(
+    e.message,
+  );
+}
+
+/**
  * Превращает технический detail/status в человечный русский текст.
  * Возвращает короткую строку, которую можно показать через showAlert или inline.
  */
 export function humanizeApiError(e: unknown): string {
+  // Обрыв связи приходил сюда как обычный `TypeError` и печатался текстом
+  // движка: человек читал «Failed to fetch» и не понимал, что делать. Ветка
+  // стоит до отказа сервера (`ApiError`), но пропускает его: 503 при живой
+  // сети — это не «нет интернета».
+  if (!(e instanceof ApiError) && isNetworkError(e)) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return "Нет интернета. Включи сеть — введённое останется на месте, отправка повторится.";
+    }
+    if (e instanceof Error && e.name === "AbortError") {
+      return "Сервер не ответил вовремя. Проверь сеть и повтори.";
+    }
+    return "Нет связи с сервером. Проверь интернет и повтори — данные не потеряны.";
+  }
   if (e instanceof ApiError) {
     const d = e.detail || "";
     // Предохранители периметра (аудит 26.10.2026). Сервер отдаёт коды, текст
