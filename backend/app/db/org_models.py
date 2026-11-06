@@ -162,6 +162,17 @@ class Organization(Base):
     # Логотип — ссылка на CDN клиента: загрузка файла потребовала бы хранилища
     # и чистки сирот, а поле при появлении загрузки останется тем же.
     brand_logo_url: Mapped[str | None] = mapped_column(Text)
+    # Свой домен клиента (06.11.2026). Пока не подтверждён, он хранится, но
+    # не включается: иначе чужой человек занял бы домен, который ему не
+    # принадлежит. Токен — наклейка для проверки файлом на домене.
+    custom_domain: Mapped[str | None] = mapped_column(String(253))
+    custom_domain_token: Mapped[str | None] = mapped_column(String(64))
+    custom_domain_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
+    custom_domain_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     # Свой бот клиента (B2B_PLATFORM_PLAN, шаг 1.6). Пусто — организация
     # работает на боте из env (текущий контур). Токен здесь только потому, что
     # у каждой организации свой BotFather-бот; отдавать его наружу нельзя.

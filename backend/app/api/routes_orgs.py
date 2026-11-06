@@ -36,6 +36,7 @@ from app.services import (
     audit,
     billing,
     brand,
+    domains,
     hr_access,
     invitations,
     mail,
@@ -91,6 +92,14 @@ _STATUS: dict[str, int] = {
     # ошибка ввода, а не конфликт состояния.
     "bad_color": status.HTTP_400_BAD_REQUEST,
     "bad_logo": status.HTTP_400_BAD_REQUEST,
+    # Свой домен (06.11.2026): неверное имя — ошибка ввода, занятый
+    # адрес — конфликт, а непрошедшая проверка — состояние домена.
+    "bad_domain": status.HTTP_400_BAD_REQUEST,
+    "domain_reserved": status.HTTP_400_BAD_REQUEST,
+    "domain_taken": status.HTTP_409_CONFLICT,
+    "domain_not_set": status.HTTP_409_CONFLICT,
+    "verify_failed": status.HTTP_409_CONFLICT,
+    "verify_mismatch": status.HTTP_409_CONFLICT,
     # Приватность (шаг 5.5): удаление требует точного кода организации —
     # опечатка не должна стирать клиента; повторный запрос и отмена
     # без запроса — конфликт состояния, а не ошибка ввода.
@@ -554,6 +563,109 @@ async def cancel_org_invoice(
         _fail(exc)
     log.info("billing.invoice_canceled", org_id=org.id, invoice_id=invoice.id)
     return _invoice_out(invoice)
+
+
+class DomainOut(BaseModel):
+    domain: str | None
+    token: str | None
+    verified: bool
+    checked_at: datetime | None
+    verify_path: str
+    verify_prefix: str
+
+
+class DomainIn(BaseModel):
+    domain: str = Field(min_length=3, max_length=253)
+
+
+def _domain_out(row: domains.DomainState) -> DomainOut:
+    return DomainOut(
+        domain=row.domain,
+        token=row.token,
+        verified=row.verified,
+        checked_at=row.checked_at,
+        verify_path=row.verify_path,
+        verify_prefix=row.verify_prefix,
+    )
+
+
+@router.get("/org/domain", response_model=DomainOut)
+async def current_domain(org: OrgDep, _admin: AdminDep) -> DomainOut:
+    """Свой домен организации — только руководителю: это адрес входа."""
+    return _domain_out(domains.state(org))
+
+
+@router.put("/org/domain", response_model=DomainOut)
+async def set_org_domain(
+    body: DomainIn,
+    session: SessionDep,
+    org: OrgDep,
+    user: CurrentUser,
+    _admin: AdminDep,
+) -> DomainOut:
+    """Сохранить домен и выдать токен проверки.
+
+    Домен не включается до подтверждения: иначе чужой человек занял бы
+    адрес, который ему не принадлежит.
+    """
+    try:
+        row = await domains.set_domain(session, org, body.domain)
+    except domains.DomainError as exc:
+        _fail(exc)
+    await audit.record(
+        session,
+        org_id=org.id,
+        action="org.domain_set",
+        user=user,
+        target_type="organization",
+        target_id=org.id,
+        details={"domain": row.domain},
+    )
+    await session.commit()
+    log.info("orgs.domain_set", org_id=org.id, domain=row.domain)
+    return _domain_out(row)
+
+
+@router.post("/org/domain/verify", response_model=DomainOut)
+async def verify_org_domain(
+    session: SessionDep, org: OrgDep, user: CurrentUser, _admin: AdminDep
+) -> DomainOut:
+    """Проверить контроль файлом `/.well-known/semitask-domain.txt`."""
+    try:
+        row = await domains.verify_domain(session, org)
+    except domains.DomainError as exc:
+        _fail(exc)
+    await audit.record(
+        session,
+        org_id=org.id,
+        action="org.domain_verified",
+        user=user,
+        target_type="organization",
+        target_id=org.id,
+        details={"domain": row.domain},
+    )
+    await session.commit()
+    return _domain_out(row)
+
+
+@router.delete("/org/domain", response_model=DomainOut)
+async def clear_org_domain(
+    session: SessionDep, org: OrgDep, user: CurrentUser, _admin: AdminDep
+) -> DomainOut:
+    """Снять свой домен. Платформенная ссылка остаётся рабочей."""
+    row = await domains.clear(session, org)
+    await audit.record(
+        session,
+        org_id=org.id,
+        action="org.domain_cleared",
+        user=user,
+        target_type="organization",
+        target_id=org.id,
+        details={},
+    )
+    await session.commit()
+    log.info("orgs.domain_cleared", org_id=org.id)
+    return _domain_out(row)
 
 
 @router.get("/brand", response_model=BrandOut)

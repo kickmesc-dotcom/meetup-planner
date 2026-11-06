@@ -215,3 +215,28 @@ export const requestInvoicePaid = (id: number) =>
 /** Отменить неоплаченный счёт. */
 export const cancelInvoice = (id: number) =>
   api<OrgInvoice>(`/api/org/invoices/${id}/cancel`, { method: "POST" });
+
+/** Свой домен организации: адрес входа вместо платформенной ссылки. */
+export interface OrgDomain {
+  domain: string | null;
+  token: string | null;
+  verified: boolean;
+  checked_at: string | null;
+  verify_path: string;
+  verify_prefix: string;
+}
+
+export const fetchOrgDomain = () => api<OrgDomain>("/api/org/domain");
+
+/** Сохранить домен. Он не включается, пока не подтверждён файлом. */
+export const saveOrgDomain = (domain: string) =>
+  api<OrgDomain>("/api/org/domain", {
+    method: "PUT",
+    body: JSON.stringify({ domain }),
+  });
+
+export const verifyOrgDomain = () =>
+  api<OrgDomain>("/api/org/domain/verify", { method: "POST" });
+
+export const clearOrgDomain = () =>
+  api<OrgDomain>("/api/org/domain", { method: "DELETE" });

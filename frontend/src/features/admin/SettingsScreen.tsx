@@ -55,6 +55,12 @@ const SHORTCUTS: Shortcut[] = [
     subtitle: "Копия данных, удаление организации, журнал доступа",
   },
   {
+    id: "domain",
+    icon: "globe",
+    title: "Свой домен",
+    subtitle: "Адрес входа для команды вместо платформенной ссылки",
+  },
+  {
     id: "texts",
     icon: "edit",
     title: "Тексты приложения",
