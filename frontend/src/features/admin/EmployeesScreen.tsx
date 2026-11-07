@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import {
@@ -103,7 +104,8 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
   });
 
   const items = q.data?.items ?? [];
-  const needle = search.trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search);
+  const needle = debouncedSearch.trim().toLowerCase();
   const visible = items.filter(
     (card) =>
       needle === "" ||

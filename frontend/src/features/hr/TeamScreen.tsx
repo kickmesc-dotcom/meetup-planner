@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   executeReset,
@@ -83,7 +84,8 @@ export default function TeamScreen({
     );
   }
 
-  const needle = search.trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search);
+  const needle = debouncedSearch.trim().toLowerCase();
   const employees = (dashboard.data?.employees ?? []).filter(
     (employee) =>
       needle === "" ||

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchDepartments,
@@ -298,7 +299,8 @@ export default function HrFeedScreen() {
   // свои события, чужие не должны попадать в счётчик.
   const freshCount = countFreshItems(items, seenAt);
   const lastFresh = freshCount > 0 ? items[freshCount - 1] ?? null : null;
-  const needle = search.trim().toLowerCase();
+  const debouncedSearch = useDebouncedValue(search);
+  const needle = debouncedSearch.trim().toLowerCase();
   // Выбранный человек остаётся в списке даже при поиске: иначе список показал
   // бы пустое значение и фильтр выглядел бы сброшенным.
   const visibleEmployees = (filters?.employees ?? []).filter(

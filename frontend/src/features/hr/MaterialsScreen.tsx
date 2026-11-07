@@ -244,6 +244,26 @@ function SheetTable({
   const { tx } = useTx();
   const header = useMemo(() => (rows.length > 0 && looksLikeHeader(rows[0]) ? rows[0] : null), [rows]);
   const body = header ? rows.slice(1) : rows;
+  // §10 `sortable-table`: в таблице смены десятки строк, и «кто опоздал»
+  // ищется сортировкой, а не глазами. `aria-sort` сообщает порядок
+  // скринридеру — иначе перестановка строк для него необъяснима.
+  const [sort, setSort] = useState<{ column: number; dir: "asc" | "desc" } | null>(null);
+  const sorted = useMemo(() => {
+    if (!sort) return body;
+    const collator = new Intl.Collator("ru", { numeric: true, sensitivity: "base" });
+    const factor = sort.dir === "asc" ? 1 : -1;
+    return [...body].sort(
+      (a, b) => factor * collator.compare(a[sort.column] ?? "", b[sort.column] ?? ""),
+    );
+  }, [body, sort]);
+
+  const toggleSort = (column: number) => {
+    setSort((prev) =>
+      prev?.column === column
+        ? { column, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { column, dir: "asc" },
+    );
+  };
 
   return (
     <div className="overflow-x-auto rounded-card border border-tg-secondary-bg">
@@ -256,16 +276,42 @@ function SheetTable({
                 <th
                   key={index}
                   scope="col"
-                  className="sticky top-0 whitespace-nowrap border-b border-tg-secondary-bg bg-tg-bg px-2 py-1.5 text-left font-semibold text-tg-text"
+                  aria-sort={
+                    sort?.column === index
+                      ? sort.dir === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : "none"
+                  }
+                  className="sticky top-0 whitespace-nowrap border-b border-tg-secondary-bg bg-tg-bg text-left font-semibold text-tg-text"
                 >
-                  {cell || "—"}
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(index)}
+                    className="flex min-h-8 w-full items-center gap-1 px-2 py-1.5 text-left press"
+                  >
+                    <span>{cell || "—"}</span>
+                    <span aria-hidden="true" className="text-tg-hint">
+                      <Icon
+                        name="chevron"
+                        size={12}
+                        className={
+                          sort?.column !== index
+                            ? "rotate-90 opacity-40"
+                            : sort.dir === "asc"
+                              ? "-rotate-90"
+                              : "rotate-90"
+                        }
+                      />
+                    </span>
+                  </button>
                 </th>
               ))}
             </tr>
           </thead>
         )}
         <tbody>
-          {body.map((row, r) => (
+          {sorted.map((row, r) => (
             <tr key={r} className="odd:bg-tg-secondary-bg/30">
               {Array.from({ length: columns }).map((_, c) => (
                 <td

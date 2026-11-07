@@ -148,6 +148,8 @@ function PollCard({ poll, users }: { poll: Poll; users: User[] }) {
                               <img
                                 src={u.avatar_url}
                                 alt=""
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-full object-cover"
                               />
                             ) : (

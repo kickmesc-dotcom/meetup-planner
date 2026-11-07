@@ -84,7 +84,13 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
               style={{ background: u.color_hex }}
             >
               {u.avatar_url ? (
-                <img src={u.avatar_url} alt="" className="w-full h-full object-cover" />
+                <img
+                src={u.avatar_url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
               ) : (
                 u.display_name[0]?.toUpperCase()
               )}
