@@ -258,7 +258,7 @@ function GestureHint({ edge }: { edge: "left" | "right" | "in" | "out" | null })
   const { tx } = useTx();
   if (edge === null) return null;
   const common =
-    "pointer-events-none absolute z-30 flex items-center justify-center rounded-full bg-tg-button/85 text-tg-button-text shadow-lg transition-opacity";
+    "pointer-events-none absolute z-30 flex items-center justify-center rounded-full bg-tg-button/85 text-tg-button-text shadow-floating transition-opacity";
   if (edge === "left" || edge === "right") {
     const side = edge === "left" ? "right-3" : "left-3";
     const arrow = edge === "left" ? "chevron" : "back";

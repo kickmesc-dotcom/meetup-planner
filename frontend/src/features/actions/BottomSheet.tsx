@@ -104,7 +104,7 @@ export default function BottomSheet({
           // §9 `scroll-behavior`: `overscroll-contain` не отдаёт прокрутку
           // странице под шторкой — иначе на телефоне она «уезжает» вместе с
           // содержимым листа, и человек теряет место, где был.
-          className="fixed inset-x-0 bottom-0 z-overlay max-h-[85vh] overflow-y-auto overscroll-contain rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
+          className="fixed inset-x-0 bottom-0 z-overlay max-h-[85vh] overflow-y-auto overscroll-contain rounded-t-card bg-tg-bg p-4 pb-8 shadow-sheet"
           style={{ paddingBottom: `calc(2rem + ${SAFE_AREA_BOTTOM})` }}
           initial={{ y: "100%" }}
           animate={{ y: 0 }}

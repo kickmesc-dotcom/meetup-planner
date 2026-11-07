@@ -97,7 +97,7 @@ export default function TimelineNavBar({ isOnToday }: Props) {
                 className={[
                   "min-h-11 rounded-tile text-xs font-medium px-1 py-1 press",
                   active
-                    ? "bg-tg-button text-tg-button-text shadow-sm"
+                    ? "bg-tg-button text-tg-button-text shadow-raised"
                     : "bg-tg-secondary-bg text-tg-text",
                 ].join(" ")}
               >

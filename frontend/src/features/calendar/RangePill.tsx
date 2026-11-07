@@ -60,7 +60,7 @@ export default function RangePill({
         e.stopPropagation();
         onTap();
       }}
-      className="absolute top-1/2 -translate-y-1/2 h-7 px-2 text-white text-xs font-medium flex items-center shadow-sm select-none"
+      className="absolute top-1/2 -translate-y-1/2 h-7 px-2 text-white text-xs font-medium flex items-center shadow-raised select-none"
       style={{
         left,
         width,

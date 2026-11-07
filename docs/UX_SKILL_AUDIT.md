@@ -106,8 +106,8 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `color-palette-from-product` | ⚠️ | тема Telegram + бренд-цвет организации (по замыслу) | — |
 | `effects-match-style` | ✅ | тени/радиусы по шкале (`styles.radius.test.ts`) | — |
 | `platform-adaptive` | ⚠️ | Telegram-тема учтена; iOS/Android идиомы — частично | — |
-| `state-clarity` | ⚠️ | hover почти не используется (тач), disabled есть | P |
-| `elevation-consistent` | ⚠️ | `shadow-sm/xl` в разных слоях без шкалы | P |
+| `state-clarity` | ✅ | этап P: нажатие — `press`, выбранное — `aria-current`/`aria-pressed`/заливка, недоступное — disabled; hover только точным указателям | — |
+| `elevation-consistent` | ✅ | этап P: три роли `shadow-raised/floating/sheet`, старые ступени запрещены `styles.elevation.test.ts` | — |
 | `dark-mode-pairing` | ✅ | отдельная тема, токены `tg-*` | — |
 | `icon-style-consistent` | ✅ | `iconSet.test.tsx`: одна библиотека, 24×24, stroke 1.8 | — |
 | `system-controls` | ⚠️ | нативные `select`/`input`; кастомные шторки | — |

@@ -22,7 +22,7 @@ export default function ScrollTopButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="fixed bottom-24 right-4 z-20 grid h-11 w-11 place-items-center rounded-full bg-tg-button text-tg-button-text shadow-lg"
+      className="fixed bottom-24 right-4 z-20 grid h-11 w-11 place-items-center rounded-full bg-tg-button text-tg-button-text shadow-floating"
     >
       <Icon name="chevron" size={18} className="-rotate-90" />
     </button>

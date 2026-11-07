@@ -66,7 +66,7 @@ export default function ModeSwitch({ className }: { className?: string }) {
             {active && (
               <motion.span
                 layoutId="mode-switch-active"
-                className="absolute inset-0 rounded-full bg-tg-bg shadow-sm"
+                className="absolute inset-0 rounded-full bg-tg-bg shadow-raised"
                 transition={{ type: "spring", stiffness: 500, damping: 34 }}
               />
             )}

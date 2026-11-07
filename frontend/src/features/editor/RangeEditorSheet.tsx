@@ -199,7 +199,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
       />
       <motion.div
         key="sheet"
-        className="fixed inset-x-0 bottom-0 z-overlay rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
+        className="fixed inset-x-0 bottom-0 z-overlay rounded-t-card bg-tg-bg p-4 pb-8 shadow-sheet"
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}

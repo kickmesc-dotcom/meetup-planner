@@ -83,7 +83,7 @@ function ActionBtn({
       className={[
         "min-h-12 rounded-card py-3 text-sm font-medium inline-flex items-center justify-center gap-1.5",
         primary
-          ? "bg-tg-button text-tg-button-text shadow-sm"
+          ? "bg-tg-button text-tg-button-text shadow-raised"
           : "bg-tg-secondary-bg",
       ].join(" ")}
     >

@@ -218,8 +218,15 @@ controls are never `rounded-card`. Side variants follow the same tokens
 | Token | Definition | Use |
 |---|---|---|
 | `card` | `bg-tg-secondary-bg border border-tg-hint/10` | every card, section, sheet panel |
-| `raised` | card + `shadow-sm` | elements lifted over content (pills, floating buttons) |
+| `raised` | card + `shadow-raised` | pills, buttons and tiles lifted over their own surface |
+| `floating` | `shadow-floating` | things hovering over content: toast, «Наверх», skip-link, calendar arrows |
+| `sheet` | `shadow-sheet` | surfaces above the page: sheets and popovers |
 | separator | `border-tg-secondary-bg/60` (in-card) · `border-tg-hint/15` (between groups) | dividers |
+
+**Rule:** depth has three roles, not four Tailwind steps. `shadow-sm`, `shadow-md`,
+`shadow-lg`, `shadow-xl`, `shadow-2xl` and arbitrary `shadow-[..]` are banned;
+`src/styles.elevation.test.ts` fails on them. Before the pass, the same role appeared
+on three neighbouring steps and a sheet differed from a popover for no stated reason.
 
 **Rule:** cards use the **full-opacity** `bg-tg-secondary-bg` plus a hairline border —
 NOT `/60` opacity, which is invisible on both themes. Shadows are for elements that

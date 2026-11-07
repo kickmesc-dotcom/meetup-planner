@@ -60,7 +60,7 @@ function ToastRow({
   }, [id, action]);
 
   return (
-    <div className="pointer-events-auto flex w-full max-w-[420px] items-start gap-2 rounded-card bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text shadow-lg ring-1 ring-tg-hint/20">
+    <div className="pointer-events-auto flex w-full max-w-[420px] items-start gap-2 rounded-card bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text shadow-floating ring-1 ring-tg-hint/20">
       <Icon
         name={success ? "check" : "alert"}
         size={16}

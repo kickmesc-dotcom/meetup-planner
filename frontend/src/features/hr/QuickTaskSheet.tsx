@@ -515,7 +515,7 @@ export default function QuickTaskSheet({ onClose }: { onClose: () => void }) {
         className={[
           "mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-medium transition-colors",
           canCreate
-            ? "bg-tg-button text-tg-button-text shadow-sm"
+            ? "bg-tg-button text-tg-button-text shadow-raised"
             : "bg-tg-secondary-bg text-tg-hint",
         ].join(" ")}
       >

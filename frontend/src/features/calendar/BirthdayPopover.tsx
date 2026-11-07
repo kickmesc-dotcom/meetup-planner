@@ -116,7 +116,7 @@ export default function BirthdayPopover() {
       onClick={close}
     >
       <div
-        className="w-full max-w-md rounded-t-card bg-tg-bg p-4 pb-6 shadow-2xl"
+        className="w-full max-w-md rounded-t-card bg-tg-bg p-4 pb-6 shadow-sheet"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">

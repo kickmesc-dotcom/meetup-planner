@@ -943,7 +943,7 @@ function FeedDay({
       <h2 className="sticky top-0 z-10 -mx-4 flex items-center gap-2 bg-tg-bg px-4 py-1">
         <span
           data-testid="feed-day"
-          className="flex min-w-0 items-center gap-1.5 rounded-full bg-tg-secondary-bg px-3 py-1.5 text-xs font-semibold text-tg-text shadow-sm"
+          className="flex min-w-0 items-center gap-1.5 rounded-full bg-tg-secondary-bg px-3 py-1.5 text-xs font-semibold text-tg-text shadow-raised"
         >
           <Icon
             name="calendar"

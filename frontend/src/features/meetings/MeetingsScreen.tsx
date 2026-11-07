@@ -157,7 +157,7 @@ function Card({
     <motion.div
       initial={{ y: 8, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-sm"
+      className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-raised"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

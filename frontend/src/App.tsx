@@ -765,7 +765,7 @@ export default function App() {
               а не заставляет проходить сайдбар и переключатель режима. */}
           <a
             href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-overlay focus:rounded-tile focus:bg-tg-bg focus:px-3 focus:py-2 focus:text-sm focus:text-tg-text focus:shadow-lg"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-overlay focus:rounded-tile focus:bg-tg-bg focus:px-3 focus:py-2 focus:text-sm focus:text-tg-text focus:shadow-floating"
           >
             {tx("К содержимому")}
           </a>
@@ -799,7 +799,7 @@ export default function App() {
     >
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-overlay focus:rounded-tile focus:bg-tg-bg focus:px-3 focus:py-2 focus:text-sm focus:text-tg-text focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-overlay focus:rounded-tile focus:bg-tg-bg focus:px-3 focus:py-2 focus:text-sm focus:text-tg-text focus:shadow-floating"
       >
         {tx("К содержимому")}
       </a>

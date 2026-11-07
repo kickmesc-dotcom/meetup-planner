@@ -37,6 +37,20 @@ export default {
         card: "12px",
         tile: "8px",
       },
+      // UI_UX_PRO_MAX §4 `elevation-consistent`: три роли тени вместо четырёх
+      // ступеней Tailwind по месту. `raised` — элемент приподнят над потоком
+      // (пилюли, кнопки), `floating` — плавающий над контентом (тост,
+      // «Наверх», skip-link), `sheet` — поверхность поверх страницы (шиты,
+      // попапы). Старые `shadow-sm/md/lg/xl/2xl` запрещены тестом
+      // `styles.elevation.test.ts`: до прохода одна и та же роль встречалась
+      // на трёх соседних ступенях, и глубина читалась как случайная.
+      boxShadow: {
+        raised: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        floating:
+          "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+        sheet:
+          "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+      },
       // DESIGN_SYSTEM §2: the "ledger" face. System mono only — the app ships
       // no webfonts (external CDNs are unreliable for this audience).
       fontFamily: {

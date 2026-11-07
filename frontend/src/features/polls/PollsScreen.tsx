@@ -68,7 +68,7 @@ function PollCard({ poll, users }: { poll: Poll; users: User[] }) {
     <motion.div
       initial={{ y: 8, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-sm"
+      className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-raised"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -202,7 +202,7 @@ function PollsSkeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-sm animate-pulse motion-reduce:animate-none"
+          className="rounded-card bg-tg-secondary-bg/60 p-3 shadow-raised animate-pulse motion-reduce:animate-none"
         >
           <div className="h-4 w-2/3 rounded-tile bg-tg-bg/60" />
           <div className="mt-2 h-3 w-1/3 rounded-tile bg-tg-bg/40" />
