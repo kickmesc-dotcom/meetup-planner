@@ -277,6 +277,7 @@ export default function QuickTaskSheet({ onClose }: { onClose: () => void }) {
           maxLength={500}
           placeholder={tx("Например: Аня, протри витрину до 18:00")}
           aria-label={tx("Что нужно сделать")}
+          aria-required="true"
           className="min-h-11 flex-1 resize-none rounded-tile bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint"
         />
         {speechCtor() && (

@@ -434,6 +434,18 @@ button,
   touch-action: manipulation;
 }
 
+/* §6 QOL: iOS Safari и Telegram-WebView на iOS зумируют страницу, если шрифт
+   поля меньше 16px. После фокуса экран «прыгает», и человек теряет место, где
+   печатал. Поднимаем размер только на iOS (по наличию `-webkit-touch-callout`),
+   чтобы на Android и десктопе компактные поля остались прежними. */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 @media (pointer: fine) {
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {

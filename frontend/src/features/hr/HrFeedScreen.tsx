@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useScrollRestore } from "@/lib/useScrollRestore";
+import ScrollTopButton from "@/components/ScrollTopButton";
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchDepartments,
@@ -336,6 +338,13 @@ export default function HrFeedScreen() {
   };
 
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  // §3 QOL: уход на другую вкладку и возврат больше не отправляют в начало
+  // ленты, а после первого экрана появляется «Наверх».
+  const { showTop, scrollToTop } = useScrollRestore(
+    "feed",
+    !feedQ.isLoading,
+    scrollerRef,
+  );
 
   /**
    * Прокрутка к нужному дню по стрелкам в плашке.
@@ -538,6 +547,8 @@ export default function HrFeedScreen() {
           </button>
         )}
       </div>
+
+      <ScrollTopButton show={showTop} label={tx("Наверх")} onClick={scrollToTop} />
 
       {filtersOpen && filters && (
         <FiltersSheet

@@ -212,6 +212,21 @@ export default function MySettingsScreen({ onClose }: { onClose: () => void }) {
                   value={name}
                   maxLength={64}
                   onChange={(event) => setName(event.target.value)}
+                  // §3 `required-fields`: без имени сохранение невозможно —
+                  // говорим это и программе чтения с экрана, и клавиатуре
+                  // (Enter сохраняет, не заставляя искать кнопку).
+                  aria-required="true"
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    if (
+                      saveName.isPending ||
+                      !name.trim() ||
+                      name.trim() === me.display_name
+                    )
+                      return;
+                    event.preventDefault();
+                    saveName.mutate(name.trim());
+                  }}
                   autoComplete="name"
                   className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
                 />

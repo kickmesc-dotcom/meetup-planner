@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ISSUE_CATEGORY_ICON,
@@ -23,6 +23,8 @@ import BottomSheet from "@/features/actions/BottomSheet";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
+import ScrollTopButton from "@/components/ScrollTopButton";
+import { useScrollRestore } from "@/lib/useScrollRestore";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
@@ -132,6 +134,15 @@ export default function IssuesScreen() {
       }),
   });
 
+  // §3 QOL: у каждого вида журнала своё место — «Все» и «Мои» запоминаются
+  // отдельно, чтобы возврат не попадал в чужой сдвиг.
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const { showTop, scrollToTop } = useScrollRestore(
+    `issues:${view}`,
+    !issuesQ.isLoading,
+    scrollerRef,
+  );
+
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: ["hr-issues"] });
     void qc.invalidateQueries({ queryKey: ["hr-issue"] });
@@ -208,7 +219,7 @@ export default function IssuesScreen() {
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+      <div ref={scrollerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
         {issuesQ.isLoading && (
           <>
             <CardSkeleton />
@@ -248,6 +259,8 @@ export default function IssuesScreen() {
           </button>
         )}
       </div>
+
+      <ScrollTopButton show={showTop} label={tx("Наверх")} onClick={scrollToTop} />
 
       {creating && (
         <CreateIssueSheet
