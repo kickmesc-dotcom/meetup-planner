@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { isToday, startOfDay } from "date-fns";
 import { useUI } from "@/store/ui";
 import { haptic } from "@/tg/webapp";
@@ -27,7 +28,7 @@ export default function NavBar() {
         className="h-11 w-11 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text press"
         aria-label={tx("назад")}
       >
-        ‹
+        <Icon name="back" size={18} />
       </button>
       <div className="flex-1 text-center">
         <div className="text-sm font-semibold leading-tight">{zoomTitle(zoom, anchor)}</div>
@@ -53,7 +54,7 @@ export default function NavBar() {
         className="h-11 w-11 flex items-center justify-center rounded-card bg-tg-secondary-bg text-tg-text press"
         aria-label={tx("вперёд")}
       >
-        ›
+        <Icon name="chevron" size={18} />
       </button>
       <ThemeSwitcher />
     </div>

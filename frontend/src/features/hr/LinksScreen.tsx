@@ -99,7 +99,7 @@ export default function LinksScreen() {
                 </span>
               </span>
               <span className="shrink-0 text-tg-hint" aria-hidden>
-                ›
+                <Icon name="chevron" size={18} />
               </span>
             </div>
           </button>

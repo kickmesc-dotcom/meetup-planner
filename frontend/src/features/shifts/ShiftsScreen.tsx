@@ -250,7 +250,7 @@ export default function ShiftsScreen() {
             className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label={tx("Предыдущая неделя")}
           >
-            ‹
+            <Icon name="back" size={18} />
           </button>
           <button
             type="button"
@@ -266,7 +266,7 @@ export default function ShiftsScreen() {
             className="min-h-11 min-w-11 rounded-tile bg-tg-secondary-bg/60 text-sm text-tg-text"
             aria-label={tx("Следующая неделя")}
           >
-            ›
+            <Icon name="chevron" size={18} />
           </button>
         </div>
 

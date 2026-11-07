@@ -58,7 +58,7 @@ export default function AskScreen() {
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label={tx("Назад к задачам")}
         >
-          ‹
+          <Icon name="back" size={18} />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">

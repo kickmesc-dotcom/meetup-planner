@@ -105,7 +105,7 @@ export default function HandoversScreen() {
             className="-ml-1 min-h-11 min-w-11 rounded-tile text-lg text-tg-hint"
             aria-label={tx("Назад к задачам")}
           >
-            ‹
+            <Icon name="back" size={18} />
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">

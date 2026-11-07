@@ -869,7 +869,7 @@ function Card({
           {badge}
         </div>
       )}
-      <div className="text-base text-tg-hint">›</div>
+      <div className="flex items-center text-tg-hint"><Icon name="chevron" size={16} /></div>
     </button>
   );
 }

@@ -12,7 +12,7 @@ import {
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
-import { InlineIcon } from "@/components/Icon";
+import Icon, { InlineIcon } from "@/components/Icon";
 import { useUI } from "@/store/ui";
 import { intlLocaleFor, useTx, type Locale } from "@/i18n";
 
@@ -106,7 +106,7 @@ export default function ReportsScreen({
           className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
           aria-label={tx("Назад в профиль")}
         >
-          ‹
+          <Icon name="back" size={18} />
         </button>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-tg-text">

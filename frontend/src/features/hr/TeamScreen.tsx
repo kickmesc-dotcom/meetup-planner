@@ -108,7 +108,7 @@ export default function TeamScreen({
             className="min-h-11 min-w-11 rounded-tile text-lg text-tg-link"
             aria-label={tx("Назад")}
           >
-            ‹
+            <Icon name="back" size={18} />
           </button>
         )}
         <div className="min-w-0 flex-1">

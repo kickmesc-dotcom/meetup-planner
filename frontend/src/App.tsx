@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMe,
@@ -151,6 +151,18 @@ export default function App() {
   const mode = useUI((s) => s.mode);
   const setMode = useUI((s) => s.setMode);
   const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);
+  // §2 `skip-links` и `focus-on-route-change`: клавиатура и скринридер не должны
+  // проходить заново через всю шапку на каждой смене вкладки. Первый рендер
+  // пропускаем — там фокус ещё ничей, и забирать его незачем.
+  const mainRef = useRef<HTMLDivElement | null>(null);
+  const firstTabRef = useRef(true);
+  useEffect(() => {
+    if (firstTabRef.current) {
+      firstTabRef.current = false;
+      return;
+    }
+    mainRef.current?.focus({ preventScroll: true });
+  }, [tab]);
   const simulationId = useSimulation((s) => s.sessionId);
   // Кому вообще можно управлять: руководитель отдела (`aup`), владелец
   // организации или прописанный разработчик. Считается по сырым данным, до
@@ -740,13 +752,28 @@ export default function App() {
             tx("Сотрудник")
           }
         >
+          {/* §2 `skip-links`: первый Tab с клавиатуры уводит к содержимому,
+              а не заставляет проходить сайдбар и переключатель режима. */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-overlay focus:rounded-tile focus:bg-tg-bg focus:px-3 focus:py-2 focus:text-sm focus:text-tg-text focus:shadow-lg"
+          >
+            {tx("К содержимому")}
+          </a>
           <SimulationBanner />
           {canManageZone && (
             <div className="flex justify-center border-b border-tg-secondary-bg px-3 py-2">
               <ModeSwitch className="w-full max-w-[320px]" />
             </div>
           )}
-          <TabTransition key={tab}>{screen}</TabTransition>
+          <div
+            ref={mainRef}
+            id="main-content"
+            tabIndex={-1}
+            className="flex min-h-0 flex-1 flex-col outline-none"
+          >
+            <TabTransition key={tab}>{screen}</TabTransition>
+          </div>
         </DesktopShell>
       </div>
     );
@@ -761,6 +788,12 @@ export default function App() {
       className="relative mx-auto flex h-full w-full max-w-[560px] flex-col sm:border-x sm:border-tg-hint/10"
       style={SAFE_AREA_ROOT}
     >
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-overlay focus:rounded-tile focus:bg-tg-bg focus:px-3 focus:py-2 focus:text-sm focus:text-tg-text focus:shadow-lg"
+      >
+        {tx("К содержимому")}
+      </a>
       <SimulationBanner />
       {/* Верхние вкладки — только у того, кому есть что переключать. У
           сотрудника их нет вовсе: его зона одна. */}
@@ -771,7 +804,14 @@ export default function App() {
         </div>
       )}
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
-      <TabTransition key={tab}>{screen}</TabTransition>
+      <div
+        ref={mainRef}
+        id="main-content"
+        tabIndex={-1}
+        className="flex min-h-0 flex-1 flex-col outline-none"
+      >
+        <TabTransition key={tab}>{screen}</TabTransition>
+      </div>
       <TabBar sections={sections ?? undefined} openTasks={openTasks} />
     </div>
   );

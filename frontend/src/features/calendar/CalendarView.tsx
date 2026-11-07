@@ -1,3 +1,4 @@
+import Icon from "@/components/Icon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDrag, usePinch } from "@use-gesture/react";
@@ -260,14 +261,14 @@ function GestureHint({ edge }: { edge: "left" | "right" | "in" | "out" | null })
     "pointer-events-none absolute z-30 flex items-center justify-center rounded-full bg-tg-button/85 text-tg-button-text shadow-lg transition-opacity";
   if (edge === "left" || edge === "right") {
     const side = edge === "left" ? "right-3" : "left-3";
-    const arrow = edge === "left" ? "›" : "‹";
+    const arrow = edge === "left" ? "chevron" : "back";
     const label = tx(edge === "left" ? "вперёд" : "назад");
     return (
       <div
         className={`${common} ${side} top-1/2 -translate-y-1/2 h-12 w-12 text-2xl font-bold fade-in-soft`}
         title={label}
       >
-        {arrow}
+        <Icon name={arrow} size={22} />
       </div>
     );
   }
