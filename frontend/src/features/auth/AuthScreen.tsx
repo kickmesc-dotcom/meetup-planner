@@ -138,14 +138,16 @@ export default function AuthScreen({
   return (
     <div className="flex h-full w-full items-center justify-center overflow-y-auto px-4 py-6">
       <div className="w-full max-w-[400px]">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-tg-hint">
-            <Icon name="lock" size={15} />
-            <span className="text-xs">SemiTask</span>
+        {/* Одна линия: марка слева, языки и тема — в общей капсуле справа.
+            Разные по весу контролы раньше читались как случайные элементы. */}
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2 text-tg-hint">
+            <Icon name="lock" size={16} />
+            <span className="truncate text-sm font-medium text-tg-text">SemiTask</span>
           </div>
-          <div className="flex items-center gap-1">
-            <LanguageSwitcher />
-            <ThemeSwitcher />
+          <div className="flex shrink-0 items-center gap-0.5 rounded-full bg-tg-secondary-bg/70 p-0.5">
+            <LanguageSwitcher bare />
+            <ThemeSwitcher bare />
           </div>
         </div>
 
@@ -174,11 +176,14 @@ export default function AuthScreen({
               {t("auth.invited")}
             </p>
           )}
-          <p className="mt-1 text-xs text-tg-hint">
-            {mode === "login" && t("auth.login.hint")}
-            {mode === "register" && t("auth.register.hint")}
-            {mode === "forgot" && t("auth.forgot.hint")}
-          </p>
+          {/* На входе подсказка ничего не добавляла к полям и только отвлекала:
+              режимы регистрации и сброса объясняют правила, вход — нет. */}
+          {mode !== "login" && (
+            <p className="mt-1 text-xs leading-snug text-tg-hint">
+              {mode === "register" && t("auth.register.hint")}
+              {mode === "forgot" && t("auth.forgot.hint")}
+            </p>
+          )}
 
           {sent ? (
             <div className="mt-4 space-y-3">
@@ -310,9 +315,9 @@ export function NoOrgScreen() {
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-6 flex items-center gap-1 self-end">
-        <LanguageSwitcher />
-        <ThemeSwitcher />
+      <div className="mb-6 flex items-center gap-0.5 self-end rounded-full bg-tg-secondary-bg/70 p-0.5">
+        <LanguageSwitcher bare />
+        <ThemeSwitcher bare />
       </div>
       <div className="max-w-sm">
         <Icon name="inbox" size={30} className="mx-auto mb-2 text-tg-hint" />

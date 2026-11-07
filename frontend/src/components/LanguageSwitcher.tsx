@@ -19,7 +19,14 @@ const LABELS: Record<Locale, MessageKey> = {
   uz: "locale.uz",
 };
 
-export default function LanguageSwitcher({ className }: { className?: string }) {
+export default function LanguageSwitcher({
+  className,
+  bare = false,
+}: {
+  className?: string;
+  /** Без своего фона: когда языки стоят в общей капсуле с темой. */
+  bare?: boolean;
+}) {
   const { locale, t } = useT();
   const setLocale = useLocale((s) => s.setLocale);
   const uzPackAvailable = useLocale((s) => s.uzPackAvailable);
@@ -29,7 +36,11 @@ export default function LanguageSwitcher({ className }: { className?: string }) 
       role="group"
       aria-label={t("locale.label")}
       data-testid="language-switcher"
-      className={["flex items-center gap-0.5 rounded-full bg-tg-secondary-bg/70 p-0.5", className ?? ""].join(" ")}
+      className={[
+        "flex items-center gap-0.5",
+        bare ? "" : "rounded-full bg-tg-secondary-bg/70 p-0.5",
+        className ?? "",
+      ].join(" ")}
     >
       {localesFor(uzPackAvailable).map((option) => {
         const active = option === locale;

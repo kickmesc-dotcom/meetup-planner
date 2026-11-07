@@ -19,7 +19,17 @@ import { useT } from "@/i18n";
 import { useTheme } from "@/store/theme";
 import { haptic, syncWebAppChrome } from "@/tg/webapp";
 
-export default function ThemeSwitcher({ className }: { className?: string }) {
+export default function ThemeSwitcher({
+  className,
+  bare = false,
+}: {
+  className?: string;
+  /**
+   * Внутри общей капсулы: без отрицательных полей и без своего фона, чтобы
+   * иконка стояла на той же линии, что и сегменты языка.
+   */
+  bare?: boolean;
+}) {
   const theme = useTheme((s) => s.theme);
   const toggleTheme = useTheme((s) => s.toggleTheme);
   const { t } = useT();
@@ -40,12 +50,18 @@ export default function ThemeSwitcher({ className }: { className?: string }) {
         syncWebAppChrome(dark ? "light" : "dark");
       }}
       className={[
-        "-my-2 grid h-11 w-11 shrink-0 place-items-center rounded-full",
+        "grid h-11 w-11 shrink-0 place-items-center rounded-full",
+        bare ? "" : "-my-2",
         "press",
         className ?? "",
       ].join(" ")}
     >
-      <span className="grid h-7 w-7 place-items-center rounded-full bg-tg-secondary-bg/70 text-tg-hint">
+      <span
+        className={[
+          "grid h-7 w-7 place-items-center rounded-full text-tg-hint",
+          bare ? "" : "bg-tg-secondary-bg/70",
+        ].join(" ")}
+      >
         <Icon name={dark ? "moon" : "sun"} size={15} />
       </span>
     </button>
