@@ -89,4 +89,13 @@ describe("AdminScreen: первые шаги и подробность", () => {
     expect(screen.getByText("Прокси")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Показать все разделы" })).toBeNull();
   });
+
+  it("находит раздел по человеческим словам, а не только по старому названию", () => {
+    renderScreen();
+    fireEvent.change(screen.getByTestId("admin-search"), {
+      target: { value: "таблиц" },
+    });
+    expect(screen.getByText("Загрузить из таблицы")).toBeTruthy();
+    expect(screen.queryByText("Запланированные задачи")).toBeNull();
+  });
 });

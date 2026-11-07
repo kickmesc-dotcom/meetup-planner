@@ -136,13 +136,13 @@ describe("AdminScreen (P1.9)", () => {
     // руководитель — поэтому правка живёт в зоне управления, а не в экране
     // сотрудника «по совместительству».
     renderScreen(false, true);
-    expect(screen.getByText("Материалы смены")).toBeTruthy();
+    expect(screen.getByText("Материалы")).toBeTruthy();
     expect(screen.getByText("Стандарты")).toBeTruthy();
   });
 
   it("не показывает документы тому, кому управлять нечем", () => {
     renderScreen(false, false);
-    expect(screen.queryByText("Материалы смены")).toBeNull();
+    expect(screen.queryByText("Материалы")).toBeNull();
     expect(screen.queryByText("Стандарты")).toBeNull();
     // Сотрудник читает их в своём профиле — из кабинета они ему не нужны.
     expect(screen.getByText("Чек-листы")).toBeTruthy();
