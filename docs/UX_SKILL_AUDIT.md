@@ -121,7 +121,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `viewport-meta` | ✅ | `initial-scale=1`, зум разрешён (этап L) | — |
 | `mobile-first` | ✅ | колонка 560px, нижняя полоса | — |
 | `breakpoint-consistency` | ⚠️ | `sm`/`lg` точечно, без шкалы 375/768/1024 | — |
-| `readable-font-size` | ⚠️ | поля 16px; основной текст 14px (`text-sm`) | S |
+| `readable-font-size` | ⚠️ | поля 16px, на iOS — принудительно (зум при фокусе убран); основной текст 14px (`text-sm`) | S |
 | `line-length-control` | ✅ | `max-w-[560px]` | — |
 | `horizontal-scroll` | ✅ | скролл только в таблицах/календаре, осознанно | — |
 | `spacing-scale` | ⚠️ | 4/8 в основном; есть `px-0.5`, `gap-0.5` | M |
