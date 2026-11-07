@@ -11,6 +11,7 @@ import ResetPasswordScreen from "./features/auth/ResetPasswordScreen";
 import { clearResetTokenFromUrl, resetTokenFromUrl } from "./features/auth/resetUrl";
 import VerifyEmailScreen from "./features/auth/VerifyEmailScreen";
 import BrandApplier from "./features/brand/BrandApplier";
+import ToastHost from "./components/ToastHost";
 import { clearVerifyTokenFromUrl, verifyTokenFromUrl } from "./features/auth/verifyUrl";
 
 // Прямая ссылка из `/app`: забираем токен в localStorage и чистим адресную
@@ -81,6 +82,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       {/* Бренд клиента: заголовок вкладки и акцент — до первого экрана. */}
       <BrandApplier />
       <Root />
+      {/* Подтверждения успеха живут над всеми экранами и зонами. */}
+      <ToastHost />
     </QueryClientProvider>
   </React.StrictMode>,
 );

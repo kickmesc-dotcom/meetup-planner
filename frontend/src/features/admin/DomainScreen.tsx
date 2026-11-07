@@ -10,6 +10,7 @@ import { humanizeApiError, looksLikeCode } from "@/api/client";
 import { Skeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
 import { useTx } from "@/i18n";
 
 /**
@@ -77,7 +78,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
     onSuccess: (row) => {
       haptic("success");
       qc.setQueryData(["org-domain"], row);
-      void showAlert(
+      showToast(
         row.verified ? tx("Домен подтверждён.") : tx("Домен пока не подтверждён."),
       );
     },
@@ -89,7 +90,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
     onSuccess: (row) => {
       haptic("success");
       qc.setQueryData(["org-domain"], row);
-      void showAlert(tx("Домен снят."));
+      showToast(tx("Домен снят."));
     },
     onError: fail,
   });

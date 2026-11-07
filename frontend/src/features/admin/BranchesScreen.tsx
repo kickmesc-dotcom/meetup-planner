@@ -10,6 +10,7 @@ import { humanizeApiError, looksLikeCode, setActiveOrg } from "@/api/client";
 import { Skeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
 import { useTx } from "@/i18n";
 
 /**
@@ -103,7 +104,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
       haptic("success");
       setEmployeeId("");
       void qc.invalidateQueries({ queryKey: ["branch-employees"] });
-      void showAlert(
+      showToast(
         tx("Сотрудник переведён: перенесено смен — {count}.", {
           count: result.shifts_moved,
         }),

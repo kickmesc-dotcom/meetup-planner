@@ -11,6 +11,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
 import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
@@ -107,7 +108,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       setDescription("");
       setExpected("");
       setTaskWeekdays([]);
-      void showAlert(tx("Поручение создано — сотрудник увидит его в приложении."));
+      showToast(tx("Поручение создано — сотрудник увидит его в приложении."));
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });

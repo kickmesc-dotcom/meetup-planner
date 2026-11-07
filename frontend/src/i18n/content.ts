@@ -2195,6 +2195,7 @@ export const EN_CONTENT: Record<string, string> = {
   "у сотрудников": "in the staff zone",
   "Вы руководитель. «Управление» вверху — это кабинет: люди, поручения и отчёты. Вкладки внизу остаются вашей сменой.": "You are a manager. “Manage” at the top is the office: people, tasks and reports. The tabs below stay your shift.",
   "Понятно": "Got it",
+  "Скрыть сообщение": "Dismiss message",
   "Меню, график и методички": "Menu, schedule and guides",
   "Частота напоминаний": "Reminder frequency",
   "Руководителю: люди, поручения и отчёты": "For managers: people, tasks and reports",
