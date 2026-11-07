@@ -99,7 +99,7 @@ export const ru = {
   // --- Навигация ---
   "nav.feed": "События",
   "nav.tasks": "Задачи",
-  "nav.shift": "Смена",
+  "nav.shift": "Чек-лист",
   // Экран — расписание смен, а не сводка часов: подпись говорит, что внутри.
   "nav.table": "График",
   "nav.team": "Команда",
@@ -232,7 +232,7 @@ export const en: Record<MessageKey, string> = {
 
   "nav.feed": "Events",
   "nav.tasks": "Tasks",
-  "nav.shift": "Shift",
+  "nav.shift": "Checklist",
   "nav.table": "Schedule",
   "nav.team": "Team",
   "nav.admin": "Admin",

@@ -60,7 +60,7 @@ describe("TabBar", () => {
     const { container } = renderTabBar();
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(5);
-    for (const label of ["Задачи", "Смена", "График", "События", "Профиль"]) {
+    for (const label of ["Задачи", "Чек-лист", "График", "События", "Профиль"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
     // Раньше здесь были эмодзи (✅ 🕒 🗓 …) — теперь один SVG на вкладку.
@@ -112,7 +112,7 @@ describe("TabBar", () => {
 
   it("тап переключает вкладку", () => {
     renderTabBar();
-    fireEvent.click(screen.getByText("Смена"));
+    fireEvent.click(screen.getByText("Чек-лист"));
     expect(useUI.getState().tab).toBe("checklist");
   });
 

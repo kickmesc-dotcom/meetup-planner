@@ -541,6 +541,8 @@ export default function AdminScreen({
   // разошлись бы (полоса подсветила бы одно, кабинет показал другое).
   const section = useUI((s) => s.adminSection) as Section;
   const setSection = useUI((s) => s.setAdminSection);
+  const setTab = useUI((s) => s.setTab);
+  const setMode = useUI((s) => s.setMode);
   const [query, setQuery] = useState("");
   const [usage, setUsage] = useState<Record<string, number>>(readUsage);
   // §11: простой режим прячет редкие группы за одну кнопку, расширенный
@@ -661,6 +663,26 @@ export default function AdminScreen({
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
       {!needle && <QuickActions onPick={select} />}
+
+      {!needle && (
+        <button
+          type="button"
+          onClick={() => {
+            haptic("selection");
+            setTab("shifts");
+            setMode("staff");
+          }}
+          className="flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg/60 px-3 text-left text-sm text-tg-text press"
+        >
+          <Icon name="calendar" size={18} className="shrink-0 text-tg-link" />
+          <span className="min-w-0 flex-1 truncate">
+            {tx("Открыть график смен")}
+          </span>
+          <span className="shrink-0 text-xs text-tg-hint">
+            {tx("у сотрудников")}
+          </span>
+        </button>
+      )}
 
       {uxMode === "simple" && (
         <button

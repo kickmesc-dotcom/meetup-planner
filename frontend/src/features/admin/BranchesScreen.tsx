@@ -6,7 +6,7 @@ import {
   fetchBranches,
   transferEmployee,
 } from "@/api/orgs";
-import { humanizeApiError, setActiveOrg } from "@/api/client";
+import { humanizeApiError, looksLikeCode, setActiveOrg } from "@/api/client";
 import { Skeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -72,7 +72,14 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
 
   const fail = (error: unknown) => {
     const code = humanizeApiError(error);
-    void showAlert(tx(ERROR_TEXT[code] ?? code));
+    void showAlert(
+      tx(
+        ERROR_TEXT[code] ??
+          (looksLikeCode(code)
+            ? "Не получилось. Попробуем ещё раз?"
+            : code),
+      ),
+    );
   };
 
   const create = useMutation({

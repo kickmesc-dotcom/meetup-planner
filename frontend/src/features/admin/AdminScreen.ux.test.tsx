@@ -90,6 +90,13 @@ describe("AdminScreen: первые шаги и подробность", () => {
     expect(screen.queryByRole("button", { name: "Показать все разделы" })).toBeNull();
   });
 
+  it("открывает график смен из кабинета, а не заставляет искать его в зоне сотрудника", () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: /Открыть график смен/ }));
+    expect(useUI.getState().tab).toBe("shifts");
+    expect(useUI.getState().mode).toBe("staff");
+  });
+
   it("находит раздел по человеческим словам, а не только по старому названию", () => {
     renderScreen();
     fireEvent.change(screen.getByTestId("admin-search"), {

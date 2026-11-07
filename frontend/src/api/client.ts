@@ -220,6 +220,18 @@ export function isNetworkError(e: unknown): boolean {
  * Превращает технический detail/status в человечный русский текст.
  * Возвращает короткую строку, которую можно показать через showAlert или inline.
  */
+/**
+ * Похоже ли сообщение на технический код (`org_not_found`), а не на фразу.
+ *
+ * Нужно экранам, у которых есть свой словарь ошибок: если кода в словаре нет,
+ * человек не должен читать «org_not_found» — это internal-деталь сервера, а
+ * не объяснение. Готовая человеческая фраза (её вернул `humanizeApiError`)
+ * остаётся как есть.
+ */
+export function looksLikeCode(text: string): boolean {
+  return /^[a-z0-9_]{2,64}$/.test(text.trim());
+}
+
 export function humanizeApiError(e: unknown): string {
   // Обрыв связи приходил сюда как обычный `TypeError` и печатался текстом
   // движка: человек читал «Failed to fetch» и не понимал, что делать. Ветка
