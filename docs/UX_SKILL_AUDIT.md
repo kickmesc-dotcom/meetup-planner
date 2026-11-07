@@ -208,17 +208,17 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `input-type-keyboard` | ✅ | `inputMode` email/numeric/url | — |
 | `password-toggle` | ✅ | этап L, тест `AuthScreen.test.tsx` | — |
 | `autofill-support` | ✅ | `autoComplete` на входе и профиле | — |
-| `undo-support` | ❌ | удаления необратимы (тост «Отменить» отсутствует) | P |
+| `undo-support` | ✅ | удалённые смена и шаблон недели возвращаются кнопкой «Отменить» в тосте | — |
 | `success-feedback` | ✅ | тост (`ToastHost`) | — |
 | `error-recovery` | ✅ | `ErrorState` + «Повторить» | — |
 | `multi-step-progress` | ✅ | онбординг с шагами | — |
-| `form-autosave` | ❌ | длинные формы (чек-лист, стандарты) не сохраняют черновик | P |
+| `form-autosave` | ✅ | мастер настройки хранит черновик на устройстве и очищает его после завершения | — |
 | `sheet-dismiss-confirm` | ✅ | этап P: `BottomSheet dirty` спрашивает перед закрытием; подключено в проблемах и передаче смены | — |
 | `error-clarity` | ✅ | `humanizeApiError` + следующий шаг | — |
 | `field-grouping` | ⚠️ | группы визуальные, без `fieldset/legend` | P |
 | `read-only-distinction` | ⚠️ | read-only и disabled не всегда различимы | P |
 | `focus-management` | ✅ | этап P: отказ отправляет фокус в почту, пароль или повтор — в зависимости от причины | — |
-| `error-summary` | ❌ | сводки ошибок нет | P |
+| `error-summary` | ⚠️ | ошибка шага мастера объявляется через `role="alert"`; многополевых форм со сводкой нет | P |
 | `touch-friendly-input` | ✅ | поля 44px+ | — |
 | `destructive-emphasis` | ✅ | красный + отдельное место | — |
 | `toast-accessibility` | ✅ | `aria-live="polite"`, фокус не крадёт | — |

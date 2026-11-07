@@ -268,7 +268,12 @@ export default function OrgSetupScreen({
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {error && (
-          <div className="mb-3 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+          // §3 `error-summary`: ошибка шага объявляется сразу — иначе
+          // скринридер узнаёт о ней, только дойдя до конца шага.
+          <div
+            role="alert"
+            className="mb-3 rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy"
+          >
             <Icon name="alert" size={13} className="mr-1 inline-block" />
             {error}
           </div>
@@ -887,7 +892,10 @@ function PeopleStep({
       </div>
 
       {error && (
-        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div
+          role="alert"
+          className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy"
+        >
           {error}
         </div>
       )}
@@ -1110,7 +1118,10 @@ function ScheduleStep({
       </div>
 
       {error && (
-        <div className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+        <div
+          role="alert"
+          className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy"
+        >
           {error}
         </div>
       )}
