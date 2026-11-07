@@ -2167,4 +2167,13 @@ export const EN_CONTENT: Record<string, string> = {
   "У этого человека уже есть профиль в филиале.": "This person already has a profile in the branch.",
   "Он уже в этом филиале.": "They are already in this branch.",
   "Этот филиал не входит в вашу сеть.": "This branch is not part of your network.",
+  "Что будем делать?": "What would you like to do?",
+  "Проверить, что горит": "Check what needs attention",
+  "Дать поручение": "Assign a task",
+  "Показать все разделы": "Show all sections",
+  "Свернуть лишние разделы": "Hide extra sections",
+  "Подробность интерфейса": "Interface detail",
+  "Простой — только основное. Расширенный — все разделы сразу.": "Simple shows the essentials. Advanced shows every section at once.",
+  "Простой режим": "Simple mode",
+  "Расширенный режим": "Advanced mode",
 };

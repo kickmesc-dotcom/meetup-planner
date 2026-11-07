@@ -44,6 +44,7 @@ import PlatformScreen from "./PlatformScreen";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
+import { useUxMode } from "./uxMode";
 
 /**
  * Админка управляющего. Здесь только рабочие вещи: люди, смена, контроль,
@@ -449,6 +450,13 @@ const GROUPS: { title: string; icon: IconName }[] = [
  * компании (чек-листы, люди, приглашения), но не хозяин сервера: эти карточки
  * ему не нужны и только пугают.
  */
+/**
+ * Что остаётся в простом режиме: люди, контроль над сменой, результат и
+ * настройки. Документы, календарь и системы — по кнопке «Показать все».
+ * Это не запрет, а порядок: спрятанное остаётся в одном нажатии.
+ */
+const SIMPLE_GROUPS = [GROUP_PEOPLE, GROUP_TEAM, GROUP_RESULT, GROUP_SETTINGS];
+
 const PLATFORM_SECTIONS: Section[] = [
   // Админка платформы: клиенты всех организаций. Владельцу салона она не
   // нужна и опасна — он увидел бы чужие компании.
@@ -535,6 +543,11 @@ export default function AdminScreen({
   const setSection = useUI((s) => s.setAdminSection);
   const [query, setQuery] = useState("");
   const [usage, setUsage] = useState<Record<string, number>>(readUsage);
+  // §11: простой режим прячет редкие группы за одну кнопку, расширенный
+  // показывает всё сразу. Поиск и «Частое» работают одинаково в обоих.
+  const uxMode = useUxMode();
+  const [showAll, setShowAll] = useState(false);
+  const simple = uxMode === "simple" && !showAll;
 
   // GHG11(4): переход из анонса фичи — сразу открыть нужный подраздел.
   const pendingAdminSection = useUI((s) => s.pendingAdminSection);
@@ -647,6 +660,20 @@ export default function AdminScreen({
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      {!needle && <QuickActions onPick={select} />}
+
+      {uxMode === "simple" && (
+        <button
+          type="button"
+          onClick={() => setShowAll((value) => !value)}
+          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm text-tg-link press"
+        >
+          {showAll
+            ? tx("Свернуть лишние разделы")
+            : tx("Показать все разделы")}
+        </button>
+      )}
+
       <div className="relative">
         <Icon
           name="search"
@@ -701,7 +728,9 @@ export default function AdminScreen({
               {frequent.map(card)}
             </SectionGroup>
           )}
-          {GROUPS.map((group) => {
+          {GROUPS.filter(
+            (group) => !simple || SIMPLE_GROUPS.includes(group.title),
+          ).map((group) => {
             const items = sections.filter(
               (s) => s.group === group.title && !lifted.has(s.id),
             );
@@ -719,6 +748,46 @@ export default function AdminScreen({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Три ответа на вопрос «что мне сейчас нужно сделать?» (промпт §4.2).
+ *
+ * Почему именно эти три. В первый день владелец приходит не «настраивать", а
+ * снять три боли: что-то горит по срокам, людям нужно поручение и в команде
+ * не хватает человека. Всё остальное — каталог ниже, когда эти три закрыты.
+ */
+function QuickActions({ onPick }: { onPick: (s: Section) => void }) {
+  const { tx } = useTx();
+  const actions: { id: Section; icon: IconName; label: string }[] = [
+    { id: "attention", icon: "alert", label: tx("Проверить, что горит") },
+    { id: "admin-tasks", icon: "clipboard", label: tx("Дать поручение") },
+    { id: "invitations", icon: "send", label: tx("Пригласить сотрудника") },
+  ];
+  return (
+    <section aria-label={tx("Что будем делать?")} data-testid="admin-quick-actions">
+      <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
+        {tx("Что будем делать?")}
+      </h2>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {actions.map((action) => (
+          <button
+            key={action.id}
+            type="button"
+            onClick={() => onPick(action.id)}
+            className="flex min-h-11 items-center gap-2 rounded-tile bg-tg-secondary-bg px-3 text-left text-sm font-medium text-tg-text press"
+          >
+            <Icon
+              name={action.icon}
+              size={18}
+              className="shrink-0 text-tg-link"
+            />
+            <span className="truncate">{action.label}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 

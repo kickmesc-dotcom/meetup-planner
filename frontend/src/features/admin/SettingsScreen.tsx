@@ -21,6 +21,7 @@ import ThemeSwitcher from "@/components/ThemeSwitcher";
 import SubScreen from "@/features/admin/SubScreen";
 import { useTx } from "@/i18n";
 import { haptic } from "@/tg/webapp";
+import { setUxMode, useUxMode } from "./uxMode";
 
 interface Shortcut {
   id: string;
@@ -86,6 +87,7 @@ export default function SettingsScreen({
   platform?: boolean;
 }) {
   const { tx } = useTx();
+  const uxMode = useUxMode();
   const shortcuts = SHORTCUTS.filter((s) => s.id !== "texts" || platform);
 
   return (
@@ -115,6 +117,43 @@ export default function SettingsScreen({
             </div>
           </div>
           <ThemeSwitcher />
+        </div>
+      </section>
+
+      <section
+        aria-label={tx("Подробность интерфейса")}
+        className="rounded-card border border-tg-secondary-bg bg-tg-secondary-bg/20 p-3"
+      >
+        <div className="text-sm font-semibold text-tg-text">
+          {tx("Подробность интерфейса")}
+        </div>
+        <p className="mt-1 text-xs text-tg-hint">
+          {tx("Простой — только основное. Расширенный — все разделы сразу.")}
+        </p>
+        <div
+          role="group"
+          aria-label={tx("Подробность интерфейса")}
+          className="mt-2 grid grid-cols-2 gap-2"
+        >
+          {(["simple", "advanced"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={uxMode === value}
+              onClick={() => {
+                haptic("selection");
+                setUxMode(value);
+              }}
+              className={[
+                "min-h-11 rounded-tile px-3 text-sm press",
+                uxMode === value
+                  ? "bg-tg-button font-medium text-tg-button-text"
+                  : "bg-tg-secondary-bg text-tg-text",
+              ].join(" ")}
+            >
+              {value === "simple" ? tx("Простой режим") : tx("Расширенный режим")}
+            </button>
+          ))}
         </div>
       </section>
 
