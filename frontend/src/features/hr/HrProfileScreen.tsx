@@ -852,13 +852,13 @@ export default function HrProfileScreen() {
       )}
 
       {showTraining && (
-        <div className="fixed inset-0 z-40 mx-auto flex w-full max-w-[560px] bg-tg-bg">
+        <div className="fixed inset-0 z-sheet mx-auto flex w-full max-w-[560px] bg-tg-bg">
           <TrainingScreen onClose={() => setShowTraining(false)} />
         </div>
       )}
 
       {orgSetupOpen && !orgSetupQ.data && (
-        <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-[560px] flex-col items-center justify-center gap-2 bg-tg-bg">
+        <div className="fixed inset-0 z-overlay mx-auto flex w-full max-w-[560px] flex-col items-center justify-center gap-2 bg-tg-bg">
           <CardSkeleton />
           <button
             type="button"
@@ -871,7 +871,7 @@ export default function HrProfileScreen() {
       )}
 
       {orgSetupOpen && orgSetupQ.data && (
-        <div className="fixed inset-0 z-50 mx-auto flex w-full max-w-[560px] bg-tg-bg">
+        <div className="fixed inset-0 z-overlay mx-auto flex w-full max-w-[560px] bg-tg-bg">
           <OrgSetupScreen
             setup={{ ...orgSetupQ.data, done: false }}
             onClose={() => {

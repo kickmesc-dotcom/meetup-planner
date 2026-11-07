@@ -191,7 +191,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
     <AnimatePresence>
       <motion.div
         key="backdrop"
-        className="fixed inset-0 bg-black/40 z-40"
+        className="fixed inset-0 bg-black/40 z-sheet"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -199,7 +199,7 @@ export default function RangeEditorSheet({ rangeId, windowStart, windowEnd, meId
       />
       <motion.div
         key="sheet"
-        className="fixed inset-x-0 bottom-0 z-50 rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
+        className="fixed inset-x-0 bottom-0 z-overlay rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}

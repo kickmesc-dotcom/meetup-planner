@@ -621,7 +621,7 @@ function KudosSheet({ onClose }: { onClose: () => void }) {
   const { tx } = useTx();
   return (
     <div
-      className="fixed inset-0 z-40 flex flex-col justify-end"
+      className="fixed inset-0 z-sheet flex flex-col justify-end"
       role="dialog"
       aria-modal="true"
       aria-label={tx("Благодарности")}
@@ -693,7 +693,7 @@ function FiltersSheet({
 }) {
   const { tx } = useTx();
   return (
-    <div className="fixed inset-0 z-40 flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={tx("Фильтры ленты")}>
+    <div className="fixed inset-0 z-sheet flex flex-col justify-end" role="dialog" aria-modal="true" aria-label={tx("Фильтры ленты")}>
       <button
         type="button"
         aria-label={tx("Закрыть фильтры")}

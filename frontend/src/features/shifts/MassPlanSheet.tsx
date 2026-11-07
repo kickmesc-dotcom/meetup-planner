@@ -152,7 +152,7 @@ export default function MassPlanSheet({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-sheet flex items-end bg-black/40" onClick={onClose}>
       <div
         className="mx-auto max-h-[92vh] w-full max-w-[560px] overflow-y-auto rounded-t-card bg-tg-bg p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]"
         onClick={(event) => event.stopPropagation()}

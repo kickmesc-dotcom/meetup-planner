@@ -43,7 +43,7 @@ export default function EmployeeCardSheet({
 
   return (
     <div
-      className="fixed inset-0 z-50 mx-auto flex w-full max-w-[560px] flex-col bg-tg-bg"
+      className="fixed inset-0 z-overlay mx-auto flex w-full max-w-[560px] flex-col bg-tg-bg"
       role="dialog"
       aria-modal="true"
       aria-label={tx("Карточка сотрудника")}

@@ -127,9 +127,9 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `spacing-scale` | ⚠️ | 4/8 в основном; есть `px-0.5`, `gap-0.5` | M |
 | `touch-density` | ⚠️ | плотные списки: кнопки 32–36px | M |
 | `container-width` | ✅ | одна ширина контента | — |
-| `z-index-management` | ❌ | `z-[100]`, `z-40`, `z-50`, `z-10` без шкалы (`MediaLightbox`, `BottomSheet`) | Q |
+| `z-index-management` | ✅ | этап Q: шкала `z-sheet`/`z-overlay`/`z-lightbox` в Tailwind, числовые слои заменены в 13 файлах, страж `styles.zindex.test.ts` | — |
 | `fixed-element-offset` | ✅ | полоса вкладок + safe-area; `Suspense`-скелет | — |
-| `scroll-behavior` | ⚠️ | вложенные скроллы в шторках | Q |
+| `scroll-behavior` | ✅ | этап Q: `overscroll-contain` в шторке — прокрутка не уходит странице под ней | — |
 | `viewport-units` | ✅ | `h-full`/`dvh`-эквивалент, без `100vh` | — |
 | `orientation-support` | ⚠️ | ландшафт не проверялся | S |
 | `content-priority` | ✅ | главное сверху, каталог ниже | — |
@@ -242,7 +242,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `modal-escape` | ✅ | этап N: Escape + кнопка закрытия + `aria-modal` (тест) | — |
 | `search-accessible` | ✅ | поиск в кабинете и лентах сверху | — |
 | `breadcrumb-web` | — | глубина ≤ 2 | — |
-| `state-preservation` | ⚠️ | фильтры ленты живут в состоянии компонента | Q |
+| `state-preservation` | ✅ | срез фильтров ленты сохраняется на сотрудника (`readFeedFilters`/`saveFeedFilters`) и восстанавливается при входе | — |
 | `gesture-nav-support` | ✅ | Telegram BackButton | — |
 | `tab-badge` | ✅ | счётчик задач, очищается при открытии | — |
 | `overflow-menu` | ⚠️ | длинные ряды кнопок сжимаются, а не уходят в «ещё» | Q |
@@ -316,4 +316,5 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 07.11.2026 | M | Тач-цели 44px в 14 файлах, `touch-action`, курсор, хит-зона иконки дня рождения 24×24 | `tsc` 0; целевые 6 файлов/25 тестов; полный фронт 888 тестов/114 файлов; сборка 0 |
 | 07.11.2026 | N | `aria-current` и имя полосы, Escape/крестик/`aria-modal` в шторке, `h1` профиля, ключ `nav.main` в RU/EN/UZ | `tsc` 0; `BottomSheet.test.tsx` 4 теста; полный фронт 888 тестов; сборка 0 |
 | 07.11.2026 | S (контраст) | Ссылки и ошибки внесены в расчёт WCAG; светлая ссылка 4.17→5.23:1, ошибка 4.23→5.62:1, тёмная ошибка 4.07→5.85:1 | `theme.contrast.test.ts` 12 тестов; `tsc` 0 |
-| 07.11.2026 | P | Ошибка у поля и фокус на первом проблемном, подтверждение закрытия шторки с вводом, IME-Enter | `tsc` 0; `AuthScreen`/`BottomSheet` 11 тестов; полный фронт 896 тестов |
+| 07.11.2026 | P | Ошибка у поля и фокус на первом проблемном, подтверждение закрытия шторки с вводом, IME-Enter | `tsc` 0; `AuthScreen`/`BottomSheet` 11 тестов; полный фронт 896 тестов; живая проверка входа на проде |
+| 07.11.2026 | Q | Шкала слоёв, `overscroll-contain`, подтверждено сохранение фильтров ленты | `styles.zindex.test.ts`; полный фронт; сборка |

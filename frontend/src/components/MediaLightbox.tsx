@@ -183,7 +183,7 @@ export default function MediaLightbox({ src, alt = "", onClose }: Props) {
         // Клик по фону (не по картинке и не после перетаскивания) закрывает.
         if (!moved.current) onClose();
       }}
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/95"
+      className="fixed inset-0 z-lightbox flex items-center justify-center overflow-hidden bg-black/95"
       style={{ touchAction: "none" }}
     >
       <button

@@ -219,7 +219,7 @@ export function PhotoThumbs({
           role="dialog"
           aria-modal="true"
           aria-label={tx("Просмотр фото")}
-          className="fixed inset-0 z-50 flex flex-col bg-black/90"
+          className="fixed inset-0 z-overlay flex flex-col bg-black/90"
           onClick={() => setOpen(null)}
         >
           <div className="flex justify-end p-3">

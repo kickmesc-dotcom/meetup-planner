@@ -23,7 +23,7 @@ export default function ToastHost() {
       role="status"
       aria-live="polite"
       data-testid="toast-host"
-      className="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-20 z-overlay flex flex-col items-center gap-2 px-4"
     >
       {toasts.map((toast) => (
         <ToastRow

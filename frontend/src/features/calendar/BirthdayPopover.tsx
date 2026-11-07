@@ -112,7 +112,7 @@ export default function BirthdayPopover() {
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/40"
+      className="fixed inset-0 z-sheet flex items-end justify-center bg-black/40"
       onClick={close}
     >
       <div

@@ -50,6 +50,16 @@ export default {
           "monospace",
         ],
       },
+      // UI_UX_PRO_MAX §9 `z-index-management`: слои — это шкала, а не числа
+      // «по месту». `sheet` — фон/экран поверх вкладок, `overlay` — панель или
+      // тост над ним, `lightbox` — просмотр фото поверх всего. Локальные
+      // `z-10`/`z-20` остаются для sticky-строк внутри своей прокрутки: это не
+      // слои приложения, а порядок внутри одного контейнера.
+      zIndex: {
+        sheet: "40",
+        overlay: "50",
+        lightbox: "100",
+      },
       colors: {
         // Telegram theme variables, mapped to Tailwind tokens (alpha-capable).
         "tg-bg": themeColor("bg-color", "#ffffff"),

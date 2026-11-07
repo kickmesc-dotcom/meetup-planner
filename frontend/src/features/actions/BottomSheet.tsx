@@ -53,7 +53,7 @@ export default function BottomSheet({
       <motion.div
         key="backdrop"
         data-testid="sheet-backdrop"
-        className="fixed inset-0 bg-black/40 z-40"
+        className="fixed inset-0 bg-black/40 z-sheet"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -68,7 +68,10 @@ export default function BottomSheet({
         // Низ шторки — с запасом на home-индикатор: иначе на iPhone в режиме
         // «на домашнем экране» последняя кнопка оказывается под полосой
         // системы, и нажать её нельзя (M1, docs/MOBILE_PARALLEL.md).
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
+        // §9 `scroll-behavior`: `overscroll-contain` не отдаёт прокрутку
+        // странице под шторкой — иначе на телефоне она «уезжает» вместе с
+        // содержимым листа, и человек теряет место, где был.
+        className="fixed inset-x-0 bottom-0 z-overlay max-h-[85vh] overflow-y-auto overscroll-contain rounded-t-card bg-tg-bg p-4 pb-8 shadow-xl"
         style={{ paddingBottom: `calc(2rem + ${SAFE_AREA_BOTTOM})` }}
         initial={{ y: "100%" }}
         animate={{ y: 0 }}

@@ -47,7 +47,7 @@ export default function DepartmentScreen({
 
   return (
     <div
-      className="fixed inset-0 z-40 mx-auto flex w-full max-w-[560px] flex-col bg-tg-bg"
+      className="fixed inset-0 z-sheet mx-auto flex w-full max-w-[560px] flex-col bg-tg-bg"
       role="dialog"
       aria-modal="true"
       aria-label={tx("Подразделение")}
