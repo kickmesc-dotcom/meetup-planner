@@ -791,6 +791,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Тебя нет в списке шестёрки": "You're not on the core team list",
   "Скинь админу свой Telegram ID командой /whoami боту.": "Send your Telegram ID to the admin with the /whoami command in the bot.",
   "Ошибка авторизации": "Sign-in error",
+  "Нет связи с сервером": "No connection to the server",
   "Не удалось загрузить участников": "Couldn't load the members",
   "Встречи и опросы": "Meetings and polls",
   "RSVP по встречам и голосования за слот — всё в одном месте.": "Meeting RSVPs and slot votes — all in one place.",

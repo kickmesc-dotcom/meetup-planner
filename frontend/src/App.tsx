@@ -8,6 +8,7 @@ import {
   type UiPrefs,
 } from "./api/availability";
 import { useBootstrap } from "./api/bootstrap";
+import { getAccessToken, getSessionToken } from "./api/client";
 
 const MeetingsPollsScreen = lazy(() => import("./features/meetings/MeetingsPollsScreen"));
 // SemiTaskBot: рабочие экраны сотрудника.
@@ -217,7 +218,32 @@ export default function App() {
     if (typeof uzPack === "boolean") setUzPackAvailable(uzPack);
   }, [uzPack, setUzPackAvailable]);
 
-  if (me.isPending || users.isPending) {
+  // Без сохранённого входа форма нужна сразу: ждать отказа сервера, чтобы
+  // её показать, значит держать нового человека на пустой загрузке.
+  const hasStoredAuth =
+    !!getInitData() || !!getSessionToken() || !!getAccessToken();
+  const authScreen = (
+    <AuthScreen
+      // Пока человек вводил пароль, `/users` и `/me/ui-prefs` уже
+      // запросили API без токена и попали в ошибку. Без сброса кеша
+      // после входа экран показывал «Не удалось загрузить участников /
+      // Нет доступа», и надо было догадаться нажать «Повторить».
+      onDone={() => {
+        void qc.invalidateQueries();
+        void me.refetch();
+      }}
+      invited={!!inviteToken}
+    />
+  );
+  // Скелет — только пока старт действительно идёт. Запрос, вставший без
+  // сети (`fetchStatus: "paused"`), не должен оставлять человека на
+  // бесконечной загрузке: ниже его встретит форма или экран повтора.
+  const bootStarting = boot.isPending && boot.fetchStatus !== "paused";
+  const fallbackStarting =
+    bootFailed &&
+    (me.isPending || users.isPending) &&
+    (me.fetchStatus === "fetching" || users.fetchStatus === "fetching");
+  if (bootStarting || fallbackStarting) {
     // На ПК скелет тоже широкий: иначе при загрузке на секунду мелькала бы
     // мобильная колонка 560px, а потом каркас «прыгал» в дэшборд.
     if (isDesktop) {
@@ -262,19 +288,7 @@ export default function App() {
       // нет — показываем форму входа. Тупик «нужен вход» остался только для
       // мини-аппа, где `initData` подписал бот, но сервер его не принял.
       if (!getInitData()) {
-        return (
-          <AuthScreen
-            // Пока человек вводил пароль, `/users` и `/me/ui-prefs` уже
-            // запросили API без токена и попали в ошибку. Без сброса кеша
-            // после входа экран показывал «Не удалось загрузить участников /
-            // Нет доступа», и надо было догадаться нажать «Повторить».
-            onDone={() => {
-              void qc.invalidateQueries();
-              void me.refetch();
-            }}
-            invited={!!inviteToken}
-          />
-        );
+        return authScreen;
       }
       return (
         <div className="flex h-full items-center justify-center px-6 text-center">
@@ -357,6 +371,24 @@ export default function App() {
         error={me.error}
         onRetry={() => me.refetch()}
         title={tx("Ошибка авторизации")}
+      />
+    );
+  }
+
+  // Данных профиля нет, и запрос не идёт: сеть пропала или запрос встал.
+  // Без сохранённого входа это обычный первый запуск — форма входа, а не
+  // скелет; с сохранённым — экран связи с кнопкой повтора.
+  if (!me.data) {
+    if (!hasStoredAuth) return authScreen;
+    return (
+      <ErrorState
+        error={me.error}
+        onRetry={() => {
+          void boot.refetch();
+          void me.refetch();
+          void users.refetch();
+        }}
+        title={tx("Нет связи с сервером")}
       />
     );
   }
