@@ -85,17 +85,21 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
             >
               {u.avatar_url ? (
                 <img
-                src={u.avatar_url}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover"
-              />
+                  src={u.avatar_url}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 u.display_name[0]?.toUpperCase()
               )}
             </div>
-            <div className="text-3xs text-tg-hint truncate max-w-[64px] mt-0.5">
+            {/* §6 `truncation-strategy`: обрезанное имя остаётся доступным целиком. */}
+            <div
+              className="text-3xs text-tg-hint truncate max-w-[64px] mt-0.5"
+              title={u.display_name}
+            >
               {u.display_name.split(/\s+/)[0]}
             </div>
           </div>

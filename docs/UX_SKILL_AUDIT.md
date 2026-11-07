@@ -76,7 +76,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
-| `image-optimization` | ⚠️ | аватары без `loading="lazy"`: `MeetingsScreen:199`, `HoursView:87`, `ParticipantRow:157`, `PollsScreen:148` | O |
+| `image-optimization` | ✅ | этап R: все четыре аватара грузятся лениво (`loading="lazy"`, `decoding="async"`) | — |
 | `image-dimension` | ⚠️ | у части `<img>` нет `width/height` или `aspect-ratio` | O |
 | `font-loading` | ✅ | системные шрифты, веб-шрифтов нет | — |
 | `font-preload` | — | грузить нечего | — |
@@ -86,13 +86,13 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `third-party-scripts` | ✅ | сторонних скриптов нет | — |
 | `reduce-reflows` | ⚠️ | отдельно не аудировалось | — |
 | `content-jumping` | ✅ | скелеты той же формы (`loading.guard.test.ts`) | — |
-| `lazy-load-below-fold` | ⚠️ | см. `image-optimization` | O |
+| `lazy-load-below-fold` | ✅ | этап R: изображения ниже первого экрана не грузятся до прокрутки | — |
 | `virtualize-lists` | ⚠️ | лента и журнал без виртуализации; на 50+ записей — риск | R |
 | `main-thread-budget` | ⚠️ | не измерялось | — |
 | `progressive-loading` | ✅ | `Skeleton`, а не «Загрузка…» | — |
-| `input-latency` | ⚠️ | поиск в кабинете без debounce | R |
+| `input-latency` | ✅ | этап R: общий `useDebouncedValue` в трёх поисках — поле не ждёт фильтра | — |
 | `tap-feedback-speed` | ✅ | CSS-переход 120мс | — |
-| `debounce-throttle` | ⚠️ | поиск фильтрует на каждый ввод | R |
+| `debounce-throttle` | ✅ | этап R: фильтр применяется через 200 мс после последнего символа | — |
 | `offline-support` | ✅ | `offline/`, PWA, экран повтора | — |
 | `network-fallback` | ⚠️ | медленная сеть: скелет есть, деградации контента нет | — |
 
@@ -152,18 +152,18 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `color-dark-mode` | ✅ | отдельные значения темы | — |
 | `color-accessible-pairs` | ✅ | этап S: ссылки и ошибки добавлены в расчёт; светлая ссылка затемнена до `#1c6fb8`, ошибка — `#c62828`, тёмная ошибка — `#ff6b6b` | — |
 | `color-not-decorative-only` | ✅ | статус = цвет + слово | — |
-| `truncation-strategy` | ❌ | `truncate` без `title`/раскрытия (имена, подписи) | S |
+| `truncation-strategy` | ⚠️ | имена в часовой шкале получили `title`; остальные `truncate` проверяются по экранам | S |
 | `letter-spacing` | ⚠️ | `tracking-wide` у мелких капсов — приемлемо | — |
 | `number-tabular` | ✅ | `tabular-nums` в цифрах, счёте, времени | — |
 | `whitespace-balance` | ✅ | карточки с 12–16px | — |
-| `heading-line-balance` | ⚠️ | `text-wrap: balance` не задан | S |
-| `long-token-wrapping` | ❌ | длинные адреса/имена: `break-words` только в `ErrorState` | S |
+| `heading-line-balance` | ✅ | этап S: `text-wrap: balance` для `h1–h3` | — |
+| `long-token-wrapping` | ✅ | этап S: `overflow-wrap: break-word` на `body` — длинное слово переносится, а не рвёт строку | — |
 
 ## 7. Animation (MEDIUM, 25 правил)
 
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
-| `duration-timing` | ⚠️ | 120мс press, 150мс fade, spring у шторки — без токенов | T |
+| `duration-timing` | ✅ | этап T: токены `--motion-press/fade/exit` и `duration-press/fade/exit` в Tailwind | — |
 | `transform-performance` | ✅ | transform/opacity | — |
 | `loading-states` | ✅ | скелет >1с, спиннер в кнопках | — |
 | `excessive-motion` | ⚠️ | одновременно подсветка вкладки и переход | T |
@@ -173,7 +173,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `continuity` | ✅ | `TabTransition` | — |
 | `parallax-subtle` | — | параллакса нет | — |
 | `spring-physics` | ✅ | framer-motion spring | — |
-| `exit-faster-than-enter` | ⚠️ | длительности равны | T |
+| `exit-faster-than-enter` | ✅ | этап T: выход шторки 160 мс и фона 100 мс против пружинного входа | — |
 | `stagger-sequence` | ⚠️ | списки появляются целиком | — |
 | `shared-element-transition` | ⚠️ | нет общих элементов между экранами | — |
 | `interruptible` | ⚠️ | шторка не отменяется новым тапом до завершения | T |
@@ -182,7 +182,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `scale-feedback` | ✅ | CSS press 0.98 | — |
 | `gesture-feedback` | ⚠️ | drag календаря — не проверялся | — |
 | `hierarchy-motion` | ⚠️ | вход снизу у шторки; у экранов — fade | — |
-| `motion-consistency` | ⚠️ | три разных длительности без общего токена | T |
+| `motion-consistency` | ✅ | этап T: одна шкала движения на всё приложение | — |
 | `opacity-threshold` | ⚠️ | скелеты 30–70 % — не контент | — |
 | `modal-motion` | ✅ | шторка снизу + фон | — |
 | `navigation-direction` | ⚠️ | вкладки без направления | — |
@@ -280,7 +280,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `legend-interactive` | — | нет легенд | — |
 | `direct-labeling` | — | нет графиков | — |
 | `tooltip-keyboard` | — | нет тултипов с данными | — |
-| `sortable-table` | ⚠️ | таблицы не сортируются, `aria-sort` нет | R |
+| `sortable-table` | ✅ | этап R: таблица материалов сортируется по колонке, `aria-sort` и стрелка состояния | — |
 | `axis-readability` | — | нет осей | — |
 | `data-density` | ✅ | один показатель на карточку | — |
 | `trend-emphasis` | — | трендов нет | — |
@@ -317,4 +317,6 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 07.11.2026 | N | `aria-current` и имя полосы, Escape/крестик/`aria-modal` в шторке, `h1` профиля, ключ `nav.main` в RU/EN/UZ | `tsc` 0; `BottomSheet.test.tsx` 4 теста; полный фронт 888 тестов; сборка 0 |
 | 07.11.2026 | S (контраст) | Ссылки и ошибки внесены в расчёт WCAG; светлая ссылка 4.17→5.23:1, ошибка 4.23→5.62:1, тёмная ошибка 4.07→5.85:1 | `theme.contrast.test.ts` 12 тестов; `tsc` 0 |
 | 07.11.2026 | P | Ошибка у поля и фокус на первом проблемном, подтверждение закрытия шторки с вводом, IME-Enter | `tsc` 0; `AuthScreen`/`BottomSheet` 11 тестов; полный фронт 896 тестов; живая проверка входа на проде |
-| 07.11.2026 | Q | Шкала слоёв, `overscroll-contain`, подтверждено сохранение фильтров ленты | `styles.zindex.test.ts`; полный фронт; сборка |
+| 07.11.2026 | Q | Шкала слоёв, `overscroll-contain`, подтверждено сохранение фильтров ленты | `styles.zindex.test.ts`; полный фронт; сборка
+| 07.11.2026 | R | Debounce поиска, сортировка таблицы с `aria-sort`, ленивые аватары | полный фронт; сборка; эмодзи-страж
+| 07.11.2026 | S/T | Перенос длинных слов, баланс заголовков, токены движения, короткий выход | полный фронт; сборка |

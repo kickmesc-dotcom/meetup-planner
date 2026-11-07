@@ -56,7 +56,9 @@ export default function BottomSheet({
         className="fixed inset-0 bg-black/40 z-sheet"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        // §7 `exit-faster-than-enter`: уход короче появления — шторка не
+        // задерживает человека, который уже закрыл её.
+        exit={{ opacity: 0, transition: { duration: 0.1 } }}
         onClick={requestClose}
       />
       <motion.div
@@ -75,7 +77,7 @@ export default function BottomSheet({
         style={{ paddingBottom: `calc(2rem + ${SAFE_AREA_BOTTOM})` }}
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
-        exit={{ y: "100%" }}
+        exit={{ y: "100%", transition: { duration: 0.16, ease: "easeIn" } }}
         transition={{ type: "spring", damping: 30, stiffness: 320 }}
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-tg-hint/40" />

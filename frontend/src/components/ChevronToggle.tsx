@@ -26,7 +26,7 @@ export default function ChevronToggle({
       name="chevron"
       size={size}
       className={[
-        "shrink-0 transition-transform duration-150 motion-reduce:transition-none",
+        "shrink-0 transition-transform duration-fade motion-reduce:transition-none",
         open ? "rotate-90" : "",
         className,
       ]
