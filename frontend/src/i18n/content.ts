@@ -2192,4 +2192,5 @@ export const EN_CONTENT: Record<string, string> = {
   "Перезапуск, если сеть зависла": "Restart if the network hangs",
   "Меню, график и методички": "Menu, schedule and guides",
   "Частота напоминаний": "Reminder frequency",
+  "Руководителю: люди, поручения и отчёты": "For managers: people, tasks and reports",
 };

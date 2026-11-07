@@ -106,6 +106,7 @@ export default function DesktopShell({
   const setTab = useUI((s) => s.setTab);
   const adminSection = useUI((s) => s.adminSection);
   const setAdminSection = useUI((s) => s.setAdminSection);
+  const setMode = useUI((s) => s.setMode);
 
   const keep = (items: NavItem[]) =>
     sections ? items.filter((item) => sectionEnabled(item.id, sections)) : items;
@@ -253,6 +254,22 @@ export default function DesktopShell({
             ))
           )}
         </nav>
+
+        {!manage && canManage && (
+          <div className="px-3 pb-2">
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setMode("manage");
+              }}
+              className="flex min-h-10 w-full items-center gap-2.5 rounded-tile bg-tg-link/10 px-3 text-left text-sm font-medium text-tg-link"
+            >
+              <Icon name="layout" size={18} />
+              <span className="min-w-0 flex-1 truncate">{tx("Управление")}</span>
+            </button>
+          </div>
+        )}
 
         <div className="border-t border-tg-hint/10 px-3 py-3">
           <div className="flex items-center gap-2">

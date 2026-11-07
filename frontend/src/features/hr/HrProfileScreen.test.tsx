@@ -209,7 +209,9 @@ describe("HrProfileScreen (P1.7)", () => {
     renderScreen();
     await screen.findByText("Пётр");
 
-    expect(screen.getByText("Руководителю")).toBeTruthy();
+    expect(
+      screen.getByText("Руководителю: люди, поручения и отчёты"),
+    ).toBeTruthy();
 
     // До раскрытия «Все разделы» управленческих пунктов в списке нет:
     // они живут только в своём блоке.

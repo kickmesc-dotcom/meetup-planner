@@ -659,7 +659,7 @@ export default function HrProfileScreen() {
         <section className="rounded-card bg-tg-bg/40 ring-1 ring-tg-hint/15">
           <div className="flex items-center gap-2 px-3 pt-2.5">
             <span className="text-2xs font-semibold uppercase tracking-wide text-tg-hint">
-              {tx("Руководителю")}
+              {tx("Руководителю: люди, поручения и отчёты")}
             </span>
           </div>
           <div className="p-2">

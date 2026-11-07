@@ -699,6 +699,7 @@ export default function App() {
         <DesktopShell
           sections={sections ?? undefined}
           openTasks={openTasks}
+          canManage={canManageZone}
           meName={hrMe.data?.display_name.replace("[BOT]", "").trim() || meData.display_name}
           meHint={
             hrMe.data?.position ??
