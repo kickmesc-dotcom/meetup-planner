@@ -118,7 +118,7 @@ export default function JobsQueueScreen({ onBack }: Props) {
               enterHotMode();
               jobs.refetch();
             }}
-            className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-2xs text-tg-hint press"
+            className="shrink-0 rounded-tile bg-tg-bg/70 px-2 py-1 text-xs text-tg-hint press"
             title={tx("Обновить и опрашивать чаще 3 минуты")}
           >
             <Icon name="refresh" size={13} className="mr-1 inline-block" />

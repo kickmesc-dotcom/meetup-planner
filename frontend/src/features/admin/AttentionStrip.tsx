@@ -181,7 +181,7 @@ function Tile({
       >
         {value}
       </span>
-      <span className="min-w-0 flex-1 text-2xs text-tg-hint">{label}</span>
+      <span className="min-w-0 flex-1 text-xs leading-snug text-tg-hint">{label}</span>
     </button>
   );
 }

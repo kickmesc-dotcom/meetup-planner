@@ -190,7 +190,7 @@ function RailLink({
     <button
       type="button"
       onClick={onClick}
-      className="shrink-0 rounded-full px-2 py-1 text-2xs font-medium text-tg-link hover:bg-tg-link/10"
+      className="shrink-0 rounded-full px-2 py-1 text-xs font-medium text-tg-link hover:bg-tg-link/10"
     >
       {children}
     </button>

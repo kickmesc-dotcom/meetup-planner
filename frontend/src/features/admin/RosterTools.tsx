@@ -392,13 +392,13 @@ export function RosterSnapshotsPanel() {
                   type="button"
                   disabled={busy}
                   onClick={() => void askRestore(snapshot)}
-                  className="min-h-8 rounded-tile bg-tg-secondary-bg px-2 text-2xs text-tg-text disabled:opacity-50"
+                  className="min-h-9 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text disabled:opacity-50"
                 >{tx("Восстановить")}</button>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => void askRemove(snapshot)}
-                  className="min-h-8 rounded-tile bg-status-busy/15 px-2 text-2xs text-status-busy disabled:opacity-50"
+                  className="min-h-9 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-50"
                 >{tx("Удалить")}</button>
               </div>
             </div>
