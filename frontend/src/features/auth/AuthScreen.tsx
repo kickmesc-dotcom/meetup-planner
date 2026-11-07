@@ -58,6 +58,9 @@ export default function AuthScreen({
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // UI_UX_PRO_MAX §8 `password-toggle`: человек должен иметь возможность
+  // проверить ввод, не перепечатывая пароль вслепую.
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -121,6 +124,8 @@ export default function AuthScreen({
     setError(null);
     setSent(false);
     setPassword("");
+    // Пароль нового режима не должен открытым текстом перейти в следующий.
+    setShowPassword(false);
   };
 
   const submit = (event: FormEvent) => {
@@ -209,7 +214,7 @@ export default function AuthScreen({
                     autoComplete="name"
                     maxLength={64}
                     placeholder={t("auth.name.placeholder")}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text placeholder:text-tg-hint"
+                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
                   />
                 </label>
               )}
@@ -224,23 +229,39 @@ export default function AuthScreen({
                   onChange={(e) => setEmail(e.target.value)}
                   maxLength={255}
                   placeholder="name@company.ru"
-                  className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text placeholder:text-tg-hint"
+                  className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
                 />
               </label>
 
               {mode !== "forgot" && (
-                <label className="block">
-                  <span className="text-xs text-tg-hint">{t("auth.password.label")}</span>
-                  <input
-                    type="password"
-                    autoComplete={mode === "register" ? "new-password" : "current-password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    maxLength={128}
-                    placeholder={mode === "register" ? t("auth.password.placeholder") : ""}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text placeholder:text-tg-hint"
-                  />
-                </label>
+                // `label htmlFor` + отдельная кнопка-глаз: обёртка-label
+                // перехватывала бы клик по глазу и уводила фокус в поле.
+                <div>
+                  <label htmlFor="auth-password" className="block text-xs text-tg-hint">
+                    {t("auth.password.label")}
+                  </label>
+                  <div className="relative mt-1">
+                    <input
+                      id="auth-password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={mode === "register" ? "new-password" : "current-password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      maxLength={128}
+                      placeholder={mode === "register" ? t("auth.password.placeholder") : ""}
+                      className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 pr-12 text-base text-tg-text placeholder:text-tg-hint"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((value) => !value)}
+                      aria-label={t(showPassword ? "auth.password.hide" : "auth.password.show")}
+                      aria-pressed={showPassword}
+                      className="absolute inset-y-0 right-0 grid min-h-11 min-w-11 place-items-center rounded-tile px-3 text-tg-hint"
+                    >
+                      <Icon name={showPassword ? "eyeOff" : "eye"} size={18} />
+                    </button>
+                  </div>
+                </div>
               )}
 
               {error && (

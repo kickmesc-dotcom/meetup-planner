@@ -65,13 +65,16 @@ function ToastRow({
         ].join(" ")}
       />
       <span className="min-w-0 flex-1 break-words">{text}</span>
+      {/* UI_UX_PRO_MAX §2 `touch-target-size`: закрытие — тоже кнопка,
+          поэтому 44×44, а не 32px текстового «×». Отрицательные отступы
+          не дают тосту вырасти из-за увеличенной тач-цели. */}
       <button
         type="button"
         aria-label={closeLabel}
         onClick={() => dismissToast(id)}
-        className="min-h-8 shrink-0 rounded-tile px-1 text-xs text-tg-hint"
+        className="-my-2 -mr-2 grid min-h-11 min-w-11 shrink-0 place-items-center rounded-tile text-tg-hint"
       >
-        ×
+        <Icon name="close" size={16} />
       </button>
     </div>
   );

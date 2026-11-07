@@ -13,6 +13,8 @@ import {
   Copy,
   DataTransferBoth,
   EditPencil,
+  Eye,
+  EyeClosed,
   Flash,
   FloppyDisk,
   Globe,
@@ -124,7 +126,10 @@ export type IconName =
   | "swap"
   | "signal"
   | "bolt"
-  | "mic";
+  | "mic"
+  // UI_UX_PRO_MAX §8 `password-toggle`: глаз открытый/перечёркнутый.
+  | "eye"
+  | "eyeOff";
 
 interface Props extends Omit<SVGProps<SVGSVGElement>, "name"> {
   name: IconName;
@@ -188,6 +193,8 @@ const ICONS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   signal: Network,
   bolt: Flash,
   mic: Microphone,
+  eye: Eye,
+  eyeOff: EyeClosed,
 };
 
 /**
