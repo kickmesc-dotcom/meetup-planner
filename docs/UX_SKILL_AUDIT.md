@@ -87,7 +87,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `reduce-reflows` | ⚠️ | отдельно не аудировалось | — |
 | `content-jumping` | ✅ | скелеты той же формы (`loading.guard.test.ts`) | — |
 | `lazy-load-below-fold` | ✅ | этап R: изображения ниже первого экрана не грузятся до прокрутки | — |
-| `virtualize-lists` | ⚠️ | лента и журнал без виртуализации; на 50+ записей — риск | R |
+| `virtualize-lists` | ✅ | лента рисует по 60, журнал по 40 записей; фильтры начинают порцию заново | — |
 | `main-thread-budget` | ⚠️ | не измерялось | — |
 | `progressive-loading` | ✅ | `Skeleton`, а не «Загрузка…» | — |
 | `input-latency` | ✅ | этап R: общий `useDebouncedValue` в трёх поисках — поле не ждёт фильтра | — |
