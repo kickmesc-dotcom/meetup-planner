@@ -280,11 +280,20 @@ export default function AuthScreen({
         </div>
 
         {/* В установленном приложении про Telegram молчим: там его нет, и
-            фраза читалась бы как ошибка выбора. */}
+            фраза читалась бы как ошибка выбора.
+            Смысл — пояснение, а не часть формы: отдельная плашка с иконкой,
+            чтобы текст не висел в воздухе мелким абзацем. */}
         {!standalone && (
-          <p className="mt-3 px-1 text-xs text-tg-hint">
-            {t("auth.telegramNote")}
-          </p>
+          <div className="mt-3 flex items-start gap-2 rounded-tile bg-tg-secondary-bg/50 p-3 ring-1 ring-tg-hint/10">
+            <Icon
+              name="bot"
+              size={16}
+              className="mt-0.5 shrink-0 text-tg-hint"
+            />
+            <p className="min-w-0 flex-1 text-xs leading-snug text-tg-hint">
+              {t("auth.telegramNote")}
+            </p>
+          </div>
         )}
       </div>
     </div>
