@@ -173,6 +173,8 @@ function fmtWhen(iso: string): string {
   });
 }
 
+const FEED_PAGE = 60;
+
 export default function HrFeedScreen() {
   const { tx, locale } = useTx();
   const [employeeId, setEmployeeId] = useState<number | null>(null);
@@ -294,6 +296,9 @@ export default function HrFeedScreen() {
   const filters = filtersQ.data;
   const canFilter = feed?.can_filter === true;
   const items = feed?.items ?? [];
+  // §10 `virtualize-lists`: в ленте бывает несколько сотен событий, а первый
+  // экран показывает десяток. Рисуем порциями: DOM не растёт вместе с историей.
+  const [feedLimit, setFeedLimit] = useState(FEED_PAGE);
   // «Новое» — верхушка ленты новее отметки просмотра. Считаем по тем же
   // строкам, что видит человек (с учётом фильтров): если он смотрит только
   // свои события, чужие не должны попадать в счётчик.
@@ -315,6 +320,12 @@ export default function HrFeedScreen() {
   const selectedDepartment = filters?.departments.find((d) => d.id === departmentId);
   const selectedEmployee = filters?.employees.find((e) => e.id === employeeId);
   const hasFilters = employeeId !== null || departmentId !== null || kinds.length > 0;
+
+  // Фильтры меняют состав ленты — порция начинается заново, иначе после
+  // смены фильтра человек остался бы с «показать ещё» на пустом хвосте.
+  useEffect(() => {
+    setFeedLimit(FEED_PAGE);
+  }, [employeeId, departmentId, kinds, debouncedSearch]);
 
   const resetFilters = () => {
     haptic("selection");
@@ -499,7 +510,7 @@ export default function HrFeedScreen() {
         )}
 
 
-        {groupByDay(items, locale).map((group, index, allGroups) => (
+        {groupByDay(items.slice(0, feedLimit), locale).map((group, index, allGroups) => (
           <FeedDay
             key={group.key}
             group={group}
@@ -517,6 +528,15 @@ export default function HrFeedScreen() {
             onOpenDepartment={setCardDepartmentId}
           />
         ))}
+        {items.length > feedLimit && (
+          <button
+            type="button"
+            onClick={() => setFeedLimit((n) => n + FEED_PAGE)}
+            className="min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 text-xs text-tg-text"
+          >
+            {tx("Показать ещё {count}", { count: items.length - feedLimit })}
+          </button>
+        )}
       </div>
 
       {filtersOpen && filters && (

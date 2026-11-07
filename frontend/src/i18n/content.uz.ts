@@ -25,6 +25,7 @@ export const UZ_CONTENT: Record<string, string> = {
   "Не отправлено: {count}. Отправим, когда появится связь.": "{count} ta yuborilmadi. Aloqa paydo bo'lganda yuboramiz.",
   "Закрыть без сохранения? Введённое не сохранится.": "Saqlashsiz yopilsinmi? Kiritilganlar saqlanmaydi.",
   "К содержимому": "Kontentga o'tish",
+  "Показать ещё {count}": "Yana {count} ta ko'rsatish",
   "Смена удалена.": "Smena o'chirildi.",
   "Смена восстановлена.": "Smena tiklandi.",
   "Шаблон удалён.": "Shablon o'chirildi.",

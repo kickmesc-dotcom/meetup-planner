@@ -101,6 +101,8 @@ function fmtMoment(iso: string): string {
   });
 }
 
+const ISSUES_PAGE = 40;
+
 export default function IssuesScreen() {
   const { tx } = useTx();
   const setTab = useUI((s) => s.setTab);
@@ -117,6 +119,9 @@ export default function IssuesScreen() {
     setSelected(pendingIssueId);
     setPendingIssueId(null);
   }, [pendingIssueId, setPendingIssueId]);
+  // §10 `virtualize-lists`: журнал может прийти сотней карточек, а первый
+  // экран показывает два-три. Рисуем порциями — DOM не растёт вместе с историей.
+  const [limit, setLimit] = useState(ISSUES_PAGE);
 
   const issuesQ = useQuery({
     queryKey: ["hr-issues", view],
@@ -188,6 +193,7 @@ export default function IssuesScreen() {
               onClick={() => {
                 haptic("light");
                 setView(option.value);
+                setLimit(ISSUES_PAGE);
               }}
               className={[
                 "min-h-11 rounded-full px-3 text-xs transition-colors",
@@ -222,7 +228,7 @@ export default function IssuesScreen() {
           </div>
         )}
 
-        {items.map((issue) => (
+        {items.slice(0, limit).map((issue) => (
           <IssueCard
             key={issue.id}
             issue={issue}
@@ -232,6 +238,15 @@ export default function IssuesScreen() {
             }}
           />
         ))}
+        {items.length > limit && (
+          <button
+            type="button"
+            onClick={() => setLimit((n) => n + ISSUES_PAGE)}
+            className="min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 text-xs text-tg-text"
+          >
+            {tx("Показать ещё {count}", { count: items.length - limit })}
+          </button>
+        )}
       </div>
 
       {creating && (
