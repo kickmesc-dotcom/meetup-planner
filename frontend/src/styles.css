@@ -134,7 +134,7 @@ html {
 input, textarea, select {
   color: var(--tg-theme-text-color, #000000);
   background-color: var(--tg-theme-secondary-bg-color, #ffffff);
-  caret-color: var(--tg-theme-link-color, #2481cc);
+  caret-color: var(--tg-theme-link-color, #1c6fb8);
 }
 
 /* Плейсхолдеры: чтоб не сливались с фоном на тёмной теме */
@@ -179,8 +179,8 @@ input {
   border-radius: 8px;
 }
 .chk-tg:checked {
-  background-color: var(--tg-theme-link-color, #2481cc);
-  border-color: var(--tg-theme-link-color, #2481cc);
+  background-color: var(--tg-theme-link-color, #1c6fb8);
+  border-color: var(--tg-theme-link-color, #1c6fb8);
 }
 .chk-tg:checked::after {
   content: "";
@@ -230,7 +230,7 @@ input {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .tgl-tg:checked {
-  background-color: var(--tg-theme-link-color, #2481cc);
+  background-color: var(--tg-theme-link-color, #1c6fb8);
 }
 .tgl-tg:checked::before {
   transform: translateX(18px);
@@ -254,7 +254,7 @@ header .text-base.font-medium {
    вообще. `:focus-visible` (а не `:focus`) — чтобы тапы не рисовали кольцо.
    Цвет — `tg-link`, т.е. тема остаётся источником правды. */
 :focus-visible {
-  outline: 2px solid var(--tg-theme-link-color, #2481cc);
+  outline: 2px solid var(--tg-theme-link-color, #1c6fb8);
   outline-offset: 2px;
 }
 
@@ -270,7 +270,7 @@ header .text-base.font-medium {
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--tg-theme-link-color, #2481cc);
+  outline: 2px solid var(--tg-theme-link-color, #1c6fb8);
   outline-offset: 1px;
 }
 

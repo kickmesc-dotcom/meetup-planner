@@ -8,6 +8,12 @@
  *
  * Заодно проверяем `hint` в обеих темах: подписи 10–12px должны читаться.
  * С P3.16 здесь же проверяется текст выбранного фильтра на 15%-подложке.
+ *
+ * UI_UX_PRO_MAX §6 `color-accessible-pairs`: ссылки (`text-tg-link`) и текст
+ * ошибок (`text-status-busy` / destructive) — тоже обычный мелкий текст, а не
+ * только «акцент». До этого прохода светлая ссылка #2481cc давала 4.17:1 на
+ * белом и 4.38:1 на вторичной подложке, а тёмная ошибка #ec3942 — 4.07:1.
+ * Тест считает все четыре пары в обеих темах, чтобы оттенок не вернули «на глаз».
  */
 import { describe, expect, it } from "vitest";
 import { THEME_PALETTE, type Theme } from "./theme";
@@ -64,6 +70,35 @@ describe("палитра темы проходит WCAG AA", () => {
     const p = THEME_PALETTE[theme];
     const ratio = contrast(p["--tg-theme-text-color"], p["--tg-theme-bg-color"]);
     expect(ratio).toBeGreaterThanOrEqual(7);
+  });
+
+  it.each(THEMES)("ссылки читаются на фоне и на вторичной подложке (%s)", (theme) => {
+    const p = THEME_PALETTE[theme];
+    expect(
+      contrast(p["--tg-theme-link-color"], p["--tg-theme-bg-color"]),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(
+        p["--tg-theme-link-color"],
+        p["--tg-theme-secondary-bg-color"],
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(THEMES)("текст ошибок читается на фоне и на вторичной подложке (%s)", (theme) => {
+    const p = THEME_PALETTE[theme];
+    expect(
+      contrast(
+        p["--tg-theme-destructive-text-color"],
+        p["--tg-theme-bg-color"],
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrast(
+        p["--tg-theme-destructive-text-color"],
+        p["--tg-theme-secondary-bg-color"],
+      ),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   // VISUAL_AUDIT P3.16: выбранный фильтр — это `bg-tg-link/15` с основным

@@ -56,8 +56,8 @@ export default {
         "tg-secondary-bg": themeColor("secondary-bg-color", "#f1f1f1"),
         "tg-text": themeColor("text-color", "#000000"),
         "tg-hint": themeColor("hint-color", "#999999"),
-        "tg-link": themeColor("link-color", "#2481cc"),
-        "tg-button": themeColor("button-color", "#2481cc"),
+        "tg-link": themeColor("link-color", "#1c6fb8"),
+        "tg-button": themeColor("button-color", "#1c6fb8"),
         "tg-button-text": themeColor("button-text-color", "#ffffff"),
         // DESIGN_SYSTEM §2: the one sanctioned "quieter text" token. Telegram's
         // own hint color fails AA on light surfaces (2.5:1), so secondary text
