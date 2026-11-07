@@ -144,7 +144,7 @@ export default function ResetPasswordScreen({
               <button
                 type="button"
                 onClick={onDone}
-                className="mt-3 min-h-9 text-xs text-tg-link"
+                className="mt-3 min-h-11 text-xs text-tg-link"
               >
                 {t("reset.needNew")}
               </button>

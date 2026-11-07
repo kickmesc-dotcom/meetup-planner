@@ -406,3 +406,23 @@ button[aria-disabled="true"],
     transform: none;
   }
 }
+
+/* UI_UX_PRO_MAX §2 `tap-delay` и `cursor-pointer`.
+   `touch-action: manipulation` убирает 300-мс ожидание двойного тапа на
+   кнопках: в рабочем приложении вкладки жмут подряд, и задержка читается как
+   «не нажалось». Курсор задаём только точным указателям — на тач-экране его
+   не видно, а на Windows без этого правила кнопки выглядят как текст. */
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+@media (pointer: fine) {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}

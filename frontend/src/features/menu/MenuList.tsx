@@ -137,7 +137,7 @@ function MenuRow({
                   ? tx("Убрать из меню на сегодня")
                   : tx("Вернуть в меню")
               }
-              className="min-h-9 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text disabled:opacity-50"
+              className="min-h-11 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text disabled:opacity-50"
             >
               {item.is_available ? tx("Убрать") : tx("Вернуть")}
             </button>
@@ -148,7 +148,7 @@ function MenuRow({
               disabled={busy}
               onClick={() => onEdit(item)}
               aria-label={tx("Изменить позицию")}
-              className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text disabled:opacity-50"
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text disabled:opacity-50"
             >
               <Icon name="edit" size={16} />
             </button>
@@ -159,7 +159,7 @@ function MenuRow({
               disabled={busy}
               onClick={() => onDelete(item)}
               aria-label={tx("Удалить позицию")}
-              className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-status-busy/10 text-status-busy disabled:opacity-50"
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-status-busy/10 text-status-busy disabled:opacity-50"
             >
               <Icon name="trash" size={16} />
             </button>

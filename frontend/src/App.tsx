@@ -686,10 +686,10 @@ export default function App() {
       <>
         <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 text-base font-medium">
+            <h1 className="flex items-center gap-1.5 text-base font-medium">
               <Icon name="profile" size={17} />
               {t("app.profile.title")}
-            </div>
+            </h1>
             <div className="text-xs text-tg-hint">
               {t("app.profile.hint")}
             </div>

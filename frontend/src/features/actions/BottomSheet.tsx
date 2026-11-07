@@ -1,6 +1,8 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { SAFE_AREA_BOTTOM } from "@/tg/safeArea";
+import Icon from "@/components/Icon";
+import { useTx } from "@/i18n";
 
 interface Props {
   title: string;
@@ -9,6 +11,19 @@ interface Props {
 }
 
 export default function BottomSheet({ title, onClose, children }: Props) {
+  const { tx } = useTx();
+
+  // §1 `escape-routes` / §9 `modal-escape`: шторка закрывается клавишей Escape,
+  // а не только тапом по фону. На телефоне фон легко перекрыть пальцем, на
+  // компьютере у человека без мыши другого выхода из шторки не было вовсе.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <AnimatePresence>
       <motion.div
@@ -24,6 +39,7 @@ export default function BottomSheet({ title, onClose, children }: Props) {
         key="sheet"
         data-testid="sheet"
         role="dialog"
+        aria-modal="true"
         aria-label={title}
         // Низ шторки — с запасом на home-индикатор: иначе на iPhone в режиме
         // «на домашнем экране» последняя кнопка оказывается под полосой
@@ -36,7 +52,15 @@ export default function BottomSheet({ title, onClose, children }: Props) {
         transition={{ type: "spring", damping: 30, stiffness: 320 }}
       >
         <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-tg-hint/40" />
-        <div className="mb-3 text-base font-semibold">{title}</div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={tx("Закрыть")}
+          className="absolute right-2 top-2 grid h-11 w-11 place-items-center rounded-full text-tg-hint press"
+        >
+          <Icon name="close" size={18} />
+        </button>
+        <div className="mb-3 pr-12 text-base font-semibold">{title}</div>
         {children}
       </motion.div>
     </AnimatePresence>

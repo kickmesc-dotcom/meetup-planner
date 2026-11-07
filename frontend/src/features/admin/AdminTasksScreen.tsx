@@ -378,7 +378,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 key={q.label}
                 type="button"
                 onClick={() => quickDue(q.min)}
-                className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
+                className="min-h-11 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
               >
                 {q.label}
               </button>
@@ -390,7 +390,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 setDueTime("");
                 setDueSeconds("00");
               }}
-              className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
+              className="min-h-11 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
             >{tx("без срока")}</button>
           </div>
 
@@ -431,7 +431,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   );
                   if (ok) bulkClose.mutate(pickedOpen);
                 }}
-                className="min-h-9 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text disabled:opacity-50"
+                className="min-h-11 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text disabled:opacity-50"
               >
                 {bulkClose.isPending
                   ? tx("Отмечаю…")
@@ -514,7 +514,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                   );
                   if (ok) close.mutate(task);
                 }}
-                className="mt-2 min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text"
+                className="mt-2 min-h-11 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text"
               >{tx("Зачесть выполненным")}</button>
             )}
           </article>

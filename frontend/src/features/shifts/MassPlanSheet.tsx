@@ -201,13 +201,13 @@ export default function MassPlanSheet({
                     type="button"
                     disabled={picked.length === 0 || templateBusy}
                     onClick={() => onApplyTemplate(template.id, picked)}
-                    className="min-h-9 rounded-tile bg-tg-link/15 px-2 text-xs font-medium text-tg-text disabled:opacity-40"
+                    className="min-h-11 rounded-tile bg-tg-link/15 px-2 text-xs font-medium text-tg-text disabled:opacity-40"
                   >{tx("Применить")}</button>
                   <button
                     type="button"
                     onClick={() => onDeleteTemplate(template.id)}
                     aria-label={`Удалить шаблон ${template.name}`}
-                    className="grid min-h-9 min-w-9 place-items-center rounded-tile bg-tg-bg/60 text-status-busy"
+                    className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-bg/60 text-status-busy"
                   >
                     <Icon name="trash" size={14} />
                   </button>
@@ -223,7 +223,7 @@ export default function MassPlanSheet({
           <button
             type="button"
             onClick={toggleAllPeople}
-            className="min-h-9 text-xs text-tg-link"
+            className="min-h-11 text-xs text-tg-link"
           >
             {allPicked ? tx("Снять всех") : tx("Выбрать всех")}
           </button>
@@ -307,14 +307,14 @@ export default function MassPlanSheet({
               type="time"
               value={startsAt}
               onChange={(event) => setStartsAt(event.target.value)}
-              className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+              className="mt-0.5 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
             />
           </label>
           <label className="flex-1 text-xs text-tg-hint">{tx("Конец")}<input
               type="time"
               value={endsAt}
               onChange={(event) => setEndsAt(event.target.value)}
-              className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+              className="mt-0.5 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
             />
           </label>
         </div>
@@ -324,7 +324,7 @@ export default function MassPlanSheet({
           onChange={(event) => setNote(event.target.value)}
           maxLength={200}
           placeholder={tx("Заметка (необязательно)")}
-          className="mt-2 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+          className="mt-2 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
         />
 
         <label className="mt-2 flex items-start gap-2 text-xs text-tg-text">

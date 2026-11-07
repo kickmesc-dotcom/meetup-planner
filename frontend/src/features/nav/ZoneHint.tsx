@@ -59,7 +59,7 @@ export default function ZoneHint({ canManage }: { canManage: boolean }) {
       <button
         type="button"
         onClick={dismiss}
-        className="min-h-8 shrink-0 rounded-tile px-2 text-tg-link press"
+        className="min-h-11 shrink-0 rounded-tile px-2 text-tg-link press"
       >
         {tx("Понятно")}
       </button>

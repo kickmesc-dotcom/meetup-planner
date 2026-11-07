@@ -167,7 +167,7 @@ export default function AuthScreen({
                 haptic("light");
                 setAppHint(false);
               }}
-              className="min-h-9 shrink-0 rounded-tile px-2 text-xs font-medium text-tg-link"
+              className="min-h-11 shrink-0 rounded-tile px-2 text-xs font-medium text-tg-link"
             >
               {t("auth.appNote.dismiss")}
             </button>
@@ -284,15 +284,15 @@ export default function AuthScreen({
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
               {mode === "login" ? (
                 <>
-                  <button type="button" onClick={() => switchMode("forgot")} className="min-h-9 text-tg-link">
+                  <button type="button" onClick={() => switchMode("forgot")} className="min-h-11 text-tg-link">
                     {t("auth.forgot")}
                   </button>
-                  <button type="button" onClick={() => switchMode("register")} className="min-h-9 text-tg-link">
+                  <button type="button" onClick={() => switchMode("register")} className="min-h-11 text-tg-link">
                     {t("auth.create")}
                   </button>
                 </>
               ) : (
-                <button type="button" onClick={() => switchMode("login")} className="min-h-9 text-tg-link">
+                <button type="button" onClick={() => switchMode("login")} className="min-h-11 text-tg-link">
                   {t("auth.haveAccount")}
                 </button>
               )}

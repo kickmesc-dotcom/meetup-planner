@@ -126,7 +126,7 @@ export default function HandoversScreen() {
               haptic("light");
               setCreating(true);
             }}
-            className="min-h-9 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
+            className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
           >{tx("Сдать смену")}</button>
         </div>
 
@@ -269,7 +269,7 @@ function HandoverCard({
           setExpanded((v) => !v);
         }}
         aria-expanded={expanded}
-        className="mt-2 inline-flex min-h-8 items-center gap-1 rounded-tile bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
+        className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-tile bg-tg-bg/50 px-2.5 text-xs text-tg-hint"
       >
         {handover.items_count > 0
           ? tx("Открытых пунктов: {count}", { count: handover.items_count })

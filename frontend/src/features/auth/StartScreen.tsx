@@ -108,7 +108,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
             type="button"
             onClick={back}
             disabled={busy}
-            className="mb-4 inline-flex min-h-9 items-center gap-1 rounded-tile px-2 text-xs text-tg-link disabled:opacity-50"
+            className="mb-4 inline-flex min-h-11 items-center gap-1 rounded-tile px-2 text-xs text-tg-link disabled:opacity-50"
           >
             <Icon name="back" size={13} />
             {tx("Назад")}
@@ -318,7 +318,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
           type="button"
           disabled={leaving}
           onClick={leave}
-          className="min-h-9 text-xs text-tg-hint disabled:opacity-50"
+          className="min-h-11 text-xs text-tg-hint disabled:opacity-50"
         >
           {leaving ? tx("Выходим…") : tx("Выйти из аккаунта")}
         </button>

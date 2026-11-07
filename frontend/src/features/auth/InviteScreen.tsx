@@ -231,7 +231,7 @@ export default function InviteScreen({
         <button
           type="button"
           onClick={onDone}
-          className="min-h-9 text-tg-hint"
+          className="min-h-11 text-tg-hint"
         >
           {t("invite.later")}
         </button>
@@ -239,7 +239,7 @@ export default function InviteScreen({
           <button
             type="button"
             onClick={switchAccount}
-            className="min-h-9 text-tg-link"
+            className="min-h-11 text-tg-link"
           >
             {t("invite.switchAccount")}
           </button>

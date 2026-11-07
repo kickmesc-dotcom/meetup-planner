@@ -167,7 +167,7 @@ export default function IssuesScreen() {
               haptic("light");
               setCreating(true);
             }}
-            className="min-h-9 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
+            className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text"
           >{tx("+ Сообщить")}</button>
         </div>
 
@@ -181,7 +181,7 @@ export default function IssuesScreen() {
                 setView(option.value);
               }}
               className={[
-                "min-h-8 rounded-full px-3 text-xs transition-colors",
+                "min-h-11 rounded-full px-3 text-xs transition-colors",
                 view === option.value
                   ? "bg-tg-button text-tg-button-text"
                   : "bg-tg-secondary-bg text-tg-hint",

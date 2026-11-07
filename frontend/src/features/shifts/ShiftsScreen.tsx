@@ -258,7 +258,7 @@ export default function ShiftsScreen() {
               haptic("selection");
               setWeekStart(mondayOf(new Date()));
             }}
-            className="min-h-9 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+            className="min-h-11 rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
           >{tx("Сегодня")}</button>
           <button
             type="button"
@@ -688,14 +688,14 @@ function ShiftSheet({
                   type="time"
                   value={startsAt}
                   onChange={(event) => setStartsAt(event.target.value)}
-                  className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+                  className="mt-0.5 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
                 />
               </label>
               <label className="flex-1 text-xs text-tg-hint">{tx("Конец")}<input
                   type="time"
                   value={endsAt}
                   onChange={(event) => setEndsAt(event.target.value)}
-                  className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+                  className="mt-0.5 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
                 />
               </label>
             </div>
@@ -705,14 +705,14 @@ function ShiftSheet({
               onChange={(event) => setNote(event.target.value)}
               maxLength={200}
               placeholder={tx("Заметка (необязательно)")}
-              className="mt-2 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+              className="mt-2 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text placeholder:text-tg-hint"
             />
 
             <label className="mt-2 block text-xs text-tg-hint">{tx("Перенести на дату (необязательно)")}<input
                 type="date"
                 value={moveTo}
                 onChange={(event) => setMoveTo(event.target.value)}
-                className="mt-0.5 min-h-9 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
+                className="mt-0.5 min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 px-2 text-xs text-tg-text"
               />
             </label>
 

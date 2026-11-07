@@ -107,6 +107,7 @@ export const ru = {
   "nav.team": "Команда",
   "nav.admin": "Админ",
   "nav.profile": "Профиль",
+  "nav.main": "Основная навигация",
   "nav.tasksOpen": "{label}, открытых: {count}",
 
   // --- Шапки экранов оболочки ---
@@ -241,6 +242,7 @@ export const en: Record<MessageKey, string> = {
   "nav.team": "Team",
   "nav.admin": "Admin",
   "nav.profile": "Profile",
+  "nav.main": "Main navigation",
   "nav.tasksOpen": "{label}, open: {count}",
 
   "app.profile.title": "Profile",
@@ -379,6 +381,7 @@ export const uz: Record<MessageKey, string> = {
   "nav.team": "Jamoa",
   "nav.admin": "Admin",
   "nav.profile": "Profil",
+  "nav.main": "Asosiy navigatsiya",
   "nav.tasksOpen": "{label}, ochiq: {count}",
 
   "app.profile.title": "Profil",

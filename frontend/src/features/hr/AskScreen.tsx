@@ -105,7 +105,7 @@ export default function AskScreen() {
                   key={example}
                   type="button"
                   onClick={() => submit(example)}
-                  className="min-h-9 rounded-full border border-tg-secondary-bg px-3 text-xs text-tg-link"
+                  className="min-h-11 rounded-full border border-tg-secondary-bg px-3 text-xs text-tg-link"
                 >
                   {tx(example)}
                 </button>

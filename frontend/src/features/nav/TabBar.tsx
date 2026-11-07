@@ -69,6 +69,7 @@ export default function TabBar({
 
   return (
     <nav
+      aria-label={t("nav.main")}
       className="flex items-stretch border-t border-tg-secondary-bg bg-tg-bg/95 backdrop-blur"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
@@ -92,6 +93,7 @@ export default function TabBar({
             // сжатие читалось бы как «прыжок» полосы. Вместо этого подсветка
             // (как в iOS): палец нажал — вкладка тихо потемнела.
             data-no-press
+            aria-current={active ? "page" : undefined}
             className={[
               "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",

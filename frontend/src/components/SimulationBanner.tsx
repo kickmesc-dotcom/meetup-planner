@@ -70,7 +70,7 @@ export default function SimulationBanner() {
         type="button"
         disabled={exit.isPending}
         onClick={() => exit.mutate()}
-        className="min-h-7 shrink-0 rounded-full bg-tg-bg px-2.5 text-xs font-medium text-tg-link disabled:opacity-50"
+        className="min-h-11 shrink-0 rounded-full bg-tg-bg px-2.5 text-xs font-medium text-tg-link disabled:opacity-50"
       >
         {exit.isPending ? tx("Чистим…") : tx("Выйти")}
       </button>
