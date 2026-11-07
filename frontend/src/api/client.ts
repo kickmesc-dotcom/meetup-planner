@@ -426,6 +426,10 @@ export function humanizeApiError(e: unknown): string {
       }
       return "Не найдено.";
     }
+    // Неизвестный внутренний код не объясняет человеку, что делать. Фраза та
+    // же, что была в «Филиалах» и «Домене», но теперь для всего приложения:
+    // экранам больше не нужно держать свою копию этого правила.
+    if (looksLikeCode(d)) return "Не получилось. Попробуем ещё раз?";
     return d || `Ошибка ${e.status}`;
   }
   if (e instanceof Error) return e.message;
