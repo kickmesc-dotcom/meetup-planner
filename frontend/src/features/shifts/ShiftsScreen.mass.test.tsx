@@ -37,6 +37,11 @@ vi.mock("@/api/shifts", () => ({
 
 const showAlert = vi.fn().mockResolvedValue(undefined);
 const showConfirm = vi.fn().mockResolvedValue(true);
+// Подтверждение успеха идёт тостом, а не алертом (§7.3).
+const showToast = vi.fn();
+vi.mock("@/components/toast", () => ({
+  showToast: (...args: unknown[]) => showToast(...args),
+}));
 vi.mock("@/tg/webapp", () => ({
   haptic: vi.fn(),
   showAlert: (...args: unknown[]) => showAlert(...args),
@@ -100,6 +105,7 @@ beforeEach(() => {
   clearMock.mockReset();
   showAlert.mockClear();
   showConfirm.mockClear();
+  showToast.mockClear();
   applyTemplateMock.mockReset();
   applyTemplateMock.mockResolvedValue({ saved: 2, skipped: 0 });
   bulkMock.mockResolvedValue({ saved: 2, skipped: 1 });
@@ -150,8 +156,9 @@ describe("ShiftsScreen: массовое планирование", () => {
     // Результат показывается числами, а не «готово»: менеджер должен видеть,
     // сколько клеток осталось занятым.
     await waitFor(() =>
-      expect(showAlert).toHaveBeenCalledWith("Записано смен: 2 · пропущено занятых: 1"),
+      expect(showToast).toHaveBeenCalledWith("Записано смен: 2 · пропущено занятых: 1"),
     );
+    expect(showAlert).not.toHaveBeenCalled();
   });
 
   it("применяет сохранённый шаблон на текущую неделю", async () => {

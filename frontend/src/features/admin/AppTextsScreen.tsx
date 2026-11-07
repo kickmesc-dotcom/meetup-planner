@@ -18,6 +18,7 @@ import {
 } from "@/api/texts";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
@@ -76,7 +77,7 @@ export default function AppTextsScreen({ onBack }: Props) {
       haptic("success");
       qc.setQueryData(["admin", "texts"], data);
       qc.invalidateQueries({ queryKey: ["app-texts"] });
-      void showAlert(tx("Тексты сохранены."));
+      showToast(tx("Тексты сохранены."));
     },
     onError: (e) => {
       haptic("error");

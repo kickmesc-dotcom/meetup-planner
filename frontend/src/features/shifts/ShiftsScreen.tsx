@@ -23,6 +23,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
 import { useTx } from "@/i18n";
 import MassPlanSheet, {
   type MassPlanInput,
@@ -133,7 +134,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(bulkText(result, tx("Записано смен")));
+      showToast(bulkText(result, tx("Записано смен")));
     },
     onError,
   });
@@ -149,7 +150,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(bulkText(result, tx("Скопировано смен")));
+      showToast(bulkText(result, tx("Скопировано смен")));
     },
     onError,
   });
@@ -164,7 +165,7 @@ export default function ShiftsScreen() {
     onSuccess: (template) => {
       haptic("success");
       refresh();
-      void showAlert(`Шаблон «${template.name}» сохранён`);
+      showToast(`Шаблон «${template.name}» сохранён`);
     },
     onError,
   });
@@ -185,7 +186,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(bulkText(result, tx("Записано смен")));
+      showToast(bulkText(result, tx("Записано смен")));
     },
     onError,
   });
@@ -206,7 +207,7 @@ export default function ShiftsScreen() {
       haptic("success");
       setMassOpen(false);
       refresh();
-      void showAlert(`Снято смен: ${result.removed}`);
+      showToast(`Снято смен: ${result.removed}`);
     },
     onError,
   });

@@ -16,6 +16,7 @@ import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
 import { AddPersonPanel, RosterSnapshotsPanel } from "./RosterTools";
 import SubScreen from "./SubScreen";
 
@@ -76,7 +77,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
     onSuccess: () => {
       haptic("success");
       refresh();
-      void showAlert(tx("Прогресс знакомства обнулён."));
+      showToast(tx("Прогресс знакомства обнулён."));
     },
     onError,
   });
@@ -96,7 +97,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
     onSuccess: () => {
       haptic("success");
       refresh();
-      void showAlert(tx("Сотрудник возвращён: доступ открыт."));
+      showToast(tx("Сотрудник возвращён: доступ открыт."));
     },
     onError,
   });
