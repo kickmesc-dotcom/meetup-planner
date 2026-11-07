@@ -34,14 +34,14 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `skip-links` | ✅ | ссылка «К содержимому» первой в оболочке, видна по фокусу | — |
 | `heading-hierarchy` | ⚠️ | этап N: профиль получил `h1`; в кабинете заголовок пока `div` — остаётся в N | N |
 | `color-not-only` | ✅ | статусы = цвет + текст/иконка | — |
-| `dynamic-type` | ⚠️ | масштаб текста не проверялся на 200 % | S |
+| `dynamic-type` | ⚠️ | 200 %: базовый шрифт 16 px, на экране входа переполнения нет; внутренние экраны без входа не проверить | S |
 | `reduced-motion` | ✅ | `motion-reduce` + `@media (prefers-reduced-motion)`; `press.guard` | — |
 | `voiceover-sr` | ⚠️ | `role=status`/`aria-live` у тостов; у форм — только `role=alert` | P |
 | `escape-routes` | ✅ | этап N: Escape, кнопка «Закрыть» 44×44, `aria-modal`; тест `BottomSheet.test.tsx` | — |
 | `keyboard-shortcuts` | — | авторских горячих клавиш нет | — |
 | `focus-not-obscured` | ⚠️ | липкие шапки есть (`HrFeedScreen`), фокус под ними не проверялся | N |
 | `focus-not-obscured-enhanced` | ⚠️ | то же, AAA-уровень | N |
-| `focus-appearance` | ⚠️ | площадь кольца и контраст 3:1 не измерены | S |
+| `focus-appearance` | ✅ | кольцо 2 px с отступом 2 px, контраст 5.23:1 / 5.87:1 (≥ 3:1), закреплено тестом | — |
 | `dragging-alternative` | ⚠️ | календарь: drag есть, кнопочные альтернативы частично | N |
 | `web-target-size` | ✅ | 24×24 AA выполняется (минимум в коде — 32px) | M |
 | `consistent-help` | ⚠️ | подсказки в разных местах экранов | R |
@@ -131,7 +131,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `fixed-element-offset` | ✅ | полоса вкладок + safe-area; `Suspense`-скелет | — |
 | `scroll-behavior` | ✅ | этап Q: `overscroll-contain` в шторке — прокрутка не уходит странице под ней | — |
 | `viewport-units` | ✅ | `h-full`/`dvh`-эквивалент, без `100vh` | — |
-| `orientation-support` | ⚠️ | ландшафт не проверялся | S |
+| `orientation-support` | ✅ | ландшафт 780×420: `scrollWidth == innerWidth`, переполнения нет | — |
 | `content-priority` | ✅ | главное сверху, каталог ниже | — |
 | `visual-hierarchy` | ✅ | размер/вес/отступ, не только цвет | — |
 | `compact-label-overflow` | ⚠️ | `truncate` без доступа к полному тексту | S |
@@ -141,7 +141,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
-| `line-height` | ⚠️ | `leading-tight` в плотных строках | S |
+| `line-height` | ⚠️ | плотный текст 14/20 (1.43); заголовки `leading-tight` — осознанно | S |
 | `line-length` | ✅ | короткие строки в карточках | — |
 | `font-pairing` | ✅ | одна системная семья | — |
 | `font-scale` | ✅ | токены `3xs…2xl`; `styles.typeScale.test.ts` | — |

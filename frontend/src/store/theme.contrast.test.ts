@@ -104,6 +104,16 @@ describe("палитра темы проходит WCAG AA", () => {
   // VISUAL_AUDIT P3.16: выбранный фильтр — это `bg-tg-link/15` с основным
   // текстом. Ссылочный цвет на такой подложке даёт ~3.1:1 в светлой теме,
   // поэтому текст там нейтральный; тест держит обе половины решения.
+  // UI_UX_PRO_MAX §3 `focus-appearance`: кольцо фокуса — элемент управления,
+  // а не декор. WCAG 1.4.11 требует 3:1 к соседнему фону; замер на проде дал
+  // 2px с отступом 2px, цвет — ссылочный. Держим обе половины: толщину и цвет.
+  it.each(THEMES)("кольцо фокуса различимо на фоне (%s)", (theme) => {
+    const p = THEME_PALETTE[theme];
+    expect(
+      contrast(p["--tg-theme-link-color"], p["--tg-theme-bg-color"]),
+    ).toBeGreaterThanOrEqual(3);
+  });
+
   it.each(THEMES)("текст выбранного фильтра читается (%s)", (theme) => {
     const p = THEME_PALETTE[theme];
     const tint = blend(
