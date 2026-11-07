@@ -134,7 +134,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `orientation-support` | ✅ | ландшафт 780×420: `scrollWidth == innerWidth`, переполнения нет | — |
 | `content-priority` | ✅ | главное сверху, каталог ниже | — |
 | `visual-hierarchy` | ✅ | размер/вес/отступ, не только цвет | — |
-| `compact-label-overflow` | ⚠️ | `truncate` без доступа к полному тексту | S |
+| `compact-label-overflow` | ⚠️ | этап S: у имён, отделов и заголовков добавлен `title` (десктоп); на тач полный текст — в карточке | S |
 | `chip-collection-reflow` | ✅ | отделы, материалы и масштаб переносятся на новую строку | — |
 
 ## 6. Typography & Color (MEDIUM, 17 правил)
