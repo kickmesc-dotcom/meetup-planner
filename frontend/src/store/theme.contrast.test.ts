@@ -15,8 +15,15 @@
  * белом и 4.38:1 на вторичной подложке, а тёмная ошибка #ec3942 — 4.07:1.
  * Тест считает все четыре пары в обеих темах, чтобы оттенок не вернули «на глаз».
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { THEME_PALETTE, type Theme } from "./theme";
+
+// §3 `contrast-data`: цветные плашки статусов живут в `styles.css` (они не
+// зависят от темы). Читаем их оттуда, чтобы тест не расходился с CSS.
+const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+const cssVar = (name: string) =>
+  css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`))?.[1] ?? "";
 
 /** Относительная яркость по WCAG 2.x (sRGB). */
 function luminance(hex: string): number {
@@ -113,6 +120,17 @@ describe("палитра темы проходит WCAG AA", () => {
       contrast(p["--tg-theme-link-color"], p["--tg-theme-bg-color"]),
     ).toBeGreaterThanOrEqual(3);
   });
+
+  // §3 `contrast-data`: на плашке статуса белый текст 12px. Если затемнить
+  // «красиво», цифры и подписи в табеле станут нечитаемыми.
+  it.each(["status-free-pill", "status-maybe-pill", "status-busy-pill"])(
+    "белый текст на плашке %s читается",
+    (name) => {
+      const pill = cssVar(name);
+      expect(pill, `в styles.css нет --${name}`).not.toBe("");
+      expect(contrast("#ffffff", pill)).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 
   it.each(THEMES)("текст выбранного фильтра читается (%s)", (theme) => {
     const p = THEME_PALETTE[theme];

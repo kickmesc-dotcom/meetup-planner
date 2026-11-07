@@ -25,8 +25,34 @@ export default function KpiCard() {
   const winner = kpi.employee_of_week;
   const place = kpi.week_place;
 
+  // §3 `screen-reader-summary`: четыре числа и место в рейтинге читаются
+  // по одному и без связи. Одна фраза связывает их в «мою неделю».
+  const summary = place
+    ? tx(
+        "Опыт смены: {xp} XP, место {place} из {total}, пунктов чек-листа {items}, поручений закрыто {tasks}.",
+        {
+          xp: kpi.week_xp,
+          place,
+          total: kpi.week_total,
+          items: kpi.week_counts.checklist_items,
+          tasks: kpi.week_counts.tasks_done,
+        },
+      )
+    : tx(
+        "Опыт смены: {xp} XP, пунктов чек-листа {items}, поручений закрыто {tasks}.",
+        {
+          xp: kpi.week_xp,
+          items: kpi.week_counts.checklist_items,
+          tasks: kpi.week_counts.tasks_done,
+        },
+      );
+
   return (
-    <section className="rounded-card bg-tg-secondary-bg/60 p-3">
+    <section
+      aria-label={tx("Опыт смены")}
+      className="rounded-card bg-tg-secondary-bg/60 p-3"
+    >
+      <p className="sr-only">{summary}</p>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-tg-text">{tx("Опыт смены")}</h2>
         <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-text">

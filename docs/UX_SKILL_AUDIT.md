@@ -135,7 +135,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `content-priority` | ✅ | главное сверху, каталог ниже | — |
 | `visual-hierarchy` | ✅ | размер/вес/отступ, не только цвет | — |
 | `compact-label-overflow` | ⚠️ | `truncate` без доступа к полному тексту | S |
-| `chip-collection-reflow` | ⚠️ | фильтры с `overflow-x-auto`, а не переносом | R |
+| `chip-collection-reflow` | ✅ | отделы, материалы и масштаб переносятся на новую строку | — |
 
 ## 6. Typography & Color (MEDIUM, 17 правил)
 
@@ -262,9 +262,9 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
 | `chart-type` | — | графиков нет: KPI и таблицы | — |
-| `color-guidance` | ⚠️ | статусы цвет + текст, но без проверки палитры на дальтонизм | R |
+| `color-guidance` | ✅ | статус читается по текстовой метке, цвет только усиливает | — |
 | `data-table` | ✅ | таблицы с текстовыми значениями | — |
-| `pattern-texture` | ⚠️ | только цвет ячейки смены | R |
+| `pattern-texture` | ✅ | в ячейке смены есть короткая метка статуса, а не только заливка | — |
 | `legend-visible` | — | нет графиков | — |
 | `tooltip-on-interact` | — | нет графиков | — |
 | `axis-labels` | — | нет осей | — |
@@ -276,7 +276,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `number-formatting` | ⚠️ | даты/числа форматируются точечно | R |
 | `touch-target-chart` | — | нет интерактивных графиков | — |
 | `no-pie-overuse` | — | нет круговых диаграмм | — |
-| `contrast-data` | ⚠️ | цвет ячеек смены не измерен | R |
+| `contrast-data` | ✅ | белый текст на трёх плашках статуса ≥ 4.5:1, закреплено тестом | — |
 | `legend-interactive` | — | нет легенд | — |
 | `direct-labeling` | — | нет графиков | — |
 | `tooltip-keyboard` | — | нет тултипов с данными | — |
@@ -286,7 +286,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `trend-emphasis` | — | трендов нет | — |
 | `gridline-subtle` | — | сеток нет | — |
 | `focusable-elements` | — | нет интерактивных точек | — |
-| `screen-reader-summary` | ⚠️ | KPI читаются как числа с подписями, без сводки | R |
+| `screen-reader-summary` | ✅ | KPI-карточка получила `sr-only` сводку одной фразой | — |
 | `error-state-chart` | — | нет графиков | — |
 | `export-option` | — | выгрузка не входит в продукт | — |
 | `drill-down-consistency` | — | нет drill-down | — |

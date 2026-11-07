@@ -317,8 +317,10 @@ export default function ShiftsScreen() {
           </button>
         </div>
 
+        {/* §3 `chip-collection-reflow`: отделы переносятся на новую строку,
+            а не уезжают вправо за край экрана. */}
         {canEdit && (q.data?.departments.length ?? 0) > 1 && (
-          <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+          <div className="mt-2 flex flex-wrap gap-1.5 pb-0.5">
             <FilterChip
               active={departmentId === null}
               label={tx("Все отделы")}

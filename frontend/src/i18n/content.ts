@@ -852,6 +852,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Шаблон удалён.": "Template deleted.",
   "Шаблон восстановлен.": "Template restored.",
   "Черновик восстановлен.": "Draft restored.",
+  "Опыт смены: {xp} XP, место {place} из {total}, пунктов чек-листа {items}, поручений закрыто {tasks}.": "Shift XP: {xp} XP, place {place} of {total}, checklist items {items}, tasks closed {tasks}.",
+  "Опыт смены: {xp} XP, пунктов чек-листа {items}, поручений закрыто {tasks}.": "Shift XP: {xp} XP, checklist items {items}, tasks closed {tasks}.",
   "Чистим…": "Cleaning up…",
   // ---------------------------------------------------------- общее: календарные подписи --
   "свободен": "free",

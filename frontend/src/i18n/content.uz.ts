@@ -30,6 +30,8 @@ export const UZ_CONTENT: Record<string, string> = {
   "Шаблон удалён.": "Shablon o'chirildi.",
   "Шаблон восстановлен.": "Shablon tiklandi.",
   "Черновик восстановлен.": "Qoralama tiklandi.",
+  "Опыт смены: {xp} XP, место {place} из {total}, пунктов чек-листа {items}, поручений закрыто {tasks}.": "Smena tajribasi: {xp} XP, haftada {place}/{total}, chek-list bandlari {items}, yopilgan topshiriqlar {tasks}.",
+  "Опыт смены: {xp} XP, пунктов чек-листа {items}, поручений закрыто {tasks}.": "Smena tajribasi: {xp} XP, chek-list bandlari {items}, yopilgan topshiriqlar {tasks}.",
   "Показан сохранённый чек-лист: связи нет. Отметки сохранятся на телефоне.": "Saqlangan chek-list ko'rsatilmoqda: aloqa yo'q. Belgilar telefonda saqlanadi.",
   "Сервер отклонил часть отметок — открой чек-лист и проверь.": "Server ba'zi belgilarni rad etdi — chek-listni ochib tekshiring.",
   // ---- сводка внимания на первом экране кабинета (05.11.2026) ----

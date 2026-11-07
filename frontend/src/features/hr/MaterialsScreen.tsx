@@ -129,7 +129,7 @@ export default function MaterialsScreen({
 
         {(materials.length > 0 || showMenu) && (
           <>
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <div className="flex flex-wrap gap-1.5 pb-1">
               {showMenu && (
                 <button
                   type="button"
