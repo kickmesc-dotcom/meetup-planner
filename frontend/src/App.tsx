@@ -39,6 +39,7 @@ import WelcomeBanner from "./features/welcome/WelcomeBanner";
 // приложения сотрудника. Он сам лениво тянет AdminScreen, поэтому здесь его нет.
 import ManageZone from "./features/admin/ManageZone";
 import ModeSwitch from "./features/nav/ModeSwitch";
+import ZoneHint from "./features/nav/ZoneHint";
 import AuthScreen from "./features/auth/AuthScreen";
 import StartScreen from "./features/auth/StartScreen";
 import InviteScreen from "./features/auth/InviteScreen";
@@ -734,6 +735,7 @@ export default function App() {
       {canManageZone && (
         <div className="border-b border-tg-secondary-bg px-3 py-2">
           <ModeSwitch />
+          <ZoneHint canManage={canManageZone} />
         </div>
       )}
       {/* VISUAL_AUDIT P3.17: `key={tab}` перезапускает вход для нового экрана. */}
