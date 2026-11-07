@@ -9,9 +9,14 @@
  * проверяем поведение: Escape, именованная кнопка закрытия и `aria-modal`,
  * без которого скринридер читает фон как доступный.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { showConfirm } from "@/tg/webapp";
 import BottomSheet from "./BottomSheet";
+
+// По умолчанию человек отвечает «нет»: код обязан пережить и отказ, и
+// undefined-ответ, а не падать на `.then`.
+vi.mock("@/tg/webapp", () => ({ showConfirm: vi.fn(() => Promise.resolve(false)) }));
 
 // В проекте не включён автоочистка testing-library: без неё четыре кейса
 // складывают четыре шторки в один document, и `getByRole` находит сразу все.
@@ -25,6 +30,46 @@ function renderSheet(onClose = vi.fn()) {
   );
   return onClose;
 }
+
+describe("шторка: несохранённый ввод", () => {
+  function renderDirty(onClose = vi.fn()) {
+    render(
+      <BottomSheet title="Массовая постановка" onClose={onClose} dirty>
+        <p>Тело шторки</p>
+      </BottomSheet>,
+    );
+    return onClose;
+  }
+
+  it("Escape спрашивает подтверждение и не закрывает сам", async () => {
+    vi.mocked(showConfirm).mockResolvedValueOnce(false);
+    const onClose = renderDirty();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(showConfirm).toHaveBeenCalledTimes(1));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("закрывается, когда человек подтвердил отказ от ввода", async () => {
+    vi.mocked(showConfirm).mockResolvedValueOnce(true);
+    const onClose = renderDirty();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  it("пустая шторка закрывается без вопросов", () => {
+    vi.mocked(showConfirm).mockClear();
+    const onClose = renderSheet();
+
+    fireEvent.click(screen.getByRole("button", { name: "Закрыть" }));
+
+    expect(showConfirm).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("шторка: выход и модальность", () => {
   it("объявлена модальным диалогом с именем", () => {

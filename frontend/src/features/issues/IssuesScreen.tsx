@@ -358,7 +358,15 @@ function CreateIssueSheet({
   });
 
   return (
-    <BottomSheet title={tx("Новая проблема")} onClose={onClose}>
+    <BottomSheet
+      title={tx("Новая проблема")}
+      onClose={onClose}
+      dirty={
+        title.trim().length > 0 ||
+        zone.trim().length > 0 ||
+        description.trim().length > 0
+      }
+    >
       <label className="block text-xs text-tg-hint">{tx("Что случилось")}<input
           value={title}
           onChange={(e) => setTitle(e.target.value)}

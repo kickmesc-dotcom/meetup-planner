@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -64,6 +64,11 @@ export default function AuthScreen({
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  // §8 `focus-management`: после отказа фокус уходит на первое поле, которое
+  // человеку нужно поправить, — иначе он остаётся на кнопке и не понимает,
+  // куда смотреть.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   // M2: в установленном приложении человек не понимает, почему перед ним
   // форма, а не бот. Подсказка — один раз и закрываемая, не блокирует вход.
   const [standalone] = useState(() => isStandalone());
@@ -76,6 +81,12 @@ export default function AuthScreen({
     // подсказку при каждом запуске до первого «Понятно».
     if (shouldShowStandaloneHint()) markStandaloneHintSeen();
   }, []);
+
+  /** Первое поле, которое могло вызвать отказ: почта или пароль. */
+  const focusProblem = (current: Mode) => {
+    if (current === "forgot" || !email.trim()) emailRef.current?.focus();
+    else passwordRef.current?.focus();
+  };
 
   const accept = (session: AuthSession) => {
     // Ссылка доступа из бота больше не нужна: сессия главнее и её можно отозвать.
@@ -91,6 +102,7 @@ export default function AuthScreen({
     onError: (e) => {
       haptic("error");
       setError(errorText(e));
+      focusProblem(mode);
     },
   });
 
@@ -100,6 +112,7 @@ export default function AuthScreen({
     onError: (e) => {
       haptic("error");
       setError(errorText(e));
+      focusProblem(mode);
     },
   });
 
@@ -113,6 +126,7 @@ export default function AuthScreen({
     onError: (e) => {
       haptic("error");
       setError(errorText(e));
+      focusProblem(mode);
     },
   });
 
@@ -133,6 +147,7 @@ export default function AuthScreen({
     setError(null);
     if (!email.trim()) {
       setError(t("auth.emailRequired"));
+      emailRef.current?.focus();
       return;
     }
     if (mode === "forgot") forgot.mutate();
@@ -222,9 +237,12 @@ export default function AuthScreen({
               <label className="block">
                 <span className="text-xs text-tg-hint">{t("auth.email.label")}</span>
                 <input
+                  ref={emailRef}
                   type="email"
                   inputMode="email"
                   autoComplete="email"
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "auth-error" : undefined}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   maxLength={255}
@@ -242,7 +260,10 @@ export default function AuthScreen({
                   </label>
                   <div className="relative mt-1">
                     <input
+                      ref={passwordRef}
                       id="auth-password"
+                      aria-invalid={!!error}
+                      aria-describedby={error ? "auth-error" : undefined}
                       type={showPassword ? "text" : "password"}
                       autoComplete={mode === "register" ? "new-password" : "current-password"}
                       value={password}
@@ -265,7 +286,11 @@ export default function AuthScreen({
               )}
 
               {error && (
-                <p role="alert" className="rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-status-busy">
+                <p
+                  id="auth-error"
+                  role="alert"
+                  className="rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-status-busy"
+                >
                   {error}
                 </p>
               )}

@@ -399,7 +399,11 @@ function CreateHandoverSheet({
   const colleagues = colleaguesQ.data ?? [];
 
   return (
-    <BottomSheet title={tx("Сдать смену")} onClose={onClose}>
+    <BottomSheet
+      title={tx("Сдать смену")}
+      onClose={onClose}
+      dirty={note.trim().length > 0 || toId !== null}
+    >
       <div className="text-xs text-tg-hint">{tx("Кому передаёшь")}</div>
       {colleaguesQ.isLoading && (
         <div className="mt-1" aria-busy="true">

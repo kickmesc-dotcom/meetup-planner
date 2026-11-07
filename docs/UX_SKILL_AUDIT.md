@@ -194,9 +194,9 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
 | `input-labels` | ⚠️ | вход — да; кабинет — часть полей только placeholder | P |
-| `error-placement` | ❌ | ошибка в общем блоке `role=alert`, не связана с полем | P |
+| `error-placement` | ✅ | этап P: `auth-error`/`reset-error`, `aria-invalid` и `aria-describedby` на полях входа и смены пароля | — |
 | `submit-feedback` | ⚠️ | `disabled` + спиннер не у всех форм | P |
-| `ime-composition-enter` | ⚠️ | Enter в поиске/чате без проверки `isComposing` | P |
+| `ime-composition-enter` | ✅ | этап P: поле подразделения не отправляется на Enter во время IME-подтверждения | — |
 | `required-indicators` | ⚠️ | обязательность описана словами, без `required`/метки | P |
 | `empty-states` | ✅ | пустые состояния с действием | — |
 | `toast-dismiss` | ✅ | 3,2с, закрытие 44×44 | — |
@@ -213,11 +213,11 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `error-recovery` | ✅ | `ErrorState` + «Повторить» | — |
 | `multi-step-progress` | ✅ | онбординг с шагами | — |
 | `form-autosave` | ❌ | длинные формы (чек-лист, стандарты) не сохраняют черновик | P |
-| `sheet-dismiss-confirm` | ❌ | шторка закрывается тапом мимо без предупреждения | P |
+| `sheet-dismiss-confirm` | ✅ | этап P: `BottomSheet dirty` спрашивает перед закрытием; подключено в проблемах и передаче смены | — |
 | `error-clarity` | ✅ | `humanizeApiError` + следующий шаг | — |
 | `field-grouping` | ⚠️ | группы визуальные, без `fieldset/legend` | P |
 | `read-only-distinction` | ⚠️ | read-only и disabled не всегда различимы | P |
-| `focus-management` | ❌ | после ошибки фокус не переходит к проблемному полю | P |
+| `focus-management` | ✅ | этап P: отказ отправляет фокус в почту, пароль или повтор — в зависимости от причины | — |
 | `error-summary` | ❌ | сводки ошибок нет | P |
 | `touch-friendly-input` | ✅ | поля 44px+ | — |
 | `destructive-emphasis` | ✅ | красный + отдельное место | — |
@@ -316,3 +316,4 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 07.11.2026 | M | Тач-цели 44px в 14 файлах, `touch-action`, курсор, хит-зона иконки дня рождения 24×24 | `tsc` 0; целевые 6 файлов/25 тестов; полный фронт 888 тестов/114 файлов; сборка 0 |
 | 07.11.2026 | N | `aria-current` и имя полосы, Escape/крестик/`aria-modal` в шторке, `h1` профиля, ключ `nav.main` в RU/EN/UZ | `tsc` 0; `BottomSheet.test.tsx` 4 теста; полный фронт 888 тестов; сборка 0 |
 | 07.11.2026 | S (контраст) | Ссылки и ошибки внесены в расчёт WCAG; светлая ссылка 4.17→5.23:1, ошибка 4.23→5.62:1, тёмная ошибка 4.07→5.85:1 | `theme.contrast.test.ts` 12 тестов; `tsc` 0 |
+| 07.11.2026 | P | Ошибка у поля и фокус на первом проблемном, подтверждение закрытия шторки с вводом, IME-Enter | `tsc` 0; `AuthScreen`/`BottomSheet` 11 тестов; полный фронт 896 тестов |

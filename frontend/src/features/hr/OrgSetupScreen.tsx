@@ -764,6 +764,10 @@ function CustomDepartment({ onAdd }: { onAdd: (name: string) => void }) {
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
+          // §8 `ime-composition-enter`: Enter подтверждает выбор в китайской,
+          // японской и корейской раскладке, а не отправляет форму. Без этой
+          // проверки ввод «добавлял» недописанное подразделение.
+          if (event.nativeEvent.isComposing) return;
           if (event.key === "Enter") submit();
         }}
         maxLength={80}

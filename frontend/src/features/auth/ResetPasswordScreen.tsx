@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { confirmPasswordReset } from "@/api/auth";
@@ -33,6 +33,10 @@ export default function ResetPasswordScreen({
   const [repeat, setRepeat] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  // §8 `focus-management`: короткий пароль и несовпадение — разные поля,
+  // поэтому и фокус уходит в разные места.
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const repeatRef = useRef<HTMLInputElement>(null);
   const { t } = useT();
   const errorText = useErrorMessage();
 
@@ -60,6 +64,7 @@ export default function ResetPasswordScreen({
     }
     if (password !== repeat) {
       setError(t("reset.mismatch"));
+      repeatRef.current?.focus();
       return;
     }
     confirm.mutate();
@@ -101,8 +106,11 @@ export default function ResetPasswordScreen({
                 <label className="block">
                   <span className="text-xs text-tg-hint">{t("reset.password")}</span>
                   <input
+                    ref={passwordRef}
                     type="password"
                     autoComplete="new-password"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "reset-error" : undefined}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     maxLength={128}
@@ -114,8 +122,11 @@ export default function ResetPasswordScreen({
                 <label className="block">
                   <span className="text-xs text-tg-hint">{t("reset.repeat")}</span>
                   <input
+                    ref={repeatRef}
                     type="password"
                     autoComplete="new-password"
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "reset-error" : undefined}
                     value={repeat}
                     onChange={(e) => setRepeat(e.target.value)}
                     maxLength={128}
@@ -125,6 +136,7 @@ export default function ResetPasswordScreen({
 
                 {error && (
                   <p
+                    id="reset-error"
                     role="alert"
                     className="rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-status-busy"
                   >

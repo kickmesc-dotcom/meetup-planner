@@ -63,3 +63,19 @@ describe("AuthScreen — показ пароля", () => {
     expect(email.className).toContain("text-base");
   });
 });
+
+describe("AuthScreen — ошибка у поля", () => {
+  it("ошибка связана с полем, а фокус уходит в почту", () => {
+    renderScreen();
+    fireEvent.click(screen.getByRole("button", { name: /Войти|Вход/i }));
+
+    const email = screen.getByLabelText("Почта") as HTMLInputElement;
+    // §8 `error-placement`: скринридер должен связать сообщение с полем,
+    // а не читать его как отдельный текст где-то ниже формы.
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+    expect(email.getAttribute("aria-describedby")).toBe("auth-error");
+    expect(screen.getByRole("alert").id).toBe("auth-error");
+    // §8 `focus-management`: после отказа фокус на первом проблемном поле.
+    expect(document.activeElement).toBe(email);
+  });
+});

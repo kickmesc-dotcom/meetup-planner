@@ -845,6 +845,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Сеанс уже был закрыт.": "The session was already closed.",
   "Вышли из режима проверки. Удалено: задач {tasks}, смен {runs}, проблем {issues}.": "Left review mode. Removed: {tasks} tasks, {runs} shifts, {issues} issues.",
   "Выйти": "Exit",
+  "Закрыть без сохранения? Введённое не сохранится.": "Close without saving? Your input will be lost.",
   "Чистим…": "Cleaning up…",
   // ---------------------------------------------------------- общее: календарные подписи --
   "свободен": "free",
