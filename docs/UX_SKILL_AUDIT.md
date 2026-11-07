@@ -112,7 +112,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `icon-style-consistent` | ✅ | `iconSet.test.tsx`: одна библиотека, 24×24, stroke 1.8 | — |
 | `system-controls` | ⚠️ | нативные `select`/`input`; кастомные шторки | — |
 | `blur-purpose` | ✅ | blur только у полос навигации как фон | — |
-| `primary-action` | ⚠️ | на части экранов несколько залитых кнопок | R |
+| `primary-action` | ✅ | главное действие залито одно; в профиле режим обучения переведён на мягкую подложку | — |
 
 ## 5. Layout & Responsive (HIGH, 17 правил)
 

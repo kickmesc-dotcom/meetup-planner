@@ -590,8 +590,10 @@ export default function HrProfileScreen() {
               onClick={() => learningMode.mutate(!me.learning_mode)}
               className={[
                 "min-h-10 flex-1 rounded-tile px-2 text-xs transition-colors disabled:opacity-50",
+                // §3 `primary-action`: включённый режим — состояние выбора,
+                // а не действие. Заливка главного действия остаётся у курса.
                 me.learning_mode
-                  ? "bg-tg-button text-tg-button-text"
+                  ? "bg-tg-link/15 font-medium text-tg-text"
                   : "bg-tg-bg/60 text-tg-text",
               ].join(" ")}
             >
