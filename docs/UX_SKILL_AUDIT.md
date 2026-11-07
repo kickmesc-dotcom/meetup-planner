@@ -166,7 +166,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `duration-timing` | ✅ | этап T: токены `--motion-press/fade/exit` и `duration-press/fade/exit` в Tailwind | — |
 | `transform-performance` | ✅ | transform/opacity | — |
 | `loading-states` | ✅ | скелет >1с, спиннер в кнопках | — |
-| `excessive-motion` | ⚠️ | одновременно подсветка вкладки и переход | T |
+| `excessive-motion` | ✅ | этап T: одно движение на смену вкладки (вход экрана); подчёркивание и цвет без анимации | — |
 | `easing` | ✅ | ease-out, spring | — |
 | `motion-meaning` | ✅ | переход = смена вкладки, шторка = снизу | — |
 | `state-transition` | ✅ | `transition-colors` | — |
@@ -176,7 +176,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `exit-faster-than-enter` | ✅ | этап T: выход шторки 160 мс и фона 100 мс против пружинного входа | — |
 | `stagger-sequence` | ⚠️ | списки появляются целиком | — |
 | `shared-element-transition` | ⚠️ | нет общих элементов между экранами | — |
-| `interruptible` | ⚠️ | шторка не отменяется новым тапом до завершения | T |
+| `interruptible` | ✅ | этап T: закрытие — состояние; тап во время входа уводит шторку, повторный тап не дублирует `onClose` | — |
 | `no-blocking-animation` | ✅ | ввод не блокируется | — |
 | `fade-crossfade` | ✅ | fade при смене вкладки | — |
 | `scale-feedback` | ✅ | CSS press 0.98 | — |
