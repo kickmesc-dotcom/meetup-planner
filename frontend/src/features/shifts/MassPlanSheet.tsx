@@ -190,7 +190,10 @@ export default function MassPlanSheet({
                   className="flex items-center gap-2 rounded-tile bg-tg-secondary-bg/40 px-2 py-1.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-xs text-tg-text">
+                    <div
+                      className="truncate text-xs text-tg-text"
+                      title={template.name}
+                    >
                       {template.name}
                     </div>
                     <div className="truncate text-2xs text-tg-hint">

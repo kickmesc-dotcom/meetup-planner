@@ -161,7 +161,9 @@ function Card({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-base font-semibold truncate">{meeting.title}</div>
+          <div className="text-base font-semibold truncate" title={meeting.title}>
+            {meeting.title}
+          </div>
           <div className="text-xs text-tg-hint">
             {format(start, "EEE d MMM, HH:mm", { locale: currentLocale() === "en" ? enGB : ru })} –{" "}
             {format(end, "HH:mm", { locale: currentLocale() === "en" ? enGB : ru })}
@@ -207,7 +209,10 @@ function Card({
                   u.display_name[0]
                 )}
               </span>
-              <span className="text-tg-text/90 truncate max-w-[60px]">
+              <span
+                className="text-tg-text/90 truncate max-w-[60px]"
+                title={u.display_name}
+              >
                 {u.display_name.split(/\s+/)[0]}
               </span>
               <span>{tx(RSVP_LABELS[rsvp])}</span>

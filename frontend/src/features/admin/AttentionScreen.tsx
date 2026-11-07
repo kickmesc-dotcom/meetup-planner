@@ -112,7 +112,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                 {overdue.slice(0, 20).map((t) => (
                   <div key={t.id} className="px-2 py-1.5 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm text-tg-text">{t.title}</span>
+                      <span className="truncate text-sm text-tg-text" title={t.title}>{t.title}</span>
                       <span className="shrink-0 text-2xs tabular-nums text-status-busy">
                         {fmtDue(t.due_at)}
                       </span>
@@ -155,7 +155,10 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   <div key={issue.id} className="px-2 py-1.5 space-y-0.5">
                     <div className="flex items-center gap-1.5">
                       <span>{ISSUE_CATEGORY_ICON[issue.category]}</span>
-                      <span className="min-w-0 flex-1 truncate text-sm text-tg-text">
+                      <span
+                        className="min-w-0 flex-1 truncate text-sm text-tg-text"
+                        title={issue.title}
+                      >
                         {issue.title}
                       </span>
                       <span className="shrink-0 text-2xs text-tg-hint">

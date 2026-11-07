@@ -154,7 +154,10 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 )}
                 {data.employees.map((e) => (
                   <div key={e.employee_id} className="flex items-center gap-2 text-xs">
-                    <span className="min-w-0 flex-1 truncate text-tg-text">
+                    <span
+                      className="min-w-0 flex-1 truncate text-tg-text"
+                      title={e.display_name}
+                    >
                       {e.display_name}
                     </span>
                     <Badge text={e.badge} emoji={e.badge_emoji} />

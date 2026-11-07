@@ -629,7 +629,7 @@ function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   const { tx } = useTx();
   return (
     <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs text-tg-text">
-      <span className="truncate">{label}</span>
+      <span className="truncate" title={label}>{label}</span>
       <button
         type="button"
         onClick={onClear}
@@ -890,7 +890,7 @@ function FilterRow({
           aria-hidden
         />
       )}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate" title={label}>{label}</span>
       {hint && <span className="shrink-0 text-2xs text-tg-hint">{hint}</span>}
       {active && <Icon name="check" size={14} className="shrink-0 text-tg-link" />}
     </button>

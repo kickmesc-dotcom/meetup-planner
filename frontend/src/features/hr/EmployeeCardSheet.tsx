@@ -61,7 +61,10 @@ export default function EmployeeCardSheet({
           <Icon name="back" size={20} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-tg-text">
+          <div
+            className="truncate text-sm font-semibold text-tg-text"
+            title={q.data?.display_name ?? undefined}
+          >
             {q.data?.display_name ?? tx("Карточка сотрудника")}
           </div>
           <div className="truncate text-xs text-tg-hint">

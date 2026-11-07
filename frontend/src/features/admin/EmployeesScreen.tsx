@@ -261,7 +261,10 @@ function EmployeeRow({
           className="mt-0.5 shrink-0 text-tg-hint"
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-tg-text">
+          <span
+            className="block truncate text-sm font-medium text-tg-text"
+            title={card.display_name}
+          >
             {card.display_name}
           </span>
           <span className="block truncate text-xs text-tg-hint">

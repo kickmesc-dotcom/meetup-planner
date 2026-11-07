@@ -537,7 +537,9 @@ function GroupRows({
         <div key={person.employee_id} className="contents">
           <div className="flex min-h-11 items-center rounded-tile bg-tg-secondary-bg/40 px-2">
             <div className="min-w-0">
-              <div className="truncate text-xs text-tg-text">{person.display_name}</div>
+              <div className="truncate text-xs text-tg-text" title={person.display_name}>
+                {person.display_name}
+              </div>
               {person.position && (
                 <div className="truncate text-2xs text-tg-hint">
                   {person.position}

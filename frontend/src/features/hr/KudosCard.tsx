@@ -101,7 +101,10 @@ export default function KudosCard() {
               <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-tg-secondary-bg text-2xs font-semibold text-tg-hint">
                 {index + 1}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-tg-text">
+              <span
+                className="min-w-0 flex-1 truncate text-sm text-tg-text"
+                title={row.display_name}
+              >
                 {row.display_name}
               </span>
               <span className="shrink-0 text-xs tabular-nums text-tg-hint">
@@ -276,7 +279,10 @@ export function KudosSheet({
                       : "bg-tg-secondary-bg/50 text-tg-text"
                   }`}
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm">
+                  <span
+                    className="min-w-0 flex-1 truncate text-sm"
+                    title={person.display_name}
+                  >
                     {person.display_name}
                   </span>
                   {person.position && (
