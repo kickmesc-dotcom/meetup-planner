@@ -283,7 +283,10 @@ export default function ShiftsScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-3 py-2">
-        <div className="flex items-center gap-2">
+        {/* §3 `responsive-actions`: четыре элемента в ряд на 320px не влезают.
+            Заголовок сжимается (`min-w-0`), а кнопки при нехватке места
+            переносятся, вместо того чтобы уехать за правый край. */}
+        <div className="flex flex-wrap items-center gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
               <Icon name="calendar" size={16} />{tx("График смен")}</div>

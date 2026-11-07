@@ -149,7 +149,7 @@ export default function IssuesScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <div className="flex items-start gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <button
             type="button"
             onClick={() => {

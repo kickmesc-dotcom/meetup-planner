@@ -55,7 +55,7 @@ export default function ReviewScreen({
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-2 border-b border-tg-secondary-bg px-3 py-2">
+      <header className="flex flex-wrap items-center gap-2 border-b border-tg-secondary-bg px-3 py-2">
         <button
           type="button"
           onClick={() => {
