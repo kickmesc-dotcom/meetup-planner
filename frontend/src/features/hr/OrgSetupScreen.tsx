@@ -15,9 +15,11 @@ import {
   saveShiftTemplate,
 } from "@/api/shifts";
 import { copyText } from "@/lib/clipboard";
+import { clearDraft, readDraft, writeDraft } from "@/lib/formDraft";
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { showToast } from "@/components/toast";
 import ProgressBar from "@/components/ProgressBar";
 import { SkeletonChips } from "@/components/Skeleton";
 import { OPTIONAL_SECTIONS } from "@/features/hr/sections";
@@ -44,6 +46,10 @@ import { useTx } from "@/i18n";
  * только в профиле: человек, впервые открывший приложение, проходил настройку
  * на языке, который не выбирал, и не мог это исправить на месте.
  */
+const ORG_SETUP_DRAFT_KEY = "semitaskbot.org-setup.draft.v1";
+
+type StoredOrgDraft = { draft: OrgSetup; picked: string[] };
+
 export default function OrgSetupScreen({
   setup,
   onClose,
@@ -53,8 +59,15 @@ export default function OrgSetupScreen({
 }) {
   const { tx } = useTx();
   const qc = useQueryClient();
+  // §3 `form-autosave`: мастер проходят один раз и до первой организации,
+  // поэтому черновик живёт на устройстве. Перезагрузка страницы или случайный
+  // уход не откатывают ответы к началу.
+  const restoredDraft = useMemo(
+    () => readDraft<StoredOrgDraft>(ORG_SETUP_DRAFT_KEY),
+    [],
+  );
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<OrgSetup>(setup);
+  const [draft, setDraft] = useState<OrgSetup>(() => restoredDraft?.draft ?? setup);
   const [error, setError] = useState<string | null>(null);
 
   const depsQ = useQuery({
@@ -89,8 +102,19 @@ export default function OrgSetupScreen({
   }, [depsQ.data, draft.presets, draft.departments]);
 
   const [pickedDepartments, setPickedDepartments] = useState<string[]>(
-    () => setup.departments,
+    () => restoredDraft?.picked ?? setup.departments,
   );
+
+  useEffect(() => {
+    writeDraft(ORG_SETUP_DRAFT_KEY, {
+      draft,
+      picked: pickedDepartments,
+    });
+  }, [draft, pickedDepartments]);
+
+  useEffect(() => {
+    if (restoredDraft) showToast(tx("Черновик восстановлен."), "info");
+  }, [restoredDraft, tx]);
 
   // Список отделов приходит асинхронно, а `useState` инициализируется один
   // раз. Поэтому первый раз, когда он загрузился, отмечаем уже существующие
@@ -186,6 +210,7 @@ export default function OrgSetupScreen({
         done: true,
       });
       qc.setQueryData(["org-setup"], data);
+      clearDraft(ORG_SETUP_DRAFT_KEY);
       onClose();
     } catch {
       /* ошибка на экране */
@@ -197,6 +222,8 @@ export default function OrgSetupScreen({
     try {
       const data = await save.mutateAsync({ done: true });
       qc.setQueryData(["org-setup"], data);
+      // «Пропустить» — тоже окончание мастера: черновик больше не нужен.
+      clearDraft(ORG_SETUP_DRAFT_KEY);
       onClose();
     } catch {
       /* ошибка на экране */

@@ -11,13 +11,23 @@ import { useSyncExternalStore } from "react";
  * Почему не контекст React. Тост зовут из обработчиков мутаций по всему
  * приложению, в том числе вне дерева провайдеров. Маленький внешний стор
  * дешевле и не заставляет прокидывать контекст через каждый экран.
+ *
+ * UI_UX_PRO_MAX §4 `undo-support`: у удаления есть действие «Отменить». Оно
+ * живёт в том же тосте, а не в отдельном диалоге: человек уже подтвердил
+ * удаление и не должен отвечать на второй вопрос.
  */
 export type ToastKind = "success" | "info";
+
+export interface ToastAction {
+  label: string;
+  run: () => void | Promise<void>;
+}
 
 export interface Toast {
   id: number;
   text: string;
   kind: ToastKind;
+  action?: ToastAction;
 }
 
 /** Больше трёх одновременно — уже очередь, а не подтверждение. */
@@ -31,10 +41,17 @@ function emit(): void {
   for (const listener of listeners) listener();
 }
 
-export function showToast(text: string, kind: ToastKind = "success"): void {
+export function showToast(
+  text: string,
+  kind: ToastKind = "success",
+  action?: ToastAction,
+): void {
   const clean = text.trim();
   if (!clean) return;
-  items = [...items, { id: nextId++, text: clean, kind }].slice(-MAX_VISIBLE);
+  items = [
+    ...items,
+    { id: nextId++, text: clean, kind, ...(action ? { action } : {}) },
+  ].slice(-MAX_VISIBLE);
   emit();
 }
 

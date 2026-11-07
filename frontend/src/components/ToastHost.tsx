@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import Icon from "./Icon";
-import { dismissToast, useToasts } from "./toast";
+import { dismissToast, useToasts, type ToastAction } from "./toast";
 import { useTx } from "@/i18n";
 
 /**
@@ -31,6 +31,7 @@ export default function ToastHost() {
           id={toast.id}
           text={toast.text}
           success={toast.kind === "success"}
+          action={toast.action}
           closeLabel={tx("Скрыть сообщение")}
         />
       ))}
@@ -42,17 +43,21 @@ function ToastRow({
   id,
   text,
   success,
+  action,
   closeLabel,
 }: {
   id: number;
   text: string;
   success: boolean;
+  action?: ToastAction;
   closeLabel: string;
 }) {
   useEffect(() => {
-    const timer = window.setTimeout(() => dismissToast(id), 3200);
+    // §4 `undo-support`: у действия больше времени — человек должен успеть
+    // прочитать «удалено» и решить, что хочет вернуть.
+    const timer = window.setTimeout(() => dismissToast(id), action ? 6000 : 3200);
     return () => window.clearTimeout(timer);
-  }, [id]);
+  }, [id, action]);
 
   return (
     <div className="pointer-events-auto flex w-full max-w-[420px] items-start gap-2 rounded-card bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text shadow-lg ring-1 ring-tg-hint/20">
@@ -65,6 +70,18 @@ function ToastRow({
         ].join(" ")}
       />
       <span className="min-w-0 flex-1 break-words">{text}</span>
+      {action && (
+        <button
+          type="button"
+          onClick={() => {
+            dismissToast(id);
+            void action.run();
+          }}
+          className="-my-2 shrink-0 rounded-tile px-2 text-sm font-medium text-tg-link press"
+        >
+          {action.label}
+        </button>
+      )}
       {/* UI_UX_PRO_MAX §2 `touch-target-size`: закрытие — тоже кнопка,
           поэтому 44×44, а не 32px текстового «×». Отрицательные отступы
           не дают тосту вырасти из-за увеличенной тач-цели. */}

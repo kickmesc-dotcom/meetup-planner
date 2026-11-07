@@ -847,6 +847,11 @@ export const EN_CONTENT: Record<string, string> = {
   "Выйти": "Exit",
   "Закрыть без сохранения? Введённое не сохранится.": "Close without saving? Your input will be lost.",
   "К содержимому": "Skip to content",
+  "Смена удалена.": "Shift deleted.",
+  "Смена восстановлена.": "Shift restored.",
+  "Шаблон удалён.": "Template deleted.",
+  "Шаблон восстановлен.": "Template restored.",
+  "Черновик восстановлен.": "Draft restored.",
   "Чистим…": "Cleaning up…",
   // ---------------------------------------------------------- общее: календарные подписи --
   "свободен": "free",

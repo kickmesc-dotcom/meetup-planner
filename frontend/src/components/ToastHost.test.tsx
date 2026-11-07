@@ -37,6 +37,17 @@ describe("ToastHost", () => {
     expect(screen.queryByText("Готово")).toBeNull();
   });
 
+  it("действие в тосте возвращает удалённое и закрывает плашку", () => {
+    const undo = vi.fn();
+    render(<ToastHost />);
+
+    act(() => showToast("Смена удалена", "success", { label: "Отменить", run: undo }));
+    fireEvent.click(screen.getByRole("button", { name: "Отменить" }));
+
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Смена удалена")).toBeNull();
+  });
+
   it("пустое сообщение не превращается в пустую плашку", () => {
     render(<ToastHost />);
     act(() => showToast("   "));

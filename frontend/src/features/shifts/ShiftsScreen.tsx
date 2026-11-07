@@ -17,6 +17,7 @@ import {
   type ShiftItem,
   type ShiftPerson,
   type ShiftStatus,
+  type ShiftTemplate,
   type ShiftWeek,
 } from "@/api/shifts";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -103,11 +104,33 @@ export default function ShiftsScreen() {
   });
 
   const remove = useMutation({
-    mutationFn: (shiftId: number) => deleteShift(shiftId),
-    onSuccess: () => {
+    // §4 `undo-support`: удалённую смену возвращаем теми же полями — человек
+    // уже подтвердил удаление, но не обязан помнить статус и часы наизусть.
+    mutationFn: async (shift: ShiftItem) => {
+      await deleteShift(shift.id);
+      return shift;
+    },
+    onSuccess: (shift) => {
       haptic("success");
       setSheet(null);
       refresh();
+      showToast(tx("Смена удалена."), "success", {
+        label: tx("Отменить"),
+        run: async () => {
+          try {
+            await saveShift(shift.employee_id, shift.day, {
+              status: shift.status,
+              starts_at: shift.starts_at,
+              ends_at: shift.ends_at,
+              note: shift.note,
+            });
+            refresh();
+            showToast(tx("Смена восстановлена."));
+          } catch (err) {
+            showAlert(humanizeApiError(err));
+          }
+        },
+      });
     },
     onError,
   });
@@ -192,10 +215,34 @@ export default function ShiftsScreen() {
   });
 
   const removeTemplate = useMutation({
-    mutationFn: (templateId: number) => deleteShiftTemplate(templateId),
-    onSuccess: () => {
+    mutationFn: async (template: ShiftTemplate) => {
+      await deleteShiftTemplate(template.id);
+      return template;
+    },
+    onSuccess: (template) => {
       haptic("success");
       refresh();
+      showToast(tx("Шаблон удалён."), "success", {
+        label: tx("Отменить"),
+        run: async () => {
+          try {
+            await saveShiftTemplate({
+              name: template.name,
+              department_id: template.department_id,
+              days: template.days.map((day) => ({
+                weekday: day.weekday,
+                status: day.status,
+                starts_at: day.starts_at,
+                ends_at: day.ends_at,
+              })),
+            });
+            refresh();
+            showToast(tx("Шаблон восстановлен."));
+          } catch (err) {
+            showAlert(humanizeApiError(err));
+          }
+        },
+      });
     },
     onError,
   });
@@ -404,7 +451,8 @@ export default function ShiftsScreen() {
           onDeleteTemplate={(templateId) => {
             void (async () => {
               const ok = await showConfirm(tx("Удалить шаблон недели?"));
-              if (ok) removeTemplate.mutate(templateId);
+              const template = templatesQ.data?.find((item) => item.id === templateId);
+              if (ok && template) removeTemplate.mutate(template);
             })();
           }}
           onClear={(input) => {
@@ -430,7 +478,10 @@ export default function ShiftsScreen() {
           onDelete={(shiftId) => {
             void (async () => {
               const ok = await showConfirm(tx("Удалить смену из табеля?"));
-              if (ok) remove.mutate(shiftId);
+              const target = sheet?.shift;
+              // Сверяем id: лист мог остаться открытым между ответом
+              // подтверждения и нажатием, а удалять надо именно ту смену.
+              if (ok && target && target.id === shiftId) remove.mutate(target);
             })();
           }}
         />

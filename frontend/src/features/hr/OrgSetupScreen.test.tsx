@@ -94,6 +94,9 @@ function renderScreen(setup: OrgSetup = SETUP) {
 }
 
 beforeEach(() => {
+  // Мастер сохраняет черновик в localStorage: без очистки ответы одного
+  // кейса восстанавливались в следующем и меняли выбранные отделы.
+  window.localStorage.clear();
   saveOrgSetup.mockReset();
   fetchDepartments.mockReset().mockResolvedValue([]);
   fetchOrgSetupProgress.mockReset();
