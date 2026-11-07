@@ -16,20 +16,35 @@ import {
 
 describe("parseDeepLink", () => {
   it("ведёт к задачам по номеру поручения", () => {
-    expect(parseDeepLink("/?task=42")).toEqual({ tab: "tasks", taskId: 42 });
+    expect(parseDeepLink("/?task=42")).toEqual({
+      tab: "tasks",
+      taskId: 42,
+      issueId: null,
+    });
   });
 
   it("понимает полный адрес от service worker", () => {
     expect(parseDeepLink("https://semitaskbot.pages.dev/?task=7")).toEqual({
       tab: "tasks",
       taskId: 7,
+      issueId: null,
     });
+  });
+
+  it("ведёт в журнал к конкретной проблеме", () => {
+    expect(parseDeepLink("/?issue=9")).toEqual({
+      tab: "issues",
+      taskId: null,
+      issueId: 9,
+    });
+    expect(parseDeepLink("/?issue=abc")).toBeNull();
   });
 
   it("открывает известный раздел", () => {
     expect(parseDeepLink("/?open=checklist")).toEqual({
       tab: "checklist",
       taskId: null,
+      issueId: null,
     });
   });
 
@@ -47,7 +62,11 @@ describe("адрес окна", () => {
 
   it("читает ссылку из location", () => {
     window.history.replaceState({}, "", "/?task=5");
-    expect(deepLinkFromLocation()).toEqual({ tab: "tasks", taskId: 5 });
+    expect(deepLinkFromLocation()).toEqual({
+      tab: "tasks",
+      taskId: 5,
+      issueId: null,
+    });
   });
 
   it("очищает параметры после применения", () => {

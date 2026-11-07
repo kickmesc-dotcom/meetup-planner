@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ISSUE_CATEGORY_ICON,
@@ -108,6 +108,15 @@ export default function IssuesScreen() {
   const [view, setView] = useState<View>("open");
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
+  // §3 `deep-link`: уведомление о проблеме открывает её карточку, а не
+  // журнал целиком. Забираем id при появлении и сразу очищаем.
+  const pendingIssueId = useUI((s) => s.pendingIssueId);
+  const setPendingIssueId = useUI((s) => s.setPendingIssueId);
+  useEffect(() => {
+    if (pendingIssueId === null) return;
+    setSelected(pendingIssueId);
+    setPendingIssueId(null);
+  }, [pendingIssueId, setPendingIssueId]);
 
   const issuesQ = useQuery({
     queryKey: ["hr-issues", view],

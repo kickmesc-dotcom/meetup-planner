@@ -151,6 +151,8 @@ export default function App() {
   const mode = useUI((s) => s.mode);
   const setMode = useUI((s) => s.setMode);
   const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);
+  const setPendingTaskId = useUI((s) => s.setPendingTaskId);
+  const setPendingIssueId = useUI((s) => s.setPendingIssueId);
   // §2 `skip-links` и `focus-on-route-change`: клавиатура и скринридер не должны
   // проходить заново через всю шапку на каждой смене вкладки. Первый рендер
   // пропускаем — там фокус ещё ничей, и забирать его незачем.
@@ -202,11 +204,18 @@ export default function App() {
   useEffect(() => {
     const apply = (raw: string) => {
       const link = parseDeepLink(raw);
-      if (link) setTab(link.tab);
+      if (!link) return;
+      setTab(link.tab);
+      // §3 `deep-link`: вкладка — только половина дела. Номер записи
+      // передаём экрану, а он сам решает, как её показать.
+      if (link.taskId !== null) setPendingTaskId(link.taskId);
+      if (link.issueId !== null) setPendingIssueId(link.issueId);
     };
     const initial = deepLinkFromLocation();
     if (initial) {
       setTab(initial.tab);
+      if (initial.taskId !== null) setPendingTaskId(initial.taskId);
+      if (initial.issueId !== null) setPendingIssueId(initial.issueId);
       clearDeepLink();
     }
     if (!("serviceWorker" in navigator)) return;
@@ -218,7 +227,7 @@ export default function App() {
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
-  }, [setTab]);
+  }, [setTab, setPendingTaskId, setPendingIssueId]);
 
   // Языковой пакет (план, 8.3): включён ли узбекский в этой организации.
   // Флаг приходит вместе с настройками, которые читает каждый вошедший. Если

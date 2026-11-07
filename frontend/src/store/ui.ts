@@ -237,6 +237,15 @@ interface UIState {
   setPendingAdminSection: (s: string | null) => void;
 
   /**
+   * §3 `deep-link`: запись, к которой ведёт уведомление. Экран забирает id при
+   * появлении (данные могут грузиться дольше ссылки) и сразу очищает.
+   */
+  pendingTaskId: number | null;
+  setPendingTaskId: (id: number | null) => void;
+  pendingIssueId: number | null;
+  setPendingIssueId: (id: number | null) => void;
+
+  /**
    * Какой раздел кабинета открыт. Лежит в сторе, а не в `AdminScreen`, потому
    * что переключать его теперь может не только сам кабинет: нижняя полоса
    * зоны управления (02.11.2026) ведёт сразу в важные разделы, и ей нужно
@@ -364,6 +373,11 @@ export const useUI = create<UIState>((set, get) => ({
 
   pendingAdminSection: null,
   setPendingAdminSection: (pendingAdminSection) => set({ pendingAdminSection }),
+
+  pendingTaskId: null,
+  setPendingTaskId: (pendingTaskId) => set({ pendingTaskId }),
+  pendingIssueId: null,
+  setPendingIssueId: (pendingIssueId) => set({ pendingIssueId }),
 
   adminSection: "root",
   setAdminSection: (adminSection) => set({ adminSection }),

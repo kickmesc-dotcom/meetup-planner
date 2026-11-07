@@ -32,6 +32,8 @@ export interface DeepLink {
   tab: Tab;
   /** Номер поручения, если ссылка ведёт к задаче. */
   taskId: number | null;
+  /** Номер проблемы, если ссылка ведёт в журнал к конкретной записи. */
+  issueId: number | null;
 }
 
 /**
@@ -49,10 +51,18 @@ export function parseDeepLink(raw: string): DeepLink | null {
   if (taskRaw !== null) {
     // Только цифры: `task=abc` — не задача, а мусор в адресе.
     if (!/^\d+$/.test(taskRaw)) return null;
-    return { tab: "tasks", taskId: Number(taskRaw) };
+    return { tab: "tasks", taskId: Number(taskRaw), issueId: null };
+  }
+  // §3 `deep-link`: уведомление о проблеме ведёт не в журнал вообще, а в ту
+  // запись, из-за которой оно пришло.
+  const issueRaw = url.searchParams.get("issue");
+  if (issueRaw !== null) {
+    if (!/^\d+$/.test(issueRaw)) return null;
+    return { tab: "issues", taskId: null, issueId: Number(issueRaw) };
   }
   const open = url.searchParams.get("open");
-  if (open && DEEP_LINK_TABS.has(open)) return { tab: open as Tab, taskId: null };
+  if (open && DEEP_LINK_TABS.has(open))
+    return { tab: open as Tab, taskId: null, issueId: null };
   return null;
 }
 

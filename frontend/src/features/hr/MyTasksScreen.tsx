@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   TASK_MODE_LABEL,
@@ -119,6 +119,11 @@ export default function MyTasksScreen() {
   // «Сказал — стало поручением» (план, 8.5). Открывается из шапки смены:
   // руководитель видит проблему в зале, а не сидит в админке.
   const [quickOpen, setQuickOpen] = useState(false);
+  // §3 `deep-link`: задача из уведомления не просто открывает вкладку —
+  // человек должен увидеть именно её, а не листать список в поисках.
+  const pendingTaskId = useUI((s) => s.pendingTaskId);
+  const setPendingTaskId = useUI((s) => s.setPendingTaskId);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   // Подписи пустого состояния меняет управляющий (админка → «Тексты»).
   const emptyTitle = useAppText("tasks.empty.title", "На сегодня всё");
   const emptyHint = useAppText(
@@ -131,6 +136,22 @@ export default function MyTasksScreen() {
     queryKey: ["hr-tasks", showClosed],
     queryFn: () => fetchTasks(showClosed),
   });
+
+  useEffect(() => {
+    if (pendingTaskId === null) return;
+    const el = document.getElementById(`task-${pendingTaskId}`);
+    // Данных ещё нет — оставляем id: эффект повторится после загрузки.
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setHighlightId(pendingTaskId);
+    setPendingTaskId(null);
+  }, [pendingTaskId, tasksQ.data, setPendingTaskId]);
+
+  useEffect(() => {
+    if (highlightId === null) return;
+    const timer = window.setTimeout(() => setHighlightId(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [highlightId]);
   // Личная панель отвечает «что делать сейчас», поэтому прогресс смены
   // подтягивается сюда же: без него главный экран не знал, открыта ли смена.
   const checklistQ = useQuery({
@@ -432,6 +453,7 @@ export default function MyTasksScreen() {
             task={t}
             busy={action.isPending}
             issueOpen={issueFor === t.id}
+            highlight={highlightId === t.id}
             onToggleIssue={() => {
               haptic("light");
               setIssueFor(issueFor === t.id ? null : t.id);
@@ -461,6 +483,7 @@ function TaskCard({
   task,
   busy,
   issueOpen,
+  highlight,
   onToggleIssue,
   onAction,
   onIssued,
@@ -468,6 +491,7 @@ function TaskCard({
   task: HrTask;
   busy: boolean;
   issueOpen: boolean;
+  highlight?: boolean;
   onToggleIssue: () => void;
   onAction: (a: TaskAction) => void;
   onIssued: () => void;
@@ -482,10 +506,14 @@ function TaskCard({
   const offSchedule = task.active_today === false && !closed;
   return (
     <article
+      id={`task-${task.id}`}
       className={[
         "rounded-card p-3",
         offSchedule ? "bg-tg-secondary-bg/30" : "bg-tg-secondary-bg/60",
-      ].join(" ")}
+        highlight ? "ring-2 ring-tg-link" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="flex items-start justify-between gap-2">
         <TranslatableText
