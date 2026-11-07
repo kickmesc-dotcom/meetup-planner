@@ -16,7 +16,6 @@
  * в верхней строке они стояли вплотную к вкладкам зон и читались как третья
  * вкладка (жалоба владельца 02.11.2026).
  */
-import { motion } from "framer-motion";
 import Icon, { type IconName } from "@/components/Icon";
 import { useTx } from "@/i18n";
 import { useUI } from "@/store/ui";
@@ -82,12 +81,10 @@ export default function ManageTabBar({
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
           >
+            {/* §7 `excessive-motion`: одно движение на смену раздела — вход
+                контента; подчёркивание не переезжает по полосе. */}
             {active && (
-              <motion.span
-                layoutId="manage-tabbar-active"
-                className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-tg-link"
-                transition={{ type: "spring", stiffness: 500, damping: 32 }}
-              />
+              <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-tg-link" />
             )}
             <Icon name={it.icon} size={20} />
             <span className="w-full truncate text-center">{tx(it.label)}</span>

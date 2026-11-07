@@ -60,14 +60,16 @@ describe("шторка: несохранённый ввод", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
-  it("пустая шторка закрывается без вопросов", () => {
+  it("пустая шторка закрывается без вопросов", async () => {
     vi.mocked(showConfirm).mockClear();
     const onClose = renderSheet();
 
     fireEvent.click(screen.getByRole("button", { name: "Закрыть" }));
 
     expect(showConfirm).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalledTimes(1);
+    // §7 `interruptible`: закрытие сначала запускает выход, а `onClose`
+    // вызывается, когда шторка уехала (или сработала страховка).
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -78,10 +80,10 @@ describe("шторка: выход и модальность", () => {
     expect(dialog.getAttribute("aria-modal")).toBe("true");
   });
 
-  it("закрывается клавишей Escape", () => {
+  it("закрывается клавишей Escape", async () => {
     const onClose = renderSheet();
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
   it("не закрывается на другие клавиши", () => {
@@ -90,7 +92,7 @@ describe("шторка: выход и модальность", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("кнопка закрытия подписана и не меньше 44×44", () => {
+  it("кнопка закрытия подписана и не меньше 44×44", async () => {
     const onClose = renderSheet();
     const button = screen.getByRole("button", { name: "Закрыть" });
     // 44px заданы фиксированной стороной (h-11 = 44px), а не min-height:
@@ -98,6 +100,6 @@ describe("шторка: выход и модальность", () => {
     expect(button.className).toContain("h-11");
     expect(button.className).toContain("w-11");
     fireEvent.click(button);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 });

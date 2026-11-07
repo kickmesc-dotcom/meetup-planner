@@ -133,7 +133,11 @@ describe("NotificationsBell (GHG11(16): колокольчик только от
     mountSheet();
     await screen.findByTestId("notifications-list");
     fireEvent.click(screen.getByTestId("sheet-backdrop"));
-    expect(useUI.getState().showNotificationsSheet).toBe(false);
+    // Нижняя шторка закрывается после выхода: состояние стора сбрасывается по
+    // завершении анимации, а не в момент тапа (§7 `interruptible`).
+    await waitFor(() =>
+      expect(useUI.getState().showNotificationsSheet).toBe(false),
+    );
   });
 
   it("шит закрывается по Escape", async () => {
@@ -141,7 +145,10 @@ describe("NotificationsBell (GHG11(16): колокольчик только от
     mountSheet();
     await screen.findByTestId("notifications-list");
     fireEvent.keyDown(window, { key: "Escape" });
-    expect(useUI.getState().showNotificationsSheet).toBe(false);
+    // Закрытие идёт через выход шторки — см. комментарий в тапе по подложке.
+    await waitFor(() =>
+      expect(useUI.getState().showNotificationsSheet).toBe(false),
+    );
   });
 
   it("список в шите рисует тексты и отмечает прочитанными", async () => {

@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import Icon, { type IconName } from "@/components/Icon";
 import { useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -104,12 +103,11 @@ export default function TabBar({
                 : undefined
             }
           >
+            {/* §7 `excessive-motion`: при смене вкладки одновременно ехали
+                подчёркивание, цвет подписи и вход экрана. Оставляем одно
+                движение; подчёркивание просто появляется у новой вкладки. */}
             {active && (
-              <motion.span
-                layoutId="tabbar-active"
-                className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-tg-link"
-                transition={{ type: "spring", stiffness: 500, damping: 32 }}
-              />
+              <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-tg-link" />
             )}
             {/* Иконка декоративная — рядом есть подпись, поэтому её не должно
                 быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
