@@ -181,7 +181,11 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         )}</p>
       </section>
 
-      <section className="rounded-card bg-tg-secondary-bg/60 p-3">
+      <section
+        role="group"
+        aria-label={tx("Написать сотруднику")}
+        className="rounded-card bg-tg-secondary-bg/60 p-3"
+      >
         <div className="text-sm font-semibold text-tg-text">{tx("Написать сотруднику")}</div>
         <p className="mt-1 text-xs text-tg-hint">{tx("Личное уведомление в приложение. В чат не дублируем.")}</p>
         <select
