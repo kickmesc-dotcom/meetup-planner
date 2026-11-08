@@ -29,9 +29,9 @@ export default defineConfig({
        * вместе с тестами, а не заранее.
        */
       thresholds: {
-        lines: 60,
-        "src/features/**": { lines: 55 },
-        "src/api/**": { lines: 35 },
+        lines: 64,
+        "src/features/**": { lines: 58 },
+        "src/api/**": { lines: 62 },
       },
     },
   },
