@@ -105,8 +105,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Tests
-        run: npx vitest run --poolOptions.forks.maxForks=2 --poolOptions.forks.minForks=1
+      # Покрытие считается в том же прогоне, что и тесты: второй запуск
+      # удваивал бы время джобы. Пороги лежат в `vitest.config.ts`.
+      - name: Tests and coverage
+        run: npx vitest run --coverage --poolOptions.forks.maxForks=2 --poolOptions.forks.minForks=1
 
       # Сборка последней: она ловит ошибки, которые не видят типы (импорт
       # чанка, размер бандла, отсутствующий ассет).

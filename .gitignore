@@ -54,3 +54,4 @@ backups/
 # Playwright (этап 1): отчёты и артефакты прогонов
 frontend/playwright-report/
 frontend/test-results/
+frontend/coverage/

@@ -8,7 +8,7 @@
 | Джоб | Команды | Что ловит |
 | --- | --- | --- |
 | Backend (pytest) | `pip install -e ".[dev]"`, `pytest -q` | регрессии в API, сервисах, миграциях (сверка схемы с моделями) и правах |
-| Frontend | `npm ci`, `npm run lint`, `npm run typecheck`, `vitest run`, `npm run build`, `npm run check:bundle`, `npm run test:e2e` | ошибки типов и правил хуков, падение экранов, забытые переводы, сборку, вес бандла и 6 e2e-сценариев |
+| Frontend | `npm ci`, `npm run lint`, `npm run typecheck`, `vitest run --coverage`, `npm run build`, `npm run check:bundle`, `npm run test:e2e` | ошибки типов и правил хуков, падение экранов, регрессию покрытия, сборку, вес бандла и 6 e2e-сценариев |
 
 Почему те же команды, что локально. Любая «особая» команда в CI через месяц
 расходится с рабочей машиной, и зелёный CI перестаёт что-либо значить. Здесь
