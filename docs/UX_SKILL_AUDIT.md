@@ -30,7 +30,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `aria-labels` | ⚠️ | у `Icon` всегда `aria-hidden`; не все иконочные кнопки имеют имя | N |
 | `icon-context` | ⚠️ | декоративные скрыты; у Controls нет единого правила «иконка = имя» | N |
 | `keyboard-nav` | ⚠️ | фокус виден; порядок табов не проверен на живом экране | N |
-| `form-labels` | ⚠️ | вход — `label htmlFor`; в кабинете часть полей только с placeholder | P |
+| `form-labels` | ✅ | этап P: у всех 44 полей без видимой подписи есть `aria-label`; шесть оставшихся в отчёте сканера получают имя через `Field`/`Checkbox` label | — |
 | `skip-links` | ✅ | ссылка «К содержимому» первой в оболочке, видна по фокусу | — |
 | `heading-hierarchy` | ⚠️ | этап N: профиль получил `h1`; в кабинете заголовок пока `div` — остаётся в N | N |
 | `color-not-only` | ✅ | статусы = цвет + текст/иконка | — |
@@ -57,7 +57,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `touch-target-size` | ✅ | этап M: действия и иконочные кнопки подняты до 44px (`IssuesScreen`, `HandoversScreen`, `MassPlanSheet`, `AdminTasksScreen`, `AttentionScreen`, `AppTextsScreen`, `AskScreen`, `MenuList`, `ZoneHint`, `SimulationBanner`, `NavBar`, вход и сброс пароля) | — |
 | `touch-spacing` | ⚠️ | в плотных списках кнопки вплотную (8px не везде) | M |
 | `hover-vs-tap` | ✅ | все действия на `onClick` | — |
-| `loading-buttons` | ⚠️ | этап P: вход и сброс — `disabled` + `aria-busy`; остальные — только `disabled` | P |
+| `loading-buttons` | ✅ | этап P: 125 async-кнопок в 47 файлах — `disabled` + `aria-busy` по тому же состоянию | — |
 | `error-feedback` | ⚠️ | ошибка в блоке формы, не у конкретного поля | P |
 | `cursor-pointer` | ✅ | этап M: курсор только для `pointer: fine`, у `disabled` — `not-allowed` | — |
 | `gesture-conflicts` | ⚠️ | календарь `touch-action: pan-y`; вложенных свайпов нет | — |
@@ -193,7 +193,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
-| `input-labels` | ⚠️ | вход — да; кабинет — часть полей только placeholder | P |
+| `input-labels` | ✅ | этап P: placeholder больше не единственное имя; ключи переведены на EN и UZ | — |
 | `error-placement` | ✅ | этап P: `auth-error`/`reset-error`, `aria-invalid` и `aria-describedby` на полях входа и смены пароля | — |
 | `submit-feedback` | ⚠️ | `disabled` + спиннер не у всех форм | P |
 | `ime-composition-enter` | ✅ | этап P: поле подразделения не отправляется на Enter во время IME-подтверждения | — |
