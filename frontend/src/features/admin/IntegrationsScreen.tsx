@@ -232,7 +232,11 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        <div className="mt-3 flex flex-col gap-2">
+        <div
+          role="group"
+          aria-label={tx("Создать ключ")}
+          className="mt-3 flex flex-col gap-2"
+        >
           <label className="text-xs font-semibold text-tg-hint">
             {tx("Название")}
             <input
