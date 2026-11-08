@@ -216,7 +216,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `sheet-dismiss-confirm` | ✅ | этап P: `BottomSheet dirty` спрашивает перед закрытием; подключено в проблемах и передаче смены | — |
 | `error-clarity` | ✅ | `humanizeApiError` + следующий шаг | — |
 | `field-grouping` | ⚠️ | группы визуальные, без `fieldset/legend` | P |
-| `read-only-distinction` | ⚠️ | read-only и disabled не всегда различимы | P |
+| `read-only-distinction` | — | полей `readOnly` в экранах нет (grep: 0), различать нечего | — |
 | `focus-management` | ✅ | этап P: отказ отправляет фокус в почту, пароль или повтор — в зависимости от причины | — |
 | `error-summary` | ⚠️ | ошибка шага мастера объявляется через `role="alert"`; многополевых форм со сводкой нет | P |
 | `touch-friendly-input` | ✅ | поля 44px+ | — |
