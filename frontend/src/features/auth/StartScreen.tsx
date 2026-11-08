@@ -207,7 +207,10 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
             </label>
 
             {error && (
-              <p className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+              <p
+                role="alert"
+                className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy"
+              >
                 <Icon name="alert" size={13} className="mr-1 inline-block" />
                 {errorText(error)}
               </p>
@@ -290,7 +293,10 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
             </div>
 
             {error && (
-              <p className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy">
+              <p
+                role="alert"
+                className="rounded-tile bg-status-busy/10 p-2 text-xs text-status-busy"
+              >
                 <Icon name="alert" size={13} className="mr-1 inline-block" />
                 {errorText(error)}
               </p>

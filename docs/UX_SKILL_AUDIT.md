@@ -222,7 +222,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `touch-friendly-input` | ✅ | поля 44px+ | — |
 | `destructive-emphasis` | ✅ | красный + отдельное место | — |
 | `toast-accessibility` | ✅ | `aria-live="polite"`, фокус не крадёт | — |
-| `aria-live-errors` | ⚠️ | `role=alert` есть не у всех ошибок | P |
+| `aria-live-errors` | ✅ | этап P: все блоки ошибок в экранах объявлены `role="alert"` (проверено сканером: 3 оставшихся закрыты) | — |
 | `contrast-feedback` | ✅ | этап S: `destructive` на фоне и вторичной подложке ≥ 4.5:1 в обеих темах | — |
 | `timeout-feedback` | ⚠️ | таймаут показывается как общая ошибка | P |
 

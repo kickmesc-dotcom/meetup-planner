@@ -295,7 +295,10 @@ export default function PollSheet(_props: Props) {
       </label>
 
       {error && (
-        <div className="mt-2 rounded-tile bg-status-busy/15 p-2 text-center text-sm text-status-busy">
+        <div
+          role="alert"
+          className="mt-2 rounded-tile bg-status-busy/15 p-2 text-center text-sm text-status-busy"
+        >
           {error}
         </div>
       )}
