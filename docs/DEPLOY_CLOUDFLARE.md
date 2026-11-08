@@ -56,14 +56,18 @@ Storage:Edit` (если нужны бакеты), `Account Settings:Read`, `User
 ```bash
 cd frontend
 npm run build
-rm -f dist/assets/*.map
+# карт исходников в dist больше нет: `sourcemap: false` в vite.config.ts
 npx wrangler@4 pages deploy dist --project-name=semitaskbot --branch=main
 ```
 
 `VITE_API_BASE` вшивается в бандл из `frontend/.env.production`. Значение
 обязательно: без него фронт стучится в `/api` на самом Pages, где API нет.
 
-## 3. API на Hugging Face Space
+## 3. API на Hugging Face Space (архив, не боевой контур)
+
+> **С 01.11.2026 Space на паузе, боевой API — Amvera.** Актуальная схема и
+> расчёт — [`INFRA_CHOICE.md`](INFRA_CHOICE.md). Раздел оставлен как запись о
+> прежнем контуре и инструкция поднять стенд, если понадобится.
 
 Space: `fryesw/meetup-planner-backend` → https://fryesw-meetup-planner-backend.hf.space
 (cpu-basic, бесплатно; в `backend/README.md` уже есть HF-frontmatter, а

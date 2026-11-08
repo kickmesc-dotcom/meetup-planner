@@ -61,7 +61,7 @@ Telegram API из некоторых сетей работает нестаби�
 - **Backend:** Python 3.12, FastAPI + aiogram 3 в одном процессе (общий event loop, вебхук `/tg/webhook`), SQLAlchemy 2.0 async + Alembic, APScheduler.
 - **Frontend:** React 18 + TypeScript + Vite, Telegram WebApp SDK (`@twa-dev/sdk`), Tailwind, TanStack Query, Zustand, Framer Motion.
 - **БД:** PostgreSQL (Neon).
-- **Хостинг:** Hugging Face Spaces (Docker, backend) + GitHub Pages (frontend) + Neon (DB) — полностью бесплатная связка.
+- **Хостинг:** Amvera (Docker, backend, Warsaw-0) + Cloudflare Pages (frontend) + Neon (DB; переезд в managed PostgreSQL Amvera — `docs/INFRA_CHOICE.md`). HF Space остановлен.
 - **Авторизация:** `Authorization: tma <initData>` — HMAC-проверка подписи Telegram WebApp, whitelist участников через env.
 
 ## Структура
