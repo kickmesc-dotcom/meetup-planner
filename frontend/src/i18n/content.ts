@@ -1162,6 +1162,18 @@ export const EN_CONTENT: Record<string, string> = {
     "Tasks in plain words, including automation",
   "Компактный (миниатюры участников) / классический":
     "Compact (participant thumbnails) / classic",
+  // Экран настроек и кабинет: заголовки и подписи рядов. Без этих строк
+  // английский интерфейс показывал русские подписи вперемешку с переводом.
+  "Компактный (миниатюры участников) или классический":
+    "Compact (participant thumbnails) or classic",
+  "Новый таймлайн или legacy-вид": "New timeline or legacy view",
+  "Языки команды": "Team languages",
+  "Узбекский пакет: включён по умолчанию":
+    "Uzbek pack: on by default",
+  "Узбекский пакет для команды: включён по умолчанию":
+    "Uzbek pack for the team: on by default",
+  "Копия данных, удаление организации, журнал доступа":
+    "Data copy, organization deletion, access log",
   "Опыт и сотрудник недели": "Experience and employee of the week",
   "Сколько стоит работа · рейтинг недели":
     "What work costs · weekly rating",

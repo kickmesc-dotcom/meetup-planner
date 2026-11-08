@@ -36,10 +36,10 @@ function renderScreen() {
 }
 
 function fill(password: string, repeat: string) {
-  fireEvent.change(screen.getByLabelText("Пароль"), {
+  fireEvent.change(screen.getByLabelText(/Пароль/), {
     target: { value: password },
   });
-  fireEvent.change(screen.getByLabelText("Ещё раз"), {
+  fireEvent.change(screen.getByLabelText(/Ещё раз/), {
     target: { value: repeat },
   });
   fireEvent.click(screen.getByRole("button", { name: "Сохранить пароль" }));

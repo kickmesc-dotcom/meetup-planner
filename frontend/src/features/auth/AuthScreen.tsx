@@ -235,12 +235,16 @@ export default function AuthScreen({
               )}
 
               <label className="block">
-                <span className="text-xs text-tg-hint">{t("auth.email.label")}</span>
+                <span className="text-xs text-tg-hint">
+                  {t("auth.email.label")} <span aria-hidden>*</span>
+                </span>
                 <input
                   ref={emailRef}
                   type="email"
                   inputMode="email"
                   autoComplete="email"
+                  required
+                  aria-required="true"
                   aria-invalid={!!error}
                   aria-describedby={error ? "auth-error" : undefined}
                   value={email}
@@ -256,7 +260,7 @@ export default function AuthScreen({
                 // перехватывала бы клик по глазу и уводила фокус в поле.
                 <div>
                   <label htmlFor="auth-password" className="block text-xs text-tg-hint">
-                    {t("auth.password.label")}
+                    {t("auth.password.label")} <span aria-hidden>*</span>
                   </label>
                   <div className="relative mt-1">
                     <input
@@ -266,6 +270,8 @@ export default function AuthScreen({
                       aria-describedby={error ? "auth-error" : undefined}
                       type={showPassword ? "text" : "password"}
                       autoComplete={mode === "register" ? "new-password" : "current-password"}
+                      required
+                      aria-required="true"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       maxLength={128}
@@ -298,10 +304,14 @@ export default function AuthScreen({
               <button
                 type="submit"
                 disabled={pending}
+                aria-busy={pending}
                 className="mt-1 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
                 {pending ? t("auth.pending") : t(SUBMITS[mode])}
               </button>
+              {/* §8 `required-indicators`: звёздочка без расшифровки — загадка,
+                  поэтому подпись идёт под формой, а не только в скринридере. */}
+              <p className="text-2xs text-tg-hint">{t("auth.requiredNote")}</p>
             </form>
           )}
 

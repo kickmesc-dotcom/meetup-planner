@@ -60,6 +60,7 @@ export default function ResetPasswordScreen({
     setError(null);
     if (password.length < MIN_PASSWORD) {
       setError(t("reset.short"));
+      passwordRef.current?.focus();
       return;
     }
     if (password !== repeat) {
@@ -104,33 +105,47 @@ export default function ResetPasswordScreen({
 
               <form className="mt-3 space-y-2" onSubmit={submit} noValidate>
                 <label className="block">
-                  <span className="text-xs text-tg-hint">{t("reset.password")}</span>
+                  <span className="text-xs text-tg-hint">
+                    {t("reset.password")} <span aria-hidden>*</span>
+                  </span>
                   <input
                     ref={passwordRef}
                     type="password"
                     autoComplete="new-password"
+                    required
+                    aria-required="true"
+                    minLength={MIN_PASSWORD}
                     aria-invalid={!!error}
-                    aria-describedby={error ? "reset-error" : undefined}
+                    aria-describedby={`reset-length${error ? " reset-error" : ""}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     maxLength={128}
                     placeholder={t("reset.password.placeholder")}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text placeholder:text-tg-hint"
+                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
                   />
+                  {/* §8 `input-helper-text`: правило остаётся на экране, а не
+                      исчезает вместе с placeholder после первого символа. */}
+                  <p id="reset-length" className="mt-1 text-2xs text-tg-hint">
+                    {t("reset.password.placeholder")}
+                  </p>
                 </label>
 
                 <label className="block">
-                  <span className="text-xs text-tg-hint">{t("reset.repeat")}</span>
+                  <span className="text-xs text-tg-hint">
+                    {t("reset.repeat")} <span aria-hidden>*</span>
+                  </span>
                   <input
                     ref={repeatRef}
                     type="password"
                     autoComplete="new-password"
+                    required
+                    aria-required="true"
                     aria-invalid={!!error}
                     aria-describedby={error ? "reset-error" : undefined}
                     value={repeat}
                     onChange={(e) => setRepeat(e.target.value)}
                     maxLength={128}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
+                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text"
                   />
                 </label>
 
@@ -147,10 +162,12 @@ export default function ResetPasswordScreen({
                 <button
                   type="submit"
                   disabled={confirm.isPending}
+                  aria-busy={confirm.isPending}
                   className="mt-1 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
                 >
                   {confirm.isPending ? t("reset.saving") : t("reset.save")}
                 </button>
+                <p className="text-2xs text-tg-hint">{t("auth.requiredNote")}</p>
               </form>
 
               <button

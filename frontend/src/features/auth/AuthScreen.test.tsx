@@ -39,7 +39,7 @@ afterEach(cleanup);
 describe("AuthScreen — показ пароля", () => {
   it("по умолчанию пароль скрыт", () => {
     renderScreen();
-    const password = screen.getByLabelText("Пароль") as HTMLInputElement;
+    const password = screen.getByLabelText(/Пароль/) as HTMLInputElement;
     expect(password.type).toBe("password");
     expect(
       screen.getByRole("button", { name: "Показать пароль" }),
@@ -48,7 +48,7 @@ describe("AuthScreen — показ пароля", () => {
 
   it("кнопка открывает пароль и меняет подпись для скринридера", () => {
     renderScreen();
-    const password = screen.getByLabelText("Пароль") as HTMLInputElement;
+    const password = screen.getByLabelText(/Пароль/) as HTMLInputElement;
 
     fireEvent.click(screen.getByRole("button", { name: "Показать пароль" }));
 
@@ -59,7 +59,7 @@ describe("AuthScreen — показ пароля", () => {
 
   it("поля не мельче 16px — iOS не будет зумить при фокусе", () => {
     renderScreen();
-    const email = screen.getByLabelText("Почта") as HTMLInputElement;
+    const email = screen.getByLabelText(/Почта/) as HTMLInputElement;
     expect(email.className).toContain("text-base");
   });
 });
@@ -69,7 +69,7 @@ describe("AuthScreen — ошибка у поля", () => {
     renderScreen();
     fireEvent.click(screen.getByRole("button", { name: /Войти|Вход/i }));
 
-    const email = screen.getByLabelText("Почта") as HTMLInputElement;
+    const email = screen.getByLabelText(/Почта/) as HTMLInputElement;
     // §8 `error-placement`: скринридер должен связать сообщение с полем,
     // а не читать его как отдельный текст где-то ниже формы.
     expect(email.getAttribute("aria-invalid")).toBe("true");

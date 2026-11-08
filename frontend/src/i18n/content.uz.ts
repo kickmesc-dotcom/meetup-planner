@@ -21,6 +21,17 @@
  * что в русском. Проверка — `src/i18n/uz.guard.test.ts`.
  */
 export const UZ_CONTENT: Record<string, string> = {
+  // ---- настройки и кабинет: подписи рядов (08.11.2026) ----
+  "Компактный (миниатюры участников) или классический":
+    "Kompaniya (ishtirokchilar miniatyuralari) yoki klassik",
+  "Новый таймлайн или legacy-вид": "Yangi taymlayn yoki eski koʻrinish",
+  "Языки команды": "Jamoa tillari",
+  "Узбекский пакет: включён по умолчанию":
+    "Oʻzbekcha paket: sukut boʻyicha yoqilgan",
+  "Узбекский пакет для команды: включён по умолчанию":
+    "Jamoa uchun oʻzbekcha paket: sukut boʻyicha yoqilgan",
+  "Копия данных, удаление организации, журнал доступа":
+    "Maʼlumot nusxasi, tashkilotni oʻchirish, kirish jurnali",
   // ---- офлайн-очередь чек-листа (05.11.2026) ----
   "Не отправлено: {count}. Отправим, когда появится связь.": "{count} ta yuborilmadi. Aloqa paydo bo'lganda yuboramiz.",
   "Закрыть без сохранения? Введённое не сохранится.": "Saqlashsiz yopilsinmi? Kiritilganlar saqlanmaydi.",
