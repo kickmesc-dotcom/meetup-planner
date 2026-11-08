@@ -243,6 +243,9 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
             />
           </label>
+          <p className="mt-1 text-2xs text-tg-hint">
+            {tx("Показывается один раз — сохраните ключ.")}
+          </p>
           {ALL_SCOPES.map((scope) => (
             <Check
               key={scope}

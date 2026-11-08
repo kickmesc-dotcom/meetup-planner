@@ -201,7 +201,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `empty-states` | ✅ | пустые состояния с действием | — |
 | `toast-dismiss` | ✅ | 3,2с, закрытие 44×44 | — |
 | `confirmation-dialogs` | ✅ | все необратимые действия спрашивают `showConfirm`; прямых `window.confirm` в экранах нет, внутри Telegram — диалог платформы | — |
-| `input-helper-text` | ⚠️ | этап P: сброс пароля — постоянная подсказка длины; остальные — по месту | P |
+| `input-helper-text` | ⚠️ | этап P: сброс пароля — постоянная длина, ключ API — «показывается один раз»; остальные формы — по месту | P |
 | `disabled-states` | ✅ | `disabled:opacity-*` + атрибут | — |
 | `progressive-disclosure` | ✅ | простой/расширенный режим кабинета | — |
 | `inline-validation` | ⚠️ | проверка на blur только в части полей | P |

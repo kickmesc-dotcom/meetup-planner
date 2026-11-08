@@ -1284,6 +1284,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Время окончания": "End time",
   "Вариант ответа": "Answer option",
   "Строки прокси": "Proxy lines",
+  "Показывается один раз — сохраните ключ.":
+    "Shown once — save the key.",
   "Опыт и сотрудник недели": "Experience and employee of the week",
   "Сколько стоит работа · рейтинг недели":
     "What work costs · weekly rating",
