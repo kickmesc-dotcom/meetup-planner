@@ -278,15 +278,18 @@ export function useTx() {
  *
  * Сервер отдаёт коды, а не фразы, поэтому переводятся именно коды из
  * `messages.ts`. Если код незнакомый — остаётся общий разбор
- * (`humanizeApiError`), лучше русский текст, чем `invite_limit` на экране.
+ * (`humanizeApiError`), и он тоже проходит через словарь экранов: без этого
+ * на английском экране появлялся русский абзац про интернет и лимиты.
  */
 export function useErrorMessage() {
   const locale = useLocale((s) => s.locale);
+  // Пакет языка мог приехать после первого отказа: подписка перерисует текст.
+  useLocale((s) => s.contentVersion);
   return (error: unknown): string => {
     if (error instanceof ApiError) {
       const key = `error.${error.detail}` as MessageKey;
       if (key in MESSAGES[locale]) return translate(locale, key);
     }
-    return humanizeApiError(error);
+    return tx(locale, humanizeApiError(error));
   };
 }

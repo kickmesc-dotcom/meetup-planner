@@ -18,7 +18,11 @@
  * Формат: `"Русский оригинал": "English text"`. Подстановки — `{name}`,
  * одинаковые в обоих языках (см. `tx`).
  */
+import { API_ERRORS_EN } from "./api-errors";
+
 export const EN_CONTENT: Record<string, string> = {
+  // Тексты humanizeApiError живут рядом с кодами в `api/client.ts`.
+  ...API_ERRORS_EN,
   // ---- офлайн-очередь чек-листа (05.11.2026) ----
   "Не отправлено: {count}. Отправим, когда появится связь.": "{count} not sent yet. We will send it when the connection is back.",
   "Показан сохранённый чек-лист: связи нет. Отметки сохранятся на телефоне.": "Showing the saved checklist: no connection. Ticks are kept on the phone.",

@@ -20,7 +20,10 @@
  * Формат: `"Русский оригинал": "Oʻzbekcha matn"`, подстановки `{name}` — те же,
  * что в русском. Проверка — `src/i18n/uz.guard.test.ts`.
  */
+import { API_ERRORS_UZ } from "./api-errors";
+
 export const UZ_CONTENT: Record<string, string> = {
+  ...API_ERRORS_UZ,
   // ---- настройки и кабинет: подписи рядов (08.11.2026) ----
   "Компактный (миниатюры участников) или классический":
     "Kompaniya (ishtirokchilar miniatyuralari) yoki klassik",
