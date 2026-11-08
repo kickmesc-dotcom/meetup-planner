@@ -586,6 +586,7 @@ function ItemRow({
       {noteOpen && (
         <div className="mt-2 rounded-tile bg-tg-bg/60 p-2">
           <textarea
+            aria-label={tx("Например: инвентарь в порядке, не хватило 2 упаковок")}
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={2}

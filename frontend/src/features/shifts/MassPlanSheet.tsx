@@ -323,6 +323,7 @@ export default function MassPlanSheet({
         </div>
 
         <input
+          aria-label={tx("Заметка (необязательно)")}
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={200}

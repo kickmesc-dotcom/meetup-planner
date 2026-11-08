@@ -656,6 +656,7 @@ function IssueSheet({
           {issue.can_comment && (
             <div className="mt-4">
               <textarea
+                aria-label={tx("Добавить комментарий")}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 rows={2}

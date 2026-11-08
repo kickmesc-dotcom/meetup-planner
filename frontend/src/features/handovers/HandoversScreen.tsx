@@ -349,6 +349,7 @@ function HandoverCard({
       {rejecting && handover.can_reject && (
         <div className="mt-2">
           <textarea
+            aria-label={tx("Почему не принимаешь? Без причины вернуть нельзя.")}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}

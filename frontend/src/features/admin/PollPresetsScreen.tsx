@@ -163,6 +163,7 @@ function PresetRow({
     >
       <div className="grid grid-cols-[1fr_auto_1fr_auto] gap-2 items-center">
         <input
+          aria-label={tx("Начало слота")}
           type="time"
           value={preset.start}
           onChange={(e) => onChange({ ...preset, start: e.target.value })}
@@ -170,6 +171,7 @@ function PresetRow({
         />
         <span className="text-tg-hint">→</span>
         <input
+          aria-label={tx("Конец слота")}
           type="time"
           value={preset.end}
           onChange={(e) => onChange({ ...preset, end: e.target.value })}

@@ -359,6 +359,7 @@ function AddItemForm({
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
       <textarea
+        aria-label={tx("Что сделать? Например: протереть столы 400–500")}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         rows={2}
@@ -479,6 +480,7 @@ function ItemEditor({
       {open && (
         <div className="mt-3 space-y-2 border-t border-tg-hint/15 pt-3">
           <textarea
+            aria-label={tx("Пункт")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             rows={2}
@@ -487,6 +489,7 @@ function ItemEditor({
             placeholder={tx("Пункт")}
           />
           <textarea
+            aria-label={tx("Пояснение (необязательно)")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
@@ -677,6 +680,7 @@ function HallsCard() {
           ))}
           <div className="flex gap-2">
             <input
+              aria-label={tx("Название нового зала")}
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={120}

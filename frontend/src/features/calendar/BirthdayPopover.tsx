@@ -150,6 +150,7 @@ export default function BirthdayPopover() {
           {greeting && (
             <div className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2">
               <textarea
+                aria-label={tx("Текст поздравления")}
                 value={greeting}
                 onChange={(e) => setGreeting(e.target.value)}
                 rows={4}

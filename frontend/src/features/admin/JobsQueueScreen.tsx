@@ -276,6 +276,7 @@ function JobRow({
       {editing && editable && (
         <div className="mt-2 flex items-center gap-2">
           <input
+            aria-label={tx("Новое время")}
             type="datetime-local"
             value={localValue}
             onChange={(e) => setLocalValue(e.target.value)}

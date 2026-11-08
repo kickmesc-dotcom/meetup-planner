@@ -238,6 +238,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
         </p>
         <div className="mt-2 flex gap-2">
           <input
+            aria-label={tx("Название филиала")}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={tx("Название филиала")}

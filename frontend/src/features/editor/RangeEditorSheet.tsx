@@ -406,6 +406,7 @@ function TimePicker({
       {!allDay && (
         <div className="mt-2 flex items-center gap-2">
           <input
+            aria-label={tx("Время начала")}
             type="time"
             className="flex-1 rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm"
             value={startHm}
@@ -414,6 +415,7 @@ function TimePicker({
           />
           <span className="text-tg-hint text-sm">→</span>
           <input
+            aria-label={tx("Время окончания")}
             type="time"
             className="flex-1 rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm"
             value={endHm}

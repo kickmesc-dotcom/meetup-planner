@@ -248,6 +248,7 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
           <div className="space-y-2">
             <div className="text-sm font-semibold text-tg-text">{tx("Клиенты")}</div>
             <input
+              aria-label={tx("Поиск по названию или коду")}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={tx("Поиск по названию или коду")}

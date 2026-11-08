@@ -282,6 +282,7 @@ function ReviewRow({
       {reworkOpen && (
         <div className="mt-2">
           <textarea
+            aria-label={tx("Что переделать — коротко и по делу")}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={2}

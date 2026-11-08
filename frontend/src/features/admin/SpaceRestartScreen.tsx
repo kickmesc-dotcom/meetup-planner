@@ -181,6 +181,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             <div>
               <div className="text-xs text-tg-hint mb-1">{tx("Дата и время (локальные)")}</div>
               <input
+                aria-label={tx("Дата и время")}
                 type="datetime-local"
                 value={isoToLocalInput(draft.at)}
                 onChange={(e) =>
@@ -202,6 +203,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
                 {tx("Каждые {hours} ч", { hours: draft.every_hours ?? 24 })}
               </div>
               <input
+                aria-label={tx("Интервал, часов")}
                 type="range"
                 min={1}
                 max={168}

@@ -811,11 +811,13 @@ function EditRowForm({
     <div className="space-y-2 pt-1 border-t border-tg-bg/50">
       <div className="grid grid-cols-[1fr_88px] gap-2">
         <input
+          aria-label={tx("Сервер")}
           value={server}
           onChange={(e) => setServer(e.target.value)}
           className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
         />
         <input
+          aria-label={tx("Порт")}
           inputMode="numeric"
           value={port}
           onChange={(e) => setPort(e.target.value.replace(/[^0-9]/g, ""))}
@@ -833,6 +835,7 @@ function EditRowForm({
           <option value="mtproto">MTProto</option>
         </select>
         <input
+          aria-label="secret / pass"
           placeholder="secret / pass"
           value={secret}
           onChange={(e) => setSecret(e.target.value)}
@@ -1033,6 +1036,7 @@ function AddProxyForm({
     <div className="space-y-2">
       <div className="grid grid-cols-[1fr_88px] gap-2">
         <input
+          aria-label="server (IP/host)"
           type="text"
           placeholder="server (IP/host)"
           value={server}
@@ -1040,6 +1044,7 @@ function AddProxyForm({
           className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text placeholder:text-tg-hint outline-none border border-transparent focus:border-tg-link"
         />
         <input
+          aria-label={tx("Порт")}
           type="text"
           inputMode="numeric"
           placeholder="port"
@@ -1059,6 +1064,7 @@ function AddProxyForm({
           <option value="http">HTTP</option>
         </select>
         <input
+          aria-label={tx("secret / pass (опц.)")}
           type="text"
           placeholder={tx("secret / pass (опц.)")}
           value={secret}

@@ -210,6 +210,7 @@ export default function PollSheet(_props: Props) {
           >
             <div className="flex items-center gap-2">
               <input
+                aria-label={tx("Дата варианта")}
                 type="date"
                 value={o.date}
                 onChange={(e) => setOption(i, { date: e.target.value })}
@@ -232,6 +233,7 @@ export default function PollSheet(_props: Props) {
             </div>
             {includeTime && (
               <input
+                aria-label={tx("Время варианта")}
                 type="time"
                 value={o.time || defaultTime}
                 onChange={(e) => setOption(i, { time: e.target.value })}

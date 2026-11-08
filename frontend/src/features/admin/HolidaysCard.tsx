@@ -106,6 +106,7 @@ export default function HolidaysCard() {
       <div className="mt-3 space-y-2 border-t border-tg-bg/60 pt-2">
         <div className="flex gap-2">
           <input
+            aria-label={tx("День")}
             value={day}
             onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
             inputMode="numeric"
@@ -113,6 +114,7 @@ export default function HolidaysCard() {
             className="w-14 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
           />
           <input
+            aria-label={tx("Месяц")}
             value={month}
             onChange={(e) => setMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
             inputMode="numeric"
@@ -120,6 +122,7 @@ export default function HolidaysCard() {
             className="w-14 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
           />
           <input
+            aria-label={tx("Что за праздник")}
             value={message}
             onChange={(e) => setMessage(e.target.value.slice(0, 120))}
             placeholder={tx("Что за праздник")}

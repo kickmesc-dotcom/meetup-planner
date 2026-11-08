@@ -901,6 +901,7 @@ function ServerSwitch() {
         "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.",
       )}</p>
       <input
+        aria-label="https://backup.example.ru"
         value={value}
         onChange={(e) => setValue(e.target.value.trim())}
         placeholder="https://backup.example.ru"

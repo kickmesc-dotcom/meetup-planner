@@ -226,6 +226,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
           {tx("Скачать пример")}
         </button>
         <input
+          aria-label={tx("Файл CSV")}
           ref={fileRef}
           type="file"
           accept=".csv,text/csv,text/plain"

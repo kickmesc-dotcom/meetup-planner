@@ -150,6 +150,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
 
             {question.kind === "text" && (
               <textarea
+                aria-label={tx("Пара слов своими словами")}
                 rows={3}
                 maxLength={2000}
                 value={answers[question.id]?.value_text ?? ""}

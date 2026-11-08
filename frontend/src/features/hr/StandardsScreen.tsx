@@ -624,6 +624,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
           <div key={index} className="rounded-tile bg-tg-bg/60 p-2">
             <div className="flex items-center gap-2">
               <input
+                aria-label={tx("Вопрос {number}")}
                 value={q.text}
                 onChange={(e) =>
                   setQuestions((prev) =>
@@ -667,6 +668,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
                   aria-label={tx("Верный вариант")}
                 />
                 <input
+                  aria-label={tx("Вариант ответа")}
                   value={option}
                   onChange={(e) =>
                     setQuestions((prev) =>
