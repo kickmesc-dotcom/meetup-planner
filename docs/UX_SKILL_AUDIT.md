@@ -36,7 +36,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `color-not-only` | ✅ | статусы = цвет + текст/иконка | — |
 | `dynamic-type` | ⚠️ | 200 %: базовый шрифт 16 px, на экране входа переполнения нет; внутренние экраны без входа не проверить | S |
 | `reduced-motion` | ✅ | `motion-reduce` + `@media (prefers-reduced-motion)`; `press.guard` | — |
-| `voiceover-sr` | ⚠️ | `role=status`/`aria-live` у тостов; у форм — только `role=alert` | P |
+| `voiceover-sr` | ✅ | этап P: тосты — `role="status"`, ошибки форм — `role="alert"`, работа кнопок — `aria-busy` | — |
 | `escape-routes` | ✅ | этап N: Escape, кнопка «Закрыть» 44×44, `aria-modal`; тест `BottomSheet.test.tsx` | — |
 | `keyboard-shortcuts` | — | авторских горячих клавиш нет | — |
 | `focus-not-obscured` | ⚠️ | липкие шапки есть (`HrFeedScreen`), фокус под ними не проверялся | N |
