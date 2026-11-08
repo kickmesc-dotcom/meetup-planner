@@ -218,6 +218,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             disabled={transfer.isPending || !employeeId || !targetId}
+            aria-busy={transfer.isPending}
             onClick={() => transfer.mutate()}
             className="mt-3 min-h-11 w-full rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
@@ -245,6 +246,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             disabled={create.isPending || name.trim().length < 2}
+            aria-busy={create.isPending}
             onClick={() => create.mutate(name.trim())}
             className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >

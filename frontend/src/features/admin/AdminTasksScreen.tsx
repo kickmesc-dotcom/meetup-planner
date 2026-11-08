@@ -404,6 +404,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         <button
           type="button"
           disabled={create.isPending}
+          aria-busy={create.isPending}
           onClick={() => create.mutate()}
           className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
@@ -424,6 +425,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 disabled={bulkClose.isPending}
+                aria-busy={bulkClose.isPending}
                 onClick={async () => {
                   const count = pickedOpen.length;
                   const ok = await showConfirm(
@@ -508,6 +510,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 disabled={close.isPending}
+                aria-busy={close.isPending}
                 onClick={async () => {
                   const ok = await showConfirm(
                     tx("Закрыть «{title}»?", { title: task.title }),

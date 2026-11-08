@@ -162,6 +162,7 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => save.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
@@ -170,6 +171,7 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => reset.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm font-semibold text-tg-hint disabled:opacity-50"
           >

@@ -114,6 +114,7 @@ function OrgRow({
         <button
           type="button"
           disabled={busy}
+          aria-busy={busy}
           onClick={() => onToggle(org)}
           className="min-h-11 rounded-tile bg-tg-secondary-bg px-3 text-sm font-semibold text-tg-hint disabled:opacity-50"
         >
@@ -152,6 +153,7 @@ function InvoiceRow({
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => onConfirm(invoice.id)}
             className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
@@ -160,6 +162,7 @@ function InvoiceRow({
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => onCancel(invoice.id)}
             className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm font-semibold text-tg-hint disabled:opacity-50"
           >

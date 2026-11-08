@@ -130,6 +130,7 @@ function MenuRow({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => onToggle(item)}
               aria-pressed={item.is_available}
               aria-label={
@@ -146,6 +147,7 @@ function MenuRow({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => onEdit(item)}
               aria-label={tx("Изменить позицию")}
               className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text disabled:opacity-50"
@@ -157,6 +159,7 @@ function MenuRow({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => onDelete(item)}
               aria-label={tx("Удалить позицию")}
               className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-status-busy/10 text-status-busy disabled:opacity-50"

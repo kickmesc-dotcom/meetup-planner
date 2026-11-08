@@ -461,6 +461,7 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
           <button
             type="button"
             disabled={!allAnswered || check.isPending}
+            aria-busy={check.isPending}
             onClick={() => {
               const values = questions.map((q) => answers[q.id] ?? -1);
               check.mutate(values);

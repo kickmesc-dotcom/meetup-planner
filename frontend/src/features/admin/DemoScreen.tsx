@@ -197,6 +197,7 @@ export default function DemoScreen({ onBack }: Props) {
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => {
                 haptic("light");
                 seed.mutate();
@@ -210,6 +211,7 @@ export default function DemoScreen({ onBack }: Props) {
             <button
               type="button"
               disabled={busy || people === 0}
+              aria-busy={busy}
               onClick={() => {
                 haptic("light");
                 simulate.mutate();
@@ -227,6 +229,7 @@ export default function DemoScreen({ onBack }: Props) {
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => {
                 haptic("light");
                 visibility.mutate(!data.visible);
@@ -240,6 +243,7 @@ export default function DemoScreen({ onBack }: Props) {
             <button
               type="button"
               disabled={busy || people === 0}
+              aria-busy={busy}
               onClick={async () => {
                 const ok = await showConfirm(
                   tx(
@@ -255,6 +259,7 @@ export default function DemoScreen({ onBack }: Props) {
             <button
               type="button"
               disabled={busy || people === 0}
+              aria-busy={busy}
               onClick={async () => {
                 const ok = await showConfirm(
                   tx(

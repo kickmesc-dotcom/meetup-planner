@@ -305,6 +305,7 @@ export default function PollSheet(_props: Props) {
           mut.mutate();
         }}
         disabled={!valid || mut.isPending}
+        aria-busy={mut.isPending}
         className="mt-4 w-full rounded-card bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50 inline-flex items-center justify-center gap-2"
       >
         {mut.isPending && <Spinner />}

@@ -358,6 +358,7 @@ function EmployeeRow({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() =>
                 onSave({
                   display_name: name,
@@ -371,6 +372,7 @@ function EmployeeRow({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={onReset}
               className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
             >{tx("Обнулить прогресс")}</button>
@@ -379,6 +381,7 @@ function EmployeeRow({
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={onRestore}
                   className="min-h-9 rounded-tile bg-status-free/15 px-3 text-xs text-status-free disabled:opacity-50"
                 >{tx("Вернуть из корзины")}</button>
@@ -387,6 +390,7 @@ function EmployeeRow({
               <button
                 type="button"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={onFire}
                 className="min-h-9 rounded-tile bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
               >{tx("Уволить")}</button>

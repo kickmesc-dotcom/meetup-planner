@@ -64,6 +64,7 @@ export default function EmailVerifyCard() {
         <button
           type="button"
           disabled={send.isPending}
+          aria-busy={send.isPending}
           onClick={() => send.mutate()}
           className="mt-2 min-h-11 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-60"
         >

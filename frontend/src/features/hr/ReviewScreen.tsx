@@ -259,6 +259,7 @@ function ReviewRow({
         <button
           type="button"
           disabled={review.isPending}
+          aria-busy={review.isPending}
           onClick={() => review.mutate(true)}
           className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
         >
@@ -267,6 +268,7 @@ function ReviewRow({
         <button
           type="button"
           disabled={review.isPending}
+          aria-busy={review.isPending}
           onClick={() => {
             haptic("light");
             setReworkOpen((v) => !v);
@@ -290,6 +292,7 @@ function ReviewRow({
           <button
             type="button"
             disabled={review.isPending || !comment.trim()}
+            aria-busy={review.isPending}
             onClick={() => review.mutate(false)}
             className="mt-1.5 min-h-9 w-full rounded-tile bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
           >

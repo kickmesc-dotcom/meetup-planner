@@ -208,6 +208,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
           <button
             type="button"
             disabled={!departmentId || createTpl.isPending}
+            aria-busy={createTpl.isPending}
             onClick={() => {
               haptic("selection");
               createTpl.mutate();
@@ -374,6 +375,7 @@ function AddItemForm({
         <button
           type="button"
           disabled={busy || !title.trim()}
+          aria-busy={busy}
           onClick={() => onSubmit(title.trim(), photo)}
           className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >{tx("Добавить")}</button>
@@ -550,6 +552,7 @@ function ItemEditor({
             <button
               type="button"
               disabled={save.isPending || !title.trim()}
+              aria-busy={save.isPending}
               onClick={() =>
                 save.mutate({
                   title: title.trim(),
@@ -561,6 +564,7 @@ function ItemEditor({
             <button
               type="button"
               disabled={remove.isPending}
+              aria-busy={remove.isPending}
               onClick={async () => {
                 const ok = await showConfirm(
                   tx("Удалить пункт «{title}»? Отметки в уже пройденных сменах исчезнут.", {
@@ -682,6 +686,7 @@ function HallsCard() {
             <button
               type="button"
               disabled={create.isPending || !name.trim()}
+              aria-busy={create.isPending}
               onClick={() => create.mutate(name.trim())}
               className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
             >

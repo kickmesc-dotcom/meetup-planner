@@ -255,6 +255,7 @@ export default function OrgSetupScreen({
               type="button"
               onClick={skip}
               disabled={save.isPending}
+              aria-busy={save.isPending}
               className="min-h-9 rounded-tile px-2 text-xs text-tg-link disabled:opacity-50"
             >
               {tx("Пропустить")}
@@ -653,6 +654,7 @@ export default function OrgSetupScreen({
         <button
           type="button"
           disabled={step === 0 || save.isPending}
+          aria-busy={save.isPending}
           onClick={() => void go(step - 1)}
           className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm text-tg-text disabled:opacity-40"
         >
@@ -661,6 +663,7 @@ export default function OrgSetupScreen({
         <button
           type="button"
           disabled={save.isPending}
+          aria-busy={save.isPending}
           onClick={() => void (step === lastStep ? finish() : go(step + 1))}
           className="min-h-11 flex-[2] rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
@@ -913,6 +916,7 @@ function PeopleStep({
         <button
           type="button"
           disabled={invite.isPending}
+          aria-busy={invite.isPending}
           onClick={() => invite.mutate()}
           className="min-h-10 shrink-0 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
         >
@@ -1188,6 +1192,7 @@ function ScheduleStep({
       <button
         type="button"
         disabled={save.isPending}
+        aria-busy={save.isPending}
         onClick={() => save.mutate()}
         className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
       >

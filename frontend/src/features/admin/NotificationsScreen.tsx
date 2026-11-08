@@ -156,6 +156,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
               key={option.hours}
               type="button"
               disabled={mute.isPending}
+              aria-busy={mute.isPending}
               onClick={() => void muteAll(option.hours, option.label)}
               className="min-h-9 rounded-full bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
             >
@@ -166,6 +167,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             <button
               type="button"
               disabled={mute.isPending}
+              aria-busy={mute.isPending}
               onClick={() => {
                 haptic("selection");
                 mute.mutate(0);
@@ -209,6 +211,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         <button
           type="button"
           disabled={target === null || text.trim().length === 0 || send.isPending}
+          aria-busy={send.isPending}
           onClick={() => {
             haptic("medium");
             send.mutate();
@@ -262,6 +265,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                               key={option.minutes}
                               type="button"
                               disabled={move.isPending}
+                              aria-busy={move.isPending}
                               onClick={() => {
                                 haptic("selection");
                                 move.mutate({
@@ -284,6 +288,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                         <button
                           type="button"
                           disabled={move.isPending || skip.isPending}
+                          aria-busy={move.isPending}
                           onClick={() => {
                             haptic("selection");
                             setMoving(item.task_id);
@@ -339,6 +344,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                       <button
                         type="button"
                         disabled={restore.isPending}
+                        aria-busy={restore.isPending}
                         onClick={() => {
                           haptic("selection");
                           restore.mutate(item.task_id);
@@ -376,6 +382,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                   <button
                     type="button"
                     disabled={drop.isPending}
+                    aria-busy={drop.isPending}
                     onClick={() => {
                       haptic("medium");
                       void (async () => {

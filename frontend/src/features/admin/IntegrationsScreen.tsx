@@ -254,6 +254,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             disabled={createKey.isPending || keyName.trim().length === 0}
+            aria-busy={createKey.isPending}
             onClick={() => createKey.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
@@ -294,6 +295,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
                       <button
                         type="button"
                         disabled={revoke.isPending}
+                        aria-busy={revoke.isPending}
                         onClick={() => revoke.mutate(key.id)}
                         className="min-h-9 flex-1 rounded-tile bg-red-500/10 text-xs font-semibold text-red-600"
                       >
@@ -372,6 +374,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
           <button
             type="button"
             disabled={addHook.isPending || url.trim().length < 8 || events.length === 0}
+            aria-busy={addHook.isPending}
             onClick={() => addHook.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
@@ -403,6 +406,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
                   <button
                     type="button"
                     disabled={patchHook.isPending}
+                    aria-busy={patchHook.isPending}
                     onClick={() =>
                       patchHook.mutate({ id: hook.id, isActive: !hook.is_active })
                     }
@@ -413,6 +417,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
                   <button
                     type="button"
                     disabled={removeHook.isPending}
+                    aria-busy={removeHook.isPending}
                     onClick={() => removeHook.mutate(hook.id)}
                     className="min-h-9 flex-1 rounded-tile bg-red-500/10 text-xs font-semibold text-red-600"
                   >

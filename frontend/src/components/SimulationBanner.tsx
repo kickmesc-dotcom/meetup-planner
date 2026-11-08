@@ -69,6 +69,7 @@ export default function SimulationBanner() {
       <button
         type="button"
         disabled={exit.isPending}
+        aria-busy={exit.isPending}
         onClick={() => exit.mutate()}
         className="min-h-11 shrink-0 rounded-full bg-tg-bg px-2.5 text-xs font-medium text-tg-link disabled:opacity-50"
       >

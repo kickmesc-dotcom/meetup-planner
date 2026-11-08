@@ -215,6 +215,7 @@ function PlanCard({
                   key={rate}
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => onRate(rate)}
                   className={`min-h-9 flex-1 rounded-tile px-2 text-xs transition-colors disabled:opacity-50 ${
                     plan.rate_type === rate
@@ -234,6 +235,7 @@ function PlanCard({
               <button
                 type="button"
                 disabled={busy || plan.training_days <= 0}
+                aria-busy={busy}
                 onClick={() => onTrainingDays(Math.max(0, plan.training_days - 1))}
                 className="min-h-11 min-w-11 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
                 aria-label={tx("Меньше учебных смен")}
@@ -246,6 +248,7 @@ function PlanCard({
               <button
                 type="button"
                 disabled={busy || plan.training_days >= 30}
+                aria-busy={busy}
                 onClick={() => onTrainingDays(Math.min(30, plan.training_days + 1))}
                 className="min-h-11 min-w-11 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-40"
                 aria-label={tx("Больше учебных смен")}
@@ -321,6 +324,7 @@ function PlanCard({
                   <button
                     type="button"
                     disabled={busy}
+                    aria-busy={busy}
                     onClick={() => onResetDay(item.day)}
                     className="min-h-8 shrink-0 rounded-full bg-tg-bg/60 px-2.5 text-xs text-tg-link disabled:opacity-50"
                   >{tx("Вернуть правило")}</button>

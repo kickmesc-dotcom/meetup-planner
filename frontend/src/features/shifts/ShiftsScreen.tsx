@@ -802,6 +802,7 @@ function ShiftSheet({
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => onDelete(state.shift!.id)}
                   className="min-h-11 rounded-card bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
                 >{tx("Удалить")}</button>

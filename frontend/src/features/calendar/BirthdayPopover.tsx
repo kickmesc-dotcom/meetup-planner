@@ -139,6 +139,7 @@ export default function BirthdayPopover() {
             type="button"
             onClick={() => greetingMut.mutate()}
             disabled={greetingMut.isPending}
+            aria-busy={greetingMut.isPending}
             className="rounded-tile bg-tg-button text-tg-button-text py-2 px-3 text-sm font-medium press disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {greetingMut.isPending && <Spinner size={14} />}
@@ -179,6 +180,7 @@ export default function BirthdayPopover() {
                   type="button"
                   onClick={() => void onPost(false)}
                   disabled={postMut.isPending || !greeting.trim()}
+                  aria-busy={postMut.isPending}
                   className="rounded-tile bg-tg-button/80 text-tg-button-text text-xs px-2 py-1 disabled:opacity-60 flex items-center gap-1"
                 >
                   {postMut.isPending && <Spinner size={10} />}
@@ -189,6 +191,7 @@ export default function BirthdayPopover() {
                   type="button"
                   onClick={() => void onPost(true)}
                   disabled={postMut.isPending || !greeting.trim()}
+                  aria-busy={postMut.isPending}
                   className="rounded-tile bg-tg-secondary-bg text-tg-text text-xs px-2 py-1 disabled:opacity-60"
                 >
                   <Icon name="edit" size={14} className="mr-1 inline-block align-[-2px]" />

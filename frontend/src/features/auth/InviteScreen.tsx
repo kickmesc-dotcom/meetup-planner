@@ -217,6 +217,7 @@ export default function InviteScreen({
       <button
         type="button"
         disabled={accept.isPending}
+        aria-busy={accept.isPending}
         onClick={() => {
           haptic("medium");
           setError(null);

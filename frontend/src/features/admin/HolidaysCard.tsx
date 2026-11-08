@@ -88,6 +88,7 @@ export default function HolidaysCard() {
                   removeMut.mutate(h.id);
                 }}
                 disabled={removeMut.isPending}
+                aria-busy={removeMut.isPending}
                 className="grid shrink-0 place-items-center rounded-tile bg-tg-bg/60 p-1.5 text-status-busy press disabled:opacity-60"
                 aria-label={tx("Удалить праздник")}
               >
@@ -132,6 +133,7 @@ export default function HolidaysCard() {
             addMut.mutate();
           }}
           disabled={!ready || addMut.isPending}
+          aria-busy={addMut.isPending}
           className="w-full rounded-tile bg-tg-button px-3 py-2 text-sm font-medium text-tg-button-text press disabled:opacity-60"
         >
           {tx("+ Добавить праздник")}

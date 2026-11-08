@@ -135,6 +135,7 @@ export default function PushCard() {
       <button
         type="button"
         disabled={busy}
+        aria-busy={busy}
         onClick={() => void toggle()}
         className="mt-2 min-h-11 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-60"
       >

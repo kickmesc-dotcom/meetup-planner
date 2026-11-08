@@ -88,6 +88,7 @@ function InvoiceRow({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => onPaid(invoice.id)}
               className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
             >
@@ -97,6 +98,7 @@ function InvoiceRow({
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => onCancel(invoice.id)}
             className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm font-semibold text-tg-hint disabled:opacity-50"
           >
@@ -196,6 +198,7 @@ export default function BillingScreen({ onBack }: { onBack: () => void }) {
                   <button
                     type="button"
                     disabled={create.isPending}
+                    aria-busy={create.isPending}
                     onClick={() => create.mutate({ plan: price.code, period: "month" })}
                     className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
                   >
@@ -204,6 +207,7 @@ export default function BillingScreen({ onBack }: { onBack: () => void }) {
                   <button
                     type="button"
                     disabled={create.isPending}
+                    aria-busy={create.isPending}
                     onClick={() => create.mutate({ plan: price.code, period: "year" })}
                     className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
                   >

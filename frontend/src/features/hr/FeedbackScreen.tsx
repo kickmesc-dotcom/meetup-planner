@@ -165,6 +165,7 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             disabled={send.isPending || Object.keys(answers).length === 0}
+            aria-busy={send.isPending}
             onClick={() => send.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
           >

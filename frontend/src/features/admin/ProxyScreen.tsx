@@ -404,6 +404,7 @@ export default function ProxyScreen({ onBack }: Props) {
         <button
           type="button"
           disabled={bootstrap.isPending}
+          aria-busy={bootstrap.isPending}
           onClick={() => {
             haptic("medium");
             bootstrap.mutate();
@@ -445,6 +446,7 @@ export default function ProxyScreen({ onBack }: Props) {
               <button
                 type="button"
                 disabled={pingAllM.isPending || !listQ.data?.length}
+                aria-busy={pingAllM.isPending}
                 onClick={() => {
                   haptic("medium");
                   pingAllM.mutate();
@@ -458,6 +460,7 @@ export default function ProxyScreen({ onBack }: Props) {
               <button
                 type="button"
                 disabled={delDead.isPending || !listQ.data?.length}
+                aria-busy={delDead.isPending}
                 onClick={() => {
                   if (confirm("Удалить прокси, которые при проверке выдали ошибку и не отвечали успехом?")) {
                     haptic("warning");

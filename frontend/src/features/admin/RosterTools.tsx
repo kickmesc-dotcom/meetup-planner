@@ -198,6 +198,7 @@ export function AddPersonPanel({
             <button
               type="button"
               disabled={tgId.length < 4 || add.isPending}
+              aria-busy={add.isPending}
               onClick={() => add.mutate()}
               className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
             >
@@ -206,6 +207,7 @@ export function AddPersonPanel({
             <button
               type="button"
               disabled={tgId.length < 4 || find.isPending}
+              aria-busy={find.isPending}
               onClick={() => find.mutate()}
               className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
             >
@@ -347,6 +349,7 @@ export function RosterSnapshotsPanel() {
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => create.mutate()}
             className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
@@ -391,12 +394,14 @@ export function RosterSnapshotsPanel() {
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => void askRestore(snapshot)}
                   className="min-h-9 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text disabled:opacity-50"
                 >{tx("Восстановить")}</button>
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => void askRemove(snapshot)}
                   className="min-h-9 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-50"
                 >{tx("Удалить")}</button>

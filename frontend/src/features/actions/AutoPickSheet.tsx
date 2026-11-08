@@ -139,6 +139,7 @@ export default function AutoPickSheet() {
           mut.mutate();
         }}
         disabled={mut.isPending}
+        aria-busy={mut.isPending}
         className="mt-3 w-full rounded-card bg-tg-button py-3 font-medium text-tg-button-text disabled:opacity-50"
       >
         {mut.isPending ? tx("Считаем…") : tx("Найти слоты")}

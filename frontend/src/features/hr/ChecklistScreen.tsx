@@ -598,6 +598,7 @@ function ItemRow({
           <button
             type="button"
             disabled={busy || !note.trim()}
+            aria-busy={busy}
             onClick={() => onSaveNote(note.trim())}
             className="mt-2 min-h-9 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
           >

@@ -198,6 +198,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
             <button
               type="button"
               disabled={departmentId === null || save.isPending}
+              aria-busy={save.isPending}
               onClick={() =>
                 save.mutate(
                   { department_id: departmentId },
@@ -255,6 +256,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
             <button
               type="button"
               disabled={experience === null || save.isPending}
+              aria-busy={save.isPending}
               onClick={() =>
                 save.mutate(
                   { department_id: departmentId, experience },
@@ -313,6 +315,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                 <button
                   type="button"
                   disabled={finish.isPending}
+                  aria-busy={finish.isPending}
                   onClick={() => finish.mutate(undefined)}
                   className="min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
                 >
@@ -321,6 +324,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
                 <button
                   type="button"
                   disabled={finish.isPending}
+                  aria-busy={finish.isPending}
                   onClick={() => {
                     haptic("light");
                     setShowCourse(true);

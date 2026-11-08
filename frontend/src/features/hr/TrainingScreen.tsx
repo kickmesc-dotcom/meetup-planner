@@ -307,6 +307,7 @@ function LessonCard({
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => {
                 haptic("medium");
                 onComplete();

@@ -190,6 +190,7 @@ export default function MaterialsScreen({
                     <button
                       type="button"
                       disabled={refresh.isPending}
+                      aria-busy={refresh.isPending}
                       onClick={() => refresh.mutate(active.id)}
                       className="ml-auto min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text disabled:opacity-50"
                     >

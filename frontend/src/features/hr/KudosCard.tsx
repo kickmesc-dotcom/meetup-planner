@@ -341,6 +341,7 @@ export function KudosSheet({
         <button
           type="button"
           disabled={selected === null || send.isPending}
+          aria-busy={send.isPending}
           onClick={() => send.mutate()}
           className="min-h-11 w-full rounded-tile bg-tg-link text-sm font-semibold text-white disabled:opacity-50"
         >

@@ -150,6 +150,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
               <button
                 type="button"
                 disabled={busy || !value.trim() || value.trim() === data.domain}
+                aria-busy={busy}
                 onClick={() => save.mutate(value.trim())}
                 className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
@@ -187,6 +188,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => verify.mutate()}
                   className="min-h-11 flex-1 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
                 >
@@ -195,6 +197,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => clear.mutate()}
                   className="min-h-11 rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text disabled:opacity-50"
                 >

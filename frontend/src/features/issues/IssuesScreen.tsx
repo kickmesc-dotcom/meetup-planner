@@ -479,6 +479,7 @@ function CreateIssueSheet({
       <button
         type="button"
         disabled={m.isPending || title.trim().length === 0}
+        aria-busy={m.isPending}
         onClick={() => m.mutate()}
         className="mt-4 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
@@ -665,6 +666,7 @@ function IssueSheet({
               <button
                 type="button"
                 disabled={commentM.isPending || comment.trim().length === 0}
+                aria-busy={commentM.isPending}
                 onClick={() => commentM.mutate()}
                 className="mt-2 min-h-10 w-full rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text disabled:opacity-50"
               >{tx("Отправить")}</button>

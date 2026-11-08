@@ -92,6 +92,7 @@ export default function WebVersionCard() {
       <button
         type="button"
         disabled={create.isPending}
+        aria-busy={create.isPending}
         onClick={() => create.mutate()}
         className="mt-2 min-h-11 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-60"
       >
@@ -206,6 +207,7 @@ function LinkRow({
         <button
           type="button"
           disabled={busy}
+          aria-busy={busy}
           onClick={onRevoke}
           className="min-h-8 shrink-0 rounded-full px-2 text-2xs text-tg-hint disabled:opacity-50"
         >{tx("Отозвать")}</button>

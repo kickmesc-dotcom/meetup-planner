@@ -278,6 +278,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
           type="button"
           onClick={() => void check()}
           disabled={busy}
+          aria-busy={busy}
           className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text press disabled:opacity-50"
         >
           {busy ? tx("Проверяем…") : tx("Проверить")}
@@ -286,6 +287,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
           type="button"
           onClick={() => void run()}
           disabled={busy || !preview || willWrite === 0}
+          aria-busy={busy}
           data-testid="import-apply"
           className="min-h-11 flex-1 rounded-tile bg-tg-link text-sm font-medium text-white press disabled:opacity-50"
         >

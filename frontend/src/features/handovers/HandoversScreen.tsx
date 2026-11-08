@@ -327,12 +327,14 @@ function HandoverCard({
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => acceptM.mutate()}
             className="min-h-10 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
           >{tx("Принять смену")}</button>
           <button
             type="button"
             disabled={busy}
+            aria-busy={busy}
             onClick={() => {
               haptic("light");
               setRejecting((v) => !v);
@@ -357,6 +359,7 @@ function HandoverCard({
           <button
             type="button"
             disabled={rejectM.isPending || reason.trim().length === 0}
+            aria-busy={rejectM.isPending}
             onClick={() => rejectM.mutate()}
             className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/20 text-xs font-medium text-status-busy disabled:opacity-50"
           >{tx("Вернуть с причиной")}</button>
@@ -481,6 +484,7 @@ function CreateHandoverSheet({
       <button
         type="button"
         disabled={m.isPending || toId === null}
+        aria-busy={m.isPending}
         onClick={() => m.mutate()}
         className="mt-4 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >

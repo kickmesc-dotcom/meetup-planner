@@ -307,6 +307,7 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
         <button
           type="button"
           disabled={create.isPending}
+          aria-busy={create.isPending}
           onClick={() => {
             haptic("medium");
             create.mutate();
@@ -386,6 +387,7 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
                   <button
                     type="button"
                     disabled={revoke.isPending}
+                    aria-busy={revoke.isPending}
                     onClick={() => {
                       haptic("medium");
                       void (async () => {

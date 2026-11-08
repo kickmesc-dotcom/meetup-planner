@@ -170,6 +170,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
             <button
               type="button"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => download.mutate(data.slug)}
               className="mt-2 min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
             >
@@ -201,6 +202,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => restore.mutate()}
                   className="mt-2 min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
                 >
@@ -235,6 +237,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                 <button
                   type="button"
                   disabled={busy || !codeMatches}
+                  aria-busy={busy}
                   onClick={() => remove.mutate()}
                   className="mt-2 min-h-11 w-full rounded-tile bg-red-500/10 text-sm font-semibold text-red-600 disabled:opacity-50"
                 >

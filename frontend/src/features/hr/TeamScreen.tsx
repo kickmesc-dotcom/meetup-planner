@@ -531,6 +531,7 @@ function WorkHoursPanel() {
       <button
         type="button"
         disabled={save.isPending}
+        aria-busy={save.isPending}
         onClick={() => save.mutate({ work_open: openValue, work_close: closeValue })}
         className="min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
       >
@@ -614,6 +615,7 @@ function WorkHoursPanel() {
               key={option.hours}
               type="button"
               disabled={mute.isPending}
+              aria-busy={mute.isPending}
               onClick={() => mute.mutate(option.hours)}
               className="min-h-8 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text disabled:opacity-50"
             >
@@ -624,6 +626,7 @@ function WorkHoursPanel() {
             <button
               type="button"
               disabled={mute.isPending}
+              aria-busy={mute.isPending}
               onClick={() => mute.mutate(0)}
               className="min-h-8 rounded-full bg-status-busy/15 px-2.5 text-xs text-status-busy disabled:opacity-50"
             >
@@ -714,6 +717,7 @@ function DangerZone() {
       <button
         type="button"
         disabled={busy}
+        aria-busy={busy}
         onClick={() => void run()}
         className="mt-2 min-h-9 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
       >

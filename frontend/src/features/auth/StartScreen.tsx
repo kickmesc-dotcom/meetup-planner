@@ -108,6 +108,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
             type="button"
             onClick={back}
             disabled={busy}
+            aria-busy={busy}
             className="mb-4 inline-flex min-h-11 items-center gap-1 rounded-tile px-2 text-xs text-tg-link disabled:opacity-50"
           >
             <Icon name="back" size={13} />
@@ -215,6 +216,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
             <button
               type="button"
               disabled={busy || code.trim().length < 2}
+              aria-busy={busy}
               onClick={() => join.mutate()}
               className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
@@ -297,6 +299,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
             <button
               type="button"
               disabled={busy || name.trim().length < 2}
+              aria-busy={busy}
               onClick={() => create.mutate()}
               className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >

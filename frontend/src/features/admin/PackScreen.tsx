@@ -203,6 +203,7 @@ export default function PackScreen({ onBack }: Props) {
           <button
             type="button"
             disabled={busy || !canApply}
+            aria-busy={busy}
             onClick={() => {
               haptic("light");
               mut.mutate(false);
@@ -214,6 +215,7 @@ export default function PackScreen({ onBack }: Props) {
           <button
             type="button"
             disabled={busy || !canApply}
+            aria-busy={busy}
             onClick={async () => {
               const ok = await showConfirm(
                 tx(

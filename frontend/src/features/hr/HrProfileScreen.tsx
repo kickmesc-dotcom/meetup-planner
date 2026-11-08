@@ -547,6 +547,7 @@ export default function HrProfileScreen() {
               <button
                 type="button"
                 disabled={save.isPending || (!pickedDept && !experience)}
+                aria-busy={save.isPending}
                 onClick={() =>
                   save.mutate({
                     department_id: pickedDept,
@@ -729,6 +730,7 @@ export default function HrProfileScreen() {
                         type="button"
                         aria-pressed={active}
                         disabled={roleSwitch.isPending || active}
+                        aria-busy={roleSwitch.isPending}
                         onClick={() => roleSwitch.mutate(option.v)}
                         className={[
                           "min-h-9 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
@@ -791,6 +793,7 @@ export default function HrProfileScreen() {
                 <button
                   type="button"
                   disabled={simulationTarget === null || simulationStart.isPending}
+                  aria-busy={simulationStart.isPending}
                   onClick={() => simulationStart.mutate()}
                   className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
                 >

@@ -106,6 +106,7 @@ export default function PhotoAttach({
       <button
         type="button"
         disabled={disabled || upload.isPending}
+        aria-busy={upload.isPending}
         onClick={() => {
           haptic("light");
           galleryRef.current?.click();

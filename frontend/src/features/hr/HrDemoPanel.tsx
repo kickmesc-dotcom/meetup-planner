@@ -133,6 +133,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 disabled={busy}
+                aria-busy={busy}
                 aria-pressed={data.visible}
                 onClick={() => {
                   haptic("selection");
@@ -176,6 +177,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => {
                     haptic("light");
                     seed.mutate();
@@ -186,6 +188,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 <button
                   type="button"
                   disabled={busy || data.employees.length === 0}
+                  aria-busy={busy}
                   onClick={() => {
                     haptic("light");
                     simulate.mutate();
@@ -203,6 +206,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={async () => {
                   const ok = await showConfirm(
                     tx("Снести всю активность тестового пула? Сотрудники останутся."),
@@ -214,6 +218,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={async () => {
                   const ok = await showConfirm(
                     tx("Удалить тестовых сотрудников вместе со всей их активностью?"),

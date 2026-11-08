@@ -113,6 +113,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
           <button
             type="button"
             disabled={!available || restart.isPending}
+            aria-busy={restart.isPending}
             onClick={async () => {
               haptic("medium");
               const ok = await showConfirm(
@@ -226,6 +227,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
           <button
             type="button"
             disabled={!available || !dirty || save.isPending}
+            aria-busy={save.isPending}
             onClick={() => {
               haptic("medium");
               save.mutate(draft);

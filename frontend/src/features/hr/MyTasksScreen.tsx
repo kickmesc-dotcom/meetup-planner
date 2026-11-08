@@ -754,6 +754,7 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
       <button
         type="button"
         disabled={m.isPending}
+        aria-busy={m.isPending}
         onClick={() => m.mutate()}
         className="mt-3 min-h-10 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
