@@ -140,6 +140,8 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
               <input
                 id="org-domain"
                 aria-required="true"
+                aria-invalid={!!save.error}
+                aria-describedby={save.error ? "org-domain-error" : undefined}
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 placeholder="cabinet.salon.ru"
@@ -158,6 +160,11 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                 {tx("Сохранить")}
               </button>
             </div>
+            {!!save.error && (
+              <p id="org-domain-error" role="alert" className="mt-1 text-2xs text-red-600">
+                {String(humanizeApiError(save.error))}
+              </p>
+            )}
           </section>
 
           {data.domain && data.token && (

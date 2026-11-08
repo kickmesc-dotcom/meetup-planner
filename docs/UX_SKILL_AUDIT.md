@@ -58,7 +58,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `touch-spacing` | ⚠️ | в плотных списках кнопки вплотную (8px не везде) | M |
 | `hover-vs-tap` | ✅ | все действия на `onClick` | — |
 | `loading-buttons` | ✅ | этап P: 125 async-кнопок в 47 файлах — `disabled` + `aria-busy` по тому же состоянию | — |
-| `error-feedback` | ⚠️ | ошибка в блоке формы, не у конкретного поля | P |
+| `error-feedback` | ⚠️ | этап P: ошибка создания ключа и сохранения домена — у поля (`aria-invalid`, `aria-describedby`, `role="alert"`); остальные формы — общий блок или тост | P |
 | `cursor-pointer` | ✅ | этап M: курсор только для `pointer: fine`, у `disabled` — `not-allowed` | — |
 | `gesture-conflicts` | ⚠️ | календарь `touch-action: pan-y`; вложенных свайпов нет | — |
 | `tap-delay` | ✅ | этап M: `touch-action: manipulation` в `styles.css` для кнопок и `[role=button]` | — |

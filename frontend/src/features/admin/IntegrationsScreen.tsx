@@ -184,9 +184,9 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
     },
   });
 
+  const keyError = createKey.error;
   const error =
     keys.error ?? hooks.error ?? deliveries.error ?? importRuns.error ??
-    createKey.error ??
     revoke.error ?? addHook.error ?? patchHook.error ?? removeHook.error;
 
   return (
@@ -242,6 +242,8 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
             <input
               value={keyName}
               aria-required="true"
+              aria-invalid={!!keyError}
+              aria-describedby={keyError ? "key-name-error" : undefined}
               onChange={(event) => setKeyName(event.target.value)}
               placeholder={tx("Например: CRM")}
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
@@ -250,6 +252,11 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
           <p className="mt-1 text-2xs text-tg-hint">
             {tx("Показывается один раз — сохраните ключ.")}
           </p>
+          {!!keyError && (
+            <p id="key-name-error" role="alert" className="text-2xs text-red-600">
+              {humanizeApiError(keyError)}
+            </p>
+          )}
           {ALL_SCOPES.map((scope) => (
             <Check
               key={scope}
