@@ -195,12 +195,12 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 |---|---|---|---|
 | `input-labels` | ✅ | этап P: placeholder больше не единственное имя; ключи переведены на EN и UZ | — |
 | `error-placement` | ✅ | этап P: `auth-error`/`reset-error`, `aria-invalid` и `aria-describedby` на полях входа и смены пароля | — |
-| `submit-feedback` | ⚠️ | `disabled` + спиннер не у всех форм | P |
+| `submit-feedback` | ⚠️ | этап P: `disabled` + `aria-busy` у всех async-кнопок; спиннер и текст «Отправляем» — по месту | P |
 | `ime-composition-enter` | ✅ | этап P: поле подразделения не отправляется на Enter во время IME-подтверждения | — |
 | `required-indicators` | ⚠️ | этап P: вход и сброс — `*`, `required`, `aria-required`; кабинет — пока словами | P |
 | `empty-states` | ✅ | пустые состояния с действием | — |
 | `toast-dismiss` | ✅ | 3,2с, закрытие 44×44 | — |
-| `confirmation-dialogs` | ⚠️ | удаления через `window.confirm` (нативно, но не оформлено) | P |
+| `confirmation-dialogs` | ✅ | все необратимые действия спрашивают `showConfirm`; прямых `window.confirm` в экранах нет, внутри Telegram — диалог платформы | — |
 | `input-helper-text` | ⚠️ | этап P: сброс пароля — постоянная подсказка длины; остальные — по месту | P |
 | `disabled-states` | ✅ | `disabled:opacity-*` + атрибут | — |
 | `progressive-disclosure` | ✅ | простой/расширенный режим кабинета | — |
@@ -224,7 +224,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `toast-accessibility` | ✅ | `aria-live="polite"`, фокус не крадёт | — |
 | `aria-live-errors` | ✅ | этап P: все блоки ошибок в экранах объявлены `role="alert"` (проверено сканером: 3 оставшихся закрыты) | — |
 | `contrast-feedback` | ✅ | этап S: `destructive` на фоне и вторичной подложке ≥ 4.5:1 в обеих темах | — |
-| `timeout-feedback` | ⚠️ | таймаут показывается как общая ошибка | P |
+| `timeout-feedback` | ✅ | `humanizeApiError` различает обрыв, таймаут (`AbortError`) и отказ сервера; тексты на EN/UZ | — |
 
 ## 9. Navigation Patterns (HIGH, 27 правил)
 
