@@ -78,7 +78,8 @@
 - [ ] Playwright: 8 сценариев — вход, лента, создание задачи, чек-лист смены,
       кабинет, интеграции (ключ), профиль, офлайн-старт. Тестовый стенд с
       демо-данными, без боевой базы.
-- [ ] `size-limit` (или `vite-plugin-bundle-analyzer` + скрипт) с бюджетом
+- [x] Бюджет бандла: `scripts/check-bundle.mjs` проверяет главный чанк (raw/gzip),
+      сумму js/css и отсутствие `.map`; шаг `Bundle budget` в CI.
       главного чанка; падение CI при превышении.
 - [ ] `ErrorBoundary` на уровне оболочки + `window.onerror` /
       `unhandledrejection` → свой приёмник (`POST /api/telemetry` с версией

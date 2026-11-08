@@ -112,3 +112,6 @@ jobs:
       # чанка, размер бандла, отсутствующий ассет).
       - name: Build
         run: npm run build
+
+      - name: Bundle budget
+        run: npm run check:bundle
