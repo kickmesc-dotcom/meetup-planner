@@ -1283,6 +1283,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Время начала": "Start time",
   "Время окончания": "End time",
   "Вариант ответа": "Answer option",
+  "Строки прокси": "Proxy lines",
   "Опыт и сотрудник недели": "Experience and employee of the week",
   "Сколько стоит работа · рейтинг недели":
     "What work costs · weekly rating",

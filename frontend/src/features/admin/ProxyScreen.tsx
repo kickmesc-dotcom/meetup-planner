@@ -927,6 +927,7 @@ function ParserBox({
   return (
     <div className="space-y-2">
       <textarea
+        aria-label={tx("Строки прокси")}
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={4}

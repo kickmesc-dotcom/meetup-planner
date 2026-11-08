@@ -138,6 +138,7 @@ export const UZ_CONTENT: Record<string, string> = {
   "Время начала": "Boshlanish vaqti",
   "Время окончания": "Tugash vaqti",
   "Вариант ответа": "Javob varianti",
+  "Строки прокси": "Proksi qatorlari",
   // ---- офлайн-очередь чек-листа (05.11.2026) ----
   "Не отправлено: {count}. Отправим, когда появится связь.": "{count} ta yuborilmadi. Aloqa paydo bo'lganda yuboramiz.",
   "Закрыть без сохранения? Введённое не сохранится.": "Saqlashsiz yopilsinmi? Kiritilganlar saqlanmaydi.",
