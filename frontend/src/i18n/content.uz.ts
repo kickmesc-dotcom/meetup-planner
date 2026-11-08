@@ -32,6 +32,94 @@ export const UZ_CONTENT: Record<string, string> = {
     "Jamoa uchun oʻzbekcha paket: sukut boʻyicha yoqilgan",
   "Копия данных, удаление организации, журнал доступа":
     "Maʼlumot nusxasi, tashkilotni oʻchirish, kirish jurnali",
+  // ---- этап L: остальные экраны (08.11.2026) ----
+  "Команда и контроль": "Jamoa va nazorat",
+  "Документы и знания": "Hujjatlar va bilimlar",
+  "Кто на смене, активность и карточки сотрудников":
+    "Kim smenada, faollik va xodim kartalari",
+  "Срез дня по стандартам и выгрузка CSV":
+    "Kunning standartlar boʻyicha kesimi va CSV eksporti",
+  "Позиции и цены: убрать на сегодня, вернуть, добавить":
+    "Pozitsiyalar va narxlar: bugunga olib tashlash, qaytarish, qoʻshish",
+  "Инструкции и тесты по ним: добавить и поправить":
+    "Koʻrsatmalar va ular boʻyicha testlar: qoʻshish va tuzatish",
+  "Язык, тема и вид экранов": "Til, mavzu va ekranlar koʻrinishi",
+  "Файл пустой — вставьте строки из таблицы.":
+    "Fayl boʻsh — jadvaldan qatorlarni qoʻying.",
+  "Файл больше 500 КБ: для переноса базы нужен другой путь.":
+    "Fayl 500 KB dan katta: bazani koʻchirish uchun boshqa yoʻl kerak.",
+  "В файле только заголовок — нет ни одной строки данных.":
+    "Faylda faqat sarlavha bor — birorta maʼlumot qatori yoʻq.",
+  "В файле больше 500 строк. Разделите его на части.":
+    "Faylda 500 dan ortiq qator bor. Uni boʻlaklarga boʻling.",
+  "Неизвестный тип импорта.": "Import turi nomaʼlum.",
+  "Нет колонки с именем (ожидается «Имя» или «Name»).":
+    "Ism ustuni yoʻq: sarlavhada «Ism» yoki «Name» kerak.",
+  "Нет колонки с датой (ожидается «Дата» или «Date»).":
+    "Sana ustuni yoʻq: sarlavhada «Sana» yoki «Date» kerak.",
+  "Нет колонки с сотрудником (имя или telegram_id).":
+    "Xodim ustuni yoʻq (ism yoki telegram_id).",
+  "Файл не разобрался. Проверьте, что это CSV с заголовком.":
+    "Fayl oʻqilmadi. CSV sarlavha bilan ekaniga ishonch hosil qiling.",
+  "Файл не прочитался. Сохраните его как CSV UTF-8 и повторите.":
+    "Fayl oʻqilmadi. Uni CSV UTF-8 qilib saqlang va qayta urinib koʻring.",
+  "Сначала выберите файл или вставьте строки таблицы.":
+    "Avval fayl tanlang yoki jadval qatorlarini qoʻying.",
+  "Не удалось разобрать файл.": "Faylni oʻqib boʻlmadi.",
+  "Импорт не применился. Попробуйте ещё раз.":
+    "Import qoʻllanmadi. Yana bir marta urinib koʻring.",
+  "табуляция": "tabulyatsiya",
+  "Вчера": "Kecha",
+  "Кабинет": "Kabinet",
+  "Внимание": "Diqqat",
+  "Считаются живые люди и непринятые приглашения: ссылка уже обещает место. Демо-профили места не занимают.":
+    "Tirik odamlar va qabul qilinmagan takliflar hisoblanadi: havola allaqachon joy vaʼda qiladi. Demo profillar joy egallamaydi.",
+  "Активные отделы и филиалы. Погашенное подразделение место освобождает.":
+    "Faol boʻlimlar va filiallar. Yopilgan boʻlinma joyni boʻshatadi.",
+  "Удалить прокси, которые при проверке выдали ошибку и не отвечали успехом?":
+    "Tekshiruvda xato bergan va hech qachon muvaffaqiyatli javob bermagan proksilarni oʻchirilsinmi?",
+  "Не нашёл ни одной валидной пары Server/Port в тексте.":
+    "Matnda bitta ham toʻgʻri Server/Port juftligi topilmadi.",
+  "Мне": "Menga",
+  "Мои сдачи": "Mening topshirishlarim",
+  "Чек-лист не назначен": "Chek-list tayinlanmagan",
+  "В графике": "Jadvalda",
+  "Больничный": "Kasal varaqasi",
+  "Не пришёл": "Kelmadi",
+  "Выходной": "Dam olish kuni",
+  "Отпуск": "Taʼtil",
+  "Администратор": "Administrator",
+  "В событиях смены видны только твои действия.":
+    "Smena voqealarida faqat oʻz harakatlaringiz koʻrinadi.",
+  "В событиях смены видны действия твоего подразделения.":
+    "Smena voqealarida boʻlimingiz harakatlari koʻrinadi.",
+  "В событиях смены видно всё, с фильтрами по людям и подразделениям.":
+    "Smena voqealarida hamma narsa koʻrinadi, odamlar va boʻlimlar boʻyicha filtrlar bilan.",
+  "Фотоотчёт можно приложить прямо в пункте чек-листа (камера или галерея), а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.":
+    "Foto-hisobotni chek-list bandida (kamera yoki galereya) qoʻshish mumkin, «ulgurolmayapman» esa vazifa kartasida. Bot chati ham ishlaydi.",
+  "не выбрано": "tanlanmagan",
+  "Я новичок": "Men yangiman",
+  "У меня есть опыт": "Tajribam bor",
+  "Как новичок": "Yangi boshlovchi sifatida",
+  "Как сейчас": "Hozirgidek",
+  "нет доступа к таблице": "jadvalga ruxsat yoʻq",
+  "сервер не достучался до Google": "server Googlega yetib bora olmadi",
+  "СБРОС": "TOZALASH",
+  "Мои": "Mening",
+  "Открытых проблем нет — смена чистая.":
+    "Ochiq muammolar yoʻq — smena toza.",
+  "Завёл карточку": "Karta ochildi",
+  "Сменил ответственного": "Masʼulni oʻzgartirdim",
+  "снят": "olib tashlandi",
+  "Снял ответственного": "Masʼulni olib tashladim",
+  "назначен:": "tayinlandi:",
+  "Назначил ответственного": "Masʼul tayinladim",
+  "Поправил карточку": "Kartani tuzatdim",
+  "📅 Календарь": "📅 Kalendar",
+  "голосов": "ovoz",
+  "голос": "ovoz",
+  "голоса": "ovozlar",
+  "смены нет": "smena yoʻq",
   // ---- офлайн-очередь чек-листа (05.11.2026) ----
   "Не отправлено: {count}. Отправим, когда появится связь.": "{count} ta yuborilmadi. Aloqa paydo bo'lganda yuboramiz.",
   "Закрыть без сохранения? Введённое не сохранится.": "Saqlashsiz yopilsinmi? Kiritilganlar saqlanmaydi.",

@@ -1174,6 +1174,96 @@ export const EN_CONTENT: Record<string, string> = {
     "Uzbek pack for the team: on by default",
   "Копия данных, удаление организации, журнал доступа":
     "Data copy, organization deletion, access log",
+  // ---- этап L: остальные экраны (08.11.2026) ----
+  // Сканер нашёл русские подписи в разметке, которым не было английского
+  // перевода: экран возвращал русский ключ и на EN читался наполовину.
+  "Команда и контроль": "Team and control",
+  "Документы и знания": "Documents and knowledge",
+  "Кто на смене, активность и карточки сотрудников":
+    "Who is on shift, activity and employee cards",
+  "Срез дня по стандартам и выгрузка CSV":
+    "Standards snapshot of the day and CSV export",
+  "Позиции и цены: убрать на сегодня, вернуть, добавить":
+    "Items and prices: hide for today, restore, add",
+  "Инструкции и тесты по ним: добавить и поправить":
+    "Instructions and their tests: add and fix",
+  "Язык, тема и вид экранов": "Language, theme and screen layout",
+  "Файл пустой — вставьте строки из таблицы.":
+    "The file is empty — paste rows from the table.",
+  "Файл больше 500 КБ: для переноса базы нужен другой путь.":
+    "The file is over 500 KB: moving a database needs another route.",
+  "В файле только заголовок — нет ни одной строки данных.":
+    "The file has only a header — no data rows.",
+  "В файле больше 500 строк. Разделите его на части.":
+    "The file has more than 500 rows. Split it into parts.",
+  "Неизвестный тип импорта.": "Unknown import type.",
+  "Нет колонки с именем (ожидается «Имя» или «Name»).":
+    "No name column (expected “Имя” or “Name”).",
+  "Нет колонки с датой (ожидается «Дата» или «Date»).":
+    "No date column (expected “Дата” or “Date”).",
+  "Нет колонки с сотрудником (имя или telegram_id).":
+    "No employee column (name or telegram_id).",
+  "Файл не разобрался. Проверьте, что это CSV с заголовком.":
+    "The file did not parse. Make sure it is a CSV with a header.",
+  "Файл не прочитался. Сохраните его как CSV UTF-8 и повторите.":
+    "The file could not be read. Save it as UTF-8 CSV and try again.",
+  "Сначала выберите файл или вставьте строки таблицы.":
+    "Choose a file or paste table rows first.",
+  "Не удалось разобрать файл.": "Could not parse the file.",
+  "Импорт не применился. Попробуйте ещё раз.":
+    "The import was not applied. Try again.",
+  "табуляция": "tab-separated",
+  "Вчера": "Yesterday",
+  "Кабинет": "Office",
+  "Внимание": "Attention",
+  "Считаются живые люди и непринятые приглашения: ссылка уже обещает место. Демо-профили места не занимают.":
+    "Real people and pending invitations count: a link already promises a seat. Demo profiles hold no seats.",
+  "Активные отделы и филиалы. Погашенное подразделение место освобождает.":
+    "Active departments and branches. A closed unit frees its seat.",
+  "Удалить прокси, которые при проверке выдали ошибку и не отвечали успехом?":
+    "Delete the proxies that failed the check and never answered successfully?",
+  "Не нашёл ни одной валидной пары Server/Port в тексте.":
+    "Found no valid Server/Port pair in the text.",
+  "Мне": "To me",
+  "Мои сдачи": "My handovers",
+  "Чек-лист не назначен": "No checklist assigned",
+  "В графике": "Scheduled",
+  "Больничный": "Sick leave",
+  "Не пришёл": "No-show",
+  "Выходной": "Day off",
+  "Отпуск": "Vacation",
+  "Администратор": "Administrator",
+  "В событиях смены видны только твои действия.":
+    "Shift events show only your own actions.",
+  "В событиях смены видны действия твоего подразделения.":
+    "Shift events show your department's actions.",
+  "В событиях смены видно всё, с фильтрами по людям и подразделениям.":
+    "Shift events show everything, filtered by people and departments.",
+  "Фотоотчёт можно приложить прямо в пункте чек-листа (камера или галерея), а «не успеваю» — в карточке задачи. Чат с ботом тоже работает.":
+    "Attach a photo report right in a checklist item (camera or gallery), and “running late” goes in the task card. The bot chat works too.",
+  "не выбрано": "not selected",
+  "Я новичок": "I'm new",
+  "У меня есть опыт": "I have experience",
+  "Как новичок": "As a beginner",
+  "Как сейчас": "As now",
+  "нет доступа к таблице": "no access to the sheet",
+  "сервер не достучался до Google": "the server could not reach Google",
+  "СБРОС": "RESET",
+  "Мои": "Mine",
+  "Открытых проблем нет — смена чистая.":
+    "No open issues — the shift is clean.",
+  "Завёл карточку": "Created the card",
+  "Сменил ответственного": "Changed the assignee",
+  "снят": "removed",
+  "Снял ответственного": "Removed the assignee",
+  "назначен:": "assigned:",
+  "Назначил ответственного": "Assigned an owner",
+  "Поправил карточку": "Edited the card",
+  "📅 Календарь": "📅 Calendar",
+  "голосов": "votes",
+  "голос": "vote",
+  "голоса": "votes",
+  "смены нет": "no shift",
   "Опыт и сотрудник недели": "Experience and employee of the week",
   "Сколько стоит работа · рейтинг недели":
     "What work costs · weekly rating",
