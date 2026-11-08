@@ -57,7 +57,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `touch-target-size` | ✅ | этап M: действия и иконочные кнопки подняты до 44px (`IssuesScreen`, `HandoversScreen`, `MassPlanSheet`, `AdminTasksScreen`, `AttentionScreen`, `AppTextsScreen`, `AskScreen`, `MenuList`, `ZoneHint`, `SimulationBanner`, `NavBar`, вход и сброс пароля) | — |
 | `touch-spacing` | ⚠️ | в плотных списках кнопки вплотную (8px не везде) | M |
 | `hover-vs-tap` | ✅ | все действия на `onClick` | — |
-| `loading-buttons` | ⚠️ | `disabled` есть, но не у всех async-кнопок | P |
+| `loading-buttons` | ⚠️ | этап P: вход и сброс — `disabled` + `aria-busy`; остальные — только `disabled` | P |
 | `error-feedback` | ⚠️ | ошибка в блоке формы, не у конкретного поля | P |
 | `cursor-pointer` | ✅ | этап M: курсор только для `pointer: fine`, у `disabled` — `not-allowed` | — |
 | `gesture-conflicts` | ⚠️ | календарь `touch-action: pan-y`; вложенных свайпов нет | — |
@@ -121,7 +121,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `viewport-meta` | ✅ | `initial-scale=1`, зум разрешён (этап L) | — |
 | `mobile-first` | ✅ | колонка 560px, нижняя полоса | — |
 | `breakpoint-consistency` | ⚠️ | `sm`/`lg` точечно, без шкалы 375/768/1024 | — |
-| `readable-font-size` | ⚠️ | поля 16px, на iOS — принудительно (зум при фокусе убран); основной текст 14px (`text-sm`) | S |
+| `readable-font-size` | ⚠️ | поля 16px (вход и сброс — `text-base`, на iOS — принудительно); основной текст 14px (`text-sm`) | S |
 | `line-length-control` | ✅ | `max-w-[560px]` | — |
 | `horizontal-scroll` | ✅ | скролл только в таблицах/календаре, осознанно | — |
 | `spacing-scale` | ⚠️ | 4/8 в основном; есть `px-0.5`, `gap-0.5` | M |
@@ -197,11 +197,11 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `error-placement` | ✅ | этап P: `auth-error`/`reset-error`, `aria-invalid` и `aria-describedby` на полях входа и смены пароля | — |
 | `submit-feedback` | ⚠️ | `disabled` + спиннер не у всех форм | P |
 | `ime-composition-enter` | ✅ | этап P: поле подразделения не отправляется на Enter во время IME-подтверждения | — |
-| `required-indicators` | ⚠️ | обязательность описана словами, без `required`/метки | P |
+| `required-indicators` | ⚠️ | этап P: вход и сброс — `*`, `required`, `aria-required`; кабинет — пока словами | P |
 | `empty-states` | ✅ | пустые состояния с действием | — |
 | `toast-dismiss` | ✅ | 3,2с, закрытие 44×44 | — |
 | `confirmation-dialogs` | ⚠️ | удаления через `window.confirm` (нативно, но не оформлено) | P |
-| `input-helper-text` | ⚠️ | подсказки есть, постоянных — мало | P |
+| `input-helper-text` | ⚠️ | этап P: сброс пароля — постоянная подсказка длины; остальные — по месту | P |
 | `disabled-states` | ✅ | `disabled:opacity-*` + атрибут | — |
 | `progressive-disclosure` | ✅ | простой/расширенный режим кабинета | — |
 | `inline-validation` | ⚠️ | проверка на blur только в части полей | P |
@@ -307,6 +307,19 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 Правило работы: этап не считается закрытым, пока не пройдены проверки и
 результат не выложен; «сделано в коде» и «проверено на живой поверхности» в
 отчёте пишутся раздельно.
+
+## Локализация (сверх матрицы скилла)
+
+Скилл не содержит правил про язык интерфейса, но на EN-поверхности подпись без
+перевода заметнее любого отступа: человек читает её как ошибку, а не как стиль.
+
+| Что | Статус | Чем подтверждено |
+|---|---|---|
+| Настройки и кабинет (6 подписей) | ✅ | этап L, EN и UZ |
+| Экраны: кабинет, импорт, профиль, задачи, пересменки, опросы (61 подпись) | ✅ | этап L, EN и UZ; строки есть в `content-*.js` прода |
+| Поля входа и сброса | ✅ | `*` и `required`, `aria-required`, `aria-busy`, постоянная подсказка длины |
+| Даты и месяцы (`dateUtils`) | ✅ | три локали в данных, `Intl` не нужен |
+| Словарь узбекского | ✅ | `uz.guard.test.ts`: значения без русских букв |
 
 ## Журнал
 
