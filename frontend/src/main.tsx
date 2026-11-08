@@ -12,6 +12,7 @@ import { clearResetTokenFromUrl, resetTokenFromUrl } from "./features/auth/reset
 import VerifyEmailScreen from "./features/auth/VerifyEmailScreen";
 import BrandApplier from "./features/brand/BrandApplier";
 import ToastHost from "./components/ToastHost";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { clearVerifyTokenFromUrl, verifyTokenFromUrl } from "./features/auth/verifyUrl";
 
 // Прямая ссылка из `/app`: забираем токен в localStorage и чистим адресную
@@ -81,7 +82,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={qc}>
       {/* Бренд клиента: заголовок вкладки и акцент — до первого экрана. */}
       <BrandApplier />
-      <Root />
+      <ErrorBoundary>
+        <Root />
+      </ErrorBoundary>
       {/* Подтверждения успеха живут над всеми экранами и зонами. */}
       <ToastHost />
     </QueryClientProvider>
