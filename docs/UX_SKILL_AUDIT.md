@@ -197,7 +197,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `error-placement` | ✅ | этап P: `auth-error`/`reset-error`, `aria-invalid` и `aria-describedby` на полях входа и смены пароля | — |
 | `submit-feedback` | ⚠️ | этап P: `disabled` + `aria-busy` у всех async-кнопок; спиннер и текст «Отправляем» — по месту | P |
 | `ime-composition-enter` | ✅ | этап P: поле подразделения не отправляется на Enter во время IME-подтверждения | — |
-| `required-indicators` | ⚠️ | этап P: вход и сброс — `*`, `required`, `aria-required`; кабинет — пока словами | P |
+| `required-indicators` | ⚠️ | этап P: вход и сброс — `*`, `required`; в кабинете 7 полей с фактической обязательностью получили `aria-required`, видимой метки там пока нет | P |
 | `empty-states` | ✅ | пустые состояния с действием | — |
 | `toast-dismiss` | ✅ | 3,2с, закрытие 44×44 | — |
 | `confirmation-dialogs` | ✅ | все необратимые действия спрашивают `showConfirm`; прямых `window.confirm` в экранах нет, внутри Telegram — диалог платформы | — |

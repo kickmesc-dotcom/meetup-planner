@@ -139,6 +139,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
             <div className="mt-1 flex gap-2">
               <input
                 id="org-domain"
+                aria-required="true"
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
                 placeholder="cabinet.salon.ru"

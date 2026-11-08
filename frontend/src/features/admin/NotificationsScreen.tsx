@@ -202,6 +202,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         </select>
         <textarea
           aria-label={tx("Что сказать сотруднику")}
+          aria-required="true"
           value={text}
           onChange={(event) => setText(event.target.value)}
           rows={2}

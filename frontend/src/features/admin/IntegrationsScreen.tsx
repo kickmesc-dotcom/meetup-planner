@@ -237,6 +237,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
             {tx("Название")}
             <input
               value={keyName}
+              aria-required="true"
               onChange={(event) => setKeyName(event.target.value)}
               placeholder={tx("Например: CRM")}
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"

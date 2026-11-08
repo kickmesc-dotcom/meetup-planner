@@ -360,6 +360,7 @@ function AddItemForm({
     <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
       <textarea
         aria-label={tx("Что сделать? Например: протереть столы 400–500")}
+        aria-required="true"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         rows={2}
@@ -681,6 +682,7 @@ function HallsCard() {
           <div className="flex gap-2">
             <input
               aria-label={tx("Название нового зала")}
+              aria-required="true"
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={120}
