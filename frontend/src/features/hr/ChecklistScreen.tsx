@@ -172,6 +172,9 @@ export default function ChecklistScreen() {
     const onOnline = () => void syncQueued();
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
+    // Подписка нужна один раз: `syncQueued` пересоздаётся каждым рендером, и в
+    // зависимостях эффект переподписывался бы на каждом изменении состояния.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (q.isError)

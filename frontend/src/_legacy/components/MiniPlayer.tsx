@@ -225,7 +225,6 @@ export function useMiniPlayer(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps — currentIdRef вместо currentId
   }, [nextId, currentId]);
 
   // Смена трека: берём заготовленный блоб или тянем новый, старый освобождаем.

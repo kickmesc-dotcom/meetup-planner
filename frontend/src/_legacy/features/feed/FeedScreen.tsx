@@ -1761,7 +1761,6 @@ function SubmissionPlayer({
   useEffect(() => {
     if (autoPlay) void load();
     // Загружаем один раз — на монтирование с флагом авто-проигрывания.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay]);
 
   useEffect(

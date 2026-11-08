@@ -277,23 +277,6 @@ export default function HrFeedScreen() {
       }),
   });
 
-  if (feedQ.isError) {
-    const err = feedQ.error;
-    // 403 = выбранный сотрудник вне области видимости. Это не «поломка», а
-    // честный отказ сервера — показываем его текстом и сбрасываем фильтр.
-    return (
-      <ErrorState
-        error={err}
-        onRetry={() => {
-          setEmployeeId(null);
-          setDepartmentId(null);
-          void feedQ.refetch();
-        }}
-        title={tx("Лента недоступна")}
-      />
-    );
-  }
-
   const feed = feedQ.data;
   const filters = filtersQ.data;
   const canFilter = feed?.can_filter === true;
@@ -345,6 +328,25 @@ export default function HrFeedScreen() {
     !feedQ.isLoading,
     scrollerRef,
   );
+
+  // Ранний возврат стоит после всех хуков: до правки ошибка ленты меняла
+  // порядок вызовов, и React ругался на условные хуки.
+  if (feedQ.isError) {
+    const err = feedQ.error;
+    // 403 = выбранный сотрудник вне области видимости. Это не «поломка», а
+    // честный отказ сервера — показываем его текстом и сбрасываем фильтр.
+    return (
+      <ErrorState
+        error={err}
+        onRetry={() => {
+          setEmployeeId(null);
+          setDepartmentId(null);
+          void feedQ.refetch();
+        }}
+        title={tx("Лента недоступна")}
+      />
+    );
+  }
 
   /**
    * Прокрутка к нужному дню по стрелкам в плашке.

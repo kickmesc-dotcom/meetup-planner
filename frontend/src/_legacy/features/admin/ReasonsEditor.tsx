@@ -88,7 +88,6 @@ export default function ReasonsEditor({
       if (hiddenOf(p)) hidden += 1;
     }
     return { ai, hidden };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, meta]);
 
   const rows = useMemo(() => {
@@ -101,7 +100,6 @@ export default function ReasonsEditor({
         if (filter === "mine") return srcOf(phrase) !== "ai";
         return true;
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, filter, meta, metaEnabled]);
 
   const add = () => {

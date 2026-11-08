@@ -66,7 +66,7 @@ export default function TrainingScreen({
     onError: (error) => void showAlert(humanizeApiError(error)),
   });
 
-  const lessons = training.data?.lessons ?? [];
+  const lessons = useMemo(() => training.data?.lessons ?? [], [training.data]);
   const levels = training.data?.levels ?? [];
 
   // Внутри уровня незакрытые уроки идут первыми: следующий шаг всегда сверху.

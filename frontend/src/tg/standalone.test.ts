@@ -48,15 +48,12 @@ function mockIosStandalone(value: boolean): void {
     configurable: true,
     value,
   });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete (window as any).matchMedia;
 }
 
 afterEach(() => {
   localStorage.clear();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete (window as any).matchMedia;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete (window.navigator as any).standalone;
 });
 

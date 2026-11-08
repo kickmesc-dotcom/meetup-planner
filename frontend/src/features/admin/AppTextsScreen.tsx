@@ -46,7 +46,9 @@ export default function AppTextsScreen({ onBack }: Props) {
     );
   }, [q.data]);
 
-  const items = q.data?.items ?? [];
+  // Список из ответа — новый массив на каждый рендер, поэтому стабилизируем
+  // его: иначе `groups` и `changes` пересчитывались бы всегда.
+  const items = useMemo(() => q.data?.items ?? [], [q.data]);
   const groups = useMemo(() => {
     const map = new Map<string, AppTextItem[]>();
     for (const item of items) {

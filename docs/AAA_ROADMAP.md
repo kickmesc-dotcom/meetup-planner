@@ -72,7 +72,7 @@
 
 ### Этап 1. Инженерный фундамент (4–6 дней, P0)
 
-- [ ] `eslint.config.js` (flat config, `@typescript-eslint`, `react-hooks`),
+- [x] `eslint.config.js` (flat config, `@typescript-eslint`, `react-hooks`),
       `npm run lint` зелёный; добавить шаг в `ci.yml`.
 - [ ] `vitest --coverage` с порогами (60 % features / 80 % api) и отчётом в CI.
 - [ ] Playwright: 8 сценариев — вход, лента, создание задачи, чек-лист смены,

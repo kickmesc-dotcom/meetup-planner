@@ -79,7 +79,6 @@ export function NotificationsList() {
   useEffect(() => {
     if (unread > 0 && !markRead.isPending) markRead.mutate();
     // `markRead` пересоздаётся каждый рендер — следим только за числом.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unread]);
 
   if (notes.isPending) {

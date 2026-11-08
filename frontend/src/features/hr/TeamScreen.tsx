@@ -71,6 +71,10 @@ export default function TeamScreen({
   // вместе с переходами в разделы.
   const [showDigest, setShowDigest] = useState(false);
 
+  // Хук вызывается до ранних возвратов: иначе порядок хуков зависел бы от
+  // того, открыт ли вложенный экран, и React ловил бы условный вызов.
+  const debouncedSearch = useDebouncedValue(search);
+
   if (showInvites) {
     return <InvitationsScreen onBack={() => setShowInvites(false)} />;
   }
@@ -84,7 +88,6 @@ export default function TeamScreen({
     );
   }
 
-  const debouncedSearch = useDebouncedValue(search);
   const needle = debouncedSearch.trim().toLowerCase();
   const employees = (dashboard.data?.employees ?? []).filter(
     (employee) =>
