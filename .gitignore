@@ -50,3 +50,7 @@ frontend/.devinit-tmp.txt
 
 # Дампы боевой базы (шаг 5.4): данные клиентов, в git им не место.
 backups/
+
+# Playwright (этап 1): отчёты и артефакты прогонов
+frontend/playwright-report/
+frontend/test-results/

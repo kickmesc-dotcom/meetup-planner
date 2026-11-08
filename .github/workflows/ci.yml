@@ -115,3 +115,11 @@ jobs:
 
       - name: Bundle budget
         run: npm run check:bundle
+
+      # Браузер ставится отдельным шагом: на раннере его нет, а кеш Playwright
+      # между прогонами не сохраняется.
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        run: npm run test:e2e
