@@ -14,6 +14,7 @@
  */
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { LOCALE_STORAGE_KEY, tx, type Locale } from "@/i18n";
+import { reportClientError } from "@/lib/telemetry";
 
 type Props = { children: ReactNode };
 type State = { error: Error | null };
@@ -35,9 +36,10 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    // Пока нет приёмника телеметрии (следующий шаг этапа 1), ошибка хотя бы
-    // остаётся в консоли вместе с деревом компонентов.
+    // Консоль — для локальной отладки; отчёт уходит на сервер, чтобы о падении
+    // у клиента узнали до его звонка, а не после.
     console.error("app.crashed", error, info.componentStack);
+    reportClientError("render", error, info.componentStack ?? "");
   }
 
   override render(): ReactNode {

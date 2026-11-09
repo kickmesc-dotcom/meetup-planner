@@ -13,6 +13,7 @@ import VerifyEmailScreen from "./features/auth/VerifyEmailScreen";
 import BrandApplier from "./features/brand/BrandApplier";
 import ToastHost from "./components/ToastHost";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { installGlobalErrorHandlers } from "./lib/telemetry";
 import { clearVerifyTokenFromUrl, verifyTokenFromUrl } from "./features/auth/verifyUrl";
 
 // Прямая ссылка из `/app`: забираем токен в localStorage и чистим адресную
@@ -24,6 +25,9 @@ syncWebAppChrome(initTheme());
 // Язык — до первого рендера: иначе английский интерфейс на миг показывал бы
 // русские подписи, а `<html lang>` оставался бы пустым.
 initLocale();
+// Ошибки вне React-дерева (обработчики, отклонённые промисы) ловим с самого
+// начала: часть падений случается до первого рендера.
+installGlobalErrorHandlers();
 
 const qc = new QueryClient({
   defaultOptions: {

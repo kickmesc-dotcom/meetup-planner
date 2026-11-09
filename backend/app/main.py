@@ -52,6 +52,7 @@ from app.api import (
     routes_shifts,
     routes_simulation,
     routes_standards,
+    routes_telemetry,
     routes_texts,
     routes_users,
     routes_v1,
@@ -597,6 +598,9 @@ def create_app() -> FastAPI:
     # возможности есть). Регистрируется последним, поэтому его собственный
     # роут уже попал в отпечаток — хеш получается устойчивым.
     app.include_router(routes_meta.router, prefix="/api")
+    # Ошибки фронта: одна ручка без авторизации — падение рендера бывает и до
+    # входа, а узнать о нём иначе можно только со слов человека.
+    app.include_router(routes_telemetry.router, prefix="/api")
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
