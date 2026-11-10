@@ -31,6 +31,7 @@ import {
   type ApiKeyRow,
 } from "@/api/integrations";
 import { humanizeApiError } from "@/api/client";
+import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
 import { useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
@@ -237,26 +238,26 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
           aria-label={tx("Создать ключ")}
           className="mt-3 flex flex-col gap-2"
         >
-          <label className="text-xs font-semibold text-tg-hint">
-            {tx("Название")}
-            <input
-              value={keyName}
-              aria-required="true"
-              aria-invalid={!!keyError}
-              aria-describedby={keyError ? "key-name-error" : undefined}
-              onChange={(event) => setKeyName(event.target.value)}
-              placeholder={tx("Например: CRM")}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
-            />
-          </label>
-          <p className="mt-1 text-2xs text-tg-hint">
-            {tx("Показывается один раз — сохраните ключ.")}
-          </p>
-          {!!keyError && (
-            <p id="key-name-error" role="alert" className="text-2xs text-red-600">
-              {humanizeApiError(keyError)}
-            </p>
-          )}
+          <FormField
+            id="key-name"
+            label={tx("Название")}
+            required
+            invalid={!!keyError}
+            error={keyError ? humanizeApiError(keyError) : undefined}
+            errorId="key-name-error"
+            hint={tx("Показывается один раз — сохраните ключ.")}
+            labelClassName="text-xs font-semibold text-tg-hint"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={keyName}
+                onChange={(event) => setKeyName(event.target.value)}
+                placeholder={tx("Например: CRM")}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
+              />
+            )}
+          </FormField>
           {ALL_SCOPES.map((scope) => (
             <Check
               key={scope}

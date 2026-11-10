@@ -7,6 +7,7 @@ import {
   verifyOrgDomain,
 } from "@/api/orgs";
 import { humanizeApiError } from "@/api/client";
+import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -133,38 +134,40 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
               )}
             </div>
 
-            <label className="mt-3 block text-xs text-tg-hint" htmlFor="org-domain">
-              {tx("Домен")}
-            </label>
-            <div className="mt-1 flex gap-2">
-              <input
-                id="org-domain"
-                aria-required="true"
-                aria-invalid={!!save.error}
-                aria-describedby={save.error ? "org-domain-error" : undefined}
-                value={value}
-                onChange={(event) => setValue(event.target.value)}
-                placeholder="cabinet.salon.ru"
-                autoCapitalize="none"
-                autoCorrect="off"
-                inputMode="url"
-                className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
-              />
-              <button
-                type="button"
-                disabled={busy || !value.trim() || value.trim() === data.domain}
-                aria-busy={busy}
-                onClick={() => save.mutate(value.trim())}
-                className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
-              >
-                {tx("Сохранить")}
-              </button>
-            </div>
-            {!!save.error && (
-              <p id="org-domain-error" role="alert" className="mt-1 text-2xs text-red-600">
-                {String(humanizeApiError(save.error))}
-              </p>
-            )}
+            <FormField
+              id="org-domain"
+              label={tx("Домен")}
+              required
+              invalid={!!save.error}
+              error={save.error ? String(humanizeApiError(save.error)) : undefined}
+              errorId="org-domain-error"
+              className="mt-3"
+              labelClassName="block text-xs text-tg-hint"
+            >
+              {(field) => (
+                <div className="mt-1 flex gap-2">
+                  <input
+                    {...field}
+                    value={value}
+                    onChange={(event) => setValue(event.target.value)}
+                    placeholder="cabinet.salon.ru"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    inputMode="url"
+                    className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || !value.trim() || value.trim() === data.domain}
+                    aria-busy={busy}
+                    onClick={() => save.mutate(value.trim())}
+                    className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+                  >
+                    {tx("Сохранить")}
+                  </button>
+                </div>
+              )}
+            </FormField>
           </section>
 
           {data.domain && data.token && (

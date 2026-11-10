@@ -98,7 +98,8 @@ describe("DomainScreen", () => {
   it("сохраняет новое имя домена", async () => {
     renderScreen();
 
-    const input = await screen.findByLabelText("Домен");
+    // Подпись теперь с маркером обязательности: ищем по части текста.
+    const input = await screen.findByLabelText(/Домен/);
     fireEvent.change(input, { target: { value: "new.salon.ru" } });
     fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
 

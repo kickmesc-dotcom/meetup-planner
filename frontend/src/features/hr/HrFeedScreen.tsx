@@ -384,7 +384,7 @@ export default function HrFeedScreen() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-lg font-semibold text-tg-text">{tx("События смены")}</h1>
           {feed && (
-            <span className="min-w-0 break-words rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-hint">
+            <span className="min-w-0 break-words rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-text">
               {tx(SCOPE_TITLE[feed.scope])}
             </span>
           )}
@@ -497,7 +497,7 @@ export default function HrFeedScreen() {
         )}
 
         {feed && !canFilter && (
-          <p className="mt-2 flex items-start gap-1.5 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-hint">
+          <p className="mt-2 flex items-start gap-1.5 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-text">
             <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
             <span>
               {tx("Видны только твои действия. Расширенные фильтры доступны руководителю подразделения и управляющему.")}
@@ -826,7 +826,7 @@ function FiltersSheet({
                       "min-h-8 rounded-full px-2.5 text-xs transition-colors",
                       active
                         ? "bg-tg-link/15 font-medium text-tg-text"
-                        : "bg-tg-secondary-bg text-tg-hint",
+                        : "bg-tg-secondary-bg text-tg-text",
                     ].join(" ")}
                   >
                     <span className="inline-flex items-center gap-1">

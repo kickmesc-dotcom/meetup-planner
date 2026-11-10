@@ -9,6 +9,7 @@ import {
   type AuthSession,
 } from "@/api/auth";
 import { clearAccessToken, clearAllTokens, setSessionToken } from "@/api/client";
+import FormField from "@/components/FormField";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
@@ -223,74 +224,79 @@ export default function AuthScreen({
           ) : (
             <form className="mt-3 space-y-2" onSubmit={submit} noValidate>
               {mode === "register" && (
-                <label className="block">
-                  <span className="text-xs text-tg-text">{t("auth.name.label")}</span>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoComplete="name"
-                    maxLength={64}
-                    placeholder={t("auth.name.placeholder")}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
-                  />
-                </label>
+                <FormField id="auth-name" label={t("auth.name.label")}>
+                  {(field) => (
+                    <input
+                      {...field}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoComplete="name"
+                      maxLength={64}
+                      placeholder={t("auth.name.placeholder")}
+                      className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
+                    />
+                  )}
+                </FormField>
               )}
 
-              <label className="block">
-                <span className="text-xs text-tg-text">
-                  {t("auth.email.label")} <span aria-hidden>*</span>
-                </span>
-                <input
-                  ref={emailRef}
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  required
-                  aria-required="true"
-                  aria-invalid={!!error}
-                  aria-describedby={error ? "auth-error" : undefined}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  maxLength={255}
-                  placeholder="name@company.ru"
-                  className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
-                />
-              </label>
+              <FormField
+                id="auth-email"
+                label={t("auth.email.label")}
+                required
+                invalid={!!error}
+                describedBy={error ? "auth-error" : undefined}
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    ref={emailRef}
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    maxLength={255}
+                    placeholder="name@company.ru"
+                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
+                  />
+                )}
+              </FormField>
 
               {mode !== "forgot" && (
                 // `label htmlFor` + отдельная кнопка-глаз: обёртка-label
                 // перехватывала бы клик по глазу и уводила фокус в поле.
-                <div>
-                  <label htmlFor="auth-password" className="block text-xs text-tg-text">
-                    {t("auth.password.label")} <span aria-hidden>*</span>
-                  </label>
-                  <div className="relative mt-1">
-                    <input
-                      ref={passwordRef}
-                      id="auth-password"
-                      aria-invalid={!!error}
-                      aria-describedby={error ? "auth-error" : undefined}
-                      type={showPassword ? "text" : "password"}
-                      autoComplete={mode === "register" ? "new-password" : "current-password"}
-                      required
-                      aria-required="true"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      maxLength={128}
-                      placeholder={mode === "register" ? t("auth.password.placeholder") : ""}
-                      className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 pr-12 text-base text-tg-text placeholder:text-tg-hint"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((value) => !value)}
-                      aria-label={t(showPassword ? "auth.password.hide" : "auth.password.show")}
-                      aria-pressed={showPassword}
-                      className="absolute inset-y-0 right-0 grid min-h-11 min-w-11 place-items-center rounded-tile px-3 text-tg-hint"
-                    >
-                      <Icon name={showPassword ? "eyeOff" : "eye"} size={18} />
-                    </button>
-                  </div>
-                </div>
+                <FormField
+                  id="auth-password"
+                  label={t("auth.password.label")}
+                  required
+                  invalid={!!error}
+                  describedBy={error ? "auth-error" : undefined}
+                >
+                  {(field) => (
+                    <div className="relative mt-1">
+                      <input
+                        {...field}
+                        ref={passwordRef}
+                        type={showPassword ? "text" : "password"}
+                        autoComplete={mode === "register" ? "new-password" : "current-password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        maxLength={128}
+                        placeholder={mode === "register" ? t("auth.password.placeholder") : ""}
+                        className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 pr-12 text-base text-tg-text placeholder:text-tg-hint"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((value) => !value)}
+                        aria-label={t(showPassword ? "auth.password.hide" : "auth.password.show")}
+                        aria-pressed={showPassword}
+                        className="absolute inset-y-0 right-0 grid min-h-11 min-w-11 place-items-center rounded-tile px-3 text-tg-hint"
+                      >
+                        <Icon name={showPassword ? "eyeOff" : "eye"} size={18} />
+                      </button>
+                    </div>
+                  )}
+                </FormField>
               )}
 
               {error && (

@@ -15,6 +15,18 @@ import { mockApi, mockSignedInApi } from "./api";
  */
 
 async function scan(page: Page, screen: string): Promise<void> {
+  // Экран входит анимацией: axe, запущенный в середине перехода, ловит
+  // интерполированные цвета (opacity 0→1) и даёт ложный контраст — причём
+  // каждый раз на другом элементе. Ждём именно завершения анимаций, а не
+  // фиксированную паузу.
+  await page.evaluate(async () => {
+    await Promise.all(
+      document
+        .getAnimations()
+        .map((animation) => animation.finished.catch(() => undefined)),
+    );
+  });
+  await page.waitForTimeout(100);
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();

@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { confirmPasswordReset } from "@/api/auth";
 import { clearAllTokens } from "@/api/client";
+import FormField from "@/components/FormField";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
@@ -104,60 +105,52 @@ export default function ResetPasswordScreen({
               <p className="mt-1 text-xs text-tg-hint">{t("reset.hint")}</p>
 
               <form className="mt-3 space-y-2" onSubmit={submit} noValidate>
-                <label className="block">
-                  <span className="text-xs text-tg-hint">
-                    {t("reset.password")} <span aria-hidden>*</span>
-                  </span>
-                  <input
-                    ref={passwordRef}
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    aria-required="true"
-                    minLength={MIN_PASSWORD}
-                    aria-invalid={!!error}
-                    aria-describedby={`reset-length${error ? " reset-error" : ""}`}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    maxLength={128}
-                    placeholder={t("reset.password.placeholder")}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
-                  />
-                  {/* §8 `input-helper-text`: правило остаётся на экране, а не
-                      исчезает вместе с placeholder после первого символа. */}
-                  <p id="reset-length" className="mt-1 text-2xs text-tg-hint">
-                    {t("reset.password.placeholder")}
-                  </p>
-                </label>
+                <FormField
+                  id="reset-password"
+                  label={t("reset.password")}
+                  required
+                  // §8 `input-helper-text`: правило остаётся на экране, а не
+                  // исчезает вместе с placeholder после первого символа.
+                  hint={t("reset.password.placeholder")}
+                  error={error}
+                  errorId="reset-error"
+                >
+                  {(field) => (
+                    <input
+                      {...field}
+                      ref={passwordRef}
+                      type="password"
+                      autoComplete="new-password"
+                      minLength={MIN_PASSWORD}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      maxLength={128}
+                      placeholder={t("reset.password.placeholder")}
+                      className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
+                    />
+                  )}
+                </FormField>
 
-                <label className="block">
-                  <span className="text-xs text-tg-hint">
-                    {t("reset.repeat")} <span aria-hidden>*</span>
-                  </span>
-                  <input
-                    ref={repeatRef}
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    aria-required="true"
-                    aria-invalid={!!error}
-                    aria-describedby={error ? "reset-error" : undefined}
-                    value={repeat}
-                    onChange={(e) => setRepeat(e.target.value)}
-                    maxLength={128}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text"
-                  />
-                </label>
-
-                {error && (
-                  <p
-                    id="reset-error"
-                    role="alert"
-                    className="rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-status-busy"
-                  >
-                    {error}
-                  </p>
-                )}
+                <FormField
+                  id="reset-repeat"
+                  label={t("reset.repeat")}
+                  required
+                  invalid={!!error}
+                  describedBy={error ? "reset-error" : undefined}
+                >
+                  {(field) => (
+                    <input
+                      {...field}
+                      ref={repeatRef}
+                      type="password"
+                      autoComplete="new-password"
+                      value={repeat}
+                      onChange={(e) => setRepeat(e.target.value)}
+                      maxLength={128}
+                      className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text"
+                    />
+                  )}
+                </FormField>
 
                 <button
                   type="submit"
