@@ -61,7 +61,7 @@ describe("BrandScreen", () => {
   it("сохраняет изменённое имя и цвет", async () => {
     renderScreen();
 
-    const name = (await screen.findByLabelText("Название")) as HTMLInputElement;
+    const name = (await screen.findByLabelText(/Название/)) as HTMLInputElement;
     fireEvent.change(name, { target: { value: "Ножницы" } });
     fireEvent.click(screen.getByText("Сохранить"));
 

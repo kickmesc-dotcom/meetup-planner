@@ -18,6 +18,7 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
+import FormField from "@/components/FormField";
 import {
   applyImport,
   previewImport,
@@ -241,23 +242,26 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      <label className="block">
-        <span className="text-xs text-tg-hint">
-          {tx("Или вставьте строки из таблицы (первая строка — заголовки)")}
-        </span>
-        <textarea
-          value={text}
-          onChange={(event) => {
-            setText(event.target.value);
-            reset();
-          }}
-          rows={5}
-          spellCheck={false}
-          data-testid="import-text"
-          placeholder={"имя;должность;подразделение\nСергей;Управляющий;Зал"}
-          className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-3 font-mono text-xs text-tg-text placeholder:text-tg-hint"
-        />
-      </label>
+      <FormField
+        id="import-text"
+        label={tx("Или вставьте строки из таблицы (первая строка — заголовки)")}
+      >
+        {(field) => (
+          <textarea
+            {...field}
+            value={text}
+            onChange={(event) => {
+              setText(event.target.value);
+              reset();
+            }}
+            rows={5}
+            spellCheck={false}
+            data-testid="import-text"
+            placeholder={"имя;должность;подразделение\nСергей;Управляющий;Зал"}
+            className="w-full rounded-tile bg-tg-secondary-bg p-3 font-mono text-xs text-tg-text placeholder:text-tg-hint"
+          />
+        )}
+      </FormField>
 
       {kind === "shifts" && (
         <label className="flex items-center gap-2 text-sm text-tg-text">

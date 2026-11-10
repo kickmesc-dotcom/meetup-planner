@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBrand, resetBrand, updateBrand, type OrgBrand } from "@/api/brand";
 import { Skeleton } from "@/components/Skeleton";
+import FormField from "@/components/FormField";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
 
@@ -112,15 +113,22 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
             )}
           </div>
 
-          <label className="block text-xs font-semibold text-tg-hint">
-            {tx("Название")}
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={64}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm font-normal text-tg-text"
-            />
-          </label>
+          <FormField
+            id="brand-name"
+            label={tx("Название")}
+            required
+            labelClassName="block text-xs font-semibold text-tg-hint"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={64}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm font-normal text-tg-text"
+              />
+            )}
+          </FormField>
 
           <label className="block text-xs font-semibold text-tg-hint">
             {tx("Цвет")}
@@ -132,26 +140,41 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
                 className="h-11 w-14 rounded-tile bg-tg-secondary-bg"
                 aria-label={tx("Цвет")}
               />
-              <input
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-                maxLength={9}
-                className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg px-3 text-sm font-normal text-tg-text"
-                aria-label={tx("Цвет в формате #1c6fb8")}
-              />
+              <FormField
+                id="brand-color-hex"
+                label={tx("Цвет в формате #1c6fb8")}
+                labelClassName="sr-only"
+                className="min-h-11 flex-1"
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    value={color}
+                    onChange={(event) => setColor(event.target.value)}
+                    maxLength={9}
+                    className="h-full w-full rounded-tile bg-tg-secondary-bg px-3 text-sm font-normal text-tg-text"
+                  />
+                )}
+              </FormField>
             </span>
           </label>
 
-          <label className="block text-xs font-semibold text-tg-hint">
-            {tx("Логотип (ссылка https)")}
-            <input
-              value={logo}
-              onChange={(event) => setLogo(event.target.value)}
-              placeholder="https://example.com/logo.png"
-              maxLength={500}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm font-normal text-tg-text"
-            />
-          </label>
+          <FormField
+            id="brand-logo"
+            label={tx("Логотип (ссылка https)")}
+            labelClassName="block text-xs font-semibold text-tg-hint"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={logo}
+                onChange={(event) => setLogo(event.target.value)}
+                placeholder="https://example.com/logo.png"
+                maxLength={500}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm font-normal text-tg-text"
+              />
+            )}
+          </FormField>
 
           {errorText && (
             <p className="rounded-tile bg-red-500/10 p-3 text-xs text-red-600" role="alert">

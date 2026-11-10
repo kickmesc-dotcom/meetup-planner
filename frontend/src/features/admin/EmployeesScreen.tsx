@@ -15,6 +15,7 @@ import {
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
 import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
@@ -166,14 +167,22 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
       subtitle={tx("Переименовать, должность, прогресс, увольнение")}
       onBack={onBack}
     >
-      <input
-        type="search"
-        value={search}
-        onChange={(event) => setSearch(event.target.value)}
-        placeholder={tx("Найти по имени, должности или отделу")}
-        aria-label={tx("Поиск по сотрудникам")}
-        className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
-      />
+      <FormField
+        id="employees-search"
+        label={tx("Поиск по сотрудникам")}
+        labelClassName="sr-only"
+      >
+        {(field) => (
+          <input
+            {...field}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={tx("Найти по имени, должности или отделу")}
+            className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
+          />
+        )}
+      </FormField>
 
       <AddPersonPanel
         onAdded={refresh}
@@ -298,32 +307,47 @@ function EmployeeRow({
             </p>
           )}
 
-          <label className="block text-xs text-tg-hint">{tx("Имя")}<input
-              type="text"
-              value={name}
-              maxLength={64}
-              onChange={(event) => setName(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
-          <label className="block text-xs text-tg-hint">{tx("Должность (влияет на пункты чек-листа)")}<input
-              type="text"
-              value={position}
-              maxLength={64}
-              placeholder={tx("например, су-шеф")}
-              onChange={(event) => setPosition(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
-          <label className="block text-xs text-tg-hint">{tx("Плашка под именем")}<input
-              type="text"
-              value={badge}
-              maxLength={64}
-              placeholder={tx("например, Управляющий")}
-              onChange={(event) => setBadge(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
+          <FormField id="employee-name" label={tx("Имя")} required>
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                value={name}
+                maxLength={64}
+                onChange={(event) => setName(event.target.value)}
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="employee-position"
+            label={tx("Должность (влияет на пункты чек-листа)")}
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                value={position}
+                maxLength={64}
+                placeholder={tx("например, су-шеф")}
+                onChange={(event) => setPosition(event.target.value)}
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField id="employee-badge" label={tx("Плашка под именем")}>
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                value={badge}
+                maxLength={64}
+                placeholder={tx("например, Управляющий")}
+                onChange={(event) => setBadge(event.target.value)}
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
 
           {/* Роль: сотрудник / руководитель / администратор. Раньше её можно
               было сменить только через «примерить роль» себе — выдать права
