@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import BottomSheet from "@/features/actions/BottomSheet";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
+import { Spinner } from "@/components/Spinner";
 import { Skeleton } from "@/components/Skeleton";
 import {
   createQuickTask,
@@ -269,17 +271,26 @@ export default function QuickTaskSheet({ onClose }: { onClose: () => void }) {
   return (
     <BottomSheet title={tx("Скажи, что нужно сделать")} onClose={onClose}>
       <div className="flex items-end gap-2">
-        <textarea
-          ref={inputRef}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          rows={2}
-          maxLength={500}
-          placeholder={tx("Например: Аня, протри витрину до 18:00")}
-          aria-label={tx("Что нужно сделать")}
-          aria-required="true"
-          className="min-h-11 flex-1 resize-none rounded-tile bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint"
-        />
+        <FormField
+          id="quick-task-text"
+          label={tx("Что нужно сделать")}
+          required
+          labelClassName="sr-only"
+          className="min-h-11 flex-1"
+        >
+          {(field) => (
+            <textarea
+              {...field}
+              ref={inputRef}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              rows={2}
+              maxLength={500}
+              placeholder={tx("Например: Аня, протри витрину до 18:00")}
+              className="h-full w-full resize-none rounded-tile bg-tg-secondary-bg px-3 py-2.5 text-sm text-tg-text outline-none placeholder:text-tg-hint"
+            />
+          )}
+        </FormField>
         {speechCtor() && (
           <button
             type="button"
@@ -519,6 +530,7 @@ export default function QuickTaskSheet({ onClose }: { onClose: () => void }) {
             : "bg-tg-secondary-bg text-tg-hint",
         ].join(" ")}
       >
+        {create.isPending && <Spinner size={14} />}
         {create.isPending ? tx("Создаю…") : tx("Создать поручение")}
       </button>
       {!canCreate && debounced.length >= 3 && !isGroup && (

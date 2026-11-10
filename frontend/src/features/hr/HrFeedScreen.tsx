@@ -18,6 +18,7 @@ import KudosCard from "@/features/hr/KudosCard";
 import DepartmentScreen from "@/features/hr/DepartmentScreen";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
+import FormField from "@/components/FormField";
 import Icon, { type IconName } from "@/components/Icon";
 import {
   TRANSLATED_MARK_INLINE,
@@ -427,14 +428,23 @@ export default function HrFeedScreen() {
         {canFilter && filters && (
           <div className="mt-3 space-y-2">
             <div className="flex gap-1.5">
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={tx("Поиск по имени или должности")}
-                aria-label={tx("Поиск сотрудника")}
-                className="min-h-10 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
-              />
+              <FormField
+                id="feed-search"
+                label={tx("Поиск сотрудника")}
+                labelClassName="sr-only"
+                className="min-h-10 min-w-0 flex-1"
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={tx("Поиск по имени или должности")}
+                    className="h-full w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
+                  />
+                )}
+              </FormField>
               <button
                 type="button"
                 aria-expanded={filtersOpen}
@@ -773,14 +783,23 @@ function FiltersSheet({
         <h3 className="mt-4 text-2xs font-medium uppercase tracking-wide text-tg-hint">
           {tx("Сотрудник")}
         </h3>
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => onSearch(event.target.value)}
-          placeholder={tx("Поиск по имени или должности")}
-          aria-label={tx("Поиск сотрудника в фильтре")}
-          className="mt-1 min-h-9 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
-        />
+        <FormField
+          id="feed-filter-search"
+          label={tx("Поиск сотрудника в фильтре")}
+          labelClassName="sr-only"
+          className="mt-1"
+        >
+          {(field) => (
+            <input
+              {...field}
+              type="search"
+              value={search}
+              onChange={(event) => onSearch(event.target.value)}
+              placeholder={tx("Поиск по имени или должности")}
+              className="min-h-9 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
+            />
+          )}
+        </FormField>
         <div className="mt-1 space-y-1">
           <FilterRow
             active={employeeId === null}

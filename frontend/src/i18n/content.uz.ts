@@ -393,6 +393,7 @@ export const UZ_CONTENT: Record<string, string> = {
   "Secret или пароль": "Secret yoki parol",
   "Пароль или secret (необязательно)": "Parol yoki secret (majburiy emas)",
   "Создать зал": "Zal yaratish",
+  "Название короче двух символов": "Nom ikki belgidan qisqa",
   "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.":
     "Asosiy manzil ishlamasa, zaxirasini koʻrsating — ilova qayta oʻrnatishsiz ishlashda davom etadi. Boʻsh — yigʻilgan manzil ishlatiladi.",
   "Сохранить и перезагрузить": "Saqlash va qayta yuklash",

@@ -520,6 +520,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Secret или пароль": "Secret or password",
   "Пароль или secret (необязательно)": "Password or secret (optional)",
   "Создать зал": "Create hall",
+  "Название короче двух символов": "Name is shorter than two characters",
   "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.": "If the main address is unreachable, set a fallback — the app keeps working without reinstalling. Empty means the build address.",
   "Сохранить и перезагрузить": "Save and reload",
   "Почта не подтверждена": "Email not verified",

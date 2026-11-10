@@ -195,7 +195,13 @@ function MenuForm({
   );
   const [description, setDescription] = useState(initial?.description ?? "");
 
-  const canSave = name.trim().length > 0 && !saving;
+  const [nameTouched, setNameTouched] = useState(false);
+  /** Один символ в названии — почти наверняка опечатка: говорим сразу. */
+  const nameError =
+    nameTouched && name.trim().length > 0 && name.trim().length < 2
+      ? tx("Название короче двух символов")
+      : undefined;
+  const canSave = name.trim().length >= 2 && !saving;
 
   return (
     <form
@@ -211,12 +217,18 @@ function MenuForm({
         });
       }}
     >
-      <FormField id="menu-name" label={tx("Название")} required>
+      <FormField
+        id="menu-name"
+        label={tx("Название")}
+        required
+        error={nameError}
+      >
         {(field) => (
           <input
             {...field}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onBlur={() => setNameTouched(true)}
             maxLength={160}
             placeholder={tx("Например: Борщ с пампушкой")}
             className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"

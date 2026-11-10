@@ -88,7 +88,7 @@ describe("быстрое поручение", () => {
   it("показывает подписи и поле до ответа сервера", () => {
     renderSheet();
     expect(screen.getByText("Скажи, что нужно сделать")).toBeTruthy();
-    expect(screen.getByLabelText("Что нужно сделать")).toBeTruthy();
+    expect(screen.getByLabelText(/Что нужно сделать/)).toBeTruthy();
     expect(
       screen.getByText(/Напиши или продиктуй одной фразой/),
     ).toBeTruthy();
@@ -102,7 +102,7 @@ describe("быстрое поручение", () => {
     parseMock.mockResolvedValue(draft());
     renderSheet();
 
-    fireEvent.change(screen.getByLabelText("Что нужно сделать"), {
+    fireEvent.change(screen.getByLabelText(/Что нужно сделать/), {
       target: { value: "Аня, протри витрину до 18:00" },
     });
 
@@ -125,7 +125,7 @@ describe("быстрое поручение", () => {
     );
     renderSheet();
 
-    fireEvent.change(screen.getByLabelText("Что нужно сделать"), {
+    fireEvent.change(screen.getByLabelText(/Что нужно сделать/), {
       target: { value: "Аня, протри витрину" },
     });
 
@@ -150,7 +150,7 @@ describe("быстрое поручение", () => {
     });
     renderSheet();
 
-    fireEvent.change(screen.getByLabelText("Что нужно сделать"), {
+    fireEvent.change(screen.getByLabelText(/Что нужно сделать/), {
       target: { value: "Аня, протри витрину до 18:00" },
     });
     await waitFor(() => expect(screen.getByText("Протри витрину")).toBeTruthy());
@@ -204,7 +204,7 @@ describe("быстрое поручение", () => {
       renderSheet();
       fireEvent.click(screen.getByLabelText("Сказать голосом"));
       await waitFor(() => {
-        const field = screen.getByLabelText("Что нужно сделать") as HTMLTextAreaElement;
+        const field = screen.getByLabelText(/Что нужно сделать/) as HTMLTextAreaElement;
         expect(field.value).toBe("помыть полы");
       });
       await waitFor(() => expect(parseMock).toHaveBeenCalledWith("помыть полы"));

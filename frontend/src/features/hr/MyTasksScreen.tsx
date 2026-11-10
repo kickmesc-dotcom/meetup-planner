@@ -19,6 +19,8 @@ import { useAppText } from "@/api/texts";
 import type { MediaItem } from "@/api/media";
 import Icon, { InlineIcon } from "@/components/Icon";
 import PhotoAttach, { PhotoThumbs } from "@/components/PhotoAttach";
+import FormField from "@/components/FormField";
+import { Spinner } from "@/components/Spinner";
 import { fetchIssues } from "@/api/issues";
 import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
@@ -719,50 +721,61 @@ function IssueForm({ taskId, onDone }: { taskId: number; onDone: () => void }) {
 
   return (
     <div className="mt-3 rounded-tile bg-tg-bg/60 p-3">
-      <label className="block text-xs text-tg-hint">
-        {tx("Причина")}
-        <select
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-        >
-          {ISSUE_REASONS.map((r) => (
-            <option key={r.code} value={r.code}>
-              {tx(r.label)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FormField id="issue-reason" label={tx("Причина")}>
+        {(field) => (
+          <select
+            {...field}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          >
+            {ISSUE_REASONS.map((r) => (
+              <option key={r.code} value={r.code}>
+                {tx(r.label)}
+              </option>
+            ))}
+          </select>
+        )}
+      </FormField>
 
-      <label className="mt-2 block text-xs text-tg-hint">
-        {tx("Когда сможешь закончить (необязательно)")}
-        <input
-          type="datetime-local"
-          value={eta}
-          onChange={(e) => setEta(e.target.value)}
-          className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-        />
-      </label>
+      <FormField
+        id="issue-eta"
+        label={tx("Когда сможешь закончить (необязательно)")}
+        className="mt-2"
+      >
+        {(field) => (
+          <input
+            {...field}
+            type="datetime-local"
+            value={eta}
+            onChange={(e) => setEta(e.target.value)}
+            className="min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
-      <label className="mt-2 block text-xs text-tg-hint">
-        {tx("Комментарий")}
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          rows={2}
-          maxLength={500}
-          placeholder={tx("Что именно мешает?")}
-          className="mt-1 w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
-        />
-      </label>
+      <FormField id="issue-comment" label={tx("Комментарий")} className="mt-2">
+        {(field) => (
+          <textarea
+            {...field}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder={tx("Что именно мешает?")}
+            className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
       <button
         type="button"
         disabled={m.isPending}
         aria-busy={m.isPending}
         onClick={() => m.mutate()}
-        className="mt-3 min-h-10 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
       >
+        {m.isPending && <Spinner size={14} />}
         {tx("Отправить руководителю")}
       </button>
     </div>
