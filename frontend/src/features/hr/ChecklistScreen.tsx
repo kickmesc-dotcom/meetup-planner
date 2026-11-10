@@ -10,6 +10,7 @@ import {
   type HrChecklistItem,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import FormField from "@/components/FormField";
 import {
   enqueueCompletion,
   flushCompletions,
@@ -588,17 +589,25 @@ function ItemRow({
       )}
       {noteOpen && (
         <div className="mt-2 rounded-tile bg-tg-bg/60 p-2">
-          <textarea
-            aria-label={tx("Например: инвентарь в порядке, не хватило 2 упаковок")}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={2}
-            maxLength={500}
-            placeholder={tx(
-              "Например: инвентарь в порядке, не хватило 2 упаковок",
+          <FormField
+            id="checklist-note"
+            label={tx("Комментарий к чек-листу")}
+            labelClassName="sr-only"
+          >
+            {(field) => (
+              <textarea
+                {...field}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder={tx(
+                  "Например: инвентарь в порядке, не хватило 2 упаковок",
+                )}
+                className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
+              />
             )}
-            className="w-full rounded-tile bg-tg-secondary-bg p-2 text-sm text-tg-text"
-          />
+          </FormField>
           <button
             type="button"
             disabled={busy || !note.trim()}

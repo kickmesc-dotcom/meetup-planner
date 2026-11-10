@@ -15,6 +15,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import DepartmentTag from "@/components/DepartmentTag";
 import Icon, { type IconName } from "@/components/Icon";
+import FormField from "@/components/FormField";
 import ChevronToggle from "@/components/ChevronToggle";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton, SkeletonText } from "@/components/Skeleton";
@@ -265,14 +266,23 @@ export default function TeamScreen({
                     : ""}
                 </span>
               </div>
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={tx("Найти человека или должность")}
-                aria-label={tx("Поиск по сотрудникам")}
-                className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
-              />
+              <FormField
+                id="team-search"
+                label={tx("Поиск по сотрудникам")}
+                labelClassName="sr-only"
+                className="mt-2"
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    type="search"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={tx("Найти человека или должность")}
+                    className="min-h-9 w-full rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
+                  />
+                )}
+              </FormField>
               <div className="mt-2 space-y-1.5">
                 {employees.length === 0 && (
                   <div className="text-xs text-tg-hint">
@@ -512,24 +522,36 @@ function WorkHoursPanel() {
   return (
     <div className="mt-2 space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <label className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
-          {tx("Открытие")}
-          <input
-            type="time"
-            value={openValue}
-            onChange={(event) => setOpen(event.target.value)}
-            className="mt-1 w-full bg-transparent text-sm text-tg-text outline-none"
-          />
-        </label>
-        <label className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint">
-          {tx("Закрытие")}
-          <input
-            type="time"
-            value={closeValue}
-            onChange={(event) => setClose(event.target.value)}
-            className="mt-1 w-full bg-transparent text-sm text-tg-text outline-none"
-          />
-        </label>
+        <FormField
+          id="team-open"
+          label={tx("Открытие")}
+          className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint"
+        >
+          {(field) => (
+            <input
+              {...field}
+              type="time"
+              value={openValue}
+              onChange={(event) => setOpen(event.target.value)}
+              className="mt-1 w-full bg-transparent text-sm text-tg-text outline-none"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="team-close"
+          label={tx("Закрытие")}
+          className="rounded-tile bg-tg-bg/50 p-2 text-xs text-tg-hint"
+        >
+          {(field) => (
+            <input
+              {...field}
+              type="time"
+              value={closeValue}
+              onChange={(event) => setClose(event.target.value)}
+              className="mt-1 w-full bg-transparent text-sm text-tg-text outline-none"
+            />
+          )}
+        </FormField>
       </div>
       <button
         type="button"

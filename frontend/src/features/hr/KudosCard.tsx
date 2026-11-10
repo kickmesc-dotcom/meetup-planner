@@ -7,6 +7,7 @@ import {
   kudosErrorText,
 } from "@/api/kudos";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
 import {
   TRANSLATED_MARK_INLINE,
@@ -229,14 +230,23 @@ export function KudosSheet({
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         <div className="flex items-center gap-2">
-          <input
-            type="search"
-            value={needle}
-            onChange={(e) => setNeedle(e.target.value)}
-            placeholder={tx("Поиск по имени")}
-            aria-label={tx("Поиск по имени")}
-            className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text outline-none"
-          />
+          <FormField
+            id="kudos-search"
+            label={tx("Поиск по имени")}
+            labelClassName="sr-only"
+            className="min-h-11 min-w-0 flex-1"
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="search"
+                value={needle}
+                onChange={(e) => setNeedle(e.target.value)}
+                placeholder={tx("Поиск по имени")}
+                className="h-full w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text outline-none"
+              />
+            )}
+          </FormField>
           {translate.canTranslate && (
             <TranslateBlockButton
               on={translate.on}

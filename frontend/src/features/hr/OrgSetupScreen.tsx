@@ -18,6 +18,7 @@ import { copyText } from "@/lib/clipboard";
 import { clearDraft, readDraft, writeDraft } from "@/lib/formDraft";
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { showToast } from "@/components/toast";
 import ProgressBar from "@/components/ProgressBar";
@@ -794,22 +795,31 @@ function CustomDepartment({ onAdd }: { onAdd: (name: string) => void }) {
   };
   return (
     <div className="flex gap-1.5">
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => {
-          // §8 `ime-composition-enter`: Enter подтверждает выбор в китайской,
-          // японской и корейской раскладке, а не отправляет форму. Без этой
-          // проверки ввод «добавлял» недописанное подразделение.
-          if (event.nativeEvent.isComposing) return;
-          if (event.key === "Enter") submit();
-        }}
-        maxLength={80}
-        placeholder={tx("Своё подразделение")}
-        aria-label={tx("Добавить своё подразделение")}
-        className="min-h-10 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
-      />
+      <FormField
+        id="org-custom-department"
+        label={tx("Добавить своё подразделение")}
+        labelClassName="sr-only"
+        className="min-h-10 min-w-0 flex-1"
+      >
+        {(field) => (
+          <input
+            {...field}
+            type="text"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              // §8 `ime-composition-enter`: Enter подтверждает выбор в китайской,
+              // японской и корейской раскладке, а не отправляет форму. Без этой
+              // проверки ввод «добавлял» недописанное подразделение.
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === "Enter") submit();
+            }}
+            maxLength={80}
+            placeholder={tx("Своё подразделение")}
+            className="h-full w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
+          />
+        )}
+      </FormField>
       <button
         type="button"
         onClick={submit}
@@ -904,15 +914,24 @@ function PeopleStep({
       )}
 
       <div className="flex gap-1.5">
-        <input
-          type="email"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          maxLength={120}
-          placeholder={tx("Почта (необязательно)")}
-          aria-label={tx("Почта (необязательно)")}
-          className="min-h-10 min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
-        />
+        <FormField
+          id="org-invite-email"
+          label={tx("Почта (необязательно)")}
+          labelClassName="sr-only"
+          className="min-h-10 min-w-0 flex-1"
+        >
+          {(field) => (
+            <input
+              {...field}
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              maxLength={120}
+              placeholder={tx("Почта (необязательно)")}
+              className="h-full w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text placeholder:text-tg-hint"
+            />
+          )}
+        </FormField>
         <button
           type="button"
           disabled={invite.isPending}
@@ -957,27 +976,27 @@ function PeopleStep({
       )}
 
       {departments.length > 0 && (
-        <label className="block">
-          <span className="text-2xs font-medium uppercase tracking-wide text-tg-hint">
-            {tx("Подразделение")}
-          </span>
-          <select
-            value={departmentId ?? ""}
-            onChange={(event) =>
-              setDepartmentId(
-                event.target.value ? Number(event.target.value) : null,
-              )
-            }
-            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-          >
-            <option value="">{tx("Пока без подразделения")}</option>
-            {departments.map((dep) => (
-              <option key={dep.id} value={dep.id}>
-                {dep.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField id="org-invite-department" label={tx("Подразделение")}>
+          {(field) => (
+            <select
+              {...field}
+              value={departmentId ?? ""}
+              onChange={(event) =>
+                setDepartmentId(
+                  event.target.value ? Number(event.target.value) : null,
+                )
+              }
+              className="min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+            >
+              <option value="">{tx("Пока без подразделения")}</option>
+              {departments.map((dep) => (
+                <option key={dep.id} value={dep.id}>
+                  {dep.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
       )}
 
       {last?.link && (
@@ -1145,48 +1164,52 @@ function ScheduleStep({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <label className="block">
-          <span className="text-2xs text-tg-hint">{tx("Начало")}</span>
-          <input
-            type="time"
-            value={startsAt}
-            onChange={(event) => setStartsAt(event.target.value)}
-            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-          />
-        </label>
-        <label className="block">
-          <span className="text-2xs text-tg-hint">{tx("Конец")}</span>
-          <input
-            type="time"
-            value={endsAt}
-            onChange={(event) => setEndsAt(event.target.value)}
-            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-          />
-        </label>
+        <FormField id="org-schedule-start" label={tx("Начало")}>
+          {(field) => (
+            <input
+              {...field}
+              type="time"
+              value={startsAt}
+              onChange={(event) => setStartsAt(event.target.value)}
+              className="min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+            />
+          )}
+        </FormField>
+        <FormField id="org-schedule-end" label={tx("Конец")}>
+          {(field) => (
+            <input
+              {...field}
+              type="time"
+              value={endsAt}
+              onChange={(event) => setEndsAt(event.target.value)}
+              className="min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+            />
+          )}
+        </FormField>
       </div>
 
       {departments.length > 0 && (
-        <label className="block">
-          <span className="text-2xs font-medium uppercase tracking-wide text-tg-hint">
-            {tx("Подразделение")}
-          </span>
-          <select
-            value={departmentId ?? ""}
-            onChange={(event) =>
-              setDepartmentId(
-                event.target.value ? Number(event.target.value) : null,
-              )
-            }
-            className="mt-1 min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-          >
-            <option value="">{tx("Все подразделения")}</option>
-            {departments.map((dep) => (
-              <option key={dep.id} value={dep.id}>
-                {dep.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField id="org-schedule-department" label={tx("Подразделение")}>
+          {(field) => (
+            <select
+              {...field}
+              value={departmentId ?? ""}
+              onChange={(event) =>
+                setDepartmentId(
+                  event.target.value ? Number(event.target.value) : null,
+                )
+              }
+              className="min-h-10 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+            >
+              <option value="">{tx("Все подразделения")}</option>
+              {departments.map((dep) => (
+                <option key={dep.id} value={dep.id}>
+                  {dep.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
       )}
 
       <button

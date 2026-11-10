@@ -521,6 +521,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Пароль или secret (необязательно)": "Password or secret (optional)",
   "Создать зал": "Create hall",
   "Название короче двух символов": "Name is shorter than two characters",
+  "Комментарий к чек-листу": "Checklist comment",
+  "Резервный адрес сервера": "Backup server address",
   "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.": "If the main address is unreachable, set a fallback — the app keeps working without reinstalling. Empty means the build address.",
   "Сохранить и перезагрузить": "Save and reload",
   "Почта не подтверждена": "Email not verified",

@@ -10,6 +10,7 @@ import {
   type HrStandardCoverage,
 } from "@/api/hr";
 import ErrorState from "@/components/ErrorState";
+import FormField from "@/components/FormField";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import Icon, { InlineIcon } from "@/components/Icon";
@@ -128,31 +129,43 @@ export default function ReportsScreen({
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
         <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="date"
-              value={on}
-              max={todayIso()}
-              onChange={(event) => setOn(event.target.value || todayIso())}
-              className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
-              aria-label={tx("Дата смены")}
-            />
+            <FormField id="report-date" label={tx("Дата смены")} labelClassName="sr-only">
+              {(field) => (
+                <input
+                  {...field}
+                  type="date"
+                  value={on}
+                  max={todayIso()}
+                  onChange={(event) => setOn(event.target.value || todayIso())}
+                  className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+                />
+              )}
+            </FormField>
             {!!meQ.data?.is_staff && (
-              <select
-                value={departmentId ?? ""}
-                onChange={(event) =>
-                  setDepartmentId(event.target.value ? Number(event.target.value) : null)
-                }
-                className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
-                aria-label={tx("Подразделение")}
+              <FormField
+                id="report-department"
+                label={tx("Подразделение")}
+                labelClassName="sr-only"
               >
-                <option value="">{tx("Все отделы")}</option>
-                {(departmentsQ.data ?? []).map((dept) => (
-                  <option key={dept.id} value={dept.id}>
-                    {dept.emoji ? `${dept.emoji} ` : ""}
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
+                {(field) => (
+                  <select
+                    {...field}
+                    value={departmentId ?? ""}
+                    onChange={(event) =>
+                      setDepartmentId(event.target.value ? Number(event.target.value) : null)
+                    }
+                    className="min-h-9 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+                  >
+                    <option value="">{tx("Все отделы")}</option>
+                    {(departmentsQ.data ?? []).map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.emoji ? `${dept.emoji} ` : ""}
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </FormField>
             )}
           </div>
           {report && (

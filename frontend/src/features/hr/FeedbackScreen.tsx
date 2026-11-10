@@ -8,6 +8,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
+import FormField from "@/components/FormField";
 import { InlineIcon } from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
@@ -149,15 +150,24 @@ export default function FeedbackScreen({ onClose }: { onClose: () => void }) {
             )}
 
             {question.kind === "text" && (
-              <textarea
-                aria-label={tx("Пара слов своими словами")}
-                rows={3}
-                maxLength={2000}
-                value={answers[question.id]?.value_text ?? ""}
-                onChange={(e) => set(question, { value_text: e.target.value })}
-                placeholder={tx("Пара слов своими словами")}
-                className="mt-2 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-              />
+              <FormField
+                id={`feedback-${question.id}`}
+                label={tx("Пара слов своими словами")}
+                labelClassName="sr-only"
+                className="mt-2"
+              >
+                {(field) => (
+                  <textarea
+                    {...field}
+                    rows={3}
+                    maxLength={2000}
+                    value={answers[question.id]?.value_text ?? ""}
+                    onChange={(e) => set(question, { value_text: e.target.value })}
+                    placeholder={tx("Пара слов своими словами")}
+                    className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
+                  />
+                )}
+              </FormField>
             )}
           </section>
         ))}

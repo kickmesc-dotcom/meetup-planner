@@ -17,6 +17,7 @@ import { useAppText } from "@/api/texts";
 import { useSimulation } from "@/store/simulation";
 import { getApiBase, humanizeApiError, setApiBase } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
+import FormField from "@/components/FormField";
 import Icon, { type IconName } from "@/components/Icon";
 import { CardSkeleton, Skeleton } from "@/components/Skeleton";
 import AchievementsCard from "@/features/hr/AchievementsCard";
@@ -751,24 +752,33 @@ export default function HrProfileScreen() {
                 <p className="mt-1 text-xs text-tg-hint">{tx(
                   "Открой приложение глазами сотрудника. Тестовые задачи и смены удалятся при выходе — настоящие данные не изменятся.",
                 )}</p>
-                <select
-                  aria-label={tx("Кого проверяем")}
-                  value={simulationTarget ?? ""}
-                  onChange={(event) =>
-                    setSimulationTarget(
-                      event.target.value ? Number(event.target.value) : null,
-                    )
-                  }
-                  className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg px-2 text-xs text-tg-text"
+                <FormField
+                  id="simulation-target"
+                  label={tx("Кого проверяем")}
+                  labelClassName="sr-only"
+                  className="mt-2"
                 >
-                  <option value="">{tx("Выбери сотрудника")}</option>
-                  {(employeesQ.data ?? []).map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.display_name}
-                      {person.department_name ? ` · ${person.department_name}` : ""}
-                    </option>
-                  ))}
-                </select>
+                  {(field) => (
+                    <select
+                      {...field}
+                      value={simulationTarget ?? ""}
+                      onChange={(event) =>
+                        setSimulationTarget(
+                          event.target.value ? Number(event.target.value) : null,
+                        )
+                      }
+                      className="min-h-10 w-full rounded-tile bg-tg-bg px-2 text-xs text-tg-text"
+                    >
+                      <option value="">{tx("Выбери сотрудника")}</option>
+                      {(employeesQ.data ?? []).map((person) => (
+                        <option key={person.id} value={person.id}>
+                          {person.display_name}
+                          {person.department_name ? ` · ${person.department_name}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
                 <div className="mt-2 flex gap-1.5">
                   {[
                     { v: "new" as const, label: "Как новичок" },
@@ -900,16 +910,25 @@ function ServerSwitch() {
       <p className="mt-1 text-xs text-tg-hint">{tx(
         "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.",
       )}</p>
-      <input
-        aria-label="https://backup.example.ru"
-        value={value}
-        onChange={(e) => setValue(e.target.value.trim())}
-        placeholder="https://backup.example.ru"
-        inputMode="url"
-        autoCapitalize="none"
-        autoCorrect="off"
-        className="mt-2 min-h-10 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
-      />
+      <FormField
+        id="api-base"
+        label={tx("Резервный адрес сервера")}
+        hint="https://backup.example.ru"
+        className="mt-2"
+      >
+        {(field) => (
+          <input
+            {...field}
+            value={value}
+            onChange={(e) => setValue(e.target.value.trim())}
+            placeholder="https://backup.example.ru"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            className="min-h-10 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
+          />
+        )}
+      </FormField>
       <button
         type="button"
         onClick={() => {

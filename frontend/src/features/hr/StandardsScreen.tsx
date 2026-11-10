@@ -15,6 +15,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import ErrorState from "@/components/ErrorState";
 import Icon, { InlineIcon } from "@/components/Icon";
+import FormField from "@/components/FormField";
 import { CardSkeleton } from "@/components/Skeleton";
 import {
   TRANSLATED_MARK,
@@ -544,56 +545,96 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
         "Пиши как для нового сотрудника: что сделать, в каком порядке и почему.",
       )}</p>
 
-      <label className="mt-3 block text-xs text-tg-hint">{tx("Название")}<input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          maxLength={200}
-          placeholder={tx("Гигиена рук перед сменой")}
-          className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
-        />
-      </label>
+      <FormField
+        id="standard-title"
+        label={tx("Название")}
+        className="mt-3 text-xs text-tg-hint"
+      >
+        {(field) => (
+          <input
+            {...field}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            placeholder={tx("Гигиена рук перед сменой")}
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
       <div className="mt-2 flex gap-2">
-        <label className="w-16 shrink-0 text-xs text-tg-hint">{tx("Значок")}<input
-            value={emoji}
-            onChange={(e) => setEmoji(e.target.value)}
-            maxLength={4}
-            placeholder={tx("Значок")}
-            className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
-          />
-        </label>
-        <label className="min-w-0 flex-1 text-xs text-tg-hint">{tx("Категория")}<select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as StandardCategory)}
-            className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
-          >
-            {(
-              Object.keys(STANDARD_CATEGORY_LABEL) as StandardCategory[]
-            ).map((key) => (
-              <option key={key} value={key}>
-                {STANDARD_CATEGORY_LABEL[key]}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FormField
+          id="standard-emoji"
+          label={tx("Значок")}
+          className="w-16 shrink-0 text-xs text-tg-hint"
+        >
+          {(field) => (
+            <input
+              {...field}
+              value={emoji}
+              onChange={(e) => setEmoji(e.target.value)}
+              maxLength={4}
+              placeholder={tx("Значок")}
+              className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-center text-sm text-tg-text"
+            />
+          )}
+        </FormField>
+        <FormField
+          id="standard-category"
+          label={tx("Категория")}
+          className="min-w-0 flex-1 text-xs text-tg-hint"
+        >
+          {(field) => (
+            <select
+              {...field}
+              value={category}
+              onChange={(e) => setCategory(e.target.value as StandardCategory)}
+              className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
+            >
+              {(
+                Object.keys(STANDARD_CATEGORY_LABEL) as StandardCategory[]
+              ).map((key) => (
+                <option key={key} value={key}>
+                  {STANDARD_CATEGORY_LABEL[key]}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
       </div>
 
-      <label className="mt-2 block text-xs text-tg-hint">{tx("Короткое описание (для списка)")}<input
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          maxLength={200}
-          className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
-        />
-      </label>
+      <FormField
+        id="standard-summary"
+        label={tx("Короткое описание (для списка)")}
+        className="mt-2 text-xs text-tg-hint"
+      >
+        {(field) => (
+          <input
+            {...field}
+            value={summary}
+            onChange={(e) => setSummary(e.target.value)}
+            maxLength={200}
+            className="mt-1 min-h-10 w-full rounded-tile bg-tg-bg/70 px-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
-      <label className="mt-2 block text-xs text-tg-hint">{tx("Инструкция")}<textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={5}
-          placeholder={tx("1. Помой руки…")}
-          className="mt-1 w-full rounded-tile bg-tg-bg/70 p-2 text-sm text-tg-text"
-        />
-      </label>
+      <FormField
+        id="standard-body"
+        label={tx("Инструкция")}
+        className="mt-2 text-xs text-tg-hint"
+      >
+        {(field) => (
+          <textarea
+            {...field}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={5}
+            placeholder={tx("1. Помой руки…")}
+            className="mt-1 w-full rounded-tile bg-tg-bg/70 p-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
       <label className="mt-2 block text-xs text-tg-hint">
         Порог сдачи: {passPercent}%

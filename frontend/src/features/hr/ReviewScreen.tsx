@@ -11,6 +11,7 @@ import { humanizeApiError } from "@/api/client";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { PhotoThumbs } from "@/components/PhotoAttach";
 import ErrorState from "@/components/ErrorState";
+import FormField from "@/components/FormField";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -281,15 +282,24 @@ function ReviewRow({
 
       {reworkOpen && (
         <div className="mt-2">
-          <textarea
-            aria-label={tx("Что переделать — коротко и по делу")}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={2}
-            maxLength={500}
-            placeholder={tx("Что переделать — коротко и по делу")}
-            className="w-full rounded-tile bg-tg-secondary-bg p-2 text-xs text-tg-text"
-          />
+          <FormField
+            id="review-rework-comment"
+            label={tx("Что переделать — коротко и по делу")}
+            required
+            labelClassName="sr-only"
+          >
+            {(field) => (
+              <textarea
+                {...field}
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder={tx("Что переделать — коротко и по делу")}
+                className="w-full rounded-tile bg-tg-secondary-bg p-2 text-xs text-tg-text"
+              />
+            )}
+          </FormField>
           <button
             type="button"
             disabled={review.isPending || !comment.trim()}
