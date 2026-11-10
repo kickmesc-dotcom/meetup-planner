@@ -27,7 +27,9 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
           <Icon name="back" size={20} />
         </button>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">{title}</div>
+          {/* Заголовок подраздела — `h1`: каждый экран кабинета открывается
+              отдельно, и у него должен быть заголовок первого уровня. */}
+          <h1 className="text-sm font-semibold truncate">{title}</h1>
           {subtitle && (
             <div className="text-xs text-tg-hint truncate">{subtitle}</div>
           )}

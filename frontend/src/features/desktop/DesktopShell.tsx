@@ -133,9 +133,12 @@ export default function DesktopShell({
             <Icon name={manage ? "layout" : "shift"} size={18} />
           </span>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-tg-text">
+            {/* Заголовок зоны — `h1` каркаса: на десктопе `ManageZone` свою
+                шапку не рисует, и без этого у кабинета не было заголовка
+                первого уровня вообще. */}
+            <h1 className="truncate text-sm font-semibold text-tg-text">
               {manage ? tx("Управление") : "SemiTask"}
-            </div>
+            </h1>
             <div className="truncate text-2xs text-tg-hint">
               {manage ? tx("Кабинет руководителя") : tx("Смена и команда")}
             </div>

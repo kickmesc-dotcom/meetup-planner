@@ -89,9 +89,12 @@ export default function ManageZone({
           настройки и живут в «Настройках». */}
       <header className="flex items-center gap-2 border-b border-tg-secondary-bg px-3 py-2 sm:px-4">
         <div className="hidden min-w-0 flex-1 md:block">
-          <div className="truncate text-sm font-semibold text-tg-text">
+          {/* h1 не только для красоты: кабинет — самостоятельный экран, и до
+              этого прохода его заголовок был `div` — скринридер не находил
+              заголовок страницы и начинал чтение с середины. */}
+          <h1 className="truncate text-sm font-semibold text-tg-text">
             {tx("Управление")}
-          </div>
+          </h1>
           <div className="truncate text-2xs text-tg-hint">
             {tx("Кабинет руководителя")}
           </div>

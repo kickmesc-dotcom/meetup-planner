@@ -41,6 +41,17 @@ describe("фокус в полях ввода", () => {
     expect(block?.[0]).not.toContain("outline: none");
   });
 
+  it("фокус не прячется под липкими шапками", () => {
+    // §2.4.11 `focus-not-obscured`: без scroll-margin браузер прокручивает к
+    // элементу вплотную к верху, и липкая шапка (лента, кабинет) закрывает
+    // кольцо фокуса — с клавиатуры непонятно, где ты.
+    // Границы блока — до закрывающей скобки на своей строке: внутри правила
+    // есть комментарий на несколько строк, и счётчик символов его не переживёт.
+    const block = css.match(/:focus-visible \{[\s\S]*?\n\}/);
+    expect(block).not.toBeNull();
+    expect(block?.[0]).toContain("scroll-margin-block");
+  });
+
   it("в разметке нет `focus:outline-none`: он перебивает общее кольцо", () => {
     const offenders: string[] = [];
     for (const [path, raw] of Object.entries(sources)) {

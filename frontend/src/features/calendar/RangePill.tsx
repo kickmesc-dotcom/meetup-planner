@@ -60,6 +60,20 @@ export default function RangePill({
         e.stopPropagation();
         onTap();
       }}
+      // Плашка была `div` с `onClick`: мышью открывалась, с клавиатуры — нет.
+      // Теперь это кнопка по смыслу: Enter/Space открывают тот же редактор,
+      // где границы и статус меняются обычными кнопками. Это и есть
+      // клавиатурная альтернатива перетаскиванию (§2.5.7
+      // `dragging-alternative`): жест ничего не добавляет, чего нельзя
+      // сделать из редактора.
+      role="button"
+      tabIndex={0}
+      aria-label={`${range.note ?? statusLabel(range.status)}, ${statusLabelShort(range.status)}`}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onTap();
+      }}
       className="absolute top-1/2 -translate-y-1/2 h-7 px-2 text-white text-xs font-medium flex items-center shadow-raised select-none"
       style={{
         left,

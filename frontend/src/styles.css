@@ -273,6 +273,12 @@ header .text-base.font-medium {
 :focus-visible {
   outline: 2px solid var(--tg-theme-link-color, #1c6fb8);
   outline-offset: 2px;
+  /* §2.4.11 `focus-not-obscured`: в ленте и кабинете есть липкие шапки, и
+     браузер, прокручивая к элементу при фокусе с клавиатуры, ставил его
+     вплотную к верху — под шапку. Отступ учитывает `scrollIntoView`, поэтому
+     кольцо фокуса остаётся видимым; на тапы правило не влияет, потому что
+     висит на `:focus-visible`. */
+  scroll-margin-block: 5rem;
 }
 
 /* Текстовые поля. Здесь стоял `outline: none` — «чтобы не было второго кольца

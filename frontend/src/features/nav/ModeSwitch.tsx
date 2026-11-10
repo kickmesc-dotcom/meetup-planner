@@ -60,7 +60,10 @@ export default function ModeSwitch({ className }: { className?: string }) {
             }}
             className={[
               "relative flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-xs transition-colors",
-              active ? "font-semibold text-tg-text" : "text-tg-hint",
+              // Неактивная зона — `text-tg-hint` на `secondary-bg/80`:
+              // axe дал ниже AA. Цвет текста одинаковый, состояние читается
+              // по подложке и весу — как у сегмент-контрола iOS.
+              active ? "font-semibold text-tg-text" : "text-tg-text/90",
             ].join(" ")}
           >
             {active && (

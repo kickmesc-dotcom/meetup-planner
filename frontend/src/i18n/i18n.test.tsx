@@ -100,7 +100,9 @@ describe("переключение языка", () => {
     );
     expect(screen.getByTestId("probe").textContent).toBe("События");
 
-    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    // Имя кнопки — «English EN»: видимый код входит в доступное имя
+    // (§2.5.3 label-in-name), поэтому ищем по части, а не по точной строке.
+    fireEvent.click(screen.getByRole("button", { name: /English/ }));
 
     expect(screen.getByTestId("probe").textContent).toBe("Events");
     expect(reload).not.toHaveBeenCalled();
@@ -138,11 +140,11 @@ describe("переключение языка", () => {
   it("отмечает выбранный язык для скринридера", () => {
     render(<LanguageSwitcher />);
     expect(
-      screen.getByRole("button", { name: "Русский" }).getAttribute("aria-pressed"),
+      screen.getByRole("button", { name: /Русский/ }).getAttribute("aria-pressed"),
     ).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: "English" }));
+    fireEvent.click(screen.getByRole("button", { name: /English/ }));
     expect(
-      screen.getByRole("button", { name: "English" }).getAttribute("aria-pressed"),
+      screen.getByRole("button", { name: /English/ }).getAttribute("aria-pressed"),
     ).toBe("true");
   });
 });
@@ -150,7 +152,7 @@ describe("переключение языка", () => {
 describe("узбекский пакет организации", () => {
   it("третий язык есть, пока пакет включён", () => {
     render(<LanguageSwitcher />);
-    expect(screen.getByRole("button", { name: "Oʻzbekcha" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Oʻzbekcha/ })).toBeTruthy();
   });
 
   it("выключенный пакет прячет язык, а не гасит кнопку", () => {
@@ -158,8 +160,8 @@ describe("узбекский пакет организации", () => {
     // кнопки просто нет.
     useLocale.setState({ uzPackAvailable: false });
     render(<LanguageSwitcher />);
-    expect(screen.queryByRole("button", { name: "Oʻzbekcha" })).toBeNull();
-    expect(screen.getByRole("button", { name: "English" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Oʻzbekcha/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /English/ })).toBeTruthy();
   });
 
   it("выключение пакета возвращает человека на русский сразу", () => {
@@ -182,7 +184,7 @@ describe("узбекский пакет организации", () => {
         <Probe />
       </>
     );
-    fireEvent.click(screen.getByRole("button", { name: "Oʻzbekcha" }));
+    fireEvent.click(screen.getByRole("button", { name: /Oʻzbekcha/ }));
     expect(screen.getByTestId("probe").textContent).toBe("Voqealar");
     expect(reload).not.toHaveBeenCalled();
   });

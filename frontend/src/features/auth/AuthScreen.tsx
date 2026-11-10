@@ -199,7 +199,9 @@ export default function AuthScreen({
           {/* На входе подсказка ничего не добавляла к полям и только отвлекала:
               режимы регистрации и сброса объясняют правила, вход — нет. */}
           {mode !== "login" && (
-            <p className="mt-1 text-xs leading-snug text-tg-hint">
+            // Подпись режима лежит на полупрозрачной плашке; hint на ней
+            // не дотягивал до AA (axe). Это объяснение, а не декор.
+            <p className="mt-1 text-xs leading-snug text-tg-text">
               {mode === "register" && t("auth.register.hint")}
               {mode === "forgot" && t("auth.forgot.hint")}
             </p>
@@ -222,7 +224,7 @@ export default function AuthScreen({
             <form className="mt-3 space-y-2" onSubmit={submit} noValidate>
               {mode === "register" && (
                 <label className="block">
-                  <span className="text-xs text-tg-hint">{t("auth.name.label")}</span>
+                  <span className="text-xs text-tg-text">{t("auth.name.label")}</span>
                   <input
                     value={name}
                     onChange={(e) => setName(e.target.value)}
@@ -235,7 +237,7 @@ export default function AuthScreen({
               )}
 
               <label className="block">
-                <span className="text-xs text-tg-hint">
+                <span className="text-xs text-tg-text">
                   {t("auth.email.label")} <span aria-hidden>*</span>
                 </span>
                 <input
@@ -259,7 +261,7 @@ export default function AuthScreen({
                 // `label htmlFor` + отдельная кнопка-глаз: обёртка-label
                 // перехватывала бы клик по глазу и уводила фокус в поле.
                 <div>
-                  <label htmlFor="auth-password" className="block text-xs text-tg-hint">
+                  <label htmlFor="auth-password" className="block text-xs text-tg-text">
                     {t("auth.password.label")} <span aria-hidden>*</span>
                   </label>
                   <div className="relative mt-1">
@@ -311,7 +313,9 @@ export default function AuthScreen({
               </button>
               {/* §8 `required-indicators`: звёздочка без расшифровки — загадка,
                   поэтому подпись идёт под формой, а не только в скринридере. */}
-              <p className="text-2xs text-tg-hint">{t("auth.requiredNote")}</p>
+              {/* Сноска про звёздочку — единственное объяснение, зачем она.
+                  На плашке `secondary-bg/40` hint не дотягивал до AA. */}
+              <p className="text-2xs text-tg-text">{t("auth.requiredNote")}</p>
             </form>
           )}
 
@@ -346,7 +350,7 @@ export default function AuthScreen({
               size={16}
               className="mt-0.5 shrink-0 text-tg-hint"
             />
-            <p className="min-w-0 flex-1 text-xs leading-snug text-tg-hint">
+            <p className="min-w-0 flex-1 text-xs leading-snug text-tg-text">
               {t("auth.telegramNote")}
             </p>
           </div>

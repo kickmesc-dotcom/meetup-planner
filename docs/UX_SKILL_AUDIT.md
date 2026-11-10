@@ -27,22 +27,22 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `color-contrast` | ✅ | этап S: 12 пар в двух темах считает `theme.contrast.test.ts` (кнопка, подсказки, основной текст, ссылки, ошибки, выбранный фильтр) | — |
 | `focus-states` | ✅ | `styles.css` кольцо 2px; `focus.guard.test.ts` запрещает `focus:outline-none` | — |
 | `alt-text` | ⚠️ | аватары `alt=""` (декоративные, имя рядом) — верно; фото в лайтбоксе проверить | O |
-| `aria-labels` | ⚠️ | у `Icon` всегда `aria-hidden`; не все иконочные кнопки имеют имя | N |
-| `icon-context` | ⚠️ | декоративные скрыты; у Controls нет единого правила «иконка = имя» | N |
-| `keyboard-nav` | ⚠️ | фокус виден; порядок табов не проверен на живом экране | N |
+| `aria-labels` | ✅ | у `Icon` всегда `aria-hidden`; иконочная кнопка без текста обязана иметь имя — страж `a11y.guard.test.ts` | N |
+| `icon-context` | ✅ | единое правило «иконка без текста = имя»; страж ловит нарушение | N |
+| `keyboard-nav` | ⚠️ | фокус виден; `RangePill` управляется Enter/Space; порядок табов на живом экране не проверен | N |
 | `form-labels` | ✅ | этап P: у всех 44 полей без видимой подписи есть `aria-label`; шесть оставшихся в отчёте сканера получают имя через `Field`/`Checkbox` label | — |
 | `skip-links` | ✅ | ссылка «К содержимому» первой в оболочке, видна по фокусу | — |
-| `heading-hierarchy` | ⚠️ | этап N: профиль получил `h1`; в кабинете заголовок пока `div` — остаётся в N | N |
+| `heading-hierarchy` | ⚠️ | `h1` на кабинете, зоне сайдбара и подразделах; `h2` у секций — этап 3 | N |
 | `color-not-only` | ✅ | статусы = цвет + текст/иконка | — |
 | `dynamic-type` | ⚠️ | 200 %: базовый шрифт 16 px, на экране входа переполнения нет; внутренние экраны без входа не проверить | S |
 | `reduced-motion` | ✅ | `motion-reduce` + `@media (prefers-reduced-motion)`; `press.guard` | — |
 | `voiceover-sr` | ✅ | этап P: тосты — `role="status"`, ошибки форм — `role="alert"`, работа кнопок — `aria-busy` | — |
 | `escape-routes` | ✅ | этап N: Escape, кнопка «Закрыть» 44×44, `aria-modal`; тест `BottomSheet.test.tsx` | — |
 | `keyboard-shortcuts` | — | авторских горячих клавиш нет | — |
-| `focus-not-obscured` | ⚠️ | липкие шапки есть (`HrFeedScreen`), фокус под ними не проверялся | N |
-| `focus-not-obscured-enhanced` | ⚠️ | то же, AAA-уровень | N |
+| `focus-not-obscured` | ✅ | `scroll-margin-block: 5rem` в глобальном `:focus-visible` + страж `focus.guard.test.ts` | N |
+| `focus-not-obscured-enhanced` | ⚠️ | отступ 5rem для AA; AAA-проверка на живых экранах не делалась | N |
 | `focus-appearance` | ✅ | кольцо 2 px с отступом 2 px, контраст 5.23:1 / 5.87:1 (≥ 3:1), закреплено тестом | — |
-| `dragging-alternative` | ⚠️ | календарь: drag есть, кнопочные альтернативы частично | N |
+| `dragging-alternative` | ✅ | `RangePill` — кнопка (Enter/Space, `aria-label`), границы правятся кнопками в `RangeEditorSheet`; drag — быстрый путь | N |
 | `web-target-size` | ✅ | 24×24 AA выполняется (минимум в коде — 32px) | M |
 | `consistent-help` | ⚠️ | подсказки в разных местах экранов | R |
 | `redundant-entry` | ⚠️ | онбординг и профиль местами спрашивают одно и то же | R |

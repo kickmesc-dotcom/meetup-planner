@@ -49,7 +49,10 @@ export default function LanguageSwitcher({
             key={option}
             type="button"
             aria-pressed={active}
-            aria-label={t(LABELS[option])}
+            // §2.5.3 `label-in-name`: видимый текст — «RU/EN/UZ», поэтому имя
+            // обязано его содержать. Было просто «Русский», и человек,
+            // который диктует «нажми RU», не находил кнопку по имени.
+            aria-label={`${t(LABELS[option])} ${option.toUpperCase()}`}
             title={t(LABELS[option])}
             onClick={() => {
               if (active) return;
@@ -62,7 +65,10 @@ export default function LanguageSwitcher({
             // значило бы выдавить заголовок шапки; промах по вертикали здесь и
             // есть основной.
             "min-h-11 min-w-9 rounded-full px-2 text-2xs font-semibold uppercase transition-colors",
-              active ? "bg-tg-bg text-tg-text" : "text-tg-hint",
+              // Неактивная кнопка была `text-tg-hint` на полупрозрачном
+              // secondary: axe дал 4.2:1 — ниже AA для текста 11 px.
+              // Различие состояний держат фон и кольцо, а не бледность.
+              active ? "bg-tg-bg text-tg-text" : "text-tg-text",
             ].join(" ")}
           >
             {option}
