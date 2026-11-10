@@ -7,6 +7,7 @@ import {
 } from "@/api/game";
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
 import { haptic, showAlert } from "@/tg/webapp";
 
 import { useTx } from "@/i18n";
@@ -105,29 +106,56 @@ export default function HolidaysCard() {
 
       <div className="mt-3 space-y-2 border-t border-tg-bg/60 pt-2">
         <div className="flex gap-2">
-          <input
-            aria-label={tx("День")}
-            value={day}
-            onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
-            inputMode="numeric"
-            placeholder={tx("ДД")}
-            className="w-14 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-          />
-          <input
-            aria-label={tx("Месяц")}
-            value={month}
-            onChange={(e) => setMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
-            inputMode="numeric"
-            placeholder={tx("ММ")}
-            className="w-14 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-          />
-          <input
-            aria-label={tx("Что за праздник")}
-            value={message}
-            onChange={(e) => setMessage(e.target.value.slice(0, 120))}
-            placeholder={tx("Что за праздник")}
-            className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
-          />
+          <FormField
+            id="holiday-day"
+            label={tx("День")}
+            labelClassName="sr-only"
+            className="w-14"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={day}
+                onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                inputMode="numeric"
+                placeholder={tx("ДД")}
+                className="w-full rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="holiday-month"
+            label={tx("Месяц")}
+            labelClassName="sr-only"
+            className="w-14"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={month}
+                onChange={(e) => setMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                inputMode="numeric"
+                placeholder={tx("ММ")}
+                className="w-full rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="holiday-title"
+            label={tx("Что за праздник")}
+            labelClassName="sr-only"
+            className="min-w-0 flex-1"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={message}
+                onChange={(e) => setMessage(e.target.value.slice(0, 120))}
+                placeholder={tx("Что за праздник")}
+                className="w-full rounded-tile bg-tg-bg/60 px-2 py-1.5 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
         </div>
         <button
           type="button"

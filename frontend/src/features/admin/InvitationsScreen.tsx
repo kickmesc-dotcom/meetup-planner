@@ -17,6 +17,7 @@ import { copyText } from "@/lib/clipboard";
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { fetchDepartments } from "@/api/hr";
 import SubScreen from "./SubScreen";
@@ -175,24 +176,33 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
                       : (row.email ?? tx("без почты"))}
                   </div>
                 </div>
-                <select
-                  aria-label={tx("Роль {name}", { name: row.name })}
-                  value={row.role}
-                  disabled={row.is_self || changeRole.isPending}
-                  onChange={(e) =>
-                    changeRole.mutate({
-                      userId: row.user_id,
-                      role: e.target.value as OrgRole,
-                    })
-                  }
-                  className="min-h-9 shrink-0 rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text disabled:opacity-50"
+                <FormField
+                  id={`member-${row.user_id}-role`}
+                  label={tx("Роль {name}", { name: row.name })}
+                  labelClassName="sr-only"
+                  className="shrink-0"
                 >
-                  {ORG_ROLES.map((value) => (
-                    <option key={value} value={value}>
-                      {ORG_ROLE_LABELS[value]}
-                    </option>
-                  ))}
-                </select>
+                  {(field) => (
+                    <select
+                      {...field}
+                      value={row.role}
+                      disabled={row.is_self || changeRole.isPending}
+                      onChange={(e) =>
+                        changeRole.mutate({
+                          userId: row.user_id,
+                          role: e.target.value as OrgRole,
+                        })
+                      }
+                      className="min-h-9 rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text disabled:opacity-50"
+                    >
+                      {ORG_ROLES.map((value) => (
+                        <option key={value} value={value}>
+                          {ORG_ROLE_LABELS[value]}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </FormField>
               </li>
             ))}
           </ul>
@@ -223,69 +233,86 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
       <section className="space-y-2 rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">{tx("Новая ссылка")}</div>
 
-        <label className="block">
-          <span className="text-xs text-tg-hint">{tx("Почта (необязательно)")}</span>
-          <input
-            type="email"
-            inputMode="email"
-            autoComplete="off"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            maxLength={255}
-            placeholder="name@company.ru"
-            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
-          />
-        </label>
+        <FormField id="invite-email" label={tx("Почта (необязательно)")}>
+          {(field) => (
+            <input
+              {...field}
+              type="email"
+              inputMode="email"
+              autoComplete="off"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              maxLength={255}
+              placeholder="name@company.ru"
+              className="min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
+            />
+          )}
+        </FormField>
 
         <div className="flex gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="text-xs text-tg-hint">{tx("Роль")}</span>
-            <select
-              aria-label={tx("Роль приглашённого")}
-              value={role}
-              onChange={(e) => setRole(e.target.value as OrgRole)}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            >
-              {ORG_ROLES.map((value) => (
-                <option key={value} value={value}>
-                  {ORG_ROLE_LABELS[value]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="w-32">
-            <span className="text-xs text-tg-hint">{tx("Срок")}</span>
-            <select
-              aria-label={tx("Срок приглашения")}
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            >
-              {DAY_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {tx("{value} дн.", { value })}
-                </option>
-              ))}
-            </select>
-          </label>
+          <FormField
+            id="invite-role"
+            label={tx("Роль")}
+            className="min-w-0 flex-1"
+          >
+            {(field) => (
+              <select
+                {...field}
+                value={role}
+                onChange={(e) => setRole(e.target.value as OrgRole)}
+                className="min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              >
+                {ORG_ROLES.map((value) => (
+                  <option key={value} value={value}>
+                    {ORG_ROLE_LABELS[value]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
+          <FormField id="invite-days" label={tx("Срок")} className="w-32">
+            {(field) => (
+              <select
+                {...field}
+                value={days}
+                onChange={(e) => setDays(Number(e.target.value))}
+                className="min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              >
+                {DAY_OPTIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {tx("{value} дн.", { value })}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
         </div>
 
         <div className="flex gap-2">
-          <label className="min-w-0 flex-1">
-            <span className="text-xs text-tg-hint">{tx("Должность (необязательно)")}</span>
-            <input
-              value={position}
-              onChange={(e) => setPosition(e.target.value)}
-              maxLength={120}
-              placeholder={tx("Например, «Бармен»")}
-              aria-label={tx("Должность в приглашении")}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
-            />
-          </label>
-          <label className="w-40">
-            <span className="text-xs text-tg-hint">{tx("Отдел (необязательно)")}</span>
+          <FormField
+            id="invite-position"
+            label={tx("Должность (необязательно)")}
+            className="min-w-0 flex-1"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={position}
+                onChange={(e) => setPosition(e.target.value)}
+                maxLength={120}
+                placeholder={tx("Например, «Бармен»")}
+                className="min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="invite-department"
+            label={tx("Отдел (необязательно)")}
+            className="w-40"
+          >
+            {(field) => (
             <select
-              aria-label={tx("Отдел в приглашении")}
+              {...field}
               value={departmentId ?? ""}
               onChange={(e) =>
                 setDepartmentId(
@@ -301,7 +328,8 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
                 </option>
               ))}
             </select>
-          </label>
+            )}
+          </FormField>
         </div>
 
         <button

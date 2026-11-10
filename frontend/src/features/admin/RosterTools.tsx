@@ -15,6 +15,7 @@ import {
 } from "@/api/hrOps";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
+import FormField from "@/components/FormField";
 import ChevronToggle from "@/components/ChevronToggle";
 import { SkeletonText } from "@/components/Skeleton";
 
@@ -121,51 +122,68 @@ export function AddPersonPanel({
 
       {open && (
         <div className="space-y-2 px-3 pb-3">
-          <label className="block text-xs text-tg-hint">
-            Telegram ID
-            <input
-              type="text"
-              inputMode="numeric"
-              value={tgId}
-              placeholder={tx("например, 123456789")}
-              onChange={(event) =>
-                setTgId(event.target.value.replace(/\D/g, "").slice(0, 15))
-              }
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
-          <label className="block text-xs text-tg-hint">{tx("Имя (необязательно)")}<input
-              type="text"
-              value={name}
-              maxLength={64}
-              placeholder={tx("как показывать в боте")}
-              onChange={(event) => setName(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
-          <label className="block text-xs text-tg-hint">{tx("Подразделение (необязательно)")}<select
-              value={departmentId}
-              onChange={(event) => setDepartmentId(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            >
-              <option value="">{tx("без подразделения")}</option>
-              {(departments.data ?? []).map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.emoji ? `${department.emoji} ` : ""}
-                  {department.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-xs text-tg-hint">{tx("Должность (необязательно)")}<input
-              type="text"
-              value={position}
-              maxLength={64}
-              placeholder={tx("например, су-шеф")}
-              onChange={(event) => setPosition(event.target.value)}
-              className="mt-1 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
+          <FormField id="roster-tg-id" label="Telegram ID">
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                inputMode="numeric"
+                value={tgId}
+                placeholder={tx("например, 123456789")}
+                onChange={(event) =>
+                  setTgId(event.target.value.replace(/\D/g, "").slice(0, 15))
+                }
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField id="roster-name" label={tx("Имя (необязательно)")}>
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                value={name}
+                maxLength={64}
+                placeholder={tx("как показывать в боте")}
+                onChange={(event) => setName(event.target.value)}
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="roster-department"
+            label={tx("Подразделение (необязательно)")}
+          >
+            {(field) => (
+              <select
+                {...field}
+                value={departmentId}
+                onChange={(event) => setDepartmentId(event.target.value)}
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              >
+                <option value="">{tx("без подразделения")}</option>
+                {(departments.data ?? []).map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.emoji ? `${department.emoji} ` : ""}
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
+          <FormField id="roster-position" label={tx("Должность (необязательно)")}>
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                value={position}
+                maxLength={64}
+                placeholder={tx("например, су-шеф")}
+                onChange={(event) => setPosition(event.target.value)}
+                className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
           <div>
             <div className="text-xs text-tg-hint">{tx("Должность в боте (роль)")}</div>
             <div className="mt-1 flex flex-wrap gap-1.5">
