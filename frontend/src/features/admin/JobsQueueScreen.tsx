@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import FormField from "@/components/FormField";
 
 import {
   cancelScheduledJob,
@@ -275,13 +276,22 @@ function JobRow({
       </div>
       {editing && editable && (
         <div className="mt-2 flex items-center gap-2">
-          <input
-            aria-label={tx("Новое время")}
-            type="datetime-local"
-            value={localValue}
-            onChange={(e) => setLocalValue(e.target.value)}
-            className="flex-1 rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
-          />
+          <FormField
+            id="job-edit-time"
+            label={tx("Новое время")}
+            labelClassName="sr-only"
+            className="flex-1"
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="datetime-local"
+                value={localValue}
+                onChange={(e) => setLocalValue(e.target.value)}
+                className="w-full rounded-tile bg-tg-bg/70 px-2 py-1.5 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+              />
+            )}
+          </FormField>
           <button
             type="button"
             onClick={() => {

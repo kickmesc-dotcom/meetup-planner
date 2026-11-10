@@ -16,6 +16,7 @@
  * оплатил» не становится бесплатным безлимитом.
  */
 import { useState } from "react";
+import FormField from "@/components/FormField";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelPlatformInvoice,
@@ -247,13 +248,21 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
 
           <div className="space-y-2">
             <div className="text-sm font-semibold text-tg-text">{tx("Клиенты")}</div>
-            <input
-              aria-label={tx("Поиск по названию или коду")}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={tx("Поиск по названию или коду")}
-              className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
-            />
+            <FormField
+              id="platform-search"
+              label={tx("Поиск по названию или коду")}
+              labelClassName="sr-only"
+            >
+              {(field) => (
+                <input
+                  {...field}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={tx("Поиск по названию или коду")}
+                  className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
+                />
+              )}
+            </FormField>
             {(orgs.data?.items ?? []).map((org) => (
               <OrgRow
                 key={org.id}

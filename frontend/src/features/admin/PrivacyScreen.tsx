@@ -14,6 +14,7 @@
  * что реально делает планировщик, а не по тексту на странице.
  */
 import { useState } from "react";
+import FormField from "@/components/FormField";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelOrgDeletion,
@@ -217,18 +218,27 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                     { days: String(data.retention.deletion_grace_days) },
                   )}
                 </p>
-                <label className="mt-2 block text-xs font-semibold text-tg-hint">
-                  {tx("Код организации")}
-                  <input
-                    value={confirm}
-                    onChange={(event) => setConfirm(event.target.value)}
-                    placeholder={data.slug}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
-                  />
-                </label>
+                <FormField
+                  id="privacy-confirm-slug"
+                  label={tx("Код организации")}
+                  hint={tx("Введите код {slug}, чтобы подтвердить — это необратимо.", {
+                    slug: data.slug,
+                  })}
+                  labelClassName="mt-2 block text-xs font-semibold text-tg-hint"
+                >
+                  {(field) => (
+                    <input
+                      {...field}
+                      value={confirm}
+                      onChange={(event) => setConfirm(event.target.value)}
+                      placeholder={data.slug}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
+                    />
+                  )}
+                </FormField>
                 <p className="mt-1 text-2xs text-tg-hint">
                   {tx("Введите код {slug}, чтобы подтвердить — это необратимо.", {
                     slug: data.slug,

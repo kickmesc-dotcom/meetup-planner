@@ -17,6 +17,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { Spinner } from "@/components/Spinner";
+import FormField from "@/components/FormField";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { SkeletonText } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
@@ -180,20 +181,28 @@ export default function SpaceRestartScreen({ onBack }: Props) {
           {draft.mode === "once" && (
             <div>
               <div className="text-xs text-tg-hint mb-1">{tx("Дата и время (локальные)")}</div>
-              <input
-                aria-label={tx("Дата и время")}
-                type="datetime-local"
-                value={isoToLocalInput(draft.at)}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    at: e.target.value
-                      ? new Date(e.target.value).toISOString()
-                      : null,
-                  })
-                }
-                className="w-full rounded-tile bg-tg-bg/60 px-2 py-2 text-sm text-tg-text"
-              />
+              <FormField
+                id="restart-at"
+                label={tx("Дата и время")}
+                labelClassName="sr-only"
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    type="datetime-local"
+                    value={isoToLocalInput(draft.at)}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        at: e.target.value
+                          ? new Date(e.target.value).toISOString()
+                          : null,
+                      })
+                    }
+                    className="w-full rounded-tile bg-tg-bg/60 px-2 py-2 text-sm text-tg-text"
+                  />
+                )}
+              </FormField>
             </div>
           )}
 

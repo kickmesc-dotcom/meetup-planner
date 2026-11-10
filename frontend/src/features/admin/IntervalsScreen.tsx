@@ -14,6 +14,7 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import FormField from "@/components/FormField";
 import Icon, { type IconName } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 
@@ -78,14 +79,23 @@ export default function IntervalsScreen({ onBack }: Props) {
         hint={tx("Раз в N минут бот проверяет, кому пора напомнить о встрече.")}
       >
         <div className="flex items-center gap-2">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={String(tick)}
-            onChange={(e) => setTick(Number(e.target.value.replace(/[^0-9]/g, "")))}
-            className="w-24 rounded-tile bg-tg-bg/70 px-2 py-2 text-center text-sm tabular-nums text-tg-text outline-none border border-transparent focus:border-tg-link"
-            aria-label={tx("Интервал напоминаний, минут")}
-          />
+          <FormField
+            id="reminder-tick"
+            label={tx("Интервал напоминаний, минут")}
+            labelClassName="sr-only"
+            className="w-24"
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="text"
+                inputMode="numeric"
+                value={String(tick)}
+                onChange={(e) => setTick(Number(e.target.value.replace(/[^0-9]/g, "")))}
+                className="w-full rounded-tile bg-tg-bg/70 px-2 py-2 text-center text-sm tabular-nums text-tg-text outline-none border border-transparent focus:border-tg-link"
+              />
+            )}
+          </FormField>
           <span className="text-xs text-tg-hint">
             {tx("мин (1–360)")}
           </span>

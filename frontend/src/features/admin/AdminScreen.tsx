@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchDashboard } from "@/api/hr";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
+import FormField from "@/components/FormField";
 import AttentionScreen from "./AttentionScreen";
 import AttentionStrip from "./AttentionStrip";
 import AppTextsScreen from "./AppTextsScreen";
@@ -702,15 +703,23 @@ export default function AdminScreen({
           size={18}
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tg-hint"
         />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={tx("Поиск: поручения, тексты, прокси…")}
-          aria-label={tx("Поиск по разделам")}
-          data-testid="admin-search"
-          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg pl-10 pr-3 text-sm text-tg-text placeholder:text-tg-hint"
-        />
+        <FormField
+          id="admin-search"
+          label={tx("Поиск по разделам")}
+          labelClassName="sr-only"
+        >
+          {(field) => (
+            <input
+              {...field}
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={tx("Поиск: поручения, тексты, прокси…")}
+              data-testid="admin-search"
+              className="min-h-11 w-full rounded-tile bg-tg-secondary-bg pl-10 pr-3 text-sm text-tg-text placeholder:text-tg-hint"
+            />
+          )}
+        </FormField>
       </div>
 
       {/* Сводка стоит выше списка разделов и прячется только при поиске:

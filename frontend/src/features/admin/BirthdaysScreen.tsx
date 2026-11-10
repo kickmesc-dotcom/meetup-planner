@@ -13,6 +13,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { ListSkeleton } from "@/components/Skeleton";
 import { Checkbox, Toggle as TgToggle } from "@/components/Checkbox";
 import { Spinner } from "@/components/Spinner";
+import FormField from "@/components/FormField";
 import Icon, { InlineIcon } from "@/components/Icon";
 import SubScreen from "./SubScreen";
 import HolidaysCard from "./HolidaysCard";
@@ -189,20 +190,23 @@ function BirthdaysForm({
             <div className="text-sm font-semibold text-tg-text">{r.display_name}</div>
 
             <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
-              <label className="flex flex-col gap-1">
-                <span className="text-xs text-tg-hint">
-                  {tx("Дата рождения")}
-                </span>
-                <input
-                  type="date"
-                  value={d.bday ?? ""}
-                  onChange={(e) => {
-                    haptic("selection");
-                    patch(r.user_id, { bday: e.target.value || null });
-                  }}
-                  className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
-                />
-              </label>
+              <FormField
+                id={`bday-${r.user_id}`}
+                label={tx("Дата рождения")}
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    type="date"
+                    value={d.bday ?? ""}
+                    onChange={(e) => {
+                      haptic("selection");
+                      patch(r.user_id, { bday: e.target.value || null });
+                    }}
+                    className="rounded-tile bg-tg-bg/70 px-2 py-2 text-sm text-tg-text outline-none border border-transparent focus:border-tg-link"
+                  />
+                )}
+              </FormField>
               <div className="pb-2">
                 <Checkbox
                   size="sm"
