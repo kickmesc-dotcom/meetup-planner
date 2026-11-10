@@ -211,7 +211,10 @@ export default function MyTasksScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <div className="flex items-start justify-between gap-2">
+        {/* `flex-wrap`: при 200 % системного шрифта блок иконочных кнопок
+            (их `min-w-11` в rem тоже удваивается) шире оставшегося места —
+            пусть уходит на вторую строку, а не выпихивает шапку за край. */}
+        <div className="flex flex-wrap items-start justify-between gap-2">
           {/* VISUAL_AUDIT P3.17: плашка стояла в одной строке с приветствием.
               На узком экране (и при крупном системном шрифте) три кнопки +
               «🛠 Разработчик» съедали всю ширину, и вместо имени оставалось
@@ -230,7 +233,9 @@ export default function MyTasksScreen() {
               </div>
             )}
           </div>
-          <span className="flex shrink-0 items-center gap-1.5">
+          {/* `max-w-full` вместо `shrink-0`: при 200 % четыре кнопки по 88 px
+              шире экрана, и без сжатия контейнер выталкивал шапку за край. */}
+          <span className="flex min-w-0 max-w-full flex-wrap items-center gap-1.5">
             {/* «Спросить» в шапке смены: вопрос возникает в работе, а не в
                 профиле, поэтому вход должен быть здесь. */}
             <button
@@ -292,7 +297,7 @@ export default function MyTasksScreen() {
             ? ` · ${tx("задач {count}", { count: open.length })}${overdue ? `, ${tx("просрочено {count}", { count: overdue })}` : ""}`
             : ""}
         </p>
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
           {[
             { v: false, label: tx("Активные") },
             { v: true, label: tx("Все") },
@@ -312,7 +317,7 @@ export default function MyTasksScreen() {
                 // ссылочный цвет даёт 3.1:1 — ниже AA для 12px.
                 showClosed === o.v
                   ? "bg-tg-link/15 font-medium text-tg-text"
-                  : "bg-tg-secondary-bg text-tg-hint",
+                  : "bg-tg-secondary-bg text-tg-text",
               ].join(" ")}
             >
               {o.label}
@@ -326,7 +331,7 @@ export default function MyTasksScreen() {
               haptic("selection");
               setTab("issues");
             }}
-            className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
+            className="ml-auto inline-flex min-h-11 items-center gap-1 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
           >
             <Icon name="alert" size={14} />
             {tx("Проблемы")}
@@ -342,7 +347,7 @@ export default function MyTasksScreen() {
               haptic("light");
               setQuickOpen(true);
             }}
-            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-full bg-tg-secondary-bg px-3 text-left text-xs text-tg-hint"
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-full bg-tg-secondary-bg px-3 text-left text-xs text-tg-text"
           >
             <Icon name="plus" size={15} className="shrink-0 text-tg-text" />
             <span className="min-w-0 flex-1 truncate">

@@ -171,6 +171,20 @@ export async function mockSignedInApi(page: Page): Promise<void> {
     if (path === "/api/org-setup") return json(ORG);
     if (path === "/api/me/ui-prefs") return json(PREFS);
     if (path === "/api/meta") return json({ ok: true });
+    // Лента и её фильтры — объекты, а не списки: с пустым `[]` экран читает
+    // `filters.departments.find` у `undefined` и падает в `ErrorBoundary`.
+    if (path === "/api/feed/filters") {
+      return json({
+        scope: "all",
+        can_filter: false,
+        kinds: [],
+        employees: [],
+        departments: [],
+      });
+    }
+    if (path === "/api/feed") {
+      return json({ items: [], can_filter: false, scope: "all" });
+    }
     // Остальное — пустой список: экранам достаточно формы и навигации, а
     // выдуманные записи пришлось бы поддерживать вместе с разметкой.
     return json([]);

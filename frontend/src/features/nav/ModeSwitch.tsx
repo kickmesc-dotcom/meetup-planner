@@ -59,7 +59,10 @@ export default function ModeSwitch({ className }: { className?: string }) {
               setMode(zone.id);
             }}
             className={[
-              "relative flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-full px-3 text-xs transition-colors",
+              // `min-w-0` + перенос подписи: при 200 % системного шрифта
+              // «Управление» шире своей половины контрола, и без переноса
+              // контрол выпихивал шапку за правый край (§1.4.4).
+              "relative flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1 text-center text-xs leading-tight transition-colors",
               // Неактивная зона — `text-tg-hint` на `secondary-bg/80`:
               // axe дал ниже AA. Цвет текста одинаковый, состояние читается
               // по подложке и весу — как у сегмент-контрола iOS.
@@ -75,9 +78,11 @@ export default function ModeSwitch({ className }: { className?: string }) {
             )}
             {/* Иконка декоративная: подпись рядом, и скринридер не должен
                 читать её отдельным словом. */}
-            <span className="relative flex items-center gap-1.5">
+            <span className="relative flex min-w-0 items-center gap-1.5">
               <Icon name={zone.icon} size={15} />
-              <span className="whitespace-nowrap">{tx(zone.label)}</span>
+              {/* Без `whitespace-nowrap`: слово переносится, но не обрезается.
+                  Обрезка была бы потерей содержимого, а не компактностью. */}
+              <span className="min-w-0 break-words">{tx(zone.label)}</span>
             </span>
           </button>
         );

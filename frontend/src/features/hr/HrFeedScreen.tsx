@@ -379,10 +379,12 @@ export default function HrFeedScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <div className="flex items-baseline justify-between gap-2">
+        {/* `flex-wrap`: при 200 % шрифта «События смены» и плашка масштаба
+            вместе шире экрана — плашка уходит на свою строку. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-lg font-semibold text-tg-text">{tx("События смены")}</h1>
           {feed && (
-            <span className="shrink-0 rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-hint">
+            <span className="min-w-0 break-words rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-hint">
               {tx(SCOPE_TITLE[feed.scope])}
             </span>
           )}

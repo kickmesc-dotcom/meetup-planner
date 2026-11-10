@@ -34,7 +34,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `skip-links` | ✅ | ссылка «К содержимому» первой в оболочке, видна по фокусу | — |
 | `heading-hierarchy` | ⚠️ | `h1` на кабинете, зоне сайдбара и подразделах; `h2` у секций — этап 3 | N |
 | `color-not-only` | ✅ | статусы = цвет + текст/иконка | — |
-| `dynamic-type` | ⚠️ | 200 %: базовый шрифт 16 px, на экране входа переполнения нет; внутренние экраны без входа не проверить | S |
+| `dynamic-type` | ✅ | 200 %: `e2e/zoom.spec.ts` — 9 экранов, выхода за правый край нет; правила переноса в шапках закреплены | S |
 | `reduced-motion` | ✅ | `motion-reduce` + `@media (prefers-reduced-motion)`; `press.guard` | — |
 | `voiceover-sr` | ✅ | этап P: тосты — `role="status"`, ошибки форм — `role="alert"`, работа кнопок — `aria-busy` | — |
 | `escape-routes` | ✅ | этап N: Escape, кнопка «Закрыть» 44×44, `aria-modal`; тест `BottomSheet.test.tsx` | — |
