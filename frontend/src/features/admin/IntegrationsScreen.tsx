@@ -33,6 +33,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import { useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
 
@@ -272,8 +273,9 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
             disabled={createKey.isPending || keyName.trim().length === 0}
             aria-busy={createKey.isPending}
             onClick={() => createKey.mutate()}
-            className="min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
+            {createKey.isPending && <Spinner size={14} />}
             {createKey.isPending ? tx("Создаём…") : tx("Создать ключ")}
           </button>
         </div>

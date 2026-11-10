@@ -10,7 +10,9 @@ import {
 } from "@/api/menu";
 import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
+import FormField from "@/components/FormField";
 import { ListSkeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import MenuList from "@/features/menu/MenuList";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
@@ -209,58 +211,85 @@ function MenuForm({
         });
       }}
     >
-      <Field label={tx("Название")}>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          maxLength={160}
-          placeholder={tx("Например: Борщ с пампушкой")}
-          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
-        />
-      </Field>
+      <FormField id="menu-name" label={tx("Название")} required>
+        {(field) => (
+          <input
+            {...field}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={160}
+            placeholder={tx("Например: Борщ с пампушкой")}
+            className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
-      <Field label={tx("Группа")} hint={tx("Пусто — общий список «Меню»")}>
-        <input
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          maxLength={64}
-          list="menu-categories"
-          placeholder={tx("Супы, Горячее, Бар")}
-          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
-        />
-        <datalist id="menu-categories">
-          {categories.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-      </Field>
+      <FormField
+        id="menu-category"
+        label={tx("Группа")}
+        hint={tx("Пусто — общий список «Меню»")}
+      >
+        {(field) => (
+          <>
+            <input
+              {...field}
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              maxLength={64}
+              list="menu-categories"
+              placeholder={tx("Супы, Горячее, Бар")}
+              className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
+            />
+            <datalist id="menu-categories">
+              {categories.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </>
+        )}
+      </FormField>
 
-      <Field label={tx("Цена, ₽")} hint={tx("Оставь пустой — будет «по запросу»")}>
-        <input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          inputMode="numeric"
-          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
-        />
-      </Field>
+      <FormField
+        id="menu-price"
+        label={tx("Цена, ₽")}
+        hint={tx("Оставь пустой — будет «по запросу»")}
+      >
+        {(field) => (
+          <input
+            {...field}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            inputMode="numeric"
+            className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
-      <Field label={tx("Описание")} hint={tx("Состав или подача — по желанию")}>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={300}
-          rows={2}
-          className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text"
-        />
-      </Field>
+      <FormField
+        id="menu-description"
+        label={tx("Описание")}
+        hint={tx("Состав или подача — по желанию")}
+      >
+        {(field) => (
+          <textarea
+            {...field}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={300}
+            rows={2}
+            className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
 
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={!canSave}
-          className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50 press"
+          aria-busy={saving}
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50 press"
         >
+          {saving && <Spinner size={14} />}
           {saving ? tx("Сохраняю…") : tx("Сохранить")}
         </button>
         <button
@@ -275,20 +304,4 @@ function MenuForm({
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-1">
-      <span className="block text-xs font-medium text-tg-hint">{label}</span>
-      {children}
-      {hint && <span className="block text-xs text-tg-hint">{hint}</span>}
-    </label>
-  );
-}
+

@@ -6,6 +6,7 @@ import { clearAllTokens } from "@/api/client";
 import FormField from "@/components/FormField";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { Spinner } from "@/components/Spinner";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useErrorMessage, useT } from "@/i18n";
 import { haptic } from "@/tg/webapp";
@@ -156,8 +157,9 @@ export default function ResetPasswordScreen({
                   type="submit"
                   disabled={confirm.isPending}
                   aria-busy={confirm.isPending}
-                  className="mt-1 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                  className="mt-1 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
                 >
+                  {confirm.isPending && <Spinner size={14} />}
                   {confirm.isPending ? t("reset.saving") : t("reset.save")}
                 </button>
                 <p className="text-2xs text-tg-hint">{t("auth.requiredNote")}</p>

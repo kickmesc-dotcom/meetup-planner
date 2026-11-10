@@ -9,6 +9,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
@@ -27,6 +28,9 @@ import { useTx } from "@/i18n";
  * это чужая наклейка: без файла с токеном любой мог бы занять домен, который
  * ему не принадлежит. Платформенная ссылка работает всегда.
  */
+/** Домен вида `salon.ru` или `cabinet.salon.ru`; протокол и путь — не сюда. */
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+
 const ERROR_TEXT: Record<string, string> = {
   bad_domain: "Это не похоже на домен вида salon.ru.",
   domain_reserved: "Платформенный адрес занять нельзя.",
@@ -47,6 +51,8 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
     staleTime: 30_000,
   });
   const [value, setValue] = useState("");
+  // §8 `inline-validation`: формат проверяется на выходе из поля, до запроса.
+  const [formatError, setFormatError] = useState<string | null>(null);
   const data = q.data;
 
   useEffect(() => {
@@ -94,6 +100,15 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
   });
 
   const busy = save.isPending || verify.isPending || clear.isPending;
+
+  const checkFormat = () => {
+    const domain = value.trim().toLowerCase();
+    setFormatError(
+      domain && !DOMAIN_RE.test(domain)
+        ? tx("Это не похоже на домен вида salon.ru.")
+        : null,
+    );
+  };
   const line = `${data?.verify_prefix ?? ""}${data?.token ?? ""}`;
 
   return (
@@ -138,8 +153,11 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
               id="org-domain"
               label={tx("Домен")}
               required
-              invalid={!!save.error}
-              error={save.error ? String(humanizeApiError(save.error)) : undefined}
+              invalid={!!save.error || !!formatError}
+              error={
+                formatError ??
+                (save.error ? String(humanizeApiError(save.error)) : undefined)
+              }
               errorId="org-domain-error"
               className="mt-3"
               labelClassName="block text-xs text-tg-hint"
@@ -149,7 +167,11 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                   <input
                     {...field}
                     value={value}
-                    onChange={(event) => setValue(event.target.value)}
+                    onChange={(event) => {
+                      setValue(event.target.value);
+                      if (formatError) setFormatError(null);
+                    }}
+                    onBlur={checkFormat}
                     placeholder="cabinet.salon.ru"
                     autoCapitalize="none"
                     autoCorrect="off"
@@ -161,8 +183,9 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                     disabled={busy || !value.trim() || value.trim() === data.domain}
                     aria-busy={busy}
                     onClick={() => save.mutate(value.trim())}
-                    className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+                    className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
                   >
+                    {save.isPending && <Spinner size={14} />}
                     {tx("Сохранить")}
                   </button>
                 </div>

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { searchKnowledge, type KnowledgeHit } from "@/api/knowledge";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
+import FormField from "@/components/FormField";
 import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
@@ -79,14 +80,23 @@ export default function AskScreen() {
             submit(text);
           }}
         >
-          <input
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder={tx("Например: как закрыть смену")}
-            className="min-h-11 min-w-0 flex-1 rounded-tile border border-tg-secondary-bg bg-transparent px-3 text-sm outline-none focus:border-tg-link"
-            aria-label={tx("Что найти")}
-            maxLength={120}
-          />
+          <FormField
+            id="ask-query"
+            label={tx("Что найти")}
+            className="min-w-0 flex-1"
+            labelClassName="sr-only"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder={tx("Например: как закрыть смену")}
+                className="min-h-11 w-full rounded-tile border border-tg-secondary-bg bg-transparent px-3 text-sm outline-none focus:border-tg-link"
+                maxLength={120}
+              />
+            )}
+          </FormField>
           <button
             type="submit"
             disabled={text.trim().length < 2}

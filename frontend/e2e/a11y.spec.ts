@@ -78,7 +78,13 @@ test.describe("после входа", () => {
   test.beforeEach(async ({ page }) => {
     await mockSignedInApi(page);
     await page.goto("/");
-    await expect(page.getByTestId("manage-tabbar").or(page.locator("nav").first())).toBeVisible();
+    await expect(
+      page.getByTestId("manage-tabbar").or(page.locator("nav").first()),
+    ).toBeVisible();
+    // Bootstrap приходит после первого рендера и пересобирает шапку: клик по
+    // вкладке в этот момент может попасть в detached-элемент. Ждём вкладку
+    // профиля — она есть только в полном каркасе.
+    await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible();
   });
 
   test("события", async ({ page }) => {

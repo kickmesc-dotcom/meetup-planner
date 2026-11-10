@@ -7,7 +7,9 @@ import {
   transferEmployee,
 } from "@/api/orgs";
 import { humanizeApiError, setActiveOrg } from "@/api/client";
+import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
@@ -173,38 +175,50 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
             )}
           </p>
 
-          <label className="mt-2 block text-xs text-tg-hint" htmlFor="transfer-person">
-            {tx("Кто переезжает")}
-          </label>
-          <select
+          <FormField
             id="transfer-person"
-            value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
-            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
+            label={tx("Кто переезжает")}
+            className="mt-2"
+            labelClassName="block text-xs text-tg-hint"
           >
-            <option value="">{tx("Выберите сотрудника")}</option>
-            {(people.data ?? []).map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.position ? `${person.name} · ${person.position}` : person.name}
-              </option>
-            ))}
-          </select>
+            {(field) => (
+              <select
+                {...field}
+                value={employeeId}
+                onChange={(event) => setEmployeeId(event.target.value)}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
+              >
+                <option value="">{tx("Выберите сотрудника")}</option>
+                {(people.data ?? []).map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.position ? `${person.name} · ${person.position}` : person.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
 
-          <label className="mt-2 block text-xs text-tg-hint" htmlFor="transfer-branch">
-            {tx("В какой филиал")}
-          </label>
-          <select
+          <FormField
             id="transfer-branch"
-            value={targetId}
-            onChange={(event) => setTargetId(event.target.value)}
-            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
+            label={tx("В какой филиал")}
+            className="mt-2"
+            labelClassName="block text-xs text-tg-hint"
           >
-            {targets.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
+            {(field) => (
+              <select
+                {...field}
+                value={targetId}
+                onChange={(event) => setTargetId(event.target.value)}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
+              >
+                {targets.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
 
           <label className="mt-2 flex items-center gap-2 text-xs text-tg-text">
             <input
@@ -220,8 +234,9 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
             disabled={transfer.isPending || !employeeId || !targetId}
             aria-busy={transfer.isPending}
             onClick={() => transfer.mutate()}
-            className="mt-3 min-h-11 w-full rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
           >
+            {transfer.isPending && <Spinner size={14} />}
             {tx("Перевести")}
           </button>
         </section>
@@ -236,25 +251,34 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
             "Филиал получит свой код и отдельные данные. Сотрудников добавляйте уже внутри него.",
           )}
         </p>
-        <div className="mt-2 flex gap-2">
-          <input
-            aria-label={tx("Название филиала")}
-            aria-required="true"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder={tx("Название филиала")}
-            className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
-          />
-          <button
-            type="button"
-            disabled={create.isPending || name.trim().length < 2}
-            aria-busy={create.isPending}
-            onClick={() => create.mutate(name.trim())}
-            className="min-h-11 shrink-0 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
-          >
-            {tx("Создать")}
-          </button>
-        </div>
+        <FormField
+          id="branch-name"
+          label={tx("Название филиала")}
+          required
+          className="mt-2"
+        >
+          {(field) => (
+            <div className="mt-1 flex gap-2">
+              <input
+                {...field}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder={tx("Название филиала")}
+                className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
+              />
+              <button
+                type="button"
+                disabled={create.isPending || name.trim().length < 2}
+                aria-busy={create.isPending}
+                onClick={() => create.mutate(name.trim())}
+                className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+              >
+                {create.isPending && <Spinner size={14} />}
+                {tx("Создать")}
+              </button>
+            </div>
+          )}
+        </FormField>
       </section>
     </SubScreen>
   );

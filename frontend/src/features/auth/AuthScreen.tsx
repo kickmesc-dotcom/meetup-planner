@@ -12,6 +12,7 @@ import { clearAccessToken, clearAllTokens, setSessionToken } from "@/api/client"
 import FormField from "@/components/FormField";
 import Icon from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { Spinner } from "@/components/Spinner";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useErrorMessage, useT } from "@/i18n";
 import type { MessageKey } from "@/i18n/messages";
@@ -35,6 +36,9 @@ import { haptic } from "@/tg/webapp";
  */
 
 type Mode = "login" | "register" | "forgot";
+
+/** Достаточно строгая проверка формы, а не полная по RFC: цель — поймать опечатку. */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const TITLES: Record<Mode, MessageKey> = {
   login: "auth.login.title",
@@ -64,6 +68,9 @@ export default function AuthScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // §8 `inline-validation`: ошибка формата рядом с полем, а не после отправки.
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   // §8 `focus-management`: после отказа фокус уходит на первое поле, которое
   // человеку нужно поправить, — иначе он остаётся на кнопке и не понимает,
@@ -141,6 +148,22 @@ export default function AuthScreen({
     setPassword("");
     // Пароль нового режима не должен открытым текстом перейти в следующий.
     setShowPassword(false);
+  };
+
+  const checkEmail = () => {
+    const value = email.trim();
+    // Пустое поле на выходе не ругаем: до первой попытки это не ошибка.
+    setEmailError(
+      value && !EMAIL_RE.test(value) ? t("auth.email.invalid") : null,
+    );
+  };
+
+  const checkPassword = () => {
+    setPasswordError(
+      mode !== "forgot" && password.length > 0 && password.length < 8
+        ? t("auth.password.short")
+        : null,
+    );
   };
 
   const submit = (event: FormEvent) => {
@@ -243,7 +266,8 @@ export default function AuthScreen({
                 id="auth-email"
                 label={t("auth.email.label")}
                 required
-                invalid={!!error}
+                invalid={!!error || !!emailError}
+                error={emailError}
                 describedBy={error ? "auth-error" : undefined}
               >
                 {(field) => (
@@ -254,7 +278,11 @@ export default function AuthScreen({
                     inputMode="email"
                     autoComplete="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailError) setEmailError(null);
+                    }}
+                    onBlur={checkEmail}
                     maxLength={255}
                     placeholder="name@company.ru"
                     className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 text-base text-tg-text placeholder:text-tg-hint"
@@ -269,7 +297,8 @@ export default function AuthScreen({
                   id="auth-password"
                   label={t("auth.password.label")}
                   required
-                  invalid={!!error}
+                  invalid={!!error || !!passwordError}
+                  error={passwordError}
                   describedBy={error ? "auth-error" : undefined}
                 >
                   {(field) => (
@@ -280,7 +309,11 @@ export default function AuthScreen({
                         type={showPassword ? "text" : "password"}
                         autoComplete={mode === "register" ? "new-password" : "current-password"}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (passwordError) setPasswordError(null);
+                        }}
+                        onBlur={checkPassword}
                         maxLength={128}
                         placeholder={mode === "register" ? t("auth.password.placeholder") : ""}
                         className="min-h-11 w-full rounded-tile bg-tg-secondary-bg px-3 pr-12 text-base text-tg-text placeholder:text-tg-hint"
@@ -313,8 +346,9 @@ export default function AuthScreen({
                 type="submit"
                 disabled={pending}
                 aria-busy={pending}
-                className="mt-1 min-h-12 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+                className="mt-1 inline-flex min-h-12 w-full items-center justify-center gap-1.5 rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
+                {pending && <Spinner size={14} />}
                 {pending ? t("auth.pending") : t(SUBMITS[mode])}
               </button>
               {/* §8 `required-indicators`: звёздочка без расшифровки — загадка,

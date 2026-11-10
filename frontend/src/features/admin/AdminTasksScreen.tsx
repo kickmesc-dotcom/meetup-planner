@@ -13,6 +13,8 @@ import { humanizeApiError } from "@/api/client";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
 import Icon, { InlineIcon } from "@/components/Icon";
+import FormField from "@/components/FormField";
+import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
 import { useTx } from "@/i18n";
@@ -175,14 +177,23 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
         <div className="text-sm font-semibold text-tg-text">{tx("Новое поручение")}</div>
 
-        <label className="block text-xs text-tg-hint">{tx("Что сделать")}<input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            maxLength={200}
-            placeholder={tx("Проверить сроки на витрине")}
-            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
-          />
-        </label>
+        <FormField
+          id="task-title"
+          label={tx("Что сделать")}
+          required
+          labelClassName="block text-xs text-tg-hint"
+        >
+          {(field) => (
+            <input
+              {...field}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={200}
+              placeholder={tx("Проверить сроки на витрине")}
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
+            />
+          )}
+        </FormField>
 
         <div className="flex gap-1.5" role="tablist" aria-label={tx("Кому")}>
           {[
@@ -211,82 +222,130 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         {scope === "department" ? (
-          <label className="block text-xs text-tg-hint">{tx("Подразделение")}<select
-              value={departmentId ?? ""}
-              onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
-              disabled={departmentsQ.isPending}
-              aria-busy={departmentsQ.isPending}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text disabled:opacity-60"
-            >
-              <option value="">
-                {departmentsQ.isPending ? tx("— загружаем список —") : tx("— выбери —")}
-              </option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.emoji ? `${d.emoji} ` : ""}
-                  {d.name}
+          <FormField
+            id="task-department"
+            label={tx("Подразделение")}
+            labelClassName="block text-xs text-tg-hint"
+          >
+            {(field) => (
+              <select
+                {...field}
+                value={departmentId ?? ""}
+                onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
+                disabled={departmentsQ.isPending}
+                aria-busy={departmentsQ.isPending}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text disabled:opacity-60"
+              >
+                <option value="">
+                  {departmentsQ.isPending ? tx("— загружаем список —") : tx("— выбери —")}
                 </option>
-              ))}
-            </select>
-          </label>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.emoji ? `${d.emoji} ` : ""}
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
         ) : (
-          <label className="block text-xs text-tg-hint">{tx("Сотрудник")}<select
-              value={assigneeId ?? ""}
-              onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
-              disabled={employeesQ.isPending}
-              aria-busy={employeesQ.isPending}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text disabled:opacity-60"
-            >
-              <option value="">
-                {employeesQ.isPending ? tx("— загружаем список —") : tx("— выбери —")}
-              </option>
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.display_name}
-                  {e.position ? ` · ${e.position}` : ""}
+          <FormField
+            id="task-employee"
+            label={tx("Сотрудник")}
+            labelClassName="block text-xs text-tg-hint"
+          >
+            {(field) => (
+              <select
+                {...field}
+                value={assigneeId ?? ""}
+                onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : null)}
+                disabled={employeesQ.isPending}
+                aria-busy={employeesQ.isPending}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text disabled:opacity-60"
+              >
+                <option value="">
+                  {employeesQ.isPending ? tx("— загружаем список —") : tx("— выбери —")}
                 </option>
-              ))}
-            </select>
-          </label>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.display_name}
+                    {e.position ? ` · ${e.position}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+          </FormField>
         )}
 
-        <label className="block text-xs text-tg-hint">{tx("Описание (необязательно)")}<textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            maxLength={1000}
-            className="mt-1 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-          />
-        </label>
+        <FormField
+          id="task-description"
+          label={tx("Описание (необязательно)")}
+          labelClassName="block text-xs text-tg-hint"
+        >
+          {(field) => (
+            <textarea
+              {...field}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              maxLength={1000}
+              className="mt-1 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
+            />
+          )}
+        </FormField>
 
-        <label className="block text-xs text-tg-hint">{tx("Что должно получиться (необязательно)")}<input
-            value={expected}
-            onChange={(e) => setExpected(e.target.value)}
-            maxLength={300}
-            className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
-          />
-        </label>
+        <FormField
+          id="task-expected"
+          label={tx("Что должно получиться (необязательно)")}
+          labelClassName="block text-xs text-tg-hint"
+        >
+          {(field) => (
+            <input
+              {...field}
+              value={expected}
+              onChange={(e) => setExpected(e.target.value)}
+              maxLength={300}
+              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
+            />
+          )}
+        </FormField>
 
         <div className="grid grid-cols-2 gap-2">
-          <label className="block text-xs text-tg-hint">{tx("Смена (необязательно)")}<input
-              type="date"
-              value={shiftDate}
-              onChange={(e) => setShiftDate(e.target.value)}
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            />
-          </label>
-          <label className="block text-xs text-tg-hint">{tx("Приоритет")}<select
-              value={priority}
-              onChange={(e) =>
-                setPriority(e.target.value as "low" | "normal" | "high")
-              }
-              className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
-            >
-              <option value="low">{tx("низкий")}</option>
-              <option value="normal">{tx("обычный")}</option>
-              <option value="high">{tx("высокий")}</option>
-            </select>
-          </label>
+          <FormField
+            id="task-shift"
+            label={tx("Смена (необязательно)")}
+            labelClassName="block text-xs text-tg-hint"
+          >
+            {(field) => (
+              <input
+                {...field}
+                type="date"
+                value={shiftDate}
+                onChange={(e) => setShiftDate(e.target.value)}
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              />
+            )}
+          </FormField>
+          <FormField
+            id="task-priority"
+            label={tx("Приоритет")}
+            labelClassName="block text-xs text-tg-hint"
+          >
+            {(field) => (
+              <select
+                {...field}
+                value={priority}
+                onChange={(e) =>
+                  setPriority(e.target.value as "low" | "normal" | "high")
+                }
+                className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
+              >
+                <option value="low">{tx("низкий")}</option>
+                <option value="normal">{tx("обычный")}</option>
+                <option value="high">{tx("высокий")}</option>
+              </select>
+            )}
+          </FormField>
         </div>
 
         <div>
@@ -343,28 +402,52 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         <div className="rounded-tile bg-tg-bg/50 p-2.5">
           <div className="text-xs text-tg-hint">{tx("Срок — дата, время и секунды. Пусто = без срока.")}</div>
           <div className="mt-2 grid grid-cols-[1.4fr_1fr_0.7fr] gap-2">
-            <label className="block text-xs text-tg-hint">{tx("Дата")}<input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-              />
-            </label>
-            <label className="block text-xs text-tg-hint">{tx("Время")}<input
-                type="time"
-                step={1}
-                value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
-                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
-              />
-            </label>
-            <label className="block text-xs text-tg-hint">{tx("Сек.")}<input
-                inputMode="numeric"
-                value={dueSeconds}
-                onChange={(e) => setDueSeconds(e.target.value.replace(/\D/g, "").slice(0, 2))}
-                className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text tabular-nums"
-              />
-            </label>
+            <FormField
+              id="task-due-date"
+              label={tx("Дата")}
+              labelClassName="block text-xs text-tg-hint"
+            >
+              {(field) => (
+                <input
+                  {...field}
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+                />
+              )}
+            </FormField>
+            <FormField
+              id="task-due-time"
+              label={tx("Время")}
+              labelClassName="block text-xs text-tg-hint"
+            >
+              {(field) => (
+                <input
+                  {...field}
+                  type="time"
+                  step={1}
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                  className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text"
+                />
+              )}
+            </FormField>
+            <FormField
+              id="task-due-seconds"
+              label={tx("Сек.")}
+              labelClassName="block text-xs text-tg-hint"
+            >
+              {(field) => (
+                <input
+                  {...field}
+                  inputMode="numeric"
+                  value={dueSeconds}
+                  onChange={(e) => setDueSeconds(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                  className="mt-1 min-h-11 w-full rounded-tile bg-tg-secondary-bg px-2 text-sm text-tg-text tabular-nums"
+                />
+              )}
+            </FormField>
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -390,7 +473,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                 setDueTime("");
                 setDueSeconds("00");
               }}
-              className="min-h-11 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-hint"
+              className="min-h-11 rounded-full bg-tg-secondary-bg px-2.5 text-xs text-tg-text"
             >{tx("без срока")}</button>
           </div>
 
@@ -406,8 +489,9 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           disabled={create.isPending}
           aria-busy={create.isPending}
           onClick={() => create.mutate()}
-          className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+          className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
+          {create.isPending && <Spinner size={14} />}
           {create.isPending ? tx("Создаю…") : tx("Создать поручение")}
         </button>
       </section>

@@ -62,6 +62,18 @@ describe("AuthScreen — показ пароля", () => {
     const email = screen.getByLabelText(/Почта/) as HTMLInputElement;
     expect(email.className).toContain("text-base");
   });
+
+  it("опечатку в почте показывает сразу после ухода из поля", () => {
+    renderScreen();
+    const email = screen.getByLabelText(/Почта/) as HTMLInputElement;
+
+    fireEvent.change(email, { target: { value: "not-an-email" } });
+    fireEvent.blur(email);
+
+    // §8 `inline-validation`: без отправки формы человек уже видит, что не так.
+    expect(screen.getByRole("alert").textContent).toContain("опечатка");
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+  });
 });
 
 describe("AuthScreen — ошибка у поля", () => {
