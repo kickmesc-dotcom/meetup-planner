@@ -13,6 +13,8 @@ import {
 } from "@/api/hrOps";
 import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
+import FormField from "@/components/FormField";
+import { Spinner } from "@/components/Spinner";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -188,32 +190,50 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
       >
         <div className="text-sm font-semibold text-tg-text">{tx("Написать сотруднику")}</div>
         <p className="mt-1 text-xs text-tg-hint">{tx("Личное уведомление в приложение. В чат не дублируем.")}</p>
-        <select
-          aria-label={tx("Кому отправить уведомление")}
-          value={target ?? ""}
-          onChange={(event) =>
-            setTarget(event.target.value ? Number(event.target.value) : null)
-          }
-          className="mt-2 min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
+        <FormField
+          id="notify-target"
+          label={tx("Кому отправить уведомление")}
+          labelClassName="sr-only"
+          className="mt-2"
         >
-          <option value="">{tx("Выбери сотрудника")}</option>
-          {people.map((card) => (
-            <option key={card.employee_id} value={card.employee_id}>
-              {card.display_name}
-              {card.position ?? card.badge ? ` · ${card.position ?? card.badge}` : ""}
-            </option>
-          ))}
-        </select>
-        <textarea
-          aria-label={tx("Что сказать сотруднику")}
-          aria-required="true"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          rows={2}
-          maxLength={400}
-          placeholder={tx("Что сказать сотруднику")}
-          className="mt-2 w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text placeholder:text-tg-hint"
-        />
+          {(field) => (
+            <select
+              {...field}
+              value={target ?? ""}
+              onChange={(event) =>
+                setTarget(event.target.value ? Number(event.target.value) : null)
+              }
+              className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-xs text-tg-text"
+            >
+              <option value="">{tx("Выбери сотрудника")}</option>
+              {people.map((card) => (
+                <option key={card.employee_id} value={card.employee_id}>
+                  {card.display_name}
+                  {card.position ?? card.badge ? ` · ${card.position ?? card.badge}` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+        </FormField>
+        <FormField
+          id="notify-text"
+          label={tx("Что сказать сотруднику")}
+          required
+          labelClassName="sr-only"
+          className="mt-2"
+        >
+          {(field) => (
+            <textarea
+              {...field}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              rows={2}
+              maxLength={400}
+              placeholder={tx("Что сказать сотруднику")}
+              className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text placeholder:text-tg-hint"
+            />
+          )}
+        </FormField>
         <button
           type="button"
           disabled={target === null || text.trim().length === 0 || send.isPending}
@@ -222,8 +242,10 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
             haptic("medium");
             send.mutate();
           }}
-          className="mt-2 min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
-        >{tx("Отправить")}</button>
+          className="mt-2 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
+        >
+          {send.isPending && <Spinner size={14} />}
+          {tx("Отправить")}</button>
       </section>
 
       {q.isLoading && <ListSkeleton rows={6} />}

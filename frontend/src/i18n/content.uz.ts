@@ -388,6 +388,11 @@ export const UZ_CONTENT: Record<string, string> = {
   "Открыть тестовый пул": "Sinov toʻplamini ochish",
   "Вернуться в чат с ботом": "Bot chatiga qaytish",
   "Сервер": "Server",
+  "Сервер (IP/хост)": "Server (IP/xost)",
+  "Тип прокси": "Proksi turi",
+  "Secret или пароль": "Secret yoki parol",
+  "Пароль или secret (необязательно)": "Parol yoki secret (majburiy emas)",
+  "Создать зал": "Zal yaratish",
   "Если основной адрес недоступен, укажи резервный — приложение продолжит работать без переустановки. Пусто — адрес из сборки.":
     "Asosiy manzil ishlamasa, zaxirasini koʻrsating — ilova qayta oʻrnatishsiz ishlashda davom etadi. Boʻsh — yigʻilgan manzil ishlatiladi.",
   "Сохранить и перезагрузить": "Saqlash va qayta yuklash",

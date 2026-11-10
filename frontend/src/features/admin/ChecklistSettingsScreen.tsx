@@ -22,6 +22,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import Icon, { InlineIcon } from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
+import FormField from "@/components/FormField";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
@@ -263,18 +264,27 @@ function TemplateEditor({
     <>
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
         <div className="flex items-center gap-2">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => {
-              const next = title.trim();
-              if (next && next !== template.title) saveTpl.mutate({ title: next });
-              else setTitle(template.title);
-            }}
-            maxLength={200}
-            className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-3 py-2 text-sm font-semibold text-tg-text"
-            aria-label={tx("Название чек-листа")}
-          />
+          <FormField
+            id={`checklist-${template.id}-title`}
+            label={tx("Название чек-листа")}
+            labelClassName="sr-only"
+            className="min-w-0 flex-1"
+          >
+            {(field) => (
+              <input
+                {...field}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={() => {
+                  const next = title.trim();
+                  if (next && next !== template.title) saveTpl.mutate({ title: next });
+                  else setTitle(template.title);
+                }}
+                maxLength={200}
+                className="w-full rounded-tile bg-tg-bg/60 px-3 py-2 text-sm font-semibold text-tg-text"
+              />
+            )}
+          </FormField>
           {saveTpl.isPending && <Spinner />}
         </div>
         <TgToggle
@@ -358,16 +368,24 @@ function AddItemForm({
   const [photo, setPhoto] = useState(false);
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-      <textarea
-        aria-label={tx("Что сделать? Например: протереть столы 400–500")}
-        aria-required="true"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        rows={2}
-        maxLength={500}
-        placeholder={tx("Что сделать? Например: протереть столы 400–500")}
-        className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-      />
+      <FormField
+        id="checklist-add-title"
+        label={tx("Что сделать? Например: протереть столы 400–500")}
+        required
+        labelClassName="sr-only"
+      >
+        {(field) => (
+          <textarea
+            {...field}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder={tx("Что сделать? Например: протереть столы 400–500")}
+            className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
+          />
+        )}
+      </FormField>
       <TgToggle
         checked={photo}
         label={tx("Закрывается только фотоотчётом")}
@@ -379,8 +397,10 @@ function AddItemForm({
           disabled={busy || !title.trim()}
           aria-busy={busy}
           onClick={() => onSubmit(title.trim(), photo)}
-          className="min-h-11 flex-1 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
-        >{tx("Добавить")}</button>
+          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
+        >
+          {busy && <Spinner size={14} />}
+          {tx("Добавить")}</button>
         <button
           type="button"
           onClick={onCancel}
@@ -480,24 +500,41 @@ function ItemEditor({
 
       {open && (
         <div className="mt-3 space-y-2 border-t border-tg-hint/15 pt-3">
-          <textarea
-            aria-label={tx("Пункт")}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            rows={2}
-            maxLength={500}
-            className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-            placeholder={tx("Пункт")}
-          />
-          <textarea
-            aria-label={tx("Пояснение (необязательно)")}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            maxLength={1000}
-            className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
-            placeholder={tx("Пояснение (необязательно)")}
-          />
+          <FormField
+            id={`checklist-item-${item.id}-title`}
+            label={tx("Пункт")}
+            required
+            labelClassName="sr-only"
+          >
+            {(field) => (
+              <textarea
+                {...field}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                rows={2}
+                maxLength={500}
+                className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
+                placeholder={tx("Пункт")}
+              />
+            )}
+          </FormField>
+          <FormField
+            id={`checklist-item-${item.id}-description`}
+            label={tx("Пояснение (необязательно)")}
+            labelClassName="sr-only"
+          >
+            {(field) => (
+              <textarea
+                {...field}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                maxLength={1000}
+                className="w-full rounded-tile bg-tg-bg/60 p-2 text-sm text-tg-text"
+                placeholder={tx("Пояснение (необязательно)")}
+              />
+            )}
+          </FormField>
           <TgToggle
             checked={item.requires_photo}
             label={tx("Закрывается только фотоотчётом")}
@@ -658,18 +695,27 @@ function HallsCard() {
               key={hall.id}
               className="flex items-center gap-2 rounded-tile bg-tg-bg/50 p-2"
             >
-              <input
-                defaultValue={hall.name}
-                onBlur={(e) => {
-                  const next = e.target.value.trim();
-                  if (next && next !== hall.name)
-                    patch.mutate({ id: hall.id, body: { name: next } });
-                  else e.target.value = hall.name;
-                }}
-                maxLength={120}
-                className="min-w-0 flex-1 rounded-tile bg-tg-secondary-bg px-2 py-1 text-sm text-tg-text"
-                aria-label={tx("Название зала {name}", { name: hall.name })}
-              />
+              <FormField
+                id={`hall-${hall.id}-name`}
+                label={tx("Название зала {name}", { name: hall.name })}
+                labelClassName="sr-only"
+                className="min-w-0 flex-1"
+              >
+                {(field) => (
+                  <input
+                    {...field}
+                    defaultValue={hall.name}
+                    onBlur={(e) => {
+                      const next = e.target.value.trim();
+                      if (next && next !== hall.name)
+                        patch.mutate({ id: hall.id, body: { name: next } });
+                      else e.target.value = hall.name;
+                    }}
+                    maxLength={120}
+                    className="w-full rounded-tile bg-tg-secondary-bg px-2 py-1 text-sm text-tg-text"
+                  />
+                )}
+              </FormField>
               <Checkbox
                 checked={hall.is_active}
                 label={tx("Вкл")}
@@ -680,23 +726,33 @@ function HallsCard() {
             </div>
           ))}
           <div className="flex gap-2">
-            <input
-              aria-label={tx("Название нового зала")}
-              aria-required="true"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={120}
-              placeholder={tx("Название нового зала")}
-              className="min-w-0 flex-1 rounded-tile bg-tg-bg/60 px-3 py-2 text-sm text-tg-text"
-            />
+            <FormField
+              id="new-hall-name"
+              label={tx("Название нового зала")}
+              required
+              labelClassName="sr-only"
+              className="min-w-0 flex-1"
+            >
+              {(field) => (
+                <input
+                  {...field}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={120}
+                  placeholder={tx("Название нового зала")}
+                  className="w-full rounded-tile bg-tg-bg/60 px-3 py-2 text-sm text-tg-text"
+                />
+              )}
+            </FormField>
             <button
               type="button"
               disabled={create.isPending || !name.trim()}
               aria-busy={create.isPending}
+              aria-label={tx("Создать зал")}
               onClick={() => create.mutate(name.trim())}
-              className="min-h-11 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
-              ＋
+              {create.isPending ? <Spinner size={14} /> : "＋"}
             </button>
           </div>
           <div className="text-xs text-tg-hint">{tx(
