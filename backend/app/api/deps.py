@@ -15,7 +15,7 @@ from app.db.base import get_sessionmaker
 from app.db.hr_models import Employee
 from app.db.models import User
 from app.db.org_models import ApiKey, Organization, reset_org, set_org
-from app.services import display_names, org_bots, org_limits, orgs
+from app.services import display_names, link_keys, org_bots, org_limits, orgs
 
 
 async def db_session() -> AsyncIterator[AsyncSession]:
@@ -265,9 +265,14 @@ async def current_employee(
             raise HTTPException(status_code, detail=code) from exc
         token = hr_simulation.activate(context)
         set_org(context.shadow.org_id)
+        keys_token, _org = await link_keys.activate_org(
+            session, context.shadow.org_id
+        )
         try:
             yield context.shadow
         finally:
+            if keys_token is not None:
+                link_keys.deactivate(keys_token)
             hr_simulation.deactivate(token)
         return
 
@@ -293,6 +298,7 @@ async def current_employee(
             )
         switch_token = set_org(x_org_id)
 
+    keys_token = None
     try:
         employee = await hr_access.ensure_employee(session, user)
         # Тенантский фильтр: все дальнейшие ORM-запросы в этом запросе видят
@@ -302,6 +308,10 @@ async def current_employee(
         # в middleware: организация известна только после
         # аутентификации, и второй раз разбирать подпись незачем.
         await org_limits.enforce_rate(session, employee.org_id)
+        # Ссылки на фото подписываются ключом этой организации (S-10/S-11).
+        # Контекст живёт до конца запроса и сбрасывается в finally: иначе
+        # следующий запрос на том же контексте подписал бы чужим ключом.
+        keys_token, _org = await link_keys.activate_org(session, employee.org_id)
         yield employee
     except hr_access.HrAccessError as exc:
         # Уволенный сотрудник: доступ закрыт, пока его не вернут из корзины.
@@ -310,6 +320,8 @@ async def current_employee(
             raise HTTPException(status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
         raise
     finally:
+        if keys_token is not None:
+            link_keys.deactivate(keys_token)
         if switch_token is not None:
             reset_org(switch_token)
 

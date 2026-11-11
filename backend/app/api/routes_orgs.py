@@ -1240,6 +1240,43 @@ async def _require_owner(
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="owner_required")
 
 
+class LinksRotatedOut(BaseModel):
+    rotated_at: datetime
+    previous_valid_until: datetime
+
+
+@router.post("/org/links/rotate", response_model=LinksRotatedOut)
+async def rotate_org_links(
+    session: SessionDep, org: OrgDep, user: CurrentUser, _admin: AdminDep
+) -> LinksRotatedOut:
+    """Отозвать ссылки на фото и календарь этой организации.
+
+    Смена ключа не трогает другие организации и не гасит открытые вкладки
+    сразу: предыдущий ключ принимается 30 дней. Это и есть точечный отзыв,
+    которого не было при общем секрете (S-10/S-11).
+    """
+    from datetime import timedelta
+
+    from app.services import link_keys
+
+    rotated_at = await link_keys.rotate(session, org)
+    await audit.record(
+        session,
+        org_id=org.id,
+        action="org.links_rotated",
+        user=user,
+        target_type="organization",
+        target_id=org.id,
+        details={},
+    )
+    await session.commit()
+    return LinksRotatedOut(
+        rotated_at=rotated_at,
+        previous_valid_until=rotated_at
+        + timedelta(days=link_keys.PREV_VALID_DAYS),
+    )
+
+
 @router.get("/org/privacy", response_model=PrivacyOut)
 async def organization_privacy(org: OrgDep, _admin: AdminDep) -> PrivacyOut:
     """Сроки хранения и состояние удаления — для экрана кабинета."""

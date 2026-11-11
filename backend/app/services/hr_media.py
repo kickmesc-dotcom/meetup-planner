@@ -103,18 +103,27 @@ def _legacy_sig_until() -> datetime | None:
         return datetime.fromisoformat(DEFAULT_LEGACY_SIG_UNTIL).replace(tzinfo=UTC)
 
 
-def _key() -> bytes:
-    """Ключ подписи. Отдельного секрета в конфиге нет — берём токен бота.
-
-    Наружу он не уходит: в ссылке только HMAC, восстановить ключ нельзя.
-    """
+def _global_key() -> bytes:
+    """Общий ключ контура — только совместимость со ссылками до S-10/S-11."""
     return get_settings().bot_token.encode("utf-8")
 
 
-def _mac(kind: str, value: int, expires: int) -> str:
+def _key() -> bytes:
+    """Ключ подписи: ключ организации из контекста, иначе общий.
+
+    Контекст ставит вход сотрудника или публичная выдача фото — там
+    организация уже известна. Наружу ключ не уходит: в ссылке только HMAC.
+    """
+    from app.services import link_keys
+
+    keys = link_keys.current()
+    return keys.current if keys is not None else _global_key()
+
+
+def _mac(kind: str, value: int, expires: int, key: bytes | None = None) -> str:
     """HMAC от «вид:id:срок». Срок входит в подпись — его нельзя продлить правкой URL."""
     payload = f"{kind}:{value}:{expires}".encode()
-    return hmac.new(_key(), payload, hashlib.sha256).hexdigest()[:32]
+    return hmac.new(key or _key(), payload, hashlib.sha256).hexdigest()[:32]
 
 
 def _expiry(now: float | None = None) -> int:
@@ -133,9 +142,13 @@ def sign(kind: str, value: int, *, expires: int | None = None) -> str:
 
 
 def _legacy_sign(kind: str, value: int) -> str:
-    """Подпись прежнего формата: HMAC от «вид:id», без срока."""
+    """Подпись прежнего формата: HMAC от «вид:id», без срока.
+
+    Считается от общего ключа сознательно: это ровно те ссылки, которые уже
+    разошлись до появления ключей организации.
+    """
     payload = f"{kind}:{value}".encode()
-    return hmac.new(_key(), payload, hashlib.sha256).hexdigest()[:32]
+    return hmac.new(_global_key(), payload, hashlib.sha256).hexdigest()[:32]
 
 
 def verify(kind: str, value: int, signature: str | None) -> bool:
@@ -168,7 +181,18 @@ def verify(kind: str, value: int, signature: str | None) -> bool:
     except ValueError:
         return False
     # Порядок важен: сначала подпись, потом срок — срок без подписи ничего не значит.
-    if not hmac.compare_digest(_mac(kind, value, expires).encode(), mac.encode("utf-8")):
+    from app.services import link_keys
+
+    keys = link_keys.current()
+    candidates = (
+        keys.candidates(_global_key()) if keys is not None else [_global_key()]
+    )
+    if not any(
+        hmac.compare_digest(
+            _mac(kind, value, expires, key).encode(), mac.encode("utf-8")
+        )
+        for key in candidates
+    ):
         return False
     if expires and time.time() > expires:
         log.info("media.link_expired", kind=kind, value=value)

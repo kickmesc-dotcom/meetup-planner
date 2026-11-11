@@ -208,14 +208,21 @@ async def auto_pick(
 
 
 @router.get("/meetings/ical/url")
-async def get_ical_url(user: CurrentUser) -> dict[str, str]:
+async def get_ical_url(user: CurrentUser, session: SessionDep) -> dict[str, str]:
     settings = get_settings()
     base = settings.public_base_url.rstrip("/")
     if not base:
         raise HTTPException(
             status.HTTP_503_SERVICE_UNAVAILABLE, "public_base_url_not_set"
         )
-    token = make_token(user.id)
+    # Ссылка подписывается ключом организации: её отзыв не должен трогать
+    # календари остальных клиентов (S-10).
+    from app.db.org_models import current_org_id
+    from app.services import link_keys
+
+    org_id = current_org_id.get()
+    _keys_token, org = await link_keys.activate_org(session, org_id)
+    token = make_token(user.id, org_id=org.id if org is not None else None)
     https_url = f"{base}/api/meetings/ical/{user.id}.ics?t={token}"
     webcal_url = https_url.replace("https://", "webcal://", 1).replace(
         "http://", "webcal://", 1
@@ -229,7 +236,28 @@ async def ical_feed(
     session: SessionDep,
     t: str = Query(...),
 ) -> Response:
-    if not verify_token(user_id, t):
+    # Публичный фид не знает сессию: организацию берём из токена, затем
+    # загружаем её ключ. Прежний токен без организации проверяется общим
+    # секретом — уже подключённые календари не должны отвалиться.
+    from app.db.org_models import Organization, set_org
+    from app.services import link_keys
+    from app.services.ical import parse_token
+
+    org_id, _mac = parse_token(t)
+    if org_id is not None:
+        org = await session.get(Organization, org_id)
+        if org is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "bad_token")
+        await link_keys.ensure(session, org)
+        keys_token = link_keys.activate(link_keys.keys_for(org))
+        try:
+            ok = verify_token(user_id, t)
+        finally:
+            link_keys.deactivate(keys_token)
+        if not ok:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "bad_token")
+        set_org(org_id)
+    elif not verify_token(user_id, t):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "bad_token")
     user = await session.get(User, user_id)
     if user is None:

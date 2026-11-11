@@ -189,6 +189,16 @@ class Organization(Base):
     # Секрет вебхука: по нему входящий апдейт находит свою организацию, не
     # доверяя ничему из тела запроса.
     webhook_secret: Mapped[str | None] = mapped_column(Text)
+    # Ключ подписи ссылок на фото и календарь (S-10/S-11, 11.11.2026).
+    # У каждой организации свой: ротация отзывает только её ссылки, а не
+    # календари и фото всех клиентов сразу. `media_key_prev` принимается
+    # 30 дней после ротации, чтобы открытые вкладки и подписки не отвалились
+    # в один день. Пусто у старых строк — ключ выдаётся при первом обращении.
+    media_key: Mapped[str | None] = mapped_column(String(64))
+    media_key_prev: Mapped[str | None] = mapped_column(String(64))
+    media_key_rotated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     # Чат, куда бот пишет отчёты и напоминания. Пусто — значение из env.
     group_chat_id: Mapped[int | None] = mapped_column(BigInteger)
     # Приватность (B2B_PLATFORM_PLAN, шаг 5.5): удаление по запросу.

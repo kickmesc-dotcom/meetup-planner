@@ -27,27 +27,64 @@ TOKEN_LENGTH = 32
 LEGACY_TOKEN_LENGTH = 16
 
 
-def _signature(user_id: int, length: int) -> str:
-    secret = get_settings().tg_webhook_secret.encode("utf-8")
-    digest = hmac.new(secret, str(user_id).encode("utf-8"), sha256).hexdigest()
+def _global_key() -> bytes:
+    """Прежний общий секрет — только для ссылок, выданных до S-10."""
+    return get_settings().tg_webhook_secret.encode("utf-8")
+
+
+def _signature(user_id: int, key: bytes, length: int = TOKEN_LENGTH) -> str:
+    digest = hmac.new(key, str(user_id).encode("utf-8"), sha256).hexdigest()
     return digest[:length]
 
 
-def make_token(user_id: int) -> str:
-    """Подпись ссылки: 128 бит. Меняется вместе с секретом вебхука."""
-    return _signature(user_id, TOKEN_LENGTH)
+def _current_key() -> bytes:
+    from app.services import link_keys
+
+    keys = link_keys.current()
+    return keys.current if keys is not None else _global_key()
+
+
+def make_token(user_id: int, *, org_id: int | None = None) -> str:
+    """Токен ссылки: `org.hmac` для организации, иначе прежний глобальный.
+
+    `org_id` входит в токен, а не только в ключ: публичный фид не знает
+    сессию, и по нему он находит организацию и её ключ до проверки подписи.
+    """
+    if org_id is None:
+        return _signature(user_id, _global_key())
+    return f"{org_id}.{_signature(user_id, _current_key())}"
+
+
+def parse_token(token: str) -> tuple[int | None, str]:
+    """Разобрать токен: `(org_id, mac)`; для прежнего формата `(None, token)`."""
+    raw_org, sep, mac = (token or "").strip().partition(".")
+    if sep and raw_org.isdigit():
+        return int(raw_org), mac
+    return None, (token or "").strip()
 
 
 def verify_token(user_id: int, token: str) -> bool:
-    """Проверить подпись. Принимаем и новый формат, и прежний 64-битный.
+    """Проверить подпись. Принимаем формат организации и оба прежних.
 
-    Сравнение — `compare_digest` и без ранних выходов: обе длины проверяются
-    всегда, иначе по времени ответа было бы видно, какой формат угадан.
+    Для токена организации контекст ключей обязателен: без него неизвестно,
+    чьим ключом проверять. Старые 64- и 128-битные токены считаются от общего
+    секрета, поэтому работают до тех пор, пока он не сменён.
     """
-    given = (token or "").strip().encode("utf-8")
-    current_ok = hmac.compare_digest(_signature(user_id, TOKEN_LENGTH).encode(), given)
+    org_id, mac = parse_token(token)
+    given = mac.encode("utf-8")
+    if org_id is not None:
+        from app.services import link_keys
+
+        keys = link_keys.current()
+        if keys is None:
+            return False
+        return any(
+            hmac.compare_digest(_signature(user_id, key).encode(), given)
+            for key in keys.candidates(_global_key())
+        )
+    current_ok = hmac.compare_digest(_signature(user_id, _global_key()).encode(), given)
     legacy_ok = hmac.compare_digest(
-        _signature(user_id, LEGACY_TOKEN_LENGTH).encode(), given
+        _signature(user_id, _global_key(), LEGACY_TOKEN_LENGTH).encode(), given
     )
     return current_ok or legacy_ok
 

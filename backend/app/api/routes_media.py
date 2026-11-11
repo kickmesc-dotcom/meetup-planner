@@ -17,8 +17,9 @@ from fastapi import APIRouter, File, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel
 
 from app.api.deps import EmployeeDep, SessionDep
-from app.db.hr_models import TaskPhoto
-from app.services import hr_media
+from app.db.hr_models import ChecklistCompletion, MediaBlob, TaskPhoto
+from app.db.org_models import Organization
+from app.services import hr_media, link_keys
 
 router = APIRouter(tags=["media"])
 
@@ -85,6 +86,28 @@ def media_headers() -> dict[str, str]:
     }
 
 
+async def _verify_for_org(
+    session, org_id: int, kind: str, value: int, signature: str | None
+) -> None:
+    """Проверить подпись ключом организации, которой принадлежит объект.
+
+    Публичная ручка не знает сессию, поэтому организацию берём из самого
+    объекта, а не из заголовка. Ключ активируется только вокруг проверки:
+    дальше по запросу он не нужен.
+    """
+    org = await session.get(Organization, org_id)
+    if org is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
+    await link_keys.ensure(session, org)
+    token = link_keys.activate(link_keys.keys_for(org))
+    try:
+        ok = hr_media.verify(kind, value, signature)
+    finally:
+        link_keys.deactivate(token)
+    if not ok:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
+
+
 @router.get("/media/tg/{photo_id}")
 async def get_telegram_photo(photo_id: int, s: str | None = None) -> Response:
     """Фото из чата: лениво скачиваем из Telegram и кешируем в блоб.
@@ -92,15 +115,16 @@ async def get_telegram_photo(photo_id: int, s: str | None = None) -> Response:
     Так старые отчёты (когда приложение ещё не умело загружать снимки) тоже
     становятся видимыми, причём повторный показ уже не ходит в Telegram.
     """
-    if not hr_media.verify("tgphoto", photo_id, s):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
     from app.db.base import get_sessionmaker
 
     sm = get_sessionmaker()
     async with sm() as session:
         photo = await session.get(TaskPhoto, photo_id)
+        # Отсутствующий и чужой фотоотчёт отвечают одинаково: иначе по коду
+        # можно было бы перебирать id и узнавать, что существует.
         if photo is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="photo_not_found")
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
+        await _verify_for_org(session, photo.org_id, "tgphoto", photo_id, s)
         blob = await hr_media.ensure_task_photo_blob(session, photo)
         if blob is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="media_unavailable")
@@ -111,12 +135,16 @@ async def get_telegram_photo(photo_id: int, s: str | None = None) -> Response:
 @router.get("/media/checklist/{completion_id}")
 async def get_checklist_photo(completion_id: int, s: str | None = None) -> Response:
     """Фото пункта чек-листа: загруженное в приложении или кеш из чата."""
-    if not hr_media.verify("checklist_photo", completion_id, s):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
     from app.db.base import get_sessionmaker
 
     sm = get_sessionmaker()
     async with sm() as session:
+        completion = await session.get(ChecklistCompletion, completion_id)
+        if completion is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
+        await _verify_for_org(
+            session, completion.org_id, "checklist_photo", completion_id, s
+        )
         blob = await hr_media.ensure_checklist_photo_blob(session, completion_id)
         if blob is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail="media_unavailable")
@@ -129,11 +157,12 @@ async def get_media(blob_id: int, s: str | None = None) -> Response:
     """Байты фото по подписанной ссылке (без авторизации — её не умеет `<img>`)."""
     from app.db.base import get_sessionmaker
 
-    if not hr_media.verify("blob", blob_id, s):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
     sm = get_sessionmaker()
     async with sm() as session:
-        blob = await hr_media.blob_or_404(session, blob_id)
+        blob = await session.get(MediaBlob, blob_id)
+        if blob is None:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="bad_signature")
+        await _verify_for_org(session, blob.org_id, "blob", blob_id, s)
         return Response(
             content=blob.data,
             media_type=blob.mime,
