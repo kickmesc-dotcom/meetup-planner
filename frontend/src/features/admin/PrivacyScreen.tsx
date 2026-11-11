@@ -26,6 +26,7 @@ import {
   saveExportFile,
   type PrivacyState,
 } from "@/api/privacy";
+import { fetchMeta } from "@/api/meta";
 import { humanizeApiError } from "@/api/client";
 import { Skeleton } from "@/components/Skeleton";
 import { useTx } from "@/i18n";
@@ -73,6 +74,17 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
     staleTime: 30_000,
     retry: false,
   });
+  // Возможности бэкенда: на Amvera сборка может отставать, и ручки отзыва
+  // там ещё нет. Скрываем только при явном ответе без неё — если `/api/meta`
+  // недоступен, оптимистично показываем, а не прячем рабочее действие.
+  const meta = useQuery({
+    queryKey: ["meta"],
+    queryFn: fetchMeta,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const canRotate =
+    !meta.data || meta.data.features.includes("org.links.rotate");
 
   const download = useMutation({
     mutationFn: async (slug: string) => {
@@ -202,10 +214,11 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
             </button>
           </section>
 
-          <section className="rounded-tile bg-tg-secondary-bg/60 p-3">
-            <div className="text-sm font-semibold text-tg-text">
-              {tx("Ссылки на фото и календарь")}
-            </div>
+          {canRotate && (
+            <section className="rounded-tile bg-tg-secondary-bg/60 p-3">
+              <div className="text-sm font-semibold text-tg-text">
+                {tx("Ссылки на фото и календарь")}
+              </div>
             <p className="mt-1 text-xs text-tg-hint">
               {tx(
                 "Если ссылка утекла или сотрудник уволен, отзовите ключ организации. Чужие календари и фото не затронуты.",
@@ -248,7 +261,8 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                 {tx("Отозвать ссылки")}
               </button>
             )}
-          </section>
+            </section>
+          )}
 
           <section
             className={[

@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import PrivacyScreen from "./PrivacyScreen";
+import { fetchMeta, type ServerMeta } from "@/api/meta";
 import {
   cancelOrgDeletion,
   fetchAudit,
@@ -22,6 +23,8 @@ import {
   saveExportFile,
   type PrivacyState,
 } from "@/api/privacy";
+
+vi.mock("@/api/meta", () => ({ fetchMeta: vi.fn() }));
 
 vi.mock("@/api/privacy", () => ({
   fetchPrivacy: vi.fn(),
@@ -40,6 +43,14 @@ const deleteMock = vi.mocked(requestOrgDeletion);
 const cancelMock = vi.mocked(cancelOrgDeletion);
 const rotateMock = vi.mocked(rotateOrgLinks);
 const saveMock = vi.mocked(saveExportFile);
+const metaMock = vi.mocked(fetchMeta);
+
+const META: ServerMeta = {
+  status: "ok",
+  code: { routes: 1, api_routes: 1, fingerprint: "abc", alembic_head: "0075" },
+  db: { provider: "local", host: null },
+  features: ["org.links.rotate"],
+};
 
 const STATE: PrivacyState = {
   slug: "salon-a",
@@ -75,6 +86,8 @@ beforeEach(() => {
   cancelMock.mockReset();
   rotateMock.mockReset();
   saveMock.mockReset();
+  metaMock.mockReset();
+  metaMock.mockResolvedValue(META);
   privacyMock.mockResolvedValue(STATE);
   auditMock.mockResolvedValue([]);
   exportMock.mockResolvedValue({ organization: { slug: "salon-a" } });
@@ -122,6 +135,15 @@ describe("PrivacyScreen", () => {
 
     fireEvent.click(button);
     await vi.waitFor(() => expect(deleteMock).toHaveBeenCalledWith("salon-a"));
+  });
+
+  it("скрывает отзыв, если бэкенд ещё не знает ручку", async () => {
+    metaMock.mockResolvedValue({ ...META, features: [] });
+    renderScreen();
+
+    await vi.waitFor(() =>
+      expect(screen.queryByText("Отозвать ссылки")).toBeNull(),
+    );
   });
 
   it("отзывает ссылки организации только после подтверждения", async () => {

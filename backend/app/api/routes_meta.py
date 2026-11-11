@@ -68,6 +68,9 @@ _FEATURE_ROUTES: dict[str, tuple[str, str]] = {
     "admin.game": ("GET", "/api/admin/game"),
     "admin.game.music": ("GET", "/api/admin/game/music"),
     "admin.game.social": ("GET", "/api/admin/game/social"),
+    # S-10/S-11: отзыв ссылок организации. Фронт скрывает кнопку, пока
+    # бэкенд не пересобран: иначе она вела бы в 404.
+    "org.links.rotate": ("POST", "/api/org/links/rotate"),
 }
 
 # Ключи, которые считаем диагностически значимыми в отпечатке кода: служебные
