@@ -35,7 +35,7 @@ from app.config import get_settings
 from app.db.models import User
 from app.db.org_models import OrgInvoice, Organization
 from app.db.tenancy import all_orgs
-from app.services import billing, monitoring, rum
+from app.services import billing, monitoring, onboarding, rum
 
 log = structlog.get_logger()
 router = APIRouter(tags=["platform"])
@@ -233,6 +233,54 @@ async def platform_rum(_admin: PlatformDep) -> dict:
     (Lighthouse) можно сравнивать напрямую.
     """
     return rum.rum.snapshot()
+
+
+class OnboardingOrgOut(BaseModel):
+    org_id: int
+    name: str
+    people: int
+    first_task_done: int
+    first_task_share: float
+    median_hours_to_first_task: float | None
+    first_checklist_done: int
+    first_checklist_share: float
+    median_hours_to_first_checklist: float | None
+    onboarding_done: int
+    onboarding_share: float
+
+
+class OnboardingTotalsOut(BaseModel):
+    people: int
+    first_task_done: int
+    first_task_share: float
+    median_hours_to_first_task: float | None
+    first_checklist_done: int
+    first_checklist_share: float
+    median_hours_to_first_checklist: float | None
+    onboarding_done: int
+    onboarding_share: float
+
+
+class PlatformOnboardingOut(BaseModel):
+    orgs: list[OnboardingOrgOut]
+    totals: OnboardingTotalsOut
+
+
+@router.get("/platform/onboarding", response_model=PlatformOnboardingOut)
+async def platform_onboarding(
+    session: SessionDep, _admin: PlatformDep
+) -> PlatformOnboardingOut:
+    """Дошёл ли человек до первой закрытой задачи — по фактам, а не по опросу.
+
+    Источник — уже существующие `task_events` и `checklist_runs`: отдельные
+    «события онбординга» не нужны, а значит их нельзя забыть отправить.
+    Демо- и симуляционные профили исключены внутри сервиса.
+
+    Ручка про все организации сразу, поэтому живёт под `PlatformDep`, а не в
+    кабинете клиента: сравнение клиентов — не данные клиента.
+    """
+    data = await onboarding.snapshot(session)
+    return PlatformOnboardingOut(**data)
 
 
 @router.get("/platform/me", response_model=PlatformMeOut)
