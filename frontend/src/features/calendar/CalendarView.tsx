@@ -126,6 +126,10 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
 
   // F5+F6: горизонтальный свайп = shiftAnchor. Порог 60px, чтобы не путать
   // со скроллом списка участников вниз. axis: 'x' прибит явно.
+  //
+  // `swipe.distance` тоже 60: по умолчанию библиотека считает свайпом уже
+  // 50 px, и быстрый короткий жест листал день мимо `dist > 60` — то есть
+  // порог был только на медленном движении. Теперь оба пути равны.
   useDrag(
     ({ last, movement: [mx], cancel, canceled, swipe: [sx] }) => {
       if (canceled) return;
@@ -146,7 +150,13 @@ const timelineEnabled = timelineFlag.data?.enabled ?? false;
       showHint(null);
       cancel();
     },
-    { target: containerRef, axis: "x", filterTaps: true, pointer: { touch: true } },
+    {
+      target: containerRef,
+      axis: "x",
+      filterTaps: true,
+      pointer: { touch: true },
+      swipe: { distance: 60 },
+    },
   );
 
   useEffect(() => {
