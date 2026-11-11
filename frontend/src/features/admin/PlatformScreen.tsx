@@ -22,6 +22,7 @@ import {
   cancelPlatformInvoice,
   confirmPlatformInvoice,
   fetchPlatformInvoices,
+  fetchPlatformOnboarding,
   fetchPlatformOrgs,
   fetchPlatformRum,
   fetchPlatformSummary,
@@ -207,6 +208,15 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
     staleTime: 60_000,
     retry: false,
   });
+  // Онбординг — отдельный запрос по той же причине: цифры по всем клиентам не
+  // должны задерживать сводку, а отсутствие ручки (бэкенд ещё не пересобран)
+  // не превращает экран в ошибку.
+  const onboardingQuery = useQuery({
+    queryKey: ["platform", "onboarding"],
+    queryFn: fetchPlatformOnboarding,
+    staleTime: 60_000,
+    retry: false,
+  });
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["platform"] });
@@ -230,6 +240,11 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
   const awaiting = invoices.data?.items.filter(
     (invoice) => invoice.status === "awaiting" || invoice.status === "pending",
   );
+  // Кому звонить: сначала самые низкие доли, только организации с людьми.
+  const lagging = (onboardingQuery.data?.orgs ?? [])
+    .filter((org) => org.people > 0 && org.first_task_share < 1)
+    .sort((a, b) => a.first_task_share - b.first_task_share)
+    .slice(0, 5);
 
   return (
     <SubScreen title={tx("Платформа")} onBack={onBack}>
@@ -302,6 +317,61 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
               </div>
             ))}
           </div>
+
+          {/* Онбординг: не «сколько зарегистрировалось», а «сколько дошло до
+              первой закрытой задачи». Ручка считает по фактам; если бэкенд
+              ещё не пересобран, блока просто нет — пустая карточка с нулями
+              выглядела бы как «никто не доходит». */}
+          {onboardingQuery.data && (
+            <div className="space-y-2" data-testid="platform-onboarding">
+              <div className="text-sm font-semibold text-tg-text">
+                {tx("Онбординг")}
+              </div>
+              <p className="text-xs text-tg-hint">
+                {tx(
+                  "Доля людей, закрывших первую задачу и первый чек-лист. Считается по фактам, демо исключены.",
+                )}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Stat
+                  label={tx("Первая задача")}
+                  value={`${Math.round(onboardingQuery.data.totals.first_task_share * 100)}%`}
+                />
+                <Stat
+                  label={tx("Медиана до задачи")}
+                  value={
+                    onboardingQuery.data.totals.median_hours_to_first_task === null
+                      ? "—"
+                      : `${onboardingQuery.data.totals.median_hours_to_first_task} ч`
+                  }
+                />
+                <Stat
+                  label={tx("Первый чек-лист")}
+                  value={`${Math.round(onboardingQuery.data.totals.first_checklist_share * 100)}%`}
+                />
+                <Stat
+                  label={tx("Дошли до конца")}
+                  value={`${Math.round(onboardingQuery.data.totals.onboarding_share * 100)}%`}
+                />
+              </div>
+              {lagging.length > 0 && (
+                <div className="space-y-1">
+                  {lagging.map((org) => (
+                    <div
+                      key={org.org_id}
+                      className="flex items-baseline justify-between rounded-tile bg-tg-secondary-bg/60 p-2 text-xs"
+                    >
+                      <span className="min-w-0 truncate text-tg-text">{org.name}</span>
+                      <span className="shrink-0 text-tg-hint">
+                        {Math.round(org.first_task_share * 100)}% ·{" "}
+                        {org.people} {tx("чел.")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-2">
             <div className="text-sm font-semibold text-tg-text">{tx("Клиенты")}</div>

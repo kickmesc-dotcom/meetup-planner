@@ -104,6 +104,47 @@ export interface PlatformRum {
 
 export const fetchPlatformRum = () => api<PlatformRum>("/api/platform/rum");
 
+/**
+ * Онбординг: дошёл ли человек до первой закрытой задачи.
+ *
+ * Считается по фактам (`task_events`, `checklist_runs`), а не по отдельным
+ * событиям: событие можно забыть отправить, закрытую задачу — нет. Демо- и
+ * симуляционные профили исключены на сервере.
+ */
+export interface PlatformOnboardingOrg {
+  org_id: number;
+  name: string;
+  people: number;
+  first_task_done: number;
+  first_task_share: number;
+  median_hours_to_first_task: number | null;
+  first_checklist_done: number;
+  first_checklist_share: number;
+  median_hours_to_first_checklist: number | null;
+  onboarding_done: number;
+  onboarding_share: number;
+}
+
+export interface PlatformOnboardingTotals {
+  people: number;
+  first_task_done: number;
+  first_task_share: number;
+  median_hours_to_first_task: number | null;
+  first_checklist_done: number;
+  first_checklist_share: number;
+  median_hours_to_first_checklist: number | null;
+  onboarding_done: number;
+  onboarding_share: number;
+}
+
+export interface PlatformOnboarding {
+  orgs: PlatformOnboardingOrg[];
+  totals: PlatformOnboardingTotals;
+}
+
+export const fetchPlatformOnboarding = () =>
+  api<PlatformOnboarding>("/api/platform/onboarding");
+
 export const fetchPlatformMe = () => api<PlatformMe>("/api/platform/me");
 
 /** Сводка по всем клиентам. Только владельцу продукта. */

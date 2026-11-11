@@ -62,16 +62,19 @@ test.describe("тач-цели ≥ 44 px", () => {
     expect(await undersized(page), "вход").toEqual([]);
   });
 
-  test("события, задачи, чек-лист и профиль", async ({ page }) => {
-    await openApp(page);
-    for (const [tab, name] of [
-      ["Задач", "задачи"],
-      ["Чек-лист", "чек-лист"],
-      ["Профиль", "профиль"],
-    ] as const) {
+  // Каждый экран — отдельный тест: в одной цепочке после чек-листа приложение
+  // иногда уходило в экран ошибки, и падал уже следующий клик. Это шум стенда,
+  // но изолированные монтирования дают точную локализацию, если дефект реальный.
+  for (const [tab, name] of [
+    ["Задач", "задачи"],
+    ["Чек-лист", "чек-лист"],
+    ["Профиль", "профиль"],
+  ] as const) {
+    test(name, async ({ page }) => {
+      await openApp(page);
       await page.getByRole("button", { name: new RegExp(tab, "i") }).first().click();
       await page.waitForTimeout(300);
       expect(await undersized(page), name).toEqual([]);
-    }
-  });
+    });
+  }
 });

@@ -16,6 +16,7 @@ import {
   cancelPlatformInvoice,
   confirmPlatformInvoice,
   fetchPlatformInvoices,
+  fetchPlatformOnboarding,
   fetchPlatformOrgs,
   fetchPlatformRum,
   fetchPlatformSummary,
@@ -28,6 +29,7 @@ vi.mock("@/api/platform", () => ({
   fetchPlatformRum: vi.fn(),
   fetchPlatformOrgs: vi.fn(),
   fetchPlatformInvoices: vi.fn(),
+  fetchPlatformOnboarding: vi.fn(),
   patchPlatformOrg: vi.fn(),
   confirmPlatformInvoice: vi.fn(),
   cancelPlatformInvoice: vi.fn(),
@@ -37,6 +39,7 @@ const summaryMock = vi.mocked(fetchPlatformSummary);
 const rumMock = vi.mocked(fetchPlatformRum);
 const orgsMock = vi.mocked(fetchPlatformOrgs);
 const invoicesMock = vi.mocked(fetchPlatformInvoices);
+const onboardingMock = vi.mocked(fetchPlatformOnboarding);
 const patchMock = vi.mocked(patchPlatformOrg);
 const confirmMock = vi.mocked(confirmPlatformInvoice);
 const cancelMock = vi.mocked(cancelPlatformInvoice);
@@ -118,6 +121,34 @@ beforeEach(() => {
   });
   orgsMock.mockResolvedValue({ items: [ORG], total: 1 });
   invoicesMock.mockResolvedValue({ items: [INVOICE], total: 1, awaiting: 1 });
+  onboardingMock.mockResolvedValue({
+    orgs: [
+      {
+        org_id: 3,
+        name: "Салон А",
+        people: 4,
+        first_task_done: 3,
+        first_task_share: 0.75,
+        median_hours_to_first_task: 5.5,
+        first_checklist_done: 2,
+        first_checklist_share: 0.5,
+        median_hours_to_first_checklist: 9,
+        onboarding_done: 1,
+        onboarding_share: 0.25,
+      },
+    ],
+    totals: {
+      people: 4,
+      first_task_done: 3,
+      first_task_share: 0.75,
+      median_hours_to_first_task: 5.5,
+      first_checklist_done: 2,
+      first_checklist_share: 0.5,
+      median_hours_to_first_checklist: 9,
+      onboarding_done: 1,
+      onboarding_share: 0.25,
+    },
+  });
   patchMock.mockResolvedValue({ ...ORG, plan: "business" });
   confirmMock.mockResolvedValue({ ...INVOICE, status: "paid" });
   cancelMock.mockResolvedValue({ ...INVOICE, status: "canceled" });
@@ -153,6 +184,18 @@ describe("PlatformScreen", () => {
     await vi.waitFor(() =>
       expect(patchMock).toHaveBeenCalledWith(3, { is_active: false }),
     );
+  });
+
+  it("показывает онбординг: долю дошедших и медиану до первой задачи", async () => {
+    renderScreen();
+
+    const card = await screen.findByTestId("platform-onboarding");
+    // Итог — 75 % и 5,5 ч: это цифры с сервера, а не «0 %» по умолчанию.
+    expect(card.textContent).toContain("75%");
+    expect(card.textContent).toContain("5.5 ч");
+    // Отстающая организация видна в списке, иначе карточка не помогает
+    // понять, кому звонить.
+    expect(card.textContent).toContain("Салон А");
   });
 
   it("подтверждает оплату отдельной ручкой", async () => {
