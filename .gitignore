@@ -55,3 +55,6 @@ backups/
 frontend/playwright-report/
 frontend/test-results/
 frontend/coverage/
+
+# Отчёты Lighthouse CI — артефакт прогона, не исходники.
+.lighthouseci/

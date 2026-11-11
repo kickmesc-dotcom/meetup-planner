@@ -118,6 +118,11 @@ jobs:
       - name: Bundle budget
         run: npm run check:bundle
 
+      # Lighthouse меряет то, чего не видит бюджет: LCP/CLS/TBT в мобильном
+      # профиле на собранной статике. Chrome на ubuntu-раннере уже есть.
+      - name: Lighthouse CI
+        run: npx lhci autorun
+
       # Браузер ставится отдельным шагом: на раннере его нет, а кеш Playwright
       # между прогонами не сохраняется.
       - name: Install Playwright browser

@@ -17,6 +17,30 @@ export default defineConfig({
      * прод-ошибок — собирать их отдельным артефактом CI, а не в `dist`.
      */
     sourcemap: false,
+    /**
+     * Разделение вендоров (этап 4, DoD «главный чанк ≤ 300 КБ raw»).
+     *
+     * Зачем. Главный чанк был 500 КБ, и в нём лежал не наш код, а библиотеки:
+     * React, `framer-motion`, иконки, даты и `@twa-dev/sdk`. Браузер грузит
+     * такие чанки параллельно, поэтому смысл не в «переложить байты», а в том,
+     * чтобы наш код не ждал и не пересобирал весь вендорный вес при каждой
+     * правке экрана. Порядок проверок важен: `date-fns-tz` тоже содержит
+     * подстроку `date-fns` и обязан попасть в один чанк с ним, иначе Rollup
+     * предупредит о двух копиях.
+     */
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (id.includes("date-fns")) return "vendor-dates";
+          if (id.includes("framer-motion")) return "vendor-motion";
+          if (id.includes("iconoir")) return "vendor-icons";
+          if (id.includes("@tanstack")) return "vendor-query";
+          if (id.includes("@twa-dev")) return "vendor-twa";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     port: 5173,
