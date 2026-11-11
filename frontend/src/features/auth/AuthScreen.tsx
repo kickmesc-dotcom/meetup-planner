@@ -184,12 +184,16 @@ export default function AuthScreen({
       <div className="w-full max-w-[400px]">
         {/* Одна линия: марка слева, языки и тема — в общей капсуле справа.
             Разные по весу контролы раньше читались как случайные элементы. */}
-        <div className="mb-3 flex items-center justify-between gap-3">
+        {/* §1.4.4 `resize-text`: при 200 % текста три языка по 44 px и тема
+            уже не влезают в одну строку с маркой. Перенос — не потеря
+            содержимого; `shrink-0` оставляем, чтобы капсула не сжимала
+            тач-цели ниже 44 px. */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 text-tg-hint">
             <Icon name="lock" size={16} />
             <span className="truncate text-sm font-medium text-tg-text">SemiTask</span>
           </div>
-          <div className="flex shrink-0 items-center gap-0.5 rounded-full bg-tg-secondary-bg/70 p-0.5">
+          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-center gap-0.5 rounded-full bg-tg-secondary-bg/70 p-0.5">
             <LanguageSwitcher bare />
             <ThemeSwitcher bare />
           </div>
@@ -424,7 +428,7 @@ export function NoOrgScreen() {
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-6 flex items-center gap-0.5 self-end rounded-full bg-tg-secondary-bg/70 p-0.5">
+      <div className="mb-6 flex max-w-full flex-wrap items-center justify-center gap-0.5 self-end rounded-full bg-tg-secondary-bg/70 p-0.5">
         <LanguageSwitcher bare />
         <ThemeSwitcher bare />
       </div>

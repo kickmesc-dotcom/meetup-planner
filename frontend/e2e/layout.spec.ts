@@ -46,7 +46,7 @@ async function overflow(page: Page): Promise<string[]> {
 async function openApp(page: Page): Promise<void> {
   await mockSignedInApi(page);
   await page.goto("/");
-  await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(400);
 }
 

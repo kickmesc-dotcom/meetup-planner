@@ -46,7 +46,10 @@ async function undersized(page: Page): Promise<string[]> {
 async function openApp(page: Page): Promise<void> {
   await mockSignedInApi(page);
   await page.goto("/");
-  await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible();
+  // 15 с вместо дефолтных 5: в полном прогоне 39 контекстов разом первый
+  // рендер иногда не успевает, и тест падал на «element(s) not found» —
+  // это шум стенда, а не дефект цели касания.
+  await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(400);
 }
 
@@ -55,7 +58,7 @@ test.describe("тач-цели ≥ 44 px", () => {
     // Без входа проверяем отдельно: там свои ссылки-переключатели режимов,
     // и они уходили в 20 px по высоте до этапа 2.
     await page.goto("/");
-    await expect(page.locator("h1")).toBeVisible();
+    await expect(page.locator("h1")).toBeVisible({ timeout: 15_000 });
     expect(await undersized(page), "вход").toEqual([]);
   });
 

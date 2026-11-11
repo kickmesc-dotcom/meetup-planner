@@ -35,7 +35,7 @@ for (const viewport of VIEWPORTS) {
     test("вход", async ({ page }) => {
       await mockApi(page);
       await page.goto("/");
-      await expect(page.locator("h1")).toBeVisible();
+      await expect(page.locator("h1")).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveScreenshot(`login-${viewport.name}.png`, {
         animations: "disabled",
         caret: "hide",
@@ -46,7 +46,7 @@ for (const viewport of VIEWPORTS) {
     test("события", async ({ page }) => {
       await mockSignedInApi(page);
       await page.goto("/");
-      await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible({ timeout: 15_000 });
       await page.waitForTimeout(600);
       await expect(page).toHaveScreenshot(`feed-${viewport.name}.png`, {
         animations: "disabled",
@@ -58,7 +58,7 @@ for (const viewport of VIEWPORTS) {
     test("задачи", async ({ page }) => {
       await mockSignedInApi(page);
       await page.goto("/");
-      await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Профиль/i })).toBeVisible({ timeout: 15_000 });
       await page.waitForTimeout(400);
       await page.getByRole("button", { name: /Задач/i }).first().click();
       await page.waitForTimeout(400);
