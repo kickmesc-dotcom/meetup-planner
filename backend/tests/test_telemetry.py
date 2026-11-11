@@ -10,13 +10,46 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api import routes_telemetry
+from app.api import guards, routes_telemetry
+
+
+def test_telemetry_is_rate_limited() -> None:
+    """Публичная ручка телеметрии должна попадать под правило лимита (S-3)."""
+    rules = [rule for rule in guards.default_rules() if rule.name == "telemetry"]
+    assert rules, "у телеметрии нет правила лимита"
+    rule = rules[0]
+    assert rule.matches("POST", "/api/telemetry")
+    assert rule.matches("POST", "/api/telemetry/vitals")
+    assert rule.matches("POST", "/api/telemetry/csp")
+    assert not rule.matches("POST", "/api/telemetryx")
 
 
 def _client() -> TestClient:
     app = FastAPI()
     app.include_router(routes_telemetry.router, prefix="/api")
     return TestClient(app)
+
+
+def test_csp_report_is_accepted_and_clipped() -> None:
+    # Формат report-uri: вложенный объект. Путь документа приходит с query —
+    # в лог он попасть не должен, поэтому проверяем очистку функцией, а не
+    # доверяем браузеру.
+    response = _client().post(
+        "/api/telemetry/csp",
+        content='{"csp-report": {"violated-directive": "script-src", '
+        '"blocked-uri": "https://evil.test/x.js", '
+        '"document-uri": "https://semitaskbot.pages.dev/?access=SECRET"}}',
+        headers={"Content-Type": "application/csp-report"},
+    )
+    assert response.status_code == 204
+    assert response.content == b""
+    assert routes_telemetry.clean_path(
+        "https://semitaskbot.pages.dev/?access=SECRET"
+    ) == "https://semitaskbot.pages.dev/"
+
+
+def test_csp_report_garbage_does_not_error() -> None:
+    assert _client().post("/api/telemetry/csp", content=b"not json").status_code == 204
 
 
 def test_accepts_report_without_auth() -> None:

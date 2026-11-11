@@ -319,6 +319,7 @@ async def _deliver(
     payload: dict | None = None,
     keyboard=None,  # noqa: ANN001
     pref_kind: str | None = None,
+    at=None,  # noqa: ANN001 — время тика для записей уведомлений
 ) -> None:
     """Личное уведомление в приложении + best-effort личка в Telegram.
 
@@ -336,7 +337,7 @@ async def _deliver(
     if not recipients:
         return
     await hr_notify.notify(
-        session, employees=recipients, kind=kind, text=text, payload=payload
+        session, employees=recipients, kind=kind, text=text, payload=payload, at=at
     )
     # Вне Telegram: push на устройства, а для важного и без подписки — письмо.
     await deliver_external(
@@ -1050,6 +1051,7 @@ async def send_shift_start_reminders(
             kind=hr_notify.KIND_SHIFT_START,
             text=hr_notify.shift_start_text(),
             payload={},
+            at=moment,
         )
         sent.append(int(employee.id))
     if sent:

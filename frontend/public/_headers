@@ -24,6 +24,11 @@
 #   веб-версии Telegram (web.telegram.org, webk/webz). Всё остальное — нельзя.
 #   По этой же причине здесь НЕТ `X-Frame-Options`: он запрещает любые iframe и
 #   сломал бы открытие приложения в Telegram.
+# * `report-uri` — сбор нарушений: без него CSP молча режет код в чужом
+#   браузере, и узнать об этом можно только из жалобы «кнопка не работает».
+#   Отчёты принимает `POST /api/telemetry/csp` (без авторизации, под лимитом
+#   частоты), в лог попадают директива, заблокированный адрес и путь документа
+#   без query.
 # * `object-src 'none'`, `base-uri 'self'`, `form-action 'self'` — закрывают
 #   классические обходы через плагины, подмену `<base>` и отправку формы на чужой
 #   адрес.
@@ -37,7 +42,7 @@
   Referrer-Policy: no-referrer
   Permissions-Policy: geolocation=(), microphone=(), payment=(), camera=(self)
   Strict-Transport-Security: max-age=31536000; includeSubDomains
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' blob: https:; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self' https://oauth.telegram.org https://*.telegram.org; frame-ancestors 'self' https://telegram.org https://*.telegram.org; base-uri 'self'; form-action 'self'; object-src 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://telegram.org; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' blob: https:; worker-src 'self' blob:; manifest-src 'self'; frame-src 'self' https://oauth.telegram.org https://*.telegram.org; frame-ancestors 'self' https://telegram.org https://*.telegram.org; base-uri 'self'; form-action 'self'; object-src 'none'; report-uri https://meetup-planner-youmakemefry.waw0.amvera.tech/api/telemetry/csp
 
 # Ассеты с хешем в имени неизменны: их можно кэшировать надолго, а заодно
 # закрыть от индексации — это не страницы.

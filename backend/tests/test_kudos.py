@@ -427,7 +427,7 @@ async def test_notification_goes_to_recipient(session, monkeypatch):
     """Благодарность не просто появляется в ленте — о ней сообщают адресату."""
     calls: list[dict] = []
 
-    async def _capture(_session, *, user_id, kind, text, payload=None):
+    async def _capture(_session, *, user_id, kind, text, payload=None, created_at=None):
         calls.append({"user_id": user_id, "kind": kind, "text": text, "payload": payload})
 
     monkeypatch.setattr(hr_notify.notifications, "add", _capture)

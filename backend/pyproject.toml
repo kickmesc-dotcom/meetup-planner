@@ -52,6 +52,13 @@ dependencies = [
     "aiohttp-socks==0.10.1",
     # Web push вне Telegram (шаг 2.4): шифрование payload + подпись VAPID.
     "pywebpush==2.0.3",
+    # Аудит 11.11.2026 (этап 6): транзитивные пакеты с advisory. Явные пины,
+    # чтобы боевая сборка получала исправленные версии, а не то, что разрешит
+    # резолвер. Совместимость с fastapi/starlette/aiogram/aiohttp проверена
+    # полным pytest.
+    "anyio==4.14.2",
+    "certifi==2026.10.18",
+    "multidict==6.9.1",
 ]
 
 [project.optional-dependencies]
@@ -73,8 +80,11 @@ mt = [
 ]
 
 dev = [
-    "pytest==8.3.3",
-    "pytest-asyncio==0.24.0",
+    # Аудит 11.11.2026: pytest 8.3.3 имел advisory (PYSEC-2026-1845). В 9.0.3
+    # режим `asyncio_mode = "auto"` и все тесты работают; pytest-asyncio 1.4
+    # — первая ветка, которая поддерживает pytest 9.
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.1.post1",
     "ruff==0.7.4",
     "mypy==1.13.0",
     "types-python-dateutil",

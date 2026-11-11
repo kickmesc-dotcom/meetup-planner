@@ -285,6 +285,7 @@ async def notify(
     kind: str,
     text: str,
     payload: dict | None = None,
+    at=None,  # noqa: ANN001 — datetime тика для детерминированных записей
 ) -> int:
     """Личное уведомление каждому получателю. Коммитит вызывающий.
 
@@ -309,6 +310,7 @@ async def notify(
             kind=kind,
             text=text,
             payload=payload,
+            created_at=at,
         )
         count += 1
     return count

@@ -32,6 +32,7 @@ async def add(
     kind: str,
     text: str,
     payload: dict | None = None,
+    created_at: "datetime | None" = None,
 ) -> AppNotification:
     """Добавить уведомление получателю. Коммитит ВЫЗЫВАЮЩИЙ.
 
@@ -43,6 +44,10 @@ async def add(
         kind=kind,
         text=text,
         payload=dict(payload or {}),
+        # Время тика, а не часов сервера: иначе дедуп «раз в день» сравнивает
+        # дату уведомления с датой расчёта и расходится на стыке суток и в
+        # тестах с фиксированным `now`.
+        **({"created_at": created_at} if created_at is not None else {}),
     )
     session.add(row)
     return row

@@ -233,7 +233,7 @@ async def test_private_dm_needs_opt_in_and_carries_buttons(session, monkeypatch)
     user, employee = await _manager(session, org, user_id=7, tg=7007)
     in_app: list[str] = []
 
-    async def fake_notify(_session, *, employees, kind, text, payload=None):
+    async def fake_notify(_session, *, employees, kind, text, payload=None, at=None):
         in_app.append(kind)
         return len(employees)
 

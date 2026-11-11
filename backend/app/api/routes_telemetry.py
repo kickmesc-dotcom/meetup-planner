@@ -20,7 +20,7 @@ from __future__ import annotations
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field, model_validator
 
 from app.services import rum
@@ -35,6 +35,7 @@ MAX_PATH = 200
 MAX_BUILD = 40
 MAX_DEVICE = 20
 MAX_PLATFORM = 20
+MAX_CSP_FIELD = 300
 
 
 def clean_path(path: str) -> str:
@@ -111,5 +112,42 @@ async def accept_vitals(payload: VitalsIn) -> Response:
         device=payload.device,
         path=clean_path(payload.path),
         build=payload.build,
+    )
+    return Response(status_code=204)
+
+
+def _clip(value: object, limit: int = MAX_CSP_FIELD) -> str:
+    return str(value or "")[:limit]
+
+
+@router.post("/telemetry/csp", status_code=204)
+async def accept_csp_report(request: Request) -> Response:
+    """Нарушение CSP с браузера: какая директива и какой адрес заблокированы.
+
+    Без авторизации: отчёт приходит со страницы, где сессии могло ещё не быть.
+    Тело — `{"csp-report": {...}}` (report-uri) или массив (report-to).
+    Любой мусор молча проглатываем: приёмник не должен превращаться в ошибку.
+    """
+    try:
+        raw = await request.json()
+    except Exception:  # noqa: BLE001 — невалидное тело не повод для 422
+        return Response(status_code=204)
+
+    report: dict = {}
+    if isinstance(raw, dict):
+        nested = raw.get("csp-report")
+        report = nested if isinstance(nested, dict) else raw
+    elif isinstance(raw, list) and raw and isinstance(raw[0], dict):
+        body = raw[0].get("body")
+        report = body if isinstance(body, dict) else raw[0]
+
+    log.warning(
+        "client.csp",
+        directive=_clip(
+            report.get("violated-directive") or report.get("effective-directive")
+        ),
+        blocked=_clip(report.get("blocked-uri")),
+        document=clean_path(_clip(report.get("document-uri"), MAX_PATH)),
+        disposition=_clip(report.get("disposition"), 20),
     )
     return Response(status_code=204)
