@@ -2197,6 +2197,15 @@ export const EN_CONTENT: Record<string, string> = {
   "Оплата по счёту: после перевода нажмите «Я оплатил» — мы подтвердим и продлим подписку. Списаний с карты нет.": "Payment by invoice: after the transfer press “I have paid” and we will confirm it and extend the subscription. No card charges.",
   "Не удалось загрузить счета — обнови экран.": "Could not load invoices — refresh the screen.",
   "Платформа": "Platform",
+  "Скорость у людей": "How fast it feels for people",
+  "Core Web Vitals по устройствам за 24 часа: p75 и доля хороших.":
+    "Core Web Vitals by device over 24 hours: p75 and the share of good ones.",
+  "Замеров пока нет — появятся после первых сессий.":
+    "No measurements yet — they appear after the first sessions.",
+  "Телефон": "Phone",
+  "Компьютер": "Computer",
+  "Веб": "Web",
+  "{share}% хороших": "{share}% good",
   "Клиенты, тарифы, блокировки и подтверждение оплат": "Clients, plans, blocks and payment confirmations",
   "Клиенты": "Clients",
   "Организаций": "Organizations",

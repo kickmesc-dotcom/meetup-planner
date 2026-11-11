@@ -8,7 +8,7 @@ import {
   type UiPrefs,
 } from "./api/availability";
 import { useBootstrap } from "./api/bootstrap";
-import { getAccessToken, getSessionToken } from "./api/client";
+import { getAccessToken, getSessionToken, isNetworkError } from "./api/client";
 
 const MeetingsPollsScreen = lazy(() => import("./features/meetings/MeetingsPollsScreen"));
 // SemiTaskBot: рабочие экраны сотрудника.
@@ -299,6 +299,10 @@ export default function App() {
   }
 
   if (me.isError) {
+    // Сеть пропала до входа. Экран «Ошибка авторизации» здесь врал бы: вход
+    // не отклонён, сервер просто не ответил. Форма сохраняет введённое и
+    // отправится, когда связь вернётся — а без неё человек видел тупик.
+    if (!hasStoredAuth && isNetworkError(me.error)) return authScreen;
     const status = me.error && (me.error as { status?: number }).status;
     const authDetail =
       me.error && (me.error as { detail?: string }).detail

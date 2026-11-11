@@ -23,6 +23,8 @@ import structlog
 from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field, model_validator
 
+from app.services import rum
+
 router = APIRouter(tags=["telemetry"])
 log = structlog.get_logger()
 
@@ -31,6 +33,8 @@ MAX_STACK = 4000
 MAX_COMPONENT_STACK = 1500
 MAX_PATH = 200
 MAX_BUILD = 40
+MAX_DEVICE = 20
+MAX_PLATFORM = 20
 
 
 def clean_path(path: str) -> str:
@@ -48,6 +52,9 @@ class ClientErrorIn(BaseModel):
     component_stack: str = Field("", max_length=MAX_COMPONENT_STACK)
     path: str = Field("", max_length=MAX_PATH)
     build: str = Field("", max_length=MAX_BUILD)
+    device: str = Field("", max_length=MAX_DEVICE)
+    platform: str = Field("", max_length=MAX_PLATFORM)
+    tg_version: str = Field("", max_length=MAX_PLATFORM)
     # Сколько раз повторилась та же ошибка: фронт схлопывает повторы, чтобы
     # цикл перерисовки не превратился в поток запросов.
     count: int = Field(1, ge=1, le=100)
@@ -69,8 +76,40 @@ async def accept_client_error(payload: ClientErrorIn) -> Response:
         message=payload.message,
         path=clean_path(payload.path),
         build=payload.build,
+        device=payload.device,
+        platform=payload.platform,
+        tg_version=payload.tg_version,
         count=payload.count,
         stack=payload.stack,
         component_stack=payload.component_stack,
+    )
+    return Response(status_code=204)
+
+
+class VitalsIn(BaseModel):
+    """Одно измерение Core Web Vitals с устройства.
+
+    Список имён закрыт: всё остальное — мусор от старых сборок и ботов, и
+    складывать его в сводку значило бы портить p75.
+    """
+
+    name: Literal["LCP", "INP", "CLS", "FCP", "TTFB"]
+    value: float = Field(ge=0, le=600_000)
+    rating: Literal["good", "needs-improvement", "poor"] | None = None
+    device: str = Field("", max_length=MAX_DEVICE)
+    platform: str = Field("", max_length=MAX_PLATFORM)
+    path: str = Field("", max_length=MAX_PATH)
+    build: str = Field("", max_length=MAX_BUILD)
+
+
+@router.post("/telemetry/vitals", status_code=204)
+async def accept_vitals(payload: VitalsIn) -> Response:
+    """Принять метрику RUM. Ответ пустой: браузеру нечего с ним делать."""
+    rum.rum.record(
+        name=payload.name,
+        value=payload.value,
+        device=payload.device,
+        path=clean_path(payload.path),
+        build=payload.build,
     )
     return Response(status_code=204)

@@ -17,6 +17,7 @@ import {
   confirmPlatformInvoice,
   fetchPlatformInvoices,
   fetchPlatformOrgs,
+  fetchPlatformRum,
   fetchPlatformSummary,
   patchPlatformOrg,
   type PlatformSummary,
@@ -24,6 +25,7 @@ import {
 
 vi.mock("@/api/platform", () => ({
   fetchPlatformSummary: vi.fn(),
+  fetchPlatformRum: vi.fn(),
   fetchPlatformOrgs: vi.fn(),
   fetchPlatformInvoices: vi.fn(),
   patchPlatformOrg: vi.fn(),
@@ -32,6 +34,7 @@ vi.mock("@/api/platform", () => ({
 }));
 
 const summaryMock = vi.mocked(fetchPlatformSummary);
+const rumMock = vi.mocked(fetchPlatformRum);
 const orgsMock = vi.mocked(fetchPlatformOrgs);
 const invoicesMock = vi.mocked(fetchPlatformInvoices);
 const patchMock = vi.mocked(patchPlatformOrg);
@@ -106,6 +109,13 @@ beforeEach(() => {
   confirmMock.mockReset();
   cancelMock.mockReset();
   summaryMock.mockResolvedValue(SUMMARY);
+  rumMock.mockResolvedValue({
+    window_seconds: 86_400,
+    events: 0,
+    metrics: {},
+    top_paths: [],
+    builds: [],
+  });
   orgsMock.mockResolvedValue({ items: [ORG], total: 1 });
   invoicesMock.mockResolvedValue({ items: [INVOICE], total: 1, awaiting: 1 });
   patchMock.mockResolvedValue({ ...ORG, plan: "business" });

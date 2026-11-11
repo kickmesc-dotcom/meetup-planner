@@ -14,6 +14,7 @@
  * до входа — токена ещё нет.
  */
 import { getApiBase } from "@/api/client";
+import { deviceKind, platformName, tgVersion } from "@/lib/device";
 
 const MAX_REPORTS = 5;
 const DEDUPE_MS = 30_000;
@@ -31,6 +32,10 @@ export interface ErrorReport {
   component_stack: string;
   path: string;
   build: string;
+  /** Тип устройства и платформа: «на Android у ленты» и «на ПК» — разные баги. */
+  device: string;
+  platform: string;
+  tg_version: string;
   count: number;
 }
 
@@ -78,6 +83,9 @@ export function buildReport(
     component_stack: cleanStack(componentStack).slice(0, MAX_COMPONENT_STACK),
     path,
     build: build.slice(0, 40),
+    device: deviceKind(),
+    platform: platformName(),
+    tg_version: tgVersion(),
     count: 1,
   };
 }

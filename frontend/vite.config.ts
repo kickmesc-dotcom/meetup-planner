@@ -1,9 +1,33 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import { execSync } from "node:child_process";
+
+/**
+ * Метка сборки: короткий хеш коммита.
+ *
+ * Зачем. Без неё отчёт об ошибке говорил «что-то упало», но не «в какой
+ * версии»: после деплоя нельзя было отличить старый баг от нового. Хеш
+ * связывает отчёт с коммитом, а `dev` — честная метка локального запуска.
+ * `git` в CI есть; без него сборка не должна падать.
+ */
+function buildId(): string {
+  try {
+    return (
+      execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+        .toString()
+        .trim() || "dev"
+    );
+  } catch {
+    return "dev";
+  }
+}
+
+const BUILD_ID = process.env.VITE_BUILD_ID || buildId();
 
 export default defineConfig({
   plugins: [react()],
+  define: { "import.meta.env.VITE_BUILD_ID": JSON.stringify(BUILD_ID) },
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
   },

@@ -14,6 +14,7 @@ import BrandApplier from "./features/brand/BrandApplier";
 import ToastHost from "./components/ToastHost";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { installGlobalErrorHandlers } from "./lib/telemetry";
+import { installVitals } from "./lib/vitals";
 import { clearVerifyTokenFromUrl, verifyTokenFromUrl } from "./features/auth/verifyUrl";
 
 // Прямая ссылка из `/app`: забираем токен в localStorage и чистим адресную
@@ -28,6 +29,8 @@ initLocale();
 // Ошибки вне React-дерева (обработчики, отклонённые промисы) ловим с самого
 // начала: часть падений случается до первого рендера.
 installGlobalErrorHandlers();
+// RUM: LCP/INP/CLS с реальных устройств — Lighthouse меряет только стенд.
+installVitals();
 
 const qc = new QueryClient({
   defaultOptions: {

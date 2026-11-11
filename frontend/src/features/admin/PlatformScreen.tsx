@@ -23,6 +23,7 @@ import {
   confirmPlatformInvoice,
   fetchPlatformInvoices,
   fetchPlatformOrgs,
+  fetchPlatformRum,
   fetchPlatformSummary,
   patchPlatformOrg,
   type PlatformInvoice,
@@ -198,6 +199,14 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
     staleTime: 15_000,
     retry: false,
   });
+  // RUM грузим отдельно от сводки: метрики приходят с реальных устройств и не
+  // должны задерживать список клиентов или валить экран при пустом окне.
+  const rumQuery = useQuery({
+    queryKey: ["platform", "rum"],
+    queryFn: fetchPlatformRum,
+    staleTime: 60_000,
+    retry: false,
+  });
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["platform"] });
@@ -244,6 +253,54 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
             <Stat label={tx("На триале")} value={String(data.on_trial)} />
             <Stat label={tx("Ждут оплаты")} value={String(data.awaiting_invoices)} />
             <Stat label={tx("К оплате")} value={money(data.unpaid_amount)} />
+          </div>
+
+          <div className="space-y-2" data-testid="platform-rum">
+            <div className="text-sm font-semibold text-tg-text">
+              {tx("Скорость у людей")}
+            </div>
+            <p className="text-xs text-tg-hint">
+              {tx("Core Web Vitals по устройствам за 24 часа: p75 и доля хороших.")}
+            </p>
+            {rumQuery.data && rumQuery.data.events === 0 && (
+              <p className="rounded-tile bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">
+                {tx("Замеров пока нет — появятся после первых сессий.")}
+              </p>
+            )}
+            {Object.entries(rumQuery.data?.metrics ?? {}).map(([name, byDevice]) => (
+              <div key={name} className="rounded-tile bg-tg-secondary-bg/60 p-3">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-semibold text-tg-text">{name}</span>
+                  <span className="text-2xs uppercase tracking-wide text-tg-hint">p75</span>
+                </div>
+                {Object.entries(byDevice).map(([device, stat]) => {
+                  const label =
+                    device === "mobile"
+                      ? tx("Телефон")
+                      : device === "desktop"
+                        ? tx("Компьютер")
+                        : tx("Веб");
+                  // Цвет — по порогу «хорошо» для конкретной метрики, а не
+                  // общий: 0,05 для CLS хорошо, а для LCP те же 0,05 — шум.
+                  const good =
+                    name === "CLS" ? stat.p75 <= 0.1 : name === "INP" ? stat.p75 <= 200 : stat.p75 <= 2500;
+                  return (
+                    <div
+                      key={device}
+                      className="mt-1 flex items-baseline justify-between text-xs"
+                    >
+                      <span className="text-tg-hint">{label}</span>
+                      <span className={good ? "text-tg-link" : "text-red-500"}>
+                        {name === "CLS"
+                          ? stat.p75.toFixed(2)
+                          : `${Math.round(stat.p75)} мс`}{" "}
+                        · {tx("{share}% хороших", { share: Math.round(stat.good_share * 100) })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
 
           <div className="space-y-2">

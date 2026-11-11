@@ -35,7 +35,7 @@ from app.config import get_settings
 from app.db.models import User
 from app.db.org_models import OrgInvoice, Organization
 from app.db.tenancy import all_orgs
-from app.services import billing, monitoring
+from app.services import billing, monitoring, rum
 
 log = structlog.get_logger()
 router = APIRouter(tags=["platform"])
@@ -222,6 +222,17 @@ async def _invoice_out(session: SessionDep, invoice: OrgInvoice) -> PlatformInvo
         period_start=_iso(invoice.period_start),
         period_end=_iso(invoice.period_end),
     )
+
+
+@router.get("/platform/rum")
+async def platform_rum(_admin: PlatformDep) -> dict:
+    """Core Web Vitals с реальных устройств: p75/p95 по платформе за 24 часа.
+
+    Источник — `POST /api/telemetry/vitals`, который пишет фронт. Экран
+    платформы читает ту же сводку, поэтому цифры в приложении и в CI
+    (Lighthouse) можно сравнивать напрямую.
+    """
+    return rum.rum.snapshot()
 
 
 @router.get("/platform/me", response_model=PlatformMeOut)

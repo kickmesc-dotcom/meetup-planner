@@ -80,6 +80,30 @@ export interface PlatformSummary {
   plans: PlatformPlan[];
 }
 
+/**
+ * RUM: p75/p95 Core Web Vitals по устройствам за окно в 24 часа.
+ *
+ * Источник — сами браузеры (`POST /api/telemetry/vitals`), поэтому это
+ * единственные цифры на экране, которые описывают не стенд CI, а телефон
+ * официанта в зале.
+ */
+export interface PlatformVitalStat {
+  count: number;
+  p75: number;
+  p95: number;
+  good_share: number;
+}
+
+export interface PlatformRum {
+  window_seconds: number;
+  events: number;
+  metrics: Record<string, Record<string, PlatformVitalStat>>;
+  top_paths: { path: string; count: number }[];
+  builds: { build: string; count: number }[];
+}
+
+export const fetchPlatformRum = () => api<PlatformRum>("/api/platform/rum");
+
 export const fetchPlatformMe = () => api<PlatformMe>("/api/platform/me");
 
 /** Сводка по всем клиентам. Только владельцу продукта. */
