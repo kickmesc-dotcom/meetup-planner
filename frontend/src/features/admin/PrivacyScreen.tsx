@@ -22,6 +22,7 @@ import {
   fetchOrgExport,
   fetchPrivacy,
   requestOrgDeletion,
+  rotateOrgLinks,
   saveExportFile,
   type PrivacyState,
 } from "@/api/privacy";
@@ -35,6 +36,7 @@ const ACTION_TEXT: Record<string, string> = {
   "data.exported": "Выгрузка данных",
   "org.delete_requested": "Запрошено удаление",
   "org.delete_canceled": "Удаление отменено",
+  "org.links_rotated": "Отозваны ссылки на фото и календарь",
   "member.role_changed": "Смена роли",
   "invitation.created": "Создано приглашение",
   "invitation.revoked": "Отозвано приглашение",
@@ -57,6 +59,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
   const qc = useQueryClient();
   const [confirm, setConfirm] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const [confirmRotate, setConfirmRotate] = useState(false);
 
   const q = useQuery({
     queryKey: ["privacy"],
@@ -111,13 +114,31 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
     },
   });
 
+  const rotate = useMutation({
+    mutationFn: () => rotateOrgLinks(),
+    onSuccess: (result) => {
+      setConfirmRotate(false);
+      setNote(
+        tx("Ссылки отозваны. Старые работают до {until}.", {
+          until: shortDate(result.previous_valid_until),
+        }),
+      );
+      void qc.invalidateQueries({ queryKey: ["privacy", "audit"] });
+    },
+  });
+
   const data = q.data;
   const error =
     q.error ??
     download.error ??
     remove.error ??
-    restore.error;
-  const busy = download.isPending || remove.isPending || restore.isPending;
+    restore.error ??
+    rotate.error;
+  const busy =
+    download.isPending ||
+    remove.isPending ||
+    restore.isPending ||
+    rotate.isPending;
   const deleting = data?.deletion.deleted === true;
   const codeMatches =
     !!data && confirm.trim().toLowerCase() === data.slug.toLowerCase();
@@ -179,6 +200,54 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                 ? tx("Скачиваем…")
                 : tx("Скачать копию данных")}
             </button>
+          </section>
+
+          <section className="rounded-tile bg-tg-secondary-bg/60 p-3">
+            <div className="text-sm font-semibold text-tg-text">
+              {tx("Ссылки на фото и календарь")}
+            </div>
+            <p className="mt-1 text-xs text-tg-hint">
+              {tx(
+                "Если ссылка утекла или сотрудник уволен, отзовите ключ организации. Чужие календари и фото не затронуты.",
+              )}
+            </p>
+            {confirmRotate ? (
+              <div className="mt-2 space-y-2">
+                <p className="text-xs text-tg-text">
+                  {tx(
+                    "Отозвать все ссылки этой организации? Старые продолжат работать 30 дней — чтобы открытые вкладки и календари не отвалились сразу.",
+                  )}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    aria-busy={rotate.isPending}
+                    onClick={() => rotate.mutate()}
+                    className="min-h-11 flex-1 rounded-tile bg-red-500/10 text-sm font-semibold text-red-600 disabled:opacity-50"
+                  >
+                    {rotate.isPending ? tx("Отзываем…") : tx("Да, отозвать")}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setConfirmRotate(false)}
+                    className="min-h-11 flex-1 rounded-tile bg-tg-bg/60 text-sm text-tg-text disabled:opacity-50"
+                  >
+                    {tx("Отмена")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirmRotate(true)}
+                className="mt-2 min-h-11 w-full rounded-tile bg-red-500/10 text-sm font-semibold text-red-600 disabled:opacity-50"
+              >
+                {tx("Отозвать ссылки")}
+              </button>
+            )}
           </section>
 
           <section

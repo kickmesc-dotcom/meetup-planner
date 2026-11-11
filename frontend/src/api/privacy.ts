@@ -62,6 +62,20 @@ export const cancelOrgDeletion = () =>
 export const fetchAudit = (limit = 20) =>
   api<AuditEvent[]>(`/api/org/audit?limit=${limit}`);
 
+/**
+ * Ротация ключа ссылок организации (S-10/S-11).
+ *
+ * Меняет только ключ этого клиента: чужие календари и фото не затрагиваются.
+ * `previous_valid_until` — до какой даты принимаются уже выданные ссылки.
+ */
+export interface LinksRotated {
+  rotated_at: string;
+  previous_valid_until: string;
+}
+
+export const rotateOrgLinks = () =>
+  api<LinksRotated>("/api/org/links/rotate", { method: "POST" });
+
 /** Скачать собранный экспорт как файл. Имя — код и дата, без ПДн. */
 export function saveExportFile(slug: string, data: Record<string, unknown>): void {
   const blob = new Blob([JSON.stringify(data, null, 2)], {

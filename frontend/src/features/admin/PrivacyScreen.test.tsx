@@ -18,6 +18,7 @@ import {
   fetchOrgExport,
   fetchPrivacy,
   requestOrgDeletion,
+  rotateOrgLinks,
   saveExportFile,
   type PrivacyState,
 } from "@/api/privacy";
@@ -28,6 +29,7 @@ vi.mock("@/api/privacy", () => ({
   fetchOrgExport: vi.fn(),
   requestOrgDeletion: vi.fn(),
   cancelOrgDeletion: vi.fn(),
+  rotateOrgLinks: vi.fn(),
   saveExportFile: vi.fn(),
 }));
 
@@ -36,6 +38,7 @@ const auditMock = vi.mocked(fetchAudit);
 const exportMock = vi.mocked(fetchOrgExport);
 const deleteMock = vi.mocked(requestOrgDeletion);
 const cancelMock = vi.mocked(cancelOrgDeletion);
+const rotateMock = vi.mocked(rotateOrgLinks);
 const saveMock = vi.mocked(saveExportFile);
 
 const STATE: PrivacyState = {
@@ -70,12 +73,17 @@ beforeEach(() => {
   exportMock.mockReset();
   deleteMock.mockReset();
   cancelMock.mockReset();
+  rotateMock.mockReset();
   saveMock.mockReset();
   privacyMock.mockResolvedValue(STATE);
   auditMock.mockResolvedValue([]);
   exportMock.mockResolvedValue({ organization: { slug: "salon-a" } });
   deleteMock.mockResolvedValue({ ...STATE.deletion, deleted: true, days_left: 30 });
   cancelMock.mockResolvedValue(STATE.deletion);
+  rotateMock.mockResolvedValue({
+    rotated_at: "2026-11-11T12:00:00+00:00",
+    previous_valid_until: "2026-12-11T12:00:00+00:00",
+  });
 });
 
 describe("PrivacyScreen", () => {
@@ -114,6 +122,17 @@ describe("PrivacyScreen", () => {
 
     fireEvent.click(button);
     await vi.waitFor(() => expect(deleteMock).toHaveBeenCalledWith("salon-a"));
+  });
+
+  it("отзывает ссылки организации только после подтверждения", async () => {
+    renderScreen();
+
+    fireEvent.click(await screen.findByText("Отозвать ссылки"));
+    expect(rotateMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText("Да, отозвать"));
+    await vi.waitFor(() => expect(rotateMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Старые работают до/)).toBeTruthy();
   });
 
   it("отменяет запланированное удаление", async () => {
