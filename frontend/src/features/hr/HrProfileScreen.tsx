@@ -378,7 +378,7 @@ export default function HrProfileScreen() {
             disabled={visibility.isPending || me.profile_locked}
             onClick={() => visibility.mutate(!me.profile_public)}
             className={[
-              "min-h-9 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
+              "min-h-11 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
               me.profile_public
                 ? "bg-tg-button text-tg-button-text"
                 : "bg-tg-secondary-bg text-tg-text",
@@ -591,7 +591,7 @@ export default function HrProfileScreen() {
               aria-pressed={me.learning_mode}
               onClick={() => learningMode.mutate(!me.learning_mode)}
               className={[
-                "min-h-10 flex-1 rounded-tile px-2 text-xs transition-colors disabled:opacity-50",
+                "min-h-11 flex-1 rounded-tile px-2 text-xs transition-colors disabled:opacity-50",
                 // §3 `primary-action`: включённый режим — состояние выбора,
                 // а не действие. Заливка главного действия остаётся у курса.
                 me.learning_mode
@@ -609,7 +609,7 @@ export default function HrProfileScreen() {
                 haptic("light");
                 setShowTraining(true);
               }}
-              className="min-h-10 flex-1 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text"
+              className="min-h-11 flex-1 rounded-tile bg-tg-button px-2 text-xs font-medium text-tg-button-text"
             >
               {trainingQ.data?.complete ? tx("Открыть курс") : tx("Продолжить курс")}
             </button>
@@ -989,7 +989,7 @@ function PrivacyRow({
           onToggle();
         }}
         className={[
-          "min-h-9 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
+          "min-h-11 shrink-0 rounded-full px-3 text-xs transition-colors disabled:opacity-60",
           value
             ? "bg-tg-button text-tg-button-text"
             : "bg-tg-secondary-bg text-tg-text",

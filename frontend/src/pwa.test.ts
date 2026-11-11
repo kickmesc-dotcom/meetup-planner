@@ -58,7 +58,7 @@ describe("manifest", () => {
     // приложения, а не в новой вкладке браузера. Ссылки входа и приглашений
     // поэтому обязаны оставаться в корне — вынести их на поддомен значит
     // выкинуть человека из приложения в браузер.
-    for (const path of ["/invite", "/reset", "/verify"]) {
+    for (const path of ["/invite", "/reset", "/verify", "/status"]) {
       expect(path.startsWith(manifest.scope)).toBe(true);
     }
     // Без этого поля запуск по ссылке мог открыть вторую копию приложения:

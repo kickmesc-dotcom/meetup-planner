@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { lazy, Suspense, useState } from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
@@ -16,6 +16,11 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { installGlobalErrorHandlers } from "./lib/telemetry";
 import { installVitals } from "./lib/vitals";
 import { clearVerifyTokenFromUrl, verifyTokenFromUrl } from "./features/auth/verifyUrl";
+import { isStatusPath } from "./features/status/status";
+
+// Статус нужен редко и в момент инцидента: тянем отдельным чанком, чтобы он
+// не входил в первую загрузку рабочего экрана.
+const StatusScreen = lazy(() => import("./features/status/StatusScreen"));
 
 // Прямая ссылка из `/app`: забираем токен в localStorage и чистим адресную
 // строку ДО первых запросов — иначе первый же `GET /api/me` ушёл бы без него.
@@ -46,7 +51,21 @@ const qc = new QueryClient({
  * только зря сходил бы в 401. После смены пароля адрес чистится — ссылка
  * одноразовая, оставаться в истории браузера ей незачем.
  */
+// `/status` открывается без входа и не поднимает `App`: во время инцидента
+// сессии может не быть вовсе, а человеку нужен ответ, а не форма входа.
+// Развилка отдельным компонентом — хуки ниже должны вызываться безусловно.
 function Root() {
+  if (isStatusPath(window.location.pathname)) {
+    return (
+      <Suspense fallback={null}>
+        <StatusScreen />
+      </Suspense>
+    );
+  }
+  return <AppRoute />;
+}
+
+function AppRoute() {
   const [resetToken, setResetToken] = useState(() => resetTokenFromUrl());
   const [verifyToken, setVerifyToken] = useState(() => verifyTokenFromUrl());
 
