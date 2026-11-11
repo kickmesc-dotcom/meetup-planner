@@ -60,11 +60,12 @@ export default function LanguageSwitcher({
               setLocale(option);
             }}
             className={[
-              // Высота 44 — минимум тач-цели. Ширина остаётся по тексту: это
-            // сегмент-контрол из соседних вариантов, и растягивать каждый до 44
-            // значило бы выдавить заголовок шапки; промах по вертикали здесь и
-            // есть основной.
-            "min-h-11 min-w-9 rounded-full px-2 text-2xs font-semibold uppercase transition-colors",
+            // §1.4.5 `touch-target-size`: не только высота, но и ширина 44.
+              // Было 36 px («промах по вертикали основной»), но AAA требует
+              // обе стороны. Три языка по 44 — 132 px; на 375 px заголовку
+              // остаётся 243, и `layout.spec.ts` подтверждает, что шапка не
+              // переполняется.
+              "min-h-11 min-w-11 rounded-full px-2 text-2xs font-semibold uppercase transition-colors",
               // Неактивная кнопка была `text-tg-hint` на полупрозрачном
               // secondary: axe дал 4.2:1 — ниже AA для текста 11 px.
               // Различие состояний держат фон и кольцо, а не бледность.

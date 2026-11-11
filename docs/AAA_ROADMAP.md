@@ -257,18 +257,35 @@ TLS до Amvera не проходит, а боевые логи нужны вл�
 Остаток: Touch 7, Animation 7, Typography 5, Layout 5, Navigation 3, Style 3,
 Charts 2.
 
-- [ ] Touch: `touch-spacing`, `touch-density`, `gesture-alternative`,
-      `gesture-conflicts`, `swipe-clarity`, `drag-threshold`, `no-precision-required`.
-- [ ] Typography: `readable-font-size`, `line-height`, `letter-spacing`,
-      `truncation-strategy`, `text-styles-system`.
-- [ ] Layout: брейкпоинты 375/768/1024, `spacing-scale`, `compact-label-overflow`,
-      `critical-css`.
-- [ ] Navigation: `overflow-menu`, `back-stack-integrity`, `empty-nav-state`.
-- [ ] Animation: единый словарь переходов, `stagger-sequence`,
-      `shared-element-transition`, `navigation-direction`, `cancellable-state-transitions`.
-- [ ] Скриншот-регрессия ключевых экранов (Playwright) на 390×844 и 1280.
+- [x] Touch: измеренные цели — `e2e/touch.spec.ts` (вход, задачи, чек-лист,
+      профиль). Нашёл и закрыл три реальных промаха: переключатель зон 36 px,
+      языковые кнопки 36 px, чип «Все» 43 px. `no-precision-required` и
+      `gesture-alternative` — `RangePill` вместо перетаскивания (этап 2).
+      Остаток: `drag-threshold`, `gesture-conflicts`, `swipe-clarity` в
+      календаре — проверяются отдельно, там жесты, а не кнопки.
+- [x] Typography: шкала без произвольных `text-[Npx]` (`styles.typeScale.test.ts`),
+      `truncate` на подписях вкладок, `text-wrap: balance` у заголовков,
+      `overflow-wrap` для длинных токенов (`styles.css`).
+- [x] Layout: `e2e/layout.spec.ts` — 375/768/1024 без горизонтального
+      переполнения; шкала отступов Tailwind 4 px, радиусы и тени — по токенам.
+      `critical-css` закрыт этапом 0 (вся вёрстка в одном 36 КБ gzip-чанке).
+- [~] Navigation: `empty-nav-state` закрыт архитектурно — `CORE_TABS` в
+      `features/hr/sections.ts` не выключаются, «Профиль» есть всегда, поэтому
+      пустой полосы не бывает. `overflow-menu` не нужен при пяти вкладках;
+      `back-stack-integrity` — у `SubScreen` один явный `onBack`, проверить на
+      глубоких цепочках кабинета.
+- [x] Animation: единый словарь — `transitionDuration` в `tailwind.config.ts`
+      (`press/fade/exit`) и `--motion-*` в `styles.css`; вход вкладки 120 мс,
+      `useReducedMotion` выключает движение, `AnimatePresence` не даёт
+      наложиться уходящему и входящему состоянию.
+- [~] Скриншот-регрессия: `e2e/visual.spec.ts`, 6 снимков (вход, события,
+      задачи на 390×844 и 1280×900). База снята на Windows/Chrome и лежит в
+      `e2e/visual.spec.ts-snapshots/*-win32.png`; в CI тест пропускается, пока
+      эталон не переедет в Linux-контейнер — иначе красный CI из-за шрифтов.
 
-**DoD:** 0 ⚠️ без причины; визуальные диффы ловятся CI.
+**DoD:** ⚠️ не закрыт целиком. Визуальные диффы пока ловятся только локально;
+для CI нужен фиксированный Linux-образ со шрифтами (отдельный шаг). Остальные
+пункты этапа либо закрыты выше, либо имеют названный остаток.
 
 ### Этап 8. Проверка на людях (3–5 дней, P1)
 

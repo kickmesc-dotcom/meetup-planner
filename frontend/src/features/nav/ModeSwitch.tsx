@@ -62,7 +62,9 @@ export default function ModeSwitch({ className }: { className?: string }) {
               // `min-w-0` + перенос подписи: при 200 % системного шрифта
               // «Управление» шире своей половины контрола, и без переноса
               // контрол выпихивал шапку за правый край (§1.4.4).
-              "relative flex min-h-9 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1 text-center text-xs leading-tight transition-colors",
+              // §1.4.5 `touch-target-size`: 36 px было ниже минимума 44 px,
+              // и переключатель зон — первое, что человек трогает в шапке.
+              "relative flex min-h-11 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1 text-center text-xs leading-tight transition-colors",
               // Неактивная зона — `text-tg-hint` на `secondary-bg/80`:
               // axe дал ниже AA. Цвет текста одинаковый, состояние читается
               // по подложке и весу — как у сегмент-контрола iOS.

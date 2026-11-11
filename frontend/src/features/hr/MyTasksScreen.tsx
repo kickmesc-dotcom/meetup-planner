@@ -312,7 +312,9 @@ export default function MyTasksScreen() {
                 setShowClosed(o.v);
               }}
               className={[
-                "min-h-11 rounded-full px-3 text-xs transition-colors",
+                // §1.4.5: «Все» выходило 43 px в ширину — на пиксель ниже
+                // минимума 44. min-w-11 держит цель, не раздувая чип.
+                "min-h-11 min-w-11 rounded-full px-3 text-xs transition-colors",
                 // P3.16: выбранный фильтр — не главная кнопка экрана. Заливка
                 // `bg-tg-button` остаётся за действием («Продолжить чек-лист»).
                 // Текст нейтральный, а не `text-tg-link`: на 15%-подложке
