@@ -49,4 +49,10 @@ describe("типографическая шкала", () => {
     expect(tailwindConfig).toContain('"3xs"');
     expect(tailwindConfig).toContain('"2xs"');
   });
+
+  it("держит семантические роли заголовков", () => {
+    for (const role of ["display", "title-lg", "title", "heading"]) {
+      expect(tailwindConfig).toMatch(new RegExp(`(^|\\s)["']?${role}["']?:\\s*\\[`, "m"));
+    }
+  });
 });

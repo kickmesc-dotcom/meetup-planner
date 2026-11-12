@@ -90,7 +90,7 @@ export default function ResetPasswordScreen({
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
           {done ? (
             <>
-              <h1 className="text-lg font-semibold text-tg-text">{t("reset.done.title")}</h1>
+              <h1 className="text-title text-tg-text">{t("reset.done.title")}</h1>
               <p className="mt-1 text-xs text-tg-hint">{t("reset.done.text")}</p>
               <button
                 type="button"
@@ -102,7 +102,7 @@ export default function ResetPasswordScreen({
             </>
           ) : (
             <>
-              <h1 className="text-lg font-semibold text-tg-text">{t("reset.title")}</h1>
+              <h1 className="text-title text-tg-text">{t("reset.title")}</h1>
               <p className="mt-1 text-xs text-tg-hint">{t("reset.hint")}</p>
 
               <form className="mt-3 space-y-2" onSubmit={submit} noValidate>

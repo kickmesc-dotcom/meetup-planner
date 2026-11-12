@@ -176,7 +176,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       onBack={onBack}
     >
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-3">
-        <h2 className="text-sm font-semibold text-tg-text">{tx("Новое поручение")}</h2>
+        <h2 className="text-heading text-tg-text">{tx("Новое поручение")}</h2>
 
         <FormField
           id="task-title"
@@ -498,7 +498,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold text-tg-text">{tx("Последние поручения")}</h2>
+        <h2 className="text-heading text-tg-text">{tx("Последние поручения")}</h2>
         {openTasks.length > 1 && (
           <div className="flex items-center gap-2 rounded-tile bg-tg-bg/50 px-2 py-1.5">
             <span className="min-w-0 flex-1 text-xs text-tg-hint">

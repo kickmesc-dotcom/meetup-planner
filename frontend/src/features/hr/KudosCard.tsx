@@ -73,7 +73,7 @@ export default function KudosCard() {
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-tg-text">
+        <h2 className="text-heading text-tg-text">
           {tx("Спасибо на этой неделе")}
         </h2>
         {week.my_place !== null && (

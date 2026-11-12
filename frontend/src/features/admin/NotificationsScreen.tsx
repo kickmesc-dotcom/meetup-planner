@@ -255,7 +255,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
       {q.data && (
         <>
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-tg-text">
+            <h2 className="text-heading text-tg-text">
               {tx("Запланировано ({count})", { count: q.data.pending.length })}
             </h2>
             {q.data.pending.length === 0 && (
@@ -350,7 +350,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
 
             {(q.data.disabled ?? []).length > 0 && (
               <div className="space-y-2">
-                <h2 className="text-sm font-semibold text-tg-text">
+                <h2 className="text-heading text-tg-text">
                   {tx("Выключено ({count})", {
                     count: q.data.disabled.length,
                   })}
@@ -388,7 +388,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
           </section>
 
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-tg-text">
+            <h2 className="text-heading text-tg-text">
               {tx("Отправлено ({count})", { count: q.data.items.length })}
             </h2>
             {q.data.items.length === 0 && (
@@ -432,4 +432,3 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
     </SubScreen>
   );
 }
-

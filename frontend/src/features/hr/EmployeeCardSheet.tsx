@@ -175,7 +175,7 @@ function CardBody({
         <>
           <section className="rounded-card bg-tg-secondary-bg/60 p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold text-tg-text">{tx("Опыт")}</h2>
+              <h2 className="text-heading text-tg-text">{tx("Опыт")}</h2>
               <span className="text-xs text-tg-hint">
                 {card.rank_emoji} {card.rank_title}
               </span>

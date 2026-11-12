@@ -97,7 +97,7 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
           <>
             {digest.calm && (
               <section className="rounded-card bg-status-free/10 p-3">
-                <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+                <h2 className="flex items-center gap-1.5 text-heading text-tg-text">
                   <Icon name="check" size={15} className="text-status-free" />
                   {tx("Всё спокойно")}
                 </h2>
@@ -149,7 +149,7 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
 
             {digest.overdue_titles.length > 0 && (
               <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-                <h2 className="text-sm font-semibold text-tg-text">
+                <h2 className="text-heading text-tg-text">
                   {tx("Что просрочено")}
                 </h2>
                 <ul className="mt-2 space-y-1.5">
@@ -173,7 +173,7 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
             )}
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Уведомления в Telegram")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">

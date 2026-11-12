@@ -92,7 +92,7 @@ export default function ManageZone({
           {/* h1 не только для красоты: кабинет — самостоятельный экран, и до
               этого прохода его заголовок был `div` — скринридер не находил
               заголовок страницы и начинал чтение с середины. */}
-          <h1 className="truncate text-sm font-semibold text-tg-text">
+          <h1 className="truncate text-heading text-tg-text">
             {tx("Управление")}
           </h1>
           <div className="truncate text-2xs text-tg-hint">

@@ -51,7 +51,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         role="alert"
         className="flex min-h-screen flex-col items-center justify-center gap-3 bg-tg-bg px-6 text-center"
       >
-        <h1 className="text-lg font-semibold text-tg-text">
+        <h1 className="text-title text-tg-text">
           {tx(locale, "Не удалось загрузить")}
         </h1>
         <p className="max-w-sm text-sm text-tg-hint">

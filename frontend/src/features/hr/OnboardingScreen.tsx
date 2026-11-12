@@ -141,7 +141,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         {step === 0 && (
           <section className="pt-10">
-            <h1 className="mt-4 text-2xl font-semibold text-tg-text">
+            <h1 className="mt-4 text-display text-tg-text">
               Привет, {employee.display_name.split(" ")[0]}!
             </h1>
             <p className="mt-2 text-sm text-tg-hint">{tx("Пара шагов — и можно начинать смену.")}</p>
@@ -158,7 +158,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
 
         {step === 1 && (
           <section className="pt-6">
-            <h1 className="text-xl font-semibold text-tg-text">{tx("Где ты работаешь?")}</h1>
+            <h1 className="text-title-lg text-tg-text">{tx("Где ты работаешь?")}</h1>
             <p className="mt-1 text-sm text-tg-hint">{tx("От этого зависят чек-лист смены и задачи.")}</p>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {/* Пока отделы едут, на их месте стоят плитки того же размера:
@@ -214,7 +214,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
 
         {step === 2 && (
           <section className="pt-6">
-            <h1 className="text-xl font-semibold text-tg-text">{tx("Как давно ты в деле?")}</h1>
+            <h1 className="text-title-lg text-tg-text">{tx("Как давно ты в деле?")}</h1>
             <div className="mt-4 space-y-2">
               {(
                 [
@@ -274,7 +274,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
           (showCourse ? (
             <section className="-mx-5 flex min-h-0 flex-col">
               <div className="px-5 pb-2">
-                <h1 className="text-xl font-semibold text-tg-text">{tx("Как устроено приложение")}</h1>
+                <h1 className="text-title-lg text-tg-text">{tx("Как устроено приложение")}</h1>
                 <p className="mt-1 text-sm text-tg-hint">
                   {tx("Короткие уроки — по одному действию на экран. Можно прервать.")}
                 </p>
@@ -288,7 +288,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
             </section>
           ) : (
             <section className="pt-4">
-              <h1 className="text-2xl font-semibold text-tg-text">
+              <h1 className="text-display text-tg-text">
                 {tx("Первая смена")}
               </h1>
               <p className="mt-2 text-sm text-tg-hint">

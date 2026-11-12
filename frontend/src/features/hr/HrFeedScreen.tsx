@@ -405,7 +405,7 @@ export default function HrFeedScreen() {
         {/* `flex-wrap`: при 200 % шрифта «События смены» и плашка масштаба
             вместе шире экрана — плашка уходит на свою строку. */}
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">{tx("События смены")}</h1>
+          <h1 className="text-title text-tg-text">{tx("События смены")}</h1>
           {feed && (
             <span className="min-w-0 break-words rounded-full bg-tg-secondary-bg px-2 py-1 text-xs text-tg-text">
               {tx(SCOPE_TITLE[feed.scope])}
@@ -744,7 +744,7 @@ function KudosSheet({ onClose }: { onClose: () => void }) {
       />
       <div className="relative max-h-[85%] overflow-y-auto rounded-t-card bg-tg-bg p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-tg-text">{tx("Благодарности")}</h2>
+          <h2 className="text-heading text-tg-text">{tx("Благодарности")}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -812,7 +812,7 @@ function FiltersSheet({
       />
       <div className="relative max-h-[85%] overflow-y-auto rounded-t-card bg-tg-bg p-4">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-tg-text">{tx("Фильтры")}</h2>
+          <h2 className="text-heading text-tg-text">{tx("Фильтры")}</h2>
           <button
             type="button"
             onClick={onClose}

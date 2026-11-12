@@ -67,7 +67,7 @@ export default function VerifyEmailScreen({
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
           {confirm.isSuccess ? (
             <>
-              <h1 className="text-lg font-semibold text-tg-text">
+              <h1 className="text-title text-tg-text">
                 {t("verify.done.title")}
               </h1>
               <p className="mt-1 text-xs text-tg-hint">{t("verify.done.text")}</p>
@@ -81,7 +81,7 @@ export default function VerifyEmailScreen({
             </>
           ) : failed ? (
             <>
-              <h1 className="text-lg font-semibold text-tg-text">
+              <h1 className="text-title text-tg-text">
                 {t("verify.error.title")}
               </h1>
               <p className="mt-1 text-xs text-tg-hint">{failure}</p>
@@ -98,7 +98,7 @@ export default function VerifyEmailScreen({
             </>
           ) : (
             <>
-              <h1 className="text-lg font-semibold text-tg-text">
+              <h1 className="text-title text-tg-text">
                 {t("verify.title")}
               </h1>
               <p className="mt-1 text-xs text-tg-hint">{t("verify.hint")}</p>

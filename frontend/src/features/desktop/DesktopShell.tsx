@@ -136,7 +136,7 @@ export default function DesktopShell({
             {/* Заголовок зоны — `h1` каркаса: на десктопе `ManageZone` свою
                 шапку не рисует, и без этого у кабинета не было заголовка
                 первого уровня вообще. */}
-            <h1 className="truncate text-sm font-semibold text-tg-text">
+            <h1 className="truncate text-heading text-tg-text">
               {manage ? tx("Управление") : "SemiTask"}
             </h1>
             <div className="truncate text-2xs text-tg-hint">

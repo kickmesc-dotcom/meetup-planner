@@ -29,7 +29,7 @@ export default function SubScreen({ title, subtitle, onBack, children }: Props) 
         <div className="flex-1 min-w-0">
           {/* Заголовок подраздела — `h1`: каждый экран кабинета открывается
               отдельно, и у него должен быть заголовок первого уровня. */}
-          <h1 className="text-sm font-semibold truncate" title={title}>
+          <h1 className="text-heading truncate" title={title}>
             {title}
           </h1>
           {subtitle && (

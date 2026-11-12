@@ -376,7 +376,7 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
 
       {q.data && (
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-tg-text">
+          <h2 className="text-heading text-tg-text">
             {tx("Живые ссылки ({count})", { count: rows.length })}
           </h2>
           {rows.length === 0 && (

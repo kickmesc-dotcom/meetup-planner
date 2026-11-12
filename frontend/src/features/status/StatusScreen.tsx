@@ -54,7 +54,7 @@ export default function StatusScreen() {
     <main className="min-h-full bg-tg-bg px-4 py-8 text-tg-text">
       <div className="mx-auto w-full max-w-md space-y-3">
         <header className="space-y-1">
-          <h1 className="text-lg font-semibold">{tx("Статус")}</h1>
+          <h1 className="text-title">{tx("Статус")}</h1>
           <p className="text-xs text-tg-hint">
             {tx("Проверка обновляется каждые 30 секунд.")}
           </p>

@@ -284,7 +284,7 @@ export default function OrgSetupScreen({
         {step === 0 && (
           <section className="space-y-4">
             <div>
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Что у вас за предприятие?")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">
@@ -307,7 +307,7 @@ export default function OrgSetupScreen({
               ))}
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Сколько человек в штате?")}
               </h2>
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -330,7 +330,7 @@ export default function OrgSetupScreen({
         {step === 1 && (
           <section className="space-y-3">
             <div>
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Из кого состоит команда?")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">
@@ -413,7 +413,7 @@ export default function OrgSetupScreen({
         {step === 4 && (
           <section className="space-y-2">
             <div>
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Какие разделы оставить?")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">
@@ -435,7 +435,7 @@ export default function OrgSetupScreen({
         {step === 5 && (
           <section className="space-y-3">
             <div>
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Кто что видит")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">
@@ -894,7 +894,7 @@ function PeopleStep({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-tg-text">
+        <h2 className="text-heading text-tg-text">
           {tx("Кого позвать первым?")}
         </h2>
         <p className="mt-1 text-xs text-tg-hint">
@@ -1132,7 +1132,7 @@ function ScheduleStep({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="text-sm font-semibold text-tg-text">
+        <h2 className="text-heading text-tg-text">
           {tx("Рабочая неделя")}
         </h2>
         <p className="mt-1 text-xs text-tg-hint">

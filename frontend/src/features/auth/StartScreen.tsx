@@ -120,7 +120,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
         {mode === "choose" && (
           <section className="space-y-4">
             <div>
-              <h1 className="text-xl font-semibold text-tg-text">
+              <h1 className="text-title-lg text-tg-text">
                 {tx("Кто вы в компании?")}
               </h1>
               <p className="mt-2 text-sm text-tg-hint">
@@ -181,7 +181,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
         {mode === "join" && (
           <section className="space-y-4">
             <div>
-              <h1 className="text-lg font-semibold text-tg-text">
+              <h1 className="text-title text-tg-text">
                 {tx("Вход в организацию")}
               </h1>
               <p className="mt-1 text-xs text-tg-hint">
@@ -240,7 +240,7 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
         {mode === "create" && (
           <section className="space-y-4">
             <div>
-              <h1 className="text-lg font-semibold text-tg-text">
+              <h1 className="text-title text-tg-text">
                 {tx("Новая организация")}
               </h1>
               <p className="mt-1 text-xs text-tg-hint">

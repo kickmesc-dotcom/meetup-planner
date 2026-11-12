@@ -152,7 +152,7 @@ function ReviewCard({
     <article className="rounded-card bg-tg-secondary-bg/60 p-3">
       <button type="button" onClick={onToggle} className="w-full text-left">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-sm font-semibold text-tg-text break-words">
+          <h2 className="text-heading text-tg-text break-words">
             {task.title}
           </h2>
           <span className="shrink-0 rounded-full bg-status-maybe/20 px-2 py-1 text-xs text-status-maybe">

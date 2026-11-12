@@ -51,7 +51,7 @@ function Section({
 }) {
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-      <h2 className="text-sm font-semibold text-tg-text">{title}</h2>
+      <h2 className="text-heading text-tg-text">{title}</h2>
       {hint && <p className="mt-0.5 text-xs text-tg-hint">{hint}</p>}
       <div className="mt-2 space-y-2">{children}</div>
     </section>

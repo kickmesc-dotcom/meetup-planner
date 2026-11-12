@@ -29,7 +29,7 @@ export default function LinksScreen() {
   return (
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
-        <h1 className="text-lg font-semibold text-tg-text">{tx("Полезные ссылки")}</h1>
+        <h1 className="text-title text-tg-text">{tx("Полезные ссылки")}</h1>
         <p className="mt-1 text-xs text-tg-hint">
           {meQ.data?.department_name
             ? tx("Общие и для подразделения «{name}»", {

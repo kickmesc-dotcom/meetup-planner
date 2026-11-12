@@ -218,7 +218,7 @@ export default function AuthScreen({
         )}
 
         <div className="rounded-card bg-tg-secondary-bg/40 p-4">
-          <h1 className="text-lg font-semibold text-tg-text">{t(TITLES[mode])}</h1>
+          <h1 className="text-title text-tg-text">{t(TITLES[mode])}</h1>
           {invited && (
             <p className="mt-2 rounded-tile bg-tg-secondary-bg/60 p-2 text-xs text-tg-text">
               {t("auth.invited")}

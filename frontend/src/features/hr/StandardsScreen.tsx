@@ -543,7 +543,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="mb-4 rounded-card bg-tg-secondary-bg/60 p-3">
-      <h2 className="text-sm font-semibold text-tg-text">{tx("Новый стандарт")}</h2>
+      <h2 className="text-heading text-tg-text">{tx("Новый стандарт")}</h2>
       <p className="mt-0.5 text-xs text-tg-hint">{tx(
         "Пиши как для нового сотрудника: что сделать, в каком порядке и почему.",
       )}</p>

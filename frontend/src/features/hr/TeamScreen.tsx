@@ -181,7 +181,7 @@ export default function TeamScreen({
 
             {dashboard.data.attention.length > 0 && (
               <section className="rounded-card bg-status-busy/10 p-3">
-                <h2 className="text-sm font-semibold text-status-busy">
+                <h2 className="text-heading text-status-busy">
                   {tx("Требует внимания")}
                 </h2>
                 <ul className="mt-2 space-y-1.5">
@@ -217,7 +217,7 @@ export default function TeamScreen({
             )}
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Позвать в команду")}
               </h2>
               <p className="mt-1 text-xs text-tg-hint">
@@ -238,7 +238,7 @@ export default function TeamScreen({
             </section>
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-              <h2 className="text-sm font-semibold text-tg-text">
+              <h2 className="text-heading text-tg-text">
                 {tx("Подразделения")}
               </h2>
               <div className="mt-2 space-y-2">
@@ -255,7 +255,7 @@ export default function TeamScreen({
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-tg-text">
+                <h2 className="text-heading text-tg-text">
                   {tx("Сотрудники")}
                 </h2>
                 <span className="text-xs tabular-nums text-tg-hint">
@@ -304,7 +304,7 @@ export default function TeamScreen({
 
             {dashboard.data.activity.length > 0 && (
               <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-                <h2 className="text-sm font-semibold text-tg-text">
+                <h2 className="text-heading text-tg-text">
                   {tx("Последние действия")}
                 </h2>
                 <ul className="mt-2 space-y-1">

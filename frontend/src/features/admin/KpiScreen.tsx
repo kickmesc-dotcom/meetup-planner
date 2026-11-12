@@ -92,7 +92,7 @@ export default function KpiScreen({ onBack }: Props) {
 
       {rules && (
         <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-          <h2 className="text-sm font-semibold text-tg-text">{tx("Сколько стоит работа")}</h2>
+          <h2 className="text-heading text-tg-text">{tx("Сколько стоит работа")}</h2>
           <div className="text-xs text-tg-hint">{tx(
             "Веса действуют сразу: опыт пересчитывается из уже записанных смен и поручений, передеплой не нужен.",
           )}</div>
@@ -129,7 +129,7 @@ export default function KpiScreen({ onBack }: Props) {
       )}
 
       <section className="rounded-card bg-tg-secondary-bg/60 p-3 space-y-2">
-        <h2 className="text-sm font-semibold text-tg-text">{tx("Неделя")}</h2>
+        <h2 className="text-heading text-tg-text">{tx("Неделя")}</h2>
         {q.data && (
           <div className="text-xs text-tg-hint">
             {tx("{from} — {to} · Mon–Sun", {

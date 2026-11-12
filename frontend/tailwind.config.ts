@@ -26,6 +26,13 @@ export default {
       fontSize: {
         "3xs": ["10px", { lineHeight: "1.2" }],
         "2xs": ["11px", { lineHeight: "1.25" }],
+        // Роли, а не «размер плюс вес по месту». Заголовок экрана и заголовок
+        // секции — разные роли с одинаковым набором свойств на всех экранах;
+        // `text-title`/`text-heading` держат размер, интерлиньяж и вес вместе.
+        display: ["24px", { lineHeight: "1.1", fontWeight: "600" }],
+        "title-lg": ["20px", { lineHeight: "1.15", fontWeight: "600" }],
+        title: ["18px", { lineHeight: "1.15", fontWeight: "600" }],
+        heading: ["14px", { lineHeight: "1.25", fontWeight: "600" }],
       },
       // VISUAL_AUDIT P1.6: два радиуса вместо «по настроению». Карточка — 12px
       // (`rounded-card`), всё внутри неё — 8px (`rounded-tile`): плитки, поля,

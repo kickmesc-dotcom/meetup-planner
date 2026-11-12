@@ -104,7 +104,7 @@ export default function MaterialsScreen({
           </button>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold text-tg-text">
+          <h1 className="text-title text-tg-text">
             {tx("Материалы смены")}
           </h1>
           <p className="mt-1 text-xs text-tg-hint">{hint}</p>

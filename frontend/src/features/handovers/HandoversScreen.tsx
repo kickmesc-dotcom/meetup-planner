@@ -109,7 +109,7 @@ export default function HandoversScreen() {
             <Icon name="back" size={18} />
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-2 text-lg font-semibold text-tg-text">
+            <h1 className="flex items-center gap-2 text-title text-tg-text">
               <Icon name="send" size={18} />{tx("Передача смены")}</h1>
             <p className="mt-0.5 text-xs text-tg-hint">
               {summary

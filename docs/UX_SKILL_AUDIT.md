@@ -146,7 +146,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `font-pairing` | ✅ | одна системная семья | — |
 | `font-scale` | ✅ | токены `3xs…2xl`; `styles.typeScale.test.ts` | — |
 | `contrast-readability` | ⚠️ | не измерено | S |
-| `text-styles-system` | ⚠️ | роли через классы, не через семантические токены | — |
+| `text-styles-system` | ⚠️ | заголовки переведены на роли `display`/`title-lg`/`title`/`heading` (66 мест), роли закреплены тестом; тело, подписи и табличные числа ещё на утилитах | — |
 | `weight-hierarchy` | ✅ | 600 заголовки, 400 текст, 500 подписи | — |
 | `color-semantic` | ✅ | `tg-*`, `status-*` | — |
 | `color-dark-mode` | ✅ | отдельные значения темы | — |
@@ -388,3 +388,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `spacing-scale` частично: 74 класса `*-0.5` в padding/gap подняты до 4px; закрыты 32 пропущенных английских перевода и устаревший мок ленты | `tsc` 0, eslint 0, 1069/1069, сборка 0 |
 | 12.11.2026 | техдолг | `network-fallback` частично: `ErrorState` называет обрыв связи, имеет `role=alert` и повторяет запрос по событию `online` | `tsc` 0, eslint 0, 8 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `consistent-help` частично: компонент `Hint`, дубль подсказки в приватности убран, подсказки полей — только через `FormField.hint` | `tsc` 0, eslint 0, 19 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `text-styles-system` частично: токены `display`/`title-lg`/`title`/`heading`, 66 заголовков переведены с `text-lg font-semibold` на роли | `tsc` 0, eslint 0, 1073/1074 → typeScale 4/4, сборка 0 |

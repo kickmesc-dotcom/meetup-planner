@@ -186,7 +186,7 @@ export default function ChecklistScreen() {
     <div className="flex h-full flex-col">
       <header className="border-b border-tg-secondary-bg px-4 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h1 className="text-lg font-semibold text-tg-text">
+          <h1 className="text-title text-tg-text">
             {tx("Чек-лист смены")}
           </h1>
           {data && data.total > 0 && (

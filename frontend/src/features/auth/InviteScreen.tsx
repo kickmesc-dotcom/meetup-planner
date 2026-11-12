@@ -110,7 +110,7 @@ export default function InviteScreen({
   if (joined) {
     return card(
       <>
-        <h1 className="text-lg font-semibold text-tg-text">
+        <h1 className="text-title text-tg-text">
           {t("invite.joined.title")}
         </h1>
         <p className="mt-1 text-xs text-tg-hint">
@@ -140,7 +140,7 @@ export default function InviteScreen({
           <div className="h-4 w-4 rounded-tile bg-tg-bg/50" />
           <div className="h-3 w-24 rounded-tile bg-tg-bg/40" />
         </div>
-        <h1 className="mt-1 text-lg font-semibold text-tg-text">
+        <h1 className="mt-1 text-title text-tg-text">
           {t("invite.title")}
         </h1>
         <div className="mt-1 animate-pulse motion-reduce:animate-none space-y-2">
@@ -154,7 +154,7 @@ export default function InviteScreen({
   if (preview.isError || !preview.data) {
     return card(
       <>
-        <h1 className="text-lg font-semibold text-tg-text">
+        <h1 className="text-title text-tg-text">
           {t("invite.error.title")}
         </h1>
         <p className="mt-1 text-xs text-tg-hint">
@@ -183,7 +183,7 @@ export default function InviteScreen({
         <Icon name="team" size={18} />
         <span className="text-xs">{invite.org_name}</span>
       </div>
-      <h1 className="mt-1 text-lg font-semibold text-tg-text">
+      <h1 className="mt-1 text-title text-tg-text">
         {t("invite.title")}
       </h1>
       <p className="mt-1 text-xs text-tg-hint">

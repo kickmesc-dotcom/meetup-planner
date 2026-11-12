@@ -54,7 +54,7 @@ export default function KpiCard() {
     >
       <p className="sr-only">{summary}</p>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-tg-text">{tx("Опыт смены")}</h2>
+        <h2 className="text-heading text-tg-text">{tx("Опыт смены")}</h2>
         <span className="rounded-full bg-tg-bg/60 px-2 py-1 text-xs text-tg-text">
           {kpi.rank.emoji} {tx(kpi.rank.title)}
         </span>

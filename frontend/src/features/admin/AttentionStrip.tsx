@@ -84,7 +84,7 @@ export default function AttentionStrip({ data, loading = false, onOpen }: Props)
           <Icon name={nothing ? "check" : "alert"} size={17} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-tg-text">
+          <h2 className="text-heading text-tg-text">
             {nothing ? tx("Всё под контролем") : tx("Требует внимания")}
           </h2>
           <p className="mt-0.5 text-2xs text-tg-hint">

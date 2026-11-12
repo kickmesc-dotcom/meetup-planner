@@ -28,7 +28,7 @@ export default function AchievementsCard() {
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-sm font-semibold text-tg-text">
+        <h2 className="flex items-center gap-1.5 text-heading text-tg-text">
           <Icon name="award" size={15} className="shrink-0 text-tg-link" />{tx("Личный прогресс")}</h2>
         <span className="text-xs text-tg-hint">
           {awarded.length ? tx("{count} шт.", { count: awarded.length }) : tx("пока пусто")}

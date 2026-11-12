@@ -229,7 +229,7 @@ export default function ReportsScreen({
 
             <section className="rounded-card bg-tg-secondary-bg/60 p-3">
               <div className="flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold text-tg-text">
+                <h2 className="text-heading text-tg-text">
                   {tx("Сейчас в работе")}
                 </h2>
                 <span className="text-xs text-tg-hint">
@@ -248,7 +248,7 @@ export default function ReportsScreen({
 
             {report.departments.length > 1 && (
               <section className="space-y-2">
-                <h2 className="px-1 text-sm font-semibold text-tg-text">
+                <h2 className="px-1 text-heading text-tg-text">
                   {tx("По отделам")}
                 </h2>
                 {report.departments.map((dept) => (
@@ -259,7 +259,7 @@ export default function ReportsScreen({
 
             <section className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <h2 className="text-sm font-semibold text-tg-text">
+                <h2 className="text-heading text-tg-text">
                   {tx("Обязательные стандарты")}
                 </h2>
                 <label className="flex items-center gap-1 text-xs text-tg-hint">

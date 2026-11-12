@@ -222,7 +222,7 @@ export default function MyTasksScreen() {
               «🛠 Разработчик» съедали всю ширину, и вместо имени оставалось
               «Привет,…». Теперь приветствие — своя строка, плашка — под ним. */}
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-lg font-semibold leading-tight text-tg-text">
+            <h1 className="truncate text-title leading-tight text-tg-text">
               {firstName ? tx("Привет, {name}", { name: firstName }) : tx("Мои задачи")}
             </h1>
             {meQ.data && (
