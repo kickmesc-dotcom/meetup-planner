@@ -309,6 +309,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         <FormField
           id="task-expected"
           label={tx("Что должно получиться (необязательно)")}
+          hint={tx("Один результат, который можно проверить глазами.")}
           labelClassName="block text-xs text-tg-hint"
         >
           {(field) => (

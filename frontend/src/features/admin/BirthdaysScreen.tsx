@@ -193,6 +193,7 @@ function BirthdaysForm({
               <FormField
                 id={`bday-${r.user_id}`}
                 label={tx("Дата рождения")}
+                hint={tx("Видно только руководителям; сотруднику — напоминание в этот день.")}
               >
                 {(field) => (
                   <input

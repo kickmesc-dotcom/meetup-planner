@@ -625,6 +625,7 @@ function AddStandardForm({ onDone }: { onDone: () => void }) {
       <FormField
         id="standard-body"
         label={tx("Инструкция")}
+        hint={tx("Каждый шаг — с новой строки: так её читают на смене.")}
         className="mt-2 text-xs text-tg-hint"
       >
         {(field) => (

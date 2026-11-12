@@ -186,6 +186,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
               <FormField
                 id="restart-at"
                 label={tx("Дата и время")}
+                hint={tx("Время твоего часового пояса — по нему и перезапустим.")}
                 labelClassName="sr-only"
               >
                 {(field) => (
