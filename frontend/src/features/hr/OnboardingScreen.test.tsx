@@ -150,6 +150,28 @@ describe("OnboardingScreen: первая смена", () => {
     expect(screen.queryByTestId("onboarding-departments-skeleton")).toBeNull();
   });
 
+  it("не спрашивает отдел повторно, если его уже назначили", () => {
+    renderScreen({
+      onboarding_state: "department",
+      department_id: 1,
+      experience: null,
+    });
+
+    expect(screen.getByText("Как давно ты в деле?")).toBeTruthy();
+    expect(screen.queryByText("Где ты работаешь?")).toBeNull();
+  });
+
+  it("пропускает знакомство, когда отдел и опыт уже известны", () => {
+    renderScreen({
+      onboarding_state: "department",
+      department_id: 1,
+      experience: "new",
+    });
+
+    expect(screen.getByText("Первая смена")).toBeTruthy();
+    expect(screen.queryByText("Как давно ты в деле?")).toBeNull();
+  });
+
   it("кто уже ответил на шаги — попадает сразу на первую смену", () => {
     renderScreen({ onboarding_state: "training", department_id: null });
 

@@ -68,10 +68,22 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
 
   const initialStep = useMemo(() => {
     if (employee.onboarding_state === "training") return 3;
-    if (employee.onboarding_state === "department") return 1;
-    if (employee.onboarding_state === "experience") return 2;
+    // Не спрашиваем то, что уже известно: отдел мог назначить руководитель,
+    // опыт — остаться с прошлого прохода. Иначе человек выбирает то же самое
+    // второй раз, а знакомство выглядит длиннее, чем есть.
+    if (employee.onboarding_state === "department") {
+      if (employee.department_id == null) return 1;
+      return employee.experience == null ? 2 : 3;
+    }
+    if (employee.onboarding_state === "experience") {
+      return employee.experience == null ? 2 : 3;
+    }
     return 0;
-  }, [employee.onboarding_state]);
+  }, [
+    employee.onboarding_state,
+    employee.department_id,
+    employee.experience,
+  ]);
 
   const [step, setStep] = useState(initialStep);
   const [departmentId, setDepartmentId] = useState<number | null>(
