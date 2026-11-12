@@ -20,6 +20,18 @@ const themeColor =
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
+    // UI_UX_PRO_MAX §7 `breakpoint-consistency`: одна шкала на всё приложение.
+    // `xs` — узкий телефон (375), `sm` — планшет в портрете, где 560-й контейнер
+    // уже получает поля, `md` — планшет, `lg` — десктоп. `xl`/`2xl` убраны:
+    // приложение живёт в 560 px, и «две колонки только с 1280» означало, что на
+    // ноутбуке 1024 они так и не включались. Тест `styles.breakpoints.test.ts`
+    // держит шкалу и запрещает произвольные `min-[...]px:`.
+    screens: {
+      xs: "375px",
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+    },
     extend: {
       // DESIGN_SYSTEM §2: no 9px, no 1px-stepped sizes. `3xs`/`2xs` are the
       // small end of the scale (avatar initials, captions, ledger labels).

@@ -120,7 +120,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 |---|---|---|---|
 | `viewport-meta` | ✅ | `initial-scale=1`, зум разрешён (этап L) | — |
 | `mobile-first` | ✅ | колонка 560px, нижняя полоса | — |
-| `breakpoint-consistency` | ⚠️ | `sm`/`lg` точечно, без шкалы 375/768/1024 | — |
+| `breakpoint-consistency` | ✅ | шкала `xs/sm/md/lg` = 375/640/768/1024 в `tailwind.config.ts`; `xl`/`2xl` убраны, двухколоночные задачи включаются на 1024; произвольные медиазапросы запрещены тестом | — |
 | `readable-font-size` | ⚠️ | поля 16px (вход и сброс — `text-base`, на iOS — принудительно); основной текст 14px (`text-sm`) | S |
 | `line-length-control` | ✅ | `max-w-[560px]` | — |
 | `horizontal-scroll` | ✅ | скролл только в таблицах/календаре, осознанно | — |
@@ -303,13 +303,13 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 2. Touch & Interaction | 5 | 2 | 2 | 1 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
-| 5. Layout & Responsive | 5 | 0 | 2 | 3 |
+| 5. Layout & Responsive | 4 | 0 | 2 | 2 |
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **35** | **10** | **15** | **10** |
+| **Итого** | **34** | **10** | **15** | **9** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,8 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (10).** `touch-spacing`,
-`breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
+**Техдолг (9).** `touch-spacing`,
+`spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
 `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
@@ -400,3 +400,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `consistent-help` закрыт: описания шагов и секций переведены на `Hint size="xs"` в пяти экранах, вид подсказки задаёт компонент | `tsc` 0, eslint 0, 14 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `error-feedback` закрыт: создание филиала и поручения показывает ошибку у поля с `aria-invalid` и `aria-describedby`, а не только тостом | `tsc` 0, eslint 0, 7 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `gesture-alternative` закрыт: доступность в часовой сетке создаётся кнопкой, а не только drag | `tsc` 0, eslint 0, 5 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `breakpoint-consistency` закрыт: шкала 375/640/768/1024, `xl` убран, произвольные медиазапросы запрещены guard-тестом | `tsc` 0, eslint 0, 6 тестов, сборка 0 |
