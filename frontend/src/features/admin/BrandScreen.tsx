@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchBrand, resetBrand, updateBrand, type OrgBrand } from "@/api/brand";
 import { Skeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import FormField from "@/components/FormField";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
@@ -189,7 +190,7 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
             onClick={() => save.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
-            {tx("Сохранить")}
+            <BusyLabel busy={busy}>{tx("Сохранить")}</BusyLabel>
           </button>
           <button
             type="button"
@@ -198,7 +199,7 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
             onClick={() => reset.mutate()}
             className="min-h-11 w-full rounded-tile bg-tg-secondary-bg text-sm font-semibold text-tg-hint disabled:opacity-50"
           >
-            {tx("Сбросить бренд")}
+            <BusyLabel busy={busy}>{tx("Сбросить бренд")}</BusyLabel>
           </button>
 
           <p className="rounded-tile bg-tg-secondary-bg/60 p-3 text-xs text-tg-hint">

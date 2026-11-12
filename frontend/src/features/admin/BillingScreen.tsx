@@ -24,6 +24,7 @@ import {
   type OrgInvoice,
 } from "@/api/orgs";
 import { Skeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
 
@@ -92,7 +93,7 @@ function InvoiceRow({
               onClick={() => onPaid(invoice.id)}
               className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
             >
-              {tx("Я оплатил")}
+              <BusyLabel busy={busy}>{tx("Я оплатил")}</BusyLabel>
             </button>
           )}
           <button
@@ -102,7 +103,7 @@ function InvoiceRow({
             onClick={() => onCancel(invoice.id)}
             className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm font-semibold text-tg-hint disabled:opacity-50"
           >
-            {tx("Отменить")}
+            <BusyLabel busy={busy}>{tx("Отменить")}</BusyLabel>
           </button>
         </div>
       )}

@@ -29,6 +29,7 @@ import {
 import { fetchMeta } from "@/api/meta";
 import { humanizeApiError } from "@/api/client";
 import { Skeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import { useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
 
@@ -208,9 +209,11 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
               onClick={() => download.mutate(data.slug)}
               className="mt-2 min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
             >
-              {download.isPending
-                ? tx("Скачиваем…")
-                : tx("Скачать копию данных")}
+              <BusyLabel busy={download.isPending}>
+                {download.isPending
+                  ? tx("Скачиваем…")
+                  : tx("Скачать копию данных")}
+              </BusyLabel>
             </button>
           </section>
 
@@ -239,7 +242,9 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                     onClick={() => rotate.mutate()}
                     className="min-h-11 flex-1 rounded-tile bg-red-500/10 text-sm font-semibold text-red-600 disabled:opacity-50"
                   >
-                    {rotate.isPending ? tx("Отзываем…") : tx("Да, отозвать")}
+                    <BusyLabel busy={rotate.isPending}>
+                      {rotate.isPending ? tx("Отзываем…") : tx("Да, отозвать")}
+                    </BusyLabel>
                   </button>
                   <button
                     type="button"
@@ -290,7 +295,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                   onClick={() => restore.mutate()}
                   className="mt-2 min-h-11 w-full rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
                 >
-                  {tx("Отменить удаление")}
+                  <BusyLabel busy={busy}>{tx("Отменить удаление")}</BusyLabel>
                 </button>
               </>
             ) : (
@@ -334,7 +339,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                   onClick={() => remove.mutate()}
                   className="mt-2 min-h-11 w-full rounded-tile bg-red-500/10 text-sm font-semibold text-red-600 disabled:opacity-50"
                 >
-                  {tx("Запросить удаление")}
+                  <BusyLabel busy={busy}>{tx("Запросить удаление")}</BusyLabel>
                 </button>
               </>
             )}

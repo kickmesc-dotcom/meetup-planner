@@ -16,6 +16,7 @@ import { ListSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import FormField from "@/components/FormField";
+import { BusyLabel } from "@/components/BusyLabel";
 import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
@@ -392,14 +393,18 @@ function EmployeeRow({
                 })
               }
               className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
-            >{tx("Сохранить")}</button>
+            >
+              <BusyLabel busy={busy}>{tx("Сохранить")}</BusyLabel>
+            </button>
             <button
               type="button"
               disabled={busy}
               aria-busy={busy}
               onClick={onReset}
               className="min-h-9 rounded-tile bg-tg-bg/60 px-3 text-xs text-tg-text disabled:opacity-50"
-            >{tx("Обнулить прогресс")}</button>
+            >
+              <BusyLabel busy={busy}>{tx("Обнулить прогресс")}</BusyLabel>
+            </button>
             {fired ? (
               card.purge_after && (
                 <button
@@ -408,7 +413,9 @@ function EmployeeRow({
                   aria-busy={busy}
                   onClick={onRestore}
                   className="min-h-9 rounded-tile bg-status-free/15 px-3 text-xs text-status-free disabled:opacity-50"
-                >{tx("Вернуть из корзины")}</button>
+                >
+                  <BusyLabel busy={busy}>{tx("Вернуть из корзины")}</BusyLabel>
+                </button>
               )
             ) : (
               <button
@@ -417,7 +424,9 @@ function EmployeeRow({
                 aria-busy={busy}
                 onClick={onFire}
                 className="min-h-9 rounded-tile bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
-              >{tx("Уволить")}</button>
+              >
+                <BusyLabel busy={busy}>{tx("Уволить")}</BusyLabel>
+              </button>
             )}
           </div>
           <p className="text-2xs text-tg-hint">

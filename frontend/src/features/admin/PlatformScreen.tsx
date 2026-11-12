@@ -31,6 +31,7 @@ import {
   type PlatformOrg,
 } from "@/api/platform";
 import { Skeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
 
@@ -121,7 +122,9 @@ function OrgRow({
           onClick={() => onToggle(org)}
           className="min-h-11 rounded-tile bg-tg-secondary-bg px-3 text-sm font-semibold text-tg-hint disabled:opacity-50"
         >
-          {org.is_active ? tx("Заблокировать") : tx("Разблокировать")}
+          <BusyLabel busy={busy}>
+            {org.is_active ? tx("Заблокировать") : tx("Разблокировать")}
+          </BusyLabel>
         </button>
       </div>
     </div>
@@ -160,7 +163,7 @@ function InvoiceRow({
             onClick={() => onConfirm(invoice.id)}
             className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
           >
-            {tx("Подтвердить оплату")}
+            <BusyLabel busy={busy}>{tx("Подтвердить оплату")}</BusyLabel>
           </button>
           <button
             type="button"
@@ -169,7 +172,7 @@ function InvoiceRow({
             onClick={() => onCancel(invoice.id)}
             className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm font-semibold text-tg-hint disabled:opacity-50"
           >
-            {tx("Отменить")}
+            <BusyLabel busy={busy}>{tx("Отменить")}</BusyLabel>
           </button>
         </div>
       )}
