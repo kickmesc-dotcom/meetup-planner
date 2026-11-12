@@ -8,6 +8,7 @@ import {
 } from "@/api/access";
 import { clearAccessToken, humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
+import { BusyLabel } from "@/components/BusyLabel";
 import { copyText } from "@/lib/clipboard";
 import { getInitData, haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { currentIntlLocale, useTx } from "@/i18n";
@@ -210,7 +211,9 @@ function LinkRow({
           aria-busy={busy}
           onClick={onRevoke}
           className="min-h-8 shrink-0 rounded-full px-2 text-2xs text-tg-hint disabled:opacity-50"
-        >{tx("Отозвать")}</button>
+        >
+          <BusyLabel busy={busy}>{tx("Отозвать")}</BusyLabel>
+        </button>
       )}
     </li>
   );

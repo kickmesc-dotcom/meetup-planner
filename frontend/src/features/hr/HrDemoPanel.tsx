@@ -10,6 +10,7 @@ import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import Badge from "@/features/hr/Badge";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { useTx } from "@/i18n";
@@ -141,7 +142,9 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="mt-2 min-h-11 w-full rounded-tile bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {data.visible ? tx("Скрыть следы") : tx("Показать следы")}
+                <BusyLabel busy={busy}>
+                  {data.visible ? tx("Скрыть следы") : tx("Показать следы")}
+                </BusyLabel>
               </button>
             </section>
 
@@ -184,7 +187,11 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   }}
                   className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
                 >
-                  <Icon name="plus" size={14} className="mr-1 inline-block" />{tx("Завести пул")}</button>
+                  <BusyLabel busy={busy}>
+                    <Icon name="plus" size={14} className="mr-1 inline-block" />
+                    {tx("Завести пул")}
+                  </BusyLabel>
+                </button>
                 <button
                   type="button"
                   disabled={busy || data.employees.length === 0}
@@ -194,7 +201,9 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                     simulate.mutate();
                   }}
                   className="min-h-10 w-full rounded-tile bg-tg-secondary-bg text-xs font-medium text-tg-text disabled:opacity-50"
-                >{tx("Симулировать 3 смены")}</button>
+                >
+                  <BusyLabel busy={busy}>{tx("Симулировать 3 смены")}</BusyLabel>
+                </button>
               </div>
             </section>
 
@@ -214,7 +223,9 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                   if (ok) purge.mutate(false);
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
-              >{tx("Снести только активность")}</button>
+              >
+                <BusyLabel busy={busy}>{tx("Снести только активность")}</BusyLabel>
+              </button>
               <button
                 type="button"
                 disabled={busy}
@@ -227,7 +238,11 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 }}
                 className="mt-2 min-h-10 w-full rounded-tile bg-status-busy text-xs font-medium text-white disabled:opacity-50"
               >
-                <Icon name="trash" size={14} className="mr-1 inline-block" />{tx("Удалить сотрудников и следы")}</button>
+                <BusyLabel busy={busy}>
+                  <Icon name="trash" size={14} className="mr-1 inline-block" />
+                  {tx("Удалить сотрудников и следы")}
+                </BusyLabel>
+              </button>
             </section>
           </>
         )}

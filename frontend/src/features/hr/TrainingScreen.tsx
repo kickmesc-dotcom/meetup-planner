@@ -11,6 +11,7 @@ import { humanizeApiError } from "@/api/client";
 import { CardSkeleton } from "@/components/Skeleton";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
+import { BusyLabel } from "@/components/BusyLabel";
 import ChevronToggle from "@/components/ChevronToggle";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { useTx } from "@/i18n";
@@ -313,7 +314,9 @@ function LessonCard({
                 onComplete();
               }}
               className="min-h-10 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
-            >{tx("Понятно, отметил")}</button>
+            >
+              <BusyLabel busy={busy}>{tx("Понятно, отметил")}</BusyLabel>
+            </button>
           ) : (
             <div className="text-xs text-status-free">{tx("Пройдено")}</div>
           )}

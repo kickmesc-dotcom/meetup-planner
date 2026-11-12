@@ -10,6 +10,7 @@ import {
 } from "@/api/push";
 import { humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
+import { BusyLabel } from "@/components/BusyLabel";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useTx } from "@/i18n";
 /**
@@ -139,11 +140,13 @@ export default function PushCard() {
         onClick={() => void toggle()}
         className="mt-2 min-h-11 w-full rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-60"
       >
-        {busy
-          ? tx("Подожди…")
-          : subscribed
-            ? tx("Выключить на этом устройстве")
-            : tx("Включить уведомления")}
+        <BusyLabel busy={busy}>
+          {busy
+            ? tx("Подожди…")
+            : subscribed
+              ? tx("Выключить на этом устройстве")
+              : tx("Включить уведомления")}
+        </BusyLabel>
       </button>
 
       {denied && (

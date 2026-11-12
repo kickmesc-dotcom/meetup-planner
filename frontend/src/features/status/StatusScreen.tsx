@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { useTx } from "@/i18n";
+import { BusyLabel } from "@/components/BusyLabel";
 import { statusView, type Meta } from "./status";
 
 const REFRESH_MS = 30_000;
@@ -111,7 +112,9 @@ export default function StatusScreen() {
           aria-busy={busy}
           className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-60"
         >
-          {busy ? tx("Проверяем…") : tx("Обновить")}
+          <BusyLabel busy={busy}>
+            {busy ? tx("Проверяем…") : tx("Обновить")}
+          </BusyLabel>
         </button>
 
         <p className="text-2xs leading-snug text-tg-hint">

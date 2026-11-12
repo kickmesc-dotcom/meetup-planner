@@ -16,6 +16,7 @@ import { humanizeApiError } from "@/api/client";
 import DepartmentTag from "@/components/DepartmentTag";
 import Icon, { type IconName } from "@/components/Icon";
 import FormField from "@/components/FormField";
+import { BusyLabel } from "@/components/BusyLabel";
 import ChevronToggle from "@/components/ChevronToggle";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton, SkeletonText } from "@/components/Skeleton";
@@ -746,14 +747,16 @@ function DangerZone() {
         onClick={() => void run()}
         className="mt-2 min-h-9 w-full rounded-tile bg-status-busy/15 text-xs font-medium text-status-busy disabled:opacity-50"
       >
-        {busy ? (
-          tx("Считаем…")
-        ) : (
-          <span className="inline-flex items-center gap-1.5">
-            <Icon name="trash" size={14} />
-            {tx("Сбросить текущую работу")}
-          </span>
-        )}
+        <BusyLabel busy={busy}>
+          {busy ? (
+            tx("Считаем…")
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="trash" size={14} />
+              {tx("Сбросить текущую работу")}
+            </span>
+          )}
+        </BusyLabel>
       </button>
     </div>
   );
