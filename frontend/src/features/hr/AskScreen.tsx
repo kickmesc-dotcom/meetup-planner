@@ -177,7 +177,11 @@ function HitCard({ hit }: { hit: KnowledgeHit }) {
       <div className="flex items-center gap-1.5 text-xs text-tg-hint">
         <Icon name={isStandard ? "book" : "check"} size={13} className="shrink-0" />
         <span>{isStandard ? tx("Стандарт") : tx("Чек-лист")}</span>
-        {hit.subtitle && <span className="truncate">· {hit.subtitle}</span>}
+        {hit.subtitle && (
+          <span className="truncate" title={hit.subtitle}>
+            · {hit.subtitle}
+          </span>
+        )}
       </div>
       <div className="mt-1 text-sm font-medium text-tg-text">{hit.title}</div>
       {hit.snippet && (

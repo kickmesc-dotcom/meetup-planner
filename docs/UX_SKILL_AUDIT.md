@@ -134,7 +134,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `orientation-support` | ✅ | ландшафт 780×420: `scrollWidth == innerWidth`, переполнения нет | — |
 | `content-priority` | ✅ | главное сверху, каталог ниже | — |
 | `visual-hierarchy` | ✅ | размер/вес/отступ, не только цвет | — |
-| `compact-label-overflow` | ⚠️ | подписи вкладок и имена в массовом планировании получили `title`/`aria-label`; для имён, отделов и заголовков на тач полный текст — в карточке | S |
+| `compact-label-overflow` | ✅ | все обрезаемые подписи кнопок (15 мест: кабинет, десктоп-навигация, лента, профиль, задачи, обучение) имеют `title` с полным текстом; имена и отделы в списках раскрываются в карточке | — |
 | `chip-collection-reflow` | ✅ | отделы, материалы и масштаб переносятся на новую строку | — |
 
 ## 6. Typography & Color (MEDIUM, 17 правил)
@@ -303,13 +303,13 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 2. Touch & Interaction | 4 | 2 | 2 | 0 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
-| 5. Layout & Responsive | 3 | 0 | 2 | 1 |
+| 5. Layout & Responsive | 2 | 0 | 2 | 0 |
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **32** | **10** | **15** | **7** |
+| **Итого** | **31** | **10** | **15** | **6** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,7 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (7).**
-`compact-label-overflow`,
+**Техдолг (6).**
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
 `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
@@ -403,3 +402,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `breakpoint-consistency` закрыт: шкала 375/640/768/1024, `xl` убран, произвольные медиазапросы запрещены guard-тестом | `tsc` 0, eslint 0, 6 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `touch-spacing` закрыт: сегмент автоперезапуска получил зазор; остальные группы целей уже с `gap-2` | `tsc` 0, eslint 0, сборка 0 (теста экрана нет) |
 | 12.11.2026 | техдолг | `spacing-scale` закрыт: дробных отступов в padding/gap нет, ширина колонки календаря вынесена в токены, добавлен `styles.spacing.test.ts` | `tsc` 0, eslint 0, 10 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `compact-label-overflow` закрыт: 15 обрезаемых подписей кнопок получили `title` с полным текстом | `tsc` 0, eslint 0, 43 теста, сборка 0 |

@@ -458,7 +458,13 @@ export default function HrFeedScreen() {
             className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg px-3 text-left text-sm press"
           >
             <Icon name="checklist" size={16} className="shrink-0 text-tg-link" />
-            <span className="min-w-0 flex-1 truncate">
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={tx("Чек-лист: {done} из {total}", {
+                done: checklist.done,
+                total: checklist.total,
+              })}
+            >
               {tx("Чек-лист: {done} из {total}", {
                 done: checklist.done,
                 total: checklist.total,
@@ -475,7 +481,10 @@ export default function HrFeedScreen() {
             className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg px-3 text-left text-sm press"
           >
             <Icon name="tasks" size={16} className="shrink-0 text-tg-link" />
-            <span className="min-w-0 flex-1 truncate">
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={tx("Мои поручения: {count}", { count: myTasks.open })}
+            >
               {tx("Мои поручения: {count}", { count: myTasks.open })}
               {myTasks.overdue > 0 && (
                 <span className="text-status-busy">
@@ -1144,7 +1153,9 @@ function FeedRow({
                 border: `1px solid ${person.border}`,
               }}
             >
-              <span className="truncate">{name}</span>
+              <span className="truncate" title={name}>
+                {name}
+              </span>
             </button>{" "}
             {demo ? (
               // Одна пометка на всю строку: ни плашки, ни префикса в имени.

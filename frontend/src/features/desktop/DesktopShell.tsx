@@ -173,7 +173,10 @@ export default function DesktopShell({
                           ].join(" ")}
                         >
                           <Icon name={item.icon} size={18} />
-                          <span className="min-w-0 flex-1 truncate">
+                          <span
+                            className="min-w-0 flex-1 truncate"
+                            title={tx(item.label)}
+                          >
                             {tx(item.label)}
                           </span>
                         </button>
@@ -203,7 +206,10 @@ export default function DesktopShell({
                   ].join(" ")}
                 >
                   <Icon name={ADMIN_SETTINGS.icon} size={18} />
-                  <span className="min-w-0 flex-1 truncate">
+                  <span
+                    className="min-w-0 flex-1 truncate"
+                    title={tx(ADMIN_SETTINGS.label)}
+                  >
                     {tx(ADMIN_SETTINGS.label)}
                   </span>
                 </button>
@@ -236,7 +242,10 @@ export default function DesktopShell({
                           ].join(" ")}
                         >
                           <Icon name={item.icon} size={18} />
-                          <span className="min-w-0 flex-1 truncate">
+                          <span
+                            className="min-w-0 flex-1 truncate"
+                            title={tx(item.label)}
+                          >
                             {tx(item.label)}
                           </span>
                           {item.id === "tasks" && openTasks > 0 && (
@@ -269,7 +278,9 @@ export default function DesktopShell({
               className="flex min-h-10 w-full items-center gap-2.5 rounded-tile bg-tg-link/10 px-3 text-left text-sm font-medium text-tg-link"
             >
               <Icon name="layout" size={18} />
-              <span className="min-w-0 flex-1 truncate">{tx("Управление")}</span>
+              <span className="min-w-0 flex-1 truncate" title={tx("Управление")}>
+                {tx("Управление")}
+              </span>
             </button>
           </div>
         )}

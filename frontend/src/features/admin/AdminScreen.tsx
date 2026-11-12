@@ -713,7 +713,10 @@ export default function AdminScreen({
           className="flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg/60 px-3 text-left text-sm text-tg-text press"
         >
           <Icon name="calendar" size={18} className="shrink-0 text-tg-link" />
-          <span className="min-w-0 flex-1 truncate">
+          <span
+            className="min-w-0 flex-1 truncate"
+            title={tx("Открыть график смен")}
+          >
             {tx("Открыть график смен")}
           </span>
           <span className="shrink-0 text-xs text-tg-hint">
@@ -850,7 +853,9 @@ function QuickActions({ onPick }: { onPick: (s: Section) => void }) {
               size={18}
               className="shrink-0 text-tg-link"
             />
-            <span className="truncate">{action.label}</span>
+            <span className="truncate" title={action.label}>
+              {action.label}
+            </span>
           </button>
         ))}
       </div>
@@ -961,7 +966,9 @@ function Card({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-tg-text">{title}</div>
-        <div className="truncate text-xs text-tg-hint">{subtitle}</div>
+        <div className="truncate text-xs text-tg-hint" title={subtitle}>
+          {subtitle}
+        </div>
       </div>
       {badge !== undefined && badge > 0 && (
         <div className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-status-busy px-1.5 text-xs font-semibold tabular-nums text-white">

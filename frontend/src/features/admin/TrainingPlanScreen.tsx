@@ -177,14 +177,23 @@ function PlanCard({
       >
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-tg-text">
+            <span
+              className="truncate text-sm font-medium text-tg-text"
+              title={plan.display_name}
+            >
               {plan.display_name}
             </span>
             {newcomer && (
               <span className="rounded-full bg-tg-link/15 px-1.5 py-1 text-2xs text-tg-link">{tx("новичок")}</span>
             )}
           </div>
-          <div className="mt-0.5 truncate text-xs text-tg-hint">
+          <div
+            className="mt-0.5 truncate text-xs text-tg-hint"
+            title={
+              [plan.position, plan.department_name].filter(Boolean).join(" · ") ||
+              tx("Без должности")
+            }
+          >
             {[plan.position, plan.department_name].filter(Boolean).join(" · ") ||
               tx("Без должности")}
           </div>

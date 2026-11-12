@@ -354,7 +354,10 @@ export default function MyTasksScreen() {
             className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-full bg-tg-secondary-bg px-3 text-left text-xs text-tg-text"
           >
             <Icon name="plus" size={15} className="shrink-0 text-tg-text" />
-            <span className="min-w-0 flex-1 truncate">
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={tx("Сказать, что нужно сделать — станет поручением")}
+            >
               {tx("Сказать, что нужно сделать — станет поручением")}
             </span>
             <Icon name="mic" size={14} className="shrink-0" />

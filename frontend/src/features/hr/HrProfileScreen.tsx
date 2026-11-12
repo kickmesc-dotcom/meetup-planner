@@ -1036,7 +1036,9 @@ function Row({ icon, label, onSelect }: RowItem) {
       className="flex min-h-11 w-full items-center gap-2 rounded-tile px-2 text-left text-sm text-tg-text active:bg-tg-bg/60"
     >
       <Icon name={icon} size={18} className="text-tg-hint" />
-      <span className="flex-1 truncate">{tx(label)}</span>
+      <span className="flex-1 truncate" title={tx(label)}>
+        {tx(label)}
+      </span>
       <Icon name="chevron" size={14} className="text-tg-hint" />
     </button>
   );

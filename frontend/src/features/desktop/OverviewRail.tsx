@@ -243,7 +243,9 @@ function Quick({
       className="lift flex min-h-11 items-center gap-2 rounded-tile border border-tg-hint/10 bg-tg-secondary-bg/30 px-2.5 text-left text-xs text-tg-text hover:bg-tg-secondary-bg/70"
     >
       <Icon name={icon} size={15} />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className="min-w-0 flex-1 truncate" title={label}>
+        {label}
+      </span>
     </button>
   );
 }
