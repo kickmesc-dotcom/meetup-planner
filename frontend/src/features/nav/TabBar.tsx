@@ -112,7 +112,9 @@ export default function TabBar({
             {/* Иконка декоративная — рядом есть подпись, поэтому её не должно
                 быть в дереве доступности (иначе скринридер читает "📅 Календарь"). */}
             <Icon name={it.icon} size={20} />
-            <span className="w-full truncate text-center">{label}</span>
+            <span className="w-full truncate text-center" title={label}>
+              {label}
+            </span>
             {it.id === "tasks" && openTasks > 0 && (
               // Счётчик читается как «Задачи: 3 открытых» через aria-label
               // кнопки; сама цифра декоративная, иначе скринридер прочитает

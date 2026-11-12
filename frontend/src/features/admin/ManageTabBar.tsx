@@ -76,6 +76,7 @@ export default function ManageTabBar({
             data-no-press
             aria-current={active ? "page" : undefined}
             data-testid={`manage-tab-${it.id}`}
+            aria-label={tx(it.label)}
             className={[
               "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
@@ -87,7 +88,9 @@ export default function ManageTabBar({
               <span className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-tg-link" />
             )}
             <Icon name={it.icon} size={20} />
-            <span className="w-full truncate text-center">{tx(it.label)}</span>
+            <span className="w-full truncate text-center" title={tx(it.label)}>
+              {tx(it.label)}
+            </span>
           </button>
         );
       })}
@@ -115,7 +118,9 @@ export default function ManageTabBar({
         >
           <Icon name="settings" size={17} />
         </span>
-        <span className="w-full truncate text-center">{tx("Настройки")}</span>
+        <span className="w-full truncate text-center" title={tx("Настройки")}>
+          {tx("Настройки")}
+        </span>
       </button>
     </nav>
   );

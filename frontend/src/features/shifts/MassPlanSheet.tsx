@@ -241,6 +241,7 @@ export default function MassPlanSheet({
                 type="button"
                 aria-pressed={active}
                 onClick={() => togglePerson(person.employee_id)}
+                title={person.display_name}
                 className={[
                   "min-h-9 max-w-[46%] truncate rounded-full px-2.5 text-xs transition-colors",
                   active
