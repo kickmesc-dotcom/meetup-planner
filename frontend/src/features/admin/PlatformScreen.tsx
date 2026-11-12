@@ -34,16 +34,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { BusyLabel } from "@/components/BusyLabel";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
-
-function money(amount: number): string {
-  return `${amount.toLocaleString("ru-RU")} ₽`;
-}
-
-function date(value: string | null): string {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleDateString("ru-RU");
-}
+import { formatDate, formatMoney } from "@/lib/format";
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Ожидает оплаты",
@@ -96,7 +87,7 @@ function OrgRow({
       </div>
       <p className="mt-1 text-xs text-tg-hint">
         {tx("Места {used} из {limit}", { used: org.seats_used, limit: org.seats_limit })} ·{" "}
-        {tx("Срок: {date}", { date: date(until) })}
+        {tx("Срок: {date}", { date: formatDate(until) })}
       </p>
       {org.subscription_expired && (
         <p className="mt-1 text-xs text-red-500">{tx("Оплата закончилась")}</p>
@@ -148,7 +139,7 @@ function InvoiceRow({
     <div className="rounded-tile bg-tg-secondary-bg/60 p-3" data-testid={`p-invoice-${invoice.id}`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="truncate text-sm font-semibold text-tg-text">{invoice.org_name}</span>
-        <span className="text-sm text-tg-hint">{money(invoice.amount)}</span>
+        <span className="text-sm text-tg-hint">{formatMoney(invoice.amount)}</span>
       </div>
       <p className="mt-1 text-xs text-tg-hint">
         {invoice.number} · {tx(invoice.plan_title)} ·{" "}
@@ -270,7 +261,7 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
             <Stat label={tx("Организаций")} value={String(data.organizations)} />
             <Stat label={tx("На триале")} value={String(data.on_trial)} />
             <Stat label={tx("Ждут оплаты")} value={String(data.awaiting_invoices)} />
-            <Stat label={tx("К оплате")} value={money(data.unpaid_amount)} />
+            <Stat label={tx("К оплате")} value={formatMoney(data.unpaid_amount)} />
           </div>
 
           <div className="space-y-2" data-testid="platform-rum">

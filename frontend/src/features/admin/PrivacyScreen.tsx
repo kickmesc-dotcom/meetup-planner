@@ -30,6 +30,7 @@ import { fetchMeta } from "@/api/meta";
 import { humanizeApiError } from "@/api/client";
 import { Skeleton } from "@/components/Skeleton";
 import { BusyLabel } from "@/components/BusyLabel";
+import { formatDateTime } from "@/lib/format";
 import { useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
 
@@ -44,17 +45,6 @@ const ACTION_TEXT: Record<string, string> = {
   "invitation.revoked": "Отозвано приглашение",
 };
 
-function shortDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
   const { tx } = useTx();
@@ -133,7 +123,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
       setConfirmRotate(false);
       setNote(
         tx("Ссылки отозваны. Старые работают до {until}.", {
-          until: shortDate(result.previous_valid_until),
+          until: formatDateTime(result.previous_valid_until),
         }),
       );
       void qc.invalidateQueries({ queryKey: ["privacy", "audit"] });
@@ -364,7 +354,7 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                         {tx(ACTION_TEXT[event.action] ?? event.action)}
                       </span>
                       <span className="shrink-0 text-2xs text-tg-hint">
-                        {shortDate(event.created_at)}
+                        {formatDateTime(event.created_at)}
                       </span>
                     </div>
                     <div className="truncate text-xs text-tg-hint">

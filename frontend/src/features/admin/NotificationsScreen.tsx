@@ -19,6 +19,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 
 import { useTx } from "@/i18n";
+import { formatDateTime } from "@/lib/format";
 /**
  * Центр уведомлений (админ): что уже ушло и что ещё сработает.
  *
@@ -144,7 +145,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
         <div className="text-sm font-semibold text-tg-text">{tx("Мьют алертов")}</div>
         <p className="mt-1 text-xs text-tg-hint">
           {muted
-            ? tx("Чат молчит до {when}.", { when: formatMoment(muted) })
+            ? tx("Чат молчит до {when}.", { when: formatDateTime(muted) })
             : tx("Алерты в чат идут как обычно.")}
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
@@ -278,7 +279,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-tg-hint">
-                    {formatMoment(item.at)} · «{item.task_title}»
+                    {formatDateTime(item.at)} · «{item.task_title}»
                   </div>
                   {item.kind === "deadline" && (
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -402,7 +403,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                     </div>
                     <div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-tg-hint">
                       <span>{item.display_name ?? tx("без профиля")}</span>
-                      <span>· {formatMoment(item.created_at)}</span>
+                      <span>· {formatDateTime(item.created_at)}</span>
                       {item.department_name && <span>· {item.department_name}</span>}
                       {item.read_at === null && <span>{tx("· не прочитано")}</span>}
                     </div>
@@ -432,13 +433,3 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
   );
 }
 
-function formatMoment(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString("ru-RU", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}

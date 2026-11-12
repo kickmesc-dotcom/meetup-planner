@@ -27,18 +27,7 @@ import { Skeleton } from "@/components/Skeleton";
 import { BusyLabel } from "@/components/BusyLabel";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
-
-function money(amount: number): string {
-  // Целые рубли: копейки в подписке не нужны, а пробелы в тысячах читаются
-  // на телефоне заметно лучше, чем «19900».
-  return `${amount.toLocaleString("ru-RU")} ₽`;
-}
-
-function date(value: string | null): string {
-  if (!value) return "—";
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleDateString("ru-RU");
-}
+import { formatDate, formatMoney } from "@/lib/format";
 
 /** Подпись статуса. Коды — из `services/billing.py`, текст живёт здесь. */
 const STATUS_LABEL: Record<string, string> = {
@@ -68,19 +57,19 @@ function InvoiceRow({
     <div className="rounded-tile bg-tg-secondary-bg/60 p-3" data-testid={`invoice-${invoice.id}`}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-semibold text-tg-text">{invoice.number}</span>
-        <span className="text-sm text-tg-hint">{money(invoice.amount)}</span>
+        <span className="text-sm text-tg-hint">{formatMoney(invoice.amount)}</span>
       </div>
       <p className="mt-1 text-xs text-tg-hint">
         {tx(invoice.plan_title)} · {title} · {tx(STATUS_LABEL[invoice.status] ?? invoice.status)}
       </p>
       {invoice.status === "pending" && (
         <p className="mt-1 text-xs text-tg-hint">
-          {tx("Оплатить до {date}", { date: date(invoice.expires_at) })}
+          {tx("Оплатить до {date}", { date: formatDate(invoice.expires_at) })}
         </p>
       )}
       {invoice.status === "paid" && invoice.period_end && (
         <p className="mt-1 text-xs text-tg-hint">
-          {tx("Оплачено до {date}", { date: date(invoice.period_end) })}
+          {tx("Оплачено до {date}", { date: formatDate(invoice.period_end) })}
         </p>
       )}
       {open && (
@@ -168,7 +157,7 @@ export default function BillingScreen({ onBack }: { onBack: () => void }) {
                   )
                 : data.plan.plan_ends_at
                   ? tx("Подписка оплачена до {date}", {
-                      date: date(data.plan.plan_ends_at),
+                      date: formatDate(data.plan.plan_ends_at),
                     })
                   : tx("Оплата не требуется: тариф действует без срока.")}
             </p>
@@ -187,7 +176,7 @@ export default function BillingScreen({ onBack }: { onBack: () => void }) {
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-semibold text-tg-text">{tx(price.title)}</span>
-                  <span className="text-sm text-tg-hint">{money(price.price_month)}</span>
+                  <span className="text-sm text-tg-hint">{formatMoney(price.price_month)}</span>
                 </div>
                 <p className="mt-1 text-xs text-tg-hint">
                   {tx("До {seats} сотрудников, {branches} подразделений", {
@@ -212,7 +201,7 @@ export default function BillingScreen({ onBack }: { onBack: () => void }) {
                     onClick={() => create.mutate({ plan: price.code, period: "year" })}
                     className="min-h-11 flex-1 rounded-tile bg-tg-link/15 text-sm font-semibold text-tg-link disabled:opacity-50"
                   >
-                    {tx("Счёт за год · {amount}", { amount: money(price.price_year) })}
+                    {tx("Счёт за год · {amount}", { amount: formatMoney(price.price_year) })}
                   </button>
                 </div>
               </div>
