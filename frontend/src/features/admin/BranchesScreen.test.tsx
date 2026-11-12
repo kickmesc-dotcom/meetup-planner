@@ -134,6 +134,22 @@ describe("BranchesScreen", () => {
     await waitFor(() => expect(createMock).toHaveBeenCalledWith("Салон Север"));
   });
 
+  it("показывает ошибку создания у поля, а не только тостом", async () => {
+    createMock.mockRejectedValueOnce("Такое название уже занято");
+    renderScreen();
+
+    const input = await screen.findByPlaceholderText("Название филиала");
+    fireEvent.change(input, { target: { value: "Салон Юг" } });
+    fireEvent.click(screen.getByRole("button", { name: "Создать" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Такое название уже занято");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toContain(
+      "branch-name-error",
+    );
+  });
+
   it("переводит сотрудника в выбранный филиал", async () => {
     renderScreen();
 

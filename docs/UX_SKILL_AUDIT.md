@@ -58,7 +58,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `touch-spacing` | ⚠️ | 6 групп кнопок (языки, зона, «Кому», дни недели ×2, чипы) получили `gap-2` — 8px; остальные плотные списки ещё по месту | M |
 | `hover-vs-tap` | ✅ | все действия на `onClick` | — |
 | `loading-buttons` | ✅ | этап P: 125 async-кнопок в 47 файлах — `disabled` + `aria-busy` по тому же состоянию | — |
-| `error-feedback` | ⚠️ | `FormField` связал вход, сброс, домен и ключ API (ошибка у поля, `role="alert"`); остальные формы кабинета — общий блок или тост | P |
+| `error-feedback` | ✅ | `FormField` связал вход, сброс, домен, ключ API, создание филиала и поручения: ошибка у поля, `role="alert"`, `aria-invalid` и `aria-describedby`; тост остался для действий без поля | — |
 | `cursor-pointer` | ✅ | этап M: курсор только для `pointer: fine`, у `disabled` — `not-allowed` | — |
 | `gesture-conflicts` | ⚠️ | календарь `touch-action: pan-y`; вложенных свайпов нет | — |
 | `tap-delay` | ✅ | этап M: `touch-action: manipulation` в `styles.css` для кнопок и `[role=button]` | — |
@@ -300,7 +300,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Раздел | ⚠️ | Живая проверка | Осознанно | Техдолг |
 |---|---:|---:|---:|---:|
 | 1. Accessibility | 2 | 2 | 0 | 0 |
-| 2. Touch & Interaction | 7 | 2 | 2 | 3 |
+| 2. Touch & Interaction | 6 | 2 | 2 | 2 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 5 | 0 | 2 | 3 |
@@ -309,7 +309,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **37** | **10** | **15** | **12** |
+| **Итого** | **36** | **10** | **15** | **11** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,7 +327,7 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (12).** `touch-spacing`, `error-feedback`, `gesture-alternative`,
+**Техдолг (11).** `touch-spacing`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
@@ -398,3 +398,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `redundant-entry` закрыт: знакомство не спрашивает назначенный отдел и известный опыт; профиль подставляет значения из карточки | `tsc` 0, eslint 0, 8 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `overflow-menu` закрыт: дни недели в сетке, тройки действий переносятся вместо сжатия | `tsc` 0, eslint 0, 21 тест, сборка 0 |
 | 12.11.2026 | техдолг | `consistent-help` закрыт: описания шагов и секций переведены на `Hint size="xs"` в пяти экранах, вид подсказки задаёт компонент | `tsc` 0, eslint 0, 14 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `error-feedback` закрыт: создание филиала и поручения показывает ошибку у поля с `aria-invalid` и `aria-describedby`, а не только тостом | `tsc` 0, eslint 0, 7 тестов, сборка 0 |

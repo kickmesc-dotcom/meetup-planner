@@ -74,6 +74,10 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
     if (!targetId && targets.length > 0) setTargetId(String(targets[0].id));
   }, [targetId, targets]);
 
+  // Ошибка создания — у поля, а не только тостом: человек остаётся в форме
+  // и видит, что именно поправить (имя занято, нет прав).
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const fail = (error: unknown) => {
     const code = humanizeApiError(error);
     void showAlert(
@@ -88,9 +92,14 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
     onSuccess: () => {
       haptic("success");
       setName("");
+      setCreateError(null);
       void qc.invalidateQueries({ queryKey: ["org-branches"] });
     },
-    onError: fail,
+    onError: (error) => {
+      haptic("error");
+      const code = humanizeApiError(error);
+      setCreateError(ERROR_TEXT[code] ?? code);
+    },
   });
 
   const transfer = useMutation({
@@ -259,6 +268,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
           id="branch-name"
           label={tx("Название филиала")}
           hint={tx("Сотрудники увидят это название в переключателе филиалов.")}
+          error={createError ?? undefined}
           required
           className="mt-2"
         >
@@ -267,7 +277,10 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
               <input
                 {...field}
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  setName(event.target.value);
+                  setCreateError(null);
+                }}
                 placeholder={tx("Название филиала")}
                 className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
               />

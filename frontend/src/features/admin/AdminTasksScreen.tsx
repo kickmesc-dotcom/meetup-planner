@@ -48,6 +48,9 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
   });
 
   const [title, setTitle] = useState("");
+  // Ошибка создания — у поля «Что сделать», а не тостом: форма остаётся
+  // открытой, и видно, что исправить.
+  const [createError, setCreateError] = useState<string | null>(null);
   const [scope, setScope] = useState<"department" | "employee">("department");
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [assigneeId, setAssigneeId] = useState<number | null>(null);
@@ -108,12 +111,16 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
       void qc.invalidateQueries({ queryKey: ["hr-admin-tasks"] });
       void qc.invalidateQueries({ queryKey: ["hr-tasks"] });
       setTitle("");
+      setCreateError(null);
       setDescription("");
       setExpected("");
       setTaskWeekdays([]);
       showToast(tx("Поручение создано — сотрудник увидит его в приложении."));
     },
-    onError: (e) => void showAlert(humanizeApiError(e)),
+    onError: (e) => {
+      haptic("error");
+      setCreateError(humanizeApiError(e));
+    },
   });
 
   const close = useMutation({
@@ -182,13 +189,17 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           id="task-title"
           label={tx("Что сделать")}
           required
+          error={createError ?? undefined}
           labelClassName="block text-xs text-tg-hint"
         >
           {(field) => (
             <input
               {...field}
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setCreateError(null);
+              }}
               maxLength={200}
               placeholder={tx("Проверить сроки на витрине")}
               className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg/60 px-3 text-sm text-tg-text"
