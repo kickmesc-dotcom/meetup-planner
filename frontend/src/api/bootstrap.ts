@@ -4,7 +4,7 @@ import type { User } from "@/types";
 
 import type { UiPrefs } from "./availability";
 import { api } from "./client";
-import type { HrEmployee, HrTask, OrgSetup } from "./hr";
+import type { HrChecklist, HrEmployee, HrTask, OrgSetup } from "./hr";
 
 /**
  * Быстрый старт: один запрос вместо шести.
@@ -30,6 +30,7 @@ export interface Bootstrap {
   users: User[];
   employee: HrEmployee | null;
   tasks: HrTask[] | null;
+  checklist: HrChecklist | null;
   org_setup: OrgSetup | null;
   ui_prefs: UiPrefs | null;
 }
@@ -52,6 +53,12 @@ export function seedBootstrap(qc: QueryClient, data: Bootstrap): void {
   // скелетона и пошёл бы за настоящими данными только по кнопке.
   if (data.employee) qc.setQueryData(["hr-employee"], data.employee, fresh);
   if (data.tasks) qc.setQueryData(["hr-tasks", false], data.tasks, fresh);
+  // Два ключа, потому что так их читают два экрана: `ChecklistScreen` —
+  // с видом смены, `MyTasksScreen` — без него. Оба получают один снимок.
+  if (data.checklist) {
+    qc.setQueryData(["hr-checklist", "shift"], data.checklist, fresh);
+    qc.setQueryData(["hr-checklist"], data.checklist, fresh);
+  }
   if (data.org_setup) qc.setQueryData(["org-setup"], data.org_setup, fresh);
   if (data.ui_prefs) qc.setQueryData(["ui-prefs"], data.ui_prefs, fresh);
 }

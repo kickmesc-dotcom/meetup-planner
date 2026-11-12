@@ -8,6 +8,7 @@ import {
   fetchDepartments,
   fetchEmployee,
   fetchFeedFilters,
+  fetchChecklist,
   fetchHrFeed,
   fetchTasks,
   type FeedKind,
@@ -220,6 +221,14 @@ export default function HrFeedScreen() {
     staleTime: 60_000,
   });
   const myTasks = countOpenTasks(tasksQ.data ?? []);
+  // Снимок смены приходит тем же bootstrap; ключ совпадает с `ChecklistScreen`,
+  // поэтому переход в «Смену» не делает второго запроса.
+  const checklistQ = useQuery({
+    queryKey: ["hr-checklist", "shift"],
+    queryFn: () => fetchChecklist("shift"),
+    staleTime: 60_000,
+  });
+  const checklist = checklistQ.data;
   // `null` — отметки нет (первый визит) или сотрудник ещё не загрузился.
   const [seenAt, setSeenAt] = useState<number | null>(null);
 
@@ -438,9 +447,26 @@ export default function HrFeedScreen() {
           )}
         </div>
 
-        {/* Незавершённое — на виду (Зейгарник): строка ведёт в те же задачи,
-            а не заставляет вспоминать, сколько их и где они лежат. При нуле
-            не рисуем: «0 поручений» — это шум, а не помощь. */}
+        {/* Незавершённое — на виду (Зейгарник): две строки ведут ровно туда,
+            куда говорят. Закрытый чек-лист не рисуем — завершённое не должно
+            занимать первый экран. */}
+        {checklist && checklist.total > 0 && checklist.done < checklist.total && (
+          <button
+            type="button"
+            data-testid="feed-checklist"
+            onClick={() => setTab("checklist")}
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg px-3 text-left text-sm press"
+          >
+            <Icon name="checklist" size={16} className="shrink-0 text-tg-link" />
+            <span className="min-w-0 flex-1 truncate">
+              {tx("Чек-лист: {done} из {total}", {
+                done: checklist.done,
+                total: checklist.total,
+              })}
+            </span>
+            <Icon name="chevron" size={16} className="shrink-0 text-tg-hint" />
+          </button>
+        )}
         {myTasks.open > 0 && (
           <button
             type="button"

@@ -35,9 +35,12 @@ from pydantic import BaseModel
 
 from app.api.deps import CurrentUser, EmployeeDep, SessionDep
 from app.api.routes_hr import (
+    TEMPLATE_SHIFT,
+    ChecklistOut,
     EmployeeOut,
     OrgSetupOut,
     TaskOut,
+    _checklist_out,
     _employee_out,
     _may_edit_setup,
     _may_manage_packs,
@@ -45,7 +48,7 @@ from app.api.routes_hr import (
     _task_views,
 )
 from app.api.routes_users import UiPrefsOut, UserOut, me_out, ui_prefs_out, users_out
-from app.services import hr_profile, hr_tasks, org_setup
+from app.services import hr_checklists, hr_profile, hr_tasks, org_setup
 
 router = APIRouter(tags=["bootstrap"])
 
@@ -63,6 +66,7 @@ class BootstrapOut(BaseModel):
     users: list[UserOut]
     employee: EmployeeOut | None = None
     tasks: list[TaskOut] | None = None
+    checklist: ChecklistOut | None = None
     org_setup: OrgSetupOut | None = None
     ui_prefs: UiPrefsOut | None = None
 
@@ -83,15 +87,24 @@ async def bootstrap(
 
     setup = await org_setup.load(session)
     tasks: list[TaskOut] | None = None
+    checklist: ChecklistOut | None = None
     if employee.onboarding_state == "done":
         rows = await hr_tasks.list_for_employee(session, employee, include_closed=False)
         tasks = await _task_views(session, rows, employee)
+        # Тот же сервис, что у `/api/checklist`: снимок смены к первому экрану.
+        # `build_view` не создаёт прогон — только собирает вид, поэтому старт
+        # не плодит пустые смены.
+        view = await hr_checklists.build_view(
+            session, employee, kind=TEMPLATE_SHIFT
+        )
+        checklist = _checklist_out(view)
 
     return BootstrapOut(
         me=await me_out(session, user),
         users=await users_out(session),
         employee=await _employee_out(session, employee, user),
         tasks=tasks,
+        checklist=checklist,
         org_setup=_org_setup_out(
             setup,
             can_edit=_may_edit_setup(employee, user),

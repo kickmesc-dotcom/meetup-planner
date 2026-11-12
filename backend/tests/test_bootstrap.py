@@ -56,6 +56,14 @@ TABLES = (
     "tasks",
     "task_assignments",
     "task_photos",
+    # Чек-лист смены: bootstrap теперь собирает и его, а `build_view` читает
+    # зал, шаблон, пункты, прогон и отметки.
+    "halls",
+    "shift_hall_choices",
+    "checklist_templates",
+    "checklist_items",
+    "checklist_runs",
+    "checklist_completions",
 )
 
 
@@ -116,6 +124,10 @@ async def test_bootstrap_returns_exactly_what_the_six_endpoints_return(session) 
     assert [t.model_dump() for t in boot.tasks or []] == [
         t.model_dump() for t in await routes_hr.my_tasks(session, employee, False, None)
     ]
+    assert boot.checklist is not None
+    assert boot.checklist.model_dump() == (
+        await routes_hr.checklist(session, employee)
+    ).model_dump()
     assert boot.org_setup is not None
     assert boot.org_setup.model_dump() == (
         await routes_hr.get_org_setup(session, user, employee)
@@ -138,6 +150,8 @@ async def test_tasks_are_not_asked_for_before_the_intro_is_finished(session) -> 
     boot = await routes_bootstrap.bootstrap(session, user, employee)
 
     assert boot.tasks is None
+    # Чек-лист до знакомства тоже не собираем: смена ещё не начата.
+    assert boot.checklist is None
     # Остальные куски при этом на месте: «нет поручений» — не «нет профиля».
     assert boot.employee is not None
     assert boot.org_setup is not None

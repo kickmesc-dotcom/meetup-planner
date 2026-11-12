@@ -20,8 +20,10 @@ import {
   fetchEmployee,
   fetchEmployeeCard,
   fetchFeedFilters,
+  fetchChecklist,
   fetchHrFeed,
   fetchTasks,
+  type HrChecklist,
   type HrEmployee,
   type HrFeedItem,
   type HrTask,
@@ -44,6 +46,7 @@ vi.mock("@/api/hr", async (importOriginal) => {
     fetchDepartmentOverview: vi.fn(),
     // Сеть в тесте не нужна: ответ задаёт сам тест.
     fetchTasks: vi.fn(),
+    fetchChecklist: vi.fn(),
   };
 });
 
@@ -76,6 +79,7 @@ const meMock = vi.mocked(fetchEmployee);
 const depsMock = vi.mocked(fetchDepartments);
 const overviewMock = vi.mocked(fetchDepartmentOverview);
 const tasksMock = vi.mocked(fetchTasks);
+const checklistMock = vi.mocked(fetchChecklist);
 
 function item(overrides: Partial<HrFeedItem> = {}): HrFeedItem {
   return {
@@ -119,6 +123,8 @@ beforeEach(() => {
   meMock.mockResolvedValue({ id: 1 } as unknown as HrEmployee);
   tasksMock.mockReset();
   tasksMock.mockResolvedValue([]);
+  checklistMock.mockReset();
+  checklistMock.mockResolvedValue({ done: 0, total: 0 } as unknown as HrChecklist);
   filtersMock.mockResolvedValue({
     scope: "all",
     can_filter: false,
@@ -133,6 +139,25 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("HrFeedScreen (P1.8)", () => {
+  it("показывает прогресс чек-листа и ведёт в смену", async () => {
+    checklistMock.mockResolvedValue({ done: 3, total: 7 } as unknown as HrChecklist);
+    useUI.setState({ tab: "feed" });
+    renderFeed([]);
+
+    const row = await screen.findByTestId("feed-checklist");
+    expect(row.textContent).toContain("Чек-лист: 3 из 7");
+
+    fireEvent.click(row);
+    expect(useUI.getState().tab).toBe("checklist");
+  });
+
+  it("не рисует закрытый чек-лист", async () => {
+    checklistMock.mockResolvedValue({ done: 7, total: 7 } as unknown as HrChecklist);
+    renderFeed([]);
+    await screen.findByText("События смены");
+    expect(screen.queryByTestId("feed-checklist")).toBeNull();
+  });
+
   it("показывает открытые поручения на ленте и ведёт в задачи", async () => {
     tasksMock.mockResolvedValue([
       { id: 1, my_status: "new", status: "new", is_overdue: false } as unknown as HrTask,
