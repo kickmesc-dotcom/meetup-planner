@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchDashboard } from "@/api/hr";
 import type { User } from "@/types";
 import { haptic } from "@/tg/webapp";
+import { useBackClose } from "@/lib/useBackClose";
 import FormField from "@/components/FormField";
 import AttentionScreen from "./AttentionScreen";
 import AttentionStrip from "./AttentionStrip";
@@ -597,6 +598,13 @@ export default function AdminScreen({
     (dashboard.data?.tasks_overdue ?? 0) + (dashboard.data?.open_issues ?? 0);
 
   const back = () => setSection("root");
+  // Системная «назад» в кабинете: из подраздела — в корень, из корня — в зону
+  // сотрудника. Без этого кнопка закрывала мини-апп целиком, и человек терял
+  // место, из которого пришёл в управление.
+  useBackClose(() => {
+    if (section !== "root") back();
+    else setMode("staff");
+  });
 
   if (section === "attention") {
     return (
