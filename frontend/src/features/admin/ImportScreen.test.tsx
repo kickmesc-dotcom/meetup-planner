@@ -118,4 +118,20 @@ describe("ImportScreen", () => {
     expect(screen.queryByTestId("import-preview")).toBeNull();
     expect(screen.getByText(/Люди должны быть заведены заранее/)).toBeTruthy();
   });
+
+  it("во время импорта говорит, что именно идёт, а не просто гаснет", async () => {
+    applyMock.mockImplementation(() => new Promise<never>(() => {}));
+    renderScreen();
+    fireEvent.change(screen.getByTestId("import-text"), {
+      target: { value: "имя\nАнна" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Проверить" }));
+    await screen.findByTestId("import-preview");
+
+    fireEvent.click(screen.getByTestId("import-apply"));
+
+    const button = screen.getByTestId("import-apply");
+    expect(await screen.findByText("Импортируем…")).toBeTruthy();
+    expect(button.getAttribute("aria-busy")).toBe("true");
+  });
 });

@@ -19,6 +19,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
 import FormField from "@/components/FormField";
+import { Spinner } from "@/components/Spinner";
 import {
   applyImport,
   previewImport,
@@ -85,6 +86,10 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Два разных ожидания: «разбираем» и «пишем». Общий `busy` гасил обе
+  // кнопки, но вторая при этом молчала — человек не понимал, идёт ли импорт.
+  const [checking, setChecking] = useState(false);
+  const [applying, setApplying] = useState(false);
 
   const reset = () => {
     setPreview(null);
@@ -120,6 +125,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
       return;
     }
     setBusy(true);
+    setChecking(true);
     setProblem(null);
     setResult(null);
     try {
@@ -131,12 +137,14 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
       const detail = error instanceof ApiError ? error.detail : "";
       setProblem(PROBLEM_TEXT[detail] ?? "Не удалось разобрать файл.");
     } finally {
+      setChecking(false);
       setBusy(false);
     }
   };
 
   const run = async () => {
     setBusy(true);
+    setApplying(true);
     setProblem(null);
     try {
       const done = await applyImport({ text, filename, kind, overwrite });
@@ -150,6 +158,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
       const detail = error instanceof ApiError ? error.detail : "";
       setProblem(PROBLEM_TEXT[detail] ?? "Импорт не применился. Попробуйте ещё раз.");
     } finally {
+      setApplying(false);
       setBusy(false);
     }
   };
@@ -283,20 +292,36 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
           type="button"
           onClick={() => void check()}
           disabled={busy}
-          aria-busy={busy}
+          aria-busy={checking}
           className="min-h-11 flex-1 rounded-tile bg-tg-secondary-bg text-sm font-medium text-tg-text press disabled:opacity-50"
         >
-          {busy ? tx("Проверяем…") : tx("Проверить")}
+          {checking ? (
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Spinner size={14} />
+              {tx("Проверяем…")}
+            </span>
+          ) : (
+            tx("Проверить")
+          )}
         </button>
         <button
           type="button"
           onClick={() => void run()}
           disabled={busy || !preview || willWrite === 0}
-          aria-busy={busy}
+          aria-busy={applying}
           data-testid="import-apply"
           className="min-h-11 flex-1 rounded-tile bg-tg-link text-sm font-medium text-white press disabled:opacity-50"
         >
-          {tx("Импортировать")} {willWrite > 0 ? willWrite : ""}
+          {applying ? (
+            <span className="inline-flex items-center justify-center gap-1.5">
+              <Spinner size={14} />
+              {tx("Импортируем…")}
+            </span>
+          ) : (
+            <>
+              {tx("Импортировать")} {willWrite > 0 ? willWrite : ""}
+            </>
+          )}
         </button>
       </div>
 
