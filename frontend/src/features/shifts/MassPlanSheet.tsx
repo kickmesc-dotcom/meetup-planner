@@ -7,6 +7,7 @@ import type {
 } from "@/api/shifts";
 import { haptic } from "@/tg/webapp";
 import Icon from "@/components/Icon";
+import { BusyLabel } from "@/components/BusyLabel";
 import { addDays, formatDate, toIso, weekdaysToIso } from "./shiftDates";
 import { useTx } from "@/i18n";
 /**
@@ -345,6 +346,7 @@ export default function MassPlanSheet({
         <button
           type="button"
           disabled={!ready || busy}
+          aria-busy={busy}
           onClick={() => {
             haptic("medium");
             onApply({
@@ -359,11 +361,13 @@ export default function MassPlanSheet({
           }}
           className="mt-3 min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
         >
-          {busy
-            ? tx("Записываем…")
-            : `${tx("Применить")}${sameHours ? ` · ${sameHours}` : ""} · ${tx(
-                statusMeta?.label ?? status,
-              )}`}
+          <BusyLabel busy={busy}>
+            {busy
+              ? tx("Записываем…")
+              : `${tx("Применить")}${sameHours ? ` · ${sameHours}` : ""} · ${tx(
+                  statusMeta?.label ?? status,
+                )}`}
+          </BusyLabel>
         </button>
         <div className="mt-1 text-center text-2xs text-tg-hint">
           {ready

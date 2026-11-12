@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { MenuItem } from "@/api/menu";
 import Icon from "@/components/Icon";
+import { Spinner } from "@/components/Spinner";
 import { useTx } from "@/i18n";
 
 /**
@@ -164,7 +165,7 @@ function MenuRow({
               aria-label={tx("Удалить позицию")}
               className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-status-busy/10 text-status-busy disabled:opacity-50"
             >
-              <Icon name="trash" size={16} />
+              {busy ? <Spinner size={16} /> : <Icon name="trash" size={16} />}
             </button>
           )}
         </div>

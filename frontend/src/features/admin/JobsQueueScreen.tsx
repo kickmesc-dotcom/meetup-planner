@@ -309,7 +309,7 @@ function JobRow({
             aria-label={tx("Сохранить время")}
             title={tx("Сохранить время")}
           >
-            <Icon name="save" size={16} />
+            {pending ? <Spinner size={16} /> : <Icon name="save" size={16} />}
           </button>
         </div>
       )}

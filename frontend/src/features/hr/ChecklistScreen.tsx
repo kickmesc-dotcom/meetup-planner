@@ -11,6 +11,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import FormField from "@/components/FormField";
+import { BusyLabel } from "@/components/BusyLabel";
 import {
   enqueueCompletion,
   flushCompletions,
@@ -615,7 +616,7 @@ function ItemRow({
             onClick={() => onSaveNote(note.trim())}
             className="mt-2 min-h-9 w-full rounded-tile bg-tg-button text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
-            {tx("Сохранить заметку")}
+            <BusyLabel busy={busy}>{tx("Сохранить заметку")}</BusyLabel>
           </button>
         </div>
       )}

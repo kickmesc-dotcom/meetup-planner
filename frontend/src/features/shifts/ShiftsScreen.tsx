@@ -21,6 +21,7 @@ import {
   type ShiftWeek,
 } from "@/api/shifts";
 import { CardSkeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
@@ -779,6 +780,7 @@ function ShiftSheet({
               <button
                 type="button"
                 disabled={busy}
+                aria-busy={busy}
                 onClick={() => {
                   haptic("medium");
                   onSave({
@@ -793,11 +795,13 @@ function ShiftSheet({
                 }}
                 className="min-h-11 flex-1 rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
               >
-                {busy
-                  ? tx("Сохраняем…")
-                  : tx("Сохранить · {status}", {
-                      status: tx(statusMeta?.label ?? status),
-                    })}
+                <BusyLabel busy={busy}>
+                  {busy
+                    ? tx("Сохраняем…")
+                    : tx("Сохранить · {status}", {
+                        status: tx(statusMeta?.label ?? status),
+                      })}
+                </BusyLabel>
               </button>
               {state.shift && (
                 <button
@@ -806,7 +810,9 @@ function ShiftSheet({
                   aria-busy={busy}
                   onClick={() => onDelete(state.shift!.id)}
                   className="min-h-11 rounded-card bg-status-busy/15 px-3 text-xs text-status-busy disabled:opacity-50"
-                >{tx("Удалить")}</button>
+                >
+                  <BusyLabel busy={busy}>{tx("Удалить")}</BusyLabel>
+                </button>
               )}
             </div>
           </>
