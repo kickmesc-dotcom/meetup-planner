@@ -1,4 +1,5 @@
-import { humanizeApiError } from "@/api/client";
+import { useEffect } from "react";
+import { humanizeApiError, isNetworkError } from "@/api/client";
 import Icon from "@/components/Icon";
 import { haptic } from "@/tg/webapp";
 import { useTx } from "@/i18n";
@@ -17,12 +18,26 @@ interface Props {
  */
 export default function ErrorState({ error, onRetry, title }: Props) {
   const { tx } = useTx();
+  const offline = isNetworkError(error);
+
+  // Обрыв сети — единственная ошибка, которую человек не может исправить
+  // кнопкой: сеть вернётся сама. Поэтому ждём `online` и повторяем запрос
+  // без нажатия; кнопка остаётся для ручного повтора.
+  useEffect(() => {
+    if (!offline || !onRetry) return;
+    const retry = () => onRetry();
+    window.addEventListener("online", retry);
+    return () => window.removeEventListener("online", retry);
+  }, [offline, onRetry]);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+    <div
+      role="alert"
+      className="flex h-full flex-col items-center justify-center px-6 text-center"
+    >
       <Icon name="alert" size={34} className="mb-2 text-status-busy" />
       <div className="text-base font-semibold text-tg-text">
-        {title ?? tx("Что-то пошло не так")}
+        {title ?? (offline ? tx("Нет связи") : tx("Что-то пошло не так"))}
       </div>
       <div className="mt-1 text-sm text-tg-hint break-words">
         {humanizeApiError(error)}

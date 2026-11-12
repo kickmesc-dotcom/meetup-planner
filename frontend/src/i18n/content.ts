@@ -2376,6 +2376,7 @@ export const EN_CONTENT: Record<string, string> = {
   "Статус": "Status",
   "Проверка обновляется каждые 30 секунд.": "The check refreshes every 30 seconds.",
   "Нет связи с API": "No connection to the API",
+  "Нет связи": "No connection",
   "Работает": "Working",
   "Есть проблемы": "There are problems",
   "API": "API",
