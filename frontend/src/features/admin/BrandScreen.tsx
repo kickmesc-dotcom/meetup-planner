@@ -96,6 +96,8 @@ export default function BrandScreen({ onBack }: { onBack: () => void }) {
                 <img
                   src={q.data.logo_url}
                   alt=""
+                  width={36}
+                  height={36}
                   className="h-9 w-9 rounded-tile object-cover"
                 />
               ) : (

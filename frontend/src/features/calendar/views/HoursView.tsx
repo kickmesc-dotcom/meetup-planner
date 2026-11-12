@@ -87,6 +87,8 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
                 <img
                   src={u.avatar_url}
                   alt=""
+                  width={32}
+                  height={32}
                   loading="lazy"
                   decoding="async"
                   className="w-full h-full object-cover"

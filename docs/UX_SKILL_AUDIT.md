@@ -77,7 +77,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
 | `image-optimization` | ✅ | этап R: все четыре аватара грузятся лениво (`loading="lazy"`, `decoding="async"`) | — |
-| `image-dimension` | ⚠️ | у части `<img>` нет `width/height` или `aspect-ratio` | O |
+| `image-dimension` | ✅ | все `<img>` получили `width/height`: логотип 36, аватары 36/32/16, фото в карточке 640×96; лайтбокс — осознанно без размеров, он масштабируется контейнером | O |
 | `font-loading` | ✅ | системные шрифты, веб-шрифтов нет | — |
 | `font-preload` | — | грузить нечего | — |
 | `critical-css` | ⚠️ | Vite собирает один CSS-файл; критический CSS не инлайнится | — |
@@ -197,7 +197,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `error-placement` | ✅ | этап P: `auth-error`/`reset-error`, `aria-invalid` и `aria-describedby` на полях входа и смены пароля | — |
 | `submit-feedback` | ✅ | 46 async-кнопок через `BusyLabel` (спиннер + текст действия) или спиннер вместо иконки; переключатели, сегменты и степперы — не кнопки действия | P |
 | `ime-composition-enter` | ✅ | этап P: поле подразделения не отправляется на Enter во время IME-подтверждения | — |
-| `required-indicators` | ⚠️ | этап P: вход и сброс — `*`, `required`; в кабинете 7 полей с фактической обязательностью получили `aria-required`, видимой метки там пока нет | P |
+| `required-indicators` | ✅ | `FormField required` рисует `*` и `aria-required`; имя в настройках получило видимую `*` при `aria-required` | P |
 | `empty-states` | ✅ | пустые состояния с действием | — |
 | `toast-dismiss` | ✅ | 3,2с, закрытие 44×44 | — |
 | `confirmation-dialogs` | ✅ | все необратимые действия спрашивают `showConfirm`; прямых `window.confirm` в экранах нет, внутри Telegram — диалог платформы | — |
@@ -301,15 +301,15 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 |---|---:|---:|---:|---:|
 | 1. Accessibility | 4 | 2 | 0 | 2 |
 | 2. Touch & Interaction | 7 | 2 | 2 | 3 |
-| 3. Performance | 5 | 2 | 1 | 2 |
+| 3. Performance | 4 | 2 | 1 | 1 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 5 | 0 | 2 | 3 |
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
 | 7. Animation | 7 | 2 | 5 | 0 |
-| 8. Forms & Feedback | 4 | 0 | 1 | 3 |
+| 8. Forms & Feedback | 3 | 0 | 1 | 2 |
 | 9. Navigation Patterns | 3 | 0 | 0 | 3 |
 | 10. Charts & Data | 2 | 0 | 0 | 2 |
-| **Итого** | **45** | **10** | **15** | **20** |
+| **Итого** | **43** | **10** | **15** | **18** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,11 +327,11 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (20).** `image-dimension`, `network-fallback`, `consistent-help`,
+**Техдолг (18).** `network-fallback`, `consistent-help`,
 `redundant-entry`, `touch-spacing`, `error-feedback`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
-`text-styles-system`, `truncation-strategy`, `required-indicators`,
-`input-helper-text`, `inline-validation`, `overflow-menu`,
+`text-styles-system`, `truncation-strategy`, `input-helper-text`,
+`inline-validation`, `overflow-menu`,
 `back-stack-integrity`, `empty-nav-state`, `large-dataset`,
 `number-formatting`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
@@ -382,3 +382,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 07.11.2026 | Q | Deep link на задачу и проблему | тесты разбора ссылки; полный фронт; сборка; Pages `4bf198bb` |
 | 12.11.2026 | матрица | `alt-text`, `heading-hierarchy`, `submit-feedback` переведены в ✅: проверены alt у лайтбокса и `PhotoAttach`, `h2` у пяти содержательных секций, 46 async-кнопок на `BusyLabel` | `tsc` 0, eslint 0, BusyLabel 2/2, профильные тесты, сборка 0 |
 | 12.11.2026 | сводка | Остаток 45 ⚠️ разнесён по разделам: 10 живая проверка, 15 осознанно, 20 техдолг; правило без причины не осталось | пересчёт скриптом по строкам матрицы: 45 = 10 + 15 + 20 |
+| 12.11.2026 | техдолг | `image-dimension` и `required-indicators` закрыты: размеры у 7 `<img>`, видимая `*` у имени; лайтбокс — осознанное исключение | `tsc` 0, eslint 0, Brand 4/4, MySettings 5/5, сборка 0 |

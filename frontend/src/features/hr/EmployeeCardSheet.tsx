@@ -240,6 +240,8 @@ function CardBody({
                   <img
                     src={card.last_media.url}
                     alt={card.last_media.caption}
+                    width={640}
+                    height={96}
                     className="h-24 w-full object-cover"
                     loading="lazy"
                   />

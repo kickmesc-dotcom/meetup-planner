@@ -204,7 +204,10 @@ export default function MySettingsScreen({ onClose }: { onClose: () => void }) {
               hint={tx("Коллеги видят это имя в ленте, команде и отчёте смены")}
             >
               <label className="block text-xs text-tg-hint" htmlFor="my-name">
-                {tx("Имя в приложении")}
+                {tx("Имя в приложении")}{" "}
+                <span className="text-status-busy" aria-hidden>
+                  *
+                </span>
               </label>
               <div className="flex gap-2">
                 <input

@@ -128,7 +128,7 @@ describe("MySettingsScreen", () => {
   it("меняет имя в приложении, а не имя из Telegram", async () => {
     renderScreen();
 
-    const input = await screen.findByLabelText("Имя в приложении");
+    const input = await screen.findByLabelText(/Имя в приложении/);
     fireEvent.change(input, { target: { value: "  Анна Петрова " } });
     fireEvent.click(screen.getByRole("button", { name: "Сохранить" }));
 

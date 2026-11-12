@@ -157,6 +157,8 @@ export default function ParticipantRow({
               <img
                 src={user.avatar_url}
                 alt={user.display_name}
+                width={36}
+                height={36}
                 loading="lazy"
                 decoding="async"
                 className="w-full h-full object-cover"
