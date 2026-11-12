@@ -663,6 +663,15 @@ export default function AdminScreen({
 
   return (
     <div className="flex-1 overflow-y-auto p-3 space-y-4">
+      {/* Сводка «что горит» стоит первой: это ответ на главный вопрос
+          руководителя, а не ещё одна карточка каталога. */}
+      {!needle && (
+        <AttentionStrip
+          data={dashboard.data}
+          loading={dashboard.isPending}
+          onOpen={select}
+        />
+      )}
       {!needle && <QuickActions onPick={select} />}
 
       {!needle && (
@@ -722,16 +731,6 @@ export default function AdminScreen({
         </FormField>
       </div>
 
-      {/* Сводка стоит выше списка разделов и прячется только при поиске:
-          человек, который ищет конкретный раздел, уже знает, что ему нужно. */}
-      {!needle && (
-        <AttentionStrip
-          data={dashboard.data}
-          loading={dashboard.isPending}
-          onOpen={select}
-        />
-      )}
-
       {needle ? (
         <>
           <p className="px-1 text-xs text-tg-hint" role="status">
@@ -783,16 +782,17 @@ export default function AdminScreen({
 }
 
 /**
- * Три ответа на вопрос «что мне сейчас нужно сделать?» (промпт §4.2).
+ * Два ответа на вопрос «что мне сейчас нужно сделать?» (промпт §4.2).
  *
- * Почему именно эти три. В первый день владелец приходит не «настраивать", а
- * снять три боли: что-то горит по срокам, людям нужно поручение и в команде
- * не хватает человека. Всё остальное — каталог ниже, когда эти три закрыты.
+ * Почему не три. «Проверить, что горит» уже делает сводка `AttentionStrip`
+ * выше: у неё есть числа и переходы в те же разделы. Третья равная кнопка
+ * дублировала главный блок и размывала акцент (8laws: Хик, фон Ресторфа,
+ * Миллер). Остались действия, которых в сводке нет: дать поручение и
+ * пригласить человека. Возможности не потеряны — только убран повтор.
  */
 function QuickActions({ onPick }: { onPick: (s: Section) => void }) {
   const { tx } = useTx();
   const actions: { id: Section; icon: IconName; label: string }[] = [
-    { id: "attention", icon: "alert", label: tx("Проверить, что горит") },
     { id: "admin-tasks", icon: "clipboard", label: tx("Дать поручение") },
     { id: "invitations", icon: "send", label: tx("Пригласить сотрудника") },
   ];
@@ -801,7 +801,7 @@ function QuickActions({ onPick }: { onPick: (s: Section) => void }) {
       <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
         {tx("Что будем делать?")}
       </h2>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {actions.map((action) => (
           <button
             key={action.id}

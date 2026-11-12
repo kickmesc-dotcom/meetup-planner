@@ -9,7 +9,7 @@
  *    возвращает всё, и выбор подробности не сбрасывается между заходами.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AdminScreen from "./AdminScreen";
 import { useUI } from "@/store/ui";
@@ -58,15 +58,32 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("AdminScreen: первые шаги и подробность", () => {
-  it("предлагает три понятных первых шага вместо выбора из каталога", async () => {
+  it("предлагает два действия, а «что горит» показывает сводка выше", async () => {
     renderScreen();
 
+    expect(screen.getByTestId("attention-strip")).toBeTruthy();
     expect(screen.getByTestId("admin-quick-actions")).toBeTruthy();
     expect(screen.getByText("Что будем делать?")).toBeTruthy();
+
+    // «Проверить, что горит» больше не третья равная кнопка: этот ответ уже
+    // даёт AttentionStrip, и дублирование размывало главный акцент.
+    expect(screen.queryByRole("button", { name: "Проверить, что горит" })).toBeNull();
+    const quick = screen.getByTestId("admin-quick-actions");
+    expect(within(quick).getAllByRole("button")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "Дать поручение" }));
     expect(await screen.findByText("поручения-экран")).toBeTruthy();
     expect(useUI.getState().adminSection).toBe("admin-tasks");
+  });
+
+  it("ставит сводку внимания перед быстрыми действиями", () => {
+    renderScreen();
+
+    const strip = screen.getByTestId("attention-strip");
+    const quick = screen.getByTestId("admin-quick-actions");
+    expect(
+      strip.compareDocumentPosition(quick) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("в простом режиме прячет редкие разделы, но возвращает их кнопкой", () => {
