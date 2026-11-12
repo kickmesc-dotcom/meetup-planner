@@ -8,6 +8,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import Icon from "@/components/Icon";
 import FormField from "@/components/FormField";
+import Hint from "@/components/Hint";
 import { haptic, showAlert } from "@/tg/webapp";
 
 import { useTx } from "@/i18n";
@@ -66,9 +67,9 @@ export default function HolidaysCard() {
         <Icon name="sparkles" size={16} className="shrink-0 text-tg-link" />
         {tx("Праздники")}
       </h2>
-      <div className="mb-2 text-xs text-tg-hint">
+      <Hint size="xs" className="mb-2">
         {tx("В эти дни всем участникам капает +50 XP, а бот поздравляет в чате")}
-      </div>
+      </Hint>
 
       {holidays.isError ? (
         <div className="py-1 text-xs text-status-busy">

@@ -8,6 +8,7 @@ import {
 } from "@/api/orgs";
 import { humanizeApiError, setActiveOrg } from "@/api/client";
 import FormField from "@/components/FormField";
+import Hint from "@/components/Hint";
 import { Skeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
@@ -124,11 +125,11 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
       subtitle={tx("Несколько салонов под одним владельцем")}
       onBack={onBack}
     >
-      <p className="text-xs text-tg-hint">
+      <Hint size="xs" className="mt-0">
         {tx(
           "У филиала свои люди, график и отчёты — данные не смешиваются. Владелец заходит в любой филиал без второй учётки.",
         )}
-      </p>
+      </Hint>
 
       {q.isLoading && <Skeleton className="mt-3 h-20" />}
 
@@ -172,11 +173,11 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
           <div className="text-sm font-semibold text-tg-text">
             {tx("Перевести сотрудника")}
           </div>
-          <p className="mt-1 text-xs text-tg-hint">
+          <Hint size="xs">
             {tx(
               "Прошлые смены остаются в отчётах прежнего филиала, будущие переезжают вместе с человеком.",
             )}
-          </p>
+          </Hint>
 
           <FormField
             id="transfer-person"
@@ -249,11 +250,11 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
         <div className="text-sm font-semibold text-tg-text">
           {tx("Новый филиал")}
         </div>
-        <p className="mt-1 text-xs text-tg-hint">
+        <Hint size="xs">
           {tx(
             "Филиал получит свой код и отдельные данные. Сотрудников добавляйте уже внутри него.",
           )}
-        </p>
+        </Hint>
         <FormField
           id="branch-name"
           label={tx("Название филиала")}

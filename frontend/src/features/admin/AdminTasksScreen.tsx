@@ -401,7 +401,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="rounded-tile bg-tg-bg/50 p-2.5">
-          <div className="text-xs text-tg-hint">{tx("Срок — дата, время и секунды. Пусто = без срока.")}</div>
+          <Hint size="xs" className="mt-0">{tx("Срок — дата, время и секунды. Пусто = без срока.")}</Hint>
           <div className="mt-2 grid grid-cols-[1.4fr_1fr_0.7fr] gap-2">
             <FormField
               id="task-due-date"

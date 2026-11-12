@@ -9,6 +9,7 @@ import {
   type OrgProfileVisibility,
 } from "@/api/hr";
 import { createInvitation, type OrgInvitation } from "@/api/orgs";
+import Hint from "@/components/Hint";
 import {
   applyShiftTemplate,
   fetchShiftWeek,
@@ -287,9 +288,9 @@ export default function OrgSetupScreen({
               <h2 className="text-heading text-tg-text">
                 {tx("Что у вас за предприятие?")}
               </h2>
-              <p className="mt-1 text-xs text-tg-hint">
+              <Hint size="xs">
                 {tx("От этого зависят подсказки по подразделениям и акценты в приложении.")}
-              </p>
+              </Hint>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {INDUSTRIES.map((item) => (
@@ -333,9 +334,9 @@ export default function OrgSetupScreen({
               <h2 className="text-heading text-tg-text">
                 {tx("Из кого состоит команда?")}
               </h2>
-              <p className="mt-1 text-xs text-tg-hint">
+              <Hint size="xs">
                 {tx("Выберите отделы — они появятся в приложении. Свои можно добавить позже в админке.")}
-              </p>
+              </Hint>
             </div>
             {/* Пока отделы едут, на их месте — таблетки того же размера.
                 Пустой блок выглядел как «отделов нет» и толкал руководителя
@@ -416,9 +417,9 @@ export default function OrgSetupScreen({
               <h2 className="text-heading text-tg-text">
                 {tx("Какие разделы оставить?")}
               </h2>
-              <p className="mt-1 text-xs text-tg-hint">
+              <Hint size="xs">
                 {tx("События, задачи, чек-лист и профиль остаются всегда — это ядро смены.")}
-              </p>
+              </Hint>
             </div>
             {OPTIONAL_SECTIONS.map((item) => (
               <Toggle
@@ -438,9 +439,9 @@ export default function OrgSetupScreen({
               <h2 className="text-heading text-tg-text">
                 {tx("Кто что видит")}
               </h2>
-              <p className="mt-1 text-xs text-tg-hint">
+              <Hint size="xs">
                 {tx("Правила действуют сразу и для всех: их проверяет сервер, а не только интерфейс.")}
-              </p>
+              </Hint>
             </div>
 
             <div className="space-y-2">
@@ -546,9 +547,9 @@ export default function OrgSetupScreen({
               <div className="mt-1 text-sm font-medium text-tg-text">
                 {tx("Всё готово")}
               </div>
-              <p className="mt-1 text-xs text-tg-hint">
+              <Hint size="xs">
                 {tx("Настройку можно поменять позже — в профиле, «Настройка организации».")}
-              </p>
+              </Hint>
             </div>
             <div className="rounded-tile bg-tg-secondary-bg/60 p-3">
               <div className="text-2xs font-medium uppercase tracking-wide text-tg-hint">

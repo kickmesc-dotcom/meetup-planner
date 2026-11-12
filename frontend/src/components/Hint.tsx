@@ -8,16 +8,26 @@ import type { ReactNode } from "react";
  * блока) поля нет, и такой текст рисовали руками: где-то `text-xs`, где-то
  * `text-2xs`, с разным отступом. Один компонент держит вид подсказки и не
  * даёт скопировать её внутрь `FormField`, где она задвоится.
+ *
+ * `size="xs"` — для описания секции или шага: это не мелкая сноска под
+ * полем, а вводный абзац, и 12 px читаются заметно легче.
  */
 export default function Hint({
   children,
   className,
+  size = "2xs",
 }: {
   children: ReactNode;
   className?: string;
+  size?: "2xs" | "xs";
 }) {
+  const sizeClass = size === "xs" ? "text-xs" : "text-2xs";
   return (
-    <p className={["mt-1 text-2xs text-tg-hint", className].filter(Boolean).join(" ")}>
+    <p
+      className={[sizeClass, "text-tg-hint", className ?? "mt-1"]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {children}
     </p>
   );

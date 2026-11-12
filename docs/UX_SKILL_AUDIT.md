@@ -44,7 +44,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `focus-appearance` | ✅ | кольцо 2 px с отступом 2 px, контраст 5.23:1 / 5.87:1 (≥ 3:1), закреплено тестом | — |
 | `dragging-alternative` | ✅ | `RangePill` — кнопка (Enter/Space, `aria-label`), границы правятся кнопками в `RangeEditorSheet`; drag — быстрый путь | N |
 | `web-target-size` | ✅ | 24×24 AA выполняется (минимум в коде — 32px) | M |
-| `consistent-help` | ⚠️ | подсказка поля живёт только в `FormField.hint` (убран дубль в приватности), подсказки групп — `Hint` с единым `text-2xs`; остальные пояснения ещё переводятся по мере касания | R |
+| `consistent-help` | ✅ | подсказка поля — только `FormField.hint` с `aria-describedby`; подсказки групп — `Hint` (`2xs`), описания шагов и секций — `Hint size="xs"`: размер задаёт компонент, а не место | — |
 | `redundant-entry` | ✅ | онбординг пропускает шаги с уже известным отделом и опытом; профиль берёт значения из карточки (`pickedDept ?? me.department_id`), а не просит ввести заново | — |
 | `accessible-authentication` | ✅ | `autoComplete`, вставка, показ пароля, вход по коду | — |
 | `auto-rotation-controls` | — | авто-каруселей нет | — |
@@ -299,7 +299,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 
 | Раздел | ⚠️ | Живая проверка | Осознанно | Техдолг |
 |---|---:|---:|---:|---:|
-| 1. Accessibility | 3 | 2 | 0 | 1 |
+| 1. Accessibility | 2 | 2 | 0 | 0 |
 | 2. Touch & Interaction | 7 | 2 | 2 | 3 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
@@ -309,7 +309,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **38** | **10** | **15** | **13** |
+| **Итого** | **37** | **10** | **15** | **12** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,7 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (13).** `consistent-help`,
-`touch-spacing`, `error-feedback`, `gesture-alternative`,
+**Техдолг (12).** `touch-spacing`, `error-feedback`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
@@ -398,3 +397,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `network-fallback` закрыт: таймаут 30 с (фото 90 с), повтор по `online`, различение обрыва и отказа | `tsc` 0, eslint 0, 37 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `redundant-entry` закрыт: знакомство не спрашивает назначенный отдел и известный опыт; профиль подставляет значения из карточки | `tsc` 0, eslint 0, 8 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `overflow-menu` закрыт: дни недели в сетке, тройки действий переносятся вместо сжатия | `tsc` 0, eslint 0, 21 тест, сборка 0 |
+| 12.11.2026 | техдолг | `consistent-help` закрыт: описания шагов и секций переведены на `Hint size="xs"` в пяти экранах, вид подсказки задаёт компонент | `tsc` 0, eslint 0, 14 тестов, сборка 0 |

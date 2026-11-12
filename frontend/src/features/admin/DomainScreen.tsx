@@ -8,6 +8,7 @@ import {
 } from "@/api/orgs";
 import { humanizeApiError } from "@/api/client";
 import FormField from "@/components/FormField";
+import Hint from "@/components/Hint";
 import { Skeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
 import { BusyLabel } from "@/components/BusyLabel";
@@ -200,26 +201,26 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
               <div className="text-sm font-semibold text-tg-text">
                 {tx("Как подтвердить")}
               </div>
-              <p className="mt-1 text-xs text-tg-hint">
+              <Hint size="xs">
                 {tx(
                   "Создайте на своём домене файл по адресу ниже — он должен открываться по https без входа.",
                 )}
-              </p>
+              </Hint>
               <code className="mt-2 block break-all rounded-tile bg-tg-bg p-2 text-xs text-tg-text">
                 https://{data.domain}
                 {data.verify_path}
               </code>
-              <p className="mt-2 text-xs text-tg-hint">
+              <Hint size="xs" className="mt-2">
                 {tx("Содержимое файла — одна строка:")}
-              </p>
+              </Hint>
               <code className="mt-1 block break-all rounded-tile bg-tg-bg p-2 text-xs text-tg-text">
                 {line}
               </code>
-              <p className="mt-2 text-2xs text-tg-hint">
+              <Hint className="mt-2">
                 {tx(
                   "Токен меняется вместе с доменом: старая наклейка на прежнем адресе ничего не подтверждает.",
                 )}
-              </p>
+              </Hint>
               <div className="mt-3 flex gap-2">
                 <button
                   type="button"
