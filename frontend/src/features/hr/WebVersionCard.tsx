@@ -197,7 +197,12 @@ function LinkRow({
   return (
     <li className="flex items-center gap-2 rounded-tile bg-tg-bg/40 px-2 py-1.5">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xs text-tg-text">
+        <div
+          className="truncate text-xs text-tg-text"
+          title={`${link.label ? tx(link.label) : tx("Ссылка")}${
+            link.is_current ? tx(" · это устройство") : ""
+          }`}
+        >
           {link.label ? tx(link.label) : tx("Ссылка")}
           {link.is_current ? tx(" · это устройство") : ""}
         </div>

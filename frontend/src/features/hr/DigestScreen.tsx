@@ -276,7 +276,9 @@ function Tile({
     <>
       <div className="flex items-center gap-1.5 text-2xs text-tg-hint">
         <Icon name={icon} size={13} />
-        <span className="truncate">{label}</span>
+        <span className="truncate" title={label}>
+          {label}
+        </span>
       </div>
       <div
         className={[

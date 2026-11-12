@@ -168,7 +168,10 @@ export default function KpiScreen({ onBack }: Props) {
                 <span className="w-5 shrink-0 text-right tabular-nums text-tg-hint">
                   {row.place}
                 </span>
-                <span className="min-w-0 flex-1 truncate text-tg-text">
+                <span
+                  className="min-w-0 flex-1 truncate text-tg-text"
+                  title={`${row.display_name}${row.department ? ` · ${row.department}` : ""}`}
+                >
                   {row.display_name}
                   {row.department ? (
                     <span className="text-tg-hint"> · {row.department}</span>

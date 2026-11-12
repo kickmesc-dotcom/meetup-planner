@@ -294,7 +294,16 @@ function EmployeeRow({
           >
             {card.display_name}
           </span>
-          <span className="block truncate text-xs text-tg-hint">
+          <span
+            className="block truncate text-xs text-tg-hint"
+            title={`${
+              [card.department_name, card.position ?? card.badge]
+                .filter(Boolean)
+                .join(" · ") || tx("без отдела")
+            } · ${ROLE_LABEL[card.role as HrRole] ?? card.role}${
+              fired ? tx(" · уволен") : ""
+            }`}
+          >
             {[card.department_name, card.position ?? card.badge]
               .filter(Boolean)
               .join(" · ") || tx("без отдела")}

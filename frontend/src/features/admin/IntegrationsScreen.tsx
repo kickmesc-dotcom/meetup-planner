@@ -291,7 +291,10 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
                 ].join(" ")}
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="min-w-0 truncate font-medium text-tg-text">
+                  <span
+                    className="min-w-0 truncate font-medium text-tg-text"
+                    title={key.name}
+                  >
                     {key.name}
                   </span>
                   <span className="shrink-0 text-2xs text-tg-hint">

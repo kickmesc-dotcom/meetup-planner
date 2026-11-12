@@ -542,7 +542,10 @@ function GroupRows({
                 {person.display_name}
               </div>
               {person.position && (
-                <div className="truncate text-2xs text-tg-hint">
+                <div
+                  className="truncate text-2xs text-tg-hint"
+                  title={person.position}
+                >
                   {person.position}
                 </div>
               )}

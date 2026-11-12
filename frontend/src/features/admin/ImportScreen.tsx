@@ -374,7 +374,9 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
                   {tx(ACTION_LABEL[row.action] ?? row.action)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-tg-text">{row.name}</span>
+                  <span className="block truncate text-tg-text" title={row.name}>
+                    {row.name}
+                  </span>
                   {row.detail && (
                     <span className="block text-tg-hint">{row.detail}</span>
                   )}

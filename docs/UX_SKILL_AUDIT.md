@@ -152,7 +152,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `color-dark-mode` | ✅ | отдельные значения темы | — |
 | `color-accessible-pairs` | ✅ | этап S: ссылки и ошибки добавлены в расчёт; светлая ссылка затемнена до `#1c6fb8`, ошибка — `#c62828`, тёмная ошибка — `#ff6b6b` | — |
 | `color-not-decorative-only` | ✅ | статус = цвет + слово | — |
-| `truncation-strategy` | ⚠️ | 18 мест, где обрезка скрывает данные, получили `title`: заголовки подраздела, организации и филиалы, имена, ссылки, задачи, настройки, праздники; остальные `truncate` — короткие статические подписи | S |
+| `truncation-strategy` | ✅ | обрезка данных раскрывается в `title`: 18 мест ранее и ещё 10 сейчас (отделы в карточке сотрудника, ключи API, KPI, состав смены, ссылки устройств, достижения); оставшиеся `truncate` — короткие статические подписи или родитель уже несёт `title` | — |
 | `letter-spacing` | ⚠️ | `tracking-wide` у мелких капсов — приемлемо | — |
 | `number-tabular` | ✅ | `tabular-nums` в цифрах, счёте, времени | — |
 | `whitespace-balance` | ✅ | карточки с 12–16px | — |
@@ -304,12 +304,12 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 2 | 0 | 2 | 0 |
-| 6. Typography & Color | 5 | 1 | 2 | 2 |
+| 6. Typography & Color | 4 | 1 | 2 | 1 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **31** | **10** | **15** | **6** |
+| **Итого** | **30** | **10** | **15** | **5** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,8 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (6).**
-`text-styles-system`, `truncation-strategy`, `input-helper-text`,
+**Техдолг (5).**
+`text-styles-system`, `input-helper-text`,
 `inline-validation`,
 `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
@@ -403,3 +403,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `touch-spacing` закрыт: сегмент автоперезапуска получил зазор; остальные группы целей уже с `gap-2` | `tsc` 0, eslint 0, сборка 0 (теста экрана нет) |
 | 12.11.2026 | техдолг | `spacing-scale` закрыт: дробных отступов в padding/gap нет, ширина колонки календаря вынесена в токены, добавлен `styles.spacing.test.ts` | `tsc` 0, eslint 0, 10 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `compact-label-overflow` закрыт: 15 обрезаемых подписей кнопок получили `title` с полным текстом | `tsc` 0, eslint 0, 43 теста, сборка 0 |
+| 12.11.2026 | техдолг | `truncation-strategy` закрыт: ещё 10 обрезаемых имён, отделов, ключей и подписей получили `title`; статические короткие подписи не трогали | `tsc` 0, eslint 0, 122 теста, сборка 0 |

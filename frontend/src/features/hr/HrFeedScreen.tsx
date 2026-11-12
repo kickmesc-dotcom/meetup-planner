@@ -1045,7 +1045,9 @@ function FeedDay({
             size={13}
             className="shrink-0 text-tg-hint"
           />
-          <span className="truncate">{group.label}</span>
+          <span className="truncate" title={group.label}>
+            {group.label}
+          </span>
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
           {translate.canTranslate && (
@@ -1206,7 +1208,9 @@ function FeedRow({
                 style={{ backgroundColor: dept.soft, border: `1px solid ${dept.border}` }}
                 aria-label={tx("Открыть подразделение {name}", { name: departmentName })}
               >
-                <span className="truncate">{departmentName}</span>
+                <span className="truncate" title={departmentName}>
+                  {departmentName}
+                </span>
                 <Icon name="chevron" size={10} className="shrink-0 opacity-60" />
               </button>
             )}

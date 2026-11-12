@@ -400,7 +400,10 @@ export function RosterSnapshotsPanel() {
               className="rounded-tile bg-tg-bg/60 px-2 py-2"
             >
               <div className="flex items-baseline gap-2">
-                <span className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text">
+                <span
+                  className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text"
+                  title={snapshot.label || tx("Без названия")}
+                >
                   {snapshot.label || tx("Без названия")}
                 </span>
                 <span className="shrink-0 text-2xs text-tg-hint">

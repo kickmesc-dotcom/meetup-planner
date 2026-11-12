@@ -45,7 +45,9 @@ export default function ProgressBar({
     <div className={["w-full", className].join(" ")}>
       {(label || hint) && (
         <div className="mb-1 flex items-baseline justify-between gap-2 text-xs text-tg-hint">
-          <span className="min-w-0 truncate">{label}</span>
+          <span className="min-w-0 truncate" title={label}>
+            {label}
+          </span>
           <span className="shrink-0 tabular-nums">
             {hint ? `${hint} ` : ""}
             {safeValue}/{total}
