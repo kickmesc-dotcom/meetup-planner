@@ -196,7 +196,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
           )}
         </FormField>
 
-        <div className="flex gap-1.5" role="tablist" aria-label={tx("Кому")}>
+        <div className="flex gap-2" role="tablist" aria-label={tx("Кому")}>
           {[
             { v: "department" as const, label: tx("Отделу") },
             { v: "employee" as const, label: tx("Сотруднику") },
@@ -351,7 +351,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
 
         <div>
           <div className="text-xs text-tg-hint">{tx("Повторяется по дням (необязательно)")}</div>
-          <div className="mt-1 flex gap-1">
+          <div className="mt-1 flex gap-2">
             {WEEKDAY_OPTIONS.map(({ day, short, full }) => {
               const selected = taskWeekdays.includes(day);
               return (

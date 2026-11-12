@@ -37,7 +37,7 @@ export default function LanguageSwitcher({
       aria-label={t("locale.label")}
       data-testid="language-switcher"
       className={[
-        "flex flex-wrap items-center justify-center gap-1",
+        "flex flex-wrap items-center justify-center gap-2",
         bare ? "" : "rounded-full bg-tg-secondary-bg/70 p-1",
         className ?? "",
       ].join(" ")}

@@ -551,7 +551,7 @@ function ItemEditor({
               не входит в прогресс. */}
           <div>
             <div className="text-xs text-tg-hint">{tx("В какие дни нужен пункт")}</div>
-            <div className="mt-1 flex gap-1">
+            <div className="mt-1 flex gap-2">
               {WEEKDAYS.map(({ day, short, full }) => {
                 const selected = parseWeekdays(item.weekdays).includes(day);
                 return (
@@ -781,7 +781,7 @@ function Chips<T extends string | number>({
 }) {
   if (loading) return <ListSkeleton rows={1} />;
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {options.map((o) => (
         <button
           key={String(o.value)}

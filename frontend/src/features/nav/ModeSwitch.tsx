@@ -40,7 +40,7 @@ export default function ModeSwitch({ className }: { className?: string }) {
       aria-label={tx("Зона приложения")}
       data-testid="mode-switch"
       className={[
-        "flex items-center gap-1 rounded-full bg-tg-secondary-bg/80 p-1",
+        "flex items-center gap-2 rounded-full bg-tg-secondary-bg/80 p-1",
         className ?? "",
       ].join(" ")}
     >

@@ -55,7 +55,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
 | `touch-target-size` | ✅ | этап M: действия и иконочные кнопки подняты до 44px (`IssuesScreen`, `HandoversScreen`, `MassPlanSheet`, `AdminTasksScreen`, `AttentionScreen`, `AppTextsScreen`, `AskScreen`, `MenuList`, `ZoneHint`, `SimulationBanner`, `NavBar`, вход и сброс пароля) | — |
-| `touch-spacing` | ⚠️ | в плотных списках кнопки вплотную (8px не везде) | M |
+| `touch-spacing` | ⚠️ | 6 групп кнопок (языки, зона, «Кому», дни недели ×2, чипы) получили `gap-2` — 8px; остальные плотные списки ещё по месту | M |
 | `hover-vs-tap` | ✅ | все действия на `onClick` | — |
 | `loading-buttons` | ✅ | этап P: 125 async-кнопок в 47 файлах — `disabled` + `aria-busy` по тому же состоянию | — |
 | `error-feedback` | ⚠️ | `FormField` связал вход, сброс, домен и ключ API (ошибка у поля, `role="alert"`); остальные формы кабинета — общий блок или тост | P |
@@ -389,3 +389,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `network-fallback` частично: `ErrorState` называет обрыв связи, имеет `role=alert` и повторяет запрос по событию `online` | `tsc` 0, eslint 0, 8 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `consistent-help` частично: компонент `Hint`, дубль подсказки в приватности убран, подсказки полей — только через `FormField.hint` | `tsc` 0, eslint 0, 19 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `text-styles-system` частично: токены `display`/`title-lg`/`title`/`heading`, 66 заголовков переведены с `text-lg font-semibold` на роли | `tsc` 0, eslint 0, 1073/1074 → typeScale 4/4, сборка 0 |
+| 12.11.2026 | техдолг | `touch-spacing` частично: зазор 8px в группах языков, зоны, «Кому», дней недели и чипов | `tsc` 0, eslint 0, 25 тестов, сборка 0 |
