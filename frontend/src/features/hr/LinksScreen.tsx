@@ -91,10 +91,13 @@ export default function LinksScreen() {
                 {l.emoji ?? <Icon name="link" size={18} />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-tg-text">
+                <span
+                  className="block truncate text-sm font-medium text-tg-text"
+                  title={l.title}
+                >
                   {l.title}
                 </span>
-                <span className="block truncate text-xs text-tg-hint">
+                <span className="block truncate text-xs text-tg-hint" title={l.url}>
                   {l.url}
                 </span>
               </span>

@@ -282,7 +282,7 @@ function LessonCard({
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-tg-text">
+          <span className="block truncate text-sm font-medium text-tg-text" title={lesson.title}>
             {lesson.title}
           </span>
           <span className="block text-xs text-tg-hint">

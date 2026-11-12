@@ -313,7 +313,7 @@ export default function TeamScreen({
                       key={`${item.at}-${index}`}
                       className="flex items-baseline justify-between gap-2 text-xs"
                     >
-                      <span className="min-w-0 truncate text-tg-text">
+                      <span className="min-w-0 truncate text-tg-text" title={item.text}>
                         {item.display_name ? `${item.display_name}: ` : ""}
                         {item.text}
                       </span>
@@ -392,7 +392,10 @@ function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
     <div className="rounded-tile bg-tg-bg/50 p-2">
       <div className="flex items-center gap-2">
         <span aria-hidden>{row.emoji ?? "•"}</span>
-        <span className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text">
+        <span
+          className="min-w-0 flex-1 truncate text-xs font-medium text-tg-text"
+          title={row.name}
+        >
           {row.name}
         </span>
         <span className="text-xs tabular-nums text-tg-hint">

@@ -453,7 +453,9 @@ export default function QuickTaskSheet({ onClose }: { onClose: () => void }) {
                   }}
                   className="flex w-full min-h-10 items-center justify-between rounded-tile px-2 text-left text-xs text-tg-text active:bg-tg-secondary-bg"
                 >
-                  <span className="truncate">{person.name}</span>
+                  <span className="truncate" title={person.name}>
+                  {person.name}
+                </span>
                   <span className="ml-2 shrink-0 text-2xs text-tg-hint">
                     {person.position ?? ""}
                   </span>

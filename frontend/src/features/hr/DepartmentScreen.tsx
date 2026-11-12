@@ -65,7 +65,10 @@ export default function DepartmentScreen({
           <Icon name="back" size={20} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-tg-text">
+          <div
+            className="truncate text-sm font-semibold text-tg-text"
+            title={q.data?.department_name ?? tx("Подразделение")}
+          >
             {q.data
               ? `${q.data.department_emoji ? `${q.data.department_emoji} ` : ""}${q.data.department_name}`
               : tx("Подразделение")}
@@ -219,7 +222,10 @@ function PersonRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
-          <span className="truncate text-sm font-medium text-tg-text">
+          <span
+            className="truncate text-sm font-medium text-tg-text"
+            title={person.display_name}
+          >
             {person.display_name}
           </span>
           {person.is_self && (

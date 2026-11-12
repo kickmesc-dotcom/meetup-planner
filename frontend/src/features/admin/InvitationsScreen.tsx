@@ -167,10 +167,10 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
                 className="flex items-center justify-between gap-2 py-2"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm text-tg-text">
+                  <div className="truncate text-sm text-tg-text" title={row.name}>
                     {row.name}
                   </div>
-                  <div className="truncate text-xs text-tg-hint">
+                  <div className="truncate text-xs text-tg-hint" title={row.email ?? undefined}>
                     {row.is_self
                       ? tx("это ты")
                       : (row.email ?? tx("без почты"))}

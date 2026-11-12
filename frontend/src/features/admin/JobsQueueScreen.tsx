@@ -222,8 +222,10 @@ function JobRow({
     <div className="rounded-tile bg-tg-bg/50 px-2 py-1.5">
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-sm truncate text-tg-text">{job.label}</div>
-          <div className="text-2xs text-tg-hint truncate">
+          <div className="text-sm truncate text-tg-text" title={job.label}>
+            {job.label}
+          </div>
+          <div className="text-2xs text-tg-hint truncate" title={job.detail ?? undefined}>
             {job.next_run_at
               ? format(new Date(job.next_run_at), "dd.MM HH:mm")
               : "—"}

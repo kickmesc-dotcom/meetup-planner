@@ -297,7 +297,10 @@ function StandardDetail({ id, onBack }: { id: number; onBack: () => void }) {
           <Icon name="back" size={18} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-tg-text">
+          <div
+            className="truncate text-sm font-semibold text-tg-text"
+            title={standard ? translate.t(standard.title) : tx("Стандарт")}
+          >
             {standard?.emoji ? `${standard.emoji} ` : ""}
             {standard ? translate.t(standard.title) : tx("Стандарт")}
           </div>

@@ -139,7 +139,10 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
             className="flex items-center justify-between gap-2 rounded-card bg-tg-secondary-bg/40 p-3"
           >
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-tg-text">
+              <div
+                className="truncate text-sm font-semibold text-tg-text"
+                title={branch.name}
+              >
                 {branch.name}
               </div>
               <div className="text-2xs text-tg-hint">

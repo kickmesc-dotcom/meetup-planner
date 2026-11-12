@@ -67,7 +67,10 @@ export default function EmployeeCardSheet({
           >
             {q.data?.display_name ?? tx("Карточка сотрудника")}
           </div>
-          <div className="truncate text-xs text-tg-hint">
+          <div
+            className="truncate text-xs text-tg-hint"
+            title={q.data?.department_name ?? tx("что делал на смене")}
+          >
             {q.data?.department_name ?? tx("что делал на смене")}
           </div>
         </div>
@@ -245,7 +248,10 @@ function CardBody({
                     className="h-24 w-full object-cover"
                     loading="lazy"
                   />
-                  <span className="mt-1 block truncate text-2xs text-tg-hint">
+                  <span
+                    className="mt-1 block truncate text-2xs text-tg-hint"
+                    title={`${card.last_media.caption} · ${formatWhen(card.last_media.at)}`}
+                  >
                     {card.last_media.caption} · {formatWhen(card.last_media.at)}
                   </span>
                 </button>

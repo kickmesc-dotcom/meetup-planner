@@ -72,7 +72,9 @@ function OrgRow({
     <div className="rounded-tile bg-tg-secondary-bg/60 p-3" data-testid={`org-${org.id}`}>
       <div className="flex items-baseline justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-tg-text">{org.name}</div>
+          <div className="truncate text-sm font-semibold text-tg-text" title={org.name}>
+            {org.name}
+          </div>
           <div className="text-xs text-tg-hint">{org.slug}</div>
         </div>
         <span
@@ -138,7 +140,9 @@ function InvoiceRow({
   return (
     <div className="rounded-tile bg-tg-secondary-bg/60 p-3" data-testid={`p-invoice-${invoice.id}`}>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-sm font-semibold text-tg-text">{invoice.org_name}</span>
+        <span className="truncate text-sm font-semibold text-tg-text" title={invoice.org_name}>
+          {invoice.org_name}
+        </span>
         <span className="text-sm text-tg-hint">{formatMoney(invoice.amount)}</span>
       </div>
       <p className="mt-1 text-xs text-tg-hint">
@@ -355,7 +359,9 @@ export default function PlatformScreen({ onBack }: { onBack: () => void }) {
                       key={org.org_id}
                       className="flex items-baseline justify-between rounded-tile bg-tg-secondary-bg/60 p-2 text-xs"
                     >
-                      <span className="min-w-0 truncate text-tg-text">{org.name}</span>
+                      <span className="min-w-0 truncate text-tg-text" title={org.name}>
+                        {org.name}
+                      </span>
                       <span className="shrink-0 text-tg-hint">
                         {Math.round(org.first_task_share * 100)}% ·{" "}
                         {org.people} {tx("чел.")}

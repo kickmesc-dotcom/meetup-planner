@@ -329,7 +329,7 @@ function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
   return (
     <div className="rounded-card bg-tg-secondary-bg/60 p-3">
       <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0 truncate text-sm font-medium text-tg-text">
+        <div className="min-w-0 truncate text-sm font-medium text-tg-text" title={dept.name}>
           {dept.emoji ? `${dept.emoji} ` : ""}
           {dept.name}
         </div>

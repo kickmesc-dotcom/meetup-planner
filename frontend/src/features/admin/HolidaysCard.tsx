@@ -81,7 +81,9 @@ export default function HolidaysCard() {
               <span className="shrink-0 tabular-nums text-tg-hint">
                 {String(h.day).padStart(2, "0")}.{String(h.month).padStart(2, "0")}
               </span>
-              <span className="min-w-0 flex-1 truncate">{h.message}</span>
+              <span className="min-w-0 flex-1 truncate" title={h.message}>
+                {h.message}
+              </span>
               <button
                 type="button"
                 onClick={() => {
