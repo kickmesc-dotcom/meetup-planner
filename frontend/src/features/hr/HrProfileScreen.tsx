@@ -31,9 +31,11 @@ import KpiCard from "@/features/hr/KpiCard";
 import PushCard from "@/features/hr/PushCard";
 import TrainingScreen from "@/features/hr/TrainingScreen";
 import WebVersionCard from "@/features/hr/WebVersionCard";
-import { useUI } from "@/store/ui";
+import { useUI, type Tab } from "@/store/ui";
 import { haptic, showAlert, WebApp } from "@/tg/webapp";
 import { useTx } from "@/i18n";
+import { sectionEnabled } from "@/features/hr/sections";
+import Hint from "@/components/Hint";
 /**
  * SemiTaskBot: «Профиль».
  *
@@ -70,9 +72,15 @@ interface RowItem {
   icon: IconName;
   label: string;
   onSelect: () => void;
+  /** Раздел организации: выключенный руководителем не открываем. */
+  tab?: Tab;
 }
 
-export default function HrProfileScreen() {
+export default function HrProfileScreen({
+  sections: enabledSections,
+}: {
+  sections?: string[];
+}) {
   const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
@@ -234,14 +242,14 @@ export default function HrProfileScreen() {
     // Поиск стоит первым: у нового сотрудника вопрос «где это написано»
     // возникает раньше, чем желание открыть раздел и листать его.
     { icon: "search", label: "Спросить", onSelect: () => setTab("ask") },
-    { icon: "book", label: "Материалы смены", onSelect: () => setTab("materials") },
-    { icon: "globe", label: "Ссылки", onSelect: () => setTab("links") },
-    { icon: "checklist", label: "Стандарты", onSelect: () => setTab("standards") },
-    { icon: "alert", label: "Журнал проблем", onSelect: () => setTab("issues") },
-    { icon: "send", label: "Передача смены", onSelect: () => setTab("handovers") },
+    { icon: "book", label: "Материалы смены", tab: "materials", onSelect: () => setTab("materials") },
+    { icon: "globe", label: "Ссылки", tab: "links", onSelect: () => setTab("links") },
+    { icon: "checklist", label: "Стандарты", tab: "standards", onSelect: () => setTab("standards") },
+    { icon: "alert", label: "Журнал проблем", tab: "issues", onSelect: () => setTab("issues") },
+    { icon: "send", label: "Передача смены", tab: "handovers", onSelect: () => setTab("handovers") },
     // «График» — расписание смен; старая сетка участников убрана (план, 13.1).
-    { icon: "calendar", label: "График", onSelect: () => setTab("shifts") },
-    { icon: "clock", label: "Встречи", onSelect: () => setTab("meetings") },
+    { icon: "calendar", label: "График", tab: "shifts", onSelect: () => setTab("shifts") },
+    { icon: "clock", label: "Встречи", tab: "meetings", onSelect: () => setTab("meetings") },
     { icon: "edit", label: "Обратная связь", onSelect: () => setShowFeedback(true) },
   ];
   // 31.10.2026: управленческие разделы больше не подмешиваются в список
@@ -255,6 +263,13 @@ export default function HrProfileScreen() {
   // теперь одна зона — одна дверь, и внутри неё уже свои разделы. Ссылка
   // передаётся через `pendingAdminSection`, чтобы человек попадал сразу в
   // «Команду», а не в корень кабинета.
+  const visibleSections = enabledSections
+    ? sections.filter((item) => !item.tab || sectionEnabled(item.tab, enabledSections))
+    : sections;
+  const hiddenSections = enabledSections
+    ? sections.filter((item) => item.tab && !sectionEnabled(item.tab, enabledSections))
+    : [];
+
   const openManage = (section?: string) => {
     if (section) setPendingAdminSection(section);
     setMode("manage");
@@ -636,7 +651,7 @@ export default function HrProfileScreen() {
           <Icon name="layout" size={18} className="text-tg-hint" />
           <span className="flex-1 text-sm font-semibold text-tg-text">{tx("Все разделы")}</span>
           <span className="text-xs tabular-nums text-tg-hint">
-            {sections.length}
+            {visibleSections.length}
           </span>
           <Icon
             name="chevron"
@@ -649,9 +664,16 @@ export default function HrProfileScreen() {
         </button>
         {showSections && (
           <div id="profile-sections" className="border-t border-tg-hint/10 p-2">
-            {sections.map((item) => (
+            {visibleSections.map((item) => (
               <Row key={item.label} {...item} />
             ))}
+            {hiddenSections.length > 0 && (
+              <Hint className="px-2 pb-1">
+                {tx("Руководитель выключил: {list}. Включить можно в настройках организации.", {
+                  list: hiddenSections.map((item) => tx(item.label)).join(", "),
+                })}
+              </Hint>
+            )}
           </div>
         )}
       </section>

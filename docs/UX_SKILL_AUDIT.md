@@ -255,7 +255,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `focus-on-route-change` | ✅ | фокус переходит на область содержимого (первый рендер не трогаем) | — |
 | `persistent-nav` | ✅ | полоса/сайдбар всегда доступны | — |
 | `destructive-nav-separation` | ✅ | «Выйти» отдельно от навигации | — |
-| `empty-nav-state` | ⚠️ | выключенный раздел просто исчезает | — |
+| `empty-nav-state` | ✅ | выключенный раздел не открывается из профиля и назван в подсказке «Руководитель выключил: …» | — |
 
 ## 10. Charts & Data (LOW, 27 правил)
 
@@ -307,9 +307,9 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 3 | 0 | 1 | 2 |
-| 9. Navigation Patterns | 3 | 0 | 0 | 3 |
+| 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **42** | **10** | **15** | **17** |
+| **Итого** | **41** | **10** | **15** | **16** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,12 +327,12 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (17).** `network-fallback`, `consistent-help`,
+**Техдолг (16).** `network-fallback`, `consistent-help`,
 `redundant-entry`, `touch-spacing`, `error-feedback`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`, `overflow-menu`,
-`back-stack-integrity`, `empty-nav-state`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
+`back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
 
 ## Этапы
@@ -392,3 +392,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `touch-spacing` частично: зазор 8px в группах языков, зоны, «Кому», дней недели и чипов | `tsc` 0, eslint 0, 25 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `compact-label-overflow` частично: полный текст подписей вкладок и имён массового планирования через `title`, разделы кабинета — ещё и `aria-label` | `tsc` 0, eslint 0, 22 теста, сборка 0 |
 | 12.11.2026 | техдолг | `input-helper-text` частично: пять подсказок (домен, импорт, имя, филиал, почта) переведены в `FormField.hint` | `tsc` 0, eslint 0, 25 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `empty-nav-state` закрыт: профиль не открывает выключенные разделы и называет их списком | `tsc` 0, eslint 0, 19 тестов, сборка 0 |

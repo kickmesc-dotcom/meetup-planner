@@ -723,7 +723,7 @@ export default function App() {
           <ThemeSwitcher />
         </header>
         <main className="flex-1 overflow-hidden flex flex-col">
-          <HrProfileScreen />
+          <HrProfileScreen sections={sections ?? undefined} />
         </main>
       </>
     );

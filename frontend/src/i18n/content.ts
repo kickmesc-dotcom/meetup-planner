@@ -2386,6 +2386,8 @@ export const EN_CONTENT: Record<string, string> = {
     "Employees will see this name in the branch switcher.",
   "Можно не указывать: ссылку передадите вручную.":
     "Optional: you can pass the link along manually.",
+  "Руководитель выключил: {list}. Включить можно в настройках организации.":
+    "Disabled by the manager: {list}. You can turn them on in the organization settings.",
   "Работает": "Working",
   "Есть проблемы": "There are problems",
   "API": "API",
