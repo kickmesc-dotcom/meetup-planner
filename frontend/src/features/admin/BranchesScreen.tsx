@@ -257,6 +257,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
         <FormField
           id="branch-name"
           label={tx("Название филиала")}
+          hint={tx("Сотрудники увидят это название в переключателе филиалов.")}
           required
           className="mt-2"
         >

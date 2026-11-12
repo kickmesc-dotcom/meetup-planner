@@ -2377,6 +2377,15 @@ export const EN_CONTENT: Record<string, string> = {
   "Проверка обновляется каждые 30 секунд.": "The check refreshes every 30 seconds.",
   "Нет связи с API": "No connection to the API",
   "Нет связи": "No connection",
+  "Без https:// — например, task.company.ru": "Without https:// — for example, task.company.ru",
+  "Разделитель — ; или табуляция. Колонки: имя, должность, подразделение.":
+    "Separator — ; or tab. Columns: name, position, department.",
+  "Так человека увидят в ленте и чек-листах.":
+    "This is how the person appears in the feed and checklists.",
+  "Сотрудники увидят это название в переключателе филиалов.":
+    "Employees will see this name in the branch switcher.",
+  "Можно не указывать: ссылку передадите вручную.":
+    "Optional: you can pass the link along manually.",
   "Работает": "Working",
   "Есть проблемы": "There are problems",
   "API": "API",

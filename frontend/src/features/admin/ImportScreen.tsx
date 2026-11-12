@@ -254,6 +254,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
       <FormField
         id="import-text"
         label={tx("Или вставьте строки из таблицы (первая строка — заголовки)")}
+        hint={tx("Разделитель — ; или табуляция. Колонки: имя, должность, подразделение.")}
       >
         {(field) => (
           <textarea

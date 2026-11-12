@@ -309,7 +309,12 @@ function EmployeeRow({
             </p>
           )}
 
-          <FormField id="employee-name" label={tx("Имя")} required>
+          <FormField
+            id="employee-name"
+            label={tx("Имя")}
+            hint={tx("Так человека увидят в ленте и чек-листах.")}
+            required
+          >
             {(field) => (
               <input
                 {...field}

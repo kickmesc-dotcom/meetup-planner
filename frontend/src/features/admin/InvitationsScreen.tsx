@@ -233,7 +233,11 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
       <section className="space-y-2 rounded-card bg-tg-secondary-bg/60 p-3">
         <div className="text-sm font-semibold text-tg-text">{tx("Новая ссылка")}</div>
 
-        <FormField id="invite-email" label={tx("Почта (необязательно)")}>
+        <FormField
+          id="invite-email"
+          label={tx("Почта (необязательно)")}
+          hint={tx("Можно не указывать: ссылку передадите вручную.")}
+        >
           {(field) => (
             <input
               {...field}

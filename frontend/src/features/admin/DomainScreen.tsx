@@ -153,6 +153,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
             <FormField
               id="org-domain"
               label={tx("Домен")}
+              hint={tx("Без https:// — например, task.company.ru")}
               required
               invalid={!!save.error || !!formatError}
               error={
