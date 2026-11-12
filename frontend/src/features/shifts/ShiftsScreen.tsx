@@ -324,7 +324,7 @@ export default function ShiftsScreen() {
         {/* §3 `chip-collection-reflow`: отделы переносятся на новую строку,
             а не уезжают вправо за край экрана. */}
         {canEdit && (q.data?.departments.length ?? 0) > 1 && (
-          <div className="mt-2 flex flex-wrap gap-1.5 pb-0.5">
+          <div className="mt-2 flex flex-wrap gap-1.5 pb-1">
             <FilterChip
               active={departmentId === null}
               label={tx("Все отделы")}
@@ -393,7 +393,7 @@ export default function ShiftsScreen() {
                   return (
                     <div
                       key={iso}
-                      className={`rounded-tile px-0.5 py-1 text-center text-2xs ${
+                      className={`rounded-tile px-1 py-1 text-center text-2xs ${
                         isToday
                           ? "bg-tg-link/15 font-medium text-tg-link"
                           : "text-tg-hint"

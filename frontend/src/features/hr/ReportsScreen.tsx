@@ -344,7 +344,7 @@ function DepartmentCard({ dept }: { dept: HrDepartmentRow }) {
           done: dept.shifts_done,
         })}
       </div>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-tg-hint">
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-tg-hint">
         <span>{tx("поручений {count}", { count: dept.tasks_shift })}</span>
         <span>{tx("на проверке {count}", { count: dept.tasks_on_review })}</span>
         <span className={dept.tasks_overdue > 0 ? "text-status-busy" : ""}>

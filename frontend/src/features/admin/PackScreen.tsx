@@ -89,7 +89,7 @@ function PackCard({ pack }: { pack: Pack }) {
             {pack.positions.map((position) => (
               <span
                 key={position}
-                className="rounded-tile bg-tg-secondary-bg px-2 py-0.5 text-2xs text-tg-text"
+                className="rounded-tile bg-tg-secondary-bg px-2 py-1 text-2xs text-tg-text"
               >
                 {position}
               </span>
@@ -102,7 +102,7 @@ function PackCard({ pack }: { pack: Pack }) {
         <div className="text-2xs uppercase tracking-wide text-tg-hint">
           {tx("Чек-листы")} · {tx("{n} пунктов", { n: pack.checklist_items })}
         </div>
-        <ul className="space-y-0.5">
+        <ul className="space-y-1">
           {[...pack.opening_items, ...pack.closing_items].map((item) => (
             <li key={item} className="text-2xs text-tg-hint">
               · {item}

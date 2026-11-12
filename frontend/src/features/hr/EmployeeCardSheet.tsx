@@ -129,7 +129,7 @@ function CardBody({
               <Badge text={card.badge} emoji={card.badge_emoji} demo={card.is_demo} />
               {card.department_name && (
                 <span
-                  className="inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-2xs font-medium text-tg-text"
+                  className="inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 text-2xs font-medium text-tg-text"
                   style={{ backgroundColor: dept.soft, border: `1px solid ${dept.border}` }}
                 >
                   {card.department_name}

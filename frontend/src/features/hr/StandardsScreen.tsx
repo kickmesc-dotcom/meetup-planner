@@ -194,7 +194,7 @@ function StandardsList({ onOpen }: { onOpen: (id: number) => void }) {
                     </span>
                     <span
                       className={[
-                        "shrink-0 rounded-full px-2 py-0.5 text-xs",
+                        "shrink-0 rounded-full px-2 py-1 text-xs",
                         item.passed
                           ? "bg-status-free/20 text-status-free"
                           : "bg-tg-bg/70 text-tg-hint",

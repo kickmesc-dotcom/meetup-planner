@@ -29,6 +29,7 @@ vi.mock("@/api/hr", () => ({
   fetchEmployee: vi.fn(),
   fetchDepartments: vi.fn(),
   fetchDepartmentOverview: vi.fn(),
+  countOpenTasks: vi.fn(() => 0),
 }));
 
 vi.mock("@/api/kudos", async (importOriginal) => {

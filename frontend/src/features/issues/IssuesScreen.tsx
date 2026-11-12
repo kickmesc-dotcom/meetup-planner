@@ -324,7 +324,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
             </h2>
             <span
               className={[
-                "shrink-0 rounded-full px-2 py-0.5 text-xs",
+                "shrink-0 rounded-full px-2 py-1 text-xs",
                 STATUS_CLASS[issue.status],
               ].join(" ")}
             >
@@ -335,7 +335,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-tg-hint">
             <span
               className={[
-                "rounded-full px-1.5 py-0.5",
+                "rounded-full px-1.5 py-1",
                 SEVERITY_CLASS[issue.severity],
               ].join(" ")}
             >
@@ -346,7 +346,7 @@ function IssueCard({ issue, onClick }: { issue: HrIssue; onClick: () => void }) 
             {issue.department_name && <span>· {issue.department_name}</span>}
           </div>
 
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-tg-hint">
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-tg-hint">
             <span>{tx("висит {age}", { age: fmtAge(issue.age_hours) })}</span>
             {issue.created_by_name && (
               <span>{tx("· завёл {name}", { name: issue.created_by_name })}</span>
@@ -557,7 +557,7 @@ function IssueSheet({
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-tg-hint">
             <span
               className={[
-                "rounded-full px-2 py-0.5",
+                "rounded-full px-2 py-1",
                 STATUS_CLASS[issue.status],
               ].join(" ")}
             >
@@ -565,7 +565,7 @@ function IssueSheet({
             </span>
             <span
               className={[
-                "rounded-full px-2 py-0.5",
+                "rounded-full px-2 py-1",
                 SEVERITY_CLASS[issue.severity],
               ].join(" ")}
             >

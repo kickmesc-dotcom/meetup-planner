@@ -234,7 +234,7 @@ function JobRow({
         </div>
         <div
           className={[
-            "text-2xs rounded-full px-1.5 py-0.5 shrink-0",
+            "text-2xs rounded-full px-1.5 py-1 shrink-0",
             kindLabel === "reminder"
               ? "bg-status-maybe/15 text-status-maybe"
               : kindLabel === "date"

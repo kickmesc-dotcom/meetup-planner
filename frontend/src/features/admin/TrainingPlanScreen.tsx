@@ -181,14 +181,14 @@ function PlanCard({
               {plan.display_name}
             </span>
             {newcomer && (
-              <span className="rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">{tx("новичок")}</span>
+              <span className="rounded-full bg-tg-link/15 px-1.5 py-1 text-2xs text-tg-link">{tx("новичок")}</span>
             )}
           </div>
           <div className="mt-0.5 truncate text-xs text-tg-hint">
             {[plan.position, plan.department_name].filter(Boolean).join(" · ") ||
               tx("Без должности")}
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-tg-hint">
+          <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs text-tg-hint">
             <span className="text-tg-text">{labels[plan.rate_type] ?? plan.rate_type}</span>
             <span>
               {tx("· учебных {training} из {total}", {

@@ -573,7 +573,7 @@ export default function OrgSetupScreen({
                     {tx("Шаблоны смен")}: {progressQ.data.shift_templates}
                   </div>
                   {progressQ.data.checklists.length ? (
-                    <ul className="mt-1 space-y-0.5">
+                    <ul className="mt-1 space-y-1">
                       {progressQ.data.checklists.slice(0, 6).map((item) => (
                         <li
                           key={`${item.department ?? ""}-${item.title}`}

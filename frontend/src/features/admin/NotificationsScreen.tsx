@@ -275,7 +275,7 @@ export default function NotificationsScreen({ onBack }: { onBack: () => void }) 
                       ? tx("напоминание о сроке")
                       : tx("вторая ступень")}
                     {item.moved && (
-                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-0.5 text-2xs text-tg-link">{tx("перенесено вручную")}</span>
+                      <span className="ml-1 rounded-full bg-tg-link/15 px-1.5 py-1 text-2xs text-tg-link">{tx("перенесено вручную")}</span>
                     )}
                   </div>
                   <div className="mt-0.5 text-xs text-tg-hint">

@@ -152,7 +152,7 @@ export default function DesktopShell({
                 <h2 className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
                   {tx("Работа")}
                 </h2>
-                <ul className="space-y-0.5">
+                <ul className="space-y-1">
                   {adminItems.map((item) => {
                     const active = adminSection === item.id;
                     return (
@@ -215,7 +215,7 @@ export default function DesktopShell({
                 <h2 className="px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-tg-hint">
                   {group.title}
                 </h2>
-                <ul className="space-y-0.5">
+                <ul className="space-y-1">
                   {group.items.map((item) => {
                     const active = tab === item.id;
                     return (

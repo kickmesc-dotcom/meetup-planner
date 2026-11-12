@@ -366,7 +366,7 @@ export default function ImportScreen({ onBack }: { onBack: () => void }) {
                 <span className="w-6 shrink-0 text-tg-hint">{row.row}</span>
                 <span
                   className={[
-                    "shrink-0 rounded-tile px-1.5 py-0.5 text-2xs font-semibold",
+                    "shrink-0 rounded-tile px-1.5 py-1 text-2xs font-semibold",
                     ACTION_CLASS[row.action] ?? ACTION_CLASS.skip,
                   ].join(" ")}
                 >

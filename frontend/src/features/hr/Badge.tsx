@@ -32,7 +32,7 @@ export default function Badge({
   return (
     <span
       className={[
-        "inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 align-middle text-2xs font-medium",
+        "inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 align-middle text-2xs font-medium",
         tone ? "text-tg-text" : "bg-tg-bg/70 text-tg-hint",
         className,
       ].join(" ")}

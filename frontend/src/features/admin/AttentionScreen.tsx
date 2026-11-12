@@ -110,7 +110,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
               )}
               <div className="divide-y divide-tg-bg/40 rounded-tile bg-tg-bg/40">
                 {overdue.slice(0, 20).map((t) => (
-                  <div key={t.id} className="px-2 py-1.5 space-y-0.5">
+                  <div key={t.id} className="px-2 py-1.5 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-tg-text" title={t.title}>{t.title}</span>
                       <span className="shrink-0 text-2xs tabular-nums text-status-busy">
@@ -143,7 +143,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
                   {tx("Проблемы: {count}", { count: openIssues.length })}
                 </div>
                 {issues.data && issues.data.summary.attention > 0 && (
-                  <span className="rounded-full bg-status-busy/15 px-2 py-0.5 text-2xs text-status-busy">
+                  <span className="rounded-full bg-status-busy/15 px-2 py-1 text-2xs text-status-busy">
                     {tx("срочных: {count}", {
                       count: issues.data.summary.attention,
                     })}
@@ -152,7 +152,7 @@ export default function AttentionScreen({ onBack, onOpenTasks }: Props) {
               </div>
               <div className="divide-y divide-tg-bg/40 rounded-tile bg-tg-bg/40">
                 {openIssues.slice(0, 20).map((issue) => (
-                  <div key={issue.id} className="px-2 py-1.5 space-y-0.5">
+                  <div key={issue.id} className="px-2 py-1.5 space-y-1">
                     <div className="flex items-center gap-1.5">
                       <span>{ISSUE_CATEGORY_ICON[issue.category]}</span>
                       <span

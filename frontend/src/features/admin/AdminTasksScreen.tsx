@@ -585,7 +585,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                     />
                   </button>
                 )}
-                <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs text-tg-hint">
+                <span className="rounded-full bg-tg-bg/60 px-2 py-1 text-xs text-tg-hint">
                   {task.status}
                 </span>
               </div>

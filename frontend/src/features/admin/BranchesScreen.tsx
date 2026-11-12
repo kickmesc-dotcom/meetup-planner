@@ -151,7 +151,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
               </div>
             </div>
             {branch.is_current ? (
-              <span className="shrink-0 rounded-full bg-green-500/15 px-2 py-0.5 text-2xs text-green-600">
+              <span className="shrink-0 rounded-full bg-green-500/15 px-2 py-1 text-2xs text-green-600">
                 {tx("Вы здесь")}
               </span>
             ) : (

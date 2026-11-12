@@ -502,7 +502,7 @@ function ItemRow({
             />
           )}
           {!folded && item.schedule_label && (
-            <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
+            <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-1 text-2xs text-tg-hint">
               <Icon name="calendar" size={11} />
               {inactive
                 ? tx("не сегодня · {label}", { label: item.schedule_label })

@@ -193,7 +193,7 @@ export default function AuthScreen({
             <Icon name="lock" size={16} />
             <span className="truncate text-sm font-medium text-tg-text">SemiTask</span>
           </div>
-          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-center gap-0.5 rounded-full bg-tg-secondary-bg/70 p-0.5">
+          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-center gap-1 rounded-full bg-tg-secondary-bg/70 p-1">
             <LanguageSwitcher bare />
             <ThemeSwitcher bare />
           </div>
@@ -428,7 +428,7 @@ export function NoOrgScreen() {
 
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-6 flex max-w-full flex-wrap items-center justify-center gap-0.5 self-end rounded-full bg-tg-secondary-bg/70 p-0.5">
+      <div className="mb-6 flex max-w-full flex-wrap items-center justify-center gap-1 self-end rounded-full bg-tg-secondary-bg/70 p-1">
         <LanguageSwitcher bare />
         <ThemeSwitcher bare />
       </div>

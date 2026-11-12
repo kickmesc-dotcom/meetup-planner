@@ -89,7 +89,7 @@ function PollCard({ poll, users }: { poll: Poll; users: User[] }) {
         </div>
         <div
           className={[
-            "shrink-0 rounded-full px-2 py-0.5 text-2xs font-medium",
+            "shrink-0 rounded-full px-2 py-1 text-2xs font-medium",
             isClosed
               ? "bg-tg-bg/60 text-tg-hint"
               : "bg-status-free/15 text-status-free",

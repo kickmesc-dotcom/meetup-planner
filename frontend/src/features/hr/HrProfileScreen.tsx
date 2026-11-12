@@ -299,7 +299,7 @@ export default function HrProfileScreen() {
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <Badge text={me.badge} emoji={me.badge_emoji} demo={me.is_demo} />
-              <span className="rounded-full bg-tg-bg/60 px-2 py-0.5 text-2xs text-tg-hint">
+              <span className="rounded-full bg-tg-bg/60 px-2 py-1 text-2xs text-tg-hint">
                 {tx(ROLE_LABEL[me.role])}
               </span>
             </div>

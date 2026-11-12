@@ -94,7 +94,7 @@ export default function TabBar({
             data-no-press
             aria-current={active ? "page" : undefined}
             className={[
-              "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
+              "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
             aria-label={

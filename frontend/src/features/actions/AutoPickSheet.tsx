@@ -163,7 +163,7 @@ export default function AutoPickSheet() {
                   <Icon
                     name="star"
                     size={11}
-                    className="mr-0.5 inline-block align-[-1px]"
+                    className="mr-1 inline-block align-[-1px]"
                   />
                   {s.score.toFixed(1)}
                 </div>

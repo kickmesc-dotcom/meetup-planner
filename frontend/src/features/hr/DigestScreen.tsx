@@ -212,7 +212,7 @@ export default function DigestScreen({ onBack }: { onBack: () => void }) {
                         </span>
                         <span
                           className={[
-                            "shrink-0 rounded-full px-2 py-0.5 text-2xs font-semibold",
+                            "shrink-0 rounded-full px-2 py-1 text-2xs font-semibold",
                             on
                               ? "bg-status-free/15 text-status-free"
                               : "bg-tg-secondary-bg text-tg-hint",

@@ -77,7 +77,7 @@ export default function ManageTabBar({
             aria-current={active ? "page" : undefined}
             data-testid={`manage-tab-${it.id}`}
             className={[
-              "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
+              "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1.5 text-2xs leading-tight transition-colors",
               active ? "text-tg-link" : "text-tg-hint",
             ].join(" ")}
           >
@@ -98,7 +98,7 @@ export default function ManageTabBar({
         aria-current={settingsActive ? "page" : undefined}
         data-testid="manage-tab-settings"
         className={[
-          "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-2xs leading-tight transition-colors",
+          "press-row relative flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-1.5 text-2xs leading-tight transition-colors",
           settingsActive ? "text-tg-text" : "text-tg-hint",
         ].join(" ")}
       >

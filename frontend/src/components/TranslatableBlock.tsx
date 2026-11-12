@@ -19,7 +19,7 @@ export const TRANSLATED_MARK =
 
 /** То же для текста внутри строки: подложка рвётся по переносам, а не рамкой. */
 export const TRANSLATED_MARK_INLINE =
-  "box-decoration-clone rounded-tile bg-tg-link/10 px-0.5 ring-1 ring-tg-link/25";
+  "box-decoration-clone rounded-tile bg-tg-link/10 px-1 ring-1 ring-tg-link/25";
 
 /**
  * Перевод целого блока данных одной кнопкой (план, 11.5).

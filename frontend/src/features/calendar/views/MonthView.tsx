@@ -186,11 +186,11 @@ function MonthBlock({
                 >
                   <Icon name="cake" size={12} className="text-tg-link" />
                   {bdayList.length > 1 && (
-                    <span className="ml-0.5 text-3xs">×{bdayList.length}</span>
+                    <span className="ml-1 text-3xs">×{bdayList.length}</span>
                   )}
                 </span>
               )}
-              <div className="flex gap-0.5 mt-auto pb-0.5">
+              <div className="flex gap-1 mt-auto pb-1">
                 {isPending && (
                   <span
                     data-testid="month-day-skeleton"

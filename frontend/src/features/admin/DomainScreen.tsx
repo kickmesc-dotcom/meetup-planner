@@ -139,7 +139,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
               {data.domain && (
                 <span
                   className={[
-                    "shrink-0 rounded-full px-2 py-0.5 text-2xs",
+                    "shrink-0 rounded-full px-2 py-1 text-2xs",
                     data.verified
                       ? "bg-green-500/15 text-green-600"
                       : "bg-tg-secondary-bg text-tg-hint",

@@ -408,7 +408,7 @@ function DepartmentRow({ row }: { row: HrDashboardDepartment }) {
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-2xs text-tg-hint">
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-2xs text-tg-hint">
         <span>{tx("закрыто {count}", { count: row.done })}</span>
         {row.overdue_tasks > 0 && (
           <span className="text-status-busy">

@@ -161,7 +161,7 @@ function Row({
   return (
     <>
       <div
-        className="text-2xs text-tg-hint pr-2 text-right border-r border-tg-secondary-bg/40 flex items-start pt-0.5"
+        className="text-2xs text-tg-hint pr-2 text-right border-r border-tg-secondary-bg/40 flex items-start pt-1"
         style={{ height: SLOT_HEIGHT_PX }}
       >
         {String(hour).padStart(2, "0")}:00

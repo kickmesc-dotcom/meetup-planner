@@ -155,21 +155,21 @@ export default function DemoScreen({ onBack }: Props) {
               )}
             </p>
             <div className="flex flex-wrap gap-2 text-2xs text-tg-hint">
-              <span className="rounded-tile bg-tg-secondary-bg px-2 py-0.5">
+              <span className="rounded-tile bg-tg-secondary-bg px-2 py-1">
                 {tx("Людей: {n}", { n: people })}
               </span>
-              <span className="rounded-tile bg-tg-secondary-bg px-2 py-0.5">
+              <span className="rounded-tile bg-tg-secondary-bg px-2 py-1">
                 {tx("Чек-листов: {n}", { n: activity?.checklist_runs ?? 0 })}
               </span>
-              <span className="rounded-tile bg-tg-secondary-bg px-2 py-0.5">
+              <span className="rounded-tile bg-tg-secondary-bg px-2 py-1">
                 {tx("Поручений: {n}", { n: activity?.tasks ?? 0 })}
               </span>
-              <span className="rounded-tile bg-tg-secondary-bg px-2 py-0.5">
+              <span className="rounded-tile bg-tg-secondary-bg px-2 py-1">
                 {tx("Ответов: {n}", { n: activity?.feedback_answers ?? 0 })}
               </span>
             </div>
             {people > 0 && (
-              <ul className="space-y-0.5">
+              <ul className="space-y-1">
                 {data.employees.map((row) => (
                   <li
                     key={row.employee_id}

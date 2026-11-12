@@ -20,7 +20,7 @@ export default function ZoomController() {
 
   return (
     <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-tg-secondary-bg">
-      <div className="flex bg-tg-secondary-bg rounded-card p-0.5 gap-0.5 w-max mx-auto">
+      <div className="flex bg-tg-secondary-bg rounded-card p-1 gap-1 w-max mx-auto">
         {COMPACT_ORDER.map((z) => (
           <button
             key={z}

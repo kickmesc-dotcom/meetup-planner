@@ -176,8 +176,8 @@ function Card({
           )}
         </div>
         {meeting.auto_picked && meeting.score != null && (
-          <div className="rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs font-medium text-tg-link shrink-0">
-            <Icon name="star" size={12} className="mr-0.5 inline-block align-[-2px]" />
+          <div className="rounded-full bg-tg-link/15 px-2 py-1 text-2xs font-medium text-tg-link shrink-0">
+            <Icon name="star" size={12} className="mr-1 inline-block align-[-2px]" />
             {meeting.score.toFixed(1)}
           </div>
         )}
@@ -190,7 +190,7 @@ function Card({
           return (
             <div
               key={u.id}
-              className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-0.5 text-xs"
+              className="flex items-center gap-1 rounded-full bg-tg-bg/60 px-2 py-1 text-xs"
               title={`${u.display_name}: ${tx(RSVP_LABELS[rsvp])}`}
             >
               <span

@@ -532,7 +532,7 @@ function TaskCard({
         />
         <span
           className={[
-            "shrink-0 rounded-full px-2 py-0.5 text-xs",
+            "shrink-0 rounded-full px-2 py-1 text-xs",
             STATUS_CLASS[status],
           ].join(" ")}
         >

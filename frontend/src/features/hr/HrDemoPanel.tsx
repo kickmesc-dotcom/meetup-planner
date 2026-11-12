@@ -119,7 +119,7 @@ export default function HrDemoPanel({ onClose }: { onClose: () => void }) {
                 <div className="text-sm font-semibold text-tg-text">{tx("Следы пула")}</div>
                 <span
                   className={[
-                    "rounded-full px-2 py-0.5 text-xs",
+                    "rounded-full px-2 py-1 text-xs",
                     data.visible
                       ? "bg-status-free/20 text-status-free"
                       : "bg-status-busy/20 text-status-busy",

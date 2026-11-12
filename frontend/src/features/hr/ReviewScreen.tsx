@@ -155,7 +155,7 @@ function ReviewCard({
           <h2 className="text-sm font-semibold text-tg-text break-words">
             {task.title}
           </h2>
-          <span className="shrink-0 rounded-full bg-status-maybe/20 px-2 py-0.5 text-xs text-status-maybe">
+          <span className="shrink-0 rounded-full bg-status-maybe/20 px-2 py-1 text-xs text-status-maybe">
             {tx("сдано {count}", { count: waiting.length })}
           </span>
         </div>

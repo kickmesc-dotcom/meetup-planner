@@ -146,7 +146,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
             <div className="text-xs text-tg-hint">{tx("Анти-луп: не чаще раза в 30 минут (после ручного — тоже).")}</div>
           </div>
 
-          <div className="flex rounded-tile bg-tg-bg/60 p-0.5 text-xs">
+          <div className="flex rounded-tile bg-tg-bg/60 p-1 text-xs">
             {(
               [
                 ["off", tx("Выкл")],

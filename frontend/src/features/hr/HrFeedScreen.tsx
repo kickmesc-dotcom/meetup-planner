@@ -407,7 +407,7 @@ export default function HrFeedScreen() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-lg font-semibold text-tg-text">{tx("События смены")}</h1>
           {feed && (
-            <span className="min-w-0 break-words rounded-full bg-tg-secondary-bg px-2 py-0.5 text-xs text-tg-text">
+            <span className="min-w-0 break-words rounded-full bg-tg-secondary-bg px-2 py-1 text-xs text-tg-text">
               {tx(SCOPE_TITLE[feed.scope])}
             </span>
           )}
@@ -440,7 +440,7 @@ export default function HrFeedScreen() {
           {freshCount > 0 && (
             <span
               data-testid="feed-fresh-count"
-              className="shrink-0 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs font-medium text-tg-text"
+              className="shrink-0 rounded-full bg-tg-link/15 px-2 py-1 text-2xs font-medium text-tg-text"
             >
               {tx("{count} новых", { count: freshCount })}
             </span>
@@ -705,7 +705,7 @@ function FreshDivider({ count }: { count: number }) {
 function Chip({ label, onClear }: { label: string; onClear: () => void }) {
   const { tx } = useTx();
   return (
-    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-tg-link/15 px-2 py-0.5 text-2xs text-tg-text">
+    <span className="inline-flex max-w-full items-center gap-1 rounded-full bg-tg-link/15 px-2 py-1 text-2xs text-tg-text">
       <span className="truncate" title={label}>{label}</span>
       <button
         type="button"
@@ -1138,7 +1138,7 @@ function FeedRow({
               }}
               // Аутлайн вокруг имени: у каждого человека свой цвет, поэтому
               // видно, где кончаются действия одного и начинаются другого.
-              className="inline-flex max-w-full items-center rounded-full px-2 py-0.5 align-middle font-medium text-tg-text active:opacity-70 disabled:opacity-100"
+              className="inline-flex max-w-full items-center rounded-full px-2 py-1 align-middle font-medium text-tg-text active:opacity-70 disabled:opacity-100"
               style={{
                 backgroundColor: person.soft,
                 border: `1px solid ${person.border}`,
@@ -1151,7 +1151,7 @@ function FeedRow({
               <span
                 data-testid="feed-demo-mark"
                 title={tx("Тестовый сотрудник")}
-                className="inline-flex items-center rounded-full bg-tg-bg/70 px-1.5 py-0.5 align-middle text-2xs font-medium text-tg-hint"
+                className="inline-flex items-center rounded-full bg-tg-bg/70 px-1.5 py-1 align-middle text-2xs font-medium text-tg-hint"
               >
                 {tx("тест")}
               </span>
@@ -1191,7 +1191,7 @@ function FeedRow({
                   haptic("selection");
                   onOpenDepartment(item.department_id);
                 }}
-                className="inline-flex max-w-full items-center gap-0.5 rounded-full px-1.5 text-2xs text-tg-text active:opacity-70 disabled:active:opacity-100"
+                className="inline-flex max-w-full items-center gap-1 rounded-full px-1.5 text-2xs text-tg-text active:opacity-70 disabled:active:opacity-100"
                 style={{ backgroundColor: dept.soft, border: `1px solid ${dept.border}` }}
                 aria-label={tx("Открыть подразделение {name}", { name: departmentName })}
               >
