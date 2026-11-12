@@ -9,7 +9,7 @@
  *    «Частое» при следующем заходе.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AdminScreen from "./AdminScreen";
 import { useUI } from "@/store/ui";
@@ -85,6 +85,31 @@ describe("AdminScreen (P1.9)", () => {
     );
     expect(strip.textContent).toContain("Просрочено");
     expect(strip.textContent).toContain("Проблемы");
+  });
+
+  it("делит «Смену и люди» на подгруппы без потери карточек", () => {
+    renderScreen();
+
+    const shift = screen.getByTestId("admin-subgroup-shift");
+    expect(within(shift).getByText("Чек-листы")).toBeTruthy();
+    expect(within(shift).getByText("Поручения")).toBeTruthy();
+    expect(within(shift).getByText("Журнал событий")).toBeTruthy();
+
+    const people = screen.getByTestId("admin-subgroup-people");
+    expect(within(people).getByText("Сотрудники")).toBeTruthy();
+    expect(within(people).getByText("Приглашения")).toBeTruthy();
+    expect(within(people).getByText("Загрузить из таблицы")).toBeTruthy();
+
+    const content = screen.getByTestId("admin-subgroup-content");
+    expect(within(content).getByText("Вид ленты")).toBeTruthy();
+    expect(within(content).getByText("Языки")).toBeTruthy();
+    expect(within(content).getByText("Пакет отрасли")).toBeTruthy();
+
+    // 13 карточек ровно по одному разу: подгруппы — навигация, а не фильтр.
+    const buttons = [shift, people, content].flatMap((group) =>
+      Array.from(group.querySelectorAll("button")),
+    );
+    expect(buttons).toHaveLength(13);
   });
 
   it("ищет по названию раздела и убирает остальные", () => {

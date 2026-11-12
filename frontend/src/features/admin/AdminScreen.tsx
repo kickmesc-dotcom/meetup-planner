@@ -446,6 +446,26 @@ const GROUPS: { title: string; icon: IconName }[] = [
 ];
 
 /**
+ * «Смена и люди» — 13 карточек, и один заголовок над ними не помогает
+ * выбрать. Делим по намерению, а не по типу сущности: сначала то, что делает
+ * руководитель в течение смены, потом люди, потом то, что видит команда.
+ * Порядок id внутри подгрупп сохраняет порядок `SECTIONS`.
+ */
+const PEOPLE_SUBGROUPS: { key: string; title: string; ids: Section[] }[] = [
+  {
+    key: "shift",
+    title: "Смена и контроль",
+    ids: ["attention", "admin-tasks", "notifications", "checklists", "training-plan", "journal"],
+  },
+  { key: "people", title: "Люди", ids: ["employees", "invitations", "import"] },
+  {
+    key: "content",
+    title: "Что видит команда",
+    ids: ["feed-settings", "languages", "pack", "demo"],
+  },
+];
+
+/**
  * Разделы платформы, а не клиента: прокси, рестарт Space, тексты, интервалы
  * напоминаний и очередь задач. Владелец организации — администратор своей
  * компании (чек-листы, люди, приглашения), но не хозяин сервера: эти карточки
@@ -771,7 +791,11 @@ export default function AdminScreen({
                 icon={group.icon}
                 title={tx(group.title)}
               >
-                {items.map(card)}
+                {group.title === GROUP_PEOPLE ? (
+                  <PeopleGroups items={items} renderCard={card} />
+                ) : (
+                  items.map(card)
+                )}
               </SectionGroup>
             );
           })}
@@ -819,6 +843,54 @@ function QuickActions({ onPick }: { onPick: (s: Section) => void }) {
         ))}
       </div>
     </section>
+  );
+}
+
+/**
+ * Подгруппы «Смены и людей». `renderCard` приходит снаружи, чтобы карточка
+ * осталась одна на весь экран и не разъехалась со счётчиком «Частого».
+ *
+ * Раздел, которого ещё нет ни в одной подгруппе, попадает в «Прочее», а не
+ * исчезает: список подгрупп — навигация, а не фильтр видимости.
+ */
+function PeopleGroups({
+  items,
+  renderCard,
+}: {
+  items: SectionDef[];
+  renderCard: (section: SectionDef) => ReactNode;
+}) {
+  const { tx } = useTx();
+  const covered = new Set(PEOPLE_SUBGROUPS.flatMap((sub) => sub.ids));
+  const rest = items.filter((section) => !covered.has(section.id));
+
+  const subgroup = (key: string, title: string, list: SectionDef[]) => {
+    if (list.length === 0) return null;
+    return (
+      <div
+        key={key}
+        data-testid={`admin-subgroup-${key}`}
+        className="space-y-2"
+      >
+        <h3 className="px-1 pt-1 text-2xs font-medium uppercase tracking-wide text-tg-hint">
+          {tx(title)}
+        </h3>
+        {list.map(renderCard)}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {PEOPLE_SUBGROUPS.map((sub) =>
+        subgroup(
+          sub.key,
+          sub.title,
+          items.filter((section) => sub.ids.includes(section.id)),
+        ),
+      )}
+      {subgroup("other", "Прочее", rest)}
+    </>
   );
 }
 
