@@ -774,7 +774,11 @@ export default function AdminScreen({
       ) : (
         <>
           {frequent.length > 0 && (
-            <SectionGroup icon="clock" title={tx("Частое")}>
+            <SectionGroup
+              icon="clock"
+              title={tx("Частое")}
+              hint={tx("Недавно открывали")}
+            >
               {frequent.map(card)}
             </SectionGroup>
           )}
@@ -897,19 +901,25 @@ function PeopleGroups({
 function SectionGroup({
   icon,
   title,
+  hint,
   children,
 }: {
   icon: IconName;
   title: string;
+  /** Пояснение под заголовком: зачем эта группа и что в ней. */
+  hint?: string;
   children: ReactNode;
 }) {
   return (
     <section className="border-t border-tg-hint/15 pt-3 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-center gap-2 px-1">
         <Icon name={icon} size={18} className="text-tg-hint" />
-        <span className="text-xs font-semibold uppercase tracking-wide text-tg-hint">
-          {title}
-        </span>
+        <div className="min-w-0">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-tg-hint">
+            {title}
+          </span>
+          {hint && <p className="text-2xs text-tg-hint/80">{hint}</p>}
+        </div>
       </div>
       <div className="space-y-2">{children}</div>
     </section>

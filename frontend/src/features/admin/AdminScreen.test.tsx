@@ -141,9 +141,22 @@ describe("AdminScreen (P1.9)", () => {
     renderScreen();
 
     expect(screen.getByText("Частое")).toBeTruthy();
+    expect(screen.getByText("Недавно открывали")).toBeTruthy();
     // Раздел переехал, а не скопировался: одна карточка и нет пустой группы.
     expect(screen.getAllByText("Тексты приложения")).toHaveLength(1);
     expect(screen.queryByText("Тексты")).toBeNull();
+  });
+
+  it("держит в «Частом» не больше трёх карточек", () => {
+    localStorage.setItem(
+      USAGE_KEY,
+      JSON.stringify({ texts: 9, attention: 8, "admin-tasks": 7, employees: 6 }),
+    );
+    renderScreen();
+
+    const section = screen.getByText("Частое").closest("section");
+    expect(section).toBeTruthy();
+    expect(within(section as HTMLElement).getAllByRole("button")).toHaveLength(3);
   });
 
   it("владельцу организации не показывает системные разделы платформы", () => {
