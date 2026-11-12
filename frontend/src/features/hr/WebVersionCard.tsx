@@ -8,6 +8,7 @@ import {
 } from "@/api/access";
 import { clearAccessToken, humanizeApiError, isEndpointMissing } from "@/api/client";
 import Icon from "@/components/Icon";
+import Hint from "@/components/Hint";
 import { BusyLabel } from "@/components/BusyLabel";
 import { copyText } from "@/lib/clipboard";
 import { getInitData, haptic, showAlert, showConfirm } from "@/tg/webapp";
@@ -84,9 +85,9 @@ export default function WebVersionCard() {
           <p className="mt-1 text-xs text-tg-hint">{tx(
             "На компьютере окно Telegram узкое. Открой ссылку в браузере — там широкий экран с разделами и сводкой смены.",
           )}</p>
-          <p className="mt-1 text-2xs text-tg-hint">{tx(
+          <Hint>{tx(
             "На телефоне ссылку можно поставить на домашний экран: в Safari — «Поделиться → На экран Домой», в Chrome — «Установить приложение». Откроется без адресной строки, как обычная программа.",
-          )}</p>
+          )}</Hint>
         </div>
       </div>
 

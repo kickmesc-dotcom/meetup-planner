@@ -16,6 +16,7 @@ import {
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import FormField from "@/components/FormField";
+import Hint from "@/components/Hint";
 import { BusyLabel } from "@/components/BusyLabel";
 import ChevronToggle from "@/components/ChevronToggle";
 import { SkeletonText } from "@/components/Skeleton";
@@ -208,9 +209,9 @@ export function AddPersonPanel({
                 </button>
               ))}
             </div>
-            <p className="mt-1 text-2xs text-tg-hint">{tx(
+            <Hint>{tx(
               "Сотрудник видит только свои действия, руководитель — своё подразделение, администратор — всё и получает кабинет.",
-            )}</p>
+            )}</Hint>
           </div>
 
           <div className="flex flex-wrap gap-1.5">

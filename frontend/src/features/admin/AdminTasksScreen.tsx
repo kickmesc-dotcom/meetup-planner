@@ -14,6 +14,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
 import Icon, { InlineIcon } from "@/components/Icon";
 import FormField from "@/components/FormField";
+import Hint from "@/components/Hint";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
@@ -379,11 +380,11 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-          <p className="mt-1 text-2xs text-tg-hint">
+          <Hint>
             {taskWeekdays.length
               ? tx("В остальные дни поручение остаётся в списке, но помечено как не сегодняшнее.")
               : tx("Ничего не выбрано — срок работает как обычно.")}
-          </p>
+          </Hint>
         </div>
 
         <div className="flex flex-wrap gap-2">

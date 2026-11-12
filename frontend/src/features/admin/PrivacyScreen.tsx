@@ -317,11 +317,6 @@ export default function PrivacyScreen({ onBack }: { onBack: () => void }) {
                     />
                   )}
                 </FormField>
-                <p className="mt-1 text-2xs text-tg-hint">
-                  {tx("Введите код {slug}, чтобы подтвердить — это необратимо.", {
-                    slug: data.slug,
-                  })}
-                </p>
                 <button
                   type="button"
                   disabled={busy || !codeMatches}
