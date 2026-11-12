@@ -180,7 +180,7 @@ function groupByDay(
 function formatMoment(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("ru-RU", {
+  return date.toLocaleTimeString(currentIntlLocale(), {
     hour: "2-digit",
     minute: "2-digit",
   });

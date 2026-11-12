@@ -24,7 +24,7 @@ import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
 import DigestScreen from "@/features/hr/DigestScreen";
 import InvitationsScreen from "@/features/admin/InvitationsScreen";
-import { useTx, type Locale } from "@/i18n";
+import { intlLocaleFor, useTx, type Locale } from "@/i18n";
 
 /**
  * Кабинет управляющего.
@@ -765,7 +765,7 @@ function DangerZone() {
 function formatTime(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString(locale === "en" ? "en-GB" : "ru-RU", {
+  return date.toLocaleTimeString(intlLocaleFor(locale), {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -774,7 +774,7 @@ function formatTime(iso: string, locale: Locale): string {
 function formatDateTime(iso: string, locale: Locale): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(locale === "en" ? "en-GB" : "ru-RU", {
+  return date.toLocaleString(intlLocaleFor(locale), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

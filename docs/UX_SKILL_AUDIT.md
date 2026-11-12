@@ -273,7 +273,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `loading-chart` | ✅ | скелеты | — |
 | `animation-optional` | ✅ | reduced-motion | — |
 | `large-dataset` | ⚠️ | отчёты без агрегации; период не ограничен | R |
-| `number-formatting` | ⚠️ | 12.11.2026: деньги и даты в оплате, платформе, сотрудниках, уведомлениях и приватности идут через `lib/format.ts` (локаль ru/en/uz, битая дата — «—»); остальные экраны — по мере касания | R |
+| `number-formatting` | ✅ | хардкод `ru-RU` в `toLocale*` убран: все даты/числа берут `currentIntlLocale()`/`intlLocaleFor()`, деньги — `formatMoney`; пять экранов кабинета — через `lib/format.ts` | R |
 | `touch-target-chart` | — | нет интерактивных графиков | — |
 | `no-pie-overuse` | — | нет круговых диаграмм | — |
 | `contrast-data` | ✅ | белый текст на трёх плашках статуса ≥ 4.5:1, закреплено тестом | — |
@@ -308,8 +308,8 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 3 | 0 | 1 | 2 |
 | 9. Navigation Patterns | 3 | 0 | 0 | 3 |
-| 10. Charts & Data | 2 | 0 | 0 | 2 |
-| **Итого** | **43** | **10** | **15** | **18** |
+| 10. Charts & Data | 1 | 0 | 0 | 1 |
+| **Итого** | **42** | **10** | **15** | **17** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,13 +327,12 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (18).** `network-fallback`, `consistent-help`,
+**Техдолг (17).** `network-fallback`, `consistent-help`,
 `redundant-entry`, `touch-spacing`, `error-feedback`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`, `overflow-menu`,
-`back-stack-integrity`, `empty-nav-state`, `large-dataset`,
-`number-formatting`. Это выполнимые срезы без владельца; каждый требует
+`back-stack-integrity`, `empty-nav-state`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
 
 ## Этапы
@@ -384,3 +383,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | сводка | Остаток 45 ⚠️ разнесён по разделам: 10 живая проверка, 15 осознанно, 20 техдолг; правило без причины не осталось | пересчёт скриптом по строкам матрицы: 45 = 10 + 15 + 20 |
 | 12.11.2026 | техдолг | `image-dimension` и `required-indicators` закрыты: размеры у 7 `<img>`, видимая `*` у имени; лайтбокс — осознанное исключение | `tsc` 0, eslint 0, Brand 4/4, MySettings 5/5, сборка 0 |
 | 12.11.2026 | техдолг | `lib/format.ts`: единые деньги, числа, дата/время по текущей локали; переведены оплата, платформа, сотрудники, уведомления и приватность | `tsc` 0, eslint 0, format 5/5, экраны 15/15, сборка 0 |
+| 12.11.2026 | техдолг | `number-formatting`: хардкод `ru-RU` убран из `toLocale*` в 12 файлах; TeamScreen учитывает uz через `intlLocaleFor` | `tsc` 0, eslint 0, 41 тест, сборка 0 |

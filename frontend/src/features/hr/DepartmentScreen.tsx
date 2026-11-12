@@ -11,7 +11,7 @@ import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic } from "@/tg/webapp";
-import { useTx } from "@/i18n";
+import { currentIntlLocale, useTx } from "@/i18n";
 import { useState } from "react";
 import { useBackClose } from "@/lib/useBackClose";
 
@@ -318,5 +318,5 @@ function relativeWhen(
   if (minutes < 60) return tx("{count} мин назад", { count: minutes });
   const hours = Math.round(minutes / 60);
   if (hours < 24) return tx("{count} ч назад", { count: hours });
-  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  return date.toLocaleDateString(currentIntlLocale(), { day: "2-digit", month: "2-digit" });
 }

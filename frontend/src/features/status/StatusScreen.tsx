@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/api/client";
-import { useTx } from "@/i18n";
+import { currentIntlLocale, useTx } from "@/i18n";
 import { BusyLabel } from "@/components/BusyLabel";
 import { statusView, type Meta } from "./status";
 
@@ -31,11 +31,11 @@ export default function StatusScreen() {
       const data = await api<Meta>("/api/meta");
       setMeta(data);
       setFailed(false);
-      setUpdated(new Date().toLocaleTimeString("ru-RU"));
+      setUpdated(new Date().toLocaleTimeString(currentIntlLocale()));
     } catch {
       setFailed(true);
       setMeta(null);
-      setUpdated(new Date().toLocaleTimeString("ru-RU"));
+      setUpdated(new Date().toLocaleTimeString(currentIntlLocale()));
     } finally {
       setBusy(false);
     }

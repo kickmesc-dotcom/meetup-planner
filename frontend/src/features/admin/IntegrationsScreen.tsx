@@ -34,7 +34,7 @@ import { humanizeApiError } from "@/api/client";
 import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
-import { useTx } from "@/i18n";
+import { currentIntlLocale, useTx } from "@/i18n";
 import SubScreen from "./SubScreen";
 
 const ALL_SCOPES = [
@@ -52,7 +52,7 @@ function shortDate(value: string | null | undefined): string {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("ru-RU", {
+  return date.toLocaleString(currentIntlLocale(), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

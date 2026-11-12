@@ -15,7 +15,7 @@ import { haptic, showAlert, WebApp } from "@/tg/webapp";
 import { fetchMenu } from "@/api/menu";
 import MenuList from "@/features/menu/MenuList";
 
-import { currentLocale, tx as txIn, useTx } from "@/i18n";
+import { currentIntlLocale, currentLocale, tx as txIn, useTx } from "@/i18n";
 /**
  * «Материалы смены»: график, меню и бар из Google Sheets.
  *
@@ -333,7 +333,7 @@ function SheetTable({
 function fmtStamp(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("ru-RU", {
+  return d.toLocaleString(currentIntlLocale(), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

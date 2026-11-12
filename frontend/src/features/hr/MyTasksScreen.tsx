@@ -26,7 +26,7 @@ import Badge from "@/features/hr/Badge";
 import ErrorState from "@/components/ErrorState";
 import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
-import { intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
+import { currentIntlLocale, intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 import { useUI } from "@/store/ui";
 import QuickTaskSheet from "@/features/hr/QuickTaskSheet";
 import TranslatableText from "@/components/TranslatableText";
@@ -643,7 +643,7 @@ function TaskCard({
 
       {closed && task.done_at && (
         <div className="mt-2 text-xs text-tg-hint">
-          Закрыто: {new Date(task.done_at).toLocaleString("ru-RU")}
+          Закрыто: {new Date(task.done_at).toLocaleString(currentIntlLocale())}
         </div>
       )}
 

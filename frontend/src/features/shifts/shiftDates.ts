@@ -1,3 +1,4 @@
+import { currentIntlLocale } from "@/i18n";
 /**
  * Даты табеля: неделя начинается с понедельника, дни — локальные.
  *
@@ -41,24 +42,24 @@ export function cellKey(employeeId: number, day: string): string {
 }
 
 export function weekday(date: Date): string {
-  return date.toLocaleDateString("ru-RU", { weekday: "short" }).slice(0, 2);
+  return date.toLocaleDateString(currentIntlLocale(), { weekday: "short" }).slice(0, 2);
 }
 
 export function formatDate(iso: string): string {
   const date = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+  return date.toLocaleDateString(currentIntlLocale(), { day: "2-digit", month: "2-digit" });
 }
 
 export function rangeLabel(days: Date[]): string {
   const first = days[0];
   const last = days[days.length - 1];
   const sameMonth = first.getMonth() === last.getMonth();
-  const left = first.toLocaleDateString("ru-RU", {
+  const left = first.toLocaleDateString(currentIntlLocale(), {
     day: "numeric",
     month: "short",
   });
-  const right = last.toLocaleDateString("ru-RU", {
+  const right = last.toLocaleDateString(currentIntlLocale(), {
     day: "numeric",
     month: sameMonth ? undefined : "short",
     year: last.getFullYear() === new Date().getFullYear() ? undefined : "numeric",

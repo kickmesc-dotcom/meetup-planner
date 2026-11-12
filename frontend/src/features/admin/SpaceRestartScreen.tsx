@@ -22,7 +22,7 @@ import Icon, { InlineIcon } from "@/components/Icon";
 import { SkeletonText } from "@/components/Skeleton";
 import SubScreen from "./SubScreen";
 
-import { useTx } from "@/i18n";
+import { currentIntlLocale, useTx } from "@/i18n";
 interface Props {
   onBack: () => void;
 }
@@ -256,7 +256,7 @@ export default function SpaceRestartScreen({ onBack }: Props) {
 function fmtDt(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString("ru-RU", {
+  return d.toLocaleString(currentIntlLocale(), {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",

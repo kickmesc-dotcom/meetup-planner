@@ -17,7 +17,7 @@ import FormField from "@/components/FormField";
 import { Spinner } from "@/components/Spinner";
 import SubScreen from "./SubScreen";
 
-import { useTx } from "@/i18n";
+import { currentIntlLocale, useTx } from "@/i18n";
 /**
  * Поручения: создание и список — в приложении, без чата с ботом.
  *
@@ -667,7 +667,7 @@ function localTime(d: Date): string {
 
 /** «20.10.2026 17:30:05» — секунды видны, чтобы точность не была фикцией. */
 function formatPrecise(d: Date): string {
-  return d.toLocaleString("ru-RU", {
+  return d.toLocaleString(currentIntlLocale(), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
