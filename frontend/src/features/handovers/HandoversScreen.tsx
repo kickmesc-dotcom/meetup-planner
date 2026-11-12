@@ -17,6 +17,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import BottomSheet from "@/features/actions/BottomSheet";
 import ErrorState from "@/components/ErrorState";
+import { BusyLabel } from "@/components/BusyLabel";
 import Icon, { type IconName } from "@/components/Icon";
 import ChevronToggle from "@/components/ChevronToggle";
 import { CardSkeleton, Skeleton, SkeletonText } from "@/components/Skeleton";
@@ -330,7 +331,9 @@ function HandoverCard({
             aria-busy={busy}
             onClick={() => acceptM.mutate()}
             className="min-h-10 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
-          >{tx("Принять смену")}</button>
+          >
+            <BusyLabel busy={busy}>{tx("Принять смену")}</BusyLabel>
+          </button>
           <button
             type="button"
             disabled={busy}

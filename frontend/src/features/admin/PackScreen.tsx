@@ -16,6 +16,7 @@ import { applyPack, fetchPack, type Pack, type PackApplyResult } from "@/api/pac
 import { humanizeApiError } from "@/api/client";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { Skeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
@@ -210,7 +211,7 @@ export default function PackScreen({ onBack }: Props) {
             }}
             className="w-full rounded-tile bg-tg-link px-3 py-2 text-sm font-semibold text-white press disabled:opacity-50"
           >
-            {tx("Применить пакет")}
+            <BusyLabel busy={busy}>{tx("Применить пакет")}</BusyLabel>
           </button>
           <button
             type="button"
@@ -226,7 +227,7 @@ export default function PackScreen({ onBack }: Props) {
             }}
             className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2 text-xs text-tg-text press disabled:opacity-50"
           >
-            {tx("Вернуть слова пакета")}
+            <BusyLabel busy={busy}>{tx("Вернуть слова пакета")}</BusyLabel>
           </button>
           {!canApply && (
             <div className="text-2xs text-tg-hint">

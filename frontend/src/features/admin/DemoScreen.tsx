@@ -25,6 +25,7 @@ import {
 import { humanizeApiError } from "@/api/client";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { Skeleton } from "@/components/Skeleton";
+import { BusyLabel } from "@/components/BusyLabel";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import SubScreen from "./SubScreen";
 import { useTx } from "@/i18n";
@@ -204,9 +205,11 @@ export default function DemoScreen({ onBack }: Props) {
               }}
               className="w-full rounded-tile bg-tg-link px-3 py-2 text-sm font-semibold text-white press disabled:opacity-50"
             >
-              {people > 0
-                ? tx("Обновить состав демо")
-                : tx("Завести демо-сотрудников")}
+              <BusyLabel busy={busy}>
+                {people > 0
+                  ? tx("Обновить состав демо")
+                  : tx("Завести демо-сотрудников")}
+              </BusyLabel>
             </button>
             <button
               type="button"
@@ -218,7 +221,9 @@ export default function DemoScreen({ onBack }: Props) {
               }}
               className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2 text-xs text-tg-text press disabled:opacity-50"
             >
-              {tx("Сгенерировать активность за 3 смены")}
+              <BusyLabel busy={busy}>
+                {tx("Сгенерировать активность за 3 смены")}
+              </BusyLabel>
             </button>
           </section>
 
@@ -236,9 +241,11 @@ export default function DemoScreen({ onBack }: Props) {
               }}
               className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2 text-xs text-tg-text press disabled:opacity-50"
             >
-              {data.visible
-                ? tx("Спрятать следы демо из ленты")
-                : tx("Показать следы демо в ленте")}
+              <BusyLabel busy={busy}>
+                {data.visible
+                  ? tx("Спрятать следы демо из ленты")
+                  : tx("Показать следы демо в ленте")}
+              </BusyLabel>
             </button>
             <button
               type="button"
@@ -254,7 +261,7 @@ export default function DemoScreen({ onBack }: Props) {
               }}
               className="w-full rounded-tile bg-tg-secondary-bg px-3 py-2 text-xs text-tg-text press disabled:opacity-50"
             >
-              {tx("Удалить только следы")}
+              <BusyLabel busy={busy}>{tx("Удалить только следы")}</BusyLabel>
             </button>
             <button
               type="button"
@@ -270,7 +277,9 @@ export default function DemoScreen({ onBack }: Props) {
               }}
               className="w-full rounded-tile bg-status-busy/10 px-3 py-2 text-xs text-status-busy press disabled:opacity-50"
             >
-              {tx("Удалить демо-сотрудников")}
+              <BusyLabel busy={busy}>
+                {tx("Удалить демо-сотрудников")}
+              </BusyLabel>
             </button>
           </section>
         </>

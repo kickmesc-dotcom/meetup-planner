@@ -10,6 +10,7 @@ import { humanizeApiError } from "@/api/client";
 import FormField from "@/components/FormField";
 import { Skeleton } from "@/components/Skeleton";
 import { Spinner } from "@/components/Spinner";
+import { BusyLabel } from "@/components/BusyLabel";
 import SubScreen from "./SubScreen";
 import { haptic, showAlert } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
@@ -226,7 +227,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                   onClick={() => verify.mutate()}
                   className="min-h-11 flex-1 rounded-tile bg-tg-button px-3 text-sm font-medium text-tg-button-text disabled:opacity-50"
                 >
-                  {tx("Проверить")}
+                  <BusyLabel busy={busy}>{tx("Проверить")}</BusyLabel>
                 </button>
                 <button
                   type="button"
@@ -235,7 +236,7 @@ export default function DomainScreen({ onBack }: { onBack: () => void }) {
                   onClick={() => clear.mutate()}
                   className="min-h-11 rounded-tile bg-tg-secondary-bg px-3 text-sm text-tg-text disabled:opacity-50"
                 >
-                  {tx("Снять")}
+                  <BusyLabel busy={busy}>{tx("Снять")}</BusyLabel>
                 </button>
               </div>
             </section>

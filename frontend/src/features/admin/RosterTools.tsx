@@ -16,6 +16,7 @@ import {
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import Icon from "@/components/Icon";
 import FormField from "@/components/FormField";
+import { BusyLabel } from "@/components/BusyLabel";
 import ChevronToggle from "@/components/ChevronToggle";
 import { SkeletonText } from "@/components/Skeleton";
 
@@ -371,7 +372,9 @@ export function RosterSnapshotsPanel() {
             onClick={() => create.mutate()}
             className="min-h-9 rounded-tile bg-tg-button px-3 text-xs font-medium text-tg-button-text disabled:opacity-50"
           >
-            {create.isPending ? tx("Снимаем…") : tx("Снять снапшот сейчас")}
+            <BusyLabel busy={create.isPending}>
+              {create.isPending ? tx("Снимаем…") : tx("Снять снапшот сейчас")}
+            </BusyLabel>
           </button>
           <p className="text-2xs text-tg-hint">
             {tx(
@@ -415,14 +418,18 @@ export function RosterSnapshotsPanel() {
                   aria-busy={busy}
                   onClick={() => void askRestore(snapshot)}
                   className="min-h-9 rounded-tile bg-tg-secondary-bg px-2 text-xs text-tg-text disabled:opacity-50"
-                >{tx("Восстановить")}</button>
+                >
+                  <BusyLabel busy={busy}>{tx("Восстановить")}</BusyLabel>
+                </button>
                 <button
                   type="button"
                   disabled={busy}
                   aria-busy={busy}
                   onClick={() => void askRemove(snapshot)}
                   className="min-h-9 rounded-tile bg-status-busy/15 px-2 text-xs text-status-busy disabled:opacity-50"
-                >{tx("Удалить")}</button>
+                >
+                  <BusyLabel busy={busy}>{tx("Удалить")}</BusyLabel>
+                </button>
               </div>
             </div>
           ))}

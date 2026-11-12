@@ -4,6 +4,7 @@ import { clearAllTokens } from "@/api/client";
 import { logoutRequest } from "@/api/auth";
 import { createOrganization, joinOrganization } from "@/api/orgs";
 import Icon from "@/components/Icon";
+import { BusyLabel } from "@/components/BusyLabel";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 import { useErrorMessage, useTx } from "@/i18n";
@@ -223,7 +224,9 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
               onClick={() => join.mutate()}
               className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
-              {join.isPending ? tx("Проверяем…") : tx("Присоединиться")}
+              <BusyLabel busy={join.isPending}>
+                {join.isPending ? tx("Проверяем…") : tx("Присоединиться")}
+              </BusyLabel>
             </button>
 
             <p className="text-xs text-tg-hint">
@@ -309,9 +312,11 @@ export default function StartScreen({ onDone }: { onDone: () => void }) {
               onClick={() => create.mutate()}
               className="min-h-11 w-full rounded-card bg-tg-button text-sm font-medium text-tg-button-text disabled:opacity-50"
             >
-              {create.isPending
-                ? tx("Создаём…")
-                : tx("Создать организацию")}
+              <BusyLabel busy={create.isPending}>
+                {create.isPending
+                  ? tx("Создаём…")
+                  : tx("Создать организацию")}
+              </BusyLabel>
             </button>
             <p className="text-xs text-tg-hint">
               {tx(
