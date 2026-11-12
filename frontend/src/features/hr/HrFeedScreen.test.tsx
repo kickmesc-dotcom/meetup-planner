@@ -21,22 +21,31 @@ import {
   fetchEmployeeCard,
   fetchFeedFilters,
   fetchHrFeed,
+  fetchTasks,
   type HrEmployee,
   type HrFeedItem,
+  type HrTask,
 } from "@/api/hr";
 import { markFeedSeen, readFeedSeen } from "@/features/hr/feedSeen";
 import { loadContent, useLocale } from "@/i18n";
+import { useUI } from "@/store/ui";
 import * as translateApi from "@/api/translate";
 import { __clearTranslateCache } from "@/components/translateCore";
 
-vi.mock("@/api/hr", () => ({
-  fetchHrFeed: vi.fn(),
-  fetchFeedFilters: vi.fn(),
-  fetchEmployeeCard: vi.fn(),
-  fetchEmployee: vi.fn(),
-  fetchDepartments: vi.fn(),
-  fetchDepartmentOverview: vi.fn(),
-}));
+vi.mock("@/api/hr", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/api/hr")>();
+  return {
+    ...actual,
+    fetchHrFeed: vi.fn(),
+    fetchFeedFilters: vi.fn(),
+    fetchEmployeeCard: vi.fn(),
+    fetchEmployee: vi.fn(),
+    fetchDepartments: vi.fn(),
+    fetchDepartmentOverview: vi.fn(),
+    // Сеть в тесте не нужна: ответ задаёт сам тест.
+    fetchTasks: vi.fn(),
+  };
+});
 
 // Карточка благодарностей (план, 8.4) живёт в ленте и ходит своим запросом.
 // Здесь она не предмет проверки, но без ответа тянула бы реальную сеть —
@@ -66,6 +75,7 @@ const cardMock = vi.mocked(fetchEmployeeCard);
 const meMock = vi.mocked(fetchEmployee);
 const depsMock = vi.mocked(fetchDepartments);
 const overviewMock = vi.mocked(fetchDepartmentOverview);
+const tasksMock = vi.mocked(fetchTasks);
 
 function item(overrides: Partial<HrFeedItem> = {}): HrFeedItem {
   return {
@@ -107,6 +117,8 @@ beforeEach(() => {
   filtersMock.mockReset();
   meMock.mockReset();
   meMock.mockResolvedValue({ id: 1 } as unknown as HrEmployee);
+  tasksMock.mockReset();
+  tasksMock.mockResolvedValue([]);
   filtersMock.mockResolvedValue({
     scope: "all",
     can_filter: false,
@@ -121,6 +133,29 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("HrFeedScreen (P1.8)", () => {
+  it("показывает открытые поручения на ленте и ведёт в задачи", async () => {
+    tasksMock.mockResolvedValue([
+      { id: 1, my_status: "new", status: "new", is_overdue: false } as unknown as HrTask,
+      { id: 2, my_status: "in_progress", status: "in_progress", is_overdue: true } as unknown as HrTask,
+    ]);
+    useUI.setState({ tab: "feed" });
+    renderFeed([]);
+
+    const row = await screen.findByTestId("feed-my-tasks");
+    expect(row.textContent).toContain("Мои поручения: 2");
+    expect(row.textContent).toContain("просрочено 1");
+
+    fireEvent.click(row);
+    expect(useUI.getState().tab).toBe("tasks");
+  });
+
+  it("не рисует строку поручений, когда открытых нет", async () => {
+    renderFeed([]);
+    // Даём запросу задач ответить, иначе «нет строки» ничего не доказывает.
+    await screen.findByText("События смены");
+    expect(screen.queryByTestId("feed-my-tasks")).toBeNull();
+  });
+
   it("помечает тестового одним «тест» и не показывает префикс", async () => {
     renderFeed([
       item({

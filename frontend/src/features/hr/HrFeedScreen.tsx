@@ -4,10 +4,12 @@ import { useScrollRestore } from "@/lib/useScrollRestore";
 import ScrollTopButton from "@/components/ScrollTopButton";
 import { useQuery } from "@tanstack/react-query";
 import {
+  countOpenTasks,
   fetchDepartments,
   fetchEmployee,
   fetchFeedFilters,
   fetchHrFeed,
+  fetchTasks,
   type FeedKind,
   type HrFeed,
   type HrFeedItem,
@@ -35,6 +37,7 @@ import {
   readFeedSeen,
 } from "@/features/hr/feedSeen";
 import { readFeedFilters, saveFeedFilters } from "@/features/hr/feedFilters";
+import { useUI } from "@/store/ui";
 
 /**
  * SemiTaskBot: «События смены» — лента с ролевой видимостью.
@@ -207,6 +210,16 @@ export default function HrFeedScreen() {
     staleTime: 60_000,
   });
   const myEmployeeId = meQ.data?.id ?? null;
+  const setTab = useUI((s) => s.setTab);
+  // Те же поручения, что на вкладке «Задачи»: bootstrap уже положил их в кеш
+  // под этим ключом, поэтому лента не делает нового запроса. Считаем тем же
+  // `countOpenTasks`, чтобы цифра не разошлась с экраном.
+  const tasksQ = useQuery({
+    queryKey: ["hr-tasks", false],
+    queryFn: () => fetchTasks(false),
+    staleTime: 60_000,
+  });
+  const myTasks = countOpenTasks(tasksQ.data ?? []);
   // `null` — отметки нет (первый визит) или сотрудник ещё не загрузился.
   const [seenAt, setSeenAt] = useState<number | null>(null);
 
@@ -424,6 +437,30 @@ export default function HrFeedScreen() {
             </span>
           )}
         </div>
+
+        {/* Незавершённое — на виду (Зейгарник): строка ведёт в те же задачи,
+            а не заставляет вспоминать, сколько их и где они лежат. При нуле
+            не рисуем: «0 поручений» — это шум, а не помощь. */}
+        {myTasks.open > 0 && (
+          <button
+            type="button"
+            data-testid="feed-my-tasks"
+            onClick={() => setTab("tasks")}
+            className="mt-2 flex min-h-11 w-full items-center gap-2 rounded-tile bg-tg-secondary-bg px-3 text-left text-sm press"
+          >
+            <Icon name="tasks" size={16} className="shrink-0 text-tg-link" />
+            <span className="min-w-0 flex-1 truncate">
+              {tx("Мои поручения: {count}", { count: myTasks.open })}
+              {myTasks.overdue > 0 && (
+                <span className="text-status-busy">
+                  {" \u00b7 "}
+                  {tx("просрочено {count}", { count: myTasks.overdue })}
+                </span>
+              )}
+            </span>
+            <Icon name="chevron" size={16} className="shrink-0 text-tg-hint" />
+          </button>
+        )}
 
         {canFilter && filters && (
           <div className="mt-3 space-y-2">
