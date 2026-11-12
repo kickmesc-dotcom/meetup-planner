@@ -108,7 +108,7 @@ export default function AskScreen() {
 
         {!query && (
           <section className="mt-4">
-            <div className="text-xs text-tg-hint">{tx("Частые вопросы")}</div>
+            <h2 className="text-xs text-tg-hint">{tx("Частые вопросы")}</h2>
             <div className="mt-2 flex flex-wrap gap-2">
               {EXAMPLES.map((example) => (
                 <button
