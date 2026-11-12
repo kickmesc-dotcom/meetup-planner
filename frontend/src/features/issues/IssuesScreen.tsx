@@ -196,7 +196,7 @@ export default function IssuesScreen() {
           >{tx("+ Сообщить")}</button>
         </div>
 
-        <div className="mt-3 flex gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {VIEW_OPTIONS.map((option) => (
             <button
               key={option.value}

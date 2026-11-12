@@ -351,7 +351,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
 
         <div>
           <div className="text-xs text-tg-hint">{tx("Повторяется по дням (необязательно)")}</div>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 grid grid-cols-7 gap-1.5">
             {WEEKDAY_OPTIONS.map(({ day, short, full }) => {
               const selected = taskWeekdays.includes(day);
               return (
@@ -369,7 +369,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
                     );
                   }}
                   className={[
-                    "min-h-9 flex-1 rounded-tile text-xs transition-colors",
+                    "min-h-9 w-full min-w-0 rounded-tile text-xs transition-colors",
                     selected
                       ? "bg-tg-button text-tg-button-text"
                       : "bg-tg-bg/60 text-tg-hint",

@@ -245,7 +245,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `state-preservation` | ✅ | срез фильтров ленты сохраняется на сотрудника (`readFeedFilters`/`saveFeedFilters`) и восстанавливается при входе | — |
 | `gesture-nav-support` | ✅ | Telegram BackButton | — |
 | `tab-badge` | ✅ | счётчик задач, очищается при открытии | — |
-| `overflow-menu` | ⚠️ | длинные ряды кнопок сжимаются, а не уходят в «ещё» | Q |
+| `overflow-menu` | ✅ | семь дней недели — `grid-cols-7` с `min-w-0` (три места); тройки фильтров и вкладок — `flex-wrap`, а не сжатие | — |
 | `bottom-nav-top-level` | ✅ | только верхние экраны | — |
 | `adaptive-navigation` | ✅ | сайдбар ≥ lg, полоса на телефоне | — |
 | `back-stack-integrity` | ⚠️ | системная «назад» в кабинете: подраздел → корень → зона сотрудника; смена вкладок по-прежнему не пишется в историю | — |
@@ -306,10 +306,10 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 5. Layout & Responsive | 5 | 0 | 2 | 3 |
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
 | 7. Animation | 7 | 2 | 5 | 0 |
-| 8. Forms & Feedback | 3 | 0 | 1 | 2 |
+| 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **39** | **10** | **15** | **14** |
+| **Итого** | **38** | **10** | **15** | **13** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,11 +327,11 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (14).** `consistent-help`,
+**Техдолг (13).** `consistent-help`,
 `touch-spacing`, `error-feedback`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
-`inline-validation`, `overflow-menu`,
+`inline-validation`,
 `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
 
@@ -397,3 +397,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `back-stack-integrity` частично: «назад» в кабинете ведёт в корень, затем в зону сотрудника | `tsc` 0, eslint 0, 25 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `network-fallback` закрыт: таймаут 30 с (фото 90 с), повтор по `online`, различение обрыва и отказа | `tsc` 0, eslint 0, 37 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `redundant-entry` закрыт: знакомство не спрашивает назначенный отдел и известный опыт; профиль подставляет значения из карточки | `tsc` 0, eslint 0, 8 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `overflow-menu` закрыт: дни недели в сетке, тройки действий переносятся вместо сжатия | `tsc` 0, eslint 0, 21 тест, сборка 0 |

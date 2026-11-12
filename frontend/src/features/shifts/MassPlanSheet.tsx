@@ -257,7 +257,9 @@ export default function MassPlanSheet({
 
         {/* 2. В какие дни. */}
         <div className="mt-3 text-xs font-medium text-tg-text">{tx("В какие дни")}</div>
-        <div className="mt-1 flex gap-1.5">
+        {/* Семь дней не сжимаем в один ряд: на узком экране подписи
+            становились неразборчивыми. Сетка держит равные ячейки. */}
+        <div className="mt-1 grid grid-cols-7 gap-1.5">
           {WEEKDAYS.map((day) => {
             const active = days.includes(day.value);
             return (
@@ -267,7 +269,7 @@ export default function MassPlanSheet({
                 aria-pressed={active}
                 onClick={() => toggleDay(day.value)}
                 className={[
-                  "min-h-11 flex-1 rounded-tile text-xs transition-colors",
+                                      "min-h-11 w-full min-w-0 rounded-tile text-xs transition-colors",
                   active
                     ? "bg-tg-link/15 font-medium text-tg-text"
                     : "bg-tg-secondary-bg/60 text-tg-hint",

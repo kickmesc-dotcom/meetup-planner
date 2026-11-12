@@ -195,7 +195,7 @@ export default function ChecklistScreen() {
             </span>
           )}
         </div>
-        <div className="mt-3 flex gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {(["shift", "close", "first_day"] as const).map((v) => (
             <button
               key={v}

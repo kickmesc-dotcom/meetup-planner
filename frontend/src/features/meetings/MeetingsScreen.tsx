@@ -223,7 +223,7 @@ function Card({
         })}
       </div>
 
-      <div className="mt-3 flex gap-1.5">
+      <div className="mt-3 flex flex-wrap gap-1.5">
         <RsvpBtn label={tx("Приду")} active={my === 1} onClick={() => onRsvp(1)} />
         <RsvpBtn label={tx("Может")} active={my === 2} onClick={() => onRsvp(2)} />
         <RsvpBtn label={tx("Нет")} active={my === 3} onClick={() => onRsvp(3)} />

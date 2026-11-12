@@ -551,7 +551,7 @@ function ItemEditor({
               не входит в прогресс. */}
           <div>
             <div className="text-xs text-tg-hint">{tx("В какие дни нужен пункт")}</div>
-            <div className="mt-1 flex gap-2">
+            <div className="mt-1 grid grid-cols-7 gap-1.5">
               {WEEKDAYS.map(({ day, short, full }) => {
                 const selected = parseWeekdays(item.weekdays).includes(day);
                 return (
@@ -570,7 +570,7 @@ function ItemEditor({
                       save.mutate({ weekdays: next });
                     }}
                     className={[
-                      "min-h-9 flex-1 rounded-tile text-xs transition-colors disabled:opacity-50",
+                      "min-h-9 w-full min-w-0 rounded-tile text-xs transition-colors disabled:opacity-50",
                       selected
                         ? "bg-tg-button text-tg-button-text"
                         : "bg-tg-bg/60 text-tg-text",

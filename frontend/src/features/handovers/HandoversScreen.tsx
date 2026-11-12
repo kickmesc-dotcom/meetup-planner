@@ -131,7 +131,7 @@ export default function HandoversScreen() {
           >{tx("Сдать смену")}</button>
         </div>
 
-        <div className="mt-3 flex gap-1.5">
+        <div className="mt-3 flex flex-wrap gap-1.5">
           {BOX_OPTIONS.map((option) => (
             <button
               key={option.value}
