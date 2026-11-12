@@ -66,7 +66,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `system-gestures` | ✅ | системные жесты не блокируются | — |
 | `press-feedback` | ✅ | `styles.css` + `press.guard.test.ts` | — |
 | `haptic-feedback` | ✅ | `haptic()` в Telegram, используется на вкладках и действиях | — |
-| `gesture-alternative` | ⚠️ | критичные действия имеют кнопки; drag календаря — частично | N |
+| `gesture-alternative` | ✅ | критичные действия имеют кнопки: свежий интервал доступности создаётся кнопкой «+» (9:00–18:00) без drag; листание календаря — стрелки `NavBar`, диапазон — `RangePill`, лайтбокс — кнопки | — |
 | `safe-area-awareness` | ✅ | `SAFE_AREA_ROOT`, `env(safe-area-inset-bottom)` в обеих полосах | — |
 | `no-precision-required` | ⚠️ | этап M: иконка дня рождения 24×24 (WCAG AA); 44px в сетке дня физически не помещается — осознанное исключение | — |
 | `swipe-clarity` | ⚠️ | свайпов с скрытыми действиями нет | — |
@@ -300,7 +300,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Раздел | ⚠️ | Живая проверка | Осознанно | Техдолг |
 |---|---:|---:|---:|---:|
 | 1. Accessibility | 2 | 2 | 0 | 0 |
-| 2. Touch & Interaction | 6 | 2 | 2 | 2 |
+| 2. Touch & Interaction | 5 | 2 | 2 | 1 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 5 | 0 | 2 | 3 |
@@ -309,7 +309,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **36** | **10** | **15** | **11** |
+| **Итого** | **35** | **10** | **15** | **10** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,7 +327,7 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (11).** `touch-spacing`, `gesture-alternative`,
+**Техдолг (10).** `touch-spacing`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
@@ -399,3 +399,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `overflow-menu` закрыт: дни недели в сетке, тройки действий переносятся вместо сжатия | `tsc` 0, eslint 0, 21 тест, сборка 0 |
 | 12.11.2026 | техдолг | `consistent-help` закрыт: описания шагов и секций переведены на `Hint size="xs"` в пяти экранах, вид подсказки задаёт компонент | `tsc` 0, eslint 0, 14 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `error-feedback` закрыт: создание филиала и поручения показывает ошибку у поля с `aria-invalid` и `aria-describedby`, а не только тостом | `tsc` 0, eslint 0, 7 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `gesture-alternative` закрыт: доступность в часовой сетке создаётся кнопкой, а не только drag | `tsc` 0, eslint 0, 5 тестов, сборка 0 |

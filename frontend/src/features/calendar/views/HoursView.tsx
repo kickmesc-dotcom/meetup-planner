@@ -6,7 +6,10 @@ import type { AvailabilityRange, User } from "@/types";
 import { rangeToHourRect, statusPillBg, statusLabel } from "../dateUtils";
 import { useUI } from "@/store/ui";
 import { createRange } from "@/api/availability";
-import { haptic } from "@/tg/webapp";
+import { humanizeApiError } from "@/api/client";
+import Icon from "@/components/Icon";
+import { useTx } from "@/i18n";
+import { haptic, showAlert } from "@/tg/webapp";
 interface Props {
   day: Date;
   users: User[];
@@ -23,6 +26,7 @@ const PARTICIPANT_COL_PX = 60;
 export default function HoursView({ day, users, meId, ranges }: Props) {
   const setEditing = useUI((s) => s.setEditingRangeId);
   const qc = useQueryClient();
+  const { tx } = useTx();
 
   // См. `ParticipantRow`: диапазон кладём в кэш сразу, иначе полоса появляется
   // только после ответа сервера и рефетча.
@@ -54,11 +58,12 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
       qc.invalidateQueries({ queryKey: ["ranges"] });
       setEditing(created.id);
     },
-    onError: (_e, _body, ctx) => {
+    onError: (error, _body, ctx) => {
       haptic("error");
       if (ctx?.snapshot) {
         for (const [key, data] of ctx.snapshot) qc.setQueryData(key, data);
       }
+      void showAlert(humanizeApiError(error));
     },
   });
 
@@ -72,8 +77,29 @@ export default function HoursView({ day, users, meId, ranges }: Props) {
           gridTemplateColumns: `${PARTICIPANT_COL_PX}px repeat(${users.length}, minmax(70px, 1fr))`,
         }}
       >
-        {/* Header строка с участниками (sticky) */}
-        <div className="sticky top-0 z-20 bg-tg-bg border-b border-tg-secondary-bg" />
+        {/* Header строка с участниками (sticky). Кнопка — альтернатива drag:
+            доступность можно создать без перетаскивания, редактор откроется
+            сразу и точное время правится кнопками. */}
+        <div className="sticky top-0 z-20 bg-tg-bg border-b border-tg-secondary-bg flex items-center justify-center">
+          <button
+            type="button"
+            aria-label={tx("Добавить доступность на 9:00–18:00")}
+            title={tx("Добавить доступность на 9:00–18:00")}
+            onClick={() => {
+              haptic("light");
+              createMut.mutate({
+                starts_at: addHours(dayStart, 9).toISOString(),
+                ends_at: addHours(dayStart, 18).toISOString(),
+                all_day: false,
+                status: 1,
+                confidence: 3,
+              });
+            }}
+            className="min-h-9 min-w-9 rounded-full bg-tg-secondary-bg text-tg-text press"
+          >
+            <Icon name="plus" size={16} className="mx-auto" />
+          </button>
+        </div>
         {users.map((u) => (
           <div
             key={`hdr-${u.id}`}
