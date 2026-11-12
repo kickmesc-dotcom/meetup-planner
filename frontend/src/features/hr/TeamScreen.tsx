@@ -72,6 +72,9 @@ export default function TeamScreen({
   // повтор плиток в шапке: к обеду сообщение тонет в чате, а здесь оно ждёт
   // вместе с переходами в разделы.
   const [showDigest, setShowDigest] = useState(false);
+  // Большой отдел не рендерим целиком: 50 строк хватает, чтобы найти человека
+  // поиском, а остальные открываются одним нажатием.
+  const [showAllEmployees, setShowAllEmployees] = useState(false);
 
   // Хук вызывается до ранних возвратов: иначе порядок хуков зависел бы от
   // того, открыт ли вложенный экран, и React ловил бы условный вызов.
@@ -99,6 +102,7 @@ export default function TeamScreen({
       (employee.badge ?? "").toLowerCase().includes(needle) ||
       (employee.department_name ?? "").toLowerCase().includes(needle),
   );
+  const visibleEmployees = showAllEmployees ? employees : employees.slice(0, 50);
 
   return (
     <div className="flex h-full flex-col">
@@ -278,7 +282,10 @@ export default function TeamScreen({
                     {...field}
                     type="search"
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setShowAllEmployees(false);
+                    }}
                     placeholder={tx("Найти человека или должность")}
                     className="min-h-9 w-full rounded-tile bg-tg-bg/50 px-2 text-xs text-tg-text placeholder:text-tg-hint"
                   />
@@ -292,13 +299,22 @@ export default function TeamScreen({
                       : tx("Сотрудников пока нет.")}
                   </div>
                 )}
-                {employees.map((employee) => (
+                {visibleEmployees.map((employee) => (
                   <EmployeeRow
                     key={employee.employee_id}
                     employee={employee}
                     onOpen={() => setCardEmployeeId(employee.employee_id)}
                   />
                 ))}
+                {!showAllEmployees && employees.length > visibleEmployees.length && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllEmployees(true)}
+                    className="min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 text-xs font-medium text-tg-link"
+                  >
+                    {tx("Показать всех: {count}", { count: employees.length })}
+                  </button>
+                )}
               </div>
             </section>
 

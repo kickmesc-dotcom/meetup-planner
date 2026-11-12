@@ -2388,6 +2388,7 @@ export const EN_CONTENT: Record<string, string> = {
     "Optional: you can pass the link along manually.",
   "Руководитель выключил: {list}. Включить можно в настройках организации.":
     "Disabled by the manager: {list}. You can turn them on in the organization settings.",
+  "Показать всех: {count}": "Show all: {count}",
   "Работает": "Working",
   "Есть проблемы": "There are problems",
   "API": "API",

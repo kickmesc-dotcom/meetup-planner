@@ -48,6 +48,9 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
 
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
+  // Длинный список не рендерим целиком: поиск и первые 50 строк закрывают
+  // повседневную работу, остальные — по кнопке.
+  const [showAll, setShowAll] = useState(false);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["admin", "employees-pool"] });
@@ -117,6 +120,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
       (card.badge ?? "").toLowerCase().includes(needle) ||
       (card.department_name ?? "").toLowerCase().includes(needle),
   );
+  const shown = showAll ? visible : visible.slice(0, 50);
   const trashDays = q.data?.trash_days ?? 30;
 
   const askFire = async (card: HrEmployeeCard) => {
@@ -179,7 +183,10 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
             {...field}
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setShowAll(false);
+            }}
             placeholder={tx("Найти по имени, должности или отделу")}
             className="min-h-10 w-full rounded-tile bg-tg-secondary-bg/60 px-3 text-sm text-tg-text placeholder:text-tg-hint"
           />
@@ -202,7 +209,7 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
         <p className="py-8 text-center text-xs text-tg-hint">{tx("Никого не нашли.")}</p>
       )}
 
-      {visible.map((card) => (
+      {shown.map((card) => (
         <EmployeeRow
           key={card.employee_id}
           card={card}
@@ -221,6 +228,15 @@ export default function EmployeesScreen({ onBack }: { onBack: () => void }) {
           onRestore={() => restore.mutate(card.employee_id)}
         />
       ))}
+      {!showAll && visible.length > shown.length && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 text-xs font-medium text-tg-link"
+        >
+          {tx("Показать всех: {count}", { count: visible.length })}
+        </button>
+      )}
     </SubScreen>
   );
 }
