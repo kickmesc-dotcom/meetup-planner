@@ -142,7 +142,8 @@ async function send(form: FormData): Promise<MediaItem> {
   return api<MediaItem>(
     "/api/media",
     { method: "POST", body: form },
-    { sameOrigin: true },
+    // Фото с телефона в слабой сети: 30 секунд по умолчанию мало.
+    { sameOrigin: true, timeoutMs: 90_000 },
   );
 }
 

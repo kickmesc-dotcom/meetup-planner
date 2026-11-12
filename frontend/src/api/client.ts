@@ -445,7 +445,7 @@ export async function api<T>(
    * а уже оттуда в HF — так слабый мобильный канал не теряет загрузку.
    * В dev-сервере запрос всё равно идёт на Vite-прокси.
    */
-  options: { sameOrigin?: boolean } = {},
+  options: { sameOrigin?: boolean; timeoutMs?: number } = {},
 ): Promise<T> {
   const initData = getInitData();
   const sessionToken = initData ? null : getSessionToken();
@@ -479,7 +479,23 @@ export async function api<T>(
   const url = path.startsWith("http")
     ? path
     : `${sameOrigin ? "" : getApiBase()}${path}`;
-  const res = await fetch(url, { ...init, headers });
+  // Медленный ответ — не вечная загрузка: через 30 секунд показываем
+  // «сервер не ответил вовремя» и даём повторить. Свой `signal` вызывающего
+  // важнее таймаута — если он есть, не подменяем его.
+  const controller = init.signal ? null : new AbortController();
+  const timer = controller
+    ? setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000)
+    : null;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers,
+      signal: controller?.signal ?? init.signal ?? undefined,
+    });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
   if (!res.ok) {
     // Токен веб-версии отозвали или истёк срок: забываем его, чтобы приложение
@@ -504,7 +520,7 @@ export async function api<T>(
       (detail === "simulation_inactive" || detail === "simulation_not_found")
     ) {
       useSimulation.getState().clear();
-      return api<T>(path, init);
+      return api<T>(path, init, options);
     }
     throw new ApiError(res.status, detail);
   }

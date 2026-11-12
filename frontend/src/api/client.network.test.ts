@@ -12,7 +12,7 @@ vi.mock("@/tg/webapp", () => ({
   clearAccessToken: vi.fn(),
 }));
 
-import { ApiError, humanizeApiError, isNetworkError } from "./client";
+import { ApiError, api, humanizeApiError, isNetworkError } from "./client";
 
 /**
  * Страж текста ошибки. Причина: обрыв связи приходил в `humanizeApiError`
@@ -28,6 +28,7 @@ function setOnline(value: boolean) {
 
 afterEach(() => {
   setOnline(true);
+  vi.unstubAllGlobals();
 });
 
 describe("isNetworkError", () => {
@@ -46,6 +47,27 @@ describe("isNetworkError", () => {
   it("без сети считает сетевой любую ошибку", () => {
     setOnline(false);
     expect(isNetworkError(new ApiError(500, "boom"))).toBe(true);
+  });
+});
+
+describe("api: медленный ответ", () => {
+  it("обрывает зависший запрос по таймауту", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        }),
+      ),
+    );
+
+    await expect(
+      api("/slow", {}, { timeoutMs: 10 }),
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 });
 

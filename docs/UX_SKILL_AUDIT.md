@@ -94,7 +94,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `tap-feedback-speed` | ✅ | CSS-переход 120мс | — |
 | `debounce-throttle` | ✅ | этап R: фильтр применяется через 200 мс после последнего символа | — |
 | `offline-support` | ✅ | `offline/`, PWA, экран повтора | — |
-| `network-fallback` | ⚠️ | `ErrorState` различает обрыв и отказ, `role=alert` и сам повторяет запрос по `online`; таймаут медленного ответа не вводили | — |
+| `network-fallback` | ✅ | `ErrorState` различает обрыв и отказ, `role=alert`, повтор по `online`; зависший запрос обрывается через 30 с (фото — 90 с) с понятным «сервер не ответил вовремя» | — |
 
 ## 4. Style Selection (HIGH, 12 правил)
 
@@ -301,7 +301,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 |---|---:|---:|---:|---:|
 | 1. Accessibility | 4 | 2 | 0 | 2 |
 | 2. Touch & Interaction | 7 | 2 | 2 | 3 |
-| 3. Performance | 4 | 2 | 1 | 1 |
+| 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 5 | 0 | 2 | 3 |
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
@@ -309,7 +309,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 8. Forms & Feedback | 3 | 0 | 1 | 2 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **41** | **10** | **15** | **16** |
+| **Итого** | **40** | **10** | **15** | **15** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,7 +327,7 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (16).** `network-fallback`, `consistent-help`,
+**Техдолг (15).** `consistent-help`,
 `redundant-entry`, `touch-spacing`, `error-feedback`, `gesture-alternative`,
 `breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
@@ -395,3 +395,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `empty-nav-state` закрыт: профиль не открывает выключенные разделы и называет их списком | `tsc` 0, eslint 0, 19 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `large-dataset` частично: команда и пул сотрудников рендерят 50 строк, остальные — по кнопке | `tsc` 0, eslint 0, 40 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `back-stack-integrity` частично: «назад» в кабинете ведёт в корень, затем в зону сотрудника | `tsc` 0, eslint 0, 25 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `network-fallback` закрыт: таймаут 30 с (фото 90 с), повтор по `online`, различение обрыва и отказа | `tsc` 0, eslint 0, 37 тестов, сборка 0 |

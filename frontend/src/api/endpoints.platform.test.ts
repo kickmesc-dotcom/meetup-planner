@@ -162,7 +162,7 @@ describe("media", () => {
     expect(path).toBe("/api/media");
     expect((init as RequestInit).method).toBe("POST");
     expect((init as RequestInit).body).toBeInstanceOf(FormData);
-    expect(options).toEqual({ sameOrigin: true });
+    expect(options).toEqual({ sameOrigin: true, timeoutMs: 90_000 });
   });
 
   it("повторяет загрузку на 503 и не повторяет на 400", async () => {
