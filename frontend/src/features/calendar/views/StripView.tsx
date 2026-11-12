@@ -29,7 +29,7 @@ export default function StripView({
   return (
     <>
       <div
-        className="grid border-b border-tg-secondary-bg/80 bg-tg-bg sticky top-0 z-10 pl-[60px]"
+        className="grid border-b border-tg-secondary-bg/80 bg-tg-bg sticky top-0 z-10 pl-cal-gutter"
         style={{ gridTemplateColumns: `repeat(${span}, minmax(36px, 1fr))` }}
       >
         {days.map((d, idx) => {

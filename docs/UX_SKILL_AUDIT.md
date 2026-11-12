@@ -124,7 +124,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `readable-font-size` | ⚠️ | поля 16px (вход и сброс — `text-base`, на iOS — принудительно); основной текст 14px (`text-sm`) | S |
 | `line-length-control` | ✅ | `max-w-[560px]` | — |
 | `horizontal-scroll` | ✅ | скролл только в таблицах/календаре, осознанно | — |
-| `spacing-scale` | ⚠️ | из padding/gap убран 2px (`*-0.5` → `*-1`, 74 класса): минимум 4px; 6/10px остаются осознанными полушагами, `mt-0.5` — оптический сдвиг строки | M |
+| `spacing-scale` | ✅ | в padding/gap/margin нет 2px, минимум 4px (74 класса исправлены ранее); 6/10px — осознанные полушаги, `mt-0.5` — оптический сдвиг; выравнивание календаря — токены `cal-gutter`/`cal-gutter-day`; правило закреплено `styles.spacing.test.ts` | — |
 | `touch-density` | ⚠️ | плотные списки: кнопки 32–36px | M |
 | `container-width` | ✅ | одна ширина контента | — |
 | `z-index-management` | ✅ | этап Q: шкала `z-sheet`/`z-overlay`/`z-lightbox` в Tailwind, числовые слои заменены в 13 файлах, страж `styles.zindex.test.ts` | — |
@@ -303,13 +303,13 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 2. Touch & Interaction | 4 | 2 | 2 | 0 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
-| 5. Layout & Responsive | 4 | 0 | 2 | 2 |
+| 5. Layout & Responsive | 3 | 0 | 2 | 1 |
 | 6. Typography & Color | 5 | 1 | 2 | 2 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **33** | **10** | **15** | **8** |
+| **Итого** | **32** | **10** | **15** | **7** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,7 +327,8 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (8).** `spacing-scale`, `compact-label-overflow`,
+**Техдолг (7).**
+`compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
 `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
@@ -401,3 +402,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `gesture-alternative` закрыт: доступность в часовой сетке создаётся кнопкой, а не только drag | `tsc` 0, eslint 0, 5 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `breakpoint-consistency` закрыт: шкала 375/640/768/1024, `xl` убран, произвольные медиазапросы запрещены guard-тестом | `tsc` 0, eslint 0, 6 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `touch-spacing` закрыт: сегмент автоперезапуска получил зазор; остальные группы целей уже с `gap-2` | `tsc` 0, eslint 0, сборка 0 (теста экрана нет) |
+| 12.11.2026 | техдолг | `spacing-scale` закрыт: дробных отступов в padding/gap нет, ширина колонки календаря вынесена в токены, добавлен `styles.spacing.test.ts` | `tsc` 0, eslint 0, 10 тестов, сборка 0 |

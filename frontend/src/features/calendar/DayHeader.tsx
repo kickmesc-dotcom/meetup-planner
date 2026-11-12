@@ -8,7 +8,7 @@ interface Props {
 export default function DayHeader({ days }: Props) {
   return (
     <div
-      className="grid border-b border-tg-secondary-bg bg-tg-bg sticky top-0 z-10 pl-[72px]"
+      className="grid border-b border-tg-secondary-bg bg-tg-bg sticky top-0 z-10 pl-cal-gutter-day"
       style={{ gridTemplateColumns: `repeat(${days.length}, minmax(36px, 1fr))` }}
     >
       {days.map((d) => {

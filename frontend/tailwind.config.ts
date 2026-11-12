@@ -35,6 +35,13 @@ export default {
     extend: {
       // DESIGN_SYSTEM §2: no 9px, no 1px-stepped sizes. `3xs`/`2xs` are the
       // small end of the scale (avatar initials, captions, ledger labels).
+      // Выравнивание шапки календаря по колонке участников: это не отступ
+      // раскладки, а ширина соседней колонки, поэтому значение живёт токеном,
+      // а не `pl-[60px]` по месту.
+      spacing: {
+        "cal-gutter": "60px",
+        "cal-gutter-day": "72px",
+      },
       fontSize: {
         "3xs": ["10px", { lineHeight: "1.2" }],
         "2xs": ["11px", { lineHeight: "1.25" }],
