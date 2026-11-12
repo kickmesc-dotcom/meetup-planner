@@ -55,7 +55,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Правило | Статус | Где / чем подтверждено | Этап |
 |---|---|---|---|
 | `touch-target-size` | ✅ | этап M: действия и иконочные кнопки подняты до 44px (`IssuesScreen`, `HandoversScreen`, `MassPlanSheet`, `AdminTasksScreen`, `AttentionScreen`, `AppTextsScreen`, `AskScreen`, `MenuList`, `ZoneHint`, `SimulationBanner`, `NavBar`, вход и сброс пароля) | — |
-| `touch-spacing` | ⚠️ | 6 групп кнопок (языки, зона, «Кому», дни недели ×2, чипы) получили `gap-2` — 8px; остальные плотные списки ещё по месту | M |
+| `touch-spacing` | ✅ | группы целей разведены: языки, зона, «Кому», дни недели, чипы — `gap-2` (8px), сегмент автоперезапуска — `gap-1`; вкладки разделены шириной ячейки, а не вплотную | — |
 | `hover-vs-tap` | ✅ | все действия на `onClick` | — |
 | `loading-buttons` | ✅ | этап P: 125 async-кнопок в 47 файлах — `disabled` + `aria-busy` по тому же состоянию | — |
 | `error-feedback` | ✅ | `FormField` связал вход, сброс, домен, ключ API, создание филиала и поручения: ошибка у поля, `role="alert"`, `aria-invalid` и `aria-describedby`; тост остался для действий без поля | — |
@@ -300,7 +300,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | Раздел | ⚠️ | Живая проверка | Осознанно | Техдолг |
 |---|---:|---:|---:|---:|
 | 1. Accessibility | 2 | 2 | 0 | 0 |
-| 2. Touch & Interaction | 5 | 2 | 2 | 1 |
+| 2. Touch & Interaction | 4 | 2 | 2 | 0 |
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 4 | 0 | 2 | 2 |
@@ -309,7 +309,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 8. Forms & Feedback | 2 | 0 | 1 | 1 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **34** | **10** | **15** | **9** |
+| **Итого** | **33** | **10** | **15** | **8** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,7 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (9).** `touch-spacing`,
-`spacing-scale`, `compact-label-overflow`,
+**Техдолг (8).** `spacing-scale`, `compact-label-overflow`,
 `text-styles-system`, `truncation-strategy`, `input-helper-text`,
 `inline-validation`,
 `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
@@ -401,3 +400,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `error-feedback` закрыт: создание филиала и поручения показывает ошибку у поля с `aria-invalid` и `aria-describedby`, а не только тостом | `tsc` 0, eslint 0, 7 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `gesture-alternative` закрыт: доступность в часовой сетке создаётся кнопкой, а не только drag | `tsc` 0, eslint 0, 5 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `breakpoint-consistency` закрыт: шкала 375/640/768/1024, `xl` убран, произвольные медиазапросы запрещены guard-тестом | `tsc` 0, eslint 0, 6 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `touch-spacing` закрыт: сегмент автоперезапуска получил зазор; остальные группы целей уже с `gap-2` | `tsc` 0, eslint 0, сборка 0 (теста экрана нет) |
