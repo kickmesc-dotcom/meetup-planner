@@ -292,6 +292,50 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `drill-down-consistency` | — | нет drill-down | — |
 | `time-scale-clarity` | — | нет временных графиков | — |
 
+## Сводка остатка (12.11.2026)
+
+45 ⚠️ — это не «неизвестно», а три разных класса. Правило без причины
+в матрице не осталось; ниже — что именно мешает поставить ✅.
+
+| Раздел | ⚠️ | Живая проверка | Осознанно | Техдолг |
+|---|---:|---:|---:|---:|
+| 1. Accessibility | 4 | 2 | 0 | 2 |
+| 2. Touch & Interaction | 7 | 2 | 2 | 3 |
+| 3. Performance | 5 | 2 | 1 | 2 |
+| 4. Style Selection | 3 | 1 | 2 | 0 |
+| 5. Layout & Responsive | 5 | 0 | 2 | 3 |
+| 6. Typography & Color | 5 | 1 | 2 | 2 |
+| 7. Animation | 7 | 2 | 5 | 0 |
+| 8. Forms & Feedback | 4 | 0 | 1 | 3 |
+| 9. Navigation Patterns | 3 | 0 | 0 | 3 |
+| 10. Charts & Data | 2 | 0 | 0 | 2 |
+| **Итого** | **45** | **10** | **15** | **20** |
+
+**Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
+`gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
+`platform-adaptive`, `contrast-readability`, `gesture-feedback`,
+`cancellable-state-transitions`. Нужен живой аккаунт, реальные сессии,
+iOS/Android или замер на устройстве; код к ним готов или проверен частично.
+
+**Осознанно (15).** `no-precision-required` (24 px — WCAG AA, 44 px в сетке
+дня не помещается), `swipe-clarity` (скрытых свайпов нет),
+`critical-css` (SPA, один CSS-файл кэшируется), `color-palette-from-product`
+(тема Telegram + бренд организации), `system-controls` (нативные контролы),
+`readable-font-size` (14 px основной, 16 px поля), `touch-density` (плотные
+списки 32–36 px при 44 px у действий), `line-height` (14/20),
+`letter-spacing` (`tracking-wide` у капсов), `stagger-sequence`,
+`shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
+`navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
+
+**Техдолг (20).** `image-dimension`, `network-fallback`, `consistent-help`,
+`redundant-entry`, `touch-spacing`, `error-feedback`, `gesture-alternative`,
+`breakpoint-consistency`, `spacing-scale`, `compact-label-overflow`,
+`text-styles-system`, `truncation-strategy`, `required-indicators`,
+`input-helper-text`, `inline-validation`, `overflow-menu`,
+`back-stack-integrity`, `empty-nav-state`, `large-dataset`,
+`number-formatting`. Это выполнимые срезы без владельца; каждый требует
+своего пака и проверки, механически галочки не ставятся.
+
 ## Этапы
 
 | Этап | Категория | Объём | Проверка | Деплой |
@@ -337,3 +381,4 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 07.11.2026 | N/Q | Skip-link, фокус после смены вкладки, SVG-стрелки во всех живых экранах | `tsc` 0, 897 тестов, сборка 0; текст `‹›` в DOM прода — 0
 | 07.11.2026 | Q | Deep link на задачу и проблему | тесты разбора ссылки; полный фронт; сборка; Pages `4bf198bb` |
 | 12.11.2026 | матрица | `alt-text`, `heading-hierarchy`, `submit-feedback` переведены в ✅: проверены alt у лайтбокса и `PhotoAttach`, `h2` у пяти содержательных секций, 46 async-кнопок на `BusyLabel` | `tsc` 0, eslint 0, BusyLabel 2/2, профильные тесты, сборка 0 |
+| 12.11.2026 | сводка | Остаток 45 ⚠️ разнесён по разделам: 10 живая проверка, 15 осознанно, 20 техдолг; правило без причины не осталось | пересчёт скриптом по строкам матрицы: 45 = 10 + 15 + 20 |
