@@ -588,7 +588,7 @@ export default function HrProfileScreen({
 
         <section className="rounded-card bg-tg-secondary-bg/60 p-3">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-tg-text">{tx("Курс")}</h3>
+            <h3 className="text-heading text-tg-text">{tx("Курс")}</h3>
             <span className="text-xs tabular-nums text-tg-hint">
               {trainingQ.data
                 ? `${trainingQ.data.done}/${trainingQ.data.total}`

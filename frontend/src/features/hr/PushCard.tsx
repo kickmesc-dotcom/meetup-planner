@@ -126,7 +126,7 @@ export default function PushCard() {
       <div className="flex items-start gap-2">
         <Icon name="bell" size={18} className="mt-0.5 text-tg-hint" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-tg-text">{tx("Уведомления в браузере")}</h3>
+          <h3 className="text-heading text-tg-text">{tx("Уведомления в браузере")}</h3>
           <p className="mt-1 text-xs text-tg-hint">{tx(
             "Напоминание о сроке придёт на телефон, даже если приложение закрыто. Telegram для этого не нужен.",
           )}</p>

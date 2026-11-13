@@ -63,7 +63,7 @@ export default function HolidaysCard() {
 
   return (
     <section className="rounded-card bg-tg-secondary-bg/60 p-3">
-      <h2 className="flex items-center gap-1.5 text-base font-semibold">
+      <h2 className="flex items-center gap-1.5 text-title text-tg-text">
         <Icon name="sparkles" size={16} className="shrink-0 text-tg-link" />
         {tx("Праздники")}
       </h2>

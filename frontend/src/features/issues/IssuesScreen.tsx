@@ -636,7 +636,7 @@ function IssueSheet({
               )}
           </div>
 
-          <h3 className="mt-4 text-sm font-semibold text-tg-text">{tx("История")}</h3>
+          <h3 className="mt-4 text-heading text-tg-text">{tx("История")}</h3>
           <ol className="mt-2 space-y-2">
             {issue.events.map((event) => (
               <li

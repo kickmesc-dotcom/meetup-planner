@@ -48,7 +48,7 @@ export default function EmailVerifyCard() {
       <div className="flex items-start gap-2">
         <Icon name="lock" size={18} className="mt-0.5 text-tg-hint" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-tg-text">{tx("Почта не подтверждена")}</h3>
+          <h3 className="text-heading text-tg-text">{tx("Почта не подтверждена")}</h3>
           <p className="mt-1 text-xs text-tg-hint">
             {me.email}. Подтверди адрес, чтобы не потерять доступ к аккаунту:
             на него приходит сброс пароля и приглашения.

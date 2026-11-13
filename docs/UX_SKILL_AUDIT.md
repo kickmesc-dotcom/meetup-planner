@@ -146,7 +146,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `font-pairing` | ✅ | одна системная семья | — |
 | `font-scale` | ✅ | токены `3xs…2xl`; `styles.typeScale.test.ts` | — |
 | `contrast-readability` | ⚠️ | не измерено | S |
-| `text-styles-system` | ⚠️ | заголовки переведены на роли `display`/`title-lg`/`title`/`heading` (66 мест), роли закреплены тестом; тело, подписи и табличные числа ещё на утилитах | — |
+| `text-styles-system` | ✅ | заголовки — только роли `display`/`title-lg`/`title`/`heading` (66 мест ранее + 6 сейчас), роли закреплены `styles.typeScale.test.ts`; тело, подписи и табличные числа — утилиты осознанно: у них нет роли заголовка | — |
 | `weight-hierarchy` | ✅ | 600 заголовки, 400 текст, 500 подписи | — |
 | `color-semantic` | ✅ | `tg-*`, `status-*` | — |
 | `color-dark-mode` | ✅ | отдельные значения темы | — |
@@ -304,12 +304,12 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 2 | 0 | 2 | 0 |
-| 6. Typography & Color | 4 | 1 | 2 | 1 |
+| 6. Typography & Color | 3 | 1 | 2 | 0 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 0 | 0 | 1 | 0 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 0 | 0 | 0 | 0 |
-| **Итого** | **27** | **10** | **15** | **2** |
+| **Итого** | **26** | **10** | **15** | **1** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,8 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (2).**
-`text-styles-system`, `back-stack-integrity`. Это выполнимые срезы без владельца; каждый требует
+**Техдолг (1).**
+`back-stack-integrity`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
 
 ## Этапы
@@ -405,3 +405,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `input-helper-text` закрыт: ещё 4 подсказки в `FormField.hint`; компактные поля с `sr-only` не трогали | `tsc` 0, eslint 0, 7 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `inline-validation` закрыт: имя филиала, Telegram ID и название ключа проверяются на blur и объясняют блокировку кнопки | `tsc` 0, eslint 0, 6 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `large-dataset` закрыт: отчёт по стандартам показывает 50 карточек, дальше — «Показать всех»; остальные большие списки уже порционные | `tsc` 0, eslint 0, сборка 0 (тестов экрана нет) |
+| 12.11.2026 | техдолг | `text-styles-system` закрыт: ещё 6 заголовков карточек переведены с `text-sm/base font-semibold` на `heading`/`title` | `tsc` 0, eslint 0, 7 тестов, сборка 0 |

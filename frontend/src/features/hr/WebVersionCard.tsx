@@ -81,7 +81,7 @@ export default function WebVersionCard() {
       <div className="flex items-start gap-2">
         <Icon name="layout" size={18} className="mt-0.5 text-tg-hint" />
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-tg-text">{tx("Веб-версия")}</h3>
+          <h3 className="text-heading text-tg-text">{tx("Веб-версия")}</h3>
           <p className="mt-1 text-xs text-tg-hint">{tx(
             "На компьютере окно Telegram узкое. Открой ссылку в браузере — там широкий экран с разделами и сводкой смены.",
           )}</p>
