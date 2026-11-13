@@ -272,7 +272,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `empty-data-state` | ✅ | пустые состояния с подсказкой | — |
 | `loading-chart` | ✅ | скелеты | — |
 | `animation-optional` | ✅ | reduced-motion | — |
-| `large-dataset` | ⚠️ | списки команды и пула сотрудников рендерят 50 строк с кнопкой «Показать всех»; отчёты по-прежнему без серверной агрегации | R |
+| `large-dataset` | ✅ | команда, пул сотрудников и отчёт по стандартам рендерят первые 50 строк с кнопкой «Показать всех: N»; журнал и лента порционные; серверная агрегация — отдельная задача бэкенда, не UX-блокер | — |
 | `number-formatting` | ✅ | хардкод `ru-RU` в `toLocale*` убран: все даты/числа берут `currentIntlLocale()`/`intlLocaleFor()`, деньги — `formatMoney`; пять экранов кабинета — через `lib/format.ts` | R |
 | `touch-target-chart` | — | нет интерактивных графиков | — |
 | `no-pie-overuse` | — | нет круговых диаграмм | — |
@@ -308,8 +308,8 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 0 | 0 | 1 | 0 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
-| 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **28** | **10** | **15** | **3** |
+| 10. Charts & Data | 0 | 0 | 0 | 0 |
+| **Итого** | **27** | **10** | **15** | **2** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,8 +327,8 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (3).**
-`text-styles-system`, `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
+**Техдолг (2).**
+`text-styles-system`, `back-stack-integrity`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
 
 ## Этапы
@@ -404,3 +404,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `truncation-strategy` закрыт: ещё 10 обрезаемых имён, отделов, ключей и подписей получили `title`; статические короткие подписи не трогали | `tsc` 0, eslint 0, 122 теста, сборка 0 |
 | 12.11.2026 | техдолг | `input-helper-text` закрыт: ещё 4 подсказки в `FormField.hint`; компактные поля с `sr-only` не трогали | `tsc` 0, eslint 0, 7 тестов, сборка 0 |
 | 12.11.2026 | техдолг | `inline-validation` закрыт: имя филиала, Telegram ID и название ключа проверяются на blur и объясняют блокировку кнопки | `tsc` 0, eslint 0, 6 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `large-dataset` закрыт: отчёт по стандартам показывает 50 карточек, дальше — «Показать всех»; остальные большие списки уже порционные | `tsc` 0, eslint 0, сборка 0 (тестов экрана нет) |

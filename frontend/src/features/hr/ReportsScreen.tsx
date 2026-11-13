@@ -61,6 +61,9 @@ export default function ReportsScreen({
   const [on, setOn] = useState<string>(todayIso());
   const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [onlyGaps, setOnlyGaps] = useState(true);
+  // Отчёт по всем стандартам сразу тяжёл: карточка каждого считает людей,
+  // которые его ещё не сдали. Первые 50 — рабочая порция, остальные по кнопке.
+  const [showAllStandards, setShowAllStandards] = useState(false);
 
   const meQ = useQuery({ queryKey: ["hr-me"], queryFn: fetchEmployee });
   const departmentsQ = useQuery({
@@ -285,9 +288,25 @@ export default function ReportsScreen({
                   )}
                 </div>
               ) : (
-                standards.map((standard) => (
-                  <StandardCard key={standard.standard_id} standard={standard} />
-                ))
+                <>
+                  {(showAllStandards ? standards : standards.slice(0, 50)).map(
+                    (standard) => (
+                      <StandardCard
+                        key={standard.standard_id}
+                        standard={standard}
+                      />
+                    ),
+                  )}
+                  {standards.length > 50 && !showAllStandards && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllStandards(true)}
+                      className="min-h-11 w-full rounded-tile bg-tg-secondary-bg/60 text-xs text-tg-link"
+                    >
+                      {tx("Показать всех: {count}", { count: standards.length })}
+                    </button>
+                  )}
+                </>
               )}
             </section>
           </>
