@@ -204,7 +204,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `input-helper-text` | ✅ | подсказка поля — только `FormField.hint`, связанная через `aria-describedby`: домен, импорт, имя, филиал, почта приглашения, дата рождения, время перезапуска, инструкция стандарта, ожидаемый результат; компактные поля с `sr-only`-подписью и placeholder в подсказке не нуждаются | — |
 | `disabled-states` | ✅ | `disabled:opacity-*` + атрибут | — |
 | `progressive-disclosure` | ✅ | простой/расширенный режим кабинета | — |
-| `inline-validation` | ⚠️ | проверка на blur только в части полей | P |
+| `inline-validation` | ✅ | ошибка появляется после ухода с поля:email и пароль — уже были, теперь имя филиала, Telegram ID и название ключа API; кнопка больше не единственное объяснение, почему действие недоступно | — |
 | `input-type-keyboard` | ✅ | `inputMode` email/numeric/url | — |
 | `password-toggle` | ✅ | этап L, тест `AuthScreen.test.tsx` | — |
 | `autofill-support` | ✅ | `autoComplete` на входе и профиле | — |
@@ -306,10 +306,10 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 5. Layout & Responsive | 2 | 0 | 2 | 0 |
 | 6. Typography & Color | 4 | 1 | 2 | 1 |
 | 7. Animation | 7 | 2 | 5 | 0 |
-| 8. Forms & Feedback | 1 | 0 | 1 | 0 |
+| 8. Forms & Feedback | 0 | 0 | 1 | 0 |
 | 9. Navigation Patterns | 2 | 0 | 0 | 2 |
 | 10. Charts & Data | 1 | 0 | 0 | 1 |
-| **Итого** | **29** | **10** | **15** | **4** |
+| **Итого** | **28** | **10** | **15** | **3** |
 
 **Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
@@ -327,10 +327,8 @@ iOS/Android или замер на устройстве; код к ним гот
 `shared-element-transition`, `hierarchy-motion`, `opacity-threshold`,
 `navigation-direction`, `error-summary` (многополевых форм со сводкой нет).
 
-**Техдолг (4).**
-`text-styles-system`,
-`inline-validation`,
-`back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
+**Техдолг (3).**
+`text-styles-system`, `back-stack-integrity`, `large-dataset`. Это выполнимые срезы без владельца; каждый требует
 своего пака и проверки, механически галочки не ставятся.
 
 ## Этапы
@@ -405,3 +403,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 12.11.2026 | техдолг | `compact-label-overflow` закрыт: 15 обрезаемых подписей кнопок получили `title` с полным текстом | `tsc` 0, eslint 0, 43 теста, сборка 0 |
 | 12.11.2026 | техдолг | `truncation-strategy` закрыт: ещё 10 обрезаемых имён, отделов, ключей и подписей получили `title`; статические короткие подписи не трогали | `tsc` 0, eslint 0, 122 теста, сборка 0 |
 | 12.11.2026 | техдолг | `input-helper-text` закрыт: ещё 4 подсказки в `FormField.hint`; компактные поля с `sr-only` не трогали | `tsc` 0, eslint 0, 7 тестов, сборка 0 |
+| 12.11.2026 | техдолг | `inline-validation` закрыт: имя филиала, Telegram ID и название ключа проверяются на blur и объясняют блокировку кнопки | `tsc` 0, eslint 0, 6 тестов, сборка 0 |

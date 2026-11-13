@@ -134,6 +134,20 @@ describe("BranchesScreen", () => {
     await waitFor(() => expect(createMock).toHaveBeenCalledWith("Салон Север"));
   });
 
+  it("подсказывает короткое имя до отправки", async () => {
+    renderScreen();
+
+    const input = await screen.findByPlaceholderText("Название филиала");
+    fireEvent.change(input, { target: { value: "A" } });
+    fireEvent.blur(input);
+
+    expect(await screen.findByRole("alert")).toHaveProperty(
+      "textContent",
+      "Название — хотя бы 2 символа, иначе филиалы не отличить.",
+    );
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
   it("показывает ошибку создания у поля, а не только тостом", async () => {
     createMock.mockRejectedValueOnce("Такое название уже занято");
     renderScreen();

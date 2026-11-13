@@ -187,6 +187,13 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
   });
 
   const keyError = createKey.error;
+  // Проверка до отправки: пустое имя — не ошибка сервера, её видно сразу
+  // после того, как человек ушёл с поля.
+  const [keyTouched, setKeyTouched] = useState(false);
+  const keyNameError =
+    keyTouched && keyName.trim().length === 0
+      ? tx("Название нужно, чтобы узнать ключ в списке.")
+      : null;
   const error =
     keys.error ?? hooks.error ?? deliveries.error ?? importRuns.error ??
     revoke.error ?? addHook.error ?? patchHook.error ?? removeHook.error;
@@ -243,8 +250,12 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
             id="key-name"
             label={tx("Название")}
             required
-            invalid={!!keyError}
-            error={keyError ? humanizeApiError(keyError) : undefined}
+            invalid={!!keyError || !!keyNameError}
+            error={
+              keyError
+                ? humanizeApiError(keyError)
+                : (keyNameError ?? undefined)
+            }
             errorId="key-name-error"
             hint={tx("Показывается один раз — сохраните ключ.")}
             labelClassName="text-xs font-semibold text-tg-hint"
@@ -254,6 +265,7 @@ export default function IntegrationsScreen({ onBack }: { onBack: () => void }) {
                 {...field}
                 value={keyName}
                 onChange={(event) => setKeyName(event.target.value)}
+                onBlur={() => setKeyTouched(true)}
                 placeholder={tx("Например: CRM")}
                 className="mt-1 min-h-11 w-full rounded-tile bg-tg-bg px-3 text-sm font-normal text-tg-text"
               />

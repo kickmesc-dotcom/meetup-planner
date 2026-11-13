@@ -43,6 +43,11 @@ export function AddPersonPanel({
   const { tx } = useTx();
   const [open, setOpen] = useState(false);
   const [tgId, setTgId] = useState("");
+  const [tgTouched, setTgTouched] = useState(false);
+  const tgError =
+    tgTouched && tgId.length > 0 && tgId.length < 4
+      ? tx("ID — только цифры, обычно 9–10 знаков. Посмотреть: /whoami в боте.")
+      : null;
   const [name, setName] = useState("");
   const [position, setPosition] = useState("");
   const [departmentId, setDepartmentId] = useState("");
@@ -124,7 +129,11 @@ export function AddPersonPanel({
 
       {open && (
         <div className="space-y-2 px-3 pb-3">
-          <FormField id="roster-tg-id" label="Telegram ID">
+          <FormField
+            id="roster-tg-id"
+            label="Telegram ID"
+            error={tgError ?? undefined}
+          >
             {(field) => (
               <input
                 {...field}
@@ -135,6 +144,7 @@ export function AddPersonPanel({
                 onChange={(event) =>
                   setTgId(event.target.value.replace(/\D/g, "").slice(0, 15))
                 }
+                onBlur={() => setTgTouched(true)}
                 className="min-h-9 w-full rounded-tile bg-tg-bg/60 px-2 text-sm text-tg-text"
               />
             )}

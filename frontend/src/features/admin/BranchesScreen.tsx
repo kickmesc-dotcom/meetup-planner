@@ -77,6 +77,11 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
   // Ошибка создания — у поля, а не только тостом: человек остаётся в форме
   // и видит, что именно поправить (имя занято, нет прав).
   const [createError, setCreateError] = useState<string | null>(null);
+  const [nameTouched, setNameTouched] = useState(false);
+  const nameError =
+    nameTouched && name.trim().length < 2
+      ? tx("Название — хотя бы 2 символа, иначе филиалы не отличить.")
+      : null;
 
   const fail = (error: unknown) => {
     const code = humanizeApiError(error);
@@ -268,7 +273,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
           id="branch-name"
           label={tx("Название филиала")}
           hint={tx("Сотрудники увидят это название в переключателе филиалов.")}
-          error={createError ?? undefined}
+          error={createError ?? nameError ?? undefined}
           required
           className="mt-2"
         >
@@ -281,6 +286,7 @@ export default function BranchesScreen({ onBack }: { onBack: () => void }) {
                   setName(event.target.value);
                   setCreateError(null);
                 }}
+                onBlur={() => setNameTouched(true)}
                 placeholder={tx("Название филиала")}
                 className="min-h-11 min-w-0 flex-1 rounded-tile bg-tg-bg px-2 text-sm text-tg-text"
               />
