@@ -308,7 +308,9 @@ Charts 2.
       для CI. Джоба `visual` идёт в `mcr.microsoft.com/playwright:v1.65.0-jammy`
       — том же образе, где снят эталон, поэтому шрифты и сглаживание совпадают;
       набор вынесен в `playwright.visual.config.ts` (`npm run test:e2e:visual`)
-      и не мешает основной e2e-джобе. Плюс платформо-независимый
+      и не мешает основной e2e-джобе; эталон переснимается скриптом
+      `npm run test:e2e:visual:update`, он сам берёт версию образа из
+      `@playwright/test` и держит Linux `node_modules` в отдельном томе. Плюс платформо-независимый
       `e2e/design.spec.ts`: computed-стили и высоты целей против
       `design-baseline.json`.
 
