@@ -289,7 +289,8 @@ Charts 2.
       пустой полосы не бывает. `overflow-menu` закрыт сеткой дней и переносом
       троек действий. `back-stack-integrity` проверен тестом: подраздел
       кабинета → корень → зона сотрудника, а смена вкладки пишет шаг истории
-      (`useTabHistory`).
+      (`useTabHistory`). Полноэкранные оверлеи, включая настройки профиля,
+      закрываются системной «назад» и не мешают друг другу.
 - [x] Animation: единый словарь — `transitionDuration` в `tailwind.config.ts`
       (`press/fade/exit`) и `--motion-*` в `styles.css`; вход вкладки 120 мс,
       `useReducedMotion` выключает движение, `AnimatePresence` не даёт

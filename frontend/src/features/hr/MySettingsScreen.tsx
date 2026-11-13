@@ -9,6 +9,7 @@ import {
   setProfileVisibility,
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
+import { useBackClose } from "@/lib/useBackClose";
 import ErrorState from "@/components/ErrorState";
 import Icon, { type IconName } from "@/components/Icon";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -90,6 +91,9 @@ function LinkRow({
 
 export default function MySettingsScreen({ onClose }: { onClose: () => void }) {
   const { tx } = useTx();
+  // Экран занимает весь кадр поверх профиля: системная «назад» должна вернуть
+  // в профиль, а не закрыть мини-апп.
+  useBackClose(onClose);
   const qc = useQueryClient();
   const setMode = useUI((s) => s.setMode);
   const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);
@@ -171,10 +175,10 @@ export default function MySettingsScreen({ onClose }: { onClose: () => void }) {
     <div className="absolute inset-0 z-30 flex flex-col bg-tg-bg">
       <header className="flex items-center gap-3 border-b border-tg-secondary-bg py-3 pl-4 pr-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-base font-medium text-tg-text">
+          <h1 className="flex items-center gap-1.5 text-base font-medium text-tg-text">
             <Icon name="settings" size={16} />
             {tx("Настройки")}
-          </div>
+          </h1>
           <div className="text-xs text-tg-hint">
             {tx("Профиль, уведомления, язык и оплата")}
           </div>

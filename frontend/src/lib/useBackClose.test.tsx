@@ -12,7 +12,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render } from "@testing-library/react";
-import { useBackClose } from "./useBackClose";
+import { resetBackCloseGuard, useBackClose } from "./useBackClose";
 
 function Overlay({ onClose }: { onClose: () => void }) {
   useBackClose(onClose);
@@ -21,6 +21,7 @@ function Overlay({ onClose }: { onClose: () => void }) {
 
 afterEach(() => {
   cleanup();
+  resetBackCloseGuard();
   vi.restoreAllMocks();
 });
 
@@ -30,7 +31,9 @@ describe("useBackClose", () => {
     render(<Overlay onClose={() => {}} />);
 
     expect(push).toHaveBeenCalledTimes(1);
-    expect(push.mock.calls[0]?.[0]).toMatchObject({ semitaskOverlay: true });
+    expect(push.mock.calls[0]?.[0]).toMatchObject({
+      semitaskOverlay: expect.stringMatching(/^overlay-\d+$/),
+    });
   });
 
   it("по системной «назад» закрывает оверлей", () => {
@@ -43,8 +46,27 @@ describe("useBackClose", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("закрытие стрелкой снимает свой шаг истории", () => {
+  it("не закрывает экран от чужого popstate — шаг снял другой оверлей", () => {
     vi.spyOn(window.history, "pushState").mockImplementation(() => {});
+    const onClose = vi.fn();
+    render(<Overlay onClose={onClose} />);
+
+    // Метка другого экземпляра: это уборка соседнего оверлея, а не жест
+    // человека. Раньше такой popstate закрывал только что открытый экран.
+    window.dispatchEvent(
+      new PopStateEvent("popstate", {
+        state: { semitaskOverlay: "overlay-999999" },
+      }),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+
+    window.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("закрытие стрелкой снимает свой шаг истории", () => {
+    // pushState не мокаем: хук снимает шаг только пока `history.state` ещё его,
+    // и подмена истории лишила бы тест смысла.
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
     const view = render(<Overlay onClose={() => {}} />);
 

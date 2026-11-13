@@ -20,6 +20,7 @@ import {
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AdminScreen from "./AdminScreen";
+import { resetBackCloseGuard } from "@/lib/useBackClose";
 import { useUI } from "@/store/ui";
 import { fetchDashboard, type HrDashboard } from "@/api/hr";
 
@@ -65,6 +66,7 @@ function renderScreen(platform = true, canManage = false) {
 
 beforeEach(() => {
   localStorage.clear();
+  resetBackCloseGuard();
   // Раздел кабинета теперь лежит в сторе (его переключает и нижняя полоса
   // зоны управления), поэтому тесты не должны начинать с чужого раздела.
   useUI.setState({ adminSection: "root" });

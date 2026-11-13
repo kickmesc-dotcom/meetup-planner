@@ -170,6 +170,69 @@ export async function mockSignedInApi(page: Page): Promise<void> {
     if (path === "/api/me/employee") return json(EMPLOYEE);
     if (path === "/api/org-setup") return json(ORG);
     if (path === "/api/me/ui-prefs") return json(PREFS);
+    // Сводка кабинета — объект: на пустом `[]` экран не может прочитать
+    // счётчики и проверка открытия раздела теряет смысл.
+    // Карточки профиля читают объекты, а не списки: на `[]` экран падает в
+    // ErrorBoundary, и проверка настроек не доходит до оверлея.
+    if (path === "/api/kpi") {
+      return json({
+        xp: 0,
+        rank: { code: "start", title: "Новичок", emoji: "🌱", threshold: 0 },
+        next_rank: null,
+        left: 0,
+        percent: 0,
+        week_xp: 0,
+        week_counts: {
+          checklist_items: 0,
+          shifts_done: 0,
+          tasks_done: 0,
+          tasks_on_time: 0,
+        },
+        week_place: null,
+        week_total: 1,
+        employee_of_week: null,
+        rules: {
+          xp_checklist_item: 1,
+          xp_shift_done: 5,
+          xp_task: 2,
+          xp_on_time: 1,
+          min_xp_winner: 10,
+        },
+      });
+    }
+    if (path === "/api/notify-prefs") {
+      return json({ prefs: [], kinds: [] });
+    }
+    if (path === "/api/me/training") {
+      return json({
+        lessons: [],
+        levels: [],
+        done: 0,
+        total: 0,
+        percent: 0,
+        complete: false,
+        onboarding_state: "done",
+        next_code: null,
+        today_training: false,
+        rate_type: "full",
+      });
+    }
+    if (path === "/api/admin/dashboard") {
+      return json({
+        work_date: "2026-11-04",
+        scope: "all",
+        departments: [],
+        employees: [],
+        attention: [],
+        activity: [],
+        total_employees: 1,
+        shifts_started: 0,
+        shifts_done: 0,
+        tasks_open: 0,
+        tasks_overdue: 0,
+        open_issues: 0,
+      });
+    }
     if (path === "/api/meta") return json({ ok: true });
     // Лента и её фильтры — объекты, а не списки: с пустым `[]` экран читает
     // `filters.departments.find` у `undefined` и падает в `ErrorBoundary`.
