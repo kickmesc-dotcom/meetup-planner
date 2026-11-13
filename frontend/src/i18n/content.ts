@@ -2402,4 +2402,20 @@ export const EN_CONTENT: Record<string, string> = {
   "Проверено": "Checked",
   "Если работа не идёт — откройте runbook: там шаги для 503, базы и токена бота.":
     "If work is stuck, open the runbook: it has steps for 503, the database and the bot token.",
+  // -------------------------------- подсказки полей и действий (13.11) --
+  "Один результат, который можно проверить глазами.":
+    "One result you can check with your own eyes.",
+  "Видно только руководителям; сотруднику — напоминание в этот день.":
+    "Visible to managers only; employees get a reminder that day.",
+  "Название — хотя бы 2 символа, иначе филиалы не отличить.":
+    "Name needs at least 2 characters, otherwise branches look alike.",
+  "Название нужно, чтобы узнать ключ в списке.":
+    "A name is needed to recognise the key in the list.",
+  "ID — только цифры, обычно 9–10 знаков. Посмотреть: /whoami в боте.":
+    "ID is digits only, usually 9–10 characters. Check with /whoami in the bot.",
+  "Время твоего часового пояса — по нему и перезапустим.":
+    "Your time zone's time — the restart follows it.",
+  "Добавить доступность на 9:00–18:00": "Add availability 9:00–18:00",
+  "Каждый шаг — с новой строки: так её читают на смене.":
+    "One step per line: that's how it's read on shift.",
 };
