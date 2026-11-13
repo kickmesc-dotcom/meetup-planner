@@ -16,6 +16,8 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Офлайн-старт требует production-сборки: у него свой конфиг.
+  testIgnore: /offline\.spec\.ts/,
   timeout: 30_000,
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),

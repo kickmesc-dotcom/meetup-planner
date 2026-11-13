@@ -157,6 +157,16 @@ describe("service worker", () => {
     expect(swRaw).toContain('startsWith("/assets/")');
   });
 
+  it("precache забирает вендорные чанки и не спотыкается о Vary", () => {
+    // Без разбора импортов входного файла в кеше остаётся только основной
+    // бандл: браузер просит `vendor-*.js`, получает ошибку и приложение
+    // замирает на заставке. Офлайн-e2e это ловит, здесь — быстрый страж.
+    expect(swRaw).toContain("imports");
+    expect(swRaw).toContain("(?:js|css)");
+    // `Vary: Accept-Encoding` у статики не должен мешать попаданию в кеш.
+    expect(swRaw).toContain("ignoreVary: true");
+  });
+
   it("показывает push и открывает приложение по клику", () => {
     // Без обработчика push подписка `userVisibleOnly` не работает: Chrome
     // отзывает её, если сообщение не превратилось в уведомление.

@@ -18,18 +18,21 @@
  *    баннер «доступна новая версия» не нужен: свежий HTML подхватывается сам;
  *  • файлы сборки (`/assets/…`, иконки, манифест) — из кеша, иначе сеть. У них
  *    в имени хеш, поэтому кеш не может «устареть»;
- *  • сборка (JS/CSS) кладётся в кеш при установке: список файлов читается из
- *    `index.html`. Без этого офлайн-старт после **первого** визита дал бы HTML
- *    без скриптов — пустой экран вместо приложения;
+ *  • сборка (JS/CSS) кладётся в кеш при установке: входной чанк и стили
+ *    читаются из `index.html`, а вендорные чанки — из статических импортов
+ *    входного файла. Без второго шага офлайн-старт после **первого** визита
+ *    давал HTML без JS: браузер запрашивал `vendor-*.js`, а их в кеше не было;
  *  • иконки/манифест попадают в кеш ещё при установке.
  *
  * Обновление: при изменении этого файла браузер ставит новый SW, `activate`
  * чистит кеши прошлых версий. Версию поднимать руками при правке списка SHELL.
  */
-// v4: тап по уведомлению переключает раздел в открытом окне (M3). Версия
-// меняет имя shell-кэша, иначе у установленных приложений остался бы старый
-// обработчик клика.
-const VERSION = "v4";
+// v5: офлайн-старт кеширует вендорные чанки из статических импортов входа.
+// До этого в кеше лежал только основной бандл, а `vendor-*.js` запрашивались
+// из сети — без неё приложение оставалось на заставке.
+// Версия меняет имена кешей, иначе у установленных приложений остался бы
+// старый неполный набор файлов и старый обработчик клика по уведомлению.
+const VERSION = "v5";
 const SHELL_CACHE = `semi-shell-${VERSION}`;
 const ASSET_CACHE = `semi-assets-${VERSION}`;
 
@@ -77,13 +80,29 @@ async function precacheBuild(shell) {
       if (url.pathname.startsWith("/assets/")) paths.add(url.pathname);
     }
     const assets = await caches.open(ASSET_CACHE);
-    await Promise.all(
-      [...paths].map(async (path) => {
-        if (await assets.match(path)) return;
-        const response = await fetch(path).catch(() => null);
-        if (response && response.ok) await assets.put(path, response);
-      }),
-    );
+    const save = async (path) => {
+      if (await assets.match(path, { ignoreVary: true })) return;
+      const response = await fetch(path).catch(() => null);
+      if (response && response.ok) await assets.put(path, response);
+    };
+    await Promise.all([...paths].map(save));
+
+    // Статические импорты входного чанка — это `vendor-*.js` (React, motion,
+    // иконки). Vite не кладёт их в `modulepreload`, поэтому из HTML их не
+    // видно, а без них браузеру нечего исполнять в офлайне.
+    const entry = [...paths].find((path) => path.endsWith(".js"));
+    if (entry) {
+      const file = await assets.match(entry, { ignoreVary: true });
+      if (file) {
+        const code = await file.text();
+        const imports = new Set();
+        for (const match of code.matchAll(/["'](\.\/[\w.-]+\.(?:js|css))["']/g)) {
+          const url = new URL(match[1], new URL(entry, self.location.origin));
+          if (url.origin === self.location.origin) imports.add(url.pathname);
+        }
+        await Promise.all([...imports].map(save));
+      }
+    }
   } catch {
     // Офлайн-старт без ассетов хуже, но рабочее приложение важнее установки.
   }
@@ -238,7 +257,10 @@ async function networkFirst(request) {
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
-  const hit = await cache.match(request);
+  // `ignoreVary` обязателен: статика сборки отдаётся с `Vary:
+  // Accept-Encoding`, а запрос браузера и запрос precache могут отличаться
+  // заголовками — без этого совпадения нет и офлайн отдаёт пустоту.
+  const hit = await cache.match(request, { ignoreVary: true });
   if (hit) return hit;
   try {
     const response = await fetch(request);

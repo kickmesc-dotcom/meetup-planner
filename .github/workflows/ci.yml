@@ -144,3 +144,8 @@ jobs:
 
       - name: E2E
         run: npm run test:e2e
+
+      # Офлайн-старт проверяется на собранной статике: service worker
+      # регистрируется только в production. `dist` уже собран выше.
+      - name: E2E offline
+        run: npm run test:e2e:offline
