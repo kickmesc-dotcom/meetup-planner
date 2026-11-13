@@ -284,11 +284,12 @@ Charts 2.
 - [x] Layout: `e2e/layout.spec.ts` — 375/768/1024 без горизонтального
       переполнения; шкала отступов Tailwind 4 px, радиусы и тени — по токенам.
       `critical-css` закрыт этапом 0 (вся вёрстка в одном 36 КБ gzip-чанке).
-- [~] Navigation: `empty-nav-state` закрыт архитектурно — `CORE_TABS` в
+- [x] Navigation: `empty-nav-state` закрыт архитектурно — `CORE_TABS` в
       `features/hr/sections.ts` не выключаются, «Профиль» есть всегда, поэтому
-      пустой полосы не бывает. `overflow-menu` не нужен при пяти вкладках;
-      `back-stack-integrity` — у `SubScreen` один явный `onBack`, проверить на
-      глубоких цепочках кабинета.
+      пустой полосы не бывает. `overflow-menu` закрыт сеткой дней и переносом
+      троек действий. `back-stack-integrity` проверен тестом: подраздел
+      кабинета → корень → зона сотрудника, а смена вкладки пишет шаг истории
+      (`useTabHistory`).
 - [x] Animation: единый словарь — `transitionDuration` в `tailwind.config.ts`
       (`press/fade/exit`) и `--motion-*` в `styles.css`; вход вкладки 120 мс,
       `useReducedMotion` выключает движение, `AnimatePresence` не даёт

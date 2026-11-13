@@ -9,7 +9,15 @@
  *    «Частое» при следующем заходе.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AdminScreen from "./AdminScreen";
 import { useUI } from "@/store/ui";
@@ -204,6 +212,22 @@ describe("AdminScreen (P1.9)", () => {
     renderScreen(false, true);
 
     expect(screen.queryByText("Тексты приложения")).toBeNull();
+  });
+
+  it("системная «назад»: подраздел → корень → зона сотрудника", async () => {
+    useUI.setState({ mode: "manage", adminSection: "texts" });
+    renderScreen();
+    expect(await screen.findByText("тексты-экран")).toBeTruthy();
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(useUI.getState().adminSection).toBe("root");
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(useUI.getState().mode).toBe("staff");
   });
 
   it("запоминает открытый раздел в localStorage", () => {
