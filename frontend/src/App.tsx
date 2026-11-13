@@ -8,6 +8,7 @@ import {
   type UiPrefs,
 } from "./api/availability";
 import { useBootstrap } from "./api/bootstrap";
+import { useTabHistory } from "./lib/useTabHistory";
 import { getAccessToken, getSessionToken, isNetworkError } from "./api/client";
 
 const MeetingsPollsScreen = lazy(() => import("./features/meetings/MeetingsPollsScreen"));
@@ -148,6 +149,8 @@ export default function App() {
   const tab = useUI((s) => s.tab);
   const { t } = useT();
   const setTab = useUI((s) => s.setTab);
+  // Системная «назад» возвращает предыдущую вкладку, а не закрывает мини-апп.
+  useTabHistory();
   const mode = useUI((s) => s.mode);
   const setMode = useUI((s) => s.setMode);
   const setPendingAdminSection = useUI((s) => s.setPendingAdminSection);

@@ -105,7 +105,8 @@ export type AppMode = "staff" | "manage";
 
 interface UIState {
   tab: Tab;
-  setTab: (t: Tab) => void;
+  /** `history: false` — вернуть вкладку без нового шага (так делает popstate). */
+  setTab: (t: Tab, opts?: { history?: boolean }) => void;
 
   /** Зона экрана: сотрудник или управление. */
   mode: AppMode;
@@ -297,14 +298,27 @@ export const useUI = create<UIState>((set, get) => ({
     resetTranslationAssist();
     set({ mode });
   },
-  setTab: (tab) => {
+  setTab: (tab, opts) => {
     // Перевод данных включается кнопкой на конкретном блоке и живёт до ухода с
     // экрана (план, 11). Вкладки здесь не размонтируются, поэтому сброс идёт
     // событием: без него человек вернулся бы на экран с подменённым текстом,
     // о котором уже забыл. Смена вкладки — ровно тот момент, когда он начал
     // читать другое.
+    if (get().tab === tab) return;
     resetTranslationAssist();
     set({ tab });
+    // Системная «назад» должна возвращать предыдущую вкладку, а не закрывать
+    // мини-апп. Пишем шаг только для настоящих переходов: popstate зовёт
+    // setTab с `history: false`, иначе история росла бы от каждого «назад».
+    if (opts?.history === false) return;
+    try {
+      window.history.pushState(
+        { ...window.history.state, semitaskTab: tab },
+        "",
+      );
+    } catch {
+      // Приватный режим: вкладки работают, системная «назад» — как раньше.
+    }
   },
 
   zoom: "week",
