@@ -149,3 +149,30 @@ jobs:
       # регистрируется только в production. `dist` уже собран выше.
       - name: E2E offline
         run: npm run test:e2e:offline
+
+  # Пиксельная регрессия. Эталон снят в этом же образе, поэтому шрифты и
+  # сглаживание совпадают; на Windows-машине разработчика Playwright берёт
+  # файл `*-win32.png`, здесь — `*-linux.png`. Отдельная джоба, а не шаг в
+  # frontend: образ уже содержит браузер, и `playwright install` не нужен.
+  visual:
+    name: Visual regression (Linux baseline)
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.65.0-jammy
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Visual regression
+        run: npm run test:e2e:visual
