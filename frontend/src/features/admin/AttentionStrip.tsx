@@ -87,7 +87,7 @@ export default function AttentionStrip({ data, loading = false, onOpen }: Props)
           <h2 className="text-heading text-tg-text">
             {nothing ? tx("Всё под контролем") : tx("Требует внимания")}
           </h2>
-          <p className="mt-0.5 text-2xs text-tg-hint">
+          <p className="mt-0.5 text-2xs text-tg-text/70">
             {tx("Смена: {started} из {total} начали", {
               started: data.shifts_started,
               total: data.total_employees,
@@ -97,7 +97,7 @@ export default function AttentionStrip({ data, loading = false, onOpen }: Props)
       </header>
 
       {nothing ? (
-        <p className="mt-2 text-xs text-tg-hint">
+        <p className="mt-2 text-xs text-tg-text/70">
           {tx("Просроченных поручений нет, открытых проблем нет.")}
         </p>
       ) : (

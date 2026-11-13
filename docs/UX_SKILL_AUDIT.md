@@ -145,7 +145,7 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | `line-length` | ✅ | короткие строки в карточках | — |
 | `font-pairing` | ✅ | одна системная семья | — |
 | `font-scale` | ✅ | токены `3xs…2xl`; `styles.typeScale.test.ts` | — |
-| `contrast-readability` | ⚠️ | не измерено | S |
+| `contrast-readability` | ✅ | axe (WCAG AA, serious/critical) на всех e2e-экранах; подсказки на цветных подложках профиля и кабинета переведены на `text-tg-text/70` | — |
 | `text-styles-system` | ✅ | заголовки — только роли `display`/`title-lg`/`title`/`heading` (66 мест ранее + 6 сейчас), роли закреплены `styles.typeScale.test.ts`; тело, подписи и табличные числа — утилиты осознанно: у них нет роли заголовка | — |
 | `weight-hierarchy` | ✅ | 600 заголовки, 400 текст, 500 подписи | — |
 | `color-semantic` | ✅ | `tg-*`, `status-*` | — |
@@ -304,16 +304,16 @@ Checklist). Поисковый скрипт `scripts/search.py` в папке с
 | 3. Performance | 3 | 2 | 1 | 0 |
 | 4. Style Selection | 3 | 1 | 2 | 0 |
 | 5. Layout & Responsive | 2 | 0 | 2 | 0 |
-| 6. Typography & Color | 3 | 1 | 2 | 0 |
+| 6. Typography & Color | 2 | 0 | 2 | 0 |
 | 7. Animation | 7 | 2 | 5 | 0 |
 | 8. Forms & Feedback | 0 | 0 | 1 | 0 |
 | 9. Navigation Patterns | 1 | 0 | 0 | 1 |
 | 10. Charts & Data | 0 | 0 | 0 | 0 |
-| **Итого** | **25** | **10** | **15** | **0** |
+| **Итого** | **24** | **9** | **15** | **0** |
 
-**Живая проверка (10).** `keyboard-nav`, `focus-not-obscured-enhanced`,
+**Живая проверка (9).** `keyboard-nav`, `focus-not-obscured-enhanced`,
 `gesture-conflicts`, `drag-threshold`, `reduce-reflows`, `main-thread-budget`,
-`platform-adaptive`, `contrast-readability`, `gesture-feedback`,
+`platform-adaptive`, `gesture-feedback`,
 `cancellable-state-transitions`. Нужен живой аккаунт, реальные сессии,
 iOS/Android или замер на устройстве; код к ним готов или проверен частично.
 
@@ -408,3 +408,4 @@ iOS/Android или замер на устройстве; код к ним гот
 | 13.11.2026 | техдолг | `back-stack-integrity` доведён: настройки профиля закрываются системной «назад» (раньше уводили с вкладки), `useBackClose` помечает свой шаг и не принимает чужой `popstate` за жест человека; e2e профиля на моке | `tsc` 0, eslint 0, 18 тестов, e2e 1/1, сборка 0 |
 | 13.11.2026 | техдолг | офлайн-старт проверен вживую: precache не клал в кэш вендорные чанки (`vendor-*.js`), без сети приложение замирало на заставке; теперь входной чанк разбирается на статические импорты, выборка из кэша не боится `Vary`; e2e на собранной статике | `tsc` 0, eslint 0, 14 pwa-тестов, офлайн-e2e 1/1, сборка 0 |
 | 13.11.2026 | техдолг | сверка плана: инженерные пункты закрыты; Lighthouse входа измерен (perf 98, LCP 2,3 с), лента и кабинет ждут аккаунт; офлайн-старт теперь проверяется e2e, а не только `pwa.test.ts` | документация, код не менялся |
+| 13.11.2026 | техдолг | `contrast-readability` закрыт: axe на профиле и кабинете находил подсказки на цветных подложках ниже 4.5:1; переведены на `text-tg-text/70`; дизайн-база и пиксельные эталоны обновлены после проверки диффа (только сглаживание текста и +2 px таб-бара) | `tsc` 0, eslint 0, e2e 43/43, офлайн 1/1, сборка 0 |

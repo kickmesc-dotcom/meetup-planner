@@ -719,7 +719,7 @@ export default function AdminScreen({
           >
             {tx("Открыть график смен")}
           </span>
-          <span className="shrink-0 text-xs text-tg-hint">
+          <span className="shrink-0 text-xs text-tg-text/70">
             {tx("у сотрудников")}
           </span>
         </button>
@@ -966,7 +966,7 @@ function Card({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-tg-text">{title}</div>
-        <div className="truncate text-xs text-tg-hint" title={subtitle}>
+        <div className="truncate text-xs text-tg-text/70" title={subtitle}>
           {subtitle}
         </div>
       </div>

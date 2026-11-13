@@ -319,7 +319,7 @@ export default function HrProfileScreen({
               </span>
             </div>
             {me.position && (
-              <div className="mt-1 text-xs text-tg-hint">
+              <div className="mt-1 text-xs text-tg-text/70">
                 {tx(me.position)}
               </div>
             )}
@@ -371,7 +371,7 @@ export default function HrProfileScreen({
           </div>
         )}
 
-        <p className="mt-2 text-xs text-tg-hint">{tx(ROLE_HINT[me.role])}</p>
+        <p className="mt-2 text-xs text-tg-text/70">{tx(ROLE_HINT[me.role])}</p>
 
         {/* Видимость профиля — рядом с «кто я», а не в глубине настроек: именно
             здесь человек отвечает на вопрос «что обо мне видят коллеги». */}
@@ -449,7 +449,7 @@ export default function HrProfileScreen({
             <Icon name="admin" size={16} className="text-tg-hint" />
             <span className="min-w-0 flex-1">
               {tx("Настройка организации")}
-              <span className="block text-2xs text-tg-hint">
+              <span className="block text-2xs text-tg-text/70">
                 {tx("Разделы, подразделения и кто что видит")}
               </span>
             </span>
@@ -471,7 +471,7 @@ export default function HrProfileScreen({
           <Icon name="settings" size={16} className="text-tg-hint" />
           <span className="min-w-0 flex-1">
             {tx("Настройки")}
-            <span className="block text-2xs text-tg-hint">
+            <span className="block text-2xs text-tg-text/70">
               {tx("Имя, публичность, уведомления, язык и оплата")}
             </span>
           </span>
