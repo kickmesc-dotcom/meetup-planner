@@ -128,7 +128,9 @@ RUM-событие — в сводке «Скорость у людей»; оф�
 GitHub → Settings → Branches → правило для `main`:
 
 - [ ] Require a pull request before merging.
-- [ ] Require status checks: `backend`, `frontend`, `visual`.
+- [ ] Require status checks (в списке они по отображаемым именам):
+      `Backend (pytest)`, `Frontend (types, tests, build)`,
+      `Visual regression (Linux baseline)`.
 - [ ] Require branches to be up to date.
 - [ ] Do not allow force pushes и deletions.
 
