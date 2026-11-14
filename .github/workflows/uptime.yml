@@ -23,9 +23,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: API /readyz отвечает и видит базу
+      # `/healthz` не трогает базу: Neon считает CU-часы бодрствования
+      # compute, и `SELECT 1` каждые десять минут не давал ему заснуть
+      # (docs/NEON_BUDGET.md). База проверяется отдельным шагом ниже.
+      - name: API /healthz отвечает
         run: |
           set -euo pipefail
+          body=$(curl -fsS --max-time 15 --retry 2 --retry-delay 5 \
+            https://meetup-planner-youmakemefry.waw0.amvera.tech/healthz)
+          echo "$body"
+          # 200 мало: `/readyz` отдаёт 200 и когда база «ok», и когда нет —
+          # проверяем содержимое, иначе монитор молчит при мёртвой БД.
+          echo "$body" | grep -q '"status":"ok"'
+          echo "$body" | grep -q '"db":"ok"'
+
+      # Раз в час, а не каждые десять минут: база должна успевать засыпать
+      # между проверками. Cron `*/10` даёт минуты 0, 10, 20…, поэтому «первая
+      # десятиминутка часа» и есть часовая частота.
+      - name: API /readyz видит базу (раз в час)
+        run: |
+          set -euo pipefail
+          if [ "$(date -u +%M)" -ge 10 ]; then
+            echo "не часовая проверка — пропуск"
+            exit 0
+          fi
           body=$(curl -fsS --max-time 15 --retry 2 --retry-delay 5 \
             https://meetup-planner-youmakemefry.waw0.amvera.tech/readyz)
           echo "$body"

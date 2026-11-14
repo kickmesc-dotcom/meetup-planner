@@ -230,8 +230,15 @@ SCHEDULER_LEADER_DISABLED = os.getenv("SCHEDULER_LEADER_DISABLED", "").strip().l
     "yes",
     "on",
 )
-LEADER_LEASE_TTL_SECONDS = max(30, _env_int("SCHEDULER_LEASE_TTL_SECONDS", 300))
-LEADER_RENEW_INTERVAL_SECONDS = max(10, _env_int("SCHEDULER_LEASE_RENEW_SECONDS", 60))
+# Продление лиза — самый частый запрос к базе за всё приложение: при прежних
+# значениях (TTL 300, renew 60) это 1440 обращений в сутки, и Neon с
+# scale-to-zero не успевал заснуть ни разу. Free-план считает CU-часы
+# бодрствования compute, поэтому лиз тикал прямо в квоту (80 из 100 за две
+# недели, см. docs/NEON_BUDGET.md). 600/1200 — база спит по десять минут между
+# продлениями, а при падении лидера второй контейнер подхватывает за 20 минут:
+# у нас один боевой инстанс, так что это цена простоя джоб, а не риск дублей.
+LEADER_LEASE_TTL_SECONDS = max(30, _env_int("SCHEDULER_LEASE_TTL_SECONDS", 1200))
+LEADER_RENEW_INTERVAL_SECONDS = max(10, _env_int("SCHEDULER_LEASE_RENEW_SECONDS", 600))
 
 def is_leader() -> bool:
     """Лидер ли этот инстанс (для диагностики/тестов)."""
