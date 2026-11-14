@@ -147,8 +147,10 @@ Cloudflare → Workers & Pages → `semitaskbot` → Deployments: оставит
 
 ### 6.3. Neon → Amvera Managed PostgreSQL
 
-По `docs/INFRA_CHOICE.md`: репетиция на копии, переключение `DATABASE_URL`,
-`alembic upgrade head`, проверка `/healthz` и `/readyz`, план отката.
+По `docs/INFRA_CHOICE.md`. Репетиция уже проведена — `docs/CUTOVER_REHEARSAL.md`
+(цель и откат проверены на приложении). Остаётся переключить `DATABASE_URL` на
+новую базу, догнать `alembic upgrade head`, проверить `/healthz`, `/readyz` и
+`/api/meta`, сутки не выключать Neon как точку возврата.
 
 **Пройдено, если:** один боевой хост и одна база, старый Neon выключен после
 суток стабильной работы.

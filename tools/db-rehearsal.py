@@ -26,6 +26,10 @@
                              собой (`--keep` — оставить для разбора).
   rehearse-local DIR       — то же, но в ОДНОРАЗОВОМ Postgres в Docker: боевую
                              инфраструктуру не трогаем вообще (нужен docker).
+  cutover DIR              — репетиция переезда: две одноразовые базы (цель и
+                             база отката), дамп в каждую, живое приложение
+                             поверх цели и поверх отката. Отвечает на вопрос
+                             «переезд обратим?», а не только «дамп цел?».
   check DIR --dsn DSN      — сверить восстановленную базу с дампом (для CI:
                              сервисный Postgres уже поднят, нужен только ответ
                              «совпало или нет»).
@@ -620,11 +624,14 @@ async def cmd_rehearse_local(args) -> int:
         print(f"1. Postgres {DOCKER_IMAGE} поднят на 127.0.0.1:{port}")
 
         venv = _venv_python() or sys.executable
-        print("2. Миграции на пустой базе (alembic upgrade head)")
+        # До ревизии дампа, а не до head: иначе колонки, добавленные позже,
+        # заполнятся `server_default` и сверка покажет ложное расхождение.
+        rev = dump_snap.get("revision") or "head"
+        print(f"2. Миграции на пустой базе (alembic upgrade {rev})")
         _run(
-            [venv, "-m", "alembic", "upgrade", "head"],
+            [venv, "-m", "alembic", "upgrade", rev],
             _alembic_env(scratch),
-            "alembic upgrade head",
+            f"alembic upgrade {rev}",
         )
 
         print("3. Заливка дампа")
@@ -673,6 +680,249 @@ async def cmd_check(args) -> int:
     return 1
 
 
+def _free_port() -> int:
+    import socket
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _start_pg_container(name: str, port: int) -> None:
+    """Поднять одноразовый Postgres — эмуляция целевой базы у провайдера."""
+    start = _docker(
+        "run", "-d", "--rm", "--name", name,
+        "-e", "POSTGRES_PASSWORD=rehearsal",
+        "-e", "POSTGRES_DB=rehearsal",
+        "-p", f"127.0.0.1:{port}:5432",
+        DOCKER_IMAGE,
+    )
+    if start.returncode != 0:
+        sys.exit((start.stderr or start.stdout or "docker run failed")[-800:])
+    _wait_postgres(name)
+
+
+def _local_dsn(port: int) -> str:
+    return f"postgresql+asyncpg://postgres:rehearsal@127.0.0.1:{port}/rehearsal"
+
+
+def _http_json(url: str, timeout: float = 5.0) -> tuple[int | None, dict | None]:
+    """GET и JSON, без падения на 4xx/5xx: код ответа — тоже результат."""
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as resp:
+            return resp.status, json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            return exc.code, json.loads(exc.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001 — тело может быть пустым или не JSON
+            return exc.code, None
+    except Exception:  # noqa: BLE001 — порт ещё не слушает
+        return None, None
+
+
+def _spawn_app(dsn: str, port: int) -> tuple[subprocess.Popen, str]:
+    """Настоящее приложение против конкретной базы — «пускают ли в него трафик»."""
+    import tempfile
+
+    log_path = os.path.join(tempfile.gettempdir(), f"cutover-app-{port}.log")
+    handle = open(log_path, "w", encoding="utf-8")
+    proc = subprocess.Popen(
+        [
+            _venv_python() or sys.executable,
+            "-m", "uvicorn", "app.main:app",
+            "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
+        ],
+        cwd=BACKEND,
+        env=_alembic_env(dsn),
+        stdout=handle,
+        stderr=subprocess.STDOUT,
+    )
+    return proc, log_path
+
+
+def _stop_app(proc: subprocess.Popen | None) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=20)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=10)
+
+
+def _app_probe(dsn: str, port: int, label: str) -> dict[str, Any]:
+    """Поднять приложение на базе и спросить его о готовности."""
+    proc, log_path = _spawn_app(dsn, port)
+
+    def tail() -> str:
+        try:
+            return open(log_path, encoding="utf-8").read()[-1500:]
+        except OSError:
+            return ""
+
+    try:
+        deadline = time.monotonic() + 120
+        while True:
+            if proc.poll() is not None:
+                raise SystemExit(f"✗ {label}: приложение упало.\n{tail()}")
+            status, _ = _http_json(f"http://127.0.0.1:{port}/healthz")
+            if status == 200:
+                break
+            if time.monotonic() > deadline:
+                raise SystemExit(f"✗ {label}: /healthz не ответил за 120 с.\n{tail()}")
+            time.sleep(0.5)
+
+        ready_status, ready = None, None
+        for _ in range(120):
+            ready_status, ready = _http_json(f"http://127.0.0.1:{port}/readyz")
+            if ready_status == 200:
+                break
+            time.sleep(0.5)
+        _, meta = _http_json(f"http://127.0.0.1:{port}/api/meta")
+        return {"ready_status": ready_status, "ready": ready or {}, "meta": meta or {}}
+    finally:
+        _stop_app(proc)
+
+
+async def cmd_cutover(args) -> int:
+    """Репетиция переезда: цель, данные, живое приложение, откат.
+
+    Чем отличается от `rehearse-local`. Тот отвечает на вопрос «дамп — это
+    рабочая точка отката?». Этот — на вопрос переезда: поднимется ли
+    приложение на новой базе и можно ли вернуться на прежнюю, если что-то не
+    так. Работает в двух одноразовых контейнерах: «цель» и «база отката»,
+    обе получают дамп, поверх каждой поднимается настоящее приложение.
+    """
+    dump_path = os.path.abspath(args.path)
+    if not os.path.isdir(dump_path):
+        sys.exit(f"Нет каталога дампа: {dump_path}")
+    dump_snap = dump_snapshot(dump_path)
+    print(
+        f"Дамп: {dump_snap['total_rows']} строк / {dump_snap['tables_count']} таблиц, "
+        f"ревизия {dump_snap.get('revision') or '—'}"
+    )
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    names = {
+        "target": f"ghg-cutover-target-{stamp}",
+        "rollback": f"ghg-cutover-back-{stamp}",
+    }
+    ports = {"target": _free_port(), "rollback": _free_port()}
+    started = time.monotonic()
+    timings: list[tuple[str, float]] = []
+    ok = False
+    try:
+        print("\n1. Две пустые базы: цель и база отката")
+        for key, name in names.items():
+            _start_pg_container(name, ports[key])
+            print(f"   · {key}: {DOCKER_IMAGE} на 127.0.0.1:{ports[key]}")
+        timings.append(("базы подняты", time.monotonic() - started))
+
+        # Схема накатывается ровно до ревизии дампа, а не до head: иначе
+        # колонки, добавленные позже, заполнятся `server_default`, и сверка
+        # покажет ложное расхождение (так и вышло с `organizations.media_key`
+        # из 0075). Миграции после restore — следующий шаг.
+        rev = dump_snap.get("revision") or "head"
+        print(f"\n2. Схема на ревизию дампа ({rev}) и данные: alembic upgrade {rev} → restore")
+        venv = _venv_python() or sys.executable
+        for key in ("target", "rollback"):
+            dsn = _local_dsn(ports[key])
+            _run(
+                [venv, "-m", "alembic", "upgrade", rev],
+                _alembic_env(dsn),
+                f"{key}: alembic upgrade {rev}",
+            )
+            _run(
+                [sys.executable, os.path.join(HERE, "backup-db.py"), "restore", dump_path, "--yes"],
+                _alembic_env(dsn),
+                f"{key}: restore дампа",
+            )
+
+        print("\n3. Сверка целевой базы с дампом (до догона миграций)")
+        conn = await connect(_local_dsn(ports["target"]))
+        try:
+            restored = await snapshot(conn)
+        finally:
+            await conn.close()
+        bad = compare(dump_snap, restored)
+        if bad:
+            raise SystemExit(f"✗ Данные цели не совпали с дампом: расхождений {bad}")
+        print(f"   ✅ {restored['total_rows']} строк / {restored['tables_count']} таблиц совпало")
+        timings.append(("данные залиты и сверены", time.monotonic() - started))
+
+        # Дамп помнит ревизию на момент снятия, поэтому после restore база
+        # откатывается на неё. Новый код не должен получить старую схему —
+        # догоняем миграции до head.
+        print("\n4. Догон миграций до head в обеих базах")
+        for key in ("target", "rollback"):
+            _run(
+                [venv, "-m", "alembic", "upgrade", "head"],
+                _alembic_env(_local_dsn(ports[key])),
+                f"{key}: alembic upgrade head",
+            )
+        timings.append(("схема догнана до head", time.monotonic() - started))
+
+        print("\n5. Приложение против ЦЕЛИ")
+        target_port = _free_port()
+        target = _app_probe(_local_dsn(ports["target"]), target_port, "цель")
+        head = (target["meta"].get("code") or {}).get("alembic_head")
+        db_rev = (target["meta"].get("db") or {}).get("alembic_version")
+        target_ok = (
+            target["ready_status"] == 200
+            and target["ready"].get("db") == "ok"
+            and bool(head)
+            and db_rev == head
+        )
+        print(
+            f"   /healthz 200, /readyz {target['ready_status']} db={target['ready'].get('db')} "
+            f"({target['ready'].get('ms')} мс), миграции {db_rev} / head {head}"
+        )
+        timings.append(("приложение работает на цели", time.monotonic() - started))
+
+        print("\n6. Откат: приложение против БАЗЫ ОТКАТА")
+        rollback_port = _free_port()
+        rollback = _app_probe(_local_dsn(ports["rollback"]), rollback_port, "откат")
+        rollback_ok = (
+            rollback["ready_status"] == 200
+            and rollback["ready"].get("db") == "ok"
+            and (rollback["meta"].get("db") or {}).get("alembic_version") == head
+        )
+        print(
+            f"   /healthz 200, /readyz {rollback['ready_status']} db={rollback['ready'].get('db')} "
+            f"({rollback['ready'].get('ms')} мс)"
+        )
+        timings.append(("откат проверен", time.monotonic() - started))
+
+        ok = target_ok and rollback_ok
+        print()
+        if ok:
+            print("✅ ПЕРЕЕЗД ОБРАТИМ")
+            print(
+                "   Цель приняла данные и подняла приложение; "
+                "возврат на прежнюю базу тоже работает."
+            )
+        else:
+            print("⚠️ ПЕРЕЕЗД НЕ ПОДТВЕРЖДЁН")
+            if not target_ok:
+                print("   · цель: приложение не вышло в готовность или версия схемы не head")
+            if not rollback_ok:
+                print("   · откат: приложение не вышло в готовность")
+    finally:
+        for name in names.values():
+            _docker("rm", "-f", name)
+        print("\n7. Одноразовые базы удалены")
+        print("   время по шагам:")
+        for label, seconds in timings:
+            print(f"   · {label:<32} {seconds:6.1f} с")
+        print(f"   · {'всего':<32} {time.monotonic() - started:6.1f} с")
+    return 0 if ok else 1
+
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="db-rehearsal.py", description=__doc__,
@@ -704,13 +954,19 @@ def main() -> int:
     p_local.add_argument("path", help="каталог дампа (backups/<штамп>)")
     p_local.set_defaults(func=cmd_rehearse_local)
 
+    p_cut = sub.add_parser(
+        "cutover", help="репетиция переезда: цель и откат под живым приложением (docker)"
+    )
+    p_cut.add_argument("path", help="каталог дампа (backups/<штамп>)")
+    p_cut.set_defaults(func=cmd_cutover)
+
     p_check = sub.add_parser("check", help="сверить базу по DSN с дампом")
     p_check.add_argument("path")
     p_check.add_argument("--dsn", required=True)
     p_check.set_defaults(func=cmd_check)
 
     args = parser.parse_args()
-    if args.cmd in {"info", "snapshot", "rehearse", "rehearse-local", "check"}:
+    if args.cmd in {"info", "snapshot", "rehearse", "rehearse-local", "check", "cutover"}:
         _ensure_asyncpg()
         return asyncio.run(args.func(args))
     return args.func(args)
