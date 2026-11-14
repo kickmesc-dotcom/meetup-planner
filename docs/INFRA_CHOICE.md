@@ -272,12 +272,16 @@ VPN, гонять его через российскую инфраструкт�
       остановлен; **остановить HF Space** (после шага 6, чтобы был запас).
 - [ ] **1. Создать Managed PostgreSQL** в Amvera: регион **Warsaw-0** (тот же,
       что у приложения), тариф «Начальный», диск 1 ГБ. Записать DSN.
-- [ ] **2. Снять дамп боевой базы:**
-      `pg_dump --no-owner --no-acl --format=custom "$DATABASE_URL" > meetup-$(date +%F).dump`
-      Размер должен быть того же порядка, что 15 МБ.
-- [ ] **3. Восстановить:** `pg_restore --no-owner --no-acl -d <amvera-dsn> meetup-….dump`
-- [ ] **4. Миграции и сверка:** `alembic upgrade head` на новой базе; head должен
-      быть `0063_translation_cache` — тот же, что в коде.
+- [ ] **2. Снять дамп боевой базы:** `tools/backup-db.py dump` (на машине нет
+      `pg_dump`, и он не нужен: дамп — логический JSONL, версионно-независимый).
+      Проверить: `tools/backup-db.py verify backups/<штамп>`.
+- [ ] **3. Восстановить:** `tools/backup-db.py restore backups/<штамп> --yes`
+      с `DATABASE_URL` целевой базы. Сверить: `tools/db-rehearsal.py check`.
+- [ ] **4. Миграции и сверка:** схема доводится до ревизии дампа, данные
+      заливаются, затем `alembic upgrade head` — порядок важен, иначе новые
+      колонки заполнятся `server_default` раньше данных. Актуальный head — в
+      `/api/meta` → `code.alembic_head` (не хардкодить номер).
+      Пошагово — `docs/CUTOVER_RUNBOOK.md`.
 - [ ] **5. Переключить `DATABASE_URL`** в переменных Amvera (`meetup-planner`),
       при падении подключения — `DB_SSL=disable` (см. `DB_CHOICE.md` §5: SSL
       раньше включался безусловно, теперь режим явный).
