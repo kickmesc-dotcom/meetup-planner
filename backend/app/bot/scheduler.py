@@ -1051,6 +1051,14 @@ def start_scheduler(bot: Bot) -> AsyncIOScheduler:
     # аварийно пересобирает планировщик — чтобы зависшая задача не блокировала
     # запуск следующей. В простое это один дешёвый проход по словарю в памяти.
     async def _watchdog_tick(*, bot: Bot) -> None:
+        # Тот же тихий час, что у тиков напоминаний и сроков. Без него watchdog
+        # единственный продолжал ходить в базу каждые пять минут всю ночь —
+        # 288 пробуждений, больше, чем у всех прореженных задач вместе, — и
+        # экономия quiet_hours не наступала. Зависшая задача ночью не требует
+        # пересбора в ту же минуту; первый запуск в окне всё равно проходит.
+        if not quiet_hours.should_run(JOB_WATCHDOG, tz=settings.scheduler_tz):
+            log.info("scheduler.job_throttled_quiet", job_id=JOB_WATCHDOG)
+            return
         # Пересбор планировщика запускаем ОТДЕЛЬНОЙ задачей: сам watchdog крутится
         # в нём же, и shutdown изнутри job'а отменил бы текущую корутину.
         stale = await collapse_stale_jobs(None)

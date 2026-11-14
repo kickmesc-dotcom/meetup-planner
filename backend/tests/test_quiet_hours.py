@@ -91,3 +91,22 @@ def test_morning_resume_after_quiet_night():
     morning = at(7, 0) + next_day
     assert quiet_hours.should_run("hr_tasks", now=morning) is True
     assert quiet_hours.should_run("hr_tasks", now=morning + timedelta(minutes=1)) is True
+
+
+def test_watchdog_tick_is_gated_by_quiet_hours():
+    """Сторож планировщика не должен быть исключением из тихого часа.
+
+    Проверка по исходнику, а не вызовом: `_watchdog_tick` объявлена внутри
+    `build_scheduler` и требует живого `Bot`. Нам важно ровно одно — что гейт
+    стоит первой строкой тела, а не «где-то рядом»: без него тик каждые 5
+    минут будил базу всю ночь и обесценивал прореживание остальных задач.
+    """
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "app" / "bot" / "scheduler.py").read_text(
+        encoding="utf-8"
+    )
+    body = src.split("async def _watchdog_tick", 1)[1].split("sched.add_job", 1)[0]
+    head = "\n".join(body.splitlines()[:12])
+    assert "quiet_hours.should_run(JOB_WATCHDOG" in head
+    assert "return" in head
