@@ -122,8 +122,8 @@ $19/мес, точную сумму показывает консоль при �
 curl -s https://meetup-planner-youmakemefry.waw0.amvera.tech/api/meta   | python -c "import sys,json;print(json.load(sys.stdin)['scheduler'].get('lease'))"
 ```
 
-В проде до рестарта поля `lease` нет вовсе (проверено 13.11.2026: ключи
-только `leader`, `quiet_hours`, `running`). После рестарта должно быть
+В проде до пересборки поля `lease` нет вовсе (проверено 13.11.2026: ключи
+только `leader`, `quiet_hours`, `running`). Пошагово — `docs/RESTART_AFTER_CHANGE.md`. После рестарта должно быть
 `{'ttl_seconds': 1200, 'renew_seconds': 600}` — это и есть подтверждение, что
 редкое продление включилось.
 
