@@ -296,3 +296,22 @@ def test_net_diag_hidden_without_token(monkeypatch):
             "regex_rejected": False,
         }
     assert get_settings  # noqa: B018 — импорт проверяет, что конфиг на месте
+
+
+def test_scheduler_state_exposes_lease_and_keeps_it_sane():
+    """Лиз планировщика должен быть виден снаружи и не истекать раньше продления.
+
+    Зачем в `/api/meta`. Продление лиза — самый частый запрос к базе, и именно
+    он держал Neon бодрствующим круглосуточно (docs/NEON_BUDGET.md §6). После
+    выкладки нужно одним запросом убедиться, что новый интервал в проде, а не
+    «наверное, применилось». Инвариант renew < ttl проверяем здесь же: если
+    продление станет реже срока жизни, два контейнера одновременно решат, что
+    они лидеры.
+    """
+    state = routes_meta._scheduler_state()
+    assert "error" not in state, state
+    lease = state["lease"]
+    assert lease["renew_seconds"] < lease["ttl_seconds"]
+    # Порог из docs/NEON_BUDGET.md: чаще раза в 5 минут продлевать нельзя,
+    # иначе Neon не успевает заснуть между продлениями.
+    assert lease["renew_seconds"] >= 300

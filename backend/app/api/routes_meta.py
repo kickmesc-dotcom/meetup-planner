@@ -615,13 +615,25 @@ def _scheduler_state() -> dict[str, Any]:
     окно прореживания, чтобы было видно, что оно вообще применилось.
     """
     try:
-        from app.bot.scheduler import get_scheduler, is_leader
+        from app.bot.scheduler import (
+            LEADER_LEASE_TTL_SECONDS,
+            LEADER_RENEW_INTERVAL_SECONDS,
+            get_scheduler,
+            is_leader,
+        )
         from app.services import quiet_hours
 
         start, end, tick = quiet_hours.quiet_window()
         return {
             "running": bool(get_scheduler().running),
             "leader": is_leader(),
+            # Видно снаружи, применён ли на контейнере код с редким продлением
+            # лиза: это главный параметр, который держал базу Neon бодрствующей
+            # (docs/NEON_BUDGET.md §6). Не секрет — просто числа.
+            "lease": {
+                "ttl_seconds": LEADER_LEASE_TTL_SECONDS,
+                "renew_seconds": LEADER_RENEW_INTERVAL_SECONDS,
+            },
             "quiet_hours": {
                 "start": start,
                 "end": end,

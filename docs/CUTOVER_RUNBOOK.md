@@ -99,6 +99,7 @@ advisory-lock, поэтому ручной `alembic upgrade` здесь — ст
 | Чек-лист | «Смена» → отметить пункт | сохраняется |
 | Бот | `getWebhookInfo` в Telegram | `pending_update_count: 0`, ошибок нет |
 | Фоновые задачи | логи Amvera | строки `scheduler.job_fired` |
+| Планировщик | `curl .../api/meta` → `scheduler.lease` | `renew_seconds` 600, `ttl_seconds` 1200 |
 
 Главная проверка переезда — **время `/readyz`**: было ~577 мс до Neon, база рядом
 с приложением должна отвечать в разы быстрее. Если цифра не упала, база не там,
