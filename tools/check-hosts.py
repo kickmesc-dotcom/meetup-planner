@@ -35,12 +35,17 @@ try:
 except Exception:  # noqa: BLE001 — печать не имеет права ронять диагностику
     pass
 
-# Боевой хост один: FastAPI на Hugging Face Space (cpu-basic, бесплатно),
-# Cloudflare держит фронт (Pages) и R2. Amvera из проекта убрана — её адрес
-# больше не проверяем, иначе «расхождение» показывал бы выключенный хост.
+# Боевой хост один: FastAPI на Amvera (Warsaw-0), Cloudflare держит фронт
+# (Pages). Обратное было верно до 30.10.2026: тогда боевым был HF Space, а
+# Amvera — нет, и комментарий здесь отставал от жизни, из-за чего скрипт
+# проверял мёртвый хост и не проверял живой.
 HOSTS: dict[str, str] = {
-    "hf (боевой)": "https://fryesw-meetup-planner-backend.hf.space",
+    "amvera (боевой)": "https://meetup-planner-youmakemefry.waw0.amvera.tech",
+    "hf (выведен, необязателен)": "https://fryesw-meetup-planner-backend.hf.space",
 }
+# Недоступность выведенного хоста — ожидаемое состояние, а не расхождение
+# сборок: иначе «1 хост с расхождением» горит всегда и привыкают игнорировать.
+OPTIONAL_HOSTS = {"hf (выведен, необязателен)"}
 
 TIMEOUT = 30
 
@@ -167,11 +172,15 @@ def main() -> int:
     print(f"  возможностей: {len(local_features)}")
 
     drifted = 0
+    stale = 0
     for name, base in HOSTS.items():
         print(f"\n=== {name} — {base} ===")
         status, body = _fetch_json(f"{base}/api/meta")
 
         if body is None:
+            if name in OPTIONAL_HOSTS:
+                print(f"  /api/meta -> HTTP {status}: хост выведен из эксплуатации — не ошибка")
+                continue
             paths = _path_count(base)
             drifted += 1
             print(f"  /api/meta -> HTTP {status}: сборка СТАРШЕ, чем появление /api/meta")
@@ -210,9 +219,25 @@ def main() -> int:
                   f" · credentials {cors.get('credentials')}")
             print(f"            регулярка {state}")
         print(f"  возможностей: {len(features)}")
+        # Отпечаток кода не меняется от правок в самих ответах: добавление поля
+        # в `/api/meta` не трогает набор роутов. Поэтому «применён ли код,
+        # экономящий квоту Neon» видно только по полю лиза — `lease` появился
+        # вместе с редким продлением (docs/NEON_BUDGET.md §6).
+        lease = (body.get("scheduler") or {}).get("lease")
+        if lease:
+            print(f"  лидер-лиз:  продление {lease.get('renew_seconds')} с"
+                  f" · TTL {lease.get('ttl_seconds')} с — экономный режим включён")
+        else:
+            print("  лидер-лиз:  поля нет — образ старше правки (продление раз в минуту)")
 
-        if same:
-            print("  вердикт: АКТУАЛЕН (отпечаток совпадает с локальным)")
+        if same and lease:
+            print("  вердикт: АКТУАЛЕН (отпечаток совпадает, экономный режим включён)")
+        elif same:
+            # Роуты те же, но поля лиза нет: сборка старше правки `/api/meta`.
+            # Это не «расхождение сборок» по отпечатку, однако и не актуально —
+            # без пересборки экономия квоты Neon на хосте не действует.
+            print("  вердикт: роуты совпадают, но образ старше правки /api/meta — пересобрать")
+            stale += 1
         else:
             drifted += 1
             missing = sorted(set(local_features) - set(features))
@@ -233,7 +258,12 @@ def main() -> int:
 
     print()
     print("=== ИТОГ ===")
-    print("  всё актуально" if drifted == 0 else f"  хостов с расхождением: {drifted}")
+    if drifted:
+        print(f"  хостов с расхождением сборок: {drifted}")
+    if stale:
+        print(f"  хостов без экономного режима (старый /api/meta): {stale} — нужна пересборка")
+    if not drifted and not stale:
+        print("  всё актуально")
     return 0
 
 
