@@ -1161,7 +1161,12 @@ class IssueEvent(OrgScoped, Base):
     __tablename__ = "hr_issue_events"
     __table_args__ = (Index("ix_hr_issue_events_issue", "issue_id", "at"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # `with_variant(Integer, "sqlite")` — как у остальных таблиц проекта:
+    # SQLite не делает BIGINT первичным ключом с автоинкрементом, и без этого
+    # запись события падает в тестах на SQLite.
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
     issue_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("hr_issues.id", ondelete="CASCADE"), nullable=False
     )

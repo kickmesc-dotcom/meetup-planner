@@ -35,6 +35,10 @@ KIND_CHECKLIST_DONE = "checklist_done"
 # Журнал операционных проблем (не поручения): тихое уведомление в колокольчик.
 KIND_ISSUE_CREATED = "issue_created"
 KIND_ISSUE_ASSIGNED = "issue_assigned"
+# Проблема стоит без движения: сначала напоминание назначенному, потом
+# руководителю. Два вида, а не один: в колокольчике важно, кому и зачем.
+KIND_ISSUE_STALE = "issue_stale"
+KIND_ISSUE_ESCALATED = "issue_escalated"
 # Передача смены: отправлена / принята / возвращена.
 KIND_HANDOVER_SENT = "handover_sent"
 KIND_HANDOVER_ACCEPTED = "handover_accepted"
@@ -185,6 +189,26 @@ def issue_created_text(issue: Issue, *, by_name: str | None = None) -> str:
 
 def issue_assigned_text(issue: Issue) -> str:
     return f"🛠 Тебе передали проблему {issue_short(issue)} — посмотри в журнале."
+
+
+def issue_stale_text(issue: Issue, hours: int) -> str:
+    """Напоминание назначенному: без обвинений, только факт и число.
+
+    «Ты забыл» — это упрёк, который не помогает решить проблему. Формулировка
+    говорит, что карточка стоит, и оставляет человеку выбор: взяться или
+    передать дальше.
+    """
+    return (
+        f"⏳ Проблема {issue_short(issue)} висит {hours} ч без движения. "
+        "Возьми в работу или передай тому, кто может."
+    )
+
+
+def issue_escalated_text(issue: Issue, hours: int) -> str:
+    return (
+        f"🚨 Проблема {issue_short(issue)} без движения {hours} ч: "
+        "напоминание уже было, ответа нет — нужен руководитель."
+    )
 
 
 async def notify_issue_created(

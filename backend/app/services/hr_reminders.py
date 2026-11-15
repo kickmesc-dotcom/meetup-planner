@@ -1094,6 +1094,7 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
     escalated_second = 0
     purged = 0
     shift_start = 0
+    issues_escalated = 0
     try:
         async with sm() as session:
             # Корзина уволенных: через 30 дней данные сносим сами, чтобы
@@ -1125,15 +1126,31 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
                 escalated_second = len(
                     await escalate_to_admins(session, bot=bot, now=now)
                 )
+                # Проблемы журнала живут по тому же тумблеру эскалаций: если
+                # руководитель выключил автоэскалацию, она не должна приходить
+                # с другой стороны через журнал.
+                from app.services import hr_issue_escalation
+
+                issues_escalated = await hr_issue_escalation.run(session, now=now)
+                # Маркеры и уведомления — часть одной транзакции тика.
+                await session.commit()
     except Exception as exc:  # noqa: BLE001 — job не имеет права падать
         log.warning("hr.tick_failed", error=str(exc))
-    if reminders or escalated or escalated_second or shift_start or purged:
+    if (
+        reminders
+        or escalated
+        or escalated_second
+        or shift_start
+        or purged
+        or issues_escalated
+    ):
         log.info(
             "hr.tick_done",
             reminders=reminders,
             escalated=escalated,
             escalated_second=escalated_second,
             shift_start=shift_start,
+            issues_escalated=issues_escalated,
             purged=purged,
         )
     return {
@@ -1141,5 +1158,6 @@ async def run_hr_tick(*, bot=None, now: datetime | None = None) -> dict:  # noqa
         "escalated": escalated,
         "escalated_second": escalated_second,
         "shift_start": shift_start,
+        "issues_escalated": issues_escalated,
         "purged": purged,
     }
