@@ -62,6 +62,12 @@ jobs:
       - name: Live e2e
         run: npm run test:e2e:live
 
+      # Отдельный конфиг: service worker живёт только в production-сборке, и
+      # проверяется он именно на CDN, а не на локальном preview. Здесь видно
+      # расхождение «локально офлайн работает, в проде — нет».
+      - name: Live offline start
+        run: npm run test:e2e:offline
+
       # Трейсы и скриншоты падений без артефакта живут только в логе, а лог
       # приватного репозитория без доступа не читается.
       - name: Upload traces

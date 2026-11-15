@@ -27,12 +27,18 @@
  * Обновление: при изменении этого файла браузер ставит новый SW, `activate`
  * чистит кеши прошлых версий. Версию поднимать руками при правке списка SHELL.
  */
+// v6: `index.html` ищется с `ignoreVary`. На CDN ответ приходит с `Vary`
+// (`Accept-Encoding`), и `match` без него не находил собственную запись:
+// precache молча выходил, кеш ассетов оставался пустым, и первый офлайн-старт
+// после визита на прод давал белый экран. Локальный preview этого не показывал —
+// там заголовки другие. Та же ошибка была в `networkFirst`.
+//
 // v5: офлайн-старт кеширует вендорные чанки из статических импортов входа.
 // До этого в кеше лежал только основной бандл, а `vendor-*.js` запрашивались
 // из сети — без неё приложение оставалось на заставке.
 // Версия меняет имена кешей, иначе у установленных приложений остался бы
 // старый неполный набор файлов и старый обработчик клика по уведомлению.
-const VERSION = "v5";
+const VERSION = "v6";
 const SHELL_CACHE = `semi-shell-${VERSION}`;
 const ASSET_CACHE = `semi-assets-${VERSION}`;
 
@@ -65,7 +71,10 @@ self.addEventListener("install", (event) => {
  */
 async function precacheBuild(shell) {
   try {
-    const page = await shell.match("/index.html");
+    // `ignoreVary` обязателен по той же причине, что и для статики ниже: на
+    // CDN ответ несёт `Vary: Accept-Encoding`, и без флага match не находит
+    // запись, которую сам же положил `addAll`.
+    const page = await shell.match("/index.html", { ignoreVary: true });
     if (!page) return;
     const html = await page.text();
     const paths = new Set();
@@ -243,7 +252,7 @@ async function networkFirst(request) {
     }
     return response;
   } catch {
-    const cached = await cache.match("/index.html");
+    const cached = await cache.match("/index.html", { ignoreVary: true });
     if (cached) return cached;
     return new Response(
       "Нет сети, а оболочка ещё не сохранена. Открой приложение один раз с интернетом.",
