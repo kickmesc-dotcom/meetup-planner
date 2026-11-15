@@ -29,6 +29,9 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { currentIntlLocale, intlLocaleFor, tx, useTx, type Locale } from "@/i18n";
 import { useUI } from "@/store/ui";
 import QuickTaskSheet from "@/features/hr/QuickTaskSheet";
+import { showToast } from "@/components/toast";
+import { enqueueAction, isRetryable } from "@/offline/actionQueue";
+import { useOfflineActions } from "@/offline/useOfflineActions";
 import TranslatableText from "@/components/TranslatableText";
 
 /**
@@ -174,11 +177,33 @@ export default function MyTasksScreen() {
     void qc.invalidateQueries({ queryKey: ["hr-feed"] });
   };
 
+  // Отметка без сети не теряется: она ждёт в очереди до события `online`.
+  // Промежуточные статусы схлопываются — важно последнее действие.
+  const offline = useOfflineActions((result) => {
+    invalidate();
+    if (result.dropped > 0) {
+      void showAlert(
+        tx("Сервер не принял часть отметок — проверь список поручений."),
+      );
+    }
+  });
+
   const action = useMutation({
-    mutationFn: ({ id, act }: { id: number; act: TaskAction }) =>
-      runTaskAction(id, act),
-    onSuccess: () => {
+    mutationFn: async ({ id, act }: { id: number; act: TaskAction }) => {
+      try {
+        return await runTaskAction(id, act);
+      } catch (error) {
+        if (!isRetryable(error)) throw error;
+        enqueueAction({ kind: "task", id, action: act });
+        return null;
+      }
+    },
+    onSuccess: (saved) => {
       haptic("light");
+      if (saved === null) {
+        showToast(tx("Нет связи — отметка отправится сама, как только она появится."));
+        return;
+      }
       invalidate();
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
@@ -456,6 +481,12 @@ export default function MyTasksScreen() {
                     : tx("Начать смену")
                   : tx("Открыть чек-лист")}
             </button>
+          </div>
+        )}
+
+        {offline.pending > 0 && (
+          <div className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-2xs text-tg-hint">
+            {tx("Ждут отправки: {count}", { count: offline.pending })}
           </div>
         )}
 

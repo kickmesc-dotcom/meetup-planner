@@ -26,6 +26,8 @@ import Icon from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
 import ScrollTopButton from "@/components/ScrollTopButton";
 import { useScrollRestore } from "@/lib/useScrollRestore";
+import { enqueueAction, isRetryable } from "@/offline/actionQueue";
+import { useOfflineActions } from "@/offline/useOfflineActions";
 import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
@@ -538,9 +540,33 @@ function IssueSheet({
     void qc.invalidateQueries({ queryKey: ["hr-issues"] });
   };
 
+  // Статус без сети ждёт отправки. Политика та же, что у поручений: сервер —
+  // источник истины, а 4xx снимает запись, чтобы она не висела вечно.
+  useOfflineActions((result) => {
+    void qc.invalidateQueries({ queryKey: ["hr-issues"] });
+    if (result.dropped > 0) {
+      void showAlert(tx("Сервер не принял смену статуса — проверь карточку."));
+    }
+  });
+
   const statusM = useMutation({
-    mutationFn: (next: IssueStatus) => setIssueStatus(issueId, next),
-    onSuccess: apply,
+    mutationFn: async (next: IssueStatus) => {
+      try {
+        return await setIssueStatus(issueId, next);
+      } catch (error) {
+        if (!isRetryable(error)) throw error;
+        enqueueAction({ kind: "issue", id: issueId, status: next });
+        return null;
+      }
+    },
+    onSuccess: (updated) => {
+      if (updated) {
+        apply(updated);
+        return;
+      }
+      haptic("light");
+      void showAlert(tx("Нет связи — статус отправится сам, как только она появится."));
+    },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });
   const commentM = useMutation({

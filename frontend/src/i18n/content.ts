@@ -503,6 +503,15 @@ export const EN_CONTENT: Record<string, string> = {
   "Смен за неделю: {count}": "Shifts this week: {count}",
   "Не назначен": "Not assigned",
   "внимание": "attention",
+  "Ждут отправки: {count}": "Waiting to send: {count}",
+  "Нет связи — отметка отправится сама, как только она появится.":
+    "No connection — the mark will be sent as soon as it is back.",
+  "Сервер не принял часть отметок — проверь список поручений.":
+    "The server rejected some marks — check your task list.",
+  "Нет связи — статус отправится сам, как только она появится.":
+    "No connection — the status will be sent as soon as it is back.",
+  "Сервер не принял смену статуса — проверь карточку.":
+    "The server rejected the status change — check the card.",
   "{count} в смене": "{count} on shift",
   "до {time}": "until {time}",
   "Назначили проблему или просрочили поручение — push на телефон":
