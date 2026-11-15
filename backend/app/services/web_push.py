@@ -60,6 +60,14 @@ MIN_REPEAT = timedelta(minutes=30)
 # максимум один лишний push — дешевле, чем запись в базу на каждую отправку.
 _RECENT: dict[tuple[int, str], datetime] = {}
 
+# Потолок событийных push. Событие — это «назначили» или «просрочили»: если за
+# смену человек получил три таких, четвёртое уже не информация, а звонок в
+# кармане посреди зала. Окно — рабочая смена, а не сутки: смена длиннее любого
+# разумного интервала, а вторая смена начнёт с чистого листа.
+EVENT_WINDOW = timedelta(hours=12)
+EVENT_LIMIT = 3
+_EVENTS: dict[int, list[datetime]] = {}
+
 
 def _allow(user_id: int, tag: str | None, moment: datetime) -> bool:
     """Не слали ли этому человеку то же самое только что."""
@@ -79,9 +87,36 @@ def _allow(user_id: int, tag: str | None, moment: datetime) -> bool:
     return True
 
 
+def allow_event(user_id: int, moment: datetime | None = None) -> bool:
+    """Можно ли этому человеку ещё одно событийное push.
+
+    Считаем не по подпискам, а по людям: у одного человека может быть телефон
+    и ноутбук, и второй push за то же событие — это дубль, а не охват.
+    """
+    uid = int(user_id)
+    at = moment or datetime.now(UTC)
+    recent = [sent for sent in _EVENTS.get(uid, []) if at - sent < EVENT_WINDOW]
+    if len(recent) >= EVENT_LIMIT:
+        _EVENTS[uid] = recent
+        log.info("push.event_capped", user=uid, limit=EVENT_LIMIT)
+        return False
+    recent.append(at)
+    _EVENTS[uid] = recent
+    if len(_EVENTS) > 2000:
+        cutoff = at - EVENT_WINDOW
+        for old, sent in list(_EVENTS.items()):
+            kept = [t for t in sent if t >= cutoff]
+            if kept:
+                _EVENTS[old] = kept
+            else:
+                del _EVENTS[old]
+    return True
+
+
 def reset_state() -> None:
-    """Сбросить память частоты (тесты и диагностика)."""
+    """Сбросить память частоты и потолка (тесты и диагностика)."""
     _RECENT.clear()
+    _EVENTS.clear()
 
 
 def enabled() -> bool:
@@ -231,6 +266,7 @@ async def send(
     tag: str | None = None,
     respect_quiet: bool = True,
     now: datetime | None = None,
+    event: bool = False,
 ) -> int:
     """Разослать уведомление. Возвращает число доставленных.
 
@@ -255,6 +291,16 @@ async def send(
     subscriptions = [
         sub for sub in subscriptions if _allow(int(sub.user_id), tag, moment)
     ]
+    if event:
+        # Потолок — до отправки, по людям, а не по устройствам.
+        allowed_users = {
+            uid
+            for uid in {int(sub.user_id) for sub in subscriptions}
+            if allow_event(uid, moment)
+        }
+        subscriptions = [
+            sub for sub in subscriptions if int(sub.user_id) in allowed_users
+        ]
     if not subscriptions:
         return 0
     payload = PushPayload(title=title, body=body, url=url, tag=tag).as_json()

@@ -53,6 +53,17 @@ BATCH_LIMIT = 200
 
 # Заголовки push по типу события. Короткие: заголовок уведомления обрезается
 # на телефоне раньше, чем название поручения в теле.
+# Какие push считаются событийными: на них действует личный выключатель
+# `events` и потолок в `web_push`. Дайджест и смена сюда не входят — дайджест
+# человек и так выбирает отдельно, а «смена не начата» — про действие сейчас.
+EVENT_PUSH_KINDS: frozenset[str] = frozenset(
+    {
+        hr_notify.KIND_TASK_DEADLINE,
+        hr_notify.KIND_TASK_OVERDUE,
+        hr_notify.KIND_TASK_ESCALATED,
+    }
+)
+
 PUSH_TITLES: dict[str, str] = {
     hr_notify.KIND_TASK_DEADLINE: "Срок поручения",
     hr_notify.KIND_TASK_OVERDUE: "Поручение просрочено",
@@ -414,7 +425,20 @@ async def deliver_external(
     if not recipients:
         return
     subs: list = []
+    event = kind in EVENT_PUSH_KINDS
     try:
+        if event:
+            # Выключатель: «события» включены по умолчанию, но человек мог
+            # их отключить. Письма ниже это не касается: там своё правило.
+            from app.services import notify_prefs
+
+            allowed = await notify_prefs.allowed_users(
+                session,
+                org_id=int(recipients[0].org_id),
+                kind="events",
+                user_ids=[int(e.user_id) for e in recipients],
+            )
+            recipients = [e for e in recipients if int(e.user_id) in allowed]
         subs = await web_push.subscriptions_for(
             session, [e.user_id for e in recipients]
         )
@@ -435,6 +459,7 @@ async def deliver_external(
                 body=_push_body(text),
                 url=target,
                 tag=f"{kind}:{task_id}" if task_id else kind,
+                event=event,
             )
     except Exception as exc:  # noqa: BLE001 — push не роняет тик
         log.warning("hr.push_failed", kind=kind, error=exc.__class__.__name__)

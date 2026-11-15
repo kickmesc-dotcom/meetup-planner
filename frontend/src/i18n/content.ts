@@ -475,6 +475,8 @@ export const EN_CONTENT: Record<string, string> = {
   "Что уйдёт в сдачу — поручений {tasks}, проблем {issues}, гостей {guests}":
     "What goes into the handover — tasks {tasks}, issues {issues}, guests {guests}",
   "Гости": "Guests",
+  "Назначили проблему или просрочили поручение — push на телефон":
+    "An issue assigned to you or a task gone overdue — a push to your phone",
   "Собираю открытые пункты…": "Collecting open items…",
   "Открытых пунктов нет — передашь только заметку.": "No open items — only the note will be passed on.",
   "Заметка следующему (необязательно)": "Note for the next person (optional)",

@@ -34,11 +34,18 @@ from app.db.org_models import NotifyPref
 # 04.11.2026 к сводке добавились напоминания о сроке и эскалации: правило
 # владельца — «любое автоматическое сообщение в личку только по явному
 # выбору» — не может действовать для одного вида из трёх.
-KINDS: tuple[str, ...] = ("digest", "deadline", "escalation")
+KINDS: tuple[str, ...] = ("digest", "deadline", "escalation", "events")
 
-# Значение по умолчанию для каждого вида. Все — выключено: включение это выбор
-# человека, а не побочный эффект установки.
+# Значение по умолчанию для каждого вида. Рассылки (сводка, напоминания,
+# эскалации) выключены: включение — выбор человека, а не побочный эффект
+# установки.
+#
+# `events` — исключение и включён: это не рассылка, а адресное событие по твоим
+# же поручениям и проблеме («назначили», «просрочили»). Молчать о том, что на
+# тебя только что повесили задачу, — хуже, чем разбудить; от потока защищает
+# потолок в `web_push`, а этот тумблер — чтобы прекратить совсем.
 DEFAULTS: dict[str, bool] = {kind: False for kind in KINDS}
+DEFAULTS["events"] = True
 
 
 class NotifyPrefError(Exception):
@@ -109,6 +116,32 @@ async def snapshot(
     return result
 
 
+async def allowed_users(
+    session: AsyncSession, *, org_id: int, kind: str, user_ids: list[int]
+) -> set[int]:
+    """Кому из этих людей можно прислать вид — с учётом значения по умолчанию.
+
+    Нужен обоим режимам: для `events` (включён по умолчанию) — все, кроме тех,
+    кто явно выключил; для рассылок — только явно включившие. `subscribers`
+    этого не умеет: он видит только строки «включено».
+    """
+    code = _check_kind(kind)
+    wanted = {int(uid) for uid in user_ids}
+    if not wanted:
+        return set()
+    rows = await session.execute(
+        select(NotifyPref.user_id, NotifyPref.enabled).where(
+            NotifyPref.org_id == org_id,
+            NotifyPref.kind == code,
+            NotifyPref.user_id.in_(wanted),
+        )
+    )
+    stated = {int(uid): bool(flag) for uid, flag in rows.all()}
+    if DEFAULTS[code]:
+        return {uid for uid in wanted if stated.get(uid, True)}
+    return {uid for uid in wanted if stated.get(uid, False)}
+
+
 async def subscribers(
     session: AsyncSession, *, org_id: int, kind: str
 ) -> set[int]:
@@ -128,6 +161,7 @@ __all__ = [
     "DEFAULTS",
     "KINDS",
     "NotifyPrefError",
+    "allowed_users",
     "get",
     "set_enabled",
     "snapshot",

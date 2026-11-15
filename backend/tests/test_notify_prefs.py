@@ -87,7 +87,13 @@ async def _manager(session, org, *, user_id: int = 1, tg: int = 1001):
     return user, employee
 
 
-async def test_all_kinds_are_off_by_default(session) -> None:
+async def test_defaults_match_declared_policy(session) -> None:
+    """Расслылки выключены, событийные push — включены.
+
+    Исключение для `events` осознанное: это адресное событие по твоим же
+    поручениям, а не рассылка. Всё остальное обязано быть выключено — иначе
+    установка приложения начинает подписывать человека без его выбора.
+    """
     org = await _org(session)
     user, _ = await _manager(session, org)
 
@@ -96,11 +102,13 @@ async def test_all_kinds_are_off_by_default(session) -> None:
             await notify_prefs.get(
                 session, org_id=org.id, user_id=user.id, kind=kind
             )
-            is False
+            is notify_prefs.DEFAULTS[kind]
         )
     assert await notify_prefs.snapshot(
         session, org_id=org.id, user_id=user.id
-    ) == {kind: False for kind in notify_prefs.KINDS}
+    ) == dict(notify_prefs.DEFAULTS)
+    assert notify_prefs.DEFAULTS["events"] is True
+    assert notify_prefs.DEFAULTS["digest"] is False
 
 
 async def test_enable_is_idempotent_and_reversible(session) -> None:

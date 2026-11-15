@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
 os.environ.setdefault("BOT_TOKEN", "test-token")
@@ -31,6 +32,7 @@ from app.db.hr_models import Employee  # noqa: E402
 from app.db.models import User  # noqa: E402
 from app.db.org_models import (  # noqa: E402
     DEFAULT_ORG_ID,
+    NotifyPref,
     Organization,
     reset_org,
     set_org,
@@ -42,6 +44,7 @@ TABLES = (
     "organizations",
     "users",
     "employees",
+    "notify_prefs",
     "push_subscriptions",
 )
 
@@ -249,6 +252,75 @@ async def test_deliver_external_skips_email_for_unimportant(session, monkeypatch
         text="Новое поручение",
     )
     assert send_mail.await_count == 0
+
+
+def test_event_cap_is_three_per_person_and_window_resets() -> None:
+    """Потолок: три события на человека за окно, четвёртое — молчим.
+
+    Считаем по людям, а не по устройствам: телефон и ноутбук — один человек.
+    """
+    web_push.reset_state()
+    try:
+        moment = datetime.now(UTC)
+        assert [web_push.allow_event(7, moment) for _ in range(3)] == [True] * 3
+        assert web_push.allow_event(7, moment) is False
+        # Другой человек начинает со своего счётчика.
+        assert web_push.allow_event(8, moment) is True
+        # Следующее окно — снова можно.
+        assert web_push.allow_event(7, moment + web_push.EVENT_WINDOW + timedelta(minutes=1)) is True
+    finally:
+        web_push.reset_state()
+
+
+async def test_push_event_honours_switch(session, monkeypatch) -> None:
+    """Выключатель `events`: выключил — push не уходит, колокольчик остаётся."""
+    await _person(session)
+    employee = await session.get(Employee, 1)
+    session.add(_sub(1))
+    await session.commit()
+
+    send = AsyncMock(return_value=1)
+    monkeypatch.setattr(web_push, "send", send)
+
+    await hr_notify.push_event(
+        session, employees=[employee], title="T", body="B", tag="task_assigned:1"
+    )
+    assert send.await_count == 1
+    assert send.await_args.kwargs["event"] is True
+
+    session.add(
+        NotifyPref(org_id=DEFAULT_ORG_ID, user_id=1, kind="events", enabled=False)
+    )
+    await session.commit()
+    send.reset_mock()
+
+    await hr_notify.push_event(
+        session, employees=[employee], title="T", body="B", tag="task_assigned:2"
+    )
+    assert send.await_count == 0
+
+
+async def test_deliver_external_respects_events_switch(session, monkeypatch) -> None:
+    """Просрочка тоже уважает выключатель, а не шлёт push в обход настроек."""
+    await _person(session)
+    employee = await session.get(Employee, 1)
+    session.add(_sub(1))
+    session.add(
+        NotifyPref(org_id=DEFAULT_ORG_ID, user_id=1, kind="events", enabled=False)
+    )
+    await session.commit()
+
+    send = AsyncMock(return_value=1)
+    monkeypatch.setattr(web_push, "send", send)
+
+    await hr_reminders.deliver_external(
+        session,
+        recipients=[employee],
+        kind=hr_notify.KIND_TASK_OVERDUE,
+        text="Просрочено",
+        payload={"task_id": 5},
+    )
+    assert send.await_count == 0
 
 
 async def test_push_body_is_single_line_and_bounded() -> None:

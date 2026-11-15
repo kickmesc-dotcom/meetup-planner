@@ -10,10 +10,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.hr_models import Employee, Handover, Issue, Task, TaskIssue
 from app.services import notifications
+
+log = structlog.get_logger()
+
+# Потолок текста в push: телефон обрезает его сам и некрасиво — лучше мы.
+MAX_PUSH_BODY = 180
 
 KIND_TASK_ASSIGNED = "task_assigned"
 KIND_TASK_DEADLINE = "task_deadline"
@@ -200,13 +206,22 @@ async def notify_issue_created(
 async def notify_issue_assigned(
     session: AsyncSession, issue: Issue, recipient: Employee
 ) -> int:
-    return await notify(
+    text = issue_assigned_text(issue)
+    count = await notify(
         session,
         employees=[recipient],
         kind=KIND_ISSUE_ASSIGNED,
-        text=issue_assigned_text(issue),
+        text=text,
         payload={"issue_id": issue.id},
     )
+    await push_event(
+        session,
+        employees=[recipient],
+        title="Тебе назначили проблему",
+        body=text,
+        tag=f"issue_assigned:{issue.id}",
+    )
+    return count
 
 
 def handover_sent_text(handover: Handover, *, items: int, by_name: str) -> str:
@@ -316,6 +331,63 @@ async def notify(
     return count
 
 
+async def push_event(
+    session: AsyncSession,
+    *,
+    employees: list[Employee],
+    title: str,
+    body: str,
+    url: str = "/",
+    tag: str | None = None,
+) -> int:
+    """Событийное push: адресное действие, а не рассылка.
+
+    Три ограничителя, все обязательные:
+    * сеанс проверки и теневые профили — никогда: тест не должен будить живого
+      человека, а тень — это демо-сотрудник;
+    * выключатель `events` из `notify_prefs`: включён по умолчанию, но человек
+      может прекратить совсем;
+    * потолок в `web_push` (3 за 12 часов на человека) — от лавины назначений.
+
+    Ошибки глотаем: уведомление не имеет права сорвать создание поручения или
+    назначение проблемы — запись в базе уже сделана вызывающим.
+    """
+    from app.services import hr_simulation, notify_prefs, web_push
+
+    if hr_simulation.current() is not None:
+        return 0
+    recipients = [employee for employee in employees if not employee.is_simulation]
+    if not recipients or not web_push.enabled():
+        return 0
+    allowed = await notify_prefs.allowed_users(
+        session,
+        org_id=int(recipients[0].org_id),
+        kind="events",
+        user_ids=[int(employee.user_id) for employee in recipients],
+    )
+    targets = [e for e in recipients if int(e.user_id) in allowed]
+    if not targets:
+        return 0
+    subscriptions = await web_push.subscriptions_for(
+        session, [employee.user_id for employee in targets]
+    )
+    if not subscriptions:
+        return 0
+    try:
+        return await web_push.send(
+            session,
+            subscriptions=subscriptions,
+            title=title,
+            body=body[:MAX_PUSH_BODY],
+            url=url,
+            tag=tag,
+            event=True,
+        )
+    except Exception as exc:  # noqa: BLE001 — push не роняет создание
+        log.warning("hr.push_event_failed", error=exc.__class__.__name__)
+        return 0
+
+
 async def notify_task_assigned(
     session: AsyncSession,
     task: Task,
@@ -324,13 +396,24 @@ async def notify_task_assigned(
     from app.db.hr_models import TASK_SCOPE_DEPARTMENT
 
     text = task_assigned_text(task, via_department=task.scope == TASK_SCOPE_DEPARTMENT)
-    return await notify(
+    count = await notify(
         session,
         employees=recipients,
         kind=KIND_TASK_ASSIGNED,
         text=text,
         payload={"task_id": task.id},
     )
+    # Колокольчик человек увидит, когда откроет приложение, а задачу на него
+    # повесили сейчас. Поэтому push — здесь же, а не в отдельной джобе.
+    await push_event(
+        session,
+        employees=recipients,
+        title="Новое поручение",
+        body=text,
+        url=f"/?task={task.id}",
+        tag=f"task_assigned:{task.id}",
+    )
+    return count
 
 
 async def notify_task_submitted(
