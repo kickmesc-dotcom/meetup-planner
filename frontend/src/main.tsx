@@ -125,6 +125,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
  * приложение просто работает как обычный сайт, поэтому `catch` молчит.
  */
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  // Регистрация после `load`, а не сразу: проверено 13.11 (roadmap 11.5) —
+  // ранний вызов не меняет поведение первого офлайн-визита, а конкурирует за
+  // канал с первой отрисовкой. `ERR_FAILED` на новой навигации приходит и с
+  // ранней регистрацией, хотя контроллер и кеш уже на месте: это ограничение
+  // эмуляции офлайна, а не момент регистрации.
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   });
