@@ -5,9 +5,15 @@
 Теперь меню — собственные данные организации, а снимок таблицы остаётся для
 графика и методичек, где ручная правка не нужна.
 
-Права разделены так же, как везде в проекте: читать может любой сотрудник
-(он в ответе видит только то, что сегодня есть), править — `aup` и админ.
-Скрытые позиции сотруднику не отдаются вовсе: для него «нет в наличии» — шум.
+Права разделены так же, как везде в проекте: читать может любой сотрудник,
+править — `aup` и админ. Позиции «нет в наличии» (стоп-лист) сотруднику
+отдаются: официанту нужно знать, что блюдо кончилось, — иначе он продаёт его
+и дальше. Отличаются они пометкой `is_available`, а не отсутствием в ответе.
+
+Почему не скрываем. До стоп-листа скрытая позиция означала «сегодня этого
+нет», и сотруднику её не показывали вовсе. Но именно он и стоит у гостя:
+пустой список молчит, а плашка «нет в наличии» отвечает на вопрос. Поэтому
+решение принимает тот, кто смотрит (`is_available`), а не фильтр выдачи.
 """
 
 from __future__ import annotations
@@ -19,7 +25,7 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import AupDep, EmployeeDep, SessionDep
 from app.db.hr_models import DEFAULT_MENU_CATEGORY, MenuItem
-from app.services import hr_access, hr_menu
+from app.services import hr_menu
 
 router = APIRouter(tags=["menu"])
 
@@ -40,8 +46,9 @@ class MenuOut(BaseModel):
     # Порядок групп задаёт выдача; фронт не сортирует повторно, чтобы подписи
     # групп и строки не разъехались.
     categories: list[str]
-    # Сколько позиций сейчас «нет в наличии». Сотруднику всегда 0: он их не видит.
-    hidden: int
+    # Сколько позиций в стоп-листе. Нужно обеим ролям: сотруднику — чтобы
+    # понять, что наверху списка не всё, руководителю — чтобы видеть объём.
+    stopped: int
 
 
 def _out(item: MenuItem) -> MenuItemOut:
@@ -58,14 +65,18 @@ def _out(item: MenuItem) -> MenuItemOut:
 
 
 @router.get("/menu", response_model=MenuOut)
-async def list_menu(session: SessionDep, employee: EmployeeDep) -> MenuOut:
-    """Меню смены. Руководитель видит и скрытые позиции, чтобы вернуть их."""
-    manage = hr_access.is_aup(employee)
-    items = await hr_menu.list_items(session, include_unavailable=manage)
+async def list_menu(session: SessionDep, _: EmployeeDep) -> MenuOut:
+    """Меню смены целиком: и то, что есть, и стоп-лист с пометкой.
+
+    Фильтр «только в наличии» — дело клиента: один и тот же ответ рисует и
+    экран сотрудника, и кабинет руководителя, а роль меняет только наличие
+    кнопок правки.
+    """
+    items = await hr_menu.list_items(session)
     return MenuOut(
         items=[_out(item) for item in items],
         categories=hr_menu.categories_of(items),
-        hidden=sum(1 for item in items if not item.is_available),
+        stopped=sum(1 for item in items if not item.is_available),
     )
 
 

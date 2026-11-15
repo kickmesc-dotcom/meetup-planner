@@ -19,6 +19,7 @@ import {
 import Badge from "@/features/hr/Badge";
 import EmployeeCardSheet from "@/features/hr/EmployeeCardSheet";
 import KudosCard from "@/features/hr/KudosCard";
+import StopListBanner from "@/features/menu/StopListBanner";
 import DepartmentScreen from "@/features/hr/DepartmentScreen";
 import { departmentTone, personTone } from "@/features/hr/tone";
 import ErrorState from "@/components/ErrorState";
@@ -502,6 +503,8 @@ export default function HrFeedScreen() {
             <Icon name="chevron" size={16} className="shrink-0 text-tg-hint" />
           </button>
         )}
+
+        <StopListBanner />
 
         {canFilter && filters && (
           <div className="mt-3 space-y-2">

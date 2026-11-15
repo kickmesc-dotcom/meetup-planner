@@ -46,8 +46,12 @@ export default function MenuScreen({ onBack }: { onBack: () => void }) {
     onSuccess: (item) => {
       haptic("success");
       invalidate();
-      // Подсказка после действия: видно, что позиция не удалена, а спрятана.
-      void (item.is_available ? null : showAlert(tx("Позиция скрыта из меню сотрудников.")));
+      // Подсказка после действия: позиция не удалена, а попала в стоп-лист.
+      void (
+        item.is_available
+          ? null
+          : showAlert(tx("Позиция в стоп-листе: сотрудники видят «нет в наличии»."))
+      );
     },
     onError: (e) => {
       haptic("error");
@@ -122,8 +126,8 @@ export default function MenuScreen({ onBack }: { onBack: () => void }) {
     <SubScreen
       title={tx("Меню смены")}
       subtitle={
-        q.data && q.data.hidden > 0
-          ? tx("Скрыто позиций: {count}", { count: String(q.data.hidden) })
+        q.data && q.data.stopped > 0
+          ? tx("В стоп-листе: {count}", { count: String(q.data.stopped) })
           : tx("Что сегодня в меню: сотрудник видит это в материалах смены")
       }
       onBack={onBack}

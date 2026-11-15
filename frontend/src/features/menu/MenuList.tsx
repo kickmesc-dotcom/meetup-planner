@@ -1,8 +1,14 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { MenuItem } from "@/api/menu";
 import Icon from "@/components/Icon";
 import { Spinner } from "@/components/Spinner";
 import { useTx } from "@/i18n";
+
+/**
+ * Что показывать: всё меню, только доступное или только стоп-лист.
+ * Фильтрация здесь, а не на сервере: ответ один и тот же для обеих ролей.
+ */
+type MenuFilter = "all" | "available" | "stopped";
 
 /**
  * Список меню по группам. Одна разметка на две роли: сотрудник читает, а
@@ -29,9 +35,23 @@ export default function MenuList({
   busyId?: number | null;
 }) {
   const { tx } = useTx();
+  /**
+   * Фильтр показывается только при непустом стоп-листе: кнопка «Стоп-лист (0)»
+   * не делает ничего и только занимает строку.
+   */
+  const [filter, setFilter] = useState<MenuFilter>("all");
+  const stoppedCount = useMemo(
+    () => items.filter((item) => !item.is_available).length,
+    [items],
+  );
+  const visible = useMemo(() => {
+    if (filter === "available") return items.filter((item) => item.is_available);
+    if (filter === "stopped") return items.filter((item) => !item.is_available);
+    return items;
+  }, [items, filter]);
   const groups = useMemo(() => {
     const byCategory = new Map<string, MenuItem[]>();
-    for (const item of items) {
+    for (const item of visible) {
       const list = byCategory.get(item.category) ?? [];
       list.push(item);
       byCategory.set(item.category, list);
@@ -39,9 +59,9 @@ export default function MenuList({
     return categories
       .map((name) => ({ name, items: byCategory.get(name) ?? [] }))
       .filter((group) => group.items.length > 0);
-  }, [items, categories]);
+  }, [visible, categories]);
 
-  if (groups.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="rounded-card bg-tg-secondary-bg/40 p-4 text-center text-xs text-tg-hint">
         {tx("Меню пока пустое.")}
@@ -49,27 +69,66 @@ export default function MenuList({
     );
   }
 
+  const filters: { id: MenuFilter; label: string }[] = [
+    { id: "all", label: tx("Все") },
+    { id: "available", label: tx("В наличии") },
+    { id: "stopped", label: tx("Стоп-лист ({count})", { count: stoppedCount }) },
+  ];
+
   return (
     <div className="space-y-4">
-      {groups.map((group) => (
-        <section key={group.name} className="space-y-1.5">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
-            {group.name}
-          </h2>
-          <div className="overflow-hidden rounded-card border border-tg-secondary-bg">
-            {group.items.map((item) => (
-              <MenuRow
-                key={item.id}
-                item={item}
-                onEdit={onEdit}
-                onToggle={onToggle}
-                onDelete={onDelete}
-                busy={busyId === item.id}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      {stoppedCount > 0 && (
+        <div
+          role="group"
+          aria-label={tx("Фильтр меню")}
+          className="flex flex-wrap gap-1.5"
+        >
+          {filters.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={filter === id}
+              onClick={() => setFilter(id)}
+              className={[
+                "min-h-9 rounded-full px-3 text-xs transition press",
+                filter === id
+                  ? "bg-tg-button text-tg-button-text"
+                  : "bg-tg-secondary-bg text-tg-hint",
+              ].join(" ")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {groups.length === 0 ? (
+        <div className="rounded-card bg-tg-secondary-bg/40 p-4 text-center text-xs text-tg-hint">
+          {filter === "stopped"
+            ? tx("В стоп-листе сейчас ничего нет.")
+            : tx("Всё в стоп-листе.")}
+        </div>
+      ) : (
+        groups.map((group) => (
+          <section key={group.name} className="space-y-1.5">
+            <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">
+              {group.name}
+            </h2>
+            <div className="overflow-hidden rounded-card border border-tg-secondary-bg">
+              {group.items.map((item) => (
+                <MenuRow
+                  key={item.id}
+                  item={item}
+                  onEdit={onEdit}
+                  onToggle={onToggle}
+                  onDelete={onDelete}
+                  busy={busyId === item.id}
+                />
+              ))}
+            </div>
+          </section>
+        ))
+      )}
     </div>
   );
 }

@@ -234,6 +234,11 @@ export async function mockSignedInApi(page: Page): Promise<void> {
       });
     }
     if (path === "/api/meta") return json({ ok: true });
+    // Меню — объект, а не список: плашка стоп-листа в шапке ленты читает
+    // `items`, а на голом `[]` уходит в `ErrorBoundary`.
+    if (path === "/api/menu") {
+      return json({ items: [], categories: [], stopped: 0 });
+    }
     // Лента и её фильтры — объекты, а не списки: с пустым `[]` экран читает
     // `filters.departments.find` у `undefined` и падает в `ErrorBoundary`.
     if (path === "/api/feed/filters") {

@@ -60,7 +60,7 @@ const MENU: Menu = {
     },
   ],
   categories: ["Супы", "Горячее"],
-  hidden: 1,
+  stopped: 1,
 };
 
 function renderScreen() {
@@ -98,7 +98,7 @@ describe("MenuScreen", () => {
     expect(screen.getByText("по запросу")).toBeTruthy();
     // Скрытая позиция остаётся в списке с пометкой: она не удалена.
     expect(screen.getByText("нет в наличии")).toBeTruthy();
-    expect(screen.getByText("Скрыто позиций: 1")).toBeTruthy();
+    expect(screen.getByText("В стоп-листе: 1")).toBeTruthy();
   });
 
   it("прячет позицию частичной правкой, а не удалением", async () => {

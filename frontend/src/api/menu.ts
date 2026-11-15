@@ -12,7 +12,11 @@ export interface MenuItem {
   description: string | null;
   /** Цена в целых рублях. `null` — «по запросу». */
   price_rub: number | null;
-  /** `false` — «сегодня этого нет»: строка остаётся, сотруднику не видна. */
+  /**
+   * `false` — позиция в стоп-листе: блюдо остаётся в меню, но с пометкой
+   * «нет в наличии». Сотрудник видит её, потому что именно он говорит гостю,
+   * что заказать нельзя.
+   */
   is_available: boolean;
   sort_order: number;
   updated_at: string | null;
@@ -22,8 +26,8 @@ export interface Menu {
   items: MenuItem[];
   /** Порядок групп задаёт сервер — фронт не сортирует повторно. */
   categories: string[];
-  /** Сколько позиций скрыто. У сотрудника всегда 0: он их не видит. */
-  hidden: number;
+  /** Сколько позиций в стоп-листе. */
+  stopped: number;
 }
 
 export interface MenuDraft {

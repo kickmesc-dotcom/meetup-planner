@@ -7,8 +7,8 @@
   собран так, чтобы менять только переданное;
 * **«нет в наличии» — не удаление.** Скрытая позиция должна возвращаться одним
   нажатием, иначе руководитель заводит её заново с нуля;
-* **сотрудник не видит скрытое.** Для него это шум: сделать он с этим ничего
-  не может;
+* **стоп-лист виден сотруднику.** Официант говорит гостю «этого нет», поэтому
+  позиция отдаётся с пометкой `is_available=false`, а не прячется из ответа;
 * **мусор в цене не доходит до базы.** Отрицательная цена и «999 999 999» —
   это опечатка, а не прайс.
 
@@ -27,6 +27,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/d
 import pytest  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
+from app.api import routes_menu  # noqa: E402
 from app.db.hr_models import DEFAULT_MENU_CATEGORY, MenuItem  # noqa: E402
 from app.services import hr_menu  # noqa: E402
 
@@ -127,6 +128,22 @@ async def test_staff_list_skips_unavailable_items(session) -> None:
     for_staff = await hr_menu.list_items(session, include_unavailable=False)
     assert [i.name for i in for_manager] == ["Борщ", "Рыба"]
     assert [i.name for i in for_staff] == ["Борщ"]
+
+
+async def test_api_menu_shows_stop_list_to_staff(session) -> None:
+    """Стоп-лист не прячется от сотрудника: официант должен знать, что кончилось.
+
+    Раньше недоступные позиции вырезались из выдачи, и сотрудник видел только
+    то, что есть. Теперь ответ один для обеих ролей: пометка вместо отсутствия.
+    """
+    await hr_menu.create_item(session, name="Борщ", price_rub=320)
+    gone = await hr_menu.create_item(session, name="Рыба", price_rub=690)
+    await hr_menu.update_item(session, gone, is_available=False)
+
+    menu = await routes_menu.list_menu(session, None)  # type: ignore[arg-type]
+
+    assert [item.name for item in menu.items] == ["Борщ", "Рыба"]
+    assert menu.stopped == 1
 
 
 async def test_update_rejects_bad_price_without_touching_the_row(session) -> None:
