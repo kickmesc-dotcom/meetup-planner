@@ -24,6 +24,8 @@ export interface HrHandoverItem {
   title: string;
   status: string;
   meta: string | null;
+  /** Категория проблемы: в превью нужна, чтобы вынести «гостей» отдельно. */
+  category?: string | null;
 }
 
 export interface HrHandover {
@@ -63,6 +65,8 @@ export interface HrHandoverPreview {
   items: HrHandoverItem[];
   tasks: number;
   issues: number;
+  /** Проблемы категории «гость»: их читают первыми. */
+  guests: number;
 }
 
 export type HandoverBox = "all" | "incoming" | "outgoing";

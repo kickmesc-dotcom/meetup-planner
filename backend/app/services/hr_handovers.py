@@ -59,6 +59,10 @@ class Snapshot:
     title: str
     status: str
     meta: str | None = None
+    # Категория проблемы (`guest`, `equipment`, …). В снимке её нет: история
+    # хранит текст и статус. Превью использует её, чтобы вынести гостей
+    # отдельным блоком — это то, что принимающий читает первым.
+    category: str | None = None
 
 
 # --------------------------------------------------------------------------
@@ -157,6 +161,7 @@ async def collect_open(session: AsyncSession, employee: Employee) -> list[Snapsh
             title=issue.title,
             status=issue.status,
             meta=_issue_meta(issue),
+            category=issue.category,
         )
         for issue in issues.all()
     ]

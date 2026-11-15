@@ -16,7 +16,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, EmployeeDep, SessionDep
-from app.db.hr_models import Handover, HandoverItem, Department, Employee
+from app.db.hr_models import (
+    ISSUE_CATEGORY_GUEST,
+    Department,
+    Employee,
+    Handover,
+    HandoverItem,
+)
 from app.db.models import User
 from app.services import hr_handovers, hr_notify
 
@@ -35,6 +41,9 @@ class HandoverItemOut(BaseModel):
     title: str
     status: str
     meta: str | None
+    # Только для превью: снимок истории категорию не хранит, поэтому по
+    # умолчанию `None`, а не обязательное поле.
+    category: str | None = None
 
 
 class HandoverOut(BaseModel):
@@ -74,6 +83,9 @@ class HandoverPreviewOut(BaseModel):
     items: list[HandoverItemOut]
     tasks: int
     issues: int
+    # Проблемы категории «гость» — отдельный счётчик: их читают до всего
+    # остального, и сдающий должен видеть, что они не потерялись.
+    guests: int = 0
 
 
 class ColleagueOut(BaseModel):
@@ -321,11 +333,17 @@ async def handover_preview(
                 title=snap.title,
                 status=snap.status,
                 meta=snap.meta,
+                category=snap.category,
             )
             for index, snap in enumerate(snapshots, start=1)
         ],
         tasks=sum(1 for s in snapshots if s.kind == "task"),
         issues=sum(1 for s in snapshots if s.kind == "issue"),
+        guests=sum(
+            1
+            for s in snapshots
+            if s.kind == "issue" and s.category == ISSUE_CATEGORY_GUEST
+        ),
     )
 
 

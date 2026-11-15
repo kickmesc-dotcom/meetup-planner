@@ -25,6 +25,7 @@ import { haptic, showAlert } from "@/tg/webapp";
 import { useUI } from "@/store/ui";
 
 import { currentIntlLocale, useTx } from "@/i18n";
+import { groupPreview } from "./previewGroups";
 /**
  * Передача смены.
  *
@@ -405,6 +406,19 @@ function CreateHandoverSheet({
 
   const colleagues = colleaguesQ.data ?? [];
 
+  /**
+   * Три блока вместо плоского списка. Поручение и проблема отвечают на разные
+   * вопросы («что не доделано» и «что сломано»), а гости — отдельная история:
+   * принимающий читает их раньше остального, поэтому они не тонут среди
+   * проблем кухни и склада. Группировка — в `previewGroups.ts`, чтобы правило
+   * было одно и проверялось без базы.
+   */
+  const groupTitle = { tasks: tx("Поручения"), issues: tx("Проблемы"), guests: tx("Гости") };
+  const previewGroups = groupPreview(previewQ.data?.items ?? []).map((group) => ({
+    ...group,
+    title: groupTitle[group.key],
+  }));
+
   return (
     <BottomSheet
       title={tx("Сдать смену")}
@@ -443,33 +457,46 @@ function CreateHandoverSheet({
       </div>
 
       <div className="mt-3 text-xs text-tg-hint">
-        {tx("Что уйдёт в сдачу")}
         {previewQ.data
-          ? tx(" — поручений {tasks}, проблем {issues}", {
+          ? tx("Что уйдёт в сдачу — поручений {tasks}, проблем {issues}, гостей {guests}", {
               tasks: previewQ.data.tasks,
               issues: previewQ.data.issues,
+              // `?? 0`: старый бэкенд поля не отдаёт, а подставлять в текст
+              // «undefined» вместо числа нельзя.
+              guests: previewQ.data.guests ?? 0,
             })
-          : ""}
+          : tx("Что уйдёт в сдачу")}
       </div>
-      <div className="mt-1 space-y-1.5">
+      <div className="mt-1 space-y-2">
         {previewQ.isLoading && (
           <div className="text-xs text-tg-hint">{tx("Собираю открытые пункты…")}</div>
         )}
-        {(previewQ.data?.items ?? []).map((item) => (
-          <div
-            key={`${item.kind}-${item.ref_id ?? item.id}`}
-            className="rounded-tile bg-tg-secondary-bg/60 px-2.5 py-1.5"
-          >
-            <div className="text-xs text-tg-text">
-              <Icon name={itemIcon(item)} size={13} className="mr-1 inline-block align-[-2px] text-tg-hint" />
-              {item.title}
+        {previewGroups.map((group) =>
+          group.items.length === 0 ? null : (
+            <div key={group.key}>
+              <div className="text-2xs font-semibold uppercase tracking-wide text-tg-hint">
+                {group.title} · {group.items.length}
+              </div>
+              <div className="mt-1 space-y-1.5">
+                {group.items.map((item) => (
+                  <div
+                    key={`${item.kind}-${item.ref_id ?? item.id}`}
+                    className="rounded-tile bg-tg-secondary-bg/60 px-2.5 py-1.5"
+                  >
+                    <div className="text-xs text-tg-text">
+                      <Icon name={itemIcon(item)} size={13} className="mr-1 inline-block align-[-2px] text-tg-hint" />
+                      {item.title}
+                    </div>
+                    <div className="mt-0.5 text-xs text-tg-hint">
+                      {item.status}
+                      {item.meta ? ` · ${item.meta}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="mt-0.5 text-xs text-tg-hint">
-              {item.status}
-              {item.meta ? ` · ${item.meta}` : ""}
-            </div>
-          </div>
-        ))}
+          ),
+        )}
         {previewQ.data && previewQ.data.items.length === 0 && (
           <div className="text-xs text-tg-hint">{tx("Открытых пунктов нет — передашь только заметку.")}</div>
         )}

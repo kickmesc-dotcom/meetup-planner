@@ -472,7 +472,9 @@ export const EN_CONTENT: Record<string, string> = {
   "Загружаю коллег…": "Loading colleagues…",
   "Некому передать: в отделе нет других активных сотрудников.": "Nobody to hand over to: no other active staff in the department.",
   "Что уйдёт в сдачу": "What goes into the handover",
-  " — поручений {tasks}, проблем {issues}": " — tasks {tasks}, issues {issues}",
+  "Что уйдёт в сдачу — поручений {tasks}, проблем {issues}, гостей {guests}":
+    "What goes into the handover — tasks {tasks}, issues {issues}, guests {guests}",
+  "Гости": "Guests",
   "Собираю открытые пункты…": "Collecting open items…",
   "Открытых пунктов нет — передашь только заметку.": "No open items — only the note will be passed on.",
   "Заметка следующему (необязательно)": "Note for the next person (optional)",
