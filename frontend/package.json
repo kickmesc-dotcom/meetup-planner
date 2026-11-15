@@ -15,7 +15,8 @@
     "test:e2e:offline": "playwright test --config playwright.offline.config.ts",
     "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "test:e2e:visual:update": "node scripts/update-visual-linux.mjs",
-    "check:bundle": "node scripts/check-bundle.mjs"
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "test:e2e:live": "playwright test --config playwright.live.config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
