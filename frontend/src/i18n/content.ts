@@ -476,6 +476,20 @@ export const EN_CONTENT: Record<string, string> = {
     "What goes into the handover — tasks {tasks}, issues {issues}, guests {guests}",
   "Гости": "Guests",
   "Сейчас на смене": "On shift now",
+  "Назад к отчёту": "Back to the report",
+  "Что мешало смене": "What held the shift back",
+  "Последние 7 дней": "Last 7 days",
+  "Новые проблемы": "New issues",
+  "Открыто сейчас": "Open now",
+  "Просрочено поручений": "Overdue tasks",
+  "Сделано поручений: {done}, из них с опозданием — {late}.":
+    "Tasks completed: {done}, {late} of them late.",
+  "Чаще всего мешало": "Most frequent blockers",
+  "Проблемы за неделю": "Issues this week",
+  "За неделю проблем не заводили — хороший знак.":
+    "No issues logged this week — a good sign.",
+  "{days} дн": "{days} d",
+  "закрыта": "resolved",
   "{count} в смене": "{count} on shift",
   "до {time}": "until {time}",
   "Назначили проблему или просрочили поручение — push на телефон":

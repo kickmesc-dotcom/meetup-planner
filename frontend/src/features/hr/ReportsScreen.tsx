@@ -15,6 +15,7 @@ import { CardSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
 import Icon, { InlineIcon } from "@/components/Icon";
 import { useUI } from "@/store/ui";
+import WeekSummaryScreen from "./WeekSummaryScreen";
 import { intlLocaleFor, useTx, type Locale } from "@/i18n";
 
 /**
@@ -64,6 +65,9 @@ export default function ReportsScreen({
   // Отчёт по всем стандартам сразу тяжёл: карточка каждого считает людей,
   // которые его ещё не сдали. Первые 50 — рабочая порция, остальные по кнопке.
   const [showAllStandards, setShowAllStandards] = useState(false);
+  // Недельная сводка — отдельный экран, а не вкладка в этом: у неё свой
+  // вопрос («что повторяется») и свой период, который нельзя сдвинуть.
+  const [weekOpen, setWeekOpen] = useState(false);
 
   const meQ = useQuery({ queryKey: ["hr-me"], queryFn: fetchEmployee });
   const departmentsQ = useQuery({
@@ -97,6 +101,15 @@ export default function ReportsScreen({
     }
   };
 
+  if (weekOpen) {
+    return (
+      <WeekSummaryScreen
+        onBack={() => setWeekOpen(false)}
+        departmentId={departmentId}
+      />
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-2 border-b border-tg-secondary-bg px-3 py-2">
@@ -120,6 +133,16 @@ export default function ReportsScreen({
             {report ? fmtDate(report.work_date, locale) : tx("Срез на дату")}
           </div>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            haptic("light");
+            setWeekOpen(true);
+          }}
+          className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text"
+        >
+          {tx("Неделя")}
+        </button>
         <button
           type="button"
           onClick={() => void download()}

@@ -16,7 +16,7 @@ from datetime import date
 from fastapi import APIRouter, HTTPException, Response, status
 
 from app.api.deps import AupDep, SessionDep
-from app.services import hr_departments, hr_reports
+from app.services import hr_departments, hr_reports, hr_week_summary
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -42,6 +42,23 @@ async def shift_report(
     await _check_department(session, department_id)
     return await hr_reports.build_shift_report(
         session, viewer=employee, on=on, department_id=department_id
+    )
+
+
+@router.get("/week", response_model=hr_week_summary.WeekSummary)
+async def week_summary(
+    session: SessionDep,
+    employee: AupDep,
+    department_id: int | None = None,
+) -> hr_week_summary.WeekSummary:
+    """Что мешало смене последние семь дней: числа, категории и список.
+
+    Период не принимаем параметром: «неделя» — это не выбор пользователя, а
+    определение сводки. Сдвинешь начало — перестанешь сравнивать её с прошлой.
+    """
+    await _check_department(session, department_id)
+    return await hr_week_summary.build(
+        session, viewer=employee, department_id=department_id
     )
 
 

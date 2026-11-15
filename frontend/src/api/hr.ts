@@ -1347,6 +1347,42 @@ function reportQuery(params: ReportParams): string {
 export const fetchShiftReport = (params: ReportParams = {}) =>
   api<HrShiftReport>(`/api/admin/reports/shift${reportQuery(params)}`);
 
+export interface HrWeekCategory {
+  category: string;
+  count: number;
+}
+
+export interface HrWeekBlocker {
+  issue_id: number;
+  title: string;
+  category: string;
+  status: string;
+  created_at: string;
+  resolved_at: string | null;
+  age_hours: number;
+}
+
+/** Недельная сводка: числа, причины по категориям и список проблем. */
+export interface HrWeekSummary {
+  start: string;
+  end: string;
+  issues_new: number;
+  issues_closed: number;
+  issues_open: number;
+  tasks_done: number;
+  tasks_done_late: number;
+  tasks_overdue_open: number;
+  categories: HrWeekCategory[];
+  blockers: HrWeekBlocker[];
+}
+
+export const fetchWeekSummary = (departmentId: number | null = null) =>
+  api<HrWeekSummary>(
+    `/api/admin/reports/week${
+      departmentId != null ? `?department_id=${departmentId}` : ""
+    }`,
+  );
+
 /** Пробелы по стандартам: кто не сдал инструкцию. */
 export const fetchStandardGaps = (
   params: ReportParams & { required_only?: boolean } = {},
