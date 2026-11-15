@@ -1,0 +1,74 @@
+name: Live smoke
+
+# Браузерная проверка живого адреса — то, чего не видит Uptime.
+#
+# `uptime.yml` спрашивает «отвечает ли API», и на это хватает curl. Здесь
+# другой вопрос: «открывается ли приложение у человека» — грузится ли бандл,
+# рисуется ли экран, нет ли нарушений доступности и не разъехалась ли вёрстка.
+# Сломанный деплой (битый ассет, CSP, service worker) при живом `/healthz`
+# выглядит именно так: API зелёный, а приложение белое.
+#
+# Почему по расписанию, а не «после деплоя»: деплой идёт с машины владельца
+# (`wrangler pages deploy`), CI о нём не знает. Расписание ловит поломку в
+# пределах суток, `workflow_dispatch` — сразу после деплоя, вручную.
+#
+# API замокан (`e2e/api.ts`) — прогон не пишет в боевую базу и не требует
+# аккаунта. Это проверка внешней оболочки, а не бизнес-логики.
+
+on:
+  schedule:
+    # 06:20 UTC — до начала смены в Москве и Ташкенте, чтобы поломка была
+    # видна раньше людей.
+    - cron: "20 6 * * *"
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Адрес для проверки (по умолчанию — прод)"
+        required: false
+        default: "https://semitaskbot.pages.dev"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Live e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # Один адрес на оба случая: ручной запуск может проверить конкретный
+      # деплой, расписание — прод.
+      LIVE_BASE_URL: ${{ inputs.base_url || 'https://semitaskbot.pages.dev' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # В CI конфиг не берёт установленный Chrome (`channel: "chrome"` только
+      # локально), поэтому нужен chromium из образа Playwright.
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Live e2e
+        run: npm run test:e2e:live
+
+      # Трейсы и скриншоты падений без артефакта живут только в логе, а лог
+      # приватного репозитория без доступа не читается.
+      - name: Upload traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-smoke-results
+          path: frontend/test-results
+          retention-days: 7
+          if-no-files-found: ignore
