@@ -19,6 +19,11 @@ import {
 } from "@/api/shifts";
 
 vi.mock("@/api/shifts", () => ({
+  // Панель «Сейчас на смене» грузится рядом с сеткой: пустой ответ, чтобы
+  // тест графика не зависел от неё.
+  fetchOnShift: vi.fn(() =>
+    Promise.resolve({ now: "", today: "", on_shift: 0, items: [] }),
+  ),
   fetchShiftWeek: vi.fn(),
   saveShift: vi.fn(),
   moveShift: vi.fn(),

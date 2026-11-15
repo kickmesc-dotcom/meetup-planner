@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from datetime import date, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -23,7 +23,7 @@ from app.db.hr_models import (
     Department,
     Employee,
 )
-from app.services import hr_shifts, hr_training_plan
+from app.services import hr_checklists, hr_settings, hr_shifts, hr_training_plan
 
 router = APIRouter(tags=["shifts"])
 
@@ -34,6 +34,23 @@ class ShiftPersonOut(BaseModel):
     position: str | None
     department_id: int | None
     department_name: str | None
+
+
+class OnShiftPersonOut(ShiftPersonOut):
+    """Смена сегодняшнего дня с состоянием на текущую минуту."""
+
+    starts_at: str | None
+    ends_at: str | None
+    # on_shift — сейчас в смене, upcoming — ещё не началась, finished — кончилась,
+    # planned — в графике без часов (такое бывает, когда часы не проставили).
+    state: str
+
+
+class OnShiftOut(BaseModel):
+    now: datetime
+    today: date
+    on_shift: int
+    items: list[OnShiftPersonOut]
 
 
 class ShiftOut(BaseModel):
@@ -288,6 +305,98 @@ def _week_start() -> date:
     """Понедельник текущей недели по часовому поясу ресторана."""
     moment = hr_training_plan.today()
     return moment - timedelta(days=moment.weekday())
+
+
+def _shift_state(
+    starts_at: str | None, ends_at: str | None, minute_of_day: int
+) -> str:
+    """Состояние смены по часам. Вынесено из роута ради простого теста.
+
+    `end` без `start` — тоже `planned`: без начала нельзя сказать, идёт смена
+    или нет, и врать «в смене» хуже, чем показать «в графике».
+    """
+    start = _minutes(starts_at)
+    end = _minutes(ends_at)
+    if start is None:
+        return "planned"
+    if end is not None and minute_of_day > end:
+        return "finished"
+    if minute_of_day >= start:
+        return "on_shift"
+    return "upcoming"
+
+
+def _minutes(hhmm: str | None) -> int | None:
+    """«10:30» → 630. Мусор в базе не должен ронять панель."""
+    if not hhmm:
+        return None
+    try:
+        hours, minutes = hhmm.split(":", 1)
+        hour, minute = int(hours), int(minutes)
+    except (TypeError, ValueError):
+        return None
+    if not (0 <= hour < 24 and 0 <= minute < 60):
+        return None
+    return hour * 60 + minute
+
+
+@router.get("/shifts/on-shift", response_model=OnShiftOut)
+async def shifts_on_shift(session: SessionDep, employee: EmployeeDep) -> OnShiftOut:
+    """Кто на смене прямо сейчас — по видимому сотруднику табелю.
+
+    Почему отдельная ручка, а не расчёт на клиенте. Правило видимости
+    (свой отдел / все отделы), сегодняшняя дата и часовой пояс организации
+    живут на сервере; клиент, считающий это сам, рано или поздно разойдётся с
+    графиком и покажет соседа, который уже ушёл.
+
+    «Сейчас» решается по часам смены, а не по отметке открытия чек-листа:
+    отметка может отсутствовать (человек забыл), а график — единственный
+    общий источник.
+    """
+    today = hr_checklists.local_today()
+    moment = hr_settings.local_now()
+    try:
+        week = await hr_shifts.week(session, employee, start=today, end=today)
+    except hr_shifts.ShiftError as exc:
+        raise _shift_error(exc) from exc
+
+    people = {person.employee_id: person for person in week.people}
+    minute_of_day = moment.hour * 60 + moment.minute
+    items: list[OnShiftPersonOut] = []
+    for row in week.shifts:
+        if row.day != today or row.status not in ("planned", "worked"):
+            continue
+        person = people.get(row.employee_id)
+        if person is None:
+            continue
+        state = _shift_state(row.starts_at, row.ends_at, minute_of_day)
+        items.append(
+            OnShiftPersonOut(
+                employee_id=person.employee_id,
+                display_name=person.display_name,
+                position=person.position,
+                department_id=person.department_id,
+                department_name=person.department_name,
+                starts_at=row.starts_at,
+                ends_at=row.ends_at,
+                state=state,
+            )
+        )
+
+    order = {"on_shift": 0, "upcoming": 1, "planned": 2, "finished": 3}
+    items.sort(
+        key=lambda item: (
+            order.get(item.state, 9),
+            item.starts_at or "99:99",
+            item.display_name,
+        )
+    )
+    return OnShiftOut(
+        now=moment,
+        today=today,
+        on_shift=sum(1 for item in items if item.state == "on_shift"),
+        items=items,
+    )
 
 
 @router.put("/shifts/{employee_id}/{day}", response_model=ShiftOut)

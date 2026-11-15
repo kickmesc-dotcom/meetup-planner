@@ -56,6 +56,25 @@ export interface ShiftWeek {
   shifts: ShiftItem[];
 }
 
+export type OnShiftState = "on_shift" | "upcoming" | "planned" | "finished";
+
+export interface OnShiftPerson extends ShiftPerson {
+  starts_at: string | null;
+  ends_at: string | null;
+  state: OnShiftState;
+}
+
+export interface OnShiftNow {
+  now: string;
+  today: string;
+  /** Сколько человек в смене прямо сейчас. */
+  on_shift: number;
+  items: OnShiftPerson[];
+}
+
+/** Кто на смене сейчас: считает сервер, с учётом видимости и часов пояса. */
+export const fetchOnShift = () => api<OnShiftNow>("/api/shifts/on-shift");
+
 export const fetchShiftWeek = (
   start: string,
   options: { days?: number; departmentId?: number | null } = {},

@@ -22,6 +22,9 @@ import {
 } from "@/api/shifts";
 
 vi.mock("@/api/shifts", () => ({
+  fetchOnShift: vi.fn(() =>
+    Promise.resolve({ now: "", today: "", on_shift: 0, items: [] }),
+  ),
   fetchShiftWeek: vi.fn(),
   saveShift: vi.fn(),
   moveShift: vi.fn(),

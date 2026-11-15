@@ -27,6 +27,7 @@ import Icon from "@/components/Icon";
 import { haptic, showAlert, showConfirm } from "@/tg/webapp";
 import { showToast } from "@/components/toast";
 import { useTx } from "@/i18n";
+import OnShiftPanel from "./OnShiftPanel";
 import MassPlanSheet, {
   type MassPlanInput,
   type TemplateSaveInput,
@@ -359,6 +360,8 @@ export default function ShiftsScreen() {
             <Icon name="clipboard" size={16} />{tx("Шаблон недели и массовые правки")}</button>
         )}
       </header>
+
+      <OnShiftPanel />
 
       <div className="flex-1 overflow-y-auto p-2">
         {q.isLoading && (
