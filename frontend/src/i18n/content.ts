@@ -490,6 +490,19 @@ export const EN_CONTENT: Record<string, string> = {
     "No issues logged this week — a good sign.",
   "{days} дн": "{days} d",
   "закрыта": "resolved",
+  "Первая неделя": "First week",
+  "Новички и наставники": "Newcomers and mentors",
+  "Новички за {days} дн: {count}": "Newcomers in {days} days: {count}",
+  "За две недели новых сотрудников не было.":
+    "No new employees in the past two weeks.",
+  "Требуют внимания: {count}. Спросите, всё ли в порядке.":
+    "Need attention: {count}. Ask how they are doing.",
+  "Все новички заходят и закрывают поручения вовремя.":
+    "All newcomers check in and finish tasks on time.",
+  "{days} дн в команде": "{days} days on the team",
+  "Смен за неделю: {count}": "Shifts this week: {count}",
+  "Не назначен": "Not assigned",
+  "внимание": "attention",
   "{count} в смене": "{count} on shift",
   "до {time}": "until {time}",
   "Назначили проблему или просрочили поручение — push на телефон":

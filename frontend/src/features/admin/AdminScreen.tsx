@@ -12,6 +12,7 @@ import BirthdaysScreen from "./BirthdaysScreen";
 import CalendarSettingsScreen from "./CalendarSettingsScreen";
 import ChecklistSettingsScreen from "./ChecklistSettingsScreen";
 import EmployeesScreen from "./EmployeesScreen";
+import MentorshipScreen from "./MentorshipScreen";
 import FeedSettingsScreen from "./FeedSettingsScreen";
 import IntervalsScreen from "./IntervalsScreen";
 import InvitationsScreen from "./InvitationsScreen";
@@ -72,6 +73,7 @@ type Section =
   | "journal"
   | "notifications"
   | "employees"
+  | "mentorship"
   | "invitations"
   | "team"
   | "review"
@@ -109,6 +111,7 @@ const VALID_SECTIONS: Section[] = [
   "journal",
   "notifications",
   "employees",
+  "mentorship",
   "invitations",
   "import",
   "team",
@@ -196,6 +199,13 @@ const SECTIONS: SectionDef[] = [
     icon: "team",
     title: "Сотрудники",
     subtitle: "Кто работает, прогресс и увольнение",
+  },
+  {
+    id: "mentorship",
+    group: GROUP_PEOPLE,
+    icon: "team",
+    title: "Первая неделя",
+    subtitle: "Новички, наставник и риски",
   },
   {
     id: "invitations",
@@ -615,6 +625,7 @@ export default function AdminScreen({
   if (section === "journal") return <JournalScreen onBack={back} />;
   if (section === "notifications") return <NotificationsScreen onBack={back} />;
   if (section === "employees") return <EmployeesScreen onBack={back} />;
+  if (section === "mentorship") return <MentorshipScreen onBack={back} />;
   if (section === "invitations") return <InvitationsScreen onBack={back} />;
   if (section === "team") return <TeamScreen canManage={false} onBack={back} />;
   if (section === "review") return <ReviewScreen onBack={back} />;

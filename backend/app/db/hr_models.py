@@ -419,6 +419,12 @@ class Employee(OrgScoped, Base):
         SmallInteger, nullable=False, default=3, server_default="3"
     )
     hire_date: Mapped[date | None] = mapped_column(Date)
+    # Наставник новичка (`services/hr_mentorship`). Ссылка на того же сотрудника,
+    # а не отдельная сущность: наставник — это роль в паре, а не должность.
+    # `SET NULL` при увольнении наставника: пара распадается, стажёр остаётся.
+    mentor_employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
