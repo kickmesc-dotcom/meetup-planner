@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { useScrollRestore } from "@/lib/useScrollRestore";
 import ScrollTopButton from "@/components/ScrollTopButton";
+import StatusAnnouncer from "@/components/StatusAnnouncer";
 import { useQuery } from "@tanstack/react-query";
 import {
   countOpenTasks,
@@ -269,7 +270,7 @@ export default function HrFeedScreen() {
 
   const filtersQ = useQuery({
     queryKey: ["hr-feed-filters"],
-    queryFn: fetchFeedFilters,
+    queryFn: ({ signal }) => fetchFeedFilters(signal),
     staleTime: 5 * 60 * 1000,
   });
   // Справочник подразделений нужен и сотруднику: список фильтров у него пуст
@@ -277,11 +278,11 @@ export default function HrFeedScreen() {
   // своего подразделения. Имя отдела берём из этого справочника.
   const depsQ = useQuery({
     queryKey: ["hr-departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
     staleTime: 5 * 60 * 1000,
   });
 
-  const feedQ = useQuery({
+  const feedQ = useQuery<HrFeed>({
     // Локаль — часть ключа: фразу записи собирает сервер, поэтому при смене
     // языка ленту надо перезапросить, а не переводить уже полученный текст.
     queryKey: ["hr-feed", employeeId, departmentId, kinds.join(","), locale],
@@ -290,14 +291,19 @@ export default function HrFeedScreen() {
     // неизвестен → исчезают и поиск, и кнопка «Фильтр», и только что
     // открытый лист. Держим предыдущий ответ, пока едет новый.
     placeholderData: (previous) => previous,
-    queryFn: () =>
-      fetchHrFeed({
-        employeeId,
-        departmentId,
-        kinds: kinds.length ? kinds : undefined,
-        limit: 100,
-        lang: locale,
-      }),
+    // `signal` — не формальность: человек меняет фильтр чаще, чем сервер
+    // успевает ответить, и без отмены каждый прошлый набор долетал до конца.
+    queryFn: ({ signal }) =>
+      fetchHrFeed(
+        {
+          employeeId,
+          departmentId,
+          kinds: kinds.length ? kinds : undefined,
+          limit: 100,
+          lang: locale,
+        },
+        signal,
+      ),
   });
 
   const feed = feedQ.data;
@@ -593,6 +599,21 @@ export default function HrFeedScreen() {
         className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
       >
         {feedQ.isLoading && <ListSkeleton rows={8} />}
+
+        {/* Скринридеру — итог, а не каждая строка: после смены фильтра человек
+            должен услышать, сколько записей стало, а не тишину. */}
+        <StatusAnnouncer
+          text={
+            feedQ.isFetching
+              ? ""
+              : items.length === 0
+                ? tx("Записей нет")
+                : tx("Записей: {count}. Показано {shown}.", {
+                    count: items.length,
+                    shown: Math.min(feedLimit, items.length),
+                  })
+          }
+        />
 
         {!feedQ.isLoading && items.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-center">

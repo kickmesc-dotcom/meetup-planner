@@ -74,7 +74,7 @@ export default function OrgSetupScreen({
 
   const depsQ = useQuery({
     queryKey: ["hr-departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
     staleTime: 5 * 60_000,
   });
 

@@ -61,7 +61,7 @@ export default function OnboardingScreen({ employee }: { employee: HrEmployee })
   const { tx } = useTx();
   const qc = useQueryClient();
   const setTab = useUI((s) => s.setTab);
-  const departmentsQ = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
+  const departmentsQ = useQuery({ queryKey: ["departments"], queryFn: ({ signal }) => fetchDepartments(signal) });
   // Курс открывается по кнопке: держим выбор в состоянии экрана, а не в
   // URL — знакомство прерывать некуда, это один проход.
   const [showCourse, setShowCourse] = useState(false);

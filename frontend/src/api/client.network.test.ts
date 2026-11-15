@@ -100,3 +100,53 @@ describe("humanizeApiError про связь", () => {
     );
   });
 });
+
+/**
+ * Страж отмены. Причина: `api()` умел принимать `AbortSignal`, но при его
+ * передаче отключал собственный таймаут — запрос, который человек «отменил»,
+ * всё равно мог висеть вечно, если отмена до `fetch` не дошла. Здесь две
+ * вещи сразу: чужой сигнал действительно обрывает запрос и таймаут продолжает
+ * работать даже вместе с сигналом.
+ */
+describe("api: отмена устаревших запросов", () => {
+  function hangingFetch() {
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          const signal = init?.signal;
+          if (!signal) return;
+          signals.push(signal);
+          signal.addEventListener("abort", () => {
+            const error = new Error("aborted");
+            error.name = "AbortError";
+            reject(error);
+          });
+        }),
+      ),
+    );
+    return signals;
+  }
+
+  it("обрывает запрос по сигналу вызывающего", async () => {
+    const signals = hangingFetch();
+    const controller = new AbortController();
+    const pending = api("/api/feed", { signal: controller.signal });
+    await Promise.resolve();
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("не отключает таймаут, когда сигнал уже передан", async () => {
+    hangingFetch();
+    const controller = new AbortController();
+
+    await expect(
+      api("/api/feed", { signal: controller.signal }, { timeoutMs: 10 }),
+    ).rejects.toMatchObject({ name: "AbortError" });
+  });
+});

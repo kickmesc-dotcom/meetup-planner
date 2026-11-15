@@ -480,21 +480,27 @@ export async function api<T>(
     ? path
     : `${sameOrigin ? "" : getApiBase()}${path}`;
   // Медленный ответ — не вечная загрузка: через 30 секунд показываем
-  // «сервер не ответил вовремя» и даём повторить. Свой `signal` вызывающего
-  // важнее таймаута — если он есть, не подменяем его.
-  const controller = init.signal ? null : new AbortController();
-  const timer = controller
-    ? setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000)
-    : null;
+  // «сервер не ответил вовремя» и даём повторить.
+  //
+  // Внешний `signal` (React Query отменяет им устаревший запрос, когда человек
+  // сменил фильтр или ушёл с экрана) раньше отключал таймаут целиком: два
+  // повода оборвать запрос конкурировали, и побеждал только один. Теперь оба
+  // ведут к одному контроллеру, поэтому зависший запрос всё равно оборвётся
+  // через 30 секунд, а смена фильтра по-прежнему снимает лишнюю нагрузку сразу.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 30_000);
+  const callerSignal = init.signal ?? null;
+  const forwardAbort = () => controller.abort();
+  if (callerSignal?.aborted) controller.abort();
+  else callerSignal?.addEventListener("abort", forwardAbort, { once: true });
   let res: Response;
   try {
-    res = await fetch(url, {
-      ...init,
-      headers,
-      signal: controller?.signal ?? init.signal ?? undefined,
-    });
+    // `signal` объединённый и идёт последним: одноимённое поле из `init` не
+    // должно перетереть защиту от зависшего ответа.
+    res = await fetch(url, { ...init, headers, signal: controller.signal });
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
+    callerSignal?.removeEventListener("abort", forwardAbort);
   }
 
   if (!res.ok) {

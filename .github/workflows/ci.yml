@@ -183,3 +183,21 @@ jobs:
 
       - name: Visual regression
         run: npm run test:e2e:visual
+
+  # Секреты в истории не видны в диффе: строку удалили, а ключ остался в старом
+  # коммите и в клонах. Обычный checkout тянет один коммит, поэтому проверке
+  # нужна полная история — отдельная джоба, чтобы не замедлять остальные.
+  secrets:
+    name: Secrets scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scan tree and history
+        run: python tools/secret-scan.py --history

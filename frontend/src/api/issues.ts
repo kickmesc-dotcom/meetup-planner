@@ -124,6 +124,8 @@ export const fetchIssues = (
     mine?: boolean;
     limit?: number;
   } = {},
+  /** Сигнал отмены: переключение вида журнала снимает прошлый запрос. */
+  signal?: AbortSignal,
 ) => {
   const params = new URLSearchParams();
   if (opts.statuses?.length) params.set("statuses", opts.statuses.join(","));
@@ -132,11 +134,14 @@ export const fetchIssues = (
   if (opts.mine) params.set("mine", "true");
   if (opts.limit) params.set("limit", String(opts.limit));
   const qs = params.toString();
-  return api<HrIssues>(`/api/issues${qs ? `?${qs}` : ""}`);
+  return api<HrIssues>(
+    `/api/issues${qs ? `?${qs}` : ""}`,
+    signal ? { signal } : undefined,
+  );
 };
 
-export const fetchIssue = (issueId: number) =>
-  api<HrIssueDetail>(`/api/issues/${issueId}`);
+export const fetchIssue = (issueId: number, signal?: AbortSignal) =>
+  api<HrIssueDetail>(`/api/issues/${issueId}`, signal ? { signal } : undefined);
 
 export const createIssue = (body: {
   title: string;

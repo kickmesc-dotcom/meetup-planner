@@ -68,7 +68,7 @@ export default function ReportsScreen({
   const meQ = useQuery({ queryKey: ["hr-me"], queryFn: fetchEmployee });
   const departmentsQ = useQuery({
     queryKey: ["hr-departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
     enabled: !!meQ.data?.is_staff,
   });
   const reportQ = useQuery({

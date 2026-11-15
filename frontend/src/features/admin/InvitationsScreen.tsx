@@ -90,7 +90,7 @@ export default function InvitationsScreen({ onBack }: { onBack: () => void }) {
 
   const departments = useQuery({
     queryKey: ["hr-departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
     staleTime: 5 * 60_000,
     retry: false,
   });

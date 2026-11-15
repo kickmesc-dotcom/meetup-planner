@@ -14,6 +14,7 @@ import {
 } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import DepartmentTag from "@/components/DepartmentTag";
+import StatusAnnouncer from "@/components/StatusAnnouncer";
 import Icon, { type IconName } from "@/components/Icon";
 import FormField from "@/components/FormField";
 import { BusyLabel } from "@/components/BusyLabel";
@@ -291,6 +292,20 @@ export default function TeamScreen({
                   />
                 )}
               </FormField>
+              {/* Поиск фильтрует на клиенте, поэтому без объявления человек
+                  с NVDA не узнает, нашёлся ли кто-нибудь и сколько. */}
+              <StatusAnnouncer
+                text={
+                  employees.length === 0
+                    ? needle
+                      ? tx("Никого не нашли")
+                      : ""
+                    : tx("Найдено: {count}. Показано {shown}.", {
+                        count: employees.length,
+                        shown: visibleEmployees.length,
+                      })
+                }
+              />
               <div className="mt-2 space-y-1.5">
                 {employees.length === 0 && (
                   <div className="text-xs text-tg-hint">

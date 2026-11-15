@@ -57,7 +57,7 @@ export function AddPersonPanel({
 
   const departments = useQuery({
     queryKey: ["hr", "departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
     staleTime: 60_000,
     enabled: open,
   });

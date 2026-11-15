@@ -20,6 +20,7 @@ import {
 import { fetchEmployee } from "@/api/hr";
 import { humanizeApiError } from "@/api/client";
 import BottomSheet from "@/features/actions/BottomSheet";
+import StatusAnnouncer from "@/components/StatusAnnouncer";
 import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { CardSkeleton } from "@/components/Skeleton";
@@ -127,11 +128,16 @@ export default function IssuesScreen() {
 
   const issuesQ = useQuery({
     queryKey: ["hr-issues", view],
-    queryFn: () =>
-      fetchIssues({
-        includeClosed: view === "all",
-        mine: view === "mine",
-      }),
+    // Переключение вида снимает прошлый запрос: журнал на сотню карточек
+    // иначе догружался бы уже после того, как человек ушёл на другую вкладку.
+    queryFn: ({ signal }) =>
+      fetchIssues(
+        {
+          includeClosed: view === "all",
+          mine: view === "mine",
+        },
+        signal,
+      ),
   });
 
   // §3 QOL: у каждого вида журнала своё место — «Все» и «Мои» запоминаются
@@ -238,6 +244,21 @@ export default function IssuesScreen() {
             )}</div>
           </div>
         )}
+
+        {/* Итог журнала — скринридеру: после смены вида «Все/Мои» список
+            обновляется без действия, о котором он бы сообщил. */}
+        <StatusAnnouncer
+          text={
+            issuesQ.isFetching
+              ? ""
+              : items.length === 0
+                ? tx("Проблем нет")
+                : tx("Проблем: {count}. Показано {shown}.", {
+                    count: items.length,
+                    shown: Math.min(limit, items.length),
+                  })
+          }
+        />
 
         {items.slice(0, limit).map((issue) => (
           <IssueCard
@@ -505,7 +526,9 @@ function IssueSheet({
 
   const detailQ = useQuery({
     queryKey: ["hr-issue", issueId],
-    queryFn: () => fetchIssue(issueId),
+    // Закрытый лист отменяет запрос карточки: иначе ответ приходил уже в
+    // никуда и висел в очереди медленной мобильной сети.
+    queryFn: ({ signal }) => fetchIssue(issueId, signal),
   });
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
 

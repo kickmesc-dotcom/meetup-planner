@@ -372,7 +372,8 @@ describe("hr: кабинет и сводка", () => {
     await fetchEmployeeCard(12);
     expect(mocks.api).toHaveBeenLastCalledWith("/api/employees/12/card");
     await fetchDepartments();
-    expect(mocks.api).toHaveBeenLastCalledWith("/api/departments");
+    // Второй аргумент — `init` для сигнала отмены: без сигнала он пустой.
+    expect(mocks.api).toHaveBeenLastCalledWith("/api/departments", undefined);
     await fetchDepartmentOverview(2);
     expect(mocks.api).toHaveBeenLastCalledWith("/api/departments/2/overview");
     await fetchOrgSetup();

@@ -93,7 +93,7 @@ export default function HrProfileScreen({
   const meQ = useQuery({ queryKey: ["hr-employee"], queryFn: fetchEmployee });
   const depsQ = useQuery({
     queryKey: ["hr-departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
   });
 
   const [departmentId, setDepartmentId] = useState<number | null>(null);

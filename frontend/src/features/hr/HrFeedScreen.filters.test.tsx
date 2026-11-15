@@ -102,6 +102,8 @@ describe("HrFeedScreen: сохранённые фильтры", () => {
           departmentId: 2,
           kinds: ["task_status"],
         }),
+        // Второй аргумент — сигнал отмены от React Query.
+        expect.anything(),
       ),
     );
   });
@@ -122,6 +124,7 @@ describe("HrFeedScreen: сохранённые фильтры", () => {
           departmentId: null,
           kinds: undefined,
         }),
+        expect.anything(),
       ),
     );
     await waitFor(() => {

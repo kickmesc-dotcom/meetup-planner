@@ -44,7 +44,7 @@ export default function AdminTasksScreen({ onBack }: { onBack: () => void }) {
   });
   const departmentsQ = useQuery({
     queryKey: ["hr-departments"],
-    queryFn: fetchDepartments,
+    queryFn: ({ signal }) => fetchDepartments(signal),
   });
 
   const [title, setTitle] = useState("");

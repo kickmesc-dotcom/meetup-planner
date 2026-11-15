@@ -386,7 +386,8 @@ export const submitOnboarding = (body: {
     body: JSON.stringify(body),
   });
 
-export const fetchDepartments = () => api<HrDepartment[]>("/api/departments");
+export const fetchDepartments = (signal?: AbortSignal) =>
+  api<HrDepartment[]>("/api/departments", signal ? { signal } : undefined);
 
 // --- Дашборд подразделения --------------------------------------------------
 
@@ -755,6 +756,8 @@ export const fetchHrFeed = (
      */
     lang?: Locale;
   } = {},
+  /** Сигнал отмены из React Query: смена фильтра снимает старый запрос. */
+  signal?: AbortSignal,
 ) => {
   const params = new URLSearchParams();
   if (opts.employeeId) params.set("employee_id", String(opts.employeeId));
@@ -762,7 +765,11 @@ export const fetchHrFeed = (
   if (opts.kinds?.length) params.set("kinds", opts.kinds.join(","));
   if (opts.lang) params.set("lang", opts.lang);
   params.set("limit", String(opts.limit ?? 50));
-  return api<HrFeed>(`/api/feed?${params.toString()}`);
+  // Без сигнала не передаём и `init`: вызов остаётся таким же, как до отмены.
+  return api<HrFeed>(
+    `/api/feed?${params.toString()}`,
+    signal ? { signal } : undefined,
+  );
 };
 
 export interface HrFeedFilterEmployee {
@@ -788,7 +795,8 @@ export interface HrFeedFilters {
  * подразделения не админ, но фильтровать своих людей ему можно. Состав списков
  * сервер считает тем же правилом, что и саму ленту.
  */
-export const fetchFeedFilters = () => api<HrFeedFilters>("/api/feed/filters");
+export const fetchFeedFilters = (signal?: AbortSignal) =>
+  api<HrFeedFilters>("/api/feed/filters", signal ? { signal } : undefined);
 
 // --- Админский контур (поручения и правила) ---
 

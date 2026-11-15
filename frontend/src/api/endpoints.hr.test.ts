@@ -189,7 +189,8 @@ describe("integrations", () => {
 describe("issues", () => {
   it("без фильтров не добавляет пустой вопрос", async () => {
     await fetchIssues();
-    expect(apiMock).toHaveBeenLastCalledWith("/api/issues");
+    // `init` передаётся только под сигнал отмены: без него — `undefined`.
+    expect(apiMock).toHaveBeenLastCalledWith("/api/issues", undefined);
   });
 
   it("собирает фильтры в строку запроса", async () => {
@@ -202,12 +203,13 @@ describe("issues", () => {
     });
     expect(apiMock).toHaveBeenLastCalledWith(
       "/api/issues?statuses=open%2Cin_progress&include_closed=true&category=it&mine=true&limit=5",
+      undefined,
     );
   });
 
   it("открывает, создаёт и правит проблему", async () => {
     await fetchIssue(4);
-    expect(apiMock).toHaveBeenLastCalledWith("/api/issues/4");
+    expect(apiMock).toHaveBeenLastCalledWith("/api/issues/4", undefined);
     await createIssue({ title: "Течёт кран", severity: "high" });
     expect(apiMock).toHaveBeenLastCalledWith("/api/issues", {
       method: "POST",

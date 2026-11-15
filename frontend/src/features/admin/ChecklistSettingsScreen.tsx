@@ -68,7 +68,7 @@ export default function ChecklistSettingsScreen({ onBack }: Props) {
   const term = useTerms();
   const { tx } = useTx();
   const qc = useQueryClient();
-  const deps = useQuery({ queryKey: ["departments"], queryFn: fetchDepartments });
+  const deps = useQuery({ queryKey: ["departments"], queryFn: ({ signal }) => fetchDepartments(signal) });
   const hallsQ = useQuery({
     queryKey: ["admin", "halls"],
     queryFn: fetchAdminHalls,

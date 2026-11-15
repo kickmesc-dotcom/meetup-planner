@@ -861,6 +861,12 @@ export const EN_CONTENT: Record<string, string> = {
   "К содержимому": "Skip to content",
   "Наверх": "Back to top",
   "Показать ещё {count}": "Show {count} more",
+  // Итог списка — тот же текст, что слышит скринридер (StatusAnnouncer).
+  "Записей нет": "No entries",
+  "Записей: {count}. Показано {shown}.": "{count} entries. Showing {shown}.",
+  "Проблем нет": "No issues",
+  "Проблем: {count}. Показано {shown}.": "{count} issues. Showing {shown}.",
+  "Найдено: {count}. Показано {shown}.": "Found: {count}. Showing {shown}.",
   "Смена удалена.": "Shift deleted.",
   "Смена восстановлена.": "Shift restored.",
   "Шаблон удалён.": "Template deleted.",
