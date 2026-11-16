@@ -78,10 +78,14 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0075_org_link_keys.py",
     # Наставник новичка (идея 7): `employees.mentor_employee_id`.
     "0076_employee_mentor.py",
+    # Склад расходников (идея 10): позиции и движения.
+    "0077_supplies.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).
 HR_TABLES = {
+    "supplies",
+    "supply_movements",
     "audit_events",
     "departments",
     "employees",

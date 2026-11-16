@@ -3,6 +3,7 @@ import {
   Bell,
   BirthdayCake,
   Book,
+  Box,
   Calendar,
   Camera,
   ChatBubble,
@@ -90,6 +91,7 @@ export type IconName =
   | "bell"
   | "checklist"
   | "book"
+  | "box"
   | "layout"
   | "award"
   | "cake"
@@ -147,6 +149,7 @@ interface Props extends Omit<SVGProps<SVGSVGElement>, "name"> {
  */
 const ICONS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   tasks: CheckCircle,
+  box: Box,
   shift: Clock,
   calendar: Calendar,
   feed: List,

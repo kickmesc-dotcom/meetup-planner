@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -27,6 +28,7 @@ from sqlalchemy import (
     Index,
     Integer,
     LargeBinary,
+    Numeric,
     SmallInteger,
     String,
     Text,
@@ -1858,6 +1860,111 @@ class TranslationCache(Base):
 # обязательного деления на салаты/горячее. Заведение, которому группы нужны,
 # вводит их само — список категорий не зашит в код.
 DEFAULT_MENU_CATEGORY = "Меню"
+
+
+SUPPLY_IN = "in"
+SUPPLY_OUT = "out"
+SUPPLY_MOVEMENT_KINDS: tuple[str, ...] = (SUPPLY_IN, SUPPLY_OUT)
+
+
+class Supply(OrgScoped, Base):
+    """Позиция склада: что расходуется и сколько осталось.
+
+    Зачем это вообще нужно. До сих пор расходники списывали «на глаз»: взял
+    упаковку перчаток — сказал вслух, а к концу месяца недостача, и никто не
+    помнит, куда ушло. Полноценный складской учёт (партии, поставщики, цены)
+    здесь не нужен и не будет поддерживаться: им занимаются другие системы.
+    Нужно ровно одно — **кто и когда взял и сколько осталось**.
+
+    Поэтому остаток — одно число в позиции, а не сумма партий. Движения
+    (`SupplyMovement`) хранят историю, но остаток читается из строки: экран
+    склада открывается в подвале на слабом телефоне, и считать сумму по всей
+    истории каждый раз — лишняя работа без пользы.
+
+    `quantity` — `Numeric(10, 2)`, потому что литры и килограммы дробные.
+    Штучные позиции просто не используют дробную часть.
+
+    `min_quantity` — порог, ниже которого позиция помечается «мало». Это не
+    автоматический заказ: система не знает поставщика и сроки, а ложная
+    тревога быстро приучает игнорировать плашку.
+    """
+
+    __tablename__ = "supplies"
+    __table_args__ = (
+        Index("ix_supplies_org_active", "org_id", "is_active"),
+        CheckConstraint("quantity >= 0", name="ck_supplies_quantity"),
+        CheckConstraint("min_quantity >= 0", name="ck_supplies_min"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    unit: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="шт", server_default="шт"
+    )
+    quantity: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, default=Decimal("0"), server_default="0"
+    )
+    min_quantity: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, default=Decimal("0"), server_default="0"
+    )
+    department_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class SupplyMovement(OrgScoped, Base):
+    """Одно движение по складу: приход или списание.
+
+    Почему отдельная таблица, а не «остаток и пара полей». Спор всегда об одном:
+    «я не брал» против «брал». Остаток этого не докажет, а строка с автором,
+    временем и комментарием — докажет.
+
+    `kind` — `in`/`out`. Приход делает руководитель, списание — любой сотрудник:
+    именно он физически берёт расходник, и требовать от него отдельного экрана
+    значит вернуть «сказал вслух».
+
+    `comment` — свободный текст, а не справочник причин: причины в каждой
+    кухне свои, и заставлять выбирать «прочее» — худший из вариантов.
+    """
+
+    __tablename__ = "supply_movements"
+    __table_args__ = (
+        Index("ix_supply_movements_order", "supply_id", "created_at"),
+        CheckConstraint("quantity > 0", name="ck_supply_movements_quantity"),
+        CheckConstraint(
+            _in_list("kind", SUPPLY_MOVEMENT_KINDS), name="ck_supply_movements_kind"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    supply_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("supplies.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(8), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    comment: Mapped[str | None] = mapped_column(String(300))
+    employee_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class MenuItem(OrgScoped, Base):

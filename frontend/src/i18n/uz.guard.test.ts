@@ -91,6 +91,7 @@ const SHIFT_SCREENS = [
   "features/issues/IssuesScreen.tsx",
   "features/hr/WeekSummaryScreen.tsx",
   "features/admin/MentorshipScreen.tsx",
+  "features/hr/SuppliesScreen.tsx",
   "features/menu/MenuList.tsx",
   "features/menu/StopListBanner.tsx",
 ];

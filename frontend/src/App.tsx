@@ -24,6 +24,7 @@ import {
 } from "./api/hr";
 const HrFeedScreen = lazy(() => import("./features/hr/HrFeedScreen"));
 const IssuesScreen = lazy(() => import("./features/issues/IssuesScreen"));
+const SuppliesScreen = lazy(() => import("./features/hr/SuppliesScreen"));
 const HandoversScreen = lazy(() => import("./features/handovers/HandoversScreen"));
 const StandardsScreen = lazy(() => import("./features/hr/StandardsScreen"));
 const AskScreen = lazy(() => import("./features/hr/AskScreen"));
@@ -674,6 +675,12 @@ export default function App() {
     content = (
       <main className="flex-1 overflow-hidden flex flex-col">
         <IssuesScreen />
+      </main>
+    );
+  } else if (tab === "supplies") {
+    content = (
+      <main className="flex-1 overflow-hidden flex flex-col">
+        <SuppliesScreen onBack={() => setTab("tasks")} />
       </main>
     );
   } else if (tab === "handovers") {

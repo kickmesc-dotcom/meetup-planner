@@ -289,6 +289,20 @@ export default function MyTasksScreen() {
             >
               <Icon name="book" size={18} />
             </button>
+            {/* Склад рядом с работой смены: расходник берут в процессе, а не
+                вспоминают в конце недели, куда он делся. */}
+            <button
+              type="button"
+              onClick={() => {
+                haptic("selection");
+                setTab("supplies");
+              }}
+              className="grid min-h-11 min-w-11 place-items-center rounded-tile bg-tg-secondary-bg text-tg-text leading-none"
+              aria-label={tx("Расходники")}
+              title={tx("Расходники")}
+            >
+              <Icon name="box" size={18} />
+            </button>
             {meQ.data?.is_aup && (
               <button
                 type="button"

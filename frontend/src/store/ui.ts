@@ -77,6 +77,8 @@ export type Tab =
   | "meetings"
   | "team"
   | "issues"
+  /** Склад расходников: остаток и кто взял. */
+  | "supplies"
   | "handovers"
   /** База стандартов и тесты по инструкциям. */
   | "standards"
