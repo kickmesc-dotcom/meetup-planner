@@ -11,6 +11,10 @@
  * зала и закрытие смены, фотоотчёт, заметка) и «Мои задачи» (список, приёмка,
  * проблемы, сроки). Это то, что человек видит в каждой смене.
  *
+ * С 13.11.2026 сюда же входит весь путь руководителя и меню: недельная сводка,
+ * первая неделя новичка, стоп-лист и фильтр меню. Список «ключевых экранов»
+ * закреплён тестом — новая строка в них без перевода роняет сборку.
+ *
  * Что остаётся русским и почему это осознанно: остальные экраны. Русский здесь
  * не «дыра», а запасной вариант — `tx` возвращает оригинал, если перевода нет.
  * Русский в команде понимает каждый, поэтому непереведённая строка читается, а
@@ -638,4 +642,67 @@ export const UZ_CONTENT: Record<string, string> = {
   "Вариант": "Variant",
   "+ Вопрос": "+ Savol",
   "Сохранить стандарт": "Standartni saqlash",
+  // ---- ключевые экраны смены: задачи, чек-лист, проблемы (13.11.2026) ----
+  "Ждут отправки: {count}": "Yuborilishi kutilmoqda: {count}",
+  "Нет связи — отметка отправится сама, как только она появится.":
+    "Aloqa yoʻq — belgi aloqa paydo boʻlishi bilan oʻzi yuboriladi.",
+  "Сервер не принял часть отметок — проверь список поручений.":
+    "Server baʼzi belgilarni qabul qilmadi — topshiriqlar roʻyxatini tekshiring.",
+  "Нет связи — статус отправится сам, как только она появится.":
+    "Aloqa yoʻq — holat aloqa paydo boʻlishi bilan oʻzi yuboriladi.",
+  "Сервер не принял смену статуса — проверь карточку.":
+    "Server holat oʻzgarishini qabul qilmadi — kartani tekshiring.",
+  "Проблем нет": "Muammolar yoʻq",
+  "Проблем: {count}. Показано {shown}.":
+    "Muammolar: {count}. Koʻrsatilgan: {shown}.",
+  "Залы": "Zallar",
+  "Открыть": "Ochish",
+  // ---- недельная сводка «что мешало смене» ----
+  "Что мешало смене": "Smenaga nima xalaqit berdi",
+  "Последние 7 дней": "Oxirgi 7 kun",
+  "Назад к отчёту": "Hisobotga qaytish",
+  "Новые проблемы": "Yangi muammolar",
+  "Открыто сейчас": "Hozir ochiq",
+  "Просрочено поручений": "Muddati oʻtgan topshiriqlar",
+  "Сделано поручений: {done}, из них с опозданием — {late}.":
+    "Bajarilgan topshiriqlar: {done}, shundan kechikkan — {late}.",
+  "Чаще всего мешало": "Koʻproq xalaqit bergan",
+  "Проблемы за неделю": "Haftadagi muammolar",
+  "За неделю проблем не заводили — хороший знак.":
+    "Bir hafta davomida muammo qayd etilmagan — yaxshi belgi.",
+  "{days} дн": "{days} kun",
+  "закрыта": "yopilgan",
+  // ---- первая неделя новичка ----
+  "Первая неделя": "Birinchi hafta",
+  "Новички и наставники": "Yangi xodimlar va murabbiylar",
+  "Новички за {days} дн: {count}": "{days} kundagi yangi xodimlar: {count}",
+  "За две недели новых сотрудников не было.":
+    "Ikki hafta ichida yangi xodimlar boʻlmadi.",
+  "Требуют внимания: {count}. Спросите, всё ли в порядке.":
+    "Eʼtibor talab qiladi: {count}. Ahvollari yaxshimi, soʻrab koʻring.",
+  "Все новички заходят и закрывают поручения вовремя.":
+    "Barcha yangi xodimlar kirib, topshiriqlarni oʻz vaqtida yopadi.",
+  "{days} дн в команде": "Jamoada {days} kun",
+  "Смен за неделю: {count}": "Haftada smenalar: {count}",
+  "Просрочено: {count}": "Muddati oʻtgan: {count}",
+  "Наставник": "Murabbiy",
+  "Не назначен": "Tayinlanmagan",
+  "внимание": "eʼtibor",
+  // ---- меню и стоп-лист ----
+  "Стоп-лист": "Toʻxtatilganlar",
+  "Стоп-лист ({count})": "Toʻxtatilganlar ({count})",
+  "В наличии": "Mavjud",
+  "нет в наличии": "mavjud emas",
+  "по запросу": "soʻrov boʻyicha",
+  "Меню пока пустое.": "Menyu hozircha boʻsh.",
+  "В стоп-листе сейчас ничего нет.":
+    "Hozir toʻxtatilganlar roʻyxatida hech narsa yoʻq.",
+  "Всё в стоп-листе.": "Hammasi toʻxtatilganlar roʻyxatida.",
+  "Вернуть": "Qaytarish",
+  "Вернуть в меню": "Menyuga qaytarish",
+  "Убрать": "Olib tashlash",
+  "Убрать из меню на сегодня": "Bugun uchun menyudan olib tashlash",
+  "Изменить позицию": "Pozitsiyani oʻzgartirish",
+  "Удалить позицию": "Pozitsiyani oʻchirish",
+  "Фильтр меню": "Menyu filtri",
 };

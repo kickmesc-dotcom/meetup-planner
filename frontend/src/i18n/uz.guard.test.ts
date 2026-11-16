@@ -30,7 +30,7 @@ const CYRILLIC = /[А-Яа-яЁё]/;
 // руководителя: «Сказал — стало поручением», «Команда» и «Проблемы».
 // Граница поднята вместе с переводом, а не заранее; небольшой люфт оставлен на
 // осознанное удаление устаревшей строки, но не на потерю экрана.
-const MIN_CONTENT_LINES = 276;
+const MIN_CONTENT_LINES = 500;
 
 function placeholders(text: string): string[] {
   return [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
@@ -72,6 +72,31 @@ describe("узбекский словарь интерфейса", () => {
   });
 });
 
+const sources = import.meta.glob("../**/*.{ts,tsx}", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+/**
+ * Экраны, которые сотрудник видит в каждой смене.
+ *
+ * Список — обещание, а не отчёт: если строка появилась здесь, её обязаны
+ * перевести вместе с экраном. Остальные экраны могут оставаться русскими:
+ * `tx` тогда вернёт оригинал, и это читаемо.
+ */
+const SHIFT_SCREENS = [
+  "features/hr/MyTasksScreen.tsx",
+  "features/hr/ChecklistScreen.tsx",
+  "features/issues/IssuesScreen.tsx",
+  "features/hr/WeekSummaryScreen.tsx",
+  "features/admin/MentorshipScreen.tsx",
+  "features/menu/MenuList.tsx",
+  "features/menu/StopListBanner.tsx",
+];
+
+const TX = /tx\(\s*"((?:[^"\\]|\\.)*)"/g;
+
 describe("узбекский словарь экранов", () => {
   it("каждый ключ существует в английском словаре — иначе опечатка", () => {
     const unknown = Object.keys(UZ_CONTENT).filter((key) => !(key in EN_CONTENT));
@@ -105,5 +130,20 @@ describe("узбекский словарь экранов", () => {
     expect(Object.keys(UZ_CONTENT).length).toBeGreaterThanOrEqual(
       MIN_CONTENT_LINES,
     );
+  });
+
+  it("переводит все строки ключевых экранов смены", () => {
+    const missing: string[] = [];
+    for (const file of SHIFT_SCREENS) {
+      const entry = Object.entries(sources).find(([path]) => path.endsWith(file));
+      if (!entry) {
+        missing.push(`${file}: исходник не найден`);
+        continue;
+      }
+      for (const match of entry[1].matchAll(TX)) {
+        if (!(match[1] in UZ_CONTENT)) missing.push(`${file}: ${match[1]}`);
+      }
+    }
+    expect(missing).toEqual([]);
   });
 });
