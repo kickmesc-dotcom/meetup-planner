@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { trackFeature } from "@/lib/product";
 import { humanizeApiError } from "@/api/client";
 import {
   fetchTrainees,
@@ -30,6 +32,10 @@ export default function MentorshipScreen({ onBack }: { onBack: () => void }) {
   const { tx } = useTx();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["admin", "trainees"], queryFn: () => fetchTrainees() });
+  useEffect(() => {
+    trackFeature("mentorship", "open");
+  }, []);
+
   const poolQ = useQuery({
     queryKey: ["admin", "employees-pool"],
     queryFn: fetchEmployeesPool,
@@ -39,7 +45,8 @@ export default function MentorshipScreen({ onBack }: { onBack: () => void }) {
   const assign = useMutation({
     mutationFn: ({ id, mentor }: { id: number; mentor: number | null }) =>
       setTraineeMentor(id, mentor),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      trackFeature("mentorship", variables.mentor === null ? "unassign" : "assign");
       void qc.invalidateQueries({ queryKey: ["admin", "trainees"] });
     },
     onError: (error) => void showAlert(humanizeApiError(error)),

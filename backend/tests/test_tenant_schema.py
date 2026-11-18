@@ -113,6 +113,7 @@ TENANT_TABLES: set[str] = {
     # Склад расходников: и позиции, и движения принадлежат организации.
     "supplies",
     "supply_movements",
+    "product_events",
     "music_game_rounds",
     "music_selections",
     "music_track_likes",
@@ -415,6 +416,7 @@ def test_migration_0054_covers_every_tenant_table() -> None:
         "api_import_runs",  # 0071
         "supplies",  # 0077
         "supply_movements",  # 0077
+        "product_events",  # 0078
     }  # 0057, 0058, 0062, 0064, 0066, 0068, 0069, 0070, 0071, 0077
     assert set(module.TENANT_TABLES) == TENANT_TABLES - already - created_later
 

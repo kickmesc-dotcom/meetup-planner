@@ -185,6 +185,16 @@ export const setIssueStatus = (
     body: JSON.stringify({ status, comment }),
   });
 
+/** Из проблемы — поручение. Исполнителем станет ответственный или автор. */
+export const createTaskFromIssue = (
+  issueId: number,
+  body: { assignee_employee_id?: number; due_at?: string } = {},
+) =>
+  api<{ task_id: number; title: string }>(`/api/issues/${issueId}/task`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+
 export const commentIssue = (issueId: number, text: string) =>
   api<HrIssueDetail>(`/api/issues/${issueId}/comments`, {
     method: "POST",

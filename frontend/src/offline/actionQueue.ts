@@ -47,6 +47,15 @@ export type QueuedAction =
       comment?: string;
       label?: string;
       queued_at: string;
+    }
+  | {
+      kind: "supply";
+      id: number;
+      /** Приход/списание; пересчёт офлайн не ставим — он требует точного факта. */
+      movement: "in" | "out";
+      quantity: number;
+      comment?: string | null;
+      queued_at: string;
     };
 
 type NewAction = QueuedAction extends infer T
@@ -88,7 +97,9 @@ function readQueue(): QueuedAction[] {
       if (typeof item !== "object" || item === null) return false;
       const entry = item as Partial<QueuedAction>;
       return (
-        (entry.kind === "task" || entry.kind === "issue") &&
+        (entry.kind === "task" ||
+          entry.kind === "issue" ||
+          entry.kind === "supply") &&
         typeof entry.id === "number"
       );
     });
@@ -110,7 +121,7 @@ export function pendingActions(): QueuedAction[] {
   return readQueue();
 }
 
-export function pendingActionsCount(kind?: "task" | "issue"): number {
+export function pendingActionsCount(kind?: "task" | "issue" | "supply"): number {
   const queue = readQueue();
   return kind ? queue.filter((item) => item.kind === kind).length : queue.length;
 }

@@ -20,9 +20,14 @@ from __future__ import annotations
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, Request, Response
-from pydantic import BaseModel, Field, model_validator
+from datetime import datetime, timedelta, timezone
 
+from fastapi import APIRouter, Query, Request, Response
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import func, select
+
+from app.api.deps import AupDep, EmployeeDep, SessionDep
+from app.db.hr_models import ProductEvent
 from app.services import rum
 
 router = APIRouter(tags=["telemetry"])
@@ -85,6 +90,80 @@ async def accept_client_error(payload: ClientErrorIn) -> Response:
         component_stack=payload.component_stack,
     )
     return Response(status_code=204)
+
+
+class ProductEventIn(BaseModel):
+    """Действие в интерфейсе: «склад», «списали», «наставник».
+
+    Словарь фич/действий открытый, но ограниченный по форме: латиница
+    в нижнем регистре, цифры, точка и подчёркивание. Свободный текст здесь
+    превратился бы в канал для данных, которых мы собирать не собираемся.
+    """
+
+    feature: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_-]+$")
+    action: str = Field(min_length=1, max_length=64, pattern=r"^[a-z0-9_-]+$")
+    screen: str | None = Field(default=None, max_length=64, pattern=r"^[a-z0-9_-]+$")
+    device: str = Field(default="", max_length=32)
+
+
+@router.post("/telemetry/product", status_code=204)
+async def accept_product_event(
+    payload: ProductEventIn, session: SessionDep, employee: EmployeeDep
+) -> Response:
+    """Счётчик «фича + действие». Без ответа: фронту нечего с ним делать.
+
+    Требует входа (`EmployeeDep`): это не ошибка, которую надо поймать до
+    авторизации, а использование — у анонимного запроса нет организации, и
+    событие легко накрутить извне.
+    """
+    session.add(
+        ProductEvent(
+            org_id=employee.org_id,
+            feature=payload.feature,
+            action=payload.action,
+            screen=payload.screen,
+            device=payload.device[:32],
+        )
+    )
+    await session.commit()
+    return Response(status_code=204)
+
+
+class FeatureUsageOut(BaseModel):
+    feature: str
+    action: str
+    count: int
+
+
+@router.get("/admin/telemetry/features", response_model=list[FeatureUsageOut])
+async def feature_usage(
+    session: SessionDep,
+    employee: AupDep,
+    days: int = Query(14, ge=1, le=90),
+) -> list[FeatureUsageOut]:
+    """Что и сколько раз использовали за период. Сортировка — от частого.
+
+    Сознательно без уникальных людей: ответ на вопрос «фича нужна?» даёт
+    частота действий, а не число сотрудников, и второе уже похоже на
+    наблюдение за человеком.
+    """
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = (
+        await session.execute(
+            select(ProductEvent.feature, ProductEvent.action, func.count())
+            .where(
+                ProductEvent.org_id == employee.org_id,
+                ProductEvent.created_at >= since,
+            )
+            .group_by(ProductEvent.feature, ProductEvent.action)
+            .order_by(func.count().desc(), ProductEvent.feature)
+            .limit(200)
+        )
+    ).all()
+    return [
+        FeatureUsageOut(feature=feature, action=action, count=int(count))
+        for feature, action, count in rows
+    ]
 
 
 class VitalsIn(BaseModel):

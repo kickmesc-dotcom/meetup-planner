@@ -1912,6 +1912,11 @@ class Supply(OrgScoped, Base):
     department_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("departments.id", ondelete="SET NULL")
     )
+    # Потолок списания на смену. `NULL` — без ограничения (перчатки, салфетки).
+    # Нужен для дорогих позиций: бытовая химия и инструмент списываются не
+    # «сколько взял», а «сколько разрешено»; превышение — повод для руководителя
+    # разобраться, а не молчаливая дыра в остатках.
+    max_out_per_shift: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
@@ -1959,8 +1964,49 @@ class SupplyMovement(OrgScoped, Base):
     kind: Mapped[str] = mapped_column(String(8), nullable=False)
     quantity: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     comment: Mapped[str | None] = mapped_column(String(300))
+    # Пересчёт: движение создано сверкой «учёт против факта», а не тем, что
+    # кто-то взял расходник. Отчёт по расхождениям фильтрует именно по нему,
+    # иначе пришлось бы угадывать по тексту комментария.
+    is_inventory: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     employee_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("employees.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ProductEvent(OrgScoped, Base):
+    """Одно действие в интерфейсе: «открыли склад», «списали», «назначили наставника».
+
+    Зачем. Десять фич можно сделать хорошо и всё равно не узнать, пользуются ли
+    ими: ошибки ловятся телеметрией, а отсутствие интереса — нет. Здесь только
+    счётчики действий, без имён и текстов: вопрос «этим пользуются?» решается
+    числом, а не слежкой за человеком.
+
+    Почему своя таблица, а не лог. Лог отвечает «что случилось сейчас», а здесь
+    нужен ответ «сколько раз за неделю»: `GROUP BY feature, action` по индексу
+    дешевле, чем разбор строк логов, и не требует внешней системы.
+
+    `org_id` обязателен: сводка показывается руководителю и не должна смешивать
+    организации. `device` — только тип (android/ios/desktop), без модели и ОС.
+    """
+
+    __tablename__ = "product_events"
+    __table_args__ = (
+        Index("ix_product_events_lookup", "org_id", "created_at", "feature"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True
+    )
+    feature: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    screen: Mapped[str | None] = mapped_column(String(64))
+    device: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="", server_default=""
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -71,12 +71,14 @@ async def test_create_and_withdraw(session) -> None:
     assert item.quantity == 10
     assert item.low is False
 
-    updated, movement = await hr_supplies.move(
+    result = await hr_supplies.move(
         session, viewer=worker, supply_id=item.id, kind="out", quantity=10, comment="Смена"
     )
-    assert updated.quantity == 0
-    assert updated.low is True
-    assert movement.employee_name is None  # имя подтягивается в истории
+    assert result.supply.quantity == 0
+    assert result.supply.low is True
+    assert result.movement.employee_name is None  # имя подтягивается в истории
+    # Первое движение через порог — повод для push, повторные — нет.
+    assert result.crossed_low is True
 
     history = await hr_supplies.history(session, viewer=worker, supply_id=item.id)
     assert [row.kind for row in history] == ["out", "in"]
@@ -116,10 +118,47 @@ async def test_fractional_quantities_keep_two_decimals(session) -> None:
     item = await hr_supplies.create_supply(
         session, viewer=admin, name="Средство", unit="л", quantity="1.5"
     )
-    updated, _ = await hr_supplies.move(
+    result = await hr_supplies.move(
         session, viewer=admin, supply_id=item.id, kind="out", quantity="0.75"
     )
-    assert updated.quantity == 0.75
+    assert result.supply.quantity == 0.75
+
+
+async def test_limit_blocks_extra_withdrawals(session) -> None:
+    admin, worker = await _people(session)
+    item = await hr_supplies.create_supply(
+        session, viewer=admin, name="Химия", quantity=10, max_out_per_shift=2
+    )
+
+    await hr_supplies.move(
+        session, viewer=worker, supply_id=item.id, kind="out", quantity=1.5
+    )
+    with pytest.raises(hr_supplies.SupplyError, match="limit_exceeded"):
+        await hr_supplies.move(
+            session, viewer=worker, supply_id=item.id, kind="out", quantity=1
+        )
+    # Инвентаризация — не списание: лимит не должен мешать сверке.
+    counted = await hr_supplies.count_supply(
+        session, viewer=admin, supply_id=item.id, quantity=6
+    )
+    assert counted.delta == -2.5
+
+
+async def test_inventory_records_discrepancy(session) -> None:
+    admin, _worker = await _people(session)
+    item = await hr_supplies.create_supply(session, viewer=admin, name="Мешки", quantity=10)
+
+    result = await hr_supplies.count_supply(
+        session, viewer=admin, supply_id=item.id, quantity=7, comment="порвались"
+    )
+    assert result.delta == -3
+    assert result.supply.quantity == 7
+    assert result.movement is not None and result.movement.is_inventory is True
+
+    rows = await hr_supplies.discrepancies(session, viewer=admin, days=30)
+    assert len(rows) == 1
+    assert rows[0].delta == -3
+    assert "порвались" in (rows[0].comment or "")
 
 
 async def test_employee_without_department_sees_only_shared(session) -> None:

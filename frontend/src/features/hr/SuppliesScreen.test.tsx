@@ -39,8 +39,9 @@ const GLOVES: Supply = {
   unit: "пар",
   quantity: 0,
   min_quantity: 2,
-  low: true,
-  department_id: null,
+      low: true,
+    max_out_per_shift: null,
+    department_id: null,
   department: null,
   updated_at: "2026-11-13T09:00:00Z",
 };
@@ -77,12 +78,14 @@ describe("SuppliesScreen", () => {
   it("списывает количество с комментарием", async () => {
     vi.mocked(moveSupply).mockResolvedValue({
       supply: { ...GLOVES, quantity: 0 },
+      crossed_low: true,
       movement: {
         id: 1,
         kind: "out",
         quantity: 3,
         comment: "Вечерняя смена",
         employee_name: "Борис",
+        is_inventory: false,
         created_at: "2026-11-13T10:00:00Z",
       },
     });

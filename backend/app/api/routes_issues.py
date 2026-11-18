@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import EmployeeDep, SessionDep
+from app.api.deps import AupDep, EmployeeDep, SessionDep
 from app.db.hr_models import (
     ISSUE_CATEGORIES,
     ISSUE_SEVERITIES,
@@ -25,9 +25,10 @@ from app.db.hr_models import (
     Department,
     Employee,
     Issue,
+    IssueEvent,
 )
 from app.db.models import User
-from app.services import hr_issues, hr_notify, hr_simulation
+from app.services import hr_issues, hr_notify, hr_simulation, hr_tasks
 
 router = APIRouter(tags=["issues"])
 
@@ -79,6 +80,21 @@ class IssueEventOut(BaseModel):
 class IssueDetailOut(IssueOut):
     events: list[IssueEventOut]
     can_comment: bool
+
+
+class IssueTaskIn(BaseModel):
+    """Из проблемы — поручение. Пустые поля берём из самой проблемы."""
+
+    assignee_employee_id: int | None = None
+    due_at: datetime | None = None
+    comment: str | None = Field(default=None, max_length=300)
+
+
+class IssueTaskOut(BaseModel):
+    task_id: int
+    title: str
+    assignee_employee_id: int | None
+    due_at: datetime | None
 
 
 class IssueSummaryOut(BaseModel):
@@ -478,6 +494,80 @@ async def change_issue_status(
     await session.commit()
     await session.refresh(issue)
     return await _detail(session, issue, employee)
+
+
+@router.post("/issues/{issue_id}/task", response_model=IssueTaskOut, status_code=201)
+async def task_from_issue(
+    issue_id: int,
+    body: IssueTaskIn,
+    session: SessionDep,
+    employee: AupDep,
+) -> IssueTaskOut:
+    """Превратить проблему в поручение конкретному человеку.
+
+    Зачем отдельная ручка, а не два шага вручную: проблема без исполнителя
+    живёт в журнале месяцами. Здесь руководитель в один тап назначает, кто и
+    когда исправит, а связь остаётся в обеих записях.
+
+    Исполнитель — всегда человек: поручение «всему отделу» из проблемы
+    размывает ответственность, а исходная проблема уже знает свой отдел.
+    """
+    issue = await hr_issues.get_issue(session, issue_id)
+    if issue is None or issue.org_id != employee.org_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="issue_not_found")
+    if issue.task_id is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="already_linked")
+
+    assignee_id = (
+        body.assignee_employee_id
+        or issue.assignee_employee_id
+        or (int(employee.id) if hr_simulation.current() is not None else None)
+    )
+    if assignee_id is None:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, detail="assignee_required"
+        )
+    if hr_simulation.current() is not None and assignee_id != int(employee.id):
+        # В режиме проверки не будим живого человека — только себя.
+        assignee_id = int(employee.id)
+
+    try:
+        task = await hr_tasks.create_task(
+            session,
+            creator=employee,
+            title=issue.title,
+            scope="employee",
+            description=(
+                (issue.description or "") + "\n\nИз проблемы №" + str(issue.id)
+            ).strip(),
+            department_id=issue.department_id,
+            assignee_employee_id=assignee_id,
+            due_at=body.due_at,
+            comment=body.comment,
+        )
+    except hr_tasks.TaskError as exc:
+        await session.rollback()
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    issue.task_id = task.id
+    session.add(
+        IssueEvent(
+            issue_id=issue.id,
+            kind="comment",
+            by_employee_id=employee.id,
+            comment=f"Создано поручение №{task.id}",
+        )
+    )
+    recipients = await hr_tasks.assignees(session, task)
+    await hr_notify.notify_task_assigned(session, task, recipients)
+    await session.commit()
+    await session.refresh(task)
+    return IssueTaskOut(
+        task_id=int(task.id),
+        title=task.title,
+        assignee_employee_id=task.assignee_employee_id,
+        due_at=task.due_at,
+    )
 
 
 @router.post("/issues/{issue_id}/comments", response_model=IssueDetailOut)

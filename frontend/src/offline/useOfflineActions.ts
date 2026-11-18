@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { runTaskAction } from "@/api/hr";
 import { setIssueStatus } from "@/api/issues";
+import { moveSupply } from "@/api/supplies";
 import {
   flushActions,
   pendingActionsCount,
@@ -20,6 +21,13 @@ import {
  */
 async function send(action: QueuedAction): Promise<unknown> {
   if (action.kind === "task") return runTaskAction(action.id, action.action);
+  if (action.kind === "supply") {
+    return moveSupply(action.id, {
+      kind: action.movement,
+      quantity: action.quantity,
+      comment: action.comment ?? null,
+    });
+  }
   return setIssueStatus(action.id, action.status, action.comment);
 }
 

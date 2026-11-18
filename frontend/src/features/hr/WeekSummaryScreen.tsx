@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { trackFeature } from "@/lib/product";
 import { fetchWeekSummary, type HrWeekBlocker } from "@/api/hr";
 import { ISSUE_CATEGORY_ICON, ISSUE_CATEGORY_LABEL, type IssueCategory } from "@/api/issues";
 import ErrorState from "@/components/ErrorState";
@@ -25,6 +27,11 @@ export default function WeekSummaryScreen({
   departmentId?: number | null;
 }) {
   const { tx } = useTx();
+
+  useEffect(() => {
+    trackFeature("week_summary", "open");
+  }, []);
+
   const q = useQuery({
     queryKey: ["week-summary", departmentId],
     queryFn: () => fetchWeekSummary(departmentId),

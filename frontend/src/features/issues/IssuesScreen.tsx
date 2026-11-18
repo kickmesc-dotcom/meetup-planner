@@ -7,6 +7,7 @@ import {
   ISSUE_STATUS_LABEL,
   commentIssue,
   createIssue,
+  createTaskFromIssue,
   fetchIssue,
   fetchIssues,
   setIssueStatus,
@@ -577,6 +578,17 @@ function IssueSheet({
     },
     onError: (e) => void showAlert(humanizeApiError(e)),
   });
+  const taskM = useMutation({
+    mutationFn: () => createTaskFromIssue(issueId),
+    onSuccess: async (task) => {
+      haptic("success");
+      void showAlert(tx("Поручение №{id} создано", { id: String(task.task_id) }));
+      await detailQ.refetch();
+      void qc.invalidateQueries({ queryKey: ["hr-issues"] });
+    },
+    onError: (e) => void showAlert(humanizeApiError(e)),
+  });
+
   const assignM = useMutation({
     mutationFn: (employeeId: number | null) =>
       updateIssue(issueId, {
@@ -672,6 +684,17 @@ function IssueSheet({
                   disabled={busy}
                   onClick={() => statusM.mutate("open")}
                 >{tx("Переоткрыть")}</ActionButton>
+              )}
+            {issue.can_close &&
+              issue.task_id === null &&
+              (issue.status === "open" || issue.status === "in_progress") && (
+                <ActionButton
+                  variant="ghost"
+                  disabled={busy || taskM.isPending}
+                  onClick={() => taskM.mutate()}
+                >
+                  {taskM.isPending ? tx("Создаю…") : tx("Поручение")}
+                </ActionButton>
               )}
             {meId !== null &&
               issue.assignee_employee_id !== meId &&

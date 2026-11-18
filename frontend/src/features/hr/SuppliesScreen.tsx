@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { humanizeApiError } from "@/api/client";
 import { fetchEmployee } from "@/api/hr";
 import {
+  countSupply,
   createSupply,
+  fetchDiscrepancies,
   fetchSupplies,
   fetchSupplyMovements,
   moveSupply,
@@ -14,6 +16,10 @@ import ErrorState from "@/components/ErrorState";
 import Icon from "@/components/Icon";
 import { ListSkeleton } from "@/components/Skeleton";
 import { haptic, showAlert } from "@/tg/webapp";
+import { showToast } from "@/components/toast";
+import { trackFeature } from "@/lib/product";
+import { enqueueAction, isRetryable } from "@/offline/actionQueue";
+import { useOfflineActions } from "@/offline/useOfflineActions";
 import { useTx } from "@/i18n";
 import SubScreen from "@/features/admin/SubScreen";
 
@@ -41,10 +47,24 @@ export default function SuppliesScreen({ onBack }: { onBack: () => void }) {
   const [openId, setOpenId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
 
+  useEffect(() => {
+    trackFeature("supplies", "open");
+  }, []);
+
+  // Списание из кладовой без сети не теряется — та же очередь, что у задач.
+  const offline = useOfflineActions(() => refresh());
+
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["supplies"] });
     void qc.invalidateQueries({ queryKey: ["supply-movements"] });
   };
+
+  const discrepanciesQ = useQuery({
+    queryKey: ["supply-discrepancies"],
+    queryFn: fetchDiscrepancies,
+    enabled: canReceive,
+    staleTime: 60_000,
+  });
 
   const items = q.data ?? [];
   const low = items.filter((item) => item.low);
@@ -83,6 +103,42 @@ export default function SuppliesScreen({ onBack }: { onBack: () => void }) {
               refresh();
             }}
           />
+        )}
+
+        {offline.pending > 0 && (
+          <div className="rounded-tile bg-tg-secondary-bg/60 px-3 py-2 text-2xs text-tg-hint">
+            {tx("Ждут отправки: {count}", { count: offline.pending })}
+          </div>
+        )}
+
+        {canReceive && (discrepanciesQ.data ?? []).length > 0 && (
+          <section className="space-y-1">
+            <h2 className="text-heading text-tg-text">{tx("Расхождения за месяц")}</h2>
+            <div className="divide-y divide-tg-secondary-bg/70 overflow-hidden rounded-card bg-tg-secondary-bg/30">
+              {(discrepanciesQ.data ?? []).slice(0, 5).map((row) => (
+                <div
+                  key={`${row.supply_id}-${row.created_at}`}
+                  className="flex items-center gap-2 px-3 py-1.5 text-2xs text-tg-hint"
+                >
+                  <span
+                    className={
+                      row.delta < 0 ? "text-status-busy" : "text-status-free"
+                    }
+                  >
+                    {row.delta > 0 ? "+" : "−"}
+                    {formatQty(Math.abs(row.delta))} {row.unit}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{row.supply_name}</span>
+                  <span className="shrink-0 tabular-nums">
+                    {new Date(row.created_at).toLocaleDateString(undefined, {
+                      day: "2-digit",
+                      month: "2-digit",
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {q.data && items.length === 0 && (
@@ -126,19 +182,68 @@ function SupplyCard({
   const [amount, setAmount] = useState("1");
   const [comment, setComment] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [counting, setCounting] = useState(false);
+  const [fact, setFact] = useState("");
+  const [countComment, setCountComment] = useState("");
 
   const move = useMutation({
-    mutationFn: () =>
-      moveSupply(item.id, {
-        kind: kind ?? "out",
-        quantity: Number(amount.replace(",", ".")),
-        comment: comment.trim() || null,
-      }),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const quantity = Number(amount.replace(",", "."));
+      try {
+        return await moveSupply(item.id, {
+          kind: kind ?? "out",
+          quantity,
+          comment: comment.trim() || null,
+        });
+      } catch (error) {
+        // Нет сети в кладовой — обычное дело; движение встанет в очередь и
+        // уйдёт само, когда связь вернётся.
+        if (!isRetryable(error)) throw error;
+        enqueueAction({
+          kind: "supply",
+          id: item.id,
+          movement: kind ?? "out",
+          quantity,
+          comment: comment.trim() || null,
+        });
+        return null;
+      }
+    },
+    onSuccess: (saved) => {
       haptic("success");
+      if (saved === null) {
+        showToast(tx("Запишем, когда появится сеть"));
+      } else {
+        trackFeature("supplies", kind === "in" ? "receive" : "write_off");
+      }
       setKind(null);
       setAmount("1");
       setComment("");
+      onChanged();
+    },
+    onError: (error) => void showAlert(humanizeApiError(error)),
+  });
+
+  const recount = useMutation({
+    mutationFn: async () => {
+      const quantity = Number(fact.replace(",", "."));
+      const result = await countSupply(item.id, {
+        quantity,
+        comment: countComment.trim() || null,
+      });
+      return result;
+    },
+    onSuccess: (result) => {
+      haptic("success");
+      trackFeature("supplies", result.delta === 0 ? "count_match" : "count_diff");
+      showToast(
+        result.delta === 0
+          ? tx("Совпало: {value}", { value: `${formatQty(item.quantity)} ${item.unit}` })
+          : tx("Записали расхождение: {value}", { value: formatQty(result.delta) }),
+      );
+      setCounting(false);
+      setFact("");
+      setCountComment("");
       onChanged();
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
@@ -170,6 +275,14 @@ function SupplyCard({
           </div>
           <div className="mt-0.5 text-2xs text-tg-hint">
             {[item.department, item.unit].filter(Boolean).join(" · ")}
+            {item.max_out_per_shift !== null && (
+              <>
+                {" · "}
+                {tx("лимит {value} за смену", {
+                  value: formatQty(item.max_out_per_shift),
+                })}
+              </>
+            )}
           </div>
         </div>
         <span
@@ -200,6 +313,18 @@ function SupplyCard({
                   className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs font-medium text-tg-text"
                 >
                   {tx("Приход")}
+                </button>
+              )}
+              {canReceive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCounting(true);
+                    setFact(String(item.quantity));
+                  }}
+                  className="min-h-9 rounded-tile px-3 text-xs font-medium text-tg-link"
+                >
+                  {tx("Пересчитать")}
                 </button>
               )}
               <button
@@ -259,6 +384,54 @@ function SupplyCard({
             </div>
           )}
 
+          {counting && (
+            <div className="space-y-2 rounded-tile bg-tg-bg/60 p-2">
+              <div className="text-2xs text-tg-hint">
+                {tx("Сколько лежит на самом деле: учёт {value}", {
+                  value: `${formatQty(item.quantity)} ${item.unit}`,
+                })}
+              </div>
+              <label className="flex items-center gap-2 text-xs text-tg-hint">
+                <span className="shrink-0">{tx("Фактически")}</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={fact}
+                  onChange={(event) => setFact(event.target.value)}
+                  className="min-h-9 w-24 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+                />
+                <span>{item.unit}</span>
+              </label>
+              <input
+                type="text"
+                value={countComment}
+                maxLength={200}
+                onChange={(event) => setCountComment(event.target.value)}
+                placeholder={tx("Почему разница (необязательно)")}
+                className="min-h-9 w-full rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+              />
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  disabled={recount.isPending || fact.trim() === ""}
+                  onClick={() => recount.mutate()}
+                  className="min-h-9 flex-1 rounded-tile bg-tg-link/15 px-3 text-xs font-medium text-tg-text disabled:opacity-60"
+                >
+                  {recount.isPending ? tx("Записываем…") : tx("Записать факт")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCounting(false)}
+                  className="min-h-9 rounded-tile bg-tg-secondary-bg px-3 text-xs text-tg-hint"
+                >
+                  {tx("Отмена")}
+                </button>
+              </div>
+            </div>
+          )}
+
           {showHistory && (
             <div className="space-y-1">
               {historyQ.isLoading && (
@@ -296,6 +469,11 @@ function MovementRow({ movement, unit }: { movement: SupplyMovement; unit: strin
       <span className="min-w-0 flex-1 truncate">
         {[movement.employee_name, movement.comment].filter(Boolean).join(" · ") ||
           tx("без комментария")}
+        {movement.is_inventory && (
+          <span className="ml-1 rounded-full bg-tg-secondary-bg px-1.5 py-0.5 text-[10px] text-tg-hint">
+            {tx("сверка")}
+          </span>
+        )}
       </span>
       <span className="shrink-0 tabular-nums">{when}</span>
     </div>
@@ -308,6 +486,8 @@ function CreateForm({ onDone }: { onDone: () => void }) {
   const [unit, setUnit] = useState("шт");
   const [quantity, setQuantity] = useState("0");
   const [minQuantity, setMinQuantity] = useState("0");
+  // Лимит необязателен: расходники без него остаются без потолка.
+  const [limit, setLimit] = useState("");
 
   const create = useMutation({
     mutationFn: () =>
@@ -316,9 +496,13 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         unit: unit.trim() || "шт",
         quantity: Number(quantity.replace(",", ".")) || 0,
         min_quantity: Number(minQuantity.replace(",", ".")) || 0,
+        max_out_per_shift: limit.trim()
+          ? Number(limit.replace(",", ".")) || null
+          : null,
       }),
     onSuccess: () => {
       haptic("success");
+      trackFeature("supplies", "create");
       onDone();
     },
     onError: (error) => void showAlert(humanizeApiError(error)),
@@ -369,6 +553,20 @@ function CreateForm({ onDone }: { onDone: () => void }) {
           onChange={(event) => setMinQuantity(event.target.value)}
           className="min-h-9 w-24 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
         />
+      </label>
+      <label className="flex items-center gap-2 text-2xs text-tg-hint">
+        {tx("Лимит за смену")}
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.01"
+          min="0"
+          value={limit}
+          onChange={(event) => setLimit(event.target.value)}
+          placeholder={tx("без лимита")}
+          className="min-h-9 w-24 rounded-tile border border-tg-secondary-bg bg-tg-bg px-2 text-xs text-tg-text"
+        />
+        <span className="text-[10px]">{tx("пусто — можно брать сколько нужно")}</span>
       </label>
       <button
         type="button"
