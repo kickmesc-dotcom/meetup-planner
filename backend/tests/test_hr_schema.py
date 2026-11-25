@@ -84,6 +84,9 @@ HR_MIGRATIONS: tuple[str, ...] = (
     "0078_product_events.py",
     # Пересчёт склада и потолок списания.
     "0079_supply_counts.py",
+    # Фото блюда (`menu_items.photo_blob_id`) и валюта цен организации
+    # (`organizations.currency`).
+    "0080_menu_photo_currency.py",
 )
 
 # Таблицы, которые заводит именно эта миграция (HR-ядро Этапа 1).

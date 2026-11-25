@@ -3,6 +3,41 @@
 Собрано 18.11.2026. Всё, что ниже, требует прав, живой поверхности или
 человека — поэтому не сделано агентом и не выдаётся за сделанное.
 
+## Блокер №0: квота Neon — сервис лежит с 19.11.2026
+
+Симптом: мини-апп в Telegram отвечает «сервис временно недоступен». Причина не
+в коде и не в Telegram.
+
+Цепочка (проверено 25.11.2026):
+
+1. Neon-проект `SemiTaskGHG` (`empty-mud-06883919`), ветка `production`
+   (`br-restless-unit-ba4cvigg`) в состоянии `archived` с 19.11 08:31;
+   последняя операция — `timeline_archive`.
+2. `POST /endpoints/ep-dry-cherry-baraqxe8/start` → **HTTP 423 `quota exceeded`**;
+   любое подключение — `asyncpg.exceptions.InsufficientResourcesError: Your
+   account or project has exceeded the quota. Upgrade your plan to increase
+   limits.`
+3. Контейнер Amvera (`meetup-planner`) в статусе `RUN_PROBLEM`: `CMD python -m
+   app.db.migrate && uvicorn …` падает на миграциях, потому что база не
+   принимает соединение. Процесс не поднимается вообще.
+4. Поэтому 503 отдают все пути, включая `/tg/webhook`. Кнопка меню ведёт на
+   `https://semitaskbot.pages.dev/` — страница жива (200, CSP с
+   `frame-ancestors telegram.org`), но её API мёртв.
+5. Ежедневный бэкап (GitHub Actions → `Backup`) падает на шаге «Снять дамп» с
+   21.11 по той же причине. Последний локальный дамп — `backups/2026-11-11_234035`.
+
+Что нужно от владельца (любой из вариантов):
+
+- Neon Console → Project → Billing: поднять план (Launch) — compute запускается
+  сразу, данные целы, ничего восстанавливать не нужно;
+- дождаться сброса квоты бесплатного плана (начало расчётного периода), затем
+  `python tools/deploy-amvera.py build`;
+- либо согласиться на восстановление из дампа 11.11 в новую базу — тогда
+  теряются данные с 11 по 19 ноября.
+
+После снятия квоты: `python tools/deploy-amvera.py status` → `/readyz` = 200,
+затем открыть мини-апп и пройти смену.
+
 ## Блокер №1: пересборка бэкенда (Amvera)
 
 Прод-API `https://meetup-planner-youmakemefry.waw0.amvera.tech` работает на
@@ -17,6 +52,7 @@
 | 0077 | расходники: позиции, движения |
 | 0078 | счётчики использования фич (`product_events`) |
 | 0079 | пересчёт склада (`is_inventory`) и лимит на смену |
+| 0080 | фото блюда (`menu_items.photo_blob_id`) и валюта цен (`organizations.currency`) |
 
 Порядок:
 

@@ -17,6 +17,7 @@ import {
   createMenuItem,
   deleteMenuItem,
   fetchMenu,
+  setMenuCurrency,
   updateMenuItem,
   type Menu,
 } from "@/api/menu";
@@ -26,6 +27,7 @@ vi.mock("@/api/menu", () => ({
   createMenuItem: vi.fn(),
   updateMenuItem: vi.fn(),
   deleteMenuItem: vi.fn(),
+  setMenuCurrency: vi.fn(),
 }));
 
 vi.mock("@/tg/webapp", () => ({
@@ -44,6 +46,8 @@ const MENU: Menu = {
       category: "Супы",
       description: "с пампушкой",
       price_rub: 320,
+      photo_blob_id: null,
+      photo_url: null,
       is_available: true,
       sort_order: 0,
       updated_at: null,
@@ -54,6 +58,8 @@ const MENU: Menu = {
       category: "Горячее",
       description: null,
       price_rub: null,
+      photo_blob_id: null,
+      photo_url: null,
       is_available: false,
       sort_order: 0,
       updated_at: null,
@@ -61,6 +67,7 @@ const MENU: Menu = {
   ],
   categories: ["Супы", "Горячее"],
   stopped: 1,
+  currency: "RUB",
 };
 
 function renderScreen() {
@@ -80,6 +87,7 @@ beforeEach(() => {
   });
   vi.mocked(createMenuItem).mockResolvedValue(MENU.items[0]);
   vi.mocked(deleteMenuItem).mockResolvedValue(undefined);
+  vi.mocked(setMenuCurrency).mockResolvedValue({ currency: "KZT" });
 });
 
 afterEach(() => {
@@ -132,8 +140,20 @@ describe("MenuScreen", () => {
         name: "Сырники",
         category: undefined,
         price_rub: 390,
+        photo_blob_id: null,
         description: null,
       }),
     );
+  });
+
+  it("меняет валюту цен организацией, а не у каждой позиции", async () => {
+    renderScreen();
+    await screen.findByText("Борщ");
+
+    fireEvent.change(screen.getByLabelText("Валюта цен"), {
+      target: { value: "KZT" },
+    });
+
+    await waitFor(() => expect(setMenuCurrency).toHaveBeenCalledWith("KZT"));
   });
 });

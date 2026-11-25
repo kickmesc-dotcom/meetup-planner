@@ -2028,8 +2028,9 @@ class MenuItem(OrgScoped, Base):
       знаний; дублировать рецепт в меню значило бы держать две правды;
     * остатки на складе — их нет ни в одном контуре, а «полу-учёт» хуже, чем
       честная пометка «нет в наличии»;
-    * фото блюда — сжатие и хранение снимков уже живут в медиа (`hr_media`),
-      и тянуть их сюда ради строки в меню незачем.
+    * байты фото — сжатие и хранение снимков живут в медиа (`hr_media`),
+      поэтому здесь только ссылка `photo_blob_id`. Копия снимка в меню
+      разошлась бы с оригиналом при первой же замене фото.
 
     `price_rub` — целые рубли. Копейки в меню не встречаются, а хранение
     копеек заставляет каждое место интерфейса помнить про деление на 100; для
@@ -2063,6 +2064,12 @@ class MenuItem(OrgScoped, Base):
     )
     description: Mapped[str | None] = mapped_column(String(300))
     price_rub: Mapped[int | None] = mapped_column(Integer)
+    # Снимок блюда из `media_blobs`. `SET NULL` при удалении снимка: позиция
+    # меню важнее картинки и не должна исчезнуть вместе с ней. Валюта цены
+    # здесь не хранится — она у организации (`organizations.currency`).
+    photo_blob_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("media_blobs.id", ondelete="SET NULL")
+    )
     is_available: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

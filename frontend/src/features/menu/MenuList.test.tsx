@@ -22,6 +22,8 @@ const ITEMS: MenuItem[] = [
     category: "Супы",
     description: null,
     price_rub: 320,
+    photo_blob_id: null,
+    photo_url: null,
     is_available: true,
     sort_order: 0,
     updated_at: null,
@@ -32,6 +34,8 @@ const ITEMS: MenuItem[] = [
     category: "Горячее",
     description: null,
     price_rub: null,
+    photo_blob_id: null,
+    photo_url: null,
     is_available: false,
     sort_order: 0,
     updated_at: null,
@@ -64,6 +68,15 @@ describe("MenuList", () => {
     fireEvent.click(screen.getByText("Все"));
     expect(screen.getByText("Борщ")).toBeTruthy();
     expect(screen.getByText("Рыба дня")).toBeTruthy();
+  });
+
+  it("цена показывается в валюте организации", () => {
+    render(<MenuList items={[ITEMS[0]]} categories={CATEGORIES} currency="KZT" />);
+
+    // Число остаётся числом, меняется только подпись: рубль в тенге был бы
+    // ошибкой цены, а не оформления.
+    expect(screen.getByText(/320/)).toBeTruthy();
+    expect(screen.queryByText(/₽/)).toBeNull();
   });
 
   it("без стоп-листа фильтр не показывается", () => {

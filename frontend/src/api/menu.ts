@@ -10,8 +10,11 @@ export interface MenuItem {
   name: string;
   category: string;
   description: string | null;
-  /** Цена в целых рублях. `null` — «по запросу». */
+  /** Цена в целых единицах валюты организации. `null` — «по запросу». */
   price_rub: number | null;
+  /** Снимок блюда: подписанная ссылка и id, чтобы отправить его обратно. */
+  photo_blob_id: number | null;
+  photo_url: string | null;
   /**
    * `false` — позиция в стоп-листе: блюдо остаётся в меню, но с пометкой
    * «нет в наличии». Сотрудник видит её, потому что именно он говорит гостю,
@@ -28,6 +31,8 @@ export interface Menu {
   categories: string[];
   /** Сколько позиций в стоп-листе. */
   stopped: number;
+  /** Валюта цен организации (`RUB`, `KZT`, `UZS`…). */
+  currency: string;
 }
 
 export interface MenuDraft {
@@ -35,6 +40,8 @@ export interface MenuDraft {
   category?: string;
   description?: string | null;
   price_rub?: number | null;
+  /** `null` — убрать фото с позиции. */
+  photo_blob_id?: number | null;
   sort_order?: number;
   is_available?: boolean;
 }
@@ -55,3 +62,13 @@ export const updateMenuItem = (
 
 export const deleteMenuItem = (id: number) =>
   api<void>(`/api/menu/${id}`, { method: "DELETE" });
+
+/**
+ * Валюта цен — свойство организации, а не позиции: официант называет гостю
+ * одну цену, и две валюты в одном меню были бы ошибкой данных.
+ */
+export const setMenuCurrency = (currency: string) =>
+  api<{ currency: string }>("/api/menu/currency", {
+    method: "PATCH",
+    body: JSON.stringify({ currency }),
+  });

@@ -131,6 +131,13 @@ class Organization(Base):
     industry: Mapped[str] = mapped_column(
         String(32), nullable=False, default="restaurant", server_default="restaurant"
     )
+    # Валюта цен организации (ISO-4217, три буквы). Отдельной таблицы нет
+    # намеренно: валют у одной организации не бывает двух, а цены меню —
+    # единственное место, где она показывается человеку. Хранится кодом, а не
+    # символом «₽»: символ подставляет клиент, и для тенге/сума он свой.
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="RUB", server_default="RUB"
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

@@ -23,6 +23,8 @@ function item(id: number, name: string, isAvailable: boolean): MenuItem {
     category: "Горячее",
     description: null,
     price_rub: 300,
+    photo_blob_id: null,
+    photo_url: null,
     is_available: isAvailable,
     sort_order: id,
     updated_at: null,
@@ -53,6 +55,7 @@ describe("StopListBanner", () => {
       items: [item(1, "Борщ", true)],
       categories: ["Горячее"],
       stopped: 0,
+      currency: "RUB",
     };
     vi.mocked(fetchMenu).mockResolvedValue(menu);
 
@@ -83,6 +86,7 @@ describe("StopListBanner", () => {
       ],
       categories: ["Горячее"],
       stopped: 4,
+      currency: "RUB",
     };
     vi.mocked(fetchMenu).mockResolvedValue(menu);
 

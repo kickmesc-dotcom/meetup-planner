@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { MenuItem } from "@/api/menu";
+import { mediaUrl } from "@/api/media";
 import Icon from "@/components/Icon";
 import { Spinner } from "@/components/Spinner";
 import { useTx } from "@/i18n";
@@ -19,9 +20,29 @@ type MenuFilter = "all" | "available" | "stopped";
  * раньше «Горячего». Здесь только раскладка по группам — никакой сортировки,
  * иначе подписи групп и строки поехали бы вразнобой.
  */
+/**
+ * Цена в валюте организации.
+ *
+ * `Intl` вместо склейки с символом: «₽», «₸» и «сум» — разные формы, и
+ * придумывать их самим значит ошибиться на первом же не-рублё.
+ */
+function formatPrice(price: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(price);
+  } catch {
+    // Неизвестный код валюты не должен ломать меню: число и код читаемы.
+    return `${price} ${currency}`;
+  }
+}
+
 export default function MenuList({
   items,
   categories,
+  currency = "RUB",
   onEdit,
   onToggle,
   onDelete,
@@ -29,6 +50,8 @@ export default function MenuList({
 }: {
   items: MenuItem[];
   categories: string[];
+  /** Валюта цен организации: одна на всё меню, а не на строку. */
+  currency?: string;
   onEdit?: (item: MenuItem) => void;
   onToggle?: (item: MenuItem) => void;
   onDelete?: (item: MenuItem) => void;
@@ -119,6 +142,7 @@ export default function MenuList({
                 <MenuRow
                   key={item.id}
                   item={item}
+                  currency={currency}
                   onEdit={onEdit}
                   onToggle={onToggle}
                   onDelete={onDelete}
@@ -135,12 +159,14 @@ export default function MenuList({
 
 function MenuRow({
   item,
+  currency,
   onEdit,
   onToggle,
   onDelete,
   busy,
 }: {
   item: MenuItem;
+  currency: string;
   onEdit?: (item: MenuItem) => void;
   onToggle?: (item: MenuItem) => void;
   onDelete?: (item: MenuItem) => void;
@@ -157,6 +183,18 @@ function MenuRow({
         busy ? "opacity-50" : "",
       ].join(" ")}
     >
+      {item.photo_url && (
+        /* `alt=""`: название стоит рядом текстом, и повторять его в подписи
+           картинки значит дважды прочитать одно и то же скринридером. */
+        <img
+          src={mediaUrl(item.photo_url) ?? undefined}
+          alt=""
+          loading="lazy"
+          width={48}
+          height={48}
+          className="h-12 w-12 shrink-0 rounded-tile object-cover"
+        />
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <span
@@ -177,7 +215,7 @@ function MenuRow({
           <span className="ml-auto whitespace-nowrap text-sm text-tg-text">
             {item.price_rub === null
               ? tx("по запросу")
-              : `${item.price_rub} ₽`}
+              : formatPrice(item.price_rub, currency)}
           </span>
         </div>
         {item.description && (

@@ -27,7 +27,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.hr_models import DEFAULT_MENU_CATEGORY, Employee, MenuItem
+from app.db.hr_models import DEFAULT_MENU_CATEGORY, Employee, MediaBlob, MenuItem
 
 # Границы полей. Держим здесь, а не в схемах API: те же числа нужны и валидации
 # Pydantic, и сервису (который зовут без Pydantic), и тестам.
@@ -35,6 +35,10 @@ MAX_NAME = 160
 MAX_CATEGORY = 64
 MAX_DESCRIPTION = 300
 MAX_PRICE_RUB = 1_000_000
+# Валюта — ISO-4217, три буквы. Символ («₽», «₸», «so'm») подставляет клиент:
+# сервер хранит код, а не картинку денег.
+CURRENCY_DEFAULT = "RUB"
+CURRENCY_LEN = 3
 
 # «Не менять поле» в частичной правке. Отличается от `None`, потому что `None`
 # в цене и описании — это осознанное «очистить», а не «оставить как было».
@@ -84,6 +88,46 @@ def clean_price(value: int | None) -> int | None:
     return value
 
 
+def clean_currency(value: str | None) -> str:
+    """Код валюты: три латинские буквы, регистр не важен.
+
+    Принимаем любой код, а не только рубль: клиент из Казахстана не должен
+    ждать релиза, чтобы получить тенге. Проверяем форму, а не список валют:
+    список пришлось бы поддерживать, а цена от него не зависит.
+    """
+    code = (value or "").strip().upper()
+    if len(code) != CURRENCY_LEN or not code.isascii() or not code.isalpha():
+        raise MenuError("bad_currency")
+    return code
+
+
+def clean_photo_id(value: int | None) -> int | None:
+    """Ссылка на снимок блюда. `None` — «фото нет», и это нормальное состояние."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise MenuError("bad_photo")
+    if value <= 0:
+        raise MenuError("bad_photo")
+    return value
+
+
+async def ensure_photo(session: AsyncSession, blob_id: int | None) -> int | None:
+    """Проверить, что снимок существует и принадлежит этой организации.
+
+    Тенантский фильтр (`app/db/tenancy.py`) добавляет к этому SELECT
+    `WHERE org_id = …`, поэтому снимок чужой организации выглядит как
+    несуществующий. Это и нужно: ссылка на чужое фото не должна попасть в
+    меню, даже если клиент угадал id.
+    """
+    if blob_id is None:
+        return None
+    found = await session.scalar(select(MediaBlob.id).where(MediaBlob.id == blob_id))
+    if found is None:
+        raise MenuError("photo_not_found")
+    return blob_id
+
+
 def clean_sort_order(value: int | None) -> int:
     if value is None:
         return 0
@@ -131,6 +175,7 @@ async def create_item(
     category: str | None = None,
     description: str | None = None,
     price_rub: int | None = None,
+    photo_blob_id: int | None = None,
     sort_order: int | None = 0,
     is_available: bool = True,
     employee: Employee | None = None,
@@ -140,6 +185,7 @@ async def create_item(
         category=clean_category(category),
         description=clean_description(description),
         price_rub=clean_price(price_rub),
+        photo_blob_id=await ensure_photo(session, clean_photo_id(photo_blob_id)),
         sort_order=clean_sort_order(sort_order),
         is_available=bool(is_available),
         updated_by_employee_id=employee.id if employee is not None else None,
@@ -157,6 +203,7 @@ async def update_item(
     category: Any = UNSET,
     description: Any = UNSET,
     price_rub: Any = UNSET,
+    photo_blob_id: Any = UNSET,
     sort_order: Any = UNSET,
     is_available: Any = UNSET,
     employee: Employee | None = None,
@@ -174,6 +221,12 @@ async def update_item(
         item.description = clean_description(description)
     if price_rub is not UNSET:
         item.price_rub = clean_price(price_rub)
+    if photo_blob_id is not UNSET:
+        # `None` здесь — осознанное «убрать фото», а не «не трогать»:
+        # нетронутое поле в PATCH просто не приходит (см. `UNSET`).
+        item.photo_blob_id = await ensure_photo(
+            session, clean_photo_id(photo_blob_id)
+        )
     if sort_order is not UNSET:
         item.sort_order = clean_sort_order(sort_order)
     if is_available is not UNSET:

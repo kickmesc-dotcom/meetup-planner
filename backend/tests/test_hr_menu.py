@@ -27,8 +27,10 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://u:p@localhost:5432/d
 import pytest  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 
+from types import SimpleNamespace  # noqa: E402
+
 from app.api import routes_menu  # noqa: E402
-from app.db.hr_models import DEFAULT_MENU_CATEGORY, MenuItem  # noqa: E402
+from app.db.hr_models import DEFAULT_MENU_CATEGORY, MediaBlob, MenuItem  # noqa: E402
 from app.services import hr_menu  # noqa: E402
 
 
@@ -36,6 +38,9 @@ from app.services import hr_menu  # noqa: E402
 async def session():
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
+        # Снимки нужны таблицей, а не моком: проверяем именно то, что ссылка на
+        # несуществующий блоб не доходит до базы.
+        await conn.run_sync(lambda c: MediaBlob.__table__.create(c))
         await conn.run_sync(lambda c: MenuItem.__table__.create(c))
     maker = async_sessionmaker(engine, expire_on_commit=False)
     async with maker() as db:
@@ -140,7 +145,7 @@ async def test_api_menu_shows_stop_list_to_staff(session) -> None:
     gone = await hr_menu.create_item(session, name="Рыба", price_rub=690)
     await hr_menu.update_item(session, gone, is_available=False)
 
-    menu = await routes_menu.list_menu(session, None)  # type: ignore[arg-type]
+    menu = await routes_menu.list_menu(session, None, None)  # type: ignore[arg-type]
 
     assert [item.name for item in menu.items] == ["Борщ", "Рыба"]
     assert menu.stopped == 1
@@ -151,6 +156,71 @@ async def test_update_rejects_bad_price_without_touching_the_row(session) -> Non
     with pytest.raises(hr_menu.MenuError):
         await hr_menu.update_item(session, item, price_rub=-5)
     assert item.price_rub == 320
+
+
+def test_currency_is_three_latin_letters() -> None:
+    assert hr_menu.clean_currency(" kzt ") == "KZT"
+    assert hr_menu.clean_currency("rub") == "RUB"
+    for bad in ("", "RU", "руб", "R1B"):
+        with pytest.raises(hr_menu.MenuError):
+            hr_menu.clean_currency(bad)
+
+
+async def test_menu_reports_organization_currency(session) -> None:
+    """Цена без валюты не говорит ничего: код приходит вместе с меню."""
+    await hr_menu.create_item(session, name="Борщ", price_rub=320)
+    menu = await routes_menu.list_menu(
+        session, None, SimpleNamespace(currency="kzt")  # type: ignore[arg-type]
+    )
+    assert menu.currency == "KZT"
+
+
+async def test_currency_change_is_stored_on_organization(session) -> None:
+    org = SimpleNamespace(currency="RUB")
+    out = await routes_menu.set_menu_currency(
+        routes_menu.CurrencyIn(currency="eur"),
+        session,
+        org,  # type: ignore[arg-type]
+        None,  # type: ignore[arg-type]
+    )
+    assert out.currency == "EUR"
+    assert org.currency == "EUR"
+
+
+def test_photo_id_rejects_garbage() -> None:
+    assert hr_menu.clean_photo_id(None) is None
+    assert hr_menu.clean_photo_id(7) == 7
+    for bad in (0, -3, True):
+        with pytest.raises(hr_menu.MenuError):
+            hr_menu.clean_photo_id(bad)  # type: ignore[arg-type]
+
+
+async def test_photo_reference_is_optional_and_cleared(session) -> None:
+    session.add(
+        MediaBlob(
+            id=7,
+            org_id=1,
+            sha256="a" * 64,
+            mime="image/jpeg",
+            size=10,
+            data=b"x",
+        )
+    )
+    await session.flush()
+
+    item = await hr_menu.create_item(session, name="Борщ", photo_blob_id=7)
+    assert item.photo_blob_id == 7
+
+    # «Убрать фото» — это `None` в частичной правке, а не отсутствие поля.
+    await hr_menu.update_item(session, item, photo_blob_id=None)
+    assert item.photo_blob_id is None
+
+
+async def test_unknown_photo_is_rejected(session) -> None:
+    """Ссылка на несуществующий (или чужой) снимок не должна попасть в меню."""
+    with pytest.raises(hr_menu.MenuError) as exc:
+        await hr_menu.create_item(session, name="Борщ", photo_blob_id=999)
+    assert str(exc.value) == "photo_not_found"
 
 
 async def test_delete_removes_the_row(session) -> None:

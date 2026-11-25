@@ -23,9 +23,10 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.api.deps import AupDep, EmployeeDep, SessionDep
+from app.api.deps import AupDep, EmployeeDep, OrgDep, SessionDep
 from app.db.hr_models import DEFAULT_MENU_CATEGORY, MenuItem
-from app.services import hr_menu
+from app.db.org_models import Organization
+from app.services import hr_media, hr_menu
 
 router = APIRouter(tags=["menu"])
 
@@ -36,6 +37,11 @@ class MenuItemOut(BaseModel):
     category: str
     description: str | None
     price_rub: int | None
+    # Ссылка на снимок блюда — подписанная, как у фотоотчётов. Отдаём и id:
+    # без него клиент не сможет отправить обратно «это же фото» при правке
+    # других полей, а гонять байты картинки ради этого незачем.
+    photo_blob_id: int | None
+    photo_url: str | None
     is_available: bool
     sort_order: int
     updated_at: datetime | None
@@ -49,6 +55,9 @@ class MenuOut(BaseModel):
     # Сколько позиций в стоп-листе. Нужно обеим ролям: сотруднику — чтобы
     # понять, что наверху списка не всё, руководителю — чтобы видеть объём.
     stopped: int
+    # Валюта цен организации: «320» без неё не говорит ничего. Приходит вместе
+    # с меню, чтобы клиент не делал второй запрос ради одной подписи.
+    currency: str
 
 
 def _out(item: MenuItem) -> MenuItemOut:
@@ -58,6 +67,12 @@ def _out(item: MenuItem) -> MenuItemOut:
         category=item.category or DEFAULT_MENU_CATEGORY,
         description=item.description,
         price_rub=item.price_rub,
+        photo_blob_id=item.photo_blob_id,
+        photo_url=(
+            hr_media.url_for(int(item.photo_blob_id))
+            if item.photo_blob_id is not None
+            else None
+        ),
         is_available=item.is_available,
         sort_order=item.sort_order,
         updated_at=item.updated_at,
@@ -65,7 +80,9 @@ def _out(item: MenuItem) -> MenuItemOut:
 
 
 @router.get("/menu", response_model=MenuOut)
-async def list_menu(session: SessionDep, _: EmployeeDep) -> MenuOut:
+async def list_menu(
+    session: SessionDep, _: EmployeeDep, org: OrgDep
+) -> MenuOut:
     """Меню смены целиком: и то, что есть, и стоп-лист с пометкой.
 
     Фильтр «только в наличии» — дело клиента: один и тот же ответ рисует и
@@ -77,7 +94,47 @@ async def list_menu(session: SessionDep, _: EmployeeDep) -> MenuOut:
         items=[_out(item) for item in items],
         categories=hr_menu.categories_of(items),
         stopped=sum(1 for item in items if not item.is_available),
+        currency=_currency_of(org),
     )
+
+
+def _currency_of(org: Organization | None) -> str:
+    """Валюта организации или рубль, если организации в запросе нет.
+
+    `None` бывает только в тестах и служебных вызовах: у настоящего запроса
+    организация всегда есть, иначе некому показывать меню.
+    """
+    raw = (getattr(org, "currency", None) or hr_menu.CURRENCY_DEFAULT).strip()
+    return raw.upper() or hr_menu.CURRENCY_DEFAULT
+
+
+class CurrencyIn(BaseModel):
+    currency: str = Field(min_length=3, max_length=3)
+
+
+class CurrencyOut(BaseModel):
+    currency: str
+
+
+@router.patch("/menu/currency", response_model=CurrencyOut)
+async def set_menu_currency(
+    body: CurrencyIn, session: SessionDep, org: OrgDep, _: AupDep
+) -> CurrencyOut:
+    """Валюта цен — один раз на организацию, а не поле каждой позиции.
+
+    Меню не может быть в двух валютах одновременно: официант называет одну
+    цену гостю. Поэтому валюта лежит в организации, а ручка живёт рядом с
+    меню — там, где руководитель её и ищет.
+    """
+    try:
+        code = hr_menu.clean_currency(body.currency)
+    except hr_menu.MenuError as exc:
+        raise _bad_request(exc) from exc
+    if org is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="org_not_found")
+    org.currency = code
+    await session.commit()
+    return CurrencyOut(currency=code)
 
 
 class MenuItemIn(BaseModel):
@@ -87,6 +144,7 @@ class MenuItemIn(BaseModel):
     )
     description: str | None = Field(None, max_length=hr_menu.MAX_DESCRIPTION)
     price_rub: int | None = Field(None, ge=0, le=hr_menu.MAX_PRICE_RUB)
+    photo_blob_id: int | None = Field(None, ge=1)
     sort_order: int = 0
     is_available: bool = True
 
@@ -98,6 +156,7 @@ class MenuItemPatch(BaseModel):
     category: str | None = Field(None, max_length=hr_menu.MAX_CATEGORY)
     description: str | None = Field(None, max_length=hr_menu.MAX_DESCRIPTION)
     price_rub: int | None = Field(None, ge=0, le=hr_menu.MAX_PRICE_RUB)
+    photo_blob_id: int | None = Field(None, ge=1)
     sort_order: int | None = None
     is_available: bool | None = None
 
@@ -117,6 +176,7 @@ async def create_menu_item(
             category=body.category,
             description=body.description,
             price_rub=body.price_rub,
+            photo_blob_id=body.photo_blob_id,
             sort_order=body.sort_order,
             is_available=body.is_available,
             employee=employee,
