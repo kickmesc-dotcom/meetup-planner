@@ -17,12 +17,15 @@
    любое подключение — `asyncpg.exceptions.InsufficientResourcesError: Your
    account or project has exceeded the quota. Upgrade your plan to increase
    limits.`
-3. Контейнер Amvera (`meetup-planner`) в статусе `RUN_PROBLEM`: `CMD python -m
-   app.db.migrate && uvicorn …` падает на миграциях, потому что база не
-   принимает соединение. Процесс не поднимается вообще.
-4. Поэтому 503 отдают все пути, включая `/tg/webhook`. Кнопка меню ведёт на
-   `https://semitaskbot.pages.dev/` — страница жива (200, CSP с
-   `frame-ancestors telegram.org`), но её API мёртв.
+3. ~~Контейнер Amvera (`meetup-planner`) в статусе `RUN_PROBLEM`~~ — **исправлено
+   26.11.2026**: `CMD` больше не падает из-за базы (`--tolerate-db-down`),
+   контейнер в `RUNNING`, `/healthz` = 200. Но API всё равно не работает:
+   `/readyz` = 503 с причиной `InsufficientResourcesError`, а данные из базы
+   взять неоткуда. Это ожидаемое «сервис на обслуживании», а не сломанный деплой.
+4. Поэтому все пути с данными отвечают 503 `service_maintenance` с понятным
+   текстом, а `/tg/webhook` — 200 и сообщением в чат (Telegram больше не копит
+   апдейты). Кнопка меню ведёт на `https://semitaskbot.pages.dev/` — страница
+   жива (200), и она показывает «сервис на обслуживании».
 5. Ежедневный бэкап (GitHub Actions → `Backup`) падает на шаге «Снять дамп» с
    21.11 по той же причине. Последний локальный дамп — `backups/2026-11-11_234035`.
 
