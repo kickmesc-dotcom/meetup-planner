@@ -273,6 +273,56 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
     assert _sessionmaker is not None
     return _sessionmaker
 
+# --- «база недоступна» -------------------------------------------------------
+#
+# Зачем отдельная проверка. Недоступная база — не ошибка кода: сервис жив и
+# должен отвечать «на обслуживании», а не 500 на каждом пути. Смотрим по всей
+# цепочке исключений, потому что SQLAlchemy оборачивает ошибку драйвера в свой
+# `OperationalError`, а настоящая причина (`ConnectionRefusedError`,
+# `InsufficientResourcesError` от Neon при исчерпанной квоте) остаётся в
+# `__cause__`.
+_DB_UNAVAILABLE_ASYNCPG = (
+    "InsufficientResourcesError",  # квота Neon: compute не стартует
+    "CannotConnectNowError",  # сервер ещё поднимается или перегружен
+    "TooManyConnectionsError",
+    "ConnectionDoesNotExistError",
+    "ConnectionRejectionError",
+    "AdminShutdownError",
+)
+
+
+def is_db_unavailable(exc: BaseException | None) -> bool:
+    """Похоже ли исключение на «база не отвечает», а не на ошибку в коде.
+
+    Намеренно узко: ошибку SQL (`UndefinedTable`) и ошибку файла на диске в
+    режим обслуживания не переводим — иначе сервис врал бы человеку про
+    «техработы» там, где виноват код или данные.
+    """
+    from sqlalchemy import exc as sa_exc
+
+    seen: set[int] = set()
+    node: BaseException | None = exc
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        if isinstance(
+            node, sa_exc.OperationalError | sa_exc.InterfaceError | sa_exc.TimeoutError
+        ):
+            return True
+        if isinstance(node, ConnectionError | TimeoutError):
+            return True
+        try:
+            import asyncpg
+        except Exception:  # noqa: BLE001 — без драйвера проверять нечего
+            asyncpg = None  # type: ignore[assignment]
+        if asyncpg is not None:
+            for name in _DB_UNAVAILABLE_ASYNCPG:
+                cls = getattr(asyncpg.exceptions, name, None)
+                if cls is not None and isinstance(node, cls):
+                    return True
+        node = node.__cause__ or node.__context__
+    return False
+
+
 async def session_dep() -> AsyncIterator[AsyncSession]:
     sm = get_sessionmaker()
     async with sm() as session:

@@ -146,11 +146,20 @@ async def upgrade_with_lock(wait: float | None = None) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Точка входа `python -m app.db.migrate` (её же вызывает Dockerfile)."""
-    from app.config import get_settings
-    from app.db.base import _normalize_url
+    """Точка входа `python -m app.db.migrate` (её же вызывает Dockerfile).
 
-    del argv
+    `--tolerate-db-down` — не считать недоступную базу причиной не поднимать
+    контейнер. Миграции тогда пропускаются, сервис стартует в режиме
+    обслуживания, а схему догоняет фоновая задача (`main._recover_db_startup`).
+    Без этого флага поведение прежнее: ошибка подключения — ненулевой код, и
+    оркестратор перезапускает контейнер. Так инцидент 19–26.11.2026 (квота
+    Neon) больше не превращает весь контейнер в `RUN_PROBLEM`.
+    """
+    args = list(argv or [])
+    tolerate_db_down = "--tolerate-db-down" in args
+    from app.config import get_settings
+    from app.db.base import _normalize_url, is_db_unavailable
+
     url = _normalize_url(get_settings().database_url)
     # Та же цепочка процессоров, что у приложения: текст ошибки подключения несёт
     # в себе DSN с паролем, и он не должен уехать в лог хостинга текстом
@@ -160,10 +169,25 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging()
     host = url.split("@")[-1].split("/")[0]
     log.info("db.migrate_start", host=host)
-    if "asyncpg" not in url:
-        run_upgrade()
-        return 0
-    applied = asyncio.run(upgrade_with_lock())
+    try:
+        if "asyncpg" not in url:
+            run_upgrade()
+            return 0
+        applied = asyncio.run(upgrade_with_lock())
+    except Exception as exc:  # noqa: BLE001 — решение принимаем по причине
+        if tolerate_db_down and is_db_unavailable(exc):
+            log.warning(
+                "db.migrate_skipped_db_unavailable",
+                host=host,
+                error=type(exc).__name__,
+            )
+            print(
+                "база недоступна: миграции пропущены, сервис поднимется "
+                "в режиме обслуживания",
+                file=sys.stderr,
+            )
+            return 0
+        raise
     if not applied:
         # Ненулевой код — контейнер перезапустится и попробует снова, уже без
         # второго набора DDL параллельно первому.

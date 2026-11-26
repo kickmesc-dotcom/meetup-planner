@@ -50,11 +50,50 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from app.api.deps import SessionDep
 from app.bot.dispatcher import bot_for_org, get_dispatcher
 from app.config import get_settings
+from app.db.base import is_db_unavailable
 from app.db.org_models import DEFAULT_ORG_ID, reset_org, set_org
 from app.services import org_bots
 
 log = structlog.get_logger()
 router = APIRouter()
+
+# Что человек видит в боте, пока база недоступна. Отвечать 503 на вебхук
+# нельзя: Telegram считает доставку неуспешной, копит апдейты и повторяет их
+# пачкой после восстановления — человек получает «запоздавшие» ответы. Поэтому
+# отвечаем `ok`, а в чат отправляем понятную фразу.
+MAINTENANCE_BOT_TEXT = (
+    "🛠 Сервис на обслуживании: база данных временно недоступна. "
+    "Попробуй через пару минут — данные не потеряны."
+)
+
+
+async def _notify_maintenance(update: Update) -> None:
+    """Сказать человеку «на обслуживании» без обращения к базе.
+
+    Берём env-бота (`DEFAULT_ORG_ID`): реестр организаций живёт в базе, и при
+    её недоступности его может не быть. Если у организации был свой бот, во
+    время аварии ответ всё равно важнее бренда — иначе человек не получит
+    ничего.
+    """
+    callback_id = None
+    chat_id = None
+    if update.message is not None:
+        chat_id = update.message.chat.id
+    elif update.callback_query is not None:
+        callback_id = update.callback_query.id
+        if update.callback_query.message is not None:
+            chat_id = update.callback_query.message.chat.id
+    bot = bot_for_org(DEFAULT_ORG_ID)
+    try:
+        if callback_id:
+            # Иначе у человека вечно крутится часики на кнопке.
+            await bot.answer_callback_query(
+                callback_id, text=MAINTENANCE_BOT_TEXT, show_alert=False
+            )
+        if chat_id is not None:
+            await bot.send_message(chat_id, MAINTENANCE_BOT_TEXT, request_timeout=10)
+    except Exception as exc:  # noqa: BLE001 — уведомление не должно ломать вебхук
+        log.warning("webhook.maintenance_notify_failed", error=str(exc)[:160])
 
 # Сколько секунд вебхук готов ждать обработчик, прежде чем ответить Telegram и
 # оставить задачу доделывать работу в фоне. Меньше окна Telegram (60 с) — с
@@ -240,10 +279,22 @@ async def tg_webhook(
     session: SessionDep,
     x_telegram_bot_api_secret_token: Annotated[str | None, Header()] = None,
 ) -> dict[str, bool]:
-    org_id = await resolve_org(session, x_telegram_bot_api_secret_token)
-
     payload = await request.json()
     update = Update.model_validate(payload)
+    try:
+        org_id = await resolve_org(session, x_telegram_bot_api_secret_token)
+    except Exception as exc:  # noqa: BLE001 — решение по причине
+        if not is_db_unavailable(exc):
+            raise
+        # Ответ 200 и сообщение в чат вместо 503: иначе Telegram копит
+        # апдейты и потом высыпает их пачкой.
+        log.warning(
+            "webhook.db_unavailable",
+            update_id=update.update_id,
+            error=type(exc).__name__,
+        )
+        await _notify_maintenance(update)
+        return {"ok": True}
     if remember_update(update.update_id):
         # Повтор доставки: ответ на этот апдейт уже отправлялся (или
         # отправляется прямо сейчас). Вторая копия — это тот самый «ответ через

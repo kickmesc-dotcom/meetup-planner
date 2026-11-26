@@ -121,6 +121,8 @@ export const API_ERRORS_EN: Record<string, string> = {
     "The photo was not found — attach it again.",
   "У этого поручения нет такого исполнителя.":
     "This task has no such assignee.",
+  "Сервис на обслуживании: база данных временно недоступна. Попробуй через пару минут — данные не потеряны.":
+    "The service is under maintenance: the database is temporarily unavailable. Try again in a couple of minutes — your data is safe.",
   "Сервис временно недоступен. Попробуй через минуту.":
     "The service is temporarily unavailable. Try again in a minute.",
   "Нет доступа.": "No access.",
@@ -241,6 +243,8 @@ export const API_ERRORS_UZ: Record<string, string> = {
     "Surat topilmadi — uni qaytadan biriktiring.",
   "У этого поручения нет такого исполнителя.":
     "Bu topshiriqda bunday ijrochi yoʻq.",
+  "Сервис на обслуживании: база данных временно недоступна. Попробуй через пару минут — данные не потеряны.":
+    "Xizmat texnik xizmatda: maʼlumotlar bazasi vaqtincha mavjud emas. Bir-ikki daqiqadan soʻng urinib koʻring — maʼlumotlar yoʻqolmagan.",
   "Сервис временно недоступен. Попробуй через минуту.":
     "Xizmat vaqtincha mavjud emas. Bir daqiqadan soʻng urinib koʻring.",
   "Нет доступа.": "Ruxsat yoʻq.",

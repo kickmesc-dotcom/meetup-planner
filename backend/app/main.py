@@ -73,7 +73,7 @@ from app.api.guards import (
     SecurityHeadersMiddleware,
 )
 from app.config import get_settings
-from app.db.base import get_sessionmaker
+from app.db.base import get_sessionmaker, is_db_unavailable
 from app.db.hr_seed import seed_hr
 from app.log_redaction import configure_logging
 from app.api.deps import session_auth
@@ -94,6 +94,33 @@ def _configure_logging(level: str) -> None:
 # Срок проверки базы в `/readyz`. Две секунды — это уже плохо (нормальный
 # `SELECT 1` на Neon — единицы миллисекунд), но ещₑ не «база лежит».
 READY_DB_TIMEOUT_SECONDS = 2.0
+
+# Режим обслуживания: сервис жив, но база недоступна. Один код и один текст на
+# всё: `/readyz`, любую ручку API и ответ вебхуку Telegram. Фронт и бот
+# показывают человеку фразу из `message`, а `detail` — машинный код, по которому
+# клиент отличает «техработы» от обычного 503 (например, от прокси хостинга).
+MAINTENANCE_DETAIL = "service_maintenance"
+MAINTENANCE_TEXT = (
+    "Сервис на обслуживании: база данных временно недоступна. "
+    "Попробуй через пару минут — данные не потеряны."
+)
+# Как часто догонять базу, которая не ответила на старте: квота Neon
+# возвращается по расписанию, и сервис должен подняться сам, без пересборки.
+STARTUP_DB_RECOVERY_SECONDS = 60.0
+
+
+def _maintenance_response(reason: str | None = None, *, db: str = "error") -> JSONResponse:
+    """Единый ответ «на обслуживании»: 503 и причина без строки подключения."""
+    body: dict[str, str] = {
+        "detail": MAINTENANCE_DETAIL,
+        "status": "degraded",
+        "db": db,
+        "message": MAINTENANCE_TEXT,
+    }
+    if reason:
+        # Только тип исключения: текст ошибки драйвера несёт DSN с паролем.
+        body["reason"] = reason
+    return JSONResponse(body, status_code=503, headers={"Retry-After": "60"})
 
 
 async def _db_ping() -> None:
@@ -306,6 +333,79 @@ async def _register_telegram_metadata_with_retry() -> None:
         backoff = min(backoff * 2, 160)
     log.error("tg.registration_gave_up")
 
+async def _run_startup_db(sm) -> None:  # noqa: ANN001 - async_sessionmaker
+    """Сидинг и реестр ботов. Нужен и на старте, и после выздоровления базы.
+
+    Вынесено отдельной функцией, чтобы фоновый догон (`_recover_db_startup`)
+    делал ровно то же, что обычный старт, а не свою полукопию.
+    """
+    async with sm() as session:
+        await seed_users(session)
+        # SemiTaskBot: начальные подразделения/чек-листы/ссылки/вопросы ОС.
+        # Идемпотентно (см. app/db/hr_seed.py): на боевой базе ничего не
+        # перезапишет, только снимает «пустой экран» у нового ресторана.
+        try:
+            await seed_hr(session)
+        except Exception as exc:  # noqa: BLE001 — сид не должен ронять старт
+            structlog.get_logger().warning("hr.seed_failed", error=str(exc))
+        # P2: bootstrap proxy pool из env (PROXIES_BOOTSTRAP_JSON), если задан.
+        try:
+            from app.services.proxies import bootstrap_from_env
+
+            await bootstrap_from_env(session)
+        except Exception as exc:  # noqa: BLE001
+            structlog.get_logger().warning("proxy.bootstrap_failed", error=str(exc))
+
+        # B2B_PLATFORM_PLAN, шаг 1.6: чей бот и чей чат. Реестр наполняется до
+        # сетевых шагов — иначе первый вебхук или планировщик успел бы взять
+        # env-бота организации по умолчанию.
+        try:
+            from app.services import org_bots
+
+            count = await org_bots.reload(session)
+            structlog.get_logger().info("orgs.bots_loaded", organizations=count)
+        except Exception as exc:  # noqa: BLE001 — реестр не должен ронять старт
+            structlog.get_logger().warning("orgs.bots_failed", error=str(exc))
+        # РЕЗЕРВНЫЙ ШАГ: Синхронизация аватарок отключена для ускорения запуска
+        # try:
+        #     await sync_all_avatars(session, get_bot())
+        # except Exception as exc:
+        #     structlog.get_logger().warning("avatars.startup_sync_failed", error=str(exc))
+
+
+async def _recover_db_startup() -> None:
+    """Догнать базу, которая была недоступна на старте.
+
+    Зачем: контейнер теперь поднимается и при мёртвой базе, но молча ждать
+    пересборки нельзя — 19.11–26.11.2026 квота Neon отключала compute на
+    неделю, и после сброса квоты сервис должен вернуться сам. Каждый круг:
+    миграции под тем же advisory-lock, что и обычно, затем сидинг. Успех —
+    выход, любая другая ошибка — в лог и следующий круг через минуту.
+    """
+    log = structlog.get_logger()
+    while True:
+        await asyncio.sleep(STARTUP_DB_RECOVERY_SECONDS)
+        try:
+            from app.db.migrate import upgrade_with_lock
+
+            applied = await upgrade_with_lock()
+        except Exception as exc:  # noqa: BLE001 — ждём дальше или шумим
+            if is_db_unavailable(exc):
+                log.info("db.startup_still_down", error=type(exc).__name__)
+            else:
+                log.error("db.startup_recovery_failed", error=str(exc)[:200])
+            continue
+        if not applied:
+            continue
+        try:
+            await _run_startup_db(get_sessionmaker())
+        except Exception as exc:  # noqa: BLE001 — догоним в следующем круге
+            log.warning("db.startup_reseed_failed", error=str(exc)[:200])
+            continue
+        log.info("db.startup_recovered")
+        return
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
@@ -321,40 +421,23 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     except Exception as exc:  # noqa: BLE001 — старт важнее диагностики
         structlog.get_logger().warning("db.ssl_probe_failed", error=str(exc))
 
-    # 1. Сидинг пользователей (Локальная операция с БД)
-    sm = get_sessionmaker()
-    async with sm() as session:
-        await seed_users(session)
-        # SemiTaskBot: начальные подразделения/чек-листы/ссылки/вопросы ОС.
-        # Идемпотентно (см. app/db/hr_seed.py): на боевой базе ничего не
-        # перезапишет, только снимает «пустой экран» у нового ресторана.
-        try:
-            await seed_hr(session)
-        except Exception as exc:  # noqa: BLE001 — сид не должен ронять старт
-            structlog.get_logger().warning("hr.seed_failed", error=str(exc))
-        # P2: bootstrap proxy pool из env (PROXIES_BOOTSTRAP_JSON), если задан.
-        try:
-            from app.services.proxies import bootstrap_from_env
-            await bootstrap_from_env(session)
-        except Exception as exc:  # noqa: BLE001
-            structlog.get_logger().warning("proxy.bootstrap_failed", error=str(exc))
-
-        # B2B_PLATFORM_PLAN, шаг 1.6: чей бот и чей чат. Реестр наполняется до
-        # сетевых шагов — иначе первый вебхук или планировщик успел бы взять
-        # env-бота организации по умолчанию.
-        try:
-            from app.services import org_bots
-
-            count = await org_bots.reload(session)
-            structlog.get_logger().info("orgs.bots_loaded", organizations=count)
-        except Exception as exc:  # noqa: BLE001 — реестр не должен ронять старт
-            structlog.get_logger().warning("orgs.bots_failed", error=str(exc))
-        
-        # РЕЗЕРВНЫЙ ШАГ: Синхронизация аватарок отключена для ускорения запуска
-        # try:
-        #     await sync_all_avatars(session, get_bot())
-        # except Exception as exc:
-        #     structlog.get_logger().warning("avatars.startup_sync_failed", error=str(exc))
+    # 1. Сидинг и реестр ботов. Недоступная база — не повод не поднимать
+    # процесс: лучше честный `/readyz` 503 и «сервис на обслуживании», чем
+    # контейнер, который вообще не стартует (инцидент 19–26.11.2026: квота
+    # Neon остановила compute, миграции упали, Amvera показала RUN_PROBLEM,
+    # и 503 отдавали все пути, включая вебхук Telegram).
+    db_task: asyncio.Task | None = None
+    try:
+        await _run_startup_db(get_sessionmaker())
+    except Exception as exc:  # noqa: BLE001 — решение по причине, а не по факту
+        if not is_db_unavailable(exc):
+            raise
+        structlog.get_logger().error(
+            "db.startup_unavailable",
+            error=type(exc).__name__,
+            hint="сервис поднимается в режиме обслуживания, схема догонится фоном",
+        )
+        db_task = asyncio.create_task(_recover_db_startup())
 
     # 2. Сетевые операции (Telegram) уходят в фон с ретраями, чтобы лагающая
     # сеть HF не блокировала FastAPI startup и первый входящий webhook.
@@ -398,7 +481,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             await translate_task
         except (asyncio.CancelledError, Exception):  # noqa: BLE001
             pass
-    for _task in (tg_task,):
+    for _task in (tg_task, db_task):
+        # `db_task` есть не всегда: он появляется только если база не ответила
+        # на старте. Пропустить его — не ошибка, а обычный путь.
+        if _task is None:
+            continue
         _task.cancel()
         try:
             await _task
@@ -481,6 +568,28 @@ def create_app() -> FastAPI:
         finally:
             session_auth.reset(auth_token)
             reset_org(token)
+
+    @app.middleware("http")
+    async def db_maintenance_guard(request, call_next):  # noqa: ANN001, ANN202
+        """Недоступная база — 503 «на обслуживании», а не 500 на каждом пути.
+
+        Ловится здесь, а не обработчиком исключений: ошибка приходит из
+        зависимости сессии, то есть до входа в функцию ручки, и обычный
+        `@app.exception_handler` её уже не видит. Middleware добавляется
+        раньше CORS, поэтому CORS оказывается снаружи и заголовки на ответе
+        есть — браузер читает 503, а не «нет связи».
+        """
+        try:
+            return await call_next(request)
+        except Exception as exc:  # noqa: BLE001 — решение по причине
+            if not is_db_unavailable(exc):
+                raise
+            structlog.get_logger().warning(
+                "db.request_unavailable",
+                path=request.url.path,
+                error=type(exc).__name__,
+            )
+            return _maintenance_response(type(exc).__name__, db="unavailable")
 
     # Предохранители периметра (аудит 26.10.2026, находки S-1…S-3).
     #
@@ -633,19 +742,10 @@ def create_app() -> FastAPI:
             await asyncio.wait_for(_db_ping(), timeout=READY_DB_TIMEOUT_SECONDS)
         except (TimeoutError, asyncio.TimeoutError):
             structlog.get_logger().warning("readyz.db_timeout")
-            return JSONResponse(
-                {"status": "degraded", "db": "timeout"}, status_code=503
-            )
+            return _maintenance_response("timeout", db="timeout")
         except Exception as exc:  # noqa: BLE001 — любая причина недоступности
             structlog.get_logger().warning("readyz.db_failed", error=str(exc))
-            return JSONResponse(
-                {
-                    "status": "degraded",
-                    "db": "error",
-                    "reason": type(exc).__name__,
-                },
-                status_code=503,
-            )
+            return _maintenance_response(type(exc).__name__)
         return JSONResponse(
             {
                 "status": "ok",
